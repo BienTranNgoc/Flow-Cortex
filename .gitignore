@@ -4,7 +4,9 @@ Thumbs.db
 .idea/
 *.iml
 .vscode/*
+# Share these editor configs with the team; keep the rest of .vscode/ local.
 !.vscode/extensions.json
+!.vscode/settings.json
 
 # Logs
 *.log
