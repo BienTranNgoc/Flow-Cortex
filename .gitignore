@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+
+# --- Backend (Gradle) ---
+backend/build/
+backend/.gradle/
+# The wrapper jar + scripts ARE committed on purpose (reproducible builds).
+
+# --- Secrets / local env ---
+# .env* files hold per-machine config; commit only the *.example templates.
+**/.env
+**/.env.*.local
+
+# Frontend node_modules is covered by frontend/.gitignore, but guard here too.
+**/node_modules/
