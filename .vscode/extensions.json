@@ -1,0 +1,21 @@
+{
+  // Recommended extensions for Flow-Cortex. VS Code offers to install these on
+  // first open. Shared so every contributor gets the same editor behaviour.
+  "recommendations": [
+    // Editor baseline — honours .editorconfig
+    "editorconfig.editorconfig",
+
+    // Frontend: React + TypeScript + Vite
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "vitest.explorer",
+
+    // Backend: Java 25 + Spring Boot + Gradle
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-boot-dev-pack",
+
+    // AI assistants that read AGENTS.md / their pointer files
+    "github.copilot",
+    "github.copilot-chat"
+  ]
+}

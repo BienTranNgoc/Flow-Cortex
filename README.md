@@ -36,6 +36,30 @@ cd frontend && npm install && npm run dev
 See [LOCAL_SETUP.md](LOCAL_SETUP.md) for the full run instructions and
 [docs/ADR.md](docs/ADR.md) for why the project is set up this way.
 
+## AI assistants & editor config
+
+The working agreement for AI coding assistants (and a contributor cheat-sheet)
+lives in **[AGENTS.md](AGENTS.md)** — one tool-neutral source of truth. Claude
+Code, Cursor, GitHub Copilot and Gemini each read it via a thin pointer
+(`CLAUDE.md`, `.cursor/rules/`, `.github/copilot-instructions.md`, `GEMINI.md`),
+so everyone gets the same rules whether or not they use a given tool. Shared
+VS Code settings and recommended extensions are in `.vscode/`. **Edit `AGENTS.md`
+only** — the pointers must not drift.
+
+`AGENTS.md` keeps the rules short and links one hop deeper to
+[`agent-kit/`](agent-kit/), the vendored detail (working agreements, the
+constitution + engineering checklists in `references/`, and the path-scoped
+`rules/`). These are tool-neutral Markdown — any assistant or human can read
+them.
+
+The kit's *execution machinery* is intentionally **not** vendored: the osf-\*
+agents, GitNexus / codebase-retrieval, hooks, skills, and MCP servers depend on
+per-machine binaries, credits, and API keys. Set those up per developer with
+[`agent-kit/docs/team-tooling-setup.md`](agent-kit/docs/team-tooling-setup.md)
+and [`agent-kit/docs/agent-setup-runbook.md`](agent-kit/docs/agent-setup-runbook.md).
+Skipping that setup is fine — `AGENTS.md` still applies; some one-hop references
+just won't be actionable.
+
 ## Conventions (inherited from the reference repo)
 
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/),

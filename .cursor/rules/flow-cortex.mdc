@@ -1,0 +1,11 @@
+---
+description: Flow-Cortex working agreement — points to AGENTS.md (the single source of truth)
+alwaysApply: true
+---
+
+The working agreement for this repo lives in **[AGENTS.md](../../AGENTS.md)** — a
+single, tool-neutral source of truth so Cursor, Claude Code, Copilot, Gemini and
+humans all follow the same rules.
+
+**Read `AGENTS.md` at the repo root and follow it.** Do not add rules here; edit
+`AGENTS.md` instead so nothing drifts out of sync.
