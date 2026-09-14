@@ -1,0 +1,52 @@
+{
+  // Shared editor settings for Flow-Cortex. Keep this small and tool-agnostic —
+  // the real rules live in AGENTS.md, formatting rules in .prettierrc /
+  // eslint.config.js, and cross-editor basics in .editorconfig.
+
+  // Respect .editorconfig (utf-8, LF, final newline, trim trailing whitespace).
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n",
+
+  // --- Frontend: format on save with Prettier, autofix ESLint ---
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // ESLint 9 flat config lives in frontend/eslint.config.js.
+  "eslint.workingDirectories": [{ "directory": "frontend", "changeProcessCwd": true }],
+
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  // Markdown keeps trailing whitespace (hard line breaks) — matches .editorconfig.
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "files.trimTrailingWhitespace": false
+  },
+
+  // --- Backend: Java / Gradle ---
+  // 4-space indent per .editorconfig; let the Java extension handle formatting.
+  "[java]": { "editor.tabSize": 4 },
+
+  // Keep build/dependency noise out of search and the file tree.
+  "files.exclude": {
+    "**/.gradle": true,
+    "backend/build": true,
+    "frontend/dist": true,
+    "frontend/coverage": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.gradle": true,
+    "backend/build": true,
+    "frontend/dist": true,
+    "frontend/coverage": true,
+    "**/*.tsbuildinfo": true
+  }
+}
