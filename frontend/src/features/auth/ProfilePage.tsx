@@ -1,0 +1,67 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { updateProfile } from '../../api/generated/flowCortexApi';
+import type { ProfileUpdateRequest } from '../../api/generated/flowCortexApi';
+import { authHeaders, unwrap } from '../../api/client';
+import { ApiError } from '../../api/problemDetail';
+import { profileSchema, type ProfileFormValues } from './profileSchema';
+import { useMeQuery } from './useAuth';
+
+/** J-7: fix my own display name; email/role/status are not self-service (R-022). */
+export function ProfilePage() {
+  const meQuery = useMeQuery();
+  const queryClient = useQueryClient();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    // `exactOptionalPropertyTypes` rejects `values: undefined` — omit the key
+    // entirely until the query resolves, rather than setting it to undefined.
+    ...(meQuery.data ? { values: { name: meQuery.data.name ?? '' } } : {}),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: ProfileUpdateRequest) => unwrap(updateProfile(values, authHeaders())),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
+  if (meQuery.isLoading) {
+    return <p role="status">Loading…</p>;
+  }
+  if (meQuery.isError || !meQuery.data) {
+    return <p role="alert">Could not load your profile.</p>;
+  }
+
+  const onSubmit = handleSubmit((values) => updateMutation.mutate(values));
+  const serverError =
+    updateMutation.error instanceof ApiError ? updateMutation.error.problem?.detail : undefined;
+
+  return (
+    <main className="profile-page">
+      <h1>My profile</h1>
+      <dl>
+        <dt>Email</dt>
+        <dd>{meQuery.data.email}</dd>
+        <dt>Role</dt>
+        <dd>{meQuery.data.role}</dd>
+      </dl>
+      <form onSubmit={onSubmit} noValidate aria-label="Edit profile">
+        <div className="field">
+          <label htmlFor="profile-name">Display name</label>
+          <input id="profile-name" {...register('name')} />
+          {errors.name && <p role="alert">{errors.name.message}</p>}
+        </div>
+        {serverError && <p role="alert">{serverError}</p>}
+        {updateMutation.isSuccess && <p role="status">Saved.</p>}
+        <button type="submit" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </form>
+    </main>
+  );
+}
