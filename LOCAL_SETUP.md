@@ -29,22 +29,41 @@ This points `core.hooksPath` at `.githooks/`, activating:
 
 ## 1. Backend (Spring Boot)
 
+The backend now has a real datasource (PostgreSQL + Flyway, `ddl-auto: validate`),
+so it needs a database to boot. The tests bring their own (Testcontainers, needs
+Docker running); `bootRun` needs a Postgres you start yourself — easiest is the
+compose one:
+
 ```bash
 cd backend
 
-./gradlew build            # compile + run all tests
-./gradlew bootRun          # start the API on http://localhost:8080
+./gradlew build            # compile + run all tests (Testcontainers → needs Docker)
 
-# Verify it's up:
-curl http://localhost:8080/api/v1/health
-# -> {"status":"UP","service":"flow-cortex"}
+# Start just the database for local bootRun:
+docker compose -f ../docker-compose.yml up -d postgres
 
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/flowcortex \
+SPRING_DATASOURCE_USERNAME=flowcortex \
+SPRING_DATASOURCE_PASSWORD=flowcortex \
+JWT_SECRET=dev-secret-change-me \
+SPRING_PROFILES_ACTIVE=dev \
+  ./gradlew bootRun        # start the API on http://localhost:8080
+
+# Public probe (no auth):
 curl http://localhost:8080/actuator/health
 # -> {"status":"UP"}
+
+# /api/v1/** is authenticated now — log in first, then use the token:
+curl -s -XPOST http://localhost:8080/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin1@flowcortex.dev","password":"AdminPass123!"}'
+# -> { "token": "..." }   (the `dev` profile seeds admin1@/admin2@ (AdminPass123!)
+#     + member1@flowcortex.dev (MemberPass123!) — dev-only, never real passwords)
 ```
 
-Coverage report after `./gradlew test`:
-`backend/build/reports/jacoco/test/html/index.html`
+Coverage report after `./gradlew test` (multi-module — the boot app aggregates ITs):
+`backend/boot/app/build/reports/jacoco/test/html/index.html` (and each
+`backend/modules/<m>/build/reports/jacoco/test/html/` for a module in isolation).
 
 ## 2. Frontend (Vite + React)
 
@@ -59,6 +78,27 @@ npm run lint                   # ESLint
 npm run typecheck              # tsc
 npm run format:check           # Prettier
 ```
+
+## 3. Run the whole stack with Docker (optional)
+
+For a one-command end-to-end run (or a demo) without installing a JDK or Node
+locally — only Docker is needed:
+
+```bash
+# JWT_SECRET has no default (design.md D4) — set it or the stack refuses to start:
+JWT_SECRET=dev-secret-change-me docker compose up --build
+# postgres -> internal (healthchecked; backend waits for it)
+# backend  -> http://localhost:8080   (API + /actuator/health)
+# frontend -> http://localhost:5173   (SPA; nginx proxies /api -> backend)
+
+# The stack seeds two admins + one member (see §1). Log in through the SPA, or:
+curl http://localhost:8080/actuator/health   # public probe
+```
+
+This is for running/demoing the assembled stack (Postgres + API + SPA). Day-to-day
+coding is still faster with a standalone Postgres + `./gradlew bootRun` + `npm run
+dev` (hot reload) as in §1. To exercise the workflow kill switch (R-046), restart
+the backend with `FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend`.
 
 ## Troubleshooting
 

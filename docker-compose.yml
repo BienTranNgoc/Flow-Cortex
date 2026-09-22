@@ -1,0 +1,75 @@
+# Local end-to-end stack for Flow-Cortex: Postgres, the Spring Boot API, and
+# the React SPA served behind nginx on the same origin. Day-to-day development
+# still uses `./gradlew bootRun` + `npm run dev` (see LOCAL_SETUP.md); this
+# file is for running or demoing the whole thing with one command:
+#
+#   JWT_SECRET=<any-non-empty-string> docker compose up --build
+#   -> frontend  http://localhost:5173   (SPA; proxies /api -> backend)
+#   -> backend   http://localhost:8080   (API + /actuator/health)
+#
+# JWT_SECRET has no default here on purpose (design.md D4) — a committed
+# real-looking default would trip the security-scan secret scanner and ship a
+# known signing key, so export it (or put it in an untracked .env next to
+# this file) before `up`.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: flowcortex
+      POSTGRES_USER: flowcortex
+      POSTGRES_PASSWORD: flowcortex
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowcortex -d flowcortex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    image: flow-cortex-backend:local
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
+      SPRING_DATASOURCE_USERNAME: flowcortex
+      SPRING_DATASOURCE_PASSWORD: flowcortex
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before running docker compose up (design.md D4) — e.g. JWT_SECRET=... docker compose up --build}
+      # Workflow-execution kill switch (R-046): defaults on. Flip it off and
+      # restart the backend to refuse new runs cleanly (503) without a rebuild:
+      #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
+      FLOWCORTEX_WORKFLOW_ENABLED: ${FLOWCORTEX_WORKFLOW_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Stays on /actuator/health (unchanged by task 3.1's /v3/api-docs permit
+    # rule) — the probe Docker itself uses to gate the frontend below.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: flow-cortex-frontend:local
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
