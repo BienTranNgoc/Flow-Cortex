@@ -3,11 +3,10 @@ package com.flowcortex.workflow.application;
 import java.util.UUID;
 
 /**
- * Published (within tx#1, AFTER the {@code WorkflowRun}+{@code RunStep}s are
- * saved) by {@link WorkflowRunServiceImpl#startRun} once that transaction
- * commits, {@link WorkflowRunOrchestrator} picks it up via a Spring Modulith
- * {@code @ApplicationModuleListener} — the async after-commit execution
- * model's entry point.
+ * Published within tx#1 (after the run + steps are saved), once {@link
+ * WorkflowRunServiceImpl#startRun}'s transaction commits. {@link WorkflowRunOrchestrator} picks
+ * it up via a Spring Modulith {@code @ApplicationModuleListener} — the async after-commit
+ * execution entry point.
  */
 record WorkflowRunStartedEvent(UUID runId) {
 }

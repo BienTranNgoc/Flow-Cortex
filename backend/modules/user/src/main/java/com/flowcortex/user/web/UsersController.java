@@ -27,16 +27,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/users} — ADMIN-only CRUD scoped to the caller's own owner
- * scope. A record outside that scope is a 404, not a 403 — {@link
- * UserService} already enforces that; this controller just relays whatever
- * it throws to {@code :shared:web}'s advice.
+ * {@code /api/v1/users} — ADMIN-only CRUD scoped to the caller's own owner scope. A record
+ * outside that scope is a 404, not a 403 — {@link UserService} enforces that; this controller
+ * just relays what it throws.
  *
- * <p>Package-private, depends only on this module's own {@code api} port.
- * Role/status are constrained by Jakarta Bean Validation so an invalid value
- * fails the SAME {@code MethodArgumentNotValidException} to 400-problem-doc
- * path as any other validation failure — no separate exception handling
- * invented for it.
+ * <p>Role/status are constrained by Jakarta Bean Validation, so an invalid value fails through
+ * the same {@code MethodArgumentNotValidException} -> 400-problem path as any other validation.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -57,10 +53,8 @@ class UsersController {
         return ResponseEntity.ok(users);
     }
 
-    // @ResponseStatus documents 201 for springdoc/orval — Spring MVC
-    // itself ignores it for a ResponseEntity-returning method (the actual 201
-    // comes from ResponseEntity.status() below); this only fixes the
-    // generated OpenAPI contract, which otherwise defaults to 200.
+    // @ResponseStatus documents 201 for springdoc/orval — Spring MVC ignores it for a
+    // ResponseEntity-returning method (actual 201 comes from ResponseEntity.status() below).
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> create(@AuthenticationPrincipal Jwt jwt,

@@ -20,15 +20,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * {@code flowcortex.workflow.enabled=false}: new runs are refused cleanly
- * (503, no row written); already-finished runs stay readable. A dedicated
- * {@code @SpringBootTest} context, since the property is bound once at
- * context startup.
+ * {@code flowcortex.workflow.enabled=false}: new runs are refused cleanly (503, no row
+ * written); already-finished runs stay readable. Dedicated {@code @SpringBootTest} context
+ * since the property binds once at startup.
  *
- * <p>The "existing run stays readable" half is seeded directly via SQL
- * (rather than {@code startRun}, which THIS context deliberately refuses) —
- * standing in for a run that completed while the flag was on, before an
- * operator later flipped it off.
+ * <p>"Existing run stays readable" is seeded via SQL directly (not {@code startRun}, which this
+ * context refuses) — standing in for a run completed before the flag was later flipped off.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.workflow.enabled=false")

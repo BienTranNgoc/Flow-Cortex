@@ -20,21 +20,16 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Drives a run's steps to completion AFTER the starting transaction has
- * committed — the {@code @ApplicationModuleListener} annotation composes
- * {@code @Async} + {@code @Transactional(REQUIRES_NEW)} + {@code
- * @TransactionalEventListener(phase = AFTER_COMMIT)}, and needs {@code
- * @EnableAsync} on the application (wired in {@code :boot:app}) plus the
- * persistent Event Publication Registry for delivery-loss protection.
+ * Drives a run's steps to completion after the starting transaction commits — {@code
+ * @ApplicationModuleListener} composes {@code @Async} + {@code @Transactional(REQUIRES_NEW)} +
+ * {@code @TransactionalEventListener(phase = AFTER_COMMIT)}, needing {@code @EnableAsync} (in
+ * {@code :boot:app}) plus the persistent Event Publication Registry.
  *
- * <p>Dispatch is strictly sequential by {@code step_order}: each step is
- * claimed atomically ({@link RunStepTransactions#claim}) before its input is
- * resolved and its work runs; a claim that loses the race (another
- * execution — e.g. a redelivered event — already has the step) simply stops
- * this invocation without side effects. A step failure (a thrown exception
- * from input resolution OR the step's own work) is recorded ({@link
- * RunStepTransactions#fail}) and halts the run — later steps stay {@code
- * pending}, never dispatched.
+ * <p>Dispatch is strictly sequential by {@code step_order}: each step is claimed atomically
+ * ({@link RunStepTransactions#claim}) before input resolution and work run; a lost claim (e.g.
+ * a redelivered event) simply stops this invocation. A step failure — from input resolution or
+ * the step's own work — is recorded ({@link RunStepTransactions#fail}) and halts the run; later
+ * steps stay {@code pending}.
  */
 @Component
 class WorkflowRunOrchestrator {
@@ -89,9 +84,8 @@ class WorkflowRunOrchestrator {
             int order = runStep.getStepOrder();
 
             if (runStep.getStatus() == RunStepStatus.COMPLETED) {
-                // Already handled by an earlier/concurrent invocation of this
-                // same listener (e.g. a redelivered event racing a normal
-                // run) — reuse its output and keep going.
+                // Already handled by an earlier/concurrent invocation (e.g. a redelivered
+                // event) — reuse its output and keep going.
                 outputsByOrder.put(order, runStep.getOutput());
                 continue;
             }

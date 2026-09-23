@@ -23,13 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Implementation of {@link WorkflowRunService}. {@link #startRun} is tx#1 of
- * the async after-commit execution model: creates the {@code WorkflowRun} +
- * its {@code pending} {@code RunStep}s,
- * commits, and publishes {@link WorkflowRunStartedEvent} — {@link
- * WorkflowRunOrchestrator} picks that event up AFTER this transaction
- * commits and drives the actual execution, so this method returns before any
- * step has run.
+ * Implementation of {@link WorkflowRunService}. {@link #startRun} is tx#1 of the async
+ * after-commit execution model: creates the {@code WorkflowRun} + its {@code pending} {@code
+ * RunStep}s, commits, and publishes {@link WorkflowRunStartedEvent} — {@link
+ * WorkflowRunOrchestrator} picks it up AFTER commit and drives execution, so this method
+ * returns before any step runs.
  */
 @Service
 class WorkflowRunServiceImpl implements WorkflowRunService {
@@ -77,9 +75,8 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         }
         runSteps = runStepRepository.saveAll(runSteps);
 
-        // Published within this transaction; WorkflowRunOrchestrator's
-        // @ApplicationModuleListener only fires AFTER this transaction
-        // commits — this method returns first.
+        // Published within this tx; WorkflowRunOrchestrator's @ApplicationModuleListener only
+        // fires after commit — this method returns first.
         events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
 
         return WorkflowMapper.toRunView(run, runSteps);

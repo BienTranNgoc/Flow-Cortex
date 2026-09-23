@@ -8,18 +8,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One step's execution within a {@link WorkflowRun}. The status ladder is
- * enforced HERE, in the mutators — {@code pending -> running} ({@link
- * #markRunning}), {@code running -> completed} ({@link #markCompleted}),
- * {@code running -> error} ({@link #markError}); every other call throws
- * {@link IllegalStateException} rather than silently corrupting the ladder.
+ * One step's execution within a {@link WorkflowRun}. The status ladder is enforced in the
+ * mutators — {@link #markRunning}, {@link #markCompleted}, {@link #markError} — every other
+ * call throws {@link IllegalStateException}.
  *
- * <p>{@link #markRunning} models the transition for direct testing and for
- * any future non-concurrent caller; the LIVE dispatch path instead claims a
- * step with an atomic {@code UPDATE ... WHERE status = 'pending'} (see
- * {@code RunStepRepository#claimPending}) — a single SQL statement is the
- * actual guard against two concurrent executions racing the same step, not
- * this in-memory check.
+ * <p>{@link #markRunning} models the transition for direct testing; the live dispatch path
+ * instead claims a step via an atomic {@code UPDATE ... WHERE status = 'pending'} ({@code
+ * RunStepRepository#claimPending}) — that SQL statement is the real guard against two
+ * concurrent executions racing the same step, not this in-memory check.
  */
 @Entity
 @Table(name = "run_step")
@@ -116,9 +112,8 @@ public class RunStep {
     }
 
     /**
-     * {@code running -> completed}. {@code resolvedInput} is recorded here
-     * (not at {@link #markRunning}) since it is only known once input
-     * resolution has actually succeeded.
+     * {@code running -> completed}. {@code resolvedInput} is recorded here, not at {@link
+     * #markRunning}, since it's only known once input resolution succeeds.
      */
     public void markCompleted(String resolvedInput, String output, Instant now) {
         requireStatus(RunStepStatus.RUNNING, RunStepStatus.COMPLETED);
@@ -129,9 +124,8 @@ public class RunStep {
     }
 
     /**
-     * {@code running -> error} — halts the owning run. {@code resolvedInput}
-     * may be {@code null}: an unresolved/dangling {@code input_ref} fails
-     * before any input value exists.
+     * {@code running -> error} — halts the owning run. {@code resolvedInput} may be {@code
+     * null}: an unresolved/dangling {@code input_ref} fails before any input value exists.
      */
     public void markError(String resolvedInput, String errorMessage, Instant now) {
         requireStatus(RunStepStatus.RUNNING, RunStepStatus.ERROR);

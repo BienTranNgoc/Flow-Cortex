@@ -26,29 +26,20 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Single-active dispatch: two concurrent attempts to claim the SAME pending
- * step must leave EXACTLY ONE winner. Exercises the actual production bean
- * ({@link RunStepTransactions#claim}, {@code @Transactional(REQUIRES_NEW)})
- * so the test proves the SAME code path the orchestrator uses — an atomic
- * {@code UPDATE run_step SET status = 'running' ... WHERE status =
- * 'pending'} acted on by row count, not an application-level
- * read-then-check. Simulates "original execution + a redelivered event"
- * racing the same step.
+ * Single-active dispatch: two concurrent attempts to claim the same pending step must leave
+ * exactly one winner. Exercises the production bean ({@link RunStepTransactions#claim}, {@code
+ * @Transactional(REQUIRES_NEW)}) so the test proves the same code path the orchestrator uses —
+ * an atomic {@code UPDATE ... WHERE status = 'pending'} decided by row count, not
+ * read-then-check. Simulates "original execution + a redelivered event" racing the same step.
  *
- * <p>Lives in this module's own {@code @DataJpaTest} (package-private access
- * to {@link RunStepTransactions} requires being in the same package) — {@link
- * com.flowcortex.workflow.TestWorkflowBootApp} supplies the {@code
- * @SpringBootConfiguration} it needs — rather than {@code :boot:app}: this is
- * internal engine machinery with no {@code api} port, so there is nothing to
- * reach from outside this module. A real Postgres (no H2) is required to
- * prove genuine cross-connection SQL atomicity, not merely single-threaded
- * correctness.
+ * <p>Lives in this module's own {@code @DataJpaTest} (package-private access to {@link
+ * RunStepTransactions} needs the same package) — {@link com.flowcortex.workflow.TestWorkflowBootApp}
+ * supplies the {@code @SpringBootConfiguration}. A real Postgres (no H2) is required to prove
+ * genuine cross-connection SQL atomicity, not just single-threaded correctness.
  *
- * <p>{@code @Transactional(NOT_SUPPORTED)} deliberately opts OUT of {@code
- * @DataJpaTest}'s default rolled-back test transaction: the seeded step must
- * be REALLY committed before the two worker threads race to claim it (each
- * going through {@code RunStepTransactions}' OWN REQUIRES_NEW transaction),
- * or neither would see it yet.
+ * <p>{@code @Transactional(NOT_SUPPORTED)} opts out of {@code @DataJpaTest}'s rolled-back test
+ * transaction: the seeded step must be really committed before the two worker threads race to
+ * claim it, or neither would see it yet.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

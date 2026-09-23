@@ -10,17 +10,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Implementation of {@link UserDirectory}. Not owner-scoped — see the
- * interface javadoc for why that is safe.
+ * Implementation of {@link UserDirectory}. Not owner-scoped — see the interface javadoc for why.
  *
- * <p>Also the per-request suspension gate (via {@link AccountStatusGuard}):
- * this is the shared identity lookup behind both {@code AuthController.me}
- * and {@code CurrentUserResolver.require}, so a SUSPENDED row throws here —
- * the same 403 {@link AccessDeniedException} {@code AuthServiceImpl#login}
- * throws for suspension — before either caller ever sees a {@link
- * CurrentUser}. A JWT already issued is never additionally revoked (no
- * session store), but its bearer is refused on the very next authenticated
- * call once their row is suspended.
+ * <p>Also the per-request suspension gate (via {@link AccountStatusGuard}): the shared identity
+ * lookup behind both {@code AuthController.me} and {@code CurrentUserResolver.require}, so a
+ * SUSPENDED row throws here — the same 403 {@link AccessDeniedException} {@code
+ * AuthServiceImpl#login} throws — before either caller sees a {@link CurrentUser}. A JWT already
+ * issued is never additionally revoked (no session store), but its bearer is refused on the
+ * very next authenticated call once suspended.
  */
 @Service
 class UserDirectoryImpl implements UserDirectory {

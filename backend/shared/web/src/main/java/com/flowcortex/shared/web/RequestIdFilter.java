@@ -15,20 +15,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Puts a request id on every log line so the lines belonging to one request
- * can be pulled out of the pile.
+ * Puts a request id on every log line so lines from one request can be pulled out of the pile.
  *
- * <p>Reuses an inbound {@code X-Request-Id} when the caller supplied one,
- * otherwise mints one; the id is echoed back on the response so a client can
- * quote it when reporting a problem. Runs first so the id is present for
- * anything later in the chain, including an authentication failure. The MDC
- * is cleared in a {@code finally} block: servlet containers pool threads, and
- * a leaked id would mislabel the next, unrelated request.
+ * <p>Reuses an inbound {@code X-Request-Id} or mints one, echoed back on the response. Runs
+ * first so the id covers the whole chain (including auth failures). MDC is cleared in a {@code
+ * finally}: containers pool threads, and a leaked id would mislabel the next request.
  *
- * <p>Emits one structured request-summary log line per request, correlated by
- * the same id. The line carries only method/path/status/duration — never a
- * header value or the request/response body, so no secret or password can
- * leak through it.
+ * <p>Emits one structured summary log line per request (method/path/status/duration only —
+ * never a header or body, so no secret can leak through it).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -66,10 +60,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Accepts only short, printable, non-whitespace ids. An inbound header is
-     * attacker-controlled and lands in the logs, so anything that could forge
-     * a log line — newlines above all — is rejected and replaced by a fresh
-     * id.
+     * Accepts only short, printable, non-whitespace ids — an inbound header is
+     * attacker-controlled and lands in the logs, so anything that could forge a log line
+     * (newlines above all) is rejected and replaced with a fresh id.
      */
     private static String sanitize(String value) {
         if (value == null) {

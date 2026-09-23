@@ -9,22 +9,15 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * Input resolution: step 1 always resolves to the run's own input; step N
- * defaults to the immediately preceding step's output, unless the step
- * definition carries an {@code input_ref} of the form {@code {step:K.field}},
- * in which case the named field is read out of step K's output (parsed as
- * JSON). An unresolved or incomplete reference — bad format, an
- * unknown/forward step, a missing output, non-JSON output, or a missing
- * field — throws rather than returning an empty string, so the orchestrator
- * turns it into a run error, not an empty input.
+ * Input resolution: step 1 resolves to the run's own input; step N defaults to the preceding
+ * step's output, unless {@code input_ref} is {@code {step:K.field}}, in which case that field
+ * is read out of step K's output (parsed as JSON). Any unresolved/incomplete reference (bad
+ * format, unknown/forward step, missing output, non-JSON, missing field) throws rather than
+ * returning empty, so the orchestrator turns it into a run error.
  *
- * <p>Builds its own plain {@link ObjectMapper} rather than injecting Spring
- * Boot's auto-configured one: parsing an arbitrary step output into a
- * {@link JsonNode} tree needs none of that bean's application-wide
- * customization (naming strategy, JSR-310 modules, ...), and depending on it
- * would tie this module to {@code :boot:app}'s own Jackson auto-configuration
- * actually firing (it does not always — Boot 4.1 does not guarantee a
- * consumer classpath alone registers one).
+ * <p>Builds its own plain {@link ObjectMapper} rather than injecting Spring Boot's
+ * auto-configured one: parsing a step output needs none of that bean's customization, and Boot
+ * 4.1 doesn't guarantee a consumer classpath alone registers it.
  */
 @Component
 class InputResolver {
@@ -34,13 +27,10 @@ class InputResolver {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * @param stepOrder     1-based position of the step being resolved
-     * @param inputRef      the step definition's raw {@code input_ref}, or
-     *                      {@code null}/blank for the default (previous
-     *                      output)
-     * @param runInput      the owning run's own input (used for step 1 only)
-     * @param priorOutputs  step_order -> output, for every step already
-     *                      completed earlier in this same run
+     * @param stepOrder    1-based position of the step being resolved
+     * @param inputRef     raw {@code input_ref}, or {@code null}/blank for the default (previous output)
+     * @param runInput     the run's own input (used for step 1 only)
+     * @param priorOutputs step_order -> output, for steps already completed in this run
      */
     String resolve(int stepOrder, String inputRef, String runInput, Map<Integer, String> priorOutputs) {
         if (stepOrder == 1) {
@@ -50,13 +40,9 @@ class InputResolver {
             return resolveRef(inputRef, priorOutputs);
         }
         int previousOrder = stepOrder - 1;
-        // priorOutputs.get(...) == null is NOT "absent" here: the orchestrator
-        // records every completed step's output (including a genuinely
-        // null/empty one, e.g. an "echo" step given the run's own null
-        // input), so a null VALUE for an already-completed step is real data
-        // to default through, not a resolution failure. containsKey is the
-        // only check that distinguishes that from the actual error case —
-        // step (stepOrder - 1) never completed at all (absent key).
+        // A null VALUE for an already-completed step is real data (e.g. an "echo" step given a
+        // null input), not absence — containsKey is the only check that distinguishes that from
+        // the real error case: step (stepOrder - 1) never completed at all.
         if (!priorOutputs.containsKey(previousOrder)) {
             throw new IllegalStateException("Step " + previousOrder + " produced no output to default from");
         }

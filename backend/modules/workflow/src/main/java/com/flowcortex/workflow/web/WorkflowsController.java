@@ -19,14 +19,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/workflows} — list/get (visibility: owner or shared) and
- * {@code /api/v1/workflows/{id}/runs} — start. Plainly authenticated by
- * {@code :shared:security}'s default chain — no per-module {@code
- * SecurityFilterChain} needed here, unlike {@code :modules:user}'s {@code
- * UserModuleSecurityConfig}.
- *
- * <p>Package-private, depends only on this module's own {@code api} port
- * plus {@code user :: api} (via {@link CurrentUserResolver}).
+ * {@code /api/v1/workflows} — list/get (visibility: owner or shared) and {@code
+ * /api/v1/workflows/{id}/runs} — start. Authenticated by {@code :shared:security}'s default
+ * chain (no per-module {@code SecurityFilterChain}, unlike {@code UserModuleSecurityConfig}).
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -58,11 +53,8 @@ class WorkflowsController {
         return ResponseEntity.ok(WorkflowResponse.from(workflowService.getVisibleWorkflow(currentUserId, id)));
     }
 
-    // @ResponseStatus documents 200 for springdoc/orval (the start call
-    // returns 200 while the run is still `running`) — the runtime status
-    // already IS 200 (ResponseEntity.ok below); this only makes the
-    // generated OpenAPI contract explicit rather than relying on springdoc's
-    // undecorated default.
+    // @ResponseStatus documents 200 for springdoc/orval explicitly, rather than relying on
+    // springdoc's undecorated default (runtime status is already 200 via ResponseEntity.ok).
     @ResponseStatus(HttpStatus.OK)
     @PostMapping(value = "/{id}/runs", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)

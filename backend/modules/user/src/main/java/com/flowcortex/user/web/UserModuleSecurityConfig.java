@@ -17,32 +17,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Security policy for THIS module's own HTTP surface — {@code /api/v1/auth}
- * and {@code /api/v1/users} — layered as a SECOND {@link SecurityFilterChain}
- * narrowly matched to those two path prefixes, evaluated before {@code
- * :shared:security}'s broad, unordered (so lowest-precedence, evaluated last
- * / fallback) default chain.
- *
- * <p>This is deliberate, not a workaround: two things this module's own
- * endpoints need cannot be expressed by adding to {@code :shared:security}'s
- * existing chain without editing that module's internals:
+ * Security policy for this module's HTTP surface ({@code /api/v1/auth}, {@code /api/v1/users})
+ * — a second, narrowly-matched {@link SecurityFilterChain} evaluated before {@code
+ * :shared:security}'s broad default chain. Needed because the shared chain can't express two
+ * things without editing its internals:
  * <ol>
- *   <li>{@code POST /api/v1/auth/login} must be reachable pre-auth — the
- *   shared chain's {@code anyRequest().authenticated()} would otherwise
- *   block it.</li>
- *   <li>{@code @PreAuthorize("hasRole('ADMIN')")} on {@code UsersController}
- *   needs the JWT's {@code role} claim mapped to a {@code ROLE_*} granted
- *   authority — the shared chain's default {@link JwtAuthenticationConverter}
- *   reads the OAuth2 {@code scope}/{@code scp} claim instead, which this
- *   module's tokens do not carry.</li>
+ *   <li>{@code POST /api/v1/auth/login} must be reachable pre-auth (shared chain's
+ *   {@code anyRequest().authenticated()} would block it).</li>
+ *   <li>{@code @PreAuthorize("hasRole('ADMIN')")} on {@code UsersController} needs the JWT's
+ *   {@code role} claim mapped to a {@code ROLE_*} authority — the shared chain's default
+ *   {@link JwtAuthenticationConverter} reads OAuth2 {@code scope}/{@code scp} instead.</li>
  * </ol>
  *
- * <p>Reuses the SAME {@link JwtDecoder} and {@code HandlerExceptionResolver}
- * beans {@code :shared:security}'s chain uses (both plain framework types —
- * consuming them by type is not a reference into that module's internal
- * packages) and the identical entry-point/access-denied-handler delegation
- * idiom, so 401/403 render through the exact same {@code
- * application/problem+json} contract as every other error.
+ * <p>Reuses the shared chain's {@link JwtDecoder} and {@code HandlerExceptionResolver} beans,
+ * so 401/403 render through the same {@code application/problem+json} contract.
  */
 @Configuration
 @EnableWebSecurity

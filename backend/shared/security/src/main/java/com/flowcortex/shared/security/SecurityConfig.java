@@ -14,16 +14,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Stateless JWT resource-server filter chain: validates a locally-signed
- * HS256 token, no session, method security enabled so modules can guard
- * endpoints with {@code @PreAuthorize}.
+ * Stateless JWT resource-server filter chain: validates a locally-signed HS256 token, no
+ * session, method security enabled so modules can guard endpoints with {@code @PreAuthorize}.
  *
- * <p>Deliberately renders no response body itself: an unauthenticated or
- * forbidden request is handed to Spring MVC's {@link HandlerExceptionResolver}
- * chain, which is exactly the chain :shared:web's global
- * {@code @RestControllerAdvice} participates in — so 401/403 come back in the
- * same {@code application/problem+json} shape as every other error, without
- * :shared:security depending on :shared:web at all.
+ * <p>Renders no response body itself: an unauthenticated/forbidden request goes through Spring
+ * MVC's {@link HandlerExceptionResolver} chain — the same one :shared:web's global {@code
+ * @RestControllerAdvice} participates in — so 401/403 come back as {@code
+ * application/problem+json} without :shared:security depending on :shared:web.
  */
 @Configuration
 @EnableWebSecurity
@@ -41,17 +38,13 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Servlet ERROR forwards are re-evaluated by the filter
-                        // chain, so an anonymous request that fails downstream
-                        // (bad path variable, missing param) and lands on /error
-                        // would otherwise come back 401 instead of the real
-                        // status. Only the internal forward is permitted here —
-                        // a direct GET /error is still denied by anyRequest().
+                        // Servlet ERROR forwards are re-evaluated by the chain; without this an
+                        // anonymous request failing downstream (bad path var, missing param) and
+                        // landing on /error comes back 401 instead of its real status. Only the
+                        // internal forward is permitted — a direct GET /error is still denied.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        // Health probe stays anonymous; the committed OpenAPI
-                        // snapshot doc + its Swagger UI are public read-only
-                        // artifacts, so the contract pipeline's snapshot test
-                        // doesn't need a token.
+                        // Health probe + committed OpenAPI snapshot/Swagger UI stay anonymous —
+                        // public read-only artifacts the contract pipeline doesn't need a token for.
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**").permitAll()

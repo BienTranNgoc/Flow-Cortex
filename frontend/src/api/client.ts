@@ -8,15 +8,12 @@ export function authHeaders(): RequestInit {
 }
 
 /**
- * Unwraps an orval-generated `{ data, status, headers }` response: returns
- * `data` on 2xx, throws {@link ApiError} otherwise. The generated fetch
- * client never throws on its own — every status resolves the promise — so
- * this is the one place that turns a non-2xx response into something
- * TanStack Query recognises as an error.
+ * Unwraps an orval-generated `{ data, status, headers }` response: returns `data` on 2xx,
+ * throws {@link ApiError} otherwise — the one place a non-2xx becomes an error TanStack Query
+ * recognises (the generated client never throws on its own).
  *
- * <p>On a 401 the stored token is cleared: {@code RequireAuth} reacts to that
- * on its next render and redirects to `/login` — an expired or revoked
- * token behaves like no token at all.
+ * <p>On a 401 the stored token is cleared: `RequireAuth` reacts on its next render and
+ * redirects to `/login` — an expired/revoked token behaves like no token at all.
  */
 export async function unwrap<T extends { status: number; data: unknown }>(
   promise: Promise<T>,

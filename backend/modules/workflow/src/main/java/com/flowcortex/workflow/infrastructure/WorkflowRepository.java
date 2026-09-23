@@ -11,10 +11,8 @@ import org.springframework.data.repository.query.Param;
 /**
  * Spring Data JPA repository for {@link Workflow}.
  *
- * <p>Visibility: a workflow is VISIBLE to a caller when {@code owner_id =
- * caller} OR {@code is_shared = true} — runs stay owner-scoped regardless
- * (see {@code WorkflowRunRepository}), a shared DEFINITION never implies
- * shared RUNS.
+ * <p>Visibility: a workflow is visible when {@code owner_id = caller} OR {@code is_shared =
+ * true} — runs stay owner-scoped regardless, a shared definition never implies shared runs.
  */
 public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
 

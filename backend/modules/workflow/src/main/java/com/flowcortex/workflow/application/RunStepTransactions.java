@@ -13,20 +13,15 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The three short REQUIRES_NEW transactions a single step's dispatch is
- * split across: claim, then the step's own work runs, then complete/fail.
- * Each method here is its OWN transaction, called through this bean's Spring
- * proxy (never {@code this.method()} from within {@link
- * WorkflowRunOrchestrator} — that would silently skip the proxy and run in
- * the caller's own transaction, defeating REQUIRES_NEW), so a mid-run step
- * failure PERSISTS instead of rolling back with whatever transaction started
- * the run.
+ * The three short REQUIRES_NEW transactions a step's dispatch splits across: claim, step work,
+ * then complete/fail. Each method must be called through this bean's Spring proxy (never {@code
+ * this.method()} from {@link WorkflowRunOrchestrator} — that skips the proxy and runs in the
+ * caller's transaction, defeating REQUIRES_NEW), so a mid-run failure persists instead of
+ * rolling back with the run's own transaction.
  *
- * <p>Note: the step work itself ({@code StepDispatcher.execute}) currently
- * runs inside the listener's REQUIRES_NEW transaction, which is harmless for
- * the sub-millisecond {@code echo}/{@code fail} demo steps. When a real step
- * type that calls a slow external provider is added, move that call OUT of a
- * transaction so it does not hold a DB connection for the whole run.
+ * <p>Note: step work ({@code StepDispatcher.execute}) currently runs inside the REQUIRES_NEW
+ * transaction — harmless for the sub-millisecond demo steps. A real provider-backed step should
+ * move that call out of the transaction so it doesn't hold a DB connection for the whole run.
  */
 @Component
 class RunStepTransactions {

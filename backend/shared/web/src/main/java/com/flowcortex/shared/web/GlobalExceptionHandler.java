@@ -23,20 +23,15 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
- * Global exception -&gt; {@link ProblemDetail} mapping, uniform across every
- * module.
+ * Global exception -&gt; {@link ProblemDetail} mapping, uniform across every module.
  *
- * <p>Extends {@link ResponseEntityExceptionHandler} so the standard Spring
- * MVC failures (unsupported method, unsupported media type, no handler
- * found, ...) keep their correct status codes and already-{@code
- * ProblemDetail} shape; this class only adds the application-specific
- * exceptions plus the {@code errors} field map for validation failures.
+ * <p>Extends {@link ResponseEntityExceptionHandler} so standard Spring MVC failures keep their
+ * correct status and {@code ProblemDetail} shape; this class adds the application exceptions
+ * plus the {@code errors} field map for validation failures.
  *
- * <p>{@link AuthenticationException} and {@link AccessDeniedException} are
- * handled here too: :shared:security's filter chain never builds a response
- * body itself, it hands both exceptions to Spring MVC's exception-resolver
- * chain (which this advice participates in), so 401/403 render through the
- * exact same contract as every other error.
+ * <p>{@link AuthenticationException} and {@link AccessDeniedException} are handled here too:
+ * :shared:security's filter chain hands both to Spring MVC's exception-resolver chain (which
+ * this advice participates in), so 401/403 render through the same contract.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -89,11 +84,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * Catches everything the more specific handlers above (and the base
-     * class's own Spring MVC handlers) do not recognise. Never leaks the raw
-     * exception message to the client — that is exactly the stack-trace
-     * disclosure this uniform contract exists to prevent — but logs the real
-     * exception so it is diagnosable via the request's correlation id
+     * Catches everything the handlers above don't recognise. Never leaks the raw exception
+     * message to the client — logs it instead, diagnosable via the request's correlation id
      * ({@code RequestIdFilter}'s MDC entry).
      */
     @ExceptionHandler(Exception.class)

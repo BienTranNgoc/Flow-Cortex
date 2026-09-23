@@ -18,12 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Implementation of {@link UserService}.
  *
- * <p>Duplicate-email safety is NOT a check-then-insert (that races): every
- * write flushes immediately ({@code saveAndFlush}) so a violation of the
- * database's {@code UNIQUE (email)} constraint surfaces synchronously, right
- * here, as a {@link DataIntegrityViolationException} translated to {@link
- * ConflictException} (409) — the database is the sole arbiter of
- * uniqueness.
+ * <p>Duplicate-email safety is not check-then-insert (races); every write flushes immediately
+ * ({@code saveAndFlush}) so a {@code UNIQUE (email)} violation surfaces synchronously here as a
+ * {@link DataIntegrityViolationException}, translated to {@link ConflictException} (409).
  */
 @Service
 class UserServiceImpl implements UserService {
@@ -78,13 +75,8 @@ class UserServiceImpl implements UserService {
         requireActiveCaller(ownerId);
         AppUser user = requireOwned(ownerId, id);
         if (id.equals(ownerId)) {
-            // An ADMIN row is self-owned (ownerId == id), so this is the one
-            // case requireOwned's scope check cannot catch: an admin
-            // suspending or downgrading their OWN row is
-            // irreversible — no other admin shares their scope to undo it,
-            // permanently locking every user in the scope out of
-            // administration. Same self-destruction class as the
-            // self-delete guard below.
+            // ADMIN row is self-owned (ownerId == id) — requireOwned's scope check can't
+            // catch an admin locking out their own scope by suspending/downgrading self.
             requireNotSelfLockout(role, status);
         }
         if (email != null && !email.isBlank()) {
@@ -106,10 +98,8 @@ class UserServiceImpl implements UserService {
     @Transactional
     public void deleteUser(UUID ownerId, UUID id) {
         requireActiveCaller(ownerId);
-        // An ADMIN row is self-owned (ownerId == id), so this is the one
-        // case requireOwned's scope check cannot catch: deleting
-        // it would orphan every MEMBER whose owner_id points at it, making
-        // them permanently unreachable through the API.
+        // ADMIN row is self-owned (ownerId == id) — deleting it would orphan every MEMBER whose
+        // owner_id points at it, making them unreachable through the API.
         if (id.equals(ownerId)) {
             throw new ConflictException("Cannot delete your own account");
         }
@@ -117,15 +107,10 @@ class UserServiceImpl implements UserService {
     }
 
     /**
-     * {@code UsersController} authorizes purely off the JWT's {@code ADMIN}
-     * role claim and never consulted the suspension gate ({@link
-     * AccountStatusGuard}) that every other {@code application} class gates
-     * through: a SUSPENDED admin holding a still-valid token kept full
-     * {@code /api/v1/users} CRUD for the token's remaining TTL. {@code
-     * ownerId} is always the CALLER's own id (an ADMIN's own row, per the
-     * self-owned-ADMIN model — the same value {@code UsersController}
-     * derives from the JWT subject for every operation), so loading it here
-     * gates the caller, not just the target.
+     * {@code UsersController} authorizes purely off the JWT's {@code ADMIN} role claim and never
+     * consulted {@link AccountStatusGuard} — a SUSPENDED admin with a still-valid token kept
+     * full CRUD for its remaining TTL. {@code ownerId} here is always the caller's own id, so
+     * loading it gates the caller, not just the target.
      */
     private void requireActiveCaller(UUID ownerId) {
         AppUser caller = userRepository.findById(ownerId)
@@ -134,10 +119,8 @@ class UserServiceImpl implements UserService {
     }
 
     /**
-     * A self-edit that would suspend the caller's own status or downgrade
-     * their own role away from ADMIN is rejected; a no-op self-update (same
-     * status/role, or leaving either {@code null}) still succeeds, since
-     * only the self-destructive transition is unsafe.
+     * Rejects a self-edit that would suspend the caller or downgrade them from ADMIN; a no-op
+     * self-update (same status/role, or {@code null}) still succeeds.
      */
     private void requireNotSelfLockout(String role, String status) {
         boolean suspendsSelf = status != null && !status.isBlank() && parseStatus(status) == UserStatus.SUSPENDED;
@@ -161,10 +144,8 @@ class UserServiceImpl implements UserService {
     }
 
     /**
-     * The web layer already constrains {@code role}/{@code status} to valid
-     * enum names ({@code @Pattern}), so this only ever fires for a caller of
-     * this {@code api} port that skips that validation (e.g. a future
-     * programming error in the dev seeder) — defence in depth, not a
+     * The web layer already constrains {@code role}/{@code status} via {@code @Pattern}; this
+     * only fires for an {@code api} caller that skips validation — defence in depth, not a
      * user-reachable path.
      */
     private static Role parseRole(String value) {

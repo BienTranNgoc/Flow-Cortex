@@ -1,15 +1,10 @@
 package com.flowcortex.workflow.domain;
 
 /**
- * A {@link RunStep}'s status ladder — the ONLY legal transitions are
- * {@code PENDING -> RUNNING} (the atomic single-active claim),
- * {@code RUNNING -> COMPLETED} (step work succeeds), and
- * {@code RUNNING -> ERROR} (step work throws, halting the run). Every other
- * transition is illegal and rejected by {@link RunStep}'s mutator methods —
- * there is no terminal-to-anything or pending-to-terminal edge.
- *
- * <p>Persisted lowercase ({@code pending}|{@code running}|{@code completed}|
- * {@code error}) via {@link RunStepStatusConverter}.
+ * A {@link RunStep}'s status ladder. Only legal transitions: {@code PENDING -> RUNNING} (atomic
+ * single-active claim), {@code RUNNING -> COMPLETED}, {@code RUNNING -> ERROR} (halts the run).
+ * All others are rejected by {@link RunStep}'s mutators. Persisted lowercase via
+ * {@link RunStepStatusConverter}.
  */
 public enum RunStepStatus {
     PENDING,

@@ -5,11 +5,9 @@ import jakarta.persistence.Converter;
 import java.util.Locale;
 
 /**
- * Persists {@link RunStepStatus} as the exact lowercase wire/DB form
- * ({@code pending}|{@code running}|{@code completed}|{@code error}) while
- * keeping the Java enum constants upper-case. {@code
- * autoApply} so {@link RunStep#status} picks this up without an explicit
- * {@code @Convert} annotation.
+ * Persists {@link RunStepStatus} as the lowercase wire/DB form ({@code pending}|{@code
+ * running}|{@code completed}|{@code error}); Java enum constants stay upper-case. {@code
+ * autoApply} lets {@link RunStep#status} pick this up without an explicit {@code @Convert}.
  */
 @Converter(autoApply = true)
 public class RunStepStatusConverter implements AttributeConverter<RunStepStatus, String> {

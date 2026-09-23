@@ -13,12 +13,9 @@ import org.springframework.data.repository.query.Param;
 /**
  * Spring Data JPA repository for {@link RunStep}.
  *
- * <p>{@link #claimPending} is the single-active-dispatch guard: one atomic
- * {@code UPDATE ... WHERE id = ? AND status = 'pending'} — a
- * conditional write acted on by ROW COUNT, not an application-level
- * read-then-check-then-write (which would race). Exactly one of two
- * concurrent callers claiming the same step gets {@code 1} back; the other
- * gets {@code 0} and must not re-execute the step.
+ * <p>{@link #claimPending} is the single-active-dispatch guard: one atomic {@code UPDATE ...
+ * WHERE status = 'pending'}, decided by row count, not read-then-check-then-write (which would
+ * race). Exactly one of two concurrent claimers gets {@code 1} back; the other gets {@code 0}.
  */
 public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
 

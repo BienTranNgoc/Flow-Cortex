@@ -10,15 +10,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * An application user. Distilled from DigiShield's {@code AppUser}
- * (tenant/MFA/risk fields dropped — IP boundary, `docs/PLAN.md` §10) and
- * re-scoped to {@code owner_id} rather than a tenant id: an ADMIN row is
- * self-owned ({@code owner_id == id}); every other row's {@code owner_id} is
- * the administering ADMIN's id.
+ * An application user, scoped by {@code owner_id} rather than a tenant id: an ADMIN row is
+ * self-owned ({@code owner_id == id}); every other row's {@code owner_id} is the administering
+ * ADMIN's id.
  *
- * <p>{@code passwordHash} is never exposed outside this module — the {@code
- * api} views ({@link com.flowcortex.user.api.CurrentUser}, {@link
- * com.flowcortex.user.api.UserView}) simply do not carry it.
+ * <p>{@code passwordHash} is never exposed outside this module — the {@code api} views ({@link
+ * com.flowcortex.user.api.CurrentUser}, {@link com.flowcortex.user.api.UserView}) don't carry it.
  */
 @Entity
 @Table(name = "app_user")

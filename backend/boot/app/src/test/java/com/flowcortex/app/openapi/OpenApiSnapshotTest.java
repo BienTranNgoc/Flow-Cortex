@@ -18,17 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * {@code /v3/api-docs.yaml} is the live source of the contract-first
- * pipeline; this test both proves springdoc renders it correctly on this
- * stack and writes it to the committed {@code docs/openapi.yaml} snapshot
- * that {@code backend-ci}/{@code frontend-ci} diff-check for drift.
+ * {@code /v3/api-docs.yaml} is the live source of the contract-first pipeline; this test proves
+ * springdoc renders it correctly and writes it to the committed {@code docs/openapi.yaml}
+ * snapshot that {@code backend-ci}/{@code frontend-ci} diff-check for drift.
  *
- * <p>Exercised against the real, fully-wired app (not a {@code @WebMvcTest}
- * slice) since the document must reflect exactly what a client would fetch —
- * including the security posture that permits it. Lives under {@code
- * com.flowcortex.app} like {@code HealthController}/{@code
- * SecurityFilterChainIT} — a direct sub-package of {@code com.flowcortex}
- * would become a stray Modulith module.
+ * <p>Exercised against the real, fully-wired app (not a {@code @WebMvcTest} slice) since the
+ * document must reflect exactly what a client would fetch, including its security posture.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)

@@ -17,26 +17,17 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 
 /**
- * Dev-profile-only demo data: TWO ADMINs in DISTINCT owner scopes (so a
- * cross-scope 404 has a real scope B to probe) plus one MEMBER under the
- * first ADMIN's scope, so the slice is runnable end to end ({@code
- * SPRING_PROFILES_ACTIVE=dev docker compose up}, alongside the
- * already-required {@code JWT_SECRET}).
+ * Dev-profile-only demo data: two ADMINs in distinct owner scopes (so a cross-scope 404 has a
+ * real scope B to probe) plus one MEMBER under the first ADMIN's scope — runnable end to end via
+ * {@code SPRING_PROFILES_ACTIVE=dev docker compose up}.
  *
- * <p>Dev-only, never active in prod: gated by {@code @Profile("dev")}, the
- * SAME profile {@code application-dev.yml}'s JWT_SECRET fallback already
- * uses — nothing here runs unless that profile is explicitly selected.
+ * <p>Gated by {@code @Profile("dev")}; never active in prod.
  *
- * <p>Idempotent for the two realistic operating modes of a dev Postgres
- * volume — freshly created (nothing seeded yet) or fully seeded already (a
- * prior successful run) — by catching {@link ConflictException} (the email
- * already exists) and skipping rather than crashing startup. A restart that
- * lands exactly between seeding the first ADMIN and the MEMBER (a crash
- * mid-seed) is NOT recovered automatically — the member step is skipped on
- * every later restart, since by then admin1's re-attempt also conflicts and
- * its real owner id is not re-derivable from that alone. This is an accepted
- * limitation of a dev-only convenience seeder: `docker compose down -v` and
- * restarting fresh recovers it.
+ * <p>Idempotent across a fresh or already-seeded dev Postgres volume: catches {@link
+ * ConflictException} (email exists) and skips rather than crashing startup. A crash exactly
+ * between seeding the first ADMIN and the MEMBER is NOT auto-recovered — the member step stays
+ * skipped on later restarts, since admin1's owner id isn't re-derivable from a conflict alone.
+ * Accepted limitation of a dev-only seeder: {@code docker compose down -v} recovers it.
  */
 @Configuration
 @Profile("dev")
@@ -52,13 +43,9 @@ class DevDataSeeder {
     private static final String ADMIN_PASSWORD = "AdminPass123!";
     private static final String MEMBER_PASSWORD = "MemberPass123!";
 
-    // A synthetic, fixed "seed" identity for the two shared demo workflows'
-    // owner_id — deliberately NOT tied to a real app_user row. Visibility of
-    // a shared workflow never depends on who owns it, and workflow.owner_id
-    // carries no FK constraint (a generalizable ownership handle, not a hard
-    // reference) — this is simpler and more idempotent than resolving
-    // admin1's real id across restarts (which would need decoding a minted
-    // JWT here for no behavioural benefit).
+    // Synthetic, fixed "seed" identity for the two shared demo workflows' owner_id — not tied to
+    // a real app_user row (workflow.owner_id has no FK constraint, and shared-workflow
+    // visibility doesn't depend on the owner). Simpler than re-resolving admin1's id on restart.
     private static final UUID DEMO_WORKFLOW_OWNER_ID = UUID.fromString("00000000-0000-0000-0000-00000000d3d0");
 
     @Bean
@@ -99,19 +86,14 @@ class DevDataSeeder {
     }
 
     /**
-     * TWO {@code is_shared=true} demo workflows so both the success and
-     * run-error UI are reachable end to end without wiring a real provider:
-     * an all-{@code echo} success path, and one whose MIDDLE step
-     * deliberately fails (the {@code fail} step type — {@code
-     * StepDispatcher}). Runs of either demo still land owner-scoped to
-     * whichever user actually starts one — a shared DEFINITION never implies
-     * shared RUNS.
+     * Two {@code is_shared=true} demo workflows so both the success and run-error UI are
+     * reachable without a real provider: an all-{@code echo} success path, and one whose middle
+     * step deliberately fails ({@code fail} type). Runs still land owner-scoped to whoever
+     * starts one — a shared definition never implies shared runs.
      *
-     * <p>Idempotent by NAME (workflow rows carry no unique constraint on
-     * {@code name} unlike {@code app_user.email}): re-running against an
-     * already-seeded volume checks {@link WorkflowService#listVisibleWorkflows}
-     * first and skips a demo whose name is already present, rather than
-     * accumulating duplicate rows on every restart.
+     * <p>Idempotent by name (no unique constraint on {@code name}, unlike {@code
+     * app_user.email}): checks {@link WorkflowService#listVisibleWorkflows} first and skips an
+     * already-present demo, rather than accumulating duplicates on restart.
      */
     @Bean
     @Order(2)

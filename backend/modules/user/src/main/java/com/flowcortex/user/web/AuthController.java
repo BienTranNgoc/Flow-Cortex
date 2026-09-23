@@ -19,11 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/auth}: login, the caller's own profile ({@code me}), and
- * self-service name update ({@code profile} — email/role/status are
- * admin-mediated only).
- *
- * <p>Package-private, depends only on this module's own {@code api} port.
+ * {@code /api/v1/auth}: login, the caller's own profile ({@code me}), and self-service name
+ * update ({@code profile} — email/role/status are admin-mediated only).
  */
 @RestController
 @RequestMapping("/api/v1/auth")

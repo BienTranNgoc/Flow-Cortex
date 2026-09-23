@@ -20,17 +20,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Concurrency: two parallel creates of the same (globally unique) email
- * must leave exactly one row, one caller succeeding and the other
- * rejected — enforced by the database's {@code UNIQUE (email)}
- * constraint ({@code V2026.09.22.001__user.sql}), not an application-level
- * check-then-insert (which would race).
+ * Concurrency: two parallel creates of the same (globally unique) email must leave exactly one
+ * row, one caller succeeding and the other rejected — enforced by the DB's {@code UNIQUE
+ * (email)} constraint, not an application-level check-then-insert (which would race).
  *
- * <p>Exercises {@link UserService} directly rather than through HTTP: the
- * race is a database-level concern below the web layer, and going through
- * two real HTTP client threads would add network/thread-pool noise without
- * proving anything more — {@link ConflictException} is what the controller
- * (and {@code UsersCrudEndpointsIT}) already proves maps to 409.
+ * <p>Exercises {@link UserService} directly rather than HTTP: the race is a DB-level concern
+ * below the web layer; two real HTTP threads would add noise without proving more — {@link
+ * ConflictException} -> 409 is already proven by {@code UsersCrudEndpointsIT}.
  */
 @Testcontainers
 @SpringBootTest

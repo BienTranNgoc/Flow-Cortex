@@ -8,15 +8,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 /**
- * Builds the {@link JwtEncoder} this module uses to mint login tokens,
- * reusing the SAME signing key {@code :shared:security} already manages
- * ({@code JwtKeyConfig}'s {@code SecretKey} bean, injected
- * here by type — {@code javax.crypto.SecretKey} is a JDK type, not a {@code
- * com.flowcortex.shared.security} one, so this is a plain bean consumption,
- * not a reference into that module's internals).
+ * Builds the {@link JwtEncoder} this module uses to mint login tokens, reusing the same signing
+ * key {@code :shared:security} manages ({@code JwtKeyConfig}'s {@code SecretKey} bean, injected
+ * by type — a plain JDK type, so this is bean consumption, not a reference into that module).
  *
- * <p>Symmetric with {@code JwtKeyConfig#jwtDecoder}: same key, same algorithm
- * (HS256), one side encodes and the other decodes.
+ * <p>Symmetric with {@code JwtKeyConfig#jwtDecoder}: same key, same algorithm (HS256).
  */
 @Configuration
 class JwtSigningConfig {

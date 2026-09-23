@@ -4,8 +4,7 @@ plugins {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
-    // Local HMAC (HS256) JWT resource server — validates a token this app
-    // itself signed (JWT_SECRET), not a remote OIDC issuer (design.md D4).
+    // Local HS256 JWT resource server: validates tokens this app signed (JWT_SECRET), not a remote OIDC issuer.
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     // HandlerExceptionResolver — the entry point / access-denied handler
     // delegate into it so :shared:web's advice renders 401/403 (this module

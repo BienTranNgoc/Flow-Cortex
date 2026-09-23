@@ -35,17 +35,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # `build` compiles and runs `check` (tests, Checkstyle, the JaCoCo
-      # coverage-floor gate — design.md D7/ADR-0004) plus the JaCoCo report.
-      # The test suite also regenerates docs/openapi.yaml (task 3.1) as a
-      # side effect, which the next step diff-checks for drift.
+      # `build` runs `check` (tests, Checkstyle, JaCoCo coverage floor — ADR-0004).
+      # The test suite also regenerates docs/openapi.yaml, which the next step diff-checks.
       - name: Build + test
         run: ./gradlew --no-daemon build
 
-      # Contract-first drift check (design.md D6, task 3.3): the snapshot
-      # test above just rewrote docs/openapi.yaml from the live /v3/api-docs
-      # document — if a controller change wasn't followed by regenerating
-      # the committed snapshot, the working tree now differs from HEAD.
+      # Contract-first drift check: the snapshot test just rewrote docs/openapi.yaml
+      # from the live /v3/api-docs; an unregenerated snapshot now differs from HEAD.
       - name: Check OpenAPI snapshot is in sync
         working-directory: .
         run: git diff --exit-code docs/openapi.yaml

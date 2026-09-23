@@ -36,11 +36,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Contract-first pipeline (design.md D6, task 3.2/3.3): regenerate the
-      # typed client from the committed docs/openapi.yaml, then fail if that
-      # regeneration doesn't match what's committed — a controller change
-      # whose regenerated snapshot wasn't followed by regenerating the
-      # client here is exactly the drift this guards against.
+      # Contract-first drift check: regenerate the typed client from the committed
+      # docs/openapi.yaml and fail if it differs from what's committed.
       - name: Generate API client
         run: npm run gen:api
 

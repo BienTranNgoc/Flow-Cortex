@@ -6,14 +6,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Without an explicit {@code servers} entry, springdoc auto-derives one from
- * the incoming request's scheme/host/port — which varies with {@code
- * webEnvironment = RANDOM_PORT} in tests, making the committed {@code
- * docs/openapi.yaml} snapshot non-deterministic across runs. Registering this
- * bean supplies a fixed, relative server so the generated document is stable
- * regardless of what port the app happens to bind to (matches the
- * same-origin {@code /api/} reverse-proxy shape docker-compose's nginx
- * already uses).
+ * Without an explicit {@code servers} entry, springdoc derives one from the request's
+ * scheme/host/port — which varies with {@code RANDOM_PORT} in tests, making the committed
+ * {@code docs/openapi.yaml} snapshot non-deterministic. This bean fixes a relative server so
+ * the doc is stable (matches nginx's same-origin {@code /api/} reverse-proxy shape).
  */
 @Configuration
 public class OpenApiConfig {

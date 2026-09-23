@@ -9,12 +9,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * One ordered step in a {@link Workflow} definition. {@code inputRef}, when
- * set, is the raw {@code {step:K.field}} reference text resolved at run
- * time; {@code null} means "default: the previous step's output" (or, for
- * step 1, the run's own input). {@code config} is reserved for a future step
- * type's per-step settings — the MVP's only types ({@code echo}/{@code
- * fail}) need none.
+ * One ordered step in a {@link Workflow} definition. {@code inputRef}, when set, is the raw
+ * {@code {step:K.field}} reference resolved at run time; {@code null} defaults to the previous
+ * step's output (or, for step 1, the run's input). {@code config} is reserved for a future step
+ * type's settings — the MVP types ({@code echo}/{@code fail}) need none.
  */
 @Entity
 @Table(name = "workflow_step")

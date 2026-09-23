@@ -8,17 +8,12 @@ import org.springframework.scheduling.annotation.EnableAsync;
 /**
  * Flow-Cortex application entry point.
  *
- * <p>This is the single Spring Boot bootstrap class for the whole modular
- * monolith. All business modules and shared libraries are wired in as
- * dependencies so Spring Modulith can detect and verify the module structure
- * rooted at this package ({@code com.flowcortex}).
+ * <p>Single Spring Boot bootstrap for the modular monolith; all modules and shared libraries
+ * are wired in so Spring Modulith can detect and verify the module structure.
  *
- * <p>{@code @EnableAsync} is what makes
- * {@code :modules:workflow}'s {@code @ApplicationModuleListener} actually run
- * on a separate thread after its triggering transaction commits — without
- * it, Spring Modulith silently runs the listener on the publishing (request)
- * thread instead, defeating the non-blocking start the whole async
- * after-commit model exists for.
+ * <p>{@code @EnableAsync} makes {@code :modules:workflow}'s {@code @ApplicationModuleListener}
+ * run on a separate thread after commit — without it, Modulith runs the listener on the
+ * publishing thread, defeating the non-blocking async model.
  */
 @Modulithic(systemName = "FlowCortex")
 @EnableAsync

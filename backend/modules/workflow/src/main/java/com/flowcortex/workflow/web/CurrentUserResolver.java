@@ -7,12 +7,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the JWT subject into a live user id via the {@code user :: api}
- * port — this is the concrete reason {@code :modules:workflow} depends on
- * {@code user :: api}: it needs the current caller's identity, not just the
- * module boundary declared unused. Defensive: a token can outlive the row it
- * was minted for ({@code AuthService#updateOwnProfile} carries the same
- * caveat in {@code :modules:user}).
+ * Resolves the JWT subject into a live user id via {@code user :: api} — the concrete reason
+ * {@code :modules:workflow} depends on it. Defensive: a token can outlive the row it was minted
+ * for (same caveat as {@code AuthService#updateOwnProfile}).
  */
 @Component
 class CurrentUserResolver {
