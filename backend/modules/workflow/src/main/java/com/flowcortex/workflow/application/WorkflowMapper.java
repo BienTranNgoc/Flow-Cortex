@@ -11,7 +11,7 @@ import com.flowcortex.workflow.domain.WorkflowStep;
 import java.util.List;
 import java.util.Locale;
 
-/** Entity -> {@code api} view mapping (design.md D1/D5), mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
+/** Entity -> {@code api} view mapping, mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
 final class WorkflowMapper {
 
     private WorkflowMapper() {
@@ -38,7 +38,7 @@ final class WorkflowMapper {
                 step.getInput(), step.getOutput(), step.getErrorMessage(), step.getStartedAt(), step.getFinishedAt());
     }
 
-    /** design.md D1: run/run_step status is wire-visible lowercase (running/completed/error/pending). */
+    /** run/run_step status is wire-visible lowercase (running/completed/error/pending). */
     private static String wire(String enumName) {
         return enumName.toLowerCase(Locale.ROOT);
     }

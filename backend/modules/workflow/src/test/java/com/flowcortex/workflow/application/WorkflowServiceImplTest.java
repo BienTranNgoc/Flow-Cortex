@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Task 5.4 — {@link WorkflowServiceImpl} (design.md D1, R-049). */
+/** {@link WorkflowServiceImpl}. */
 class WorkflowServiceImplTest {
 
     private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);

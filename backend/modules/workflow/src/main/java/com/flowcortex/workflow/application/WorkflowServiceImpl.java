@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Implementation of {@link WorkflowService} (design.md D1, R-049). */
+/** Implementation of {@link WorkflowService}. */
 @Service
 class WorkflowServiceImpl implements WorkflowService {
 

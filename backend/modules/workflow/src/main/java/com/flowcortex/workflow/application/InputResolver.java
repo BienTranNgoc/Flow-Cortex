@@ -9,14 +9,14 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * Input resolution (design.md D5/R-042): step 1 always resolves to the run's
- * own input; step N defaults to the immediately preceding step's output,
- * unless the step definition carries an {@code input_ref} of the form
- * {@code {step:K.field}}, in which case the named field is read out of step
- * K's output (parsed as JSON). An unresolved or incomplete reference — bad
- * format, an unknown/forward step, a missing output, non-JSON output, or a
- * missing field — throws rather than returning an empty string, so the
- * orchestrator turns it into a run error (design.md D5, not an empty input).
+ * Input resolution: step 1 always resolves to the run's own input; step N
+ * defaults to the immediately preceding step's output, unless the step
+ * definition carries an {@code input_ref} of the form {@code {step:K.field}},
+ * in which case the named field is read out of step K's output (parsed as
+ * JSON). An unresolved or incomplete reference — bad format, an
+ * unknown/forward step, a missing output, non-JSON output, or a missing
+ * field — throws rather than returning an empty string, so the orchestrator
+ * turns it into a run error, not an empty input.
  *
  * <p>Builds its own plain {@link ObjectMapper} rather than injecting Spring
  * Boot's auto-configured one: parsing an arbitrary step output into a

@@ -26,23 +26,23 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 5.3 — R-045 single-active dispatch: two concurrent attempts to claim
- * the SAME pending step must leave EXACTLY ONE winner. Exercises the actual
- * production bean ({@link RunStepTransactions#claim}, {@code @Transactional
- * (REQUIRES_NEW)}) so the test proves the SAME code path the orchestrator
- * uses — an atomic {@code UPDATE run_step SET status = 'running' ... WHERE
- * status = 'pending'} acted on by row count, not an application-level
- * read-then-check (design.md D5). Simulates "original execution + a
- * redelivered event" racing the same step.
+ * Single-active dispatch: two concurrent attempts to claim the SAME pending
+ * step must leave EXACTLY ONE winner. Exercises the actual production bean
+ * ({@link RunStepTransactions#claim}, {@code @Transactional(REQUIRES_NEW)})
+ * so the test proves the SAME code path the orchestrator uses — an atomic
+ * {@code UPDATE run_step SET status = 'running' ... WHERE status =
+ * 'pending'} acted on by row count, not an application-level
+ * read-then-check. Simulates "original execution + a redelivered event"
+ * racing the same step.
  *
  * <p>Lives in this module's own {@code @DataJpaTest} (package-private access
  * to {@link RunStepTransactions} requires being in the same package) — {@link
  * com.flowcortex.workflow.TestWorkflowBootApp} supplies the {@code
  * @SpringBootConfiguration} it needs — rather than {@code :boot:app}: this is
  * internal engine machinery with no {@code api} port, so there is nothing to
- * reach from outside this module. A real Postgres (design.md D7 — no H2) is
- * required to prove genuine cross-connection SQL atomicity, not merely
- * single-threaded correctness.
+ * reach from outside this module. A real Postgres (no H2) is required to
+ * prove genuine cross-connection SQL atomicity, not merely single-threaded
+ * correctness.
  *
  * <p>{@code @Transactional(NOT_SUPPORTED)} deliberately opts OUT of {@code
  * @DataJpaTest}'s default rolled-back test transaction: the seeded step must

@@ -22,10 +22,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
- * Task 4.3 (design.md D1/R-020/R-021/R-024/R-025), authored before {@link
- * UserServiceImpl} existed (red before green, per tasks.md's directive) —
- * pure unit coverage with a mocked repository; the R-024 concurrency proof
- * against a real database is {@code UserConcurrentCreateIT} (:boot:app).
+ * Authored before {@link UserServiceImpl} existed (red before green) — pure
+ * unit coverage with a mocked repository; the concurrency proof against a
+ * real database is {@code UserConcurrentCreateIT} (:boot:app).
  */
 class UserServiceImplTest {
 
@@ -51,7 +50,7 @@ class UserServiceImplTest {
         verify(repository).saveAndFlush(captor.capture());
         AppUser saved = captor.getValue();
         // Never the raw password, and a real BCrypt hash (the encoder itself
-        // proves the format) — R-021.
+        // proves the format).
         assertThat(saved.getPasswordHash()).isNotEqualTo("correct horse battery staple");
         assertThat(saved.getPasswordHash()).startsWith("$2");
         // UserView (what a controller can ever return) simply has no
@@ -108,7 +107,7 @@ class UserServiceImplTest {
         assertThat(admin.role()).isEqualTo("ADMIN");
     }
 
-    /** G1 — {@code requireActiveCaller} loads this row for every {@code ownerId} argument above. */
+    /** {@code requireActiveCaller} loads this row for every {@code ownerId} argument above. */
     private static AppUser activeOwner(UUID ownerId) {
         return new AppUser(ownerId, ownerId, "owner@example.com", "$2a$hash", "Owner", Role.ADMIN,
                 UserStatus.ACTIVE);

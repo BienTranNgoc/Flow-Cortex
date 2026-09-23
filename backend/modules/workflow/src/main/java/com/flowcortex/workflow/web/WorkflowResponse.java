@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** design.md D1/R-049 — {@code isShared} is what makes a workflow listable to every authenticated user. */
+/** {@code isShared} is what makes a workflow listable to every authenticated user. */
 record WorkflowResponse(
         UUID id, String name, boolean isShared, Instant createdAt, Instant updatedAt,
         List<WorkflowStepResponse> steps) {

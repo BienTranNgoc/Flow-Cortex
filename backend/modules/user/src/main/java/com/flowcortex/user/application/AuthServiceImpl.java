@@ -17,16 +17,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Implementation of {@link AuthService} (design.md D4).
+ * Implementation of {@link AuthService}.
  */
 @Service
 class AuthServiceImpl implements AuthService {
 
     /**
-     * [AGENT-ASSUMED] Token lifetime — not specified by design.md/tasks.md
-     * (no refresh flow exists this change, proposal — Out of Scope); a fixed,
-     * generous session length is the simplest choice that does not force a
-     * re-login mid-demo.
+     * Token lifetime — no refresh flow exists yet; a fixed, generous session
+     * length is the simplest choice that does not force a re-login mid-demo.
      */
     private static final Duration TOKEN_TTL = Duration.ofHours(12);
 

@@ -1,7 +1,7 @@
 # 'dev' Spring profile — local convenience only (e.g.
 # `./gradlew bootRun --args='--spring.profiles.active=dev'`). NEVER used by
 # docker compose or any deployed environment; those set JWT_SECRET explicitly
-# (design.md D4). The value below is a deliberately obvious placeholder, not a
+# The value below is a deliberately obvious placeholder, not a
 # real credential, so it is safe to commit.
 flowcortex:
   security:

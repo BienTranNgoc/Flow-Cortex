@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
-/** Task 5.3 — the two MVP step types (design.md D1 Open Questions, task 5.9). */
+/** The two MVP step types. */
 class StepDispatcherTest {
 
     private final StepDispatcher dispatcher = new StepDispatcher();

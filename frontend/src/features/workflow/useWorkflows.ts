@@ -3,7 +3,7 @@ import { getRun, getWorkflow, listWorkflows, startRun } from '../../api/generate
 import type { StartRunRequest } from '../../api/generated/flowCortexApi';
 import { authHeaders, unwrap } from '../../api/client';
 
-/** ALL authenticated users (owner OR shared, design.md D1/R-049) — no admin gate, unlike `features/users`. */
+/** ALL authenticated users (owner OR shared) — no admin gate, unlike `features/users`. */
 export function useWorkflowsQuery() {
   return useQuery({
     queryKey: ['workflows'],
@@ -26,10 +26,10 @@ export function useStartRunMutation(workflowId: string) {
 }
 
 /**
- * Polls `/api/v1/runs/{id}` while the run is still `running` (design.md
- * D5/R-050 — the start call returns before steps finish, so this is what
- * actually shows a step advancing pending -> running -> completed|error).
- * Stops polling once the run reaches either terminal status.
+ * Polls `/api/v1/runs/{id}` while the run is still `running` — the start
+ * call returns before steps finish, so this is what actually shows a step
+ * advancing pending -> running -> completed|error. Stops polling once the
+ * run reaches either terminal status.
  */
 export function useRunQuery(runId: string | undefined) {
   return useQuery({

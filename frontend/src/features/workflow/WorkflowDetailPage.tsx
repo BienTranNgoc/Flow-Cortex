@@ -7,9 +7,9 @@ import { startRunSchema, type StartRunFormValues } from './startRunSchema';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 
 /**
- * `/workflows/:id` — steps + "start run" (task 5.10, J-5/J-9/J-10/J-11). On
- * a successful start, navigates straight to the run-progress view (the
- * returned run id) so watching it progress is the very next turn.
+ * `/workflows/:id` — steps + "start run". On a successful start, navigates
+ * straight to the run-progress view (the returned run id) so watching it
+ * progress is the very next turn.
  */
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,9 +33,9 @@ export function WorkflowDetailPage() {
 
   const workflow = workflowQuery.data;
   const startError = startRunMutation.error instanceof ApiError ? startRunMutation.error.problem : undefined;
-  // J-10: execution-disabled (kill switch off, R-046) is a 503 — show the
-  // reason plus a concrete next action rather than a bare error or a
-  // spinner that never resolves.
+  // Execution-disabled (kill switch off) is a 503 — show the reason plus a
+  // concrete next action rather than a bare error or a spinner that never
+  // resolves.
   const isExecutionDisabled = startRunMutation.error instanceof ApiError && startRunMutation.error.status === 503;
 
   const onStart = handleSubmit((values) => {

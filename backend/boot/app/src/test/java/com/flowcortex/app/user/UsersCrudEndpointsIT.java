@@ -14,12 +14,11 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 4.5 verify — {@code /api/v1/users} against the real, fully-wired app
- * (design.md D1/D3, R-020/R-023/R-024/R-025). Covers J-2 (create + validation
- * + conflict), J-3's admin-side oracle (suspend), J-4 (cross-scope 404),
- * J-6 (MEMBER/unauthenticated locked out), and J-8 (admin-mediated email
- * correction). This also test-locks slice 2's AccessDeniedException→403
- * plumbing (apply-report-slice2.md Deviations) via the MEMBER→403 case.
+ * {@code /api/v1/users} against the real, fully-wired app. Covers create +
+ * validation + conflict, admin suspending a user, cross-scope 404,
+ * MEMBER/unauthenticated locked out, and admin-mediated email correction.
+ * This also test-locks the AccessDeniedException→403 plumbing via the
+ * MEMBER→403 case.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)

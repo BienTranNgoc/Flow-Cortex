@@ -11,9 +11,9 @@ export function useAuthToken(): string | null {
 }
 
 /**
- * The signed-in user's own record (design.md J-1/J-7). Disabled while signed
- * out — there's nothing to fetch, and an unauthenticated call would only
- * bounce back a 401 the query cache has no reason to hold onto.
+ * The signed-in user's own record. Disabled while signed out — there's
+ * nothing to fetch, and an unauthenticated call would only bounce back a
+ * 401 the query cache has no reason to hold onto.
  */
 export function useMeQuery() {
   const token = useAuthToken();

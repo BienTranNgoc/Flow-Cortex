@@ -1,6 +1,6 @@
-/* Functional MVP only — no design tokens yet (tasks.md Directive). Keeps
-   every viewport (375px/768px/1280px, task 4.7 verify) free of horizontal
-   scroll and touch targets >=44px. */
+/* Functional MVP only — no design tokens yet. Keeps every viewport
+   (375px/768px/1280px) free of horizontal scroll and touch targets
+   >=44px. */
 
 *,
 *::before,

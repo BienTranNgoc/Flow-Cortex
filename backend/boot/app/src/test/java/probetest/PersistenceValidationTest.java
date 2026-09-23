@@ -16,8 +16,8 @@ import org.springframework.context.annotation.Configuration;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
- * Task 2.3 — proves {@code ddl-auto: validate} both ways on real Postgres:
- * boot succeeds when the schema Flyway migrated matches
+ * Proves {@code ddl-auto: validate} both ways on real Postgres: boot
+ * succeeds when the schema Flyway migrated matches
  * {@link ProbeEntity}'s mapping, and boot fails when it deliberately doesn't.
  * Uses {@link ApplicationContextRunner} (rather than a full
  * {@code @SpringBootTest}) so the failing scenario can be asserted on

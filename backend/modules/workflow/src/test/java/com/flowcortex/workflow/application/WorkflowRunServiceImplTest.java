@@ -27,8 +27,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Task 5.4/5.5 — {@link WorkflowRunServiceImpl}: start-run tx#1 (design.md
- * D5/R-050), the kill switch (R-046), and owner-scoped reads (R-047).
+ * {@link WorkflowRunServiceImpl}: start-run tx#1, the kill switch, and
+ * owner-scoped reads.
  */
 class WorkflowRunServiceImplTest {
 

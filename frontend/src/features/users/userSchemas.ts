@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Mirrors `UsersController.CreateUserRequest` (design.md D3, task 4.5). */
+/** Mirrors `UsersController.CreateUserRequest`. */
 export const createUserSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Enter a valid email'),
   password: z

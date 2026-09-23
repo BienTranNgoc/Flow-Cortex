@@ -5,7 +5,7 @@ import { authHeaders, unwrap } from '../../api/client';
 
 const USERS_QUERY_KEY = ['users'] as const;
 
-/** ADMIN-only user list, owner-scoped server-side (design.md D1/R-023/R-025). */
+/** ADMIN-only user list, owner-scoped server-side. */
 export function useUsersQuery() {
   return useQuery({
     queryKey: USERS_QUERY_KEY,

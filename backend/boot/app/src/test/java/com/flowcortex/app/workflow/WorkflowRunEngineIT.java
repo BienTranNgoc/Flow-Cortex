@@ -16,9 +16,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 5.3 — the workflow run engine end to end, exercised through the real
- * {@code api} ports (design.md D5, R-041/R-042/R-044/R-049/R-050). Each test
- * targets one spec scenario the tasks.md verify clause names.
+ * The workflow run engine end to end, exercised through the real {@code
+ * api} ports.
  */
 @Testcontainers
 @SpringBootTest
@@ -32,8 +31,8 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
         RunView started = workflowRunService.startRun(user.id(), workflow.id(), "hello");
 
         // The returned view is built INSIDE the same transaction that just
-        // inserted the run — the async listener cannot possibly have run yet
-        // (design.md D5/R-050), so this is deterministic, not a race.
+        // inserted the run — the async listener cannot possibly have run
+        // yet, so this is deterministic, not a race.
         assertThat(started.status()).isEqualTo("running");
         assertThat(started.steps()).hasSize(1);
         assertThat(started.steps().get(0).status()).isEqualTo("pending");
@@ -46,9 +45,9 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
 
     @Test
     void aPollCanObserveANonTerminalStepBeforeCompletion() {
-        // A possibility guarantee, not a determinism one (acceptance.md's own
-        // "Not verified" note): assert the STRUCTURAL fact that makes it
-        // possible — the run starts non-terminal — rather than requiring a
+        // A possibility guarantee, not a determinism one: assert the
+        // STRUCTURAL fact that makes it possible — the run starts
+        // non-terminal — rather than requiring a
         // specific poll to catch an in-flight step (echo steps finish in
         // sub-millisecond time, so timing a genuine mid-flight catch would be
         // flaky).
@@ -77,8 +76,8 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
         List<RunStepView> steps = finished.steps();
         assertThat(steps).extracting(RunStepView::status).containsExactly("completed", "completed", "completed");
         assertThat(steps).extracting(RunStepView::output).containsExactly("hello", "hello", "hello");
-        // Sequential dispatch (R-041): each step's start time is not before
-        // the previous step's.
+        // Sequential dispatch: each step's start time is not before the
+        // previous step's.
         assertThat(steps.get(0).startedAt()).isBeforeOrEqualTo(steps.get(1).startedAt());
         assertThat(steps.get(1).startedAt()).isBeforeOrEqualTo(steps.get(2).startedAt());
     }
@@ -122,7 +121,7 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
     void allEchoStepsCompleteWhenTheRunIsStartedWithNoInput() {
         // The browser-loop QA bug: the seeded "Echo Demo (all steps succeed)"
         // is shaped exactly like this (three echo steps) and is started with
-        // NO input from the UI ("optional" input label, J-5). Step 1 echoes
+        // NO input from the UI (an "optional" input label). Step 1 echoes
         // the run's null input, completing with a null output — step 2's
         // DEFAULT resolution must treat that as a genuinely completed
         // predecessor and pass the null output through, not error.
@@ -199,8 +198,8 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
         awaitTerminal(otherMember.id(), otherRun.id());
 
         // The owner of the (shared) workflow definition cannot read a run
-        // they did not themselves start (R-047 — a shared definition never
-        // means shared runs).
+        // they did not themselves start — a shared definition never means
+        // shared runs.
         assertThatThrownBy(() -> workflowRunService.getRun(owner.id(), otherRun.id()))
                 .isInstanceOf(NotFoundException.class);
         // The runner can read their own run.

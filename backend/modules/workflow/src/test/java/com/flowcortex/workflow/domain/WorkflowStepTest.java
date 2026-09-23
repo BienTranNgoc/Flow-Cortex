@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Task 5.2 — the {@code workflow_step} entity (design.md D1, R-040/R-042). */
+/** The {@code workflow_step} entity. */
 class WorkflowStepTest {
 
     @Test

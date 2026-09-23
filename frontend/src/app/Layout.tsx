@@ -2,9 +2,9 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
 
 /**
- * App shell: nav + signed-in user + sign-out. MEMBER sees no Users link
- * (task 4.7, J-6) — `RequireAdmin` on the route itself is the actual guard;
- * this is just so a MEMBER never sees a link to somewhere they can't go.
+ * App shell: nav + signed-in user + sign-out. MEMBER sees no Users link —
+ * `RequireAdmin` on the route itself is the actual guard; this is just so a
+ * MEMBER never sees a link to somewhere they can't go.
  */
 export function Layout() {
   const meQuery = useMeQuery();

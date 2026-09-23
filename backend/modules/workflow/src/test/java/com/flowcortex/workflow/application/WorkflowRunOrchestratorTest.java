@@ -23,12 +23,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Task 5.3/5.4 — {@link WorkflowRunOrchestrator}'s dispatch loop (design.md
- * D5, R-041/R-044/R-045), with every collaborator mocked: sequential claim,
- * halt-on-error, and the "another execution already handling this" skip
- * (R-045's live guard). End-to-end async execution against a real database
- * is {@code WorkflowRunEngineIT} (:boot:app) — this covers the loop's own
- * branching logic in isolation.
+ * {@link WorkflowRunOrchestrator}'s dispatch loop, with every collaborator
+ * mocked: sequential claim, halt-on-error, and the "another execution
+ * already handling this" skip. End-to-end async execution against a real
+ * database is {@code WorkflowRunEngineIT} (:boot:app) — this covers the
+ * loop's own branching logic in isolation.
  */
 class WorkflowRunOrchestratorTest {
 

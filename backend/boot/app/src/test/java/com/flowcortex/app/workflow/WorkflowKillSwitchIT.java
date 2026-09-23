@@ -20,10 +20,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 5.5 verify — {@code flowcortex.workflow.enabled=false} (design.md
- * D5/R-046): new runs are refused cleanly (503, no row written); already-
- * finished runs stay readable (J-9/J-10). A dedicated {@code @SpringBootTest}
- * context, since the property is bound once at context startup.
+ * {@code flowcortex.workflow.enabled=false}: new runs are refused cleanly
+ * (503, no row written); already-finished runs stay readable. A dedicated
+ * {@code @SpringBootTest} context, since the property is bound once at
+ * context startup.
  *
  * <p>The "existing run stays readable" half is seeded directly via SQL
  * (rather than {@code startRun}, which THIS context deliberately refuses) —

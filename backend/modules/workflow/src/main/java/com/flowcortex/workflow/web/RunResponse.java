@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * {@code status} is the exact lowercase wire value (design.md D1): running/completed/error. Returned by both the
+ * {@code status} is the exact lowercase wire value: running/completed/error. Returned by both the
  * start-run endpoint (freshly `running`, all steps `pending`) and the run-read endpoint (whatever the poll observes).
  */
 record RunResponse(

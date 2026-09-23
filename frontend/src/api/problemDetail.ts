@@ -1,6 +1,6 @@
 /**
- * RFC 9457 `application/problem+json` shape (design.md D3) — the backend's
- * uniform error contract across every endpoint.
+ * RFC 9457 `application/problem+json` shape — the backend's uniform error
+ * contract across every endpoint.
  */
 export interface ProblemDetail {
   type?: string;

@@ -19,12 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/auth} (design.md D3/D4): login, the caller's own profile
- * ({@code me}), and self-service name update ({@code profile} — email/role/
- * status are admin-mediated only, R-022).
+ * {@code /api/v1/auth}: login, the caller's own profile ({@code me}), and
+ * self-service name update ({@code profile} — email/role/status are
+ * admin-mediated only).
  *
- * <p>Package-private, depends only on this module's own {@code api} port
- * (design.md D3).
+ * <p>Package-private, depends only on this module's own {@code api} port.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -73,7 +72,7 @@ class AuthController {
     record ProfileUpdateRequest(@NotBlank String name) {
     }
 
-    /** Never carries {@code passwordHash} (R-021) — {@link CurrentUser} does not either. */
+    /** Never carries {@code passwordHash} — {@link CurrentUser} does not either. */
     record MeResponse(UUID id, String email, String name, String role, String status) {
         static MeResponse from(CurrentUser user) {
             return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status());

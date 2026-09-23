@@ -8,7 +8,7 @@ import { ApiError } from '../../api/problemDetail';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 
-/** J-7: fix my own display name; email/role/status are not self-service (R-022). */
+/** Fix my own display name; email/role/status are not self-service. */
 export function ProfilePage() {
   const meQuery = useMeQuery();
   const queryClient = useQueryClient();

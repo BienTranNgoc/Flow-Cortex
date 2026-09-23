@@ -7,10 +7,10 @@ import jakarta.persistence.Table;
 import java.util.UUID;
 
 /**
- * Test-only JPA entity for {@link PersistenceValidationTest} (task 2.3). No
- * domain entity exists yet (group 4 adds the first one) — this proves
- * {@code ddl-auto: validate} genuinely validates a mapping against a
- * Flyway-migrated Postgres schema, both when they match and when they don't.
+ * Test-only JPA entity for {@link PersistenceValidationTest}. No domain
+ * entity exists yet — this proves {@code ddl-auto: validate} genuinely
+ * validates a mapping against a Flyway-migrated Postgres schema, both when
+ * they match and when they don't.
  *
  * <p>Deliberately package-scoped OUTSIDE {@code com.flowcortex} so it is never
  * swept into the real app's entity scan (which is rooted at

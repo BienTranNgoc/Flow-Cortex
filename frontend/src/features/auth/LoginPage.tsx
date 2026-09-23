@@ -6,8 +6,8 @@ import { loginSchema, type LoginFormValues } from './loginSchema';
 import { useAuthToken, useLoginMutation } from './useAuth';
 
 /**
- * J-1: email+password → token → guarded route. Functional MVP only (tasks.md
- * Directive — no design tokens yet).
+ * Email+password → token → guarded route. Functional MVP only — no design
+ * tokens yet.
  */
 export function LoginPage() {
   const token = useAuthToken();

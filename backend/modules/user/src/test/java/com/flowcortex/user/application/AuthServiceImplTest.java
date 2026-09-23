@@ -26,8 +26,8 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 /**
- * Task 4.3 (design.md D4/R-021/R-023), authored before {@link
- * AuthServiceImpl} existed. {@link JwtEncoder} is mocked — the concrete
+ * Authored before {@link AuthServiceImpl} existed. {@link JwtEncoder} is
+ * mocked — the concrete
  * encoding is proven by {@code JwtSigningConfig}'s wiring plus the real HTTP
  * round-trip in {@code UserModuleEndpointsIT} (:boot:app); this test locks
  * WHAT gets minted (subject, role claim) and, just as importantly, when it

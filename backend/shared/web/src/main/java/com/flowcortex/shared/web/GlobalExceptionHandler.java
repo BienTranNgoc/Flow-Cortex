@@ -24,7 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 /**
  * Global exception -&gt; {@link ProblemDetail} mapping, uniform across every
- * module (design.md D3, R-005/R-006).
+ * module.
  *
  * <p>Extends {@link ResponseEntityExceptionHandler} so the standard Spring
  * MVC failures (unsupported method, unsupported media type, no handler
@@ -92,9 +92,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      * Catches everything the more specific handlers above (and the base
      * class's own Spring MVC handlers) do not recognise. Never leaks the raw
      * exception message to the client — that is exactly the stack-trace
-     * disclosure D3's uniform contract exists to prevent — but logs the real
+     * disclosure this uniform contract exists to prevent — but logs the real
      * exception so it is diagnosable via the request's correlation id
-     * (RequestIdFilter's MDC entry, D3/R-009).
+     * ({@code RequestIdFilter}'s MDC entry).
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {

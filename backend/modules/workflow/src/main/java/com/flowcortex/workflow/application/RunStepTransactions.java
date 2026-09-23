@@ -13,21 +13,20 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The three short REQUIRES_NEW transactions a single step's dispatch is split
- * across (design.md D5): claim, then the step's own work runs, then
- * complete/fail. Each method here is its OWN transaction, called through this
- * bean's Spring proxy (never {@code this.method()} from within {@link
- * WorkflowRunOrchestrator} — that would silently skip the proxy and run in the
- * caller's own transaction, defeating REQUIRES_NEW), so a mid-run step failure
- * PERSISTS instead of rolling back with whatever transaction started the run
- * (design.md D5, R-050).
+ * The three short REQUIRES_NEW transactions a single step's dispatch is
+ * split across: claim, then the step's own work runs, then complete/fail.
+ * Each method here is its OWN transaction, called through this bean's Spring
+ * proxy (never {@code this.method()} from within {@link
+ * WorkflowRunOrchestrator} — that would silently skip the proxy and run in
+ * the caller's own transaction, defeating REQUIRES_NEW), so a mid-run step
+ * failure PERSISTS instead of rolling back with whatever transaction started
+ * the run.
  *
- * <p>Note: the step work itself ({@code StepDispatcher.execute}) currently runs
- * inside the listener's REQUIRES_NEW transaction, which is harmless for the
- * sub-millisecond {@code echo}/{@code fail} demo steps. When a real step type
- * that calls a slow external provider is added (deferred — proposal Out of
- * Scope), move that call OUT of a transaction so it does not hold a DB
- * connection for the whole run.
+ * <p>Note: the step work itself ({@code StepDispatcher.execute}) currently
+ * runs inside the listener's REQUIRES_NEW transaction, which is harmless for
+ * the sub-millisecond {@code echo}/{@code fail} demo steps. When a real step
+ * type that calls a slow external provider is added, move that call OUT of a
+ * transaction so it does not hold a DB connection for the whole run.
  */
 @Component
 class RunStepTransactions {
@@ -40,13 +39,13 @@ class RunStepTransactions {
         this.workflowRunRepository = workflowRunRepository;
     }
 
-    /** {@code pending -> running}, atomically (R-045) — see {@code RunStepRepository#claimPending}. */
+    /** {@code pending -> running}, atomically — see {@code RunStepRepository#claimPending}. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     boolean claim(UUID stepId, Instant now) {
         return runStepRepository.claimPending(stepId, now) == 1;
     }
 
-    /** {@code running -> completed}; marks the owning run {@code completed} too if this was the last step (R-044). */
+    /** {@code running -> completed}; marks the owning run {@code completed} too if this was the last step. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void complete(UUID runId, UUID stepId, String resolvedInput, String output, Instant now) {
         RunStep step = requireStep(stepId);
@@ -61,7 +60,7 @@ class RunStepTransactions {
         }
     }
 
-    /** {@code running -> error}; marks the owning run {@code error} unconditionally — halts further dispatch (R-044). */
+    /** {@code running -> error}; marks the owning run {@code error} unconditionally — halts further dispatch. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void fail(UUID runId, UUID stepId, String resolvedInput, String errorMessage, Instant now) {
         RunStep step = requireStep(stepId);

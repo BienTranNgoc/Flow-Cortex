@@ -8,10 +8,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Task 5.3 — input resolution (design.md D5/R-042): step 1 resolves to the
- * run's own input; step N defaults to the previous step's output, or an
- * explicit {@code {step:K.field}} reference; an unresolved/incomplete
- * reference throws rather than resolving to an empty string.
+ * Input resolution: step 1 resolves to the run's own input; step N defaults
+ * to the previous step's output, or an explicit {@code {step:K.field}}
+ * reference; an unresolved/incomplete reference throws rather than
+ * resolving to an empty string.
  */
 class InputResolverTest {
 
@@ -26,8 +26,8 @@ class InputResolverTest {
 
     @Test
     void stepOneIgnoresAnyInputRefAndStillUsesRunInput() {
-        // step 1 has no "previous step" to default from, and design.md D5
-        // fixes step 1 <- run.input unconditionally.
+        // step 1 has no "previous step" to default from — step 1 <-
+        // run.input is fixed, unconditionally.
         String resolved = resolver.resolve(1, "{step:1.field}", "the run input", Map.of());
 
         assertThat(resolved).isEqualTo("the run input");
@@ -55,7 +55,7 @@ class InputResolverTest {
         // (e.g. an "echo" step given the run's own null/empty input) records
         // a null output in priorOutputs — that is a completed step's real
         // output, not an absent one, and must default through rather than
-        // erroring (R-042 only errors on a step that never completed).
+        // erroring (resolution only errors on a step that never completed).
         Map<Integer, String> priorOutputs = new LinkedHashMap<>();
         priorOutputs.put(1, null);
 

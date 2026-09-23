@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Exists only so {@link GlobalExceptionHandlerTest} has real endpoints to
- * exercise the advice against (task 2.5) — never shipped, test sources only.
+ * exercise the advice against — never shipped, test sources only.
  */
 @RestController
 class ThrowawayTestController {

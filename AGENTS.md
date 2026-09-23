@@ -133,7 +133,7 @@ Encode **durable patterns, not library names** — they outlive the churn (valid
 
 ## 14. Comment hygiene — lean, no junk (Flow-Cortex local rule)
 
-This repo keeps comments **minimal**. Well-named code is the primary documentation; a comment earns its place only when it says something the code cannot. Target well under ~10% comment lines in a file — if a class is a third comments, it is over-commented.
+This repo keeps comments **minimal**. Well-named code is the primary documentation; a comment earns its place only when it says something the code cannot. Target well under ~10% comment lines in an implementation file — if a service/controller/entity is a third comments, it is over-commented. One deliberate exception: a module's public **`api` port interface** carries its contract as Javadoc (scope semantics, what throws what, null-means-unchanged) — that Javadoc IS the deliverable other modules code against, so those files are exempt from the density heuristic; keep each note precise, not long.
 
 **The reference sources are read, never mirrored for style.** Xood and DigiShield are heavily commented; that is THEIR convention and correct THERE. Do NOT carry their explanatory-comment density into Flow-Cortex. Port the *pattern*, write the comment fresh (or not at all).
 

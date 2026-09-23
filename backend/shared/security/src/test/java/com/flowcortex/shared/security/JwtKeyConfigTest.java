@@ -7,8 +7,8 @@ import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 
 /**
- * Plain-JUnit coverage of the fail-fast JWT_SECRET validation (design.md D4)
- * — no Spring context needed, so this runs fast and covers the one piece of
+ * Plain-JUnit coverage of the fail-fast JWT_SECRET validation — no Spring
+ * context needed, so this runs fast and covers the one piece of
  * :shared:security that is not itself a {@code *Config} exclusion detail.
  */
 class JwtKeyConfigTest {

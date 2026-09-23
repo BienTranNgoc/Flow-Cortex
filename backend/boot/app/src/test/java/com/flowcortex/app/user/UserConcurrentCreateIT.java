@@ -20,9 +20,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 4.3 — R-024 concurrency: two parallel creates of the same (globally
- * unique) email must leave exactly one row, one caller succeeding and the
- * other rejected — enforced by the database's {@code UNIQUE (email)}
+ * Concurrency: two parallel creates of the same (globally unique) email
+ * must leave exactly one row, one caller succeeding and the other
+ * rejected — enforced by the database's {@code UNIQUE (email)}
  * constraint ({@code V2026.09.22.001__user.sql}), not an application-level
  * check-then-insert (which would race).
  *

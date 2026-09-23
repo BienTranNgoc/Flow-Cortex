@@ -1,7 +1,6 @@
 /* Card list + step list — inherently narrow, single-column content, so no
    horizontal-scroll breakpoint is needed the way the Users table's
-   collapse-to-cards rule is (task 5.10 verify: 375/768/1280px, no
-   horizontal scroll). */
+   collapse-to-cards rule is. */
 
 .workflow-list {
   list-style: none;

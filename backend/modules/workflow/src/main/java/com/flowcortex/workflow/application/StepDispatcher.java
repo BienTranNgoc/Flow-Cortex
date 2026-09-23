@@ -3,16 +3,15 @@ package com.flowcortex.workflow.application;
 import org.springframework.stereotype.Component;
 
 /**
- * Executes a single step's work by {@code type} (design.md D1 Open
- * Questions — only two MVP types exist; a real provider-backed catalogue is
- * a later change).
+ * Executes a single step's work by {@code type} — only two MVP types exist; a
+ * real provider-backed catalogue is a later change.
  *
  * <ul>
- *   <li>{@code echo} — returns its resolved input verbatim (R-042's "engine
- *   is provable without wiring an external provider").</li>
+ *   <li>{@code echo} — returns its resolved input verbatim, so the engine is
+ *   provable without wiring an external provider.</li>
  *   <li>{@code fail} — deliberately, deterministically throws, so the
- *   run-error UI (J-11) is reachable from a seeded demo (task 5.9) without a
- *   real failing provider.</li>
+ *   run-error UI is reachable from a seeded demo without a real failing
+ *   provider.</li>
  * </ul>
  */
 @Component

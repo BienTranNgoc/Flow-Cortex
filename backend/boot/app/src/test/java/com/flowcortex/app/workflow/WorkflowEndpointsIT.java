@@ -17,11 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 5.7 verify — {@code /api/v1/workflows}, {@code
- * /api/v1/workflows/{id}/runs}, {@code /api/v1/runs/{id}} against the real,
- * fully-wired app (design.md D3/D5). Covers J-5's HTTP-level oracle (start
- * returns 200 before steps finish, shared-demo visibility) and the 404
- * shapes for an unknown/foreign workflow or run.
+ * {@code /api/v1/workflows}, {@code /api/v1/workflows/{id}/runs}, {@code
+ * /api/v1/runs/{id}} against the real, fully-wired app. Covers the
+ * HTTP-level start-returns-200-before-steps-finish behavior, shared-demo
+ * visibility, and the 404 shapes for an unknown/foreign workflow or run.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -119,11 +118,11 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
 
     @Test
     void suspendedUserWithStillValidTokenReturns403OnWorkflowCall() {
-        // A self-owned ADMIN (newUser) can no longer suspend itself (G2's
+        // A self-owned ADMIN (newUser) can no longer suspend itself (the
         // self-lockout guard, UserServiceImpl#updateUser), so this suspends
         // a MEMBER managed by an owning admin instead — workflow access is
-        // open to MEMBER too (task 5.11), so this still proves the same
-        // live-suspend property on `/api/v1/workflows`.
+        // open to MEMBER too, so this still proves the same live-suspend
+        // property on `/api/v1/workflows`.
         UserView owner = newUser("http-live-suspend-workflow-owner");
         UserView user = userService.createUser(owner.id(), uniqueEmail("http-live-suspend-workflow"),
                 "password123", "Soon Suspended", "MEMBER");

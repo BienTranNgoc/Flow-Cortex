@@ -3,7 +3,7 @@ spring:
     name: flow-cortex
 
   # Local defaults for a bare `./gradlew bootRun` against a manually-started
-  # Postgres. SPRING_DATASOURCE_* env vars (docker compose, group 3) or the
+  # Postgres. SPRING_DATASOURCE_* env vars (docker compose) or the
   # Testcontainers @ServiceConnection (every test) override these outright —
   # neither needs the ${VAR:default} placeholder form, Spring's relaxed env
   # binding takes precedence over this file automatically.
@@ -16,7 +16,7 @@ spring:
   jpa:
     hibernate:
       # Schema is Flyway-owned; Hibernate only validates its entity mapping
-      # against what Flyway already migrated (design.md D7/R-004) — never
+      # against what Flyway already migrated — never
       # mutates the schema itself.
       ddl-auto: validate
     open-in-view: false
@@ -38,7 +38,7 @@ management:
     health:
       show-details: when-authorized
 
-# Contract-first OpenAPI pipeline (design.md D6, task 3.1): document the
+# Contract-first OpenAPI: document the
 # actuator endpoints alongside the app's own controllers in /v3/api-docs so
 # the committed snapshot reflects everything that is actually reachable.
 springdoc:
@@ -47,16 +47,15 @@ springdoc:
 # No default here on purpose — a committed real-looking default would trip the
 # security-scan secret scanner (Trivy) and ship a known signing key. Only the
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
-# profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly
-# (design.md D4).
+# profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
   security:
     jwt-secret: ${JWT_SECRET:}
-  # Kill switch (design.md D5/R-046, task 5.5) gating POST
+  # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
   # FLOWCORTEX_WORKFLOW_ENABLED env var + a process restart (no new flag
-  # library, no runtime toggle endpoint) — an existing-config property, not a
-  # DB-backed live toggle, per this task's explicit instruction.
+  # library, no runtime toggle endpoint) — a plain config property, not a
+  # DB-backed live toggle.
   workflow:
     enabled: ${FLOWCORTEX_WORKFLOW_ENABLED:true}

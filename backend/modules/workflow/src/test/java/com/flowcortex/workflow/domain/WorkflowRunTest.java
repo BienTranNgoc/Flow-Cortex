@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Task 5.2 — the {@code workflow_run} entity (design.md D5, R-044). */
+/** The {@code workflow_run} entity. */
 class WorkflowRunTest {
 
     @Test

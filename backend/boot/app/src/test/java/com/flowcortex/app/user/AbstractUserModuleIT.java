@@ -13,8 +13,7 @@ import org.springframework.http.ResponseEntity;
 
 /**
  * Shared HTTP-level test support for the {@code /api/v1/auth} and {@code
- * /api/v1/users} endpoint ITs (task 4.5's verify: "all user spec scenarios
- * green; problem docs on 400/401/403/404"). Not itself annotated with {@code
+ * /api/v1/users} endpoint ITs. Not itself annotated with {@code
  * @SpringBootTest}/{@code @Testcontainers} — each concrete subclass carries
  * those, matching this codebase's existing IT pattern ({@code
  * SecurityFilterChainIT}, {@code OpenApiSnapshotTest}).
@@ -22,8 +21,8 @@ import org.springframework.http.ResponseEntity;
  * <p>Preconditions ("Given a seeded ADMIN...") are set up directly through
  * the {@link UserService} {@code api} port — the only legitimate way to
  * bootstrap the FIRST user of an owner scope, since {@code POST /users}
- * itself requires an already-authenticated ADMIN (design.md D1's self-owned-
- * ADMIN decision; see {@code UserService#createInitialAdmin}'s javadoc). The
+ * itself requires an already-authenticated ADMIN (the self-owned-ADMIN
+ * decision; see {@code UserService#createInitialAdmin}'s javadoc). The
  * WHEN/THEN of each scenario goes through the real HTTP surface.
  */
 abstract class AbstractUserModuleIT extends AbstractPostgresBootTest {

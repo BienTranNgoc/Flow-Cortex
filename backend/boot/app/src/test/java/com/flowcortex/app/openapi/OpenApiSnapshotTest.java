@@ -18,18 +18,17 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 3.1 (design.md D6): {@code /v3/api-docs.yaml} is the live source of
- * the contract-first pipeline; this test both proves springdoc renders it
- * correctly on this stack and writes it to the committed {@code
- * docs/openapi.yaml} snapshot that {@code backend-ci}/{@code frontend-ci}
- * diff-check for drift (task 3.3).
+ * {@code /v3/api-docs.yaml} is the live source of the contract-first
+ * pipeline; this test both proves springdoc renders it correctly on this
+ * stack and writes it to the committed {@code docs/openapi.yaml} snapshot
+ * that {@code backend-ci}/{@code frontend-ci} diff-check for drift.
  *
  * <p>Exercised against the real, fully-wired app (not a {@code @WebMvcTest}
  * slice) since the document must reflect exactly what a client would fetch —
- * including the security posture that permits it (task 3.1 lane delta).
- * Lives under {@code com.flowcortex.app} like {@code HealthController}/{@code
+ * including the security posture that permits it. Lives under {@code
+ * com.flowcortex.app} like {@code HealthController}/{@code
  * SecurityFilterChainIT} — a direct sub-package of {@code com.flowcortex}
- * would become a stray Modulith module (task 1.3's pitfall).
+ * would become a stray Modulith module.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -42,9 +41,9 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
     @Test
     void jacksonThreeSchemaAnnotationSurvivesGeneration() {
         // Smoke test for springdoc's early-Boot-4/Jackson-3 introspection
-        // friction (design.md D6/Risks, issues #3169/#3268): a @Schema
-        // annotation on a Java record component (HealthController.HealthResponse)
-        // must actually reach the generated document, not merely compile.
+        // friction (issues #3169/#3268): a @Schema annotation on a Java
+        // record component (HealthController.HealthResponse) must actually
+        // reach the generated document, not merely compile.
         ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs.yaml", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

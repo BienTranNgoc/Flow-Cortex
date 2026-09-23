@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Task 5.4 — entity -&gt; {@code api} view mapping, including the lowercase wire-status rule (design.md D1). */
+/** Entity -&gt; {@code api} view mapping, including the lowercase wire-status rule. */
 class WorkflowMapperTest {
 
     @Test

@@ -23,9 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Implementation of {@link WorkflowRunService} (design.md D5). {@link
- * #startRun} is tx#1 of the async after-commit execution model (R-050):
- * creates the {@code WorkflowRun} + its {@code pending} {@code RunStep}s,
+ * Implementation of {@link WorkflowRunService}. {@link #startRun} is tx#1 of
+ * the async after-commit execution model: creates the {@code WorkflowRun} +
+ * its {@code pending} {@code RunStep}s,
  * commits, and publishes {@link WorkflowRunStartedEvent} — {@link
  * WorkflowRunOrchestrator} picks that event up AFTER this transaction
  * commits and drives the actual execution, so this method returns before any
@@ -56,9 +56,8 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     @Transactional
     public RunView startRun(UUID currentUserId, UUID workflowId, String input) {
-        // Kill switch (R-046) — checked BEFORE anything is persisted: off
-        // means no run is created at all, not a run that is immediately
-        // refused.
+        // Kill switch — checked BEFORE anything is persisted: off means no
+        // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Workflow execution is currently disabled");
@@ -80,7 +79,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         // Published within this transaction; WorkflowRunOrchestrator's
         // @ApplicationModuleListener only fires AFTER this transaction
-        // commits (design.md D5/R-050) — this method returns first.
+        // commits — this method returns first.
         events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
 
         return WorkflowMapper.toRunView(run, runSteps);

@@ -4,9 +4,9 @@ import java.util.UUID;
 
 /**
  * Immutable view of an authenticated user, exposed to the web layer and to
- * other modules (design.md D2 — {@code workflow} resolves "who is calling"
- * through this port rather than depending on {@code user}'s internal JPA
- * entity). Never carries the password hash (R-021).
+ * other modules — {@code workflow} resolves "who is calling" through this
+ * port rather than depending on {@code user}'s internal JPA entity. Never
+ * carries the password hash.
  *
  * @param id      the user's own id — this is the value a signed JWT carries
  *                as its subject, and what another module stamps as an

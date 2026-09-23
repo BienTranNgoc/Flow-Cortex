@@ -12,8 +12,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /**
  * Builds the HS256 signing/verification key from the {@code JWT_SECRET}
- * environment variable (design.md D4). The base {@code application.yml}
- * supplies no fallback — only the {@code dev} Spring profile does, in
+ * environment variable. The base {@code application.yml} supplies no
+ * fallback — only the {@code dev} Spring profile does, in
  * {@code application-dev.yml}, so a real deployment that forgets to set
  * {@code JWT_SECRET} fails to start instead of silently signing tokens with a
  * weak or shared key.

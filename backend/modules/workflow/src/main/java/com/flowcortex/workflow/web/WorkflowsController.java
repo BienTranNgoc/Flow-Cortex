@@ -19,14 +19,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/workflows} — list/get (visibility: owner or shared, R-049)
- * and {@code /api/v1/workflows/{id}/runs} — start (design.md D5/R-050).
- * Plainly authenticated by {@code :shared:security}'s default chain — no
- * per-module {@code SecurityFilterChain} needed here (design.md D4 sync,
- * unlike {@code :modules:user}'s {@code UserModuleSecurityConfig}).
+ * {@code /api/v1/workflows} — list/get (visibility: owner or shared) and
+ * {@code /api/v1/workflows/{id}/runs} — start. Plainly authenticated by
+ * {@code :shared:security}'s default chain — no per-module {@code
+ * SecurityFilterChain} needed here, unlike {@code :modules:user}'s {@code
+ * UserModuleSecurityConfig}.
  *
  * <p>Package-private, depends only on this module's own {@code api} port
- * plus {@code user :: api} (via {@link CurrentUserResolver}) — design.md D3.
+ * plus {@code user :: api} (via {@link CurrentUserResolver}).
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -58,11 +58,11 @@ class WorkflowsController {
         return ResponseEntity.ok(WorkflowResponse.from(workflowService.getVisibleWorkflow(currentUserId, id)));
     }
 
-    // @ResponseStatus documents 200 for springdoc/orval (J-5 oracle: the start
-    // call returns 200 while the run is still `running` — task 5.7 lane
-    // delta) — the runtime status already IS 200 (ResponseEntity.ok below);
-    // this only makes the generated OpenAPI contract explicit rather than
-    // relying on springdoc's undecorated default (slice-4 discovery).
+    // @ResponseStatus documents 200 for springdoc/orval (the start call
+    // returns 200 while the run is still `running`) — the runtime status
+    // already IS 200 (ResponseEntity.ok below); this only makes the
+    // generated OpenAPI contract explicit rather than relying on springdoc's
+    // undecorated default.
     @ResponseStatus(HttpStatus.OK)
     @PostMapping(value = "/{id}/runs", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)

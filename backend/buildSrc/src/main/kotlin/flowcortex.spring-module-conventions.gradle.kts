@@ -1,7 +1,7 @@
 // Convention plugin for a Spring Modulith library module (:modules:*,
 // :shared:*): toolchain + -parameters + dependency-management BOMs + baseline
 // module deps + Checkstyle/JaCoCo gates + persistence (JPA/Postgres/Flyway) +
-// Jakarta Bean Validation (design.md D7, tasks 2.1/2.2/2.6).
+// Jakarta Bean Validation.
 plugins {
     `java-library`
     checkstyle
@@ -38,15 +38,15 @@ dependencies {
     "implementation"("org.springframework.modulith:spring-modulith-starter-core")
 
     // Jakarta Bean Validation (Hibernate Validator) — convention: every inbound
-    // request record across every module is @Valid with Jakarta constraints
-    // (design.md D3/R-006, task 2.6); MethodArgumentNotValidException /
-    // ConstraintViolationException are handled centrally by :shared:web's
-    // GlobalExceptionHandler -> 400 ProblemDetail.
+    // request record across every module is @Valid with Jakarta constraints;
+    // MethodArgumentNotValidException / ConstraintViolationException are
+    // handled centrally by :shared:web's GlobalExceptionHandler -> 400
+    // ProblemDetail.
     "implementation"("org.springframework.boot:spring-boot-starter-validation")
 
-    // Persistence — JPA + PostgreSQL + Flyway (design.md D7, task 2.2). No H2:
-    // dev uses compose Postgres, tests use Testcontainers Postgres, so
-    // ddl-auto: validate holds in every profile the app actually runs in.
+    // Persistence — JPA + PostgreSQL + Flyway. No H2: dev uses compose
+    // Postgres, tests use Testcontainers Postgres, so ddl-auto: validate
+    // holds in every profile the app actually runs in.
     "implementation"("org.springframework.boot:spring-boot-starter-data-jpa")
     "runtimeOnly"("org.postgresql:postgresql")
     "implementation"("org.flywaydb:flyway-core")
@@ -86,12 +86,8 @@ tasks.named("check") {
     dependsOn(tasks.withType<Checkstyle>())
 }
 
-// ---------------------------------------------------------------------------
-// JaCoCo code coverage.
-//
-// Coverage exclusions: generated / boilerplate that is not meaningfully
-// unit-tested (Application classes, Spring config, package-info, ...).
-// ---------------------------------------------------------------------------
+// JaCoCo coverage exclusions: generated / boilerplate that is not
+// meaningfully unit-tested (Application classes, Spring config, package-info, ...).
 val jacocoExclusions = listOf(
     "**/*Application*",
     "**/config/**",
@@ -129,7 +125,7 @@ tasks.jacocoTestCoverageVerification {
                 value = "COVEREDRATIO"
                 // Starts higher than DigiShield's own ratchet (0.30->0.50 over
                 // time): FC is greenfield and small, so 0.50 is reachable from
-                // the first slice rather than a later target (design.md D7).
+                // the first slice rather than a later target.
                 minimum = "0.50".toBigDecimal()
             }
         }

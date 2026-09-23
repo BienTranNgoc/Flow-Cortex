@@ -3,9 +3,9 @@ import { Navigate } from 'react-router-dom';
 import { useMeQuery } from './useAuth';
 
 /**
- * ADMIN-only route guard (design.md D4, R-023) — a MEMBER is bounced back to
- * `/` rather than shown a 403 page (the nav already hides the link, task
- * 4.7); a direct URL visit still cannot reach the page, matching J-6.
+ * ADMIN-only route guard — a MEMBER is bounced back to `/` rather than shown
+ * a 403 page (the nav already hides the link); a direct URL visit still
+ * cannot reach the page.
  */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const meQuery = useMeQuery();

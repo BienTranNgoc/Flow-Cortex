@@ -4,7 +4,7 @@ import com.flowcortex.workflow.api.RunStepView;
 import java.time.Instant;
 import java.util.UUID;
 
-/** {@code status} is the exact lowercase wire value (design.md D1): pending/running/completed/error. */
+/** {@code status} is the exact lowercase wire value: pending/running/completed/error. */
 record RunStepResponse(
         UUID id, int stepOrder, String type, String status, String input, String output, String errorMessage,
         Instant startedAt, Instant finishedAt) {

@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * dependencies so Spring Modulith can detect and verify the module structure
  * rooted at this package ({@code com.flowcortex}).
  *
- * <p>{@code @EnableAsync} (design.md D5/R-050, task 5.4) is what makes
+ * <p>{@code @EnableAsync} is what makes
  * {@code :modules:workflow}'s {@code @ApplicationModuleListener} actually run
  * on a separate thread after its triggering transaction commits — without
  * it, Spring Modulith silently runs the listener on the publishing (request)

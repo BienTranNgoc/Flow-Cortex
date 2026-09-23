@@ -15,17 +15,15 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 2.7 verify: an unauthenticated request is rejected with a 401
- * {@code application/problem+json} body, rendered by :shared:web's advice via
- * :shared:security's {@code AuthenticationEntryPoint} delegation (design.md
- * D3/D4). Exercised against the real, fully-wired filter chain — not a
- * {@code @WebMvcTest} slice — since that is exactly what the mechanism being
- * proven depends on.
+ * Verifies an unauthenticated request is rejected with a 401 {@code
+ * application/problem+json} body, rendered by :shared:web's advice via
+ * :shared:security's {@code AuthenticationEntryPoint} delegation. Exercised
+ * against the real, fully-wired filter chain — not a {@code @WebMvcTest}
+ * slice — since that is exactly what the mechanism being proven depends on.
  *
  * <p>Lives under {@code com.flowcortex.app} (the composition root's own
  * package), like {@code HealthController} — a direct sub-package of
- * {@code com.flowcortex} would become a stray Modulith module (task 1.3's
- * pitfall).
+ * {@code com.flowcortex} would become a stray Modulith module.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)

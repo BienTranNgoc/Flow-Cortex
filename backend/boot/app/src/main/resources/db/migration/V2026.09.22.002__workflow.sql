@@ -1,18 +1,9 @@
--- =============================================================================
--- Flow-Cortex - workflow module (V2026.09.22.002)
+-- workflow / workflow_step (the definition) and workflow_run / run_step (one
+-- execution). Columns match the Hibernate entities so `ddl-auto: validate` passes.
 --
--- Four greenfield tables (design.md D1, task 5.1): workflow / workflow_step
--- (the definition) and workflow_run / run_step (one execution of a
--- definition). Columns and types match the Hibernate-mapped entities exactly
--- so the app can boot with `spring.jpa.hibernate.ddl-auto: validate`
--- (design.md D7/R-004) — same convention V2026.09.22.001__user.sql follows.
---
--- Visibility vs. ownership (design.md D1, R-049): a workflow DEFINITION can be
--- shared (`is_shared = true`, listed to every authenticated user); a
--- workflow RUN never is — `workflow_run.owner_id` always scopes reads to the
--- user who started it (R-047), regardless of whether the workflow itself is
--- shared.
--- =============================================================================
+-- A workflow DEFINITION may be shared (`is_shared = true`, listed to every
+-- authenticated user); a RUN never is — `workflow_run.owner_id` always scopes
+-- reads to the user who started it.
 
 CREATE TABLE workflow (
     id         uuid         PRIMARY KEY,
@@ -25,8 +16,8 @@ CREATE TABLE workflow (
 
 CREATE INDEX idx_workflow_owner_id ON workflow (owner_id);
 
--- workflow_step: the ordered definition of a workflow (design.md D1, R-040).
--- `input_ref` carries the raw `{step:K.field}` reference text (R-042); NULL
+-- workflow_step: the ordered definition of a workflow.
+-- `input_ref` carries the raw `{step:K.field}` reference text; NULL
 -- means "default to the previous step's output" (or, for step 1, the run's
 -- own input).
 CREATE TABLE workflow_step (
@@ -40,9 +31,9 @@ CREATE TABLE workflow_step (
     CONSTRAINT uq_workflow_step_order UNIQUE (workflow_id, step_order)
 );
 
--- workflow_run: one execution of a workflow (design.md D5). `status` is the
--- 4->3-value ladder's RUN-level derivation (`running`|`completed`|`error`,
--- R-044) persisted as a plain lowercase string (RunStatusConverter maps the
+-- workflow_run: one execution of a workflow. `status` is the run-level
+-- derivation of the step ladder (`running`|`completed`|`error`)
+-- persisted as a plain lowercase string (RunStatusConverter maps the
 -- Java enum to/from this exact wire form).
 CREATE TABLE workflow_run (
     id            uuid        PRIMARY KEY,
@@ -58,10 +49,10 @@ CREATE TABLE workflow_run (
 CREATE INDEX idx_workflow_run_owner_id ON workflow_run (owner_id);
 CREATE INDEX idx_workflow_run_workflow_id ON workflow_run (workflow_id);
 
--- run_step: one step's execution within a run (design.md D5, R-043/R-045).
+-- run_step: one step's execution within a run.
 -- `status` is the 4-value ladder (`pending`|`running`|`completed`|`error`)
 -- persisted lowercase (RunStepStatusConverter). The single-active-dispatch
--- atomic claim (R-045) is a raw `UPDATE run_step SET status='running' ...
+-- atomic claim is a raw `UPDATE run_step SET status='running' ...
 -- WHERE id = ? AND status = 'pending'` acting on this exact column.
 CREATE TABLE run_step (
     id            uuid        PRIMARY KEY,

@@ -7,7 +7,7 @@ import com.flowcortex.user.domain.AppUser;
 /**
  * Maps the internal {@link AppUser} entity to the {@code api} views. The one
  * place that mapping happens, so {@code passwordHash} has exactly one spot it
- * could leak from — and does not (R-021).
+ * could leak from — and does not.
  */
 final class AppUserMapper {
 

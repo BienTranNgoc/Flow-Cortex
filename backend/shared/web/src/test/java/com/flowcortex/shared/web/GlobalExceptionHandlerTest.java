@@ -13,9 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * Task 2.5 — authored (and run red, with {@link GlobalExceptionHandler}
- * temporarily removed) before task 2.4's advice was wired; see
- * apply-report-slice2.md for the red-run evidence.
+ * Authored (and run red, with {@link GlobalExceptionHandler} temporarily
+ * removed) before the advice was wired.
  */
 @WebMvcTest(ThrowawayTestController.class)
 class GlobalExceptionHandlerTest {

@@ -8,9 +8,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Task 5.3 — the {@code run_step} status ladder (design.md D5, R-043): the
- * only legal transitions are {@code pending -> running -> completed} or
- * {@code pending -> running -> error}; every other call is rejected.
+ * The {@code run_step} status ladder: the only legal transitions are
+ * {@code pending -> running -> completed} or {@code pending -> running ->
+ * error}; every other call is rejected.
  */
 class RunStepTest {
 
@@ -68,8 +68,8 @@ class RunStepTest {
 
     @Test
     void errorMayBeRecordedWithoutAResolvedInput() {
-        // An unresolved/dangling input_ref (R-042) fails before any input
-        // value exists — markError must accept a null resolvedInput.
+        // An unresolved/dangling input_ref fails before any input value
+        // exists — markError must accept a null resolvedInput.
         RunStep step = newPendingStep();
         step.markRunning(Instant.now());
 

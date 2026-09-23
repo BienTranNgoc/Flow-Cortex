@@ -28,11 +28,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 4.8 verify — the dev-profile seeder runs as part of context startup
- * (a bare {@code @SpringBootTest} invokes {@link ApplicationRunner} beans the
- * same way {@code SpringApplication.run} does), leaving TWO ADMINs in
- * DISTINCT owner scopes plus one MEMBER under the first, and re-running it
- * against already-seeded data does not crash (idempotent).
+ * The dev-profile seeder runs as part of context startup (a bare {@code
+ * @SpringBootTest} invokes {@link ApplicationRunner} beans the same way
+ * {@code SpringApplication.run} does), leaving TWO ADMINs in DISTINCT owner
+ * scopes plus one MEMBER under the first, and re-running it against
+ * already-seeded data does not crash (idempotent).
  */
 @Testcontainers
 @SpringBootTest
@@ -92,8 +92,8 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
         assertThat(member.role()).isEqualTo("MEMBER");
         assertThat(member.ownerId()).isEqualTo(admin1Id);
 
-        // Cross-scope: admin2 cannot see the member seeded under admin1's scope
-        // (R-025) — the same invisibility J-4 exercises, using real seeded data.
+        // Cross-scope: admin2 cannot see the member seeded under admin1's
+        // scope, using real seeded data.
         assertThrows(NotFoundException.class, () -> userService.getUser(admin2Id, memberId));
     }
 
@@ -104,10 +104,10 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
     }
 
     /**
-     * Task 5.9 — the two {@code is_shared=true} demo workflows: visible to
-     * ANY authenticated user (R-049), one all-{@code echo} success path, one
-     * whose middle step deliberately fails (J-11's reachable-without-a-real-
-     * provider failing run).
+     * The two {@code is_shared=true} demo workflows: visible to ANY
+     * authenticated user, one all-{@code echo} success path, one whose
+     * middle step deliberately fails, so a failing run is reachable without
+     * a real provider.
      */
     @Test
     void seedsTwoSharedDemoWorkflowsOneSucceedingOneFailingAtItsMiddleStep() {

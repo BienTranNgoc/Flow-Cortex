@@ -1,21 +1,9 @@
--- =============================================================================
--- Flow-Cortex - user module (V2026.09.22.001)
+-- app_user: columns match the AppUser entity so `ddl-auto: validate` passes.
 --
--- app_user (design.md D1, task 4.1): the first MAIN-source table. Columns and
--- types match the Hibernate-mapped AppUser entity exactly so the app can boot
--- with `spring.jpa.hibernate.ddl-auto: validate` (design.md D7/R-004).
---
--- Ownership scope: `owner_id` is the administering ADMIN's id (an ADMIN row is
--- self-owned, owner_id = own id). Login is by bare email with no scope input,
--- so uniqueness on email is GLOBAL, not per-owner (design.md D1, R-024) — this
--- is what task 4.3's concurrency IT proves: two parallel creates of the same
--- email race on this one constraint, and the database is the sole arbiter.
---
--- No Row-Level Security here (unlike DigiShield's tenant_isolation policy):
--- design.md marks RLS as a later step keyed on owner_id (Out of Scope for this
--- change) — greenfield tables, no data migration, two-way door (design.md D1
--- Reversibility).
--- =============================================================================
+-- owner_id is the administering ADMIN's id (an ADMIN row is self-owned). Login
+-- is by bare email with no scope input, so email uniqueness is GLOBAL, not
+-- per-owner — the UNIQUE constraint is the sole arbiter when two creates race.
+-- No Row-Level Security yet; a later step can key it on owner_id.
 
 CREATE TABLE app_user (
     id            uuid         PRIMARY KEY,

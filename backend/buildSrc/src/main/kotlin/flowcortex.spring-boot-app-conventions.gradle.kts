@@ -1,10 +1,9 @@
 // Convention plugin for the executable Spring Boot app (:boot:app): Boot
 // plugin + bootJar + Modulith test starter + the same Checkstyle/JaCoCo gates
-// as flowcortex.spring-module-conventions (design.md D7, task 2.1). Kept as a
-// separate plugin file (not composing the module-conventions one) since the
-// app applies the plain `java` plugin, not `java-library` — mirrors
-// DigiShield's own two-conventions split, gates duplicated rather than
-// shared, same as there.
+// as flowcortex.spring-module-conventions. Kept as a separate plugin file
+// (not composing the module-conventions one) since the app applies the plain
+// `java` plugin, not `java-library` — mirrors DigiShield's own
+// two-conventions split, gates duplicated rather than shared, same as there.
 plugins {
     java
     checkstyle
@@ -62,10 +61,8 @@ tasks.named("check") {
     dependsOn(tasks.withType<Checkstyle>())
 }
 
-// ---------------------------------------------------------------------------
-// JaCoCo code coverage (boot app). Same exclusions as the module convention —
+// JaCoCo coverage (boot app). Same exclusions as the module convention —
 // *Application*/*Config*/package-info are not meaningfully unit-tested.
-// ---------------------------------------------------------------------------
 val jacocoExclusions = listOf(
     "**/*Application*",
     "**/config/**",

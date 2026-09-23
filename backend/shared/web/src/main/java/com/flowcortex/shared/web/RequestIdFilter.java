@@ -16,7 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Puts a request id on every log line so the lines belonging to one request
- * can be pulled out of the pile (design.md D3/R-009).
+ * can be pulled out of the pile.
  *
  * <p>Reuses an inbound {@code X-Request-Id} when the caller supplied one,
  * otherwise mints one; the id is echoed back on the response so a client can

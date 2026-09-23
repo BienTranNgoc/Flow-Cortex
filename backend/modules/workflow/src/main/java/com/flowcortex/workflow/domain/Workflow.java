@@ -8,10 +8,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A workflow definition (design.md D1). {@code isShared} is the ONLY sharing
- * dimension: a shared definition is listed to every authenticated user
- * (R-049), but that never implies shared RUNS — {@link WorkflowRun#ownerId}
- * always scopes reads to the user who started it.
+ * A workflow definition. {@code isShared} is the ONLY sharing dimension: a
+ * shared definition is listed to every authenticated user, but that never
+ * implies shared RUNS — {@link WorkflowRun#ownerId} always scopes reads to
+ * the user who started it.
  */
 @Entity
 @Table(name = "workflow")

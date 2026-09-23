@@ -6,7 +6,7 @@ import { ApiError } from '../../api/problemDetail';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
 import { useDeleteUserMutation, useUpdateUserMutation } from './useUsers';
 
-/** One row of the Users table (task 4.7) — view mode, or an inline edit form. */
+/** One row of the Users table — view mode, or an inline edit form. */
 export function UserRow({ user }: { user: UserResponse }) {
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();

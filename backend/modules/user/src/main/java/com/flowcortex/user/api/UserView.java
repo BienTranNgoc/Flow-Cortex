@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * Public view of an {@code app_user} row returned by {@link UserService}'s
- * CRUD operations (design.md D1). Never carries the password hash (R-021).
+ * CRUD operations. Never carries the password hash.
  */
 public record UserView(
         UUID id,

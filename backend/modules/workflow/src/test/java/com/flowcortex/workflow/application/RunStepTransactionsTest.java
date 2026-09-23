@@ -20,7 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Task 5.4 — {@link RunStepTransactions}, at the unit level (the REQUIRES_NEW
+ * {@link RunStepTransactions}, at the unit level (the REQUIRES_NEW
  * propagation itself is proven at the Testcontainers level by {@link
  * RunStepClaimConcurrencyIT} / {@code WorkflowRunEngineIT}; this covers the
  * business logic each method performs once inside its own transaction).

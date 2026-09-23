@@ -11,9 +11,9 @@ const STEP_LABELS: Record<string, string> = {
 
 /**
  * `/workflows/:workflowId/runs/:runId` — polls the run until it reaches a
- * terminal status (task 5.10, design.md D5/R-050): each step advances
- * pending -> running -> completed|error. A failing step shows its own
- * message and no step after it ever leaves `pending` (J-11).
+ * terminal status: each step advances pending -> running -> completed|error.
+ * A failing step shows its own message and no step after it ever leaves
+ * `pending`.
  */
 export function RunProgressPage() {
   const { workflowId, runId } = useParams<{ workflowId: string; runId: string }>();

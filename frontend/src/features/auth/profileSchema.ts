@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Self-service profile update is name-only (design.md D4/R-022). */
+/** Self-service profile update is name-only. */
 export const profileSchema = z.object({
   name: z.string().min(1, 'Name is required'),
 });

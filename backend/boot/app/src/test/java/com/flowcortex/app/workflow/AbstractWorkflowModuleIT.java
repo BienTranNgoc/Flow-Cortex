@@ -16,9 +16,8 @@ import java.util.function.Predicate;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Shared setup + polling support for the workflow engine ITs (task 5.3's
- * verify: "each workflow spec scenario has a locking test"). Preconditions go
- * through the {@code api} ports only ({@link UserService}, {@link
+ * Shared setup + polling support for the workflow engine ITs. Preconditions
+ * go through the {@code api} ports only ({@link UserService}, {@link
  * WorkflowService}, {@link WorkflowRunService}) — never a module's internal
  * repository — the same discipline {@code AbstractUserModuleIT} follows.
  */
@@ -37,7 +36,7 @@ abstract class AbstractWorkflowModuleIT extends AbstractPostgresBootTest {
         return prefix + "-" + UUID.randomUUID() + "@example.com";
     }
 
-    /** A fresh, self-owned member-capable user (an ADMIN, since only ADMIN rows are self-owned, design.md D1). */
+    /** A fresh, self-owned member-capable user (an ADMIN, since only ADMIN rows are self-owned). */
     protected UserView newUser(String prefix) {
         return userService.createInitialAdmin(uniqueEmail(prefix), "password123", prefix);
     }
@@ -49,8 +48,8 @@ abstract class AbstractWorkflowModuleIT extends AbstractPostgresBootTest {
     /**
      * Polls {@link WorkflowRunService#getRun} until {@code condition} holds
      * or {@code timeout} elapses (async after-commit execution runs on a
-     * background thread, design.md D5/R-050 — there is no synchronous point
-     * to await otherwise). Fails the test with the LAST observed run rather
+     * background thread — there is no synchronous point to await
+     * otherwise). Fails the test with the LAST observed run rather
      * than a bare timeout exception, so a failing assertion shows the actual
      * stuck state.
      */

@@ -28,15 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code /api/v1/users} — ADMIN-only CRUD scoped to the caller's own owner
- * scope (design.md D1/D3, R-023/R-025). A record outside that scope is a 404,
- * not a 403 (R-025) — {@link UserService} already enforces that; this
- * controller just relays whatever it throws to {@code :shared:web}'s advice.
+ * scope. A record outside that scope is a 404, not a 403 — {@link
+ * UserService} already enforces that; this controller just relays whatever
+ * it throws to {@code :shared:web}'s advice.
  *
- * <p>Package-private, depends only on this module's own {@code api} port
- * (design.md D3). Role/status are constrained by Jakarta Bean Validation so
- * an invalid value fails the SAME {@code MethodArgumentNotValidException} to
- * 400-problem-doc path as any other validation failure (design.md D3/R-006) —
- * no separate exception handling invented for it.
+ * <p>Package-private, depends only on this module's own {@code api} port.
+ * Role/status are constrained by Jakarta Bean Validation so an invalid value
+ * fails the SAME {@code MethodArgumentNotValidException} to 400-problem-doc
+ * path as any other validation failure — no separate exception handling
+ * invented for it.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -57,7 +57,7 @@ class UsersController {
         return ResponseEntity.ok(users);
     }
 
-    // @ResponseStatus documents 201 for springdoc/orval (task 4.6) — Spring MVC
+    // @ResponseStatus documents 201 for springdoc/orval — Spring MVC
     // itself ignores it for a ResponseEntity-returning method (the actual 201
     // comes from ResponseEntity.status() below); this only fixes the
     // generated OpenAPI contract, which otherwise defaults to 200.
@@ -104,7 +104,7 @@ class UsersController {
             @NotBlank @Pattern(regexp = "ADMIN|MEMBER") String role) {
     }
 
-    /** Partial update — a {@code null} field is left unchanged (design.md D1). */
+    /** Partial update — a {@code null} field is left unchanged. */
     record UpdateUserRequest(
             @Email String email,
             String name,
@@ -112,7 +112,7 @@ class UsersController {
             @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {
     }
 
-    /** Never carries {@code passwordHash} (R-021) — {@link UserView} does not either. */
+    /** Never carries {@code passwordHash} — {@link UserView} does not either. */
     record UserResponse(UUID id, String email, String name, String role, String status, Instant createdAt,
             Instant updatedAt) {
         static UserResponse from(UserView view) {

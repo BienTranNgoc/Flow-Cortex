@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import './WorkflowPages.css';
 import { useWorkflowsQuery } from './useWorkflows';
 
-/** `/workflows` — list = owner OR shared (design.md D1/R-049, task 5.10, J-5). */
+/** `/workflows` — list = owner OR shared. */
 export function WorkflowsListPage() {
   const workflowsQuery = useWorkflowsQuery();
 

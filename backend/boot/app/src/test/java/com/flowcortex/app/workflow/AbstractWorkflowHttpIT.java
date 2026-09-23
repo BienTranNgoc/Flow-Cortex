@@ -12,10 +12,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Shared HTTP-level test support for the workflow endpoint ITs (task 5.7's
- * verify clause) — mirrors {@code AbstractUserModuleIT}'s role for {@code
- * :modules:user}'s endpoints. Real login over HTTP (not a hand-minted token)
- * so the same JWT the running app actually issues is exercised end to end.
+ * Shared HTTP-level test support for the workflow endpoint ITs — mirrors
+ * {@code AbstractUserModuleIT}'s role for {@code :modules:user}'s endpoints.
+ * Real login over HTTP (not a hand-minted token) so the same JWT the running
+ * app actually issues is exercised end to end.
  */
 abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
 

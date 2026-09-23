@@ -8,8 +8,8 @@ import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
 
 /**
- * ADMIN-only user list + create/edit/delete (task 4.7, J-2). Functional MVP
- * only — no design tokens yet (tasks.md Directive).
+ * ADMIN-only user list + create/edit/delete. Functional MVP only — no
+ * design tokens yet.
  */
 export function UsersPage() {
   const usersQuery = useUsersQuery();

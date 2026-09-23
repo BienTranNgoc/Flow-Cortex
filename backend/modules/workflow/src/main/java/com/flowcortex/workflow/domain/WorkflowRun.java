@@ -8,13 +8,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One execution of a {@link Workflow} (design.md D5). {@code status} is
- * DERIVED from this run's {@link RunStep}s (R-044) — {@link #markCompleted}/
- * {@link #markError} are only ever called by the orchestrator
- * (application layer), never directly by a caller.
+ * One execution of a {@link Workflow}. {@code status} is DERIVED from this
+ * run's {@link RunStep}s — {@link #markCompleted}/{@link #markError} are
+ * only ever called by the orchestrator (application layer), never directly
+ * by a caller.
  *
- * <p>Always owner-scoped to the user who started it (R-047) — never implied
- * shared by a shared workflow DEFINITION (design.md D1).
+ * <p>Always owner-scoped to the user who started it — never implied shared
+ * by a shared workflow DEFINITION.
  */
 @Entity
 @Table(name = "workflow_run")
@@ -90,13 +90,13 @@ public class WorkflowRun {
         return finishedAt;
     }
 
-    /** R-044: reached once every {@link RunStep} of this run is {@code COMPLETED}. */
+    /** Reached once every {@link RunStep} of this run is {@code COMPLETED}. */
     public void markCompleted(Instant now) {
         this.status = RunStatus.COMPLETED;
         this.finishedAt = now;
     }
 
-    /** R-044: reached the moment any {@link RunStep} errors — halts further dispatch. */
+    /** Reached the moment any {@link RunStep} errors — halts further dispatch. */
     public void markError(String errorMessage, Instant now) {
         this.status = RunStatus.ERROR;
         this.errorMessage = errorMessage;

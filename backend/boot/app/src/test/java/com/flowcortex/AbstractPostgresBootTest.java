@@ -5,8 +5,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
  * Shared Testcontainers Postgres wiring for :boot:app tests that boot the
- * real application context (design.md D7 — no H2; every DB-backed test uses
- * Testcontainers Postgres via Boot's {@code @ServiceConnection}).
+ * real application context — no H2; every DB-backed test uses Testcontainers
+ * Postgres via Boot's {@code @ServiceConnection}.
  *
  * <p>The container field is static and declared on this shared base so every
  * subclass reuses the very same instance — one container started for the
@@ -16,15 +16,15 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * still extend it.
  *
  * <p>Started via a plain static initializer, deliberately WITHOUT {@code
- * @Container}/{@code @Testcontainers} (task 3.1 finding): JUnit's extension
- * stops a {@code @Container} field at the end of the OWNING test class's
- * lifecycle even when the field is inherited from this shared base, which
- * races a mid-suite restart (a new container on a new port) against a
- * Spring context — cached from an earlier class with a different {@code
+ * @Container}/{@code @Testcontainers}: JUnit's extension stops a {@code
+ * @Container} field at the end of the OWNING test class's lifecycle even
+ * when the field is inherited from this shared base, which races a
+ * mid-suite restart (a new container on a new port) against a Spring
+ * context — cached from an earlier class with a different {@code
  * @SpringBootTest} configuration — that still holds a Hikari pool bound to
  * the old, now-stale port. This surfaced only once a THIRD {@code
- * @SpringBootTest} class (OpenApiSnapshotTest) joined the two from slice 2.
- * {@code @ServiceConnection} only needs the field + annotation to wire the
+ * @SpringBootTest} class (OpenApiSnapshotTest) joined the suite. {@code
+ * @ServiceConnection} only needs the field + annotation to wire the
  * datasource — it does not require JUnit's container-lifecycle extension —
  * so this is start-once, stop-never (Testcontainers' Ryuk reaper cleans up
  * when the test JVM exits), which is genuinely one container for the whole

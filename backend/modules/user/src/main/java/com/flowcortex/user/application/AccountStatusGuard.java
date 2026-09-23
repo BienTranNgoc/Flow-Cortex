@@ -5,9 +5,9 @@ import com.flowcortex.user.domain.UserStatus;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * The suspension gate (R-021/R-023): the single place "a suspended principal
- * performs no authenticated action" lives, shared by every {@code
- * application} class that has an {@link AppUser} in hand after a lookup —
+ * The suspension gate: the single place "a suspended principal performs no
+ * authenticated action" lives, shared by every {@code application} class
+ * that has an {@link AppUser} in hand after a lookup —
  * {@link UserDirectoryImpl} (identity resolution behind {@code /auth/me} and
  * every workflow endpoint), {@link AuthServiceImpl} ({@code login}, {@code
  * updateOwnProfile}), and {@link UserServiceImpl} (every {@code

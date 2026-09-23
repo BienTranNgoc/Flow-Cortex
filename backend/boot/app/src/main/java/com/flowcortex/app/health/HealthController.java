@@ -17,18 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class HealthController {
 
-    // Explicit `produces` (task 3.1/3.2 finding): without it, springdoc has no
-    // fixed content-type to document and emits the ambiguous wildcard `*/*`
-    // for this operation's response, which made orval's generated fetch
-    // client fall back to an untyped raw-string body — a real
-    // client.typecheck failure, not merely a documentation nicety.
+    // Explicit `produces`: without it, springdoc has no fixed content-type to
+    // document and emits the ambiguous wildcard `*/*` for this operation's
+    // response, which made orval's generated fetch client fall back to an
+    // untyped raw-string body — a real client.typecheck failure, not merely a
+    // documentation nicety.
     @GetMapping(value = "/health", produces = MediaType.APPLICATION_JSON_VALUE)
     public HealthResponse health() {
         return new HealthResponse("UP", "flow-cortex");
     }
 
-    // @Schema on a record component (design.md D6): the smoke test for
-    // springdoc's early-Boot-4/Jackson-3 introspection friction — proven by
+    // @Schema on a record component: the smoke test for springdoc's
+    // early-Boot-4/Jackson-3 introspection friction — proven by
     // OpenApiSnapshotTest asserting these descriptions actually reach the
     // generated /v3/api-docs document, not merely compiling.
     public record HealthResponse(

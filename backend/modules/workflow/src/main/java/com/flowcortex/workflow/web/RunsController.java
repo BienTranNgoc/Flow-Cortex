@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code /api/v1/runs/{id}} — read a run's status + steps, ALWAYS
- * owner-scoped (R-047, even for a run of a shared workflow definition) —
- * unknown or foreign run id is a 404, not an empty 200 (design.md D3).
+ * owner-scoped (even for a run of a shared workflow definition) — unknown or
+ * foreign run id is a 404, not an empty 200.
  */
 @RestController
 @RequestMapping("/api/v1/runs")

@@ -5,9 +5,9 @@ import jakarta.persistence.Converter;
 import java.util.Locale;
 
 /**
- * Persists {@link RunStatus} as the exact lowercase wire/DB form design.md D1
- * specifies ({@code running}|{@code completed}|{@code error}) while keeping
- * the Java enum constants upper-case (this codebase's convention). {@code
+ * Persists {@link RunStatus} as the exact lowercase wire/DB form ({@code
+ * running}|{@code completed}|{@code error}) while keeping the Java enum
+ * constants upper-case (this codebase's convention). {@code
  * autoApply} so {@link WorkflowRun#status} picks this up without an explicit
  * {@code @Convert} annotation.
  */

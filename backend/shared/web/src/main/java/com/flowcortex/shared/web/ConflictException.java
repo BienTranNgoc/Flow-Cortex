@@ -2,9 +2,8 @@ package com.flowcortex.shared.web;
 
 /**
  * Thrown by any module when a request would violate a uniqueness or state
- * constraint (e.g. a duplicate email, design.md R-024). Mapped by
- * {@link GlobalExceptionHandler} to a 409 {@code application/problem+json}
- * response.
+ * constraint (e.g. a duplicate email). Mapped by {@link
+ * GlobalExceptionHandler} to a 409 {@code application/problem+json} response.
  */
 public class ConflictException extends RuntimeException {
 

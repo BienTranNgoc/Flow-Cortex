@@ -6,9 +6,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * BCrypt password hashing (design.md D4/R-021) — one bean shared by {@link
- * UserServiceImpl} (hashing on create/update) and {@link AuthServiceImpl}
- * (verifying on login).
+ * BCrypt password hashing — one bean shared by {@link UserServiceImpl}
+ * (hashing on create/update) and {@link AuthServiceImpl} (verifying on
+ * login).
  */
 @Configuration
 class PasswordEncoderConfig {

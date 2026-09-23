@@ -13,9 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Task 4.5 verify — {@code /api/v1/auth} against the real, fully-wired app
- * (design.md D3/D4). Covers J-1 (login + me, R-021/R-022), J-3's login-side
- * oracle (suspended → 403, R-023), and J-7 (self profile update, R-022).
+ * {@code /api/v1/auth} against the real, fully-wired app. Covers login + me,
+ * suspended login (403), and self profile update.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
@@ -40,7 +39,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         assertThat(me.email()).isEqualTo(email);
         assertThat(me.role()).isEqualTo("ADMIN");
         // MeView has no password field at all — the JSON body cannot carry
-        // one either (R-021), confirmed by grepping the raw body too.
+        // one either, confirmed by grepping the raw body too.
         ResponseEntity<String> rawMe = get("/api/v1/auth/me", token, String.class);
         assertThat(rawMe.getBody()).doesNotContain("password");
     }
@@ -66,10 +65,10 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     @Test
     void loginSuspendedUserCorrectPasswordReturns403AndNoTokenIsUsable() {
         // A self-owned ADMIN (createInitialAdmin) can no longer suspend
-        // itself (G2's self-lockout guard, UserServiceImpl#updateUser), so
-        // this suspends a MEMBER managed by an owning admin instead —
-        // R-023's "a suspended user cannot log in" scenario doesn't require
-        // the suspended user to be a self-owned admin.
+        // itself (the self-lockout guard, UserServiceImpl#updateUser), so
+        // this suspends a MEMBER managed by an owning admin instead — "a
+        // suspended user cannot log in" doesn't require the suspended user
+        // to be a self-owned admin.
         UserView owningAdmin =
                 userService.createInitialAdmin(uniqueEmail("admin-for-suspended-login"), "correct-password-1",
                         "Owning Admin");
@@ -141,7 +140,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
                 put("/api/v1/auth/profile", token, new ProfileUpdateRequest("New Display Name"), MeView.class);
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(updateResponse.getBody().name()).isEqualTo("New Display Name");
-        // email is unchanged by a profile update (name-only, R-022).
+        // email is unchanged by a profile update (name-only).
         assertThat(updateResponse.getBody().email()).isEqualTo(email);
 
         ResponseEntity<MeView> meAfter = get("/api/v1/auth/me", token, MeView.class);

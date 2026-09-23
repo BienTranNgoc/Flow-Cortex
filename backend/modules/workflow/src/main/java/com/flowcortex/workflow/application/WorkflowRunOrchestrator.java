@@ -20,22 +20,21 @@ import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Drives a run's steps to completion (design.md D5) AFTER the starting
- * transaction has committed — the {@code @ApplicationModuleListener}
- * annotation composes {@code @Async} + {@code @Transactional(REQUIRES_NEW)}
- * + {@code @TransactionalEventListener(phase = AFTER_COMMIT)}, and needs
- * {@code @EnableAsync} on the application (wired in {@code :boot:app},
- * design.md R-050) plus the persistent Event Publication Registry for
- * delivery-loss protection.
+ * Drives a run's steps to completion AFTER the starting transaction has
+ * committed — the {@code @ApplicationModuleListener} annotation composes
+ * {@code @Async} + {@code @Transactional(REQUIRES_NEW)} + {@code
+ * @TransactionalEventListener(phase = AFTER_COMMIT)}, and needs {@code
+ * @EnableAsync} on the application (wired in {@code :boot:app}) plus the
+ * persistent Event Publication Registry for delivery-loss protection.
  *
- * <p>Dispatch is strictly sequential by {@code step_order} (R-041): each step
- * is claimed atomically ({@link RunStepTransactions#claim}, R-045) before
- * its input is resolved and its work runs; a claim that loses the race
- * (another execution — e.g. a redelivered event — already has the step)
- * simply stops this invocation without side effects. A step failure (a
- * thrown exception from input resolution OR the step's own work) is
- * recorded ({@link RunStepTransactions#fail}) and halts the run — later
- * steps stay {@code pending}, never dispatched (R-044).
+ * <p>Dispatch is strictly sequential by {@code step_order}: each step is
+ * claimed atomically ({@link RunStepTransactions#claim}) before its input is
+ * resolved and its work runs; a claim that loses the race (another
+ * execution — e.g. a redelivered event — already has the step) simply stops
+ * this invocation without side effects. A step failure (a thrown exception
+ * from input resolution OR the step's own work) is recorded ({@link
+ * RunStepTransactions#fail}) and halts the run — later steps stay {@code
+ * pending}, never dispatched.
  */
 @Component
 class WorkflowRunOrchestrator {

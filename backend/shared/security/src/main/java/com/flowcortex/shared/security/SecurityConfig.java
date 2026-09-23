@@ -14,16 +14,16 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Stateless JWT resource-server filter chain (design.md D4): validates a
- * locally-signed HS256 token, no session, method security enabled so modules
- * can guard endpoints with {@code @PreAuthorize} (group 4 — R-023).
+ * Stateless JWT resource-server filter chain: validates a locally-signed
+ * HS256 token, no session, method security enabled so modules can guard
+ * endpoints with {@code @PreAuthorize}.
  *
  * <p>Deliberately renders no response body itself: an unauthenticated or
  * forbidden request is handed to Spring MVC's {@link HandlerExceptionResolver}
  * chain, which is exactly the chain :shared:web's global
  * {@code @RestControllerAdvice} participates in — so 401/403 come back in the
- * same {@code application/problem+json} shape as every other error (D3),
- * without :shared:security depending on :shared:web at all.
+ * same {@code application/problem+json} shape as every other error, without
+ * :shared:security depending on :shared:web at all.
  */
 @Configuration
 @EnableWebSecurity
@@ -50,9 +50,8 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         // Health probe stays anonymous; the committed OpenAPI
                         // snapshot doc + its Swagger UI are public read-only
-                        // artifacts (design.md D6, task 3.1) so the contract
-                        // pipeline's snapshot test doesn't need a token — the
-                        // auth/login + per-route rules land in group 4.
+                        // artifacts, so the contract pipeline's snapshot test
+                        // doesn't need a token.
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**").permitAll()

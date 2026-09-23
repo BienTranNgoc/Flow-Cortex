@@ -17,16 +17,15 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 
 /**
- * Task 4.8 — dev-profile-only demo data: TWO ADMINs in DISTINCT owner scopes
- * (so J-4's cross-scope 404 has a real scope B to probe) plus one MEMBER
- * under the first ADMIN's scope, so the slice is runnable end to end
- * ({@code SPRING_PROFILES_ACTIVE=dev docker compose up}, alongside the
+ * Dev-profile-only demo data: TWO ADMINs in DISTINCT owner scopes (so a
+ * cross-scope 404 has a real scope B to probe) plus one MEMBER under the
+ * first ADMIN's scope, so the slice is runnable end to end ({@code
+ * SPRING_PROFILES_ACTIVE=dev docker compose up}, alongside the
  * already-required {@code JWT_SECRET}).
  *
  * <p>Dev-only, never active in prod: gated by {@code @Profile("dev")}, the
  * SAME profile {@code application-dev.yml}'s JWT_SECRET fallback already
- * uses (design.md D4) — nothing here runs unless that profile is explicitly
- * selected.
+ * uses — nothing here runs unless that profile is explicitly selected.
  *
  * <p>Idempotent for the two realistic operating modes of a dev Postgres
  * volume — freshly created (nothing seeded yet) or fully seeded already (a
@@ -54,13 +53,12 @@ class DevDataSeeder {
     private static final String MEMBER_PASSWORD = "MemberPass123!";
 
     // A synthetic, fixed "seed" identity for the two shared demo workflows'
-    // owner_id (task 5.9) — deliberately NOT tied to a real app_user row.
-    // Visibility of a shared workflow (R-049) never depends on who owns it,
-    // and workflow.owner_id carries no FK constraint (design.md D1: a
-    // generalizable ownership handle, not a hard reference) — this is
-    // simpler and more idempotent than resolving admin1's real id across
-    // restarts (which would need decoding a minted JWT here for no
-    // behavioural benefit).
+    // owner_id — deliberately NOT tied to a real app_user row. Visibility of
+    // a shared workflow never depends on who owns it, and workflow.owner_id
+    // carries no FK constraint (a generalizable ownership handle, not a hard
+    // reference) — this is simpler and more idempotent than resolving
+    // admin1's real id across restarts (which would need decoding a minted
+    // JWT here for no behavioural benefit).
     private static final UUID DEMO_WORKFLOW_OWNER_ID = UUID.fromString("00000000-0000-0000-0000-00000000d3d0");
 
     @Bean
@@ -101,12 +99,13 @@ class DevDataSeeder {
     }
 
     /**
-     * Task 5.9 — TWO {@code is_shared=true} demo workflows so J-5/J-11 are
-     * reachable end to end without wiring a real provider: an all-{@code
-     * echo} success path, and one whose MIDDLE step deliberately fails (the
-     * {@code fail} step type — {@code StepDispatcher}). Runs of either demo
-     * still land owner-scoped to whichever user actually starts one
-     * (design.md D1 — a shared DEFINITION never implies shared RUNS).
+     * TWO {@code is_shared=true} demo workflows so both the success and
+     * run-error UI are reachable end to end without wiring a real provider:
+     * an all-{@code echo} success path, and one whose MIDDLE step
+     * deliberately fails (the {@code fail} step type — {@code
+     * StepDispatcher}). Runs of either demo still land owner-scoped to
+     * whichever user actually starts one — a shared DEFINITION never implies
+     * shared RUNS.
      *
      * <p>Idempotent by NAME (workflow rows carry no unique constraint on
      * {@code name} unlike {@code app_user.email}): re-running against an
