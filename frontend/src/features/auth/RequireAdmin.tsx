@@ -2,18 +2,14 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useMeQuery } from './useAuth';
 
-/**
- * ADMIN-only route guard — a MEMBER is bounced back to `/` rather than shown
- * a 403 page (the nav already hides the link); a direct URL visit still
- * cannot reach the page.
- */
-export function RequireAdmin({ children }: { children: ReactNode }) {
+/** ADMIN-only route guard: a MEMBER (or a direct URL visit) is bounced to `/`; the nav already hides the link. */
+export function RequireAdmin({ children }: Readonly<{ children: ReactNode }>) {
   const meQuery = useMeQuery();
 
   if (meQuery.isLoading) {
-    return <p role="status">Loading…</p>;
+    return <output>Loading…</output>;
   }
-  if (meQuery.isError || !meQuery.data || meQuery.data.role !== 'ADMIN') {
+  if (meQuery.isError || meQuery.data?.role !== 'ADMIN') {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;

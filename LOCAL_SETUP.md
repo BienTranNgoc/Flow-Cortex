@@ -39,15 +39,16 @@ cd backend
 
 ./gradlew build            # compile + run all tests (Testcontainers → needs Docker)
 
-# Start just the database for local bootRun:
+# Start just the database (compose reads POSTGRES_PASSWORD / JWT_SECRET from .env):
+cp ../.env.example ../.env         # once — then edit the values
 docker compose -f ../docker-compose.yml up -d postgres
 
+set -a; . ../.env; set +a          # export JWT_SECRET (32+ chars) + POSTGRES_PASSWORD
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/flowcortex \
 SPRING_DATASOURCE_USERNAME=flowcortex \
-SPRING_DATASOURCE_PASSWORD=flowcortex \
-JWT_SECRET=dev-secret-change-me \
+SPRING_DATASOURCE_PASSWORD=$POSTGRES_PASSWORD \
 SPRING_PROFILES_ACTIVE=dev \
-  ./gradlew bootRun        # start the API on http://localhost:8080
+  ./gradlew bootRun                # start the API on http://localhost:8080
 
 # Public probe (no auth):
 curl http://localhost:8080/actuator/health
@@ -85,8 +86,8 @@ For a one-command end-to-end run (or a demo) without installing a JDK or Node
 locally — only Docker is needed:
 
 ```bash
-# JWT_SECRET has no default (design.md D4) — set it or the stack refuses to start:
-JWT_SECRET=dev-secret-change-me docker compose up --build
+cp .env.example .env               # once — set JWT_SECRET (32+ chars) and POSTGRES_PASSWORD
+docker compose up --build
 # postgres -> internal (healthchecked; backend waits for it)
 # backend  -> http://localhost:8080   (API + /actuator/health)
 # frontend -> http://localhost:5173   (SPA; nginx proxies /api -> backend)
@@ -97,7 +98,7 @@ curl http://localhost:8080/actuator/health   # public probe
 
 This is for running/demoing the assembled stack (Postgres + API + SPA). Day-to-day
 coding is still faster with a standalone Postgres + `./gradlew bootRun` + `npm run
-dev` (hot reload) as in §1. To exercise the workflow kill switch (R-046), restart
+dev` (hot reload) as in §1. To exercise the workflow kill switch, restart
 the backend with `FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend`.
 
 ## Troubleshooting

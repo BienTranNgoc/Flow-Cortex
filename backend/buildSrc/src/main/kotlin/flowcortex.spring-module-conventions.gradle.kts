@@ -1,7 +1,5 @@
-// Convention plugin for a Spring Modulith library module (:modules:*,
-// :shared:*): toolchain + -parameters + dependency-management BOMs + baseline
-// module deps + Checkstyle/JaCoCo gates + persistence (JPA/Postgres/Flyway) +
-// Jakarta Bean Validation.
+// Convention plugin for a Spring Modulith library module: toolchain, -parameters, BOMs,
+// Checkstyle/JaCoCo gates, persistence (JPA/Postgres/Flyway), Jakarta Bean Validation.
 plugins {
     `java-library`
     checkstyle
@@ -15,21 +13,22 @@ java {
     }
 }
 
-// Spring resolves @PathVariable/@RequestParam names via reflection; without
-// -parameters, unnamed bindings fail at runtime.
+// Spring resolves @PathVariable/@RequestParam names via reflection; -parameters is required.
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
 }
 
-// Pin BOM-managed versions past fixable HIGH CVEs (Trivy scan in
-// security-scan.yml): netty 4.2.16, pgjdbc 42.7.12.
+// Pin BOM-managed versions past fixable HIGH CVEs (Trivy scan): netty 4.2.16, pgjdbc 42.7.12.
 extra["netty.version"] = "4.2.16.Final"
 extra["postgresql.version"] = "42.7.12"
 
+val springBootVersion = providers.gradleProperty("springBootVersion").get()
+val springModulithVersion = providers.gradleProperty("springModulithVersion").get()
+
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:4.1.0")
-        mavenBom("org.springframework.modulith:spring-modulith-bom:2.1.0")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:$springBootVersion")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:$springModulithVersion")
     }
 }
 
@@ -37,25 +36,18 @@ dependencies {
     "implementation"("org.springframework.boot:spring-boot-starter")
     "implementation"("org.springframework.modulith:spring-modulith-starter-core")
 
-    // Jakarta Bean Validation (Hibernate Validator) — convention: every inbound
-    // request record across every module is @Valid with Jakarta constraints;
-    // MethodArgumentNotValidException / ConstraintViolationException are
-    // handled centrally by :shared:web's GlobalExceptionHandler -> 400
-    // ProblemDetail.
+    // Jakarta Bean Validation: every inbound request record is @Valid; violations are handled
+    // centrally by :shared:web's GlobalExceptionHandler -> 400 ProblemDetail.
     "implementation"("org.springframework.boot:spring-boot-starter-validation")
 
-    // Persistence — JPA + PostgreSQL + Flyway. No H2: dev uses compose
-    // Postgres, tests use Testcontainers Postgres, so ddl-auto: validate
-    // holds in every profile the app actually runs in.
+    // Persistence: JPA + PostgreSQL + Flyway. No H2 — dev/test both use real Postgres, so
+    // ddl-auto: validate holds in every profile the app runs in.
     "implementation"("org.springframework.boot:spring-boot-starter-data-jpa")
     "runtimeOnly"("org.postgresql:postgresql")
     "implementation"("org.flywaydb:flyway-core")
-    // Spring Boot 4 moved FlywayAutoConfiguration into its own module; without
-    // it flyway-core is on the classpath but migrations never run (silent
-    // no-op), and ddl-auto: validate then fails against an unmigrated schema.
+    // Spring Boot 4 moved FlywayAutoConfiguration out; without it migrations silently no-op.
     "implementation"("org.springframework.boot:spring-boot-flyway")
-    // Flyway 10+ (Boot 4.x) splits per-database support into modules; without
-    // the PostgreSQL one Flyway silently no-ops the same way.
+    // Flyway 10+ splits per-database support into modules; without this one it silently no-ops.
     "runtimeOnly"("org.flywaydb:flyway-database-postgresql")
 
     "testImplementation"("org.springframework.boot:spring-boot-starter-test")
@@ -75,19 +67,16 @@ checkstyle {
     configProperties["checkstyle.suppressions.file"] =
         rootProject.layout.projectDirectory.file("config/checkstyle/suppressions.xml").asFile.absolutePath
     maxWarnings = 0
-    // Enforced from the start: a Checkstyle violation fails the build. No
-    // ignoreFailures grace period — a gate nobody can fail is not a gate.
+    // A Checkstyle violation fails the build — no ignoreFailures grace period.
     isIgnoreFailures = false
 }
 
-// Ensure checkstyle runs as part of `check` (the checkstyle plugin already wires
-// checkstyleMain / checkstyleTest into the check task by default).
+// checkstyle already wires into `check` by default; this makes it explicit.
 tasks.named("check") {
     dependsOn(tasks.withType<Checkstyle>())
 }
 
-// JaCoCo coverage exclusions: generated / boilerplate that is not
-// meaningfully unit-tested (Application classes, Spring config, package-info, ...).
+// JaCoCo exclusions: generated/boilerplate not meaningfully unit-tested.
 val jacocoExclusions = listOf(
     "**/*Application*",
     "**/config/**",
@@ -123,9 +112,7 @@ tasks.jacocoTestCoverageVerification {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // Starts higher than DigiShield's own ratchet (0.30->0.50 over
-                // time): FC is greenfield and small, so 0.50 is reachable from
-                // the first slice rather than a later target.
+                // Greenfield + small codebase: 0.50 is reachable from the first slice.
                 minimum = "0.50".toBigDecimal()
             }
         }

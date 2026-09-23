@@ -1,9 +1,6 @@
-// Convention plugin for the executable Spring Boot app (:boot:app): Boot
-// plugin + bootJar + Modulith test starter + the same Checkstyle/JaCoCo gates
-// as flowcortex.spring-module-conventions. Kept as a separate plugin file
-// (not composing the module-conventions one) since the app applies the plain
-// `java` plugin, not `java-library` — mirrors DigiShield's own
-// two-conventions split, gates duplicated rather than shared, same as there.
+// Convention plugin for the executable Spring Boot app (:boot:app): Boot plugin + bootJar +
+// Modulith test starter + the same Checkstyle/JaCoCo gates as spring-module-conventions. Kept
+// separate (not composing that one) since the app applies plain `java`, not `java-library`.
 plugins {
     java
     checkstyle
@@ -18,24 +15,23 @@ java {
     }
 }
 
-// Spring resolves @PathVariable/@RequestParam names via reflection; without
-// -parameters, unnamed bindings fail at runtime. The Boot plugin already adds
-// this to the app project, but keep it explicit so it survives refactors.
+// Spring resolves @PathVariable/@RequestParam names via reflection; the Boot plugin already
+// adds -parameters, but keep it explicit so it survives refactors.
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
 }
 
-// Pin BOM-managed versions past fixable HIGH CVEs (Trivy scan in
-// security-scan.yml): netty 4.2.16, pgjdbc 42.7.12.
+// Pin BOM-managed versions past fixable HIGH CVEs (Trivy scan): netty 4.2.16, pgjdbc 42.7.12.
 extra["netty.version"] = "4.2.16.Final"
 extra["postgresql.version"] = "42.7.12"
 
-// The Spring Boot Gradle plugin + io.spring.dependency-management combo
-// auto-imports spring-boot-dependencies matching the applied Boot version, so
-// only the Modulith BOM needs importing explicitly here.
+// Boot plugin + dependency-management auto-imports spring-boot-dependencies for the applied
+// Boot version, so only the Modulith BOM needs importing explicitly here.
+val springModulithVersion = providers.gradleProperty("springModulithVersion").get()
+
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.modulith:spring-modulith-bom:2.1.0")
+        mavenBom("org.springframework.modulith:spring-modulith-bom:$springModulithVersion")
     }
 }
 
@@ -61,8 +57,7 @@ tasks.named("check") {
     dependsOn(tasks.withType<Checkstyle>())
 }
 
-// JaCoCo coverage (boot app). Same exclusions as the module convention —
-// *Application*/*Config*/package-info are not meaningfully unit-tested.
+// Same JaCoCo exclusions as the module convention — generated/boilerplate, not unit-tested.
 val jacocoExclusions = listOf(
     "**/*Application*",
     "**/config/**",

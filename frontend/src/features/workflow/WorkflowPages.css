@@ -92,7 +92,7 @@
 .run-step-output,
 .run-step-error {
   margin: 0.35rem 0 0;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .run-error {

@@ -3,14 +3,12 @@ spring:
     name: flow-cortex
 
   # Local defaults for a bare `./gradlew bootRun` against a manually-started
-  # Postgres. SPRING_DATASOURCE_* env vars (docker compose) or the
-  # Testcontainers @ServiceConnection (every test) override these outright —
-  # neither needs the ${VAR:default} placeholder form, Spring's relaxed env
-  # binding takes precedence over this file automatically.
+  # Postgres; SPRING_DATASOURCE_* env vars (docker compose) and Testcontainers
+  # @ServiceConnection (tests) override them. The password is never defaulted
+  # here — set SPRING_DATASOURCE_PASSWORD (see LOCAL_SETUP.md).
   datasource:
     url: jdbc:postgresql://localhost:5432/flowcortex
     username: flowcortex
-    password: flowcortex
     driver-class-name: org.postgresql.Driver
 
   jpa:
