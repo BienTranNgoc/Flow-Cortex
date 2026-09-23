@@ -1,0 +1,71 @@
+# Local end-to-end stack: Postgres, the Spring Boot API, and the React SPA
+# behind nginx on one origin. Day-to-day dev still uses `./gradlew bootRun` +
+# `npm run dev` (LOCAL_SETUP.md); this is the one-command run/demo:
+#
+#   cp .env.example .env    # JWT_SECRET, POSTGRES_PASSWORD — compose loads .env
+#   docker compose up --build
+#   -> frontend  http://localhost:5173   (SPA; proxies /api -> backend)
+#   -> backend   http://localhost:8080   (API + /actuator/health)
+#
+# No credential has a default here: a committed value would be a known secret.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: flowcortex
+      POSTGRES_USER: flowcortex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowcortex -d flowcortex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    image: flow-cortex-backend:local
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
+      SPRING_DATASOURCE_USERNAME: flowcortex
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (see .env.example)}
+      # Workflow-execution kill switch: defaults on. Flip it off and restart the
+      # backend to refuse new runs (503) without a rebuild:
+      #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
+      FLOWCORTEX_WORKFLOW_ENABLED: ${FLOWCORTEX_WORKFLOW_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The probe Docker uses to gate the frontend below.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: flow-cortex-frontend:local
+    ports:
+      - "5173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

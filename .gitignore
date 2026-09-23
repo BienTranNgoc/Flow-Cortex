@@ -23,3 +23,12 @@ backend/.gradle/
 
 # Frontend node_modules is covered by frontend/.gitignore, but guard here too.
 **/node_modules/
+
+# --- Local tooling / planning workspace (not product logic) ---
+# Local assistant/session config.
+.claude/
+# Spec & planning workspace — kept local, not part of the shared source.
+openspec/
+docs/PLAN.md
+docs/jira-backlog.csv
+*-Plan.pdf

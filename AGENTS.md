@@ -130,3 +130,18 @@ Read when the task calls for one; none of these load by default.
 ## 13. Fullstack defaults
 
 Encode **durable patterns, not library names** — they outlive the churn (validator, auth lib, framework minor). The one always-on invariant: **parse every value crossing a trust boundary** (API body, form, external response, env var) with a Standard-Schema validator — the type is *derived from* the schema; types alone are never validation. The full 2026 rule set (RSC boundary, RFC 9457 errors, server/client-state split, OTel-per-route, WCAG 2.2 targets, INP budget) loads with the code via `agent-kit/rules/fullstack-best-practice.md` (§11) — detail one hop away, per this file's own discipline.
+
+## 14. Comment hygiene — lean, no junk (Flow-Cortex local rule)
+
+This repo keeps comments **minimal**. Well-named code is the primary documentation; a comment earns its place only when it says something the code cannot. Target well under ~10% comment lines in an implementation file — if a service/controller/entity is a third comments, it is over-commented. One deliberate exception: a module's public **`api` port interface** carries its contract as Javadoc (scope semantics, what throws what, null-means-unchanged) — that Javadoc IS the deliverable other modules code against, so those files are exempt from the density heuristic; keep each note precise, not long.
+
+**The reference sources are read, never mirrored for style.** Xood and DigiShield are heavily commented; that is THEIR convention and correct THERE. Do NOT carry their explanatory-comment density into Flow-Cortex. Port the *pattern*, write the comment fresh (or not at all).
+
+**Delete on sight (junk):**
+- Comments that restate the code (`// increment i`, `/** Gets the id. */ getId()`, a Javadoc that just re-says the method name).
+- Step-by-step narration of obvious control flow.
+- Multi-line essays explaining standard framework/library mechanics a competent reader already knows (the DigiShield-style "why `-parameters`", "what a BOM does" blocks) — a one-line pointer at most, usually nothing.
+- Section-divider banners (`// ===== SERVICES =====`), commented-out code, and `TODO`/`FIXME` left as a substitute for doing the work.
+- OpenSpec/task traceability in code (`Task N`, `R-xxx`, change ids) — §6 already bans these; they live in git history, never in comments.
+
+**Keep (earns its place):** a non-obvious *why* (a workaround and the constraint that forces it, a deliberate ordering, a spec/RFC citation for a rule that looks wrong but isn't), a public-`api`-port contract note that a caller genuinely needs, and a `//` explaining an intentional deviation from the obvious approach. When in doubt, cut it — a missing junk comment costs nothing; a wrong or stale one misleads.

@@ -1,0 +1,7 @@
+# Gradle build output for every subproject in this multi-module build. The
+# root .gitignore's backend/build/ + backend/.gradle/ predate this layout and
+# only match the top-level path, not the nested subprojects created here
+# (backend/boot/app/build/, backend/modules/*/build/, backend/shared/*/build/,
+# backend/buildSrc/build/).
+**/build/
+**/.gradle/

@@ -11,12 +11,19 @@ foundations + architecture, no cloud infra yet).
 
 ```
 Flow-Cortex/
-├─ backend/      Gradle (Kotlin DSL) · Spring Boot 4.1 · Java 25
-│   └─ src/main/java/com/flowcortex/{api,application,domain,infrastructure}
-├─ frontend/     Vite · React · TypeScript · ESLint · Prettier · Vitest
-├─ docs/         ADR.md — the decision log
+├─ backend/      Gradle (Kotlin DSL, multi-module) · Spring Boot 4.1 · Java 25 · Dockerfile
+│   ├─ boot/app/       composition root — executable app, ModularityTests
+│   ├─ modules/{user,workflow}/   business modules (api → application → domain → infrastructure → web)
+│   ├─ shared/{web,security}/     cross-module libraries (ProblemDetail advice, JWT filter chain)
+│   └─ buildSrc/       convention plugins (Checkstyle, JaCoCo, BOMs — ADR-0003)
+├─ frontend/     Vite · React · TypeScript · ESLint · Prettier · Vitest · Dockerfile + nginx.conf
+│   └─ src/api/generated/   orval-generated OpenAPI client (ADR-0005, not hand-edited)
+├─ docker-compose.yml   one-command end-to-end stack (postgres + backend + SPA behind nginx)
+├─ docs/         ADR.md — the decision log · openapi.yaml — committed contract-first snapshot (ADR-0005)
+├─ openspec/     spec-driven change workspace (specs/ + changes/)
 ├─ scripts/      commit-subject validation, one-time hook setup
 ├─ .githooks/    commit-msg (Conventional Commits) · pre-push (protect main)
+├─ .github/      CI workflows (backend/frontend/security) · CODEOWNERS
 └─ .editorconfig
 ```
 
@@ -32,6 +39,9 @@ cd backend && ./gradlew build      # compiles + runs tests
 # 3. Frontend
 cd frontend && npm install && npm run dev
 ```
+
+Prefer one command? `docker compose up --build` brings the whole stack up
+(frontend on `:5173`, backend on `:8080`) — see [LOCAL_SETUP.md](LOCAL_SETUP.md).
 
 See [LOCAL_SETUP.md](LOCAL_SETUP.md) for the full run instructions and
 [docs/ADR.md](docs/ADR.md) for why the project is set up this way.
@@ -66,14 +76,19 @@ just won't be actionable.
   English subject, ≤100 chars — enforced by the `commit-msg` hook.
 - **Branching:** no direct pushes to `main`; feature branch + PR. The `pre-push`
   hook blocks it locally; enable branch protection on GitHub for the real gate.
-- **Backend layering:** `api → application → domain → infrastructure` per feature.
+- **Backend layering:** `api → application → domain → infrastructure → web` per module (Spring Modulith `@ApplicationModule`; only the `api` package is exported).
 - **Tests:** written alongside code; coverage is measured now, gated later
   (see ADR-0001).
 
 ## Roadmap (next tầng, when the project earns it)
 
 - **Tầng 2 — contract-first:** define an OpenAPI spec, generate the frontend API
-  client (orval), add contract-drift checks.
-- **Tầng 3 — CI/CD:** GitHub Actions (build/test/lint), CODEOWNERS, dependency
-  and image scanning (Trivy).
-- **Tầng 4 — infra as code:** only when there is something real to deploy.
+  client (orval), add contract-drift checks. *(landed — see ADR-0005; both
+  `backend-ci` and `frontend-ci` fail on an uncommitted regeneration.)*
+- **Tầng 3 — CI:** GitHub Actions build/test/lint (`backend-ci`, `frontend-ci`),
+  `CODEOWNERS`, and a report-only Trivy scan live in `.github/`. *(landed — the
+  scans gate nothing yet; flip them to blocking once the numbers are known, the
+  same way JaCoCo is measured before it gates.)*
+- **Tầng 4 — containers & infra:** `docker compose up --build` runs the whole
+  stack locally (see LOCAL_SETUP.md). Deploy pipelines and infra-as-code wait
+  until there is something real to deploy.

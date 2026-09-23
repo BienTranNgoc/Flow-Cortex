@@ -1,5 +1,12 @@
 rootProject.name = "flow-cortex"
 
-// Single module for now. When a second bounded context appears, promote this to
-// a multi-module build the way the reference repo does: extract the shared build
-// logic into buildSrc convention plugins and `include(":modules:...")` here.
+// Multi-module build (ADR-0003, modular monolith via Spring Modulith). Module
+// boundaries are enforced at build time by ModularityTests.verify() in
+// :boot:app; see backend/buildSrc for the shared convention plugins.
+include(
+    ":boot:app",
+    ":modules:user",
+    ":modules:workflow",
+    ":shared:web",
+    ":shared:security",
+)

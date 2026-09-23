@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: flow-cortex
+
+  # Local defaults for a bare `./gradlew bootRun` against a manually-started
+  # Postgres; SPRING_DATASOURCE_* env vars (docker compose) and Testcontainers
+  # @ServiceConnection (tests) override them. The password is never defaulted
+  # here — set SPRING_DATASOURCE_PASSWORD (see LOCAL_SETUP.md).
+  datasource:
+    url: jdbc:postgresql://localhost:5432/flowcortex
+    username: flowcortex
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # Schema is Flyway-owned; Hibernate only validates its entity mapping
+      # against what Flyway already migrated — never
+      # mutates the schema itself.
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+# Actuator: expose only health + info over HTTP for now. Widen deliberately.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# Contract-first OpenAPI: document the
+# actuator endpoints alongside the app's own controllers in /v3/api-docs so
+# the committed snapshot reflects everything that is actually reachable.
+springdoc:
+  show-actuator: true
+
+# No default here on purpose — a committed real-looking default would trip the
+# security-scan secret scanner (Trivy) and ship a known signing key. Only the
+# 'dev' profile (application-dev.yml) supplies a fallback; every other
+# profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
+flowcortex:
+  security:
+    jwt-secret: ${JWT_SECRET:}
+  # Kill switch gating POST
+  # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
+  # already-started/finished runs stay readable. Flip via the
+  # FLOWCORTEX_WORKFLOW_ENABLED env var + a process restart (no new flag
+  # library, no runtime toggle endpoint) — a plain config property, not a
+  # DB-backed live toggle.
+  workflow:
+    enabled: ${FLOWCORTEX_WORKFLOW_ENABLED:true}
