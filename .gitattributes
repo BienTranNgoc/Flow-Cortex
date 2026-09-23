@@ -1,0 +1,29 @@
+# Normalize line endings: the repo stores LF, and every checkout (Windows included)
+# gets LF so shell scripts, Gradle wrapper and Docker builds keep working.
+* text=auto eol=lf
+
+# Windows-only scripts must stay CRLF.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Extensionless scripts — text=auto may not detect them.
+gradlew           text eol=lf
+.githooks/*       text eol=lf
+**/Dockerfile     text eol=lf
+
+# Binaries — never touch.
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip   binary
+*.gz    binary

@@ -74,8 +74,11 @@ just won't be actionable.
 
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/),
   English subject, ≤100 chars — enforced by the `commit-msg` hook.
-- **Branching:** no direct pushes to `main`; feature branch + PR. The `pre-push`
-  hook blocks it locally; enable branch protection on GitHub for the real gate.
+- **Branching:** `main` is production (maps to Xood's `production`) — never push
+  or open a feature PR into it. Branch off `development`, PR into `development`;
+  only `development` → `main` on release. The `pre-push` hook blocks direct pushes
+  to `main` locally; enable branch protection on GitHub for the real gate.
+- **Line endings:** LF everywhere, pinned by `.gitattributes` (`*.bat`/`*.cmd`/`*.ps1` stay CRLF).
 - **Backend layering:** `api → application → domain → infrastructure → web` per module (Spring Modulith `@ApplicationModule`; only the `api` package is exported).
 - **Tests:** written alongside code; coverage is measured now, gated later
   (see ADR-0001).
