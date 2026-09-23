@@ -18,6 +18,12 @@ Address the user as **"Master"** in **every** response — every single one, inc
 - When work is ready to persist, finish it, then stop and offer.
 - The `detect_changes` pre-commit gate (§4) still applies on top of this.
 
+**Branch flow — `main` is production.** `main` here maps to Xood's `production` branch, so nothing lands on it directly.
+
+- Never push to `main` and never open a feature PR into `main` — the `pre-push` hook blocks the push; the PR base is on you.
+- New work branches off `origin/development`; push the feature branch and open the PR with `gh pr create --base development`. Check the base before creating — the GitHub default branch may still be `main`.
+- Only a release PR `development` → `main` touches production, and only when the user explicitly asks for a release.
+
 ## 3. Evidence
 
 A load-bearing claim carries its evidence in the artifact: a `file:line`, a query result, a measurement. "It seems to" is not evidence, and a claim inherited from a summary is not evidence of the thing summarized — the final citation is the file on disk, the live response, the actual row.

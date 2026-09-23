@@ -27,6 +27,18 @@ This points `core.hooksPath` at `.githooks/`, activating:
 - **commit-msg** — rejects commits that are not Conventional Commits or not in English.
 - **pre-push** — blocks direct pushes to `main` / `master`.
 
+Branch flow: `main` is production (maps to Xood's `production`). Branch off
+`development`, open the PR into `development` (`gh pr create --base development`);
+only `development` is merged into `main` on release.
+
+**Windows:** line endings are pinned to LF by `.gitattributes`. If a clone made
+before it landed still has CRLF files, re-checkout once on a clean tree:
+
+```bash
+git config core.autocrlf false
+git rm -r --cached -q . && git reset --hard HEAD
+```
+
 ## 1. Backend (Spring Boot)
 
 The backend now has a real datasource (PostgreSQL + Flyway, `ddl-auto: validate`),

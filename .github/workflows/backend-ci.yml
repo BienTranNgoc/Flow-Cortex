@@ -2,7 +2,7 @@ name: backend-ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
     paths:
       - 'backend/**'
       - 'docs/openapi.yaml'
