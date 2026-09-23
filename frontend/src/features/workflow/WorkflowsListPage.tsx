@@ -9,9 +9,9 @@ export function WorkflowsListPage() {
   return (
     <main>
       <h1>Workflows</h1>
-      {workflowsQuery.isLoading && <p role="status">Loading workflows…</p>}
+      {workflowsQuery.isLoading && <output>Loading workflows…</output>}
       {workflowsQuery.isError && <p role="alert">Could not load workflows.</p>}
-      {workflowsQuery.data && workflowsQuery.data.length === 0 && <p>No workflows yet.</p>}
+      {workflowsQuery.data?.length === 0 && <p>No workflows yet.</p>}
       {workflowsQuery.data && workflowsQuery.data.length > 0 && (
         <ul className="workflow-list">
           {workflowsQuery.data.map((workflow) => (

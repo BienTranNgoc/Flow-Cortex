@@ -23,7 +23,7 @@ export function RunProgressPage() {
     return <p role="alert">No run selected.</p>;
   }
   if (runQuery.isLoading) {
-    return <p role="status">Loading run…</p>;
+    return <output>Loading run…</output>;
   }
   if (runQuery.isError || !runQuery.data) {
     return <p role="alert">Could not load this run.</p>;

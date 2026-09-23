@@ -8,7 +8,7 @@ import { useAuthToken } from './useAuth';
  * from any call, `src/api/client.ts`) redirects through, since this
  * component re-renders whenever the token store changes.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
   const token = useAuthToken();
   const location = useLocation();
 

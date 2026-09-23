@@ -7,7 +7,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     // Pinned exactly: 3.1.1 is where springdoc's Boot 4 / Jackson 3 introspection settled.
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${providers.gradleProperty("springdocVersion").get()}")
     // Every module + shared library, so Modulith scans the whole com.flowcortex tree.
     implementation(project(":modules:user"))
     implementation(project(":modules:workflow"))
@@ -17,7 +17,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     // Boot 4 moved the MVC test slice out of spring-boot-starter-test.
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.20.4"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:${providers.gradleProperty("testcontainersVersion").get()}"))
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

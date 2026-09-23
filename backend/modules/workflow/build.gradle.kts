@@ -22,7 +22,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     // The atomic step-claim IT needs a real Postgres (no H2), scoped to this module's
     // own @DataJpaTest since the Flyway-migrated schema lives in :boot:app.
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.20.4"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:${providers.gradleProperty("testcontainersVersion").get()}"))
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

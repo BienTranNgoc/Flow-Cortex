@@ -4,7 +4,7 @@ export function HomePage() {
   const meQuery = useMeQuery();
 
   if (meQuery.isLoading) {
-    return <p role="status">Loading…</p>;
+    return <output>Loading…</output>;
   }
   if (meQuery.isError || !meQuery.data) {
     return <p role="alert">Could not load your account.</p>;

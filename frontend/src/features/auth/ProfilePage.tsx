@@ -31,7 +31,7 @@ export function ProfilePage() {
   });
 
   if (meQuery.isLoading) {
-    return <p role="status">Loading…</p>;
+    return <output>Loading…</output>;
   }
   if (meQuery.isError || !meQuery.data) {
     return <p role="alert">Could not load your profile.</p>;
@@ -57,7 +57,7 @@ export function ProfilePage() {
           {errors.name && <p role="alert">{errors.name.message}</p>}
         </div>
         {serverError && <p role="alert">{serverError}</p>}
-        {updateMutation.isSuccess && <p role="status">Saved.</p>}
+        {updateMutation.isSuccess && <output>Saved.</output>}
         <button type="submit" disabled={updateMutation.isPending}>
           {updateMutation.isPending ? 'Saving…' : 'Save'}
         </button>

@@ -83,7 +83,7 @@ export function UsersPage() {
       <div className="users-table-wrapper" style={{ marginTop: '1.5rem' }}>
         {usersQuery.isLoading && <output>Loading users…</output>}
         {usersQuery.isError && <p role="alert">Could not load users.</p>}
-        {usersQuery.data && usersQuery.data.length === 0 && <p>No users yet — add one above.</p>}
+        {usersQuery.data?.length === 0 && <p>No users yet — add one above.</p>}
         {usersQuery.data && usersQuery.data.length > 0 && (
           <table className="users-table">
             <thead>

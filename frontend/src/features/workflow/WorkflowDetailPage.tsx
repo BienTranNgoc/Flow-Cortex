@@ -25,7 +25,7 @@ export function WorkflowDetailPage() {
     return <p role="alert">No workflow selected.</p>;
   }
   if (workflowQuery.isLoading) {
-    return <p role="status">Loading workflow…</p>;
+    return <output>Loading workflow…</output>;
   }
   if (workflowQuery.isError || !workflowQuery.data) {
     return <p role="alert">Could not load this workflow.</p>;
