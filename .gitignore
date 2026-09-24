@@ -36,3 +36,6 @@ openspec/
 docs/PLAN.md
 docs/jira-backlog.csv
 *-Plan.pdf
+
+# Local docker compose override
+docker-compose.override.yml
