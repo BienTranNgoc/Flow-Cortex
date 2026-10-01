@@ -5,25 +5,36 @@ DigiShield reference repo, deliberately scaled down to a solo project (Tầng 0�
 foundations + architecture, no cloud infra yet).
 
 - **Repo:** https://github.com/BienTranNgoc/Flow-Cortex
-- **Stack:** Spring Boot 4.1 / Java 25 (backend) · React + TypeScript + Vite (frontend)
+- **Stack:** Spring Boot 4.1 / Java 25 (API) · Python 3.12 media worker over
+  RabbitMQ 4.3 and an S3-compatible store (Silo) · React + TypeScript + Vite
+  (member app and admin console)
 
 ## Layout
 
 ```
 Flow-Cortex/
 ├─ backend/      Gradle (Kotlin DSL, multi-module) · Spring Boot 4.1 · Java 25 · Dockerfile
-│   ├─ boot/app/       composition root — executable app, ModularityTests
-│   ├─ modules/{user,workflow}/   business modules (api → application → domain → infrastructure → web)
+│   ├─ boot/app/       composition root — executable app, ModularityTests, Flyway migrations
+│   ├─ modules/{user,workflow,media}/   business modules (api → application → domain → infrastructure → web);
+│   │                  media = broker topology, job outbox, result listeners, presigned URLs
 │   ├─ shared/{web,security}/     cross-module libraries (ProblemDetail advice, JWT filter chain)
 │   └─ buildSrc/       convention plugins (Checkstyle, JaCoCo, BOMs — ADR-0003)
-├─ frontend/     Vite · React · TypeScript · ESLint · Prettier · Vitest · Dockerfile + nginx.conf
-│   └─ src/api/generated/   orval-generated OpenAPI client (ADR-0005, not hand-edited)
-├─ docker-compose.yml   one-command end-to-end stack (postgres + backend + SPA behind nginx)
-├─ docs/         ADR.md — the decision log · openapi.yaml — committed contract-first snapshot (ADR-0005)
-├─ openspec/     spec-driven change workspace (specs/ + changes/)
-├─ scripts/      commit-subject validation, one-time hook setup
+├─ worker/       Python media worker (uv · ruff · mypy · pytest) — consumes media.jobs, runs ffprobe (ADR-0007)
+├─ contracts/    JSON Schemas of the broker messages, the source of truth for Java and Python
+├─ frontend/     member app — Vite · React · TypeScript · ESLint · Prettier · Vitest · Dockerfile + nginx.conf
+├─ admin/        admin console (ADMIN only: runs, media jobs, users) — same stack, own image, port 5174 (ADR-0008)
+├─ packages/     npm workspaces shared by both SPAs
+│   ├─ api-client/   orval-generated OpenAPI client + unwrap/ApiError/token store (ADR-0005, generated part not hand-edited)
+│   └─ ui-kit/       shared React pieces (route error boundary, client error reporter)
+├─ infra/        minio/ — the store's one-shot init: buckets, uploads lifecycle, per-service users and policies
+├─ observability/   optional overlay config: collector, Tempo, Loki, Prometheus, Grafana dashboards
+├─ docker-compose.yml          one-command stack: postgres, rabbitmq, store, backend, worker, both SPAs
+├─ compose.observability.yaml  the optional traces/logs/metrics overlay
+├─ docs/         ADR.md — the decision log · ERD.md — the schema · openapi.yaml — committed contract-first snapshot (ADR-0005)
+├─ openspec/     spec-driven change workspace (local, gitignored)
+├─ scripts/      hook setup, commit-subject validation, smoke-probe.sh (compose smoke), check-telemetry.sh
 ├─ .githooks/    commit-msg (Conventional Commits) · pre-push (protect main)
-├─ .github/      CI workflows (backend/frontend/security) · CODEOWNERS
+├─ .github/      CI workflows (backend, frontend, worker, contracts, compose-smoke, security) · CODEOWNERS
 └─ .editorconfig
 ```
 
@@ -36,12 +47,17 @@ bash scripts/setup-hooks.sh
 # 2. Backend — needs a JDK 25 on JAVA_HOME (no auto-provision configured)
 cd backend && ./gradlew build      # compiles + runs tests
 
-# 3. Frontend
-cd frontend && npm install && npm run dev
+# 3. Member app and admin console (npm workspaces — install once at the root)
+npm install
+npm run dev -w frontend    # member app
+npm run dev -w admin       # admin console
 ```
 
-Prefer one command? `docker compose up --build` brings the whole stack up
-(frontend on `:5173`, backend on `:8080`) — see [LOCAL_SETUP.md](LOCAL_SETUP.md).
+Prefer one command? `cp .env.example .env`, replace the `change-me` values, then
+`docker compose up --build` brings the whole stack up — see
+[LOCAL_SETUP.md](LOCAL_SETUP.md). Open the member app at <http://localhost:5173>;
+admins use the console at <http://localhost:5174> (Users lives there). The API is
+on `:8080`.
 
 See [LOCAL_SETUP.md](LOCAL_SETUP.md) for the full run instructions and
 [docs/ADR.md](docs/ADR.md) for why the project is set up this way.
