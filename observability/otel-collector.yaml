@@ -1,0 +1,111 @@
+# OTLP in from the backend and the worker; traces to Tempo, logs to Loki, the
+# worker's metrics to Prometheus. Backend metrics are scraped, not pushed.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # First, so an export backlog sheds data instead of growing past mem_limit.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+
+  # Last line of defence: both services strip URL queries at the source, so a
+  # presigned-URL signature or credential reaching this point is a leak. The
+  # pattern is case-insensitive and also matches a URL-encoded `%3D` form.
+  # `$$` is a literal `$` in collector config.
+  # One statement group runs in a single inferred context, and in a child context
+  # (span event) a span without children is never visited, so every context gets
+  # its own group. flatten() runs only when a match sits inside an array or a
+  # nested map, which replace_all_patterns does not enter. Span-link attributes
+  # are not reachable from OTTL in this version.
+  # error_mode ignore: a statement that fails on one record is logged and skipped
+  # instead of dropping the record; scripts/check-telemetry.sh is the backstop
+  # that finds anything this lets through.
+  transform/redact:
+    error_mode: ignore
+    trace_statements:
+      - context: resource
+        statements:
+          - flatten(resource.attributes) where IsMatch(String(resource.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(resource.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: scope
+        statements:
+          - flatten(scope.attributes) where IsMatch(String(scope.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(scope.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: span
+        statements:
+          - flatten(span.attributes) where IsMatch(String(span.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(span.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+          - replace_pattern(span.name, "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+          - replace_pattern(span.status.message, "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: spanevent
+        statements:
+          - flatten(spanevent.attributes) where IsMatch(String(spanevent.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(spanevent.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+    log_statements:
+      - context: resource
+        statements:
+          - flatten(resource.attributes) where IsMatch(String(resource.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(resource.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: scope
+        statements:
+          - flatten(scope.attributes) where IsMatch(String(scope.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(scope.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: log
+        statements:
+          - replace_pattern(log.body, "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED") where IsString(log.body)
+          - flatten(log.body) where IsMap(log.body) and IsMatch(String(log.body), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(log.body, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED") where IsMap(log.body)
+          - flatten(log.attributes) where IsMatch(String(log.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(log.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+
+  # The worker's metrics carry no URLs today; this keeps a future label from
+  # carrying one into Prometheus.
+  transform/redact-metrics:
+    error_mode: ignore
+    metric_statements:
+      - context: resource
+        statements:
+          - flatten(resource.attributes) where IsMatch(String(resource.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(resource.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+      - context: datapoint
+        statements:
+          - flatten(datapoint.attributes) where IsMatch(String(datapoint.attributes), "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)")
+          - replace_all_patterns(datapoint.attributes, "value", "(?i)X-Amz-(Signature|Credential|Security-Token)(=|%3D)[^&\\s\"]*", "X-Amz-$$1=REDACTED")
+
+  batch: {}
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/redact, batch]
+      exporters: [otlp_grpc/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/redact, batch]
+      exporters: [otlp_http/loki]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/redact-metrics, batch]
+      exporters: [otlp_http/prometheus]
+  telemetry:
+    logs:
+      level: info

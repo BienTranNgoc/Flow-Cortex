@@ -1,0 +1,132 @@
+{
+  "uid": "media-engine",
+  "title": "Media engine",
+  "description": "Jobs dispatched by the API and finished by the worker, the media.jobs queue, late results and reaped steps.",
+  "tags": ["flow-cortex", "media"],
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "30s",
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Jobs dispatched",
+      "description": "Jobs the API published to media.jobs in the selected range.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(media_jobs_dispatched_total[$__range]))",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Late results discarded",
+      "description": "Results that lost the step's compare-and-set (late after a timeout, or a duplicate) and were ignored.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(media_late_result_discarded_total[$__range]))",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Steps reaped by code",
+      "description": "Steps the reaper closed, summed over inline and remote steps.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none", "textMode": "value_and_name" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (code) (increase(media_reaper_reaped_total{code=~\"lease_expired|queue_timeout|run_timeout\"}[$__range]))",
+          "legendFormat": "{{code}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Jobs by status (since worker start)",
+      "description": "Jobs the worker finished since it started, by outcome: completed, an error code, retried or abandoned. A cumulative count: the worker pushes every 60 s and a new outcome's first job has no earlier sample to take an increase from.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "basic", "showUnfilled": true },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (outcome) (media_worker_jobs_total)",
+          "legendFormat": "{{outcome}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "media.jobs queue depth",
+      "description": "Messages waiting (ready) and in progress (unacked) on media.jobs, and dead-lettered jobs.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\", queue=\"media.jobs\"})",
+          "legendFormat": "ready"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\", queue=\"media.jobs\"})",
+          "legendFormat": "unacked"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rabbitmq_queue_messages{job=\"rabbitmq-per-object\", queue=\"media.jobs.dlq\"})",
+          "legendFormat": "dead-lettered (media.jobs.dlq)"
+        }
+      ]
+    }
+  ]
+}

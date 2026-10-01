@@ -1,0 +1,56 @@
+# Tempo 3 single binary (target "all"): the live store and backend scheduler
+# replace the 2.x ingester and compactor, so neither block appears here.
+
+server:
+  http_listen_port: 3200
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/blocks
+    wal:
+      path: /var/tempo/wal
+
+# Service-graph and span metrics feed Grafana's service map.
+metrics_generator:
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+
+usage_report:
+  reporting_enabled: false
+
+# Keep traces 7 days, like Loki and Prometheus. Tempo 3 carries block_retention
+# in both the scheduler's and the worker's compaction settings, so both are set.
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 168h
+backend_worker:
+  compaction:
+    block_retention: 168h
+
+# Search the stored blocks for all but the last minute (Tempo needs more than its
+# 30 s query-end cutoff). By default a window younger
+# than 15 min is answered from the live store alone, which has already handed
+# finished traces to blocks, so a short recent search missed them.
+query_frontend:
+  search:
+    query_backend_after: 1m
