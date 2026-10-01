@@ -31,7 +31,9 @@ class MediaExternalizationConfig {
     /**
      * Spring Modulith 2.1.0 and 2.1.1 compute the headers an externalization configuration
      * declares, then send without them, so the ids are set on the way out, from the job body,
-     * unless the message already carries one.
+     * unless the message already carries one. The run id goes out as baggage the same way: a
+     * resubmitted job is sent with no run in context, and the trace propagator only writes
+     * {@code baggage} over it when the context has some.
      */
     @Bean
     RabbitTemplateCustomizer jobMessageIds() {
@@ -40,6 +42,7 @@ class MediaExternalizationConfig {
 
     static final class JobMessageIds implements MessagePostProcessor {
 
+        private static final String BAGGAGE = "baggage";
         private static final JsonMapper JSON = JsonMapper.builder().build();
 
         @Override
@@ -51,11 +54,16 @@ class MediaExternalizationConfig {
         public Message postProcessMessage(Message message, Correlation correlation, String exchange,
                 String routingKey) {
             MessageProperties properties = message.getMessageProperties();
-            if (MediaTopologyConfig.EXCHANGE.equals(exchange) && MediaTopologyConfig.JOB_KEY.equals(routingKey)
-                    && properties.getMessageId() == null) {
-                JsonNode job = JSON.readTree(message.getBody());
+            if (!MediaTopologyConfig.EXCHANGE.equals(exchange) || !MediaTopologyConfig.JOB_KEY.equals(routingKey)) {
+                return message;
+            }
+            JsonNode job = JSON.readTree(message.getBody());
+            if (properties.getMessageId() == null) {
                 properties.setMessageId(job.get("jobId").asString());
                 properties.setCorrelationId(job.get("runId").asString());
+            }
+            if (properties.getHeader(BAGGAGE) == null) {
+                properties.setHeader(BAGGAGE, "runId=" + job.get("runId").asString());
             }
             return message;
         }

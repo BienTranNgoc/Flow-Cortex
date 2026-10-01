@@ -46,5 +46,23 @@ class MediaExternalizationConfigTest {
 
         assertThat(sent.getMessageId()).isNull();
         assertThat(sent.getCorrelationId()).isNull();
+        assertThat(sent.getHeaders()).doesNotContainKey("baggage");
+    }
+
+    @Test
+    void aJobMessageSentWithoutBaggageCarriesTheRunIdAsBaggage() {
+        MessageProperties sent = ids.postProcessMessage(job(null), null, "media", "job").getMessageProperties();
+
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=" + runId);
+    }
+
+    @Test
+    void baggageTheMessageAlreadyCarriesIsKept() {
+        Message job = job(null);
+        job.getMessageProperties().setHeader("baggage", "runId=set-upstream");
+
+        MessageProperties sent = ids.postProcessMessage(job, null, "media", "job").getMessageProperties();
+
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=set-upstream");
     }
 }

@@ -31,6 +31,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Clock;
@@ -81,7 +82,8 @@ class RunAdvancerTest {
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
         return new RunAdvancer(workflowRunRepository, runStepRepository, workflowStepRepository, transactions,
-                new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, meters, LEASE, clock);
+                new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters,
+                LEASE, clock);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);

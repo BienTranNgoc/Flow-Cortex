@@ -16,6 +16,8 @@ import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.BaggageInScope;
 import io.micrometer.tracing.Tracer;
 import java.time.Clock;
@@ -63,6 +65,7 @@ class RunAdvancer {
     private static final Logger LOG = LoggerFactory.getLogger(RunAdvancer.class);
     /** Carried as W3C baggage on everything the run sends, so the worker logs it too. */
     private static final String BAGGAGE_RUN_ID = "runId";
+    private static final String RUN_OBSERVATION = "workflow.run";
     private static final Duration HEARTBEAT = Duration.ofSeconds(30);
     /** Inline steps have no broker, so no redeliveries to count. */
     private static final short INLINE_DELIVERY = 0;
@@ -77,6 +80,7 @@ class RunAdvancer {
     private final TaskExecutor taskExecutor;
     private final TaskScheduler scheduler;
     private final Tracer tracer;
+    private final ObservationRegistry observations;
     private final Counter dispatchedJobs;
     private final Counter lateResults;
     private final Duration lease;
@@ -87,17 +91,19 @@ class RunAdvancer {
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry,
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
-            ObjectProvider<Tracer> tracer, MeterRegistry meters,
+            ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
-                taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP), meters,
-                Duration.ofSeconds(leaseSeconds), Clock.systemUTC());
+                taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
+                observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
+                Clock.systemUTC());
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
-            TaskScheduler scheduler, Tracer tracer, MeterRegistry meters, Duration lease, Clock clock) {
+            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
+            Duration lease, Clock clock) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -107,6 +113,7 @@ class RunAdvancer {
         this.taskExecutor = taskExecutor;
         this.scheduler = scheduler;
         this.tracer = tracer;
+        this.observations = observations;
         this.dispatchedJobs = Counter.builder("media.jobs.dispatched")
                 .description("Remote steps handed to the media engine")
                 .register(meters);
@@ -406,11 +413,18 @@ class RunAdvancer {
         }
     }
 
-    /** {@code runId} on the run's log lines, and as baggage on the job messages and spans it starts. */
+    /**
+     * {@code runId} on the run's log lines, and as baggage on the job messages and spans it starts.
+     * The baggage scope writes the run id into the enclosing span's shared context and takes it out
+     * again on close, while the outbox sends a job from its own task, which may start after that.
+     * The run's own span, started inside the scope, keeps the run id for whatever continues it.
+     */
     private void inRun(UUID runId, Runnable action) {
         try (StepLogContext ignored = StepLogContext.run(runId);
                 BaggageInScope baggage = tracer.createBaggageInScope(BAGGAGE_RUN_ID, runId.toString())) {
-            action.run();
+            Observation.createNotStarted(RUN_OBSERVATION, observations)
+                    .highCardinalityKeyValue(BAGGAGE_RUN_ID, runId.toString())
+                    .observe(action);
         }
     }
 }

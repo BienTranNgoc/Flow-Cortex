@@ -94,6 +94,8 @@ class BrokerOutageIT extends AbstractIsolatedBrokerIT {
                         .until(() -> channel.basicGet("media.jobs", true), response -> response != null);
                 assertThat(delivered.getProps().getMessageId()).isEqualTo(job.jobId().toString());
                 assertThat(delivered.getProps().getCorrelationId()).isEqualTo(job.runId().toString());
+                assertThat(delivered.getProps().getHeaders().get("baggage")).asString()
+                        .contains("runId=" + job.runId());
             }
         } finally {
             unpauseBrokerIfPaused();
