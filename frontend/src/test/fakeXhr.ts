@@ -1,9 +1,9 @@
 /**
  * Stand-in for `XMLHttpRequest`: records each request and lets the test decide when and how it
- * ends. Install with `vi.stubGlobal('XMLHttpRequest', FakeXhr)` and reset `FakeXhr.instances`.
+ * ends. Install with `vi.stubGlobal('XMLHttpRequest', FakeXhr)` and empty `FakeXhr.instances`.
  */
 export class FakeXhr {
-  static instances: FakeXhr[] = [];
+  static readonly instances: FakeXhr[] = [];
 
   method = '';
   url = '';

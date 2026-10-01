@@ -33,6 +33,14 @@ export class StartStageError extends Error {
   }
 }
 
+async function stage<T>(name: StartStage, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    throw new StartStageError(name, error);
+  }
+}
+
 /**
  * One press of Start: `POST /uploads`, the PUT, then `POST …/runs` only once the PUT succeeded,
  * so no run is ever started with an upload id whose object is missing. A call made while one is
@@ -40,14 +48,6 @@ export class StartStageError extends Error {
  */
 export function createStartWithUpload(deps: StartWithUploadDeps) {
   let inFlight = false;
-
-  async function stage<T>(name: StartStage, work: () => Promise<T>): Promise<T> {
-    try {
-      return await work();
-    } catch (error) {
-      throw new StartStageError(name, error);
-    }
-  }
 
   return async function start(
     file: File,

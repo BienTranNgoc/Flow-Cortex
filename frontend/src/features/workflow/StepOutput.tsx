@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { outputFields, parseReport } from './stepOutputFields';
 
 /** A step's output: a JSON object as labelled fields with its raw JSON behind a toggle, anything else as text. */
-export function StepOutput({ output }: { output: string }) {
+export function StepOutput({ output }: Readonly<{ output: string }>) {
   const [showRaw, setShowRaw] = useState(false);
   const rawId = useId();
   const report = parseReport(output);

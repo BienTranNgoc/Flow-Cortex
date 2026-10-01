@@ -14,7 +14,7 @@ export type StartRunFormValues = z.infer<typeof startRunSchema>;
  * The server's defaults for uploads (`flowcortex.media.upload`). Checked on pick only so a member
  * hears about a wrong file before uploading it; `/uploads` and the run start decide.
  */
-const MEDIA_EXTENSIONS = ['mp4', 'mov', 'webm', 'mkv', 'm4a', 'mp3', 'wav'];
+const MEDIA_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'mkv', 'm4a', 'mp3', 'wav']);
 // Mirrors FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES (default 524288000); when it changes, the server decides.
 const MAX_MEDIA_BYTES = 500 * 1024 * 1024;
 
@@ -35,7 +35,7 @@ export function mediaFileProblem(file: File): FileProblem | null {
   }
   const dot = file.name.lastIndexOf('.');
   const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
-  if (!MEDIA_EXTENSIONS.includes(extension)) {
+  if (!MEDIA_EXTENSIONS.has(extension)) {
     return {
       message:
         "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",

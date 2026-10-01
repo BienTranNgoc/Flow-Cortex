@@ -176,9 +176,10 @@ def test_a_kill_before_the_output_upload_stops_it() -> None:
     client = mock.Mock()
     runner = ProcessRunner()
     runner.kill("shutdown")
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
 
     with pytest.raises(ProcessKilled):
-        Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET).put("runs/r/steps/1/a", b"{}", "x", runner)
+        storage.put("runs/r/steps/1/a", b"{}", "x", runner)
 
     client.put_object.assert_not_called()
 

@@ -11,9 +11,11 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --frozen --no-dev --no-install-project
+# --no-build: dependencies come from wheels only, so no sdist setup code runs; uv
+# still builds the worker itself.
+RUN uv sync --frozen --no-build --no-dev --no-install-project
 COPY src ./src
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-build --no-dev --no-editable
 
 # --- runtime stage: ffmpeg from the distro, unprivileged user -------------------
 FROM python:3.12-slim AS runtime

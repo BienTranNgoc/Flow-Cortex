@@ -167,7 +167,8 @@ def test_transient_store_failure_names_no_url_in_logs_or_spans(
 
     assert conn.consume.rejects == [(1, True)]
     retried = [line for line in lines if line["message"].startswith("transient failure")]
-    assert retried and retried[0]["error"] == "TransientError"
+    assert retried
+    assert retried[0]["error"] == "TransientError"
     assert UPLOAD_BUCKET in retried[0]["reason"]
     for line in lines:
         assert "http://" not in json.dumps(line), line

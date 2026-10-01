@@ -26,7 +26,7 @@ function looksLikeJson(value: string): boolean {
   }
 }
 
-function StepProgress({ step }: { step: RunStepResponse }) {
+function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
   if (step.status !== 'running') {
     return null;
   }

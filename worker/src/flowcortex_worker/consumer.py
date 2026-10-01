@@ -466,8 +466,12 @@ class Consumer:
                 return
             try:
                 future.set_result(fn())
-            except BaseException as exc:
+            except Exception as exc:
                 future.set_exception(exc)
+            except BaseException as exc:
+                # The waiting thread still learns the outcome; an exit keeps unwinding this one.
+                future.set_exception(exc)
+                raise
 
         if self._closed.is_set():
             raise Abandoned("connection closed")

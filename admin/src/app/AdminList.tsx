@@ -37,6 +37,29 @@ export function AdminList<T>({
   const disabled = error instanceof ApiError && error.status === 503;
   const filterId = `${noun.replace(/\s+/g, '-')}-status`;
 
+  let empty: ReactNode;
+  if (data && data.page > 0) {
+    empty = (
+      <>
+        <p>No {noun} on this page.</p>
+        <button type="button" onClick={() => onPageChange(0)}>
+          Back to first page
+        </button>
+      </>
+    );
+  } else if (status) {
+    empty = (
+      <>
+        <p>No {noun} match this filter</p>
+        <button type="button" onClick={() => onStatusChange('')}>
+          Clear filter
+        </button>
+      </>
+    );
+  } else {
+    empty = <p>No {noun} yet.</p>;
+  }
+
   return (
     <>
       <div className="list-toolbar">
@@ -57,9 +80,7 @@ export function AdminList<T>({
       </div>
 
       {disabled && (
-        <p role="status" className="disabled-banner">
-          Admin console is disabled
-        </p>
+        <output className="disabled-banner">Admin console is disabled</output>
       )}
       {error && !disabled && (
         <div className="list-error">
@@ -71,27 +92,7 @@ export function AdminList<T>({
       )}
       {(query.isPending || query.isPlaceholderData) && <output>Loading {noun}…</output>}
       {data && error && <p className="stale-note">Showing the results loaded before this error.</p>}
-      {data && data.items.length === 0 && (
-        <div className="list-empty">
-          {data.page > 0 ? (
-            <>
-              <p>No {noun} on this page.</p>
-              <button type="button" onClick={() => onPageChange(0)}>
-                Back to first page
-              </button>
-            </>
-          ) : status ? (
-            <>
-              <p>No {noun} match this filter</p>
-              <button type="button" onClick={() => onStatusChange('')}>
-                Clear filter
-              </button>
-            </>
-          ) : (
-            <p>No {noun} yet.</p>
-          )}
-        </div>
-      )}
+      {data?.items.length === 0 && <div className="list-empty">{empty}</div>}
       {data && data.items.length > 0 && (
         <div className="table-wrapper" aria-busy={query.isPlaceholderData}>
           {children(data.items)}

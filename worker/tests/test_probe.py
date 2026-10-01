@@ -116,15 +116,19 @@ def test_text_file_named_like_a_video_fails_permanently(tmp_path: Path) -> None:
     text = tmp_path / "clip.mp4"
     text.write_text("not a video")
 
+    media_job, runner = job(), ProcessRunner()
+
     with pytest.raises(PermanentError) as failed:
-        probe.handle(job(), {"media": text}, ProcessRunner())
+        probe.handle(media_job, {"media": text}, runner)
 
     assert failed.value.code == "probe_failed"
 
 
 def test_job_without_the_media_input_is_a_contract_violation(clip: Path) -> None:
+    media_job, runner = job(), ProcessRunner()
+
     with pytest.raises(PermanentError) as failed:
-        probe.handle(job(), {"source": clip}, ProcessRunner())
+        probe.handle(media_job, {"source": clip}, runner)
 
     assert failed.value.code == "contract_violation"
 
@@ -168,8 +172,10 @@ def test_a_still_image_is_not_a_video(tmp_path: Path) -> None:
         check=True,
     )  # fmt: skip
 
+    media_job, runner = job(), ProcessRunner()
+
     with pytest.raises(PermanentError) as failed:
-        probe.handle(job(), {"media": image}, ProcessRunner())
+        probe.handle(media_job, {"media": image}, runner)
 
     assert failed.value.code == "probe_failed"
 

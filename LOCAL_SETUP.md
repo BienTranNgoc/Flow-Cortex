@@ -246,7 +246,7 @@ fix named in each case, when:
 
   ```bash
   docker compose run --rm --no-deps --entrypoint sh minio-init -c \
-    'MC_HOST_local="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@minio:9000" mc admin user remove local <old access key>'
+    'MC_HOST_ROOT="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@minio:9000" mc admin user remove local <old access key>'
   ```
 - **Runs from before the media engine.** A database from an earlier checkout can
   hold runs whose input is raw JSON text; they display as such. `down -v` clears

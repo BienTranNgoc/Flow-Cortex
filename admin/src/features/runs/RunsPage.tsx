@@ -27,30 +27,30 @@ export function RunsPage() {
         onPageChange={setPage}
       >
         {(runs) => (
-          <table className="admin-table" role="table">
-            <thead role="rowgroup">
-              <tr role="row">
-                <th scope="col" role="columnheader">Workflow</th>
-                <th scope="col" role="columnheader">Owner</th>
-                <th scope="col" role="columnheader">Status</th>
-                <th scope="col" role="columnheader">Started</th>
-                <th scope="col" role="columnheader">Finished</th>
-                <th scope="col" role="columnheader">Error</th>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th scope="col">Workflow</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Status</th>
+                <th scope="col">Started</th>
+                <th scope="col">Finished</th>
+                <th scope="col">Error</th>
               </tr>
             </thead>
-            <tbody role="rowgroup">
+            <tbody>
               {runs.map((run) => (
-                <tr role="row" key={run.id}>
-                  <td role="cell" data-label="Workflow">{run.workflowName}</td>
-                  <td role="cell" data-label="Owner">{run.ownerEmail ?? '(deleted user)'}</td>
-                  <td role="cell" data-label="Status">{run.status}</td>
-                  <td role="cell" data-label="Started">
+                <tr key={run.id}>
+                  <td data-label="Workflow">{run.workflowName}</td>
+                  <td data-label="Owner">{run.ownerEmail ?? '(deleted user)'}</td>
+                  <td data-label="Status">{run.status}</td>
+                  <td data-label="Started">
                     <Timestamp value={run.startedAt} />
                   </td>
-                  <td role="cell" data-label="Finished">
+                  <td data-label="Finished">
                     <Timestamp value={run.finishedAt} />
                   </td>
-                  <td role="cell" data-label="Error">{run.errorMessage ?? '—'}</td>
+                  <td data-label="Error">{run.errorMessage ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

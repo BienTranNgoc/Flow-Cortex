@@ -9,7 +9,7 @@ function clip() {
 
 describe('uploadFile', () => {
   beforeEach(() => {
-    FakeXhr.instances = [];
+    FakeXhr.instances.length = 0;
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
   });
   afterEach(() => {

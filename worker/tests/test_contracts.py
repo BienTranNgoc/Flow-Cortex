@@ -129,8 +129,9 @@ def test_url_input_fails() -> None:
 
 
 def test_progress_kind_outside_started_or_heartbeat_fails() -> None:
+    message = progress() | {"kind": "finished"}
     with pytest.raises(ValidationError):
-        MediaProgress.model_validate(progress() | {"kind": "finished"})
+        MediaProgress.model_validate(message)
 
 
 @pytest.mark.parametrize(

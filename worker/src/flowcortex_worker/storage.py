@@ -153,7 +153,7 @@ class Storage:
                 out.write(chunk)
 
     @staticmethod
-    def _classify(exc: Exception, ref: MediaJobInput) -> Exception:
+    def _classify(exc: Exception, ref: MediaJobInput) -> PermanentError | TransientError:
         if isinstance(exc, ClientError):
             code = str(exc.response.get("Error", {}).get("Code", ""))
             if code in _MISSING:

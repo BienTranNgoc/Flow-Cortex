@@ -37,8 +37,9 @@ pass() { echo "PASS  $*"; }
 fail() { echo "FAIL  $*" >&2; exit 1; }
 
 login() {
+  local email=$1 password=$2
   curl -sS --fail-with-body -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg e "$1" --arg p "$2" '{email: $e, password: $p}')" \
+    -d "$(jq -n --arg e "$email" --arg p "$password" '{email: $e, password: $p}')" \
     "$API_URL/api/v1/auth/login" | jq -er .token
 }
 
@@ -55,12 +56,14 @@ api() {
 
 # Requests an upload grant for a file name and a declared size; prints the grant.
 grant() {
-  api "$member" /api/v1/uploads "$(jq -n --arg n "$1" --argjson s "$2" '{fileName: $n, size: $s}')"
+  local name=$1 size=$2
+  api "$member" /api/v1/uploads "$(jq -n --arg n "$name" --argjson s "$size" '{fileName: $n, size: $s}')"
 }
 
 # PUTs a file to a grant's URL; prints the HTTP status.
 put() {
-  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$1" -H "Content-Type: video/mp4" "$2"
+  local file=$1 url=$2
+  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$file" -H "Content-Type: video/mp4" "$url"
 }
 
 # Uploads a file and starts the workflow on it; prints the run id.

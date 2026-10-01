@@ -64,7 +64,7 @@ jobs:
           cache-dependency-glob: worker/uv.lock
 
       - name: Install
-        run: uv sync --frozen
+        run: uv sync --frozen --no-build
 
       - name: Regenerate the Python models
         run: bash scripts/gen_contracts.sh
@@ -82,4 +82,4 @@ jobs:
           fi
 
       - name: Contract tests
-        run: uv run --frozen pytest tests/test_contracts.py
+        run: uv run --frozen --no-build pytest tests/test_contracts.py

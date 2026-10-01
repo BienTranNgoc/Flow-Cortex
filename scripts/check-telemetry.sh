@@ -52,8 +52,8 @@ SERVICES=(flow-cortex flow-worker)
 TARGET_JOBS=(backend rabbitmq minio postgres-exporter)
 
 failures=0
-pass() { echo "PASS  $*"; }
-fail() { echo "FAIL  $*"; failures=$((failures + 1)); }
+pass() { echo "PASS  $*"; return 0; }
+fail() { echo "FAIL  $*"; failures=$((failures + 1)); return 0; }
 
 grafana_container="$(docker ps -q \
   --filter "label=com.docker.compose.project=$PROJECT" \

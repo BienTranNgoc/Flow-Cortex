@@ -19,26 +19,28 @@ case "${MINIO_ROOT_USER}${MINIO_ROOT_PASSWORD}" in
         echo "minio-init: MINIO_ROOT_USER/MINIO_ROOT_PASSWORD may use only letters, digits and . _ ~ -" >&2
         exit 1
         ;;
+    *) ;;
 esac
-export MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000"
+# mc reads alias X from MC_HOST_X; the alias is upper case to keep the variable so.
+export MC_HOST_ROOT="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000"
 
-mc mb --ignore-existing local/flowcortex-uploads local/flowcortex-media
+mc mb --ignore-existing ROOT/flowcortex-uploads ROOT/flowcortex-media
 
 # `import` replaces the whole lifecycle configuration; `mc ilm rule add` would
 # append a duplicate rule on every run.
-mc ilm import local/flowcortex-uploads < "$DIR/uploads-lifecycle.json"
+mc ilm import ROOT/flowcortex-uploads < "$DIR/uploads-lifecycle.json"
 
 # `policy create` overwrites an existing policy of the same name; `user add`
 # on an existing user only resets its secret. Keys go in on stdin (printf is a
 # shell builtin), so no secret appears on a command line.
-mc admin policy create local flowcortex-backend "$DIR/backend-policy.json"
-mc admin policy create local flowcortex-worker "$DIR/worker-policy.json"
-printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add local >/dev/null
-printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add local >/dev/null
+mc admin policy create ROOT flowcortex-backend "$DIR/backend-policy.json"
+mc admin policy create ROOT flowcortex-worker "$DIR/worker-policy.json"
+printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
+printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 
 # Re-attaching an attached policy is an error on the server; treat it as done.
 attach() {
-    if out=$(mc admin policy attach local "$1" --user "$2" 2>&1); then
+    if out=$(mc admin policy attach ROOT "$1" --user "$2" 2>&1); then
         echo "$out"
         return 0
     fi

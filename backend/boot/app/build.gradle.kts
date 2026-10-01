@@ -10,9 +10,9 @@ dependencies {
     // from the management port, module and JDBC observations. JDBC parameter values stay out.
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation("io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:2.28.1-alpha")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:${providers.gradleProperty("otelLogbackAppenderVersion").get()}")
     implementation("org.springframework.modulith:spring-modulith-starter-insight")
-    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:2.3.0")
+    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:${providers.gradleProperty("datasourceMicrometerVersion").get()}")
     // The management chain matches actuator endpoints with Boot's EndpointRequest.
     implementation("org.springframework.boot:spring-boot-starter-security")
     // Pinned exactly: 3.1.1 is where springdoc's Boot 4 / Jackson 3 introspection settled.

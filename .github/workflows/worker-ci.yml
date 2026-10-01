@@ -45,14 +45,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: Install
-        # --locked also fails when uv.lock no longer matches pyproject.toml.
-        run: uv sync --locked
+        # --locked also fails when uv.lock no longer matches pyproject.toml. --no-build:
+        # dependencies come from wheels only; uv still builds the worker itself.
+        run: uv sync --locked --no-build
 
       - name: Lint
-        run: uv run --frozen ruff check .
+        run: uv run --frozen --no-build ruff check .
 
       - name: Type-check
-        run: uv run --frozen mypy
+        run: uv run --frozen --no-build mypy
 
       - name: Test
-        run: uv run --frozen pytest -rs
+        run: uv run --frozen --no-build pytest -rs

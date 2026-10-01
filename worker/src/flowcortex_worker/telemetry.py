@@ -130,6 +130,7 @@ class CapLogAttributes(LogRecordProcessor):
         )
 
     def shutdown(self) -> None:
+        # Nothing to release: the processor holds no exporter, buffer or thread.
         pass
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
