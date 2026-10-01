@@ -1,0 +1,16 @@
+backend/
+worker/
+openspec/
+.git
+.gitnexus/
+.claude/
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+**/.env
+**/.env.local
+**/.env.*.local
+**/.idea
+**/.vscode

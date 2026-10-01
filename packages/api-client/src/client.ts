@@ -1,4 +1,4 @@
-import { getToken, setToken } from '../features/auth/tokenStore';
+import { getToken, setToken } from './tokenStore';
 import { ApiError, type ProblemDetail } from './problemDetail';
 
 /** Bearer-auth `RequestInit` for the generated client's `options` param. */
