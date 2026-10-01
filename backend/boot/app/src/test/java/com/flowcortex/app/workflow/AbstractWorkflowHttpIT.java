@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
  * Real login over HTTP (not a hand-minted token) so the same JWT the running
  * app actually issues is exercised end to end.
  */
-abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
+public abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
 
     @Autowired
     protected TestRestTemplate restTemplate;
@@ -64,7 +64,7 @@ abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
     record StartRunRequestView(String input) {
     }
 
-    record WorkflowStepResponseView(UUID id, int stepOrder, String name, String type) {
+    record WorkflowStepResponseView(UUID id, int stepOrder, String name, String type, String mode) {
     }
 
     record WorkflowResponseView(
@@ -74,7 +74,7 @@ abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
 
     record RunStepResponseView(
             UUID id, int stepOrder, String type, String status, String input, String output, String errorMessage,
-            Instant startedAt, Instant finishedAt) {
+            Instant startedAt, Instant finishedAt, String mode) {
     }
 
     record RunResponseView(

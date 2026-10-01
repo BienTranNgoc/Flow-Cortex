@@ -50,4 +50,20 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
                 .andExpect(jsonPath("$.errors.name").exists());
     }
+
+    @Test
+    void anInvalidRequestParameterReturns400NamingTheParameter() throws Exception {
+        mockMvc.perform(get("/test/page").param("size", "500"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.errors.size").exists());
+    }
+
+    @Test
+    void aRequestParameterOfTheWrongTypeReturns400NamingTheParameter() throws Exception {
+        mockMvc.perform(get("/test/page").param("size", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.errors.size").exists());
+    }
 }

@@ -5,15 +5,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -26,6 +30,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void listIncludesSharedWorkflowsFromOtherOwners() {
@@ -54,6 +61,33 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().steps()).extracting(WorkflowStepResponseView::stepOrder).containsExactly(1, 2);
+    }
+
+    @Test
+    void eachWorkflowStepAndRunStepSaysWhetherItRunsInlineOrRemote() {
+        UserView owner = newUser("http-step-mode");
+        WorkflowView workflow = newWorkflow(owner.id(), false,
+                new NewWorkflowStep("check", "probe", null),
+                new NewWorkflowStep("echo", "echo", null));
+        String token = loginAs(owner);
+        UUID runId = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbcTemplate.update("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at) "
+                + "VALUES (?, ?, ?, 'running', 'clip.mp4', ?)", runId, workflow.id(), owner.id(), now);
+        jdbcTemplate.update("INSERT INTO run_step (id, run_id, step_order, type, status) VALUES "
+                + "(?, ?, 1, 'probe', 'pending'), (?, ?, 2, 'echo', 'pending')",
+                UUID.randomUUID(), runId, UUID.randomUUID(), runId);
+
+        ResponseEntity<WorkflowResponseView> workflowResponse =
+                get("/api/v1/workflows/" + workflow.id(), token, WorkflowResponseView.class);
+        ResponseEntity<RunResponseView> runResponse = get("/api/v1/runs/" + runId, token, RunResponseView.class);
+
+        assertThat(workflowResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(workflowResponse.getBody().steps()).extracting(WorkflowStepResponseView::mode)
+                .containsExactly("remote", "inline");
+        assertThat(runResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(runResponse.getBody().steps()).extracting(RunStepResponseView::mode)
+                .containsExactly("remote", "inline");
     }
 
     @Test
@@ -149,6 +183,34 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
         assertThat(response.getBody()).contains("\"input\"");
+    }
+
+    @Test
+    void aRunShowsTheFileNamePickupAndOutputNamesButNeverWhereTheObjectIsStored() {
+        UserView user = newUser("http-step-outputs");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "probe", null));
+        String token = loginAs(user);
+        UUID runId = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        String upload = "{\"key\":\"source\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"owner/upload\"}";
+        jdbcTemplate.update("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at, "
+                + "finished_at) VALUES (?, ?, ?, 'completed', ?, ?, ?)", runId, workflow.id(), user.id(), "clip.mp4",
+                now, now);
+        jdbcTemplate.update("INSERT INTO run_step (id, run_id, step_order, type, status, input, output, outputs, "
+                        + "started_at, picked_up_at, delivery_count, progress_percent, finished_at) "
+                        + "VALUES (?, ?, 1, 'probe', 'completed', ?, '{}', ?::jsonb, ?, ?, 1, 100, ?)",
+                UUID.randomUUID(), runId, upload, "[{\"name\":\"video-details.json\",\"bucket\":\"flowcortex-media\","
+                        + "\"objectKey\":\"runs/" + runId + "/steps/1/video-details.json\","
+                        + "\"mime\":\"application/json\",\"bytes\":42}]", now, now, now);
+
+        ResponseEntity<String> response = get("/api/v1/runs/" + runId, token, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .contains("\"input\":\"clip.mp4\"")
+                .contains("\"pickedUpAt\"", "\"deliveryCount\":1", "\"progressPercent\":100", "\"attempt\":1")
+                .contains("\"outputs\":[{\"name\":\"video-details.json\",\"mime\":\"application/json\",\"bytes\":42}]")
+                .doesNotContain("objectKey", "flowcortex-media", "flowcortex-uploads", "owner/upload", "bucket");
     }
 
     private RunResponseView awaitTerminalHttp(String token, UUID runId, Duration timeout) {

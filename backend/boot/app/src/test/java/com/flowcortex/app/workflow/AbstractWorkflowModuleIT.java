@@ -21,7 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * WorkflowService}, {@link WorkflowRunService}) — never a module's internal
  * repository — the same discipline {@code AbstractUserModuleIT} follows.
  */
-abstract class AbstractWorkflowModuleIT extends AbstractPostgresBootTest {
+public abstract class AbstractWorkflowModuleIT extends AbstractPostgresBootTest {
 
     @Autowired
     protected UserService userService;

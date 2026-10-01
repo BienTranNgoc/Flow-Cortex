@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # --- build stage: compile + package the Spring Boot executable jar ----------
-FROM eclipse-temurin:25-jdk AS build
+# Built on the host's platform: the jar is platform-independent, so a cross
+# build never runs Gradle under emulation.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # settings.gradle.kts include()s every subproject, so all directories must
@@ -29,8 +31,10 @@ USER spring
 
 COPY --from=build /workspace/boot/app/build/libs/*-SNAPSHOT.jar app.jar
 
+# 8081 (health, metrics) is left out on purpose: it is reached only inside the
+# service network.
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=5 \
-  CMD curl -fsS http://localhost:8080/actuator/health || exit 1
+  CMD curl -fsS http://localhost:8080/readyz || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

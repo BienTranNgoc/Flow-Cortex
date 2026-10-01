@@ -43,9 +43,10 @@ public class SecurityConfig {
                         // landing on /error comes back 401 instead of its real status. Only the
                         // internal forward is permitted — a direct GET /error is still denied.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        // Health probe + committed OpenAPI snapshot/Swagger UI stay anonymous —
-                        // public read-only artifacts the contract pipeline doesn't need a token for.
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Liveness/readiness probes + committed OpenAPI snapshot/Swagger UI stay
+                        // anonymous — public read-only artifacts the contract pipeline doesn't need a
+                        // token for. The actuator lives on the management port, not here.
+                        .requestMatchers("/livez", "/readyz").permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated())

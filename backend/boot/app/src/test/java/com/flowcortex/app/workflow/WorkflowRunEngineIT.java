@@ -3,25 +3,210 @@ package com.flowcortex.app.workflow;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.media.api.MediaJobCompleted;
+import com.flowcortex.media.api.MediaJobProgressed;
+import com.flowcortex.media.api.MediaOutput;
+import com.flowcortex.media.api.MediaProgress;
+import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.shared.web.GlobalExceptionHandler;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
+import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowView;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.validation.ConstraintViolationException;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.ProblemDetail;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The workflow run engine end to end, exercised through the real {@code
- * api} ports.
+ * api} ports. The reaper runs every 200 ms here so a stuck step is closed within
+ * the poll timeout; stuck states are seeded with SQL because nothing in-process can
+ * produce a worker that stopped heartbeating.
  */
 @Testcontainers
-@SpringBootTest
+@SpringBootTest(properties = "flowcortex.workflow.reaper-interval-ms=200")
 class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ApplicationEventPublisher events;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
+    private ApplicationContext context;
+
+    @Autowired
+    private GlobalExceptionHandler exceptionHandler;
+
+    @Test
+    void aPickedUpStepWhoseLeaseLapsedIsClosedAsLeaseExpired() {
+        UserView user = newUser("lease-expired");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant past = Instant.now().minusSeconds(60);
+        UUID runId = seedRunningStep(workflow.id(), user.id(), "echo", past.plusSeconds(3600), past,
+                past.plusSeconds(10), past.plusSeconds(3600));
+        double before = reaped("lease_expired");
+
+        RunView finished = awaitTerminal(user.id(), runId);
+
+        assertThat(finished.status()).isEqualTo("error");
+        assertThat(finished.steps().get(0).status()).isEqualTo("error");
+        assertThat(finished.steps().get(0).errorCode()).isEqualTo("lease_expired");
+        assertThat(finished.errorMessage()).isNotBlank();
+        assertThat(reaped("lease_expired")).isGreaterThan(before);
+    }
+
+    @Test
+    void aRunLeftWithAPendingStepAndNothingInFlightIsAdvancedByTheSweep() {
+        UserView user = newUser("stalled-run");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "echo", null));
+        UUID runId = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbcTemplate.update("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at) "
+                + "VALUES (?, ?, ?, 'running', 'in', ?)", runId, workflow.id(), user.id(), now);
+        jdbcTemplate.update("INSERT INTO run_step (id, run_id, step_order, type, status, input, output, started_at, "
+                + "finished_at) VALUES (?, ?, 1, 'echo', 'completed', 'in', 'carried', ?, ?)",
+                UUID.randomUUID(), runId, now, now);
+        jdbcTemplate.update("INSERT INTO run_step (id, run_id, step_order, type, status) "
+                + "VALUES (?, ?, 2, 'echo', 'pending')", UUID.randomUUID(), runId);
+
+        RunView finished = awaitTerminal(user.id(), runId);
+
+        assertThat(finished.status()).isEqualTo("completed");
+        assertThat(finished.steps().get(1).output()).isEqualTo("carried");
+    }
+
+    @Test
+    void aStepNeverPickedUpBeforeItsQueueDeadlineIsClosedAsQueueTimeout() {
+        UserView user = newUser("queue-timeout");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "probe", null));
+        UUID runId = seedRunningStep(workflow.id(), user.id(), "probe", Instant.now().minusSeconds(1), null, null,
+                null);
+
+        RunView finished = awaitTerminal(user.id(), runId);
+
+        assertThat(finished.status()).isEqualTo("error");
+        assertThat(finished.steps().get(0).errorCode()).isEqualTo("queue_timeout");
+        assertThat(finished.steps().get(0).pickedUpAt()).isNull();
+    }
+
+    @Test
+    void progressFromTheWorkerIsExposedAndItsResultCompletesTheStepWithNamedOutputs() {
+        UserView user = newUser("remote-progress");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "probe", null));
+        UUID runId = seedRunningStep(workflow.id(), user.id(), "probe", Instant.now().plusSeconds(1800), null, null,
+                null);
+        UUID stepId = workflowRunService.getRun(user.id(), runId).steps().get(0).id();
+        Instant startedAt = Instant.now();
+
+        publish(new MediaJobProgressed(new MediaProgress("1", stepId, runId, 1, 1, MediaProgress.Kind.STARTED, null,
+                null, startedAt)));
+        publish(new MediaJobProgressed(new MediaProgress("1", stepId, runId, 1, 1, MediaProgress.Kind.HEARTBEAT, 40,
+                null, startedAt.plusSeconds(1))));
+
+        RunView inFlight = pollUntil(user.id(), runId, run -> {
+            RunStepView step = run.steps().get(0);
+            return step.pickedUpAt() != null && Integer.valueOf(40).equals(step.progressPercent());
+        }, Duration.ofSeconds(10));
+        assertThat(inFlight.steps().get(0).deliveryCount()).isEqualTo(1);
+        assertThat(inFlight.steps().get(0).attempt()).isEqualTo(1);
+        assertThat(inFlight.steps().get(0).status()).isEqualTo("running");
+
+        MediaOutput details = new MediaOutput("video-details.json", "flowcortex-media",
+                "runs/" + runId + "/steps/1/video-details.json", "application/json", 42L, null);
+        publish(new MediaJobCompleted(new MediaResult("1", stepId, runId, 1, 1, MediaResult.Status.COMPLETED,
+                List.of(details), Map.of("videoCodec", "h264"), null, Instant.now(), "worker-it")));
+
+        RunView finished = awaitTerminal(user.id(), runId);
+        assertThat(finished.status()).isEqualTo("completed");
+        assertThat(finished.steps().get(0).output()).isEqualTo("{\"videoCodec\":\"h264\"}");
+        assertThat(finished.steps().get(0).outputs())
+                .containsExactly(new RunStepOutputView("video-details.json", "application/json", 42L));
+    }
+
+    @Test
+    void anUnknownStepTypeIsRejectedAtCreationAsA400NamingTheStep() {
+        UserView user = newUser("unknown-type");
+
+        assertThatThrownBy(() -> newWorkflow(user.id(), false, new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "transcode", null)))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, violation -> {
+                    ProblemDetail problem = exceptionHandler.handleConstraintViolation(violation);
+                    assertThat(problem.getStatus()).isEqualTo(400);
+                    assertThat(problem.getProperties()).extractingByKey("errors")
+                            .asInstanceOf(InstanceOfAssertFactories.MAP)
+                            .containsOnlyKeys("steps[1].type");
+                });
+        assertThat(workflowService.listVisibleWorkflows(user.id())).extracting(WorkflowView::ownerId)
+                .doesNotContain(user.id());
+    }
+
+    @Test
+    void inlineStepsRunOnBootsBoundedApplicationTaskExecutorAndNoExecutorBeanOfOursExists() throws Exception {
+        assertThat(context.getBeansOfType(ThreadPoolTaskExecutor.class)).containsOnlyKeys("applicationTaskExecutor");
+        ThreadPoolTaskExecutor executor = context.getBean("applicationTaskExecutor", ThreadPoolTaskExecutor.class);
+        assertThat(executor.getCorePoolSize()).isEqualTo(8);
+        assertThat(executor.getMaxPoolSize()).isEqualTo(16);
+        assertThat(executor.getQueueCapacity()).isEqualTo(500);
+        assertThat(executor.submit(() -> Thread.currentThread().getName()).get(5, TimeUnit.SECONDS))
+                .startsWith("app-async-");
+    }
+
+    private void publish(Object event) {
+        transactionTemplate.executeWithoutResult(status -> events.publishEvent(event));
+    }
+
+    /** The steps these tests seed are inline ({@code echo}). */
+    private double reaped(String code) {
+        return meterRegistry.get("media.reaper.reaped").tags("code", code, "mode", "inline").counter().count();
+    }
+
+    /** A running run with one running step in the given lease state, as a crashed executor would leave it. */
+    private UUID seedRunningStep(UUID workflowId, UUID ownerId, String type, Instant queueDeadline,
+            Instant pickedUpAt, Instant leaseUntil, Instant runDeadline) {
+        UUID runId = UUID.randomUUID();
+        Instant now = Instant.now();
+        jdbcTemplate.update("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at) "
+                + "VALUES (?, ?, ?, 'running', 'in', ?)", runId, workflowId, ownerId, Timestamp.from(now));
+        jdbcTemplate.update("INSERT INTO run_step (id, run_id, step_order, type, status, input, started_at, "
+                        + "queue_deadline, picked_up_at, lease_until, run_deadline) "
+                        + "VALUES (?, ?, 1, ?, 'running', 'in', ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), runId, type, Timestamp.from(now), timestamp(queueDeadline), timestamp(pickedUpAt),
+                timestamp(leaseUntil), timestamp(runDeadline));
+        return runId;
+    }
+
+    private static Timestamp timestamp(Instant instant) {
+        return instant == null ? null : Timestamp.from(instant);
+    }
 
     @Test
     void startReturnsBeforeStepsFinishAndAllStepsStartPending() {

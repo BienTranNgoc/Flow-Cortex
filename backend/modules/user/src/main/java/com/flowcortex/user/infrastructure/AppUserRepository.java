@@ -1,10 +1,13 @@
 package com.flowcortex.user.infrastructure;
 
 import com.flowcortex.user.domain.AppUser;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Spring Data JPA repository for {@link AppUser}.
@@ -25,4 +28,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Optional<AppUser> findByOwnerIdAndId(UUID ownerId, UUID id);
 
     List<AppUser> findAllByOwnerIdOrderByEmailAsc(UUID ownerId);
+
+    /** Ids and emails only, whatever the status: the rest of the row, the password hash included, stays unread. */
+    @Query("SELECT new com.flowcortex.user.infrastructure.UserEmail(u.id, u.email) FROM AppUser u WHERE u.id IN :ids")
+    List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<UUID> ids);
 }
