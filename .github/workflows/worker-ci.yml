@@ -1,0 +1,58 @@
+name: worker-ci
+
+# Lint, type-check and test the Python media worker. The tests start the pinned
+# RabbitMQ and Silo images with Testcontainers (Docker is on the hosted runner)
+# and run the real ffprobe, so the runner installs ffmpeg.
+on:
+  push:
+    branches: [main, development]
+    paths:
+      - 'worker/**'
+      - 'contracts/**'
+      - '.github/workflows/worker-ci.yml'
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'contracts/**'
+      - '.github/workflows/worker-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.21'
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: worker/uv.lock
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install
+        # --locked also fails when uv.lock no longer matches pyproject.toml.
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run --frozen ruff check .
+
+      - name: Type-check
+        run: uv run --frozen mypy
+
+      - name: Test
+        run: uv run --frozen pytest -rs
