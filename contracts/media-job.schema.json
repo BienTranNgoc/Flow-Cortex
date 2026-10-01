@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/media-job.schema.json",
+  "title": "MediaJob",
+  "description": "A job the API publishes to the media worker. Inputs are references to objects already in the store; the worker fetches nothing by URL.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "jobId",
+    "runId",
+    "correlationId",
+    "stepOrder",
+    "capability",
+    "inputs",
+    "params",
+    "outputPrefix",
+    "attempt",
+    "maxRuntimeSeconds",
+    "maxInputBytes",
+    "issuedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "jobId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+    },
+    "stepOrder": { "type": "integer", "minimum": 1 },
+    "capability": { "$ref": "#/$defs/capability" },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/input" }
+    },
+    "params": { "type": "object" },
+    "outputPrefix": {
+      "type": "string",
+      "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
+      "description": "The only key prefix the worker writes under: runs/{runId}/steps/{stepOrder}/."
+    },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+    "maxInputBytes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The upload maximum; the worker re-checks each input object's size against it."
+    },
+    "issuedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "capability": {
+      "title": "MediaCapability",
+      "type": "string",
+      "enum": ["probe"]
+    },
+    "input": {
+      "title": "MediaJobInput",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "bucket", "objectKey"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "bucket": { "type": "string", "minLength": 1 },
+        "objectKey": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
