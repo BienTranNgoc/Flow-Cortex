@@ -15,6 +15,8 @@ export default defineConfig({
     // Reference machine already runs another Vite app on 5173; Vite will fall
     // back to the next free port automatically if this one is taken.
     port: 5173,
+    // Same-origin like the nginx image: the backend sends no CORS headers.
+    proxy: { '/api': 'http://localhost:8080' },
   },
   test: {
     globals: true,
