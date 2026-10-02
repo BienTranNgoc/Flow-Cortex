@@ -7,6 +7,7 @@ include(
     ":boot:app",
     ":modules:user",
     ":modules:workflow",
+    ":modules:media",
     ":shared:web",
     ":shared:security",
 )

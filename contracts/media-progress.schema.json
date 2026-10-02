@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/media-progress.schema.json",
+  "title": "MediaProgress",
+  "description": "A liveness message for one delivery of a job: `started` once per delivery, then periodic heartbeats.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "jobId", "runId", "attempt", "deliveryCount", "kind", "at"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "jobId": { "type": "string", "format": "uuid" },
+    "runId": { "type": "string", "format": "uuid" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "deliveryCount": { "type": "integer", "minimum": 0 },
+    "kind": {
+      "title": "MediaProgressKind",
+      "type": "string",
+      "enum": ["started", "heartbeat"]
+    },
+    "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "message": { "type": "string" },
+    "at": { "type": "string", "format": "date-time" }
+  }
+}

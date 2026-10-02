@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -16,10 +17,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -80,6 +84,33 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
         detail.setProperty("errors", errors);
+        return ResponseEntity.status(status).headers(headers).body(detail);
+    }
+
+    /** A constrained {@code @RequestParam}/{@code @PathVariable}: {@code errors} is keyed by the parameter name. */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail detail = createProblemDetail(ex, status, "Request validation failed", null, null, request);
+        detail.setType(PROBLEM_BASE.resolve("validation-failed"));
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (ParameterValidationResult result : ex.getParameterValidationResults()) {
+            errors.put(result.getMethodParameter().getParameterName(),
+                    result.getResolvableErrors().getFirst().getDefaultMessage());
+        }
+        detail.setProperty("errors", errors);
+        return ResponseEntity.status(status).headers(headers).body(detail);
+    }
+
+    /** A request parameter that does not convert to its type ({@code page=abc}): {@code errors} names it. */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String name = ex instanceof MethodArgumentTypeMismatchException mismatch
+                ? mismatch.getName() : ex.getPropertyName();
+        ProblemDetail detail = createProblemDetail(ex, status, "Request validation failed", null, null, request);
+        detail.setType(PROBLEM_BASE.resolve("validation-failed"));
+        detail.setProperty("errors", Map.of(name == null ? "request" : name, "has the wrong type"));
         return ResponseEntity.status(status).headers(headers).body(detail);
     }
 

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: flow-cortex
+    type: file
+    # A dashboard whose file is removed is removed from Grafana too.
+    disableDeletion: false
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

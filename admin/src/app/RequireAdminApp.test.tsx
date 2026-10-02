@@ -1,0 +1,107 @@
+import { setToken } from '@flow-cortex/api-client';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { App } from '../App';
+import { ADMIN_ME, MEMBER_ME, settled, stubApi, testQueryClient } from '../test/fakeApi';
+import { queryClient } from './queryClient';
+import { RequireAdminApp } from './RequireAdminApp';
+
+const EMPTY_PAGE = { items: [], page: 0, size: 20, total: 0 };
+
+afterEach(() => {
+  setToken(null);
+  queryClient.clear();
+  vi.unstubAllGlobals();
+});
+
+describe('RequireAdminApp', () => {
+  it('sends a signed-out visitor to /login and back to /runs after an ADMIN login', async () => {
+    stubApi({
+      'POST /api/v1/auth/login': { status: 200, body: { token: 'admin-token' } },
+      'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
+      'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
+    });
+    window.history.pushState({}, '', '/runs');
+    render(<App />);
+
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/login');
+
+    await userEvent.type(screen.getByLabelText('Email'), ADMIN_ME.email);
+    await userEvent.type(screen.getByLabelText('Password'), 'secret');
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/runs');
+  });
+
+  it('shows a MEMBER "No access" with sign-out and makes no admin API call', async () => {
+    const calls = stubApi({ 'GET /api/v1/auth/me': { status: 200, body: MEMBER_ME } });
+    setToken('member-token');
+    window.history.pushState({}, '', '/runs');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'No access' })).toBeInTheDocument();
+    expect(screen.getByText(/does not have the ADMIN role/)).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin navigation' })).not.toBeInTheDocument();
+    await settled(queryClient);
+    expect(calls.map((call) => call.path)).toEqual(['/api/v1/auth/me']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('drops every cached admin result on sign-out', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
+      'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
+    });
+    setToken('admin-token-signout');
+    window.history.pushState({}, '', '/runs');
+    render(<App />);
+    expect(await screen.findByText('No runs yet.')).toBeInTheDocument();
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['admin'] })).not.toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['admin'] })).toHaveLength(0);
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['me', 'admin-token-signout'] })).toHaveLength(0);
+  });
+
+  it('renders its children for an ADMIN', async () => {
+    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    setToken('admin-token-children');
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <RequireAdminApp>
+            <p>admin content</p>
+          </RequireAdminApp>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('admin content')).toBeInTheDocument();
+  });
+
+  it('shows a retryable error when the signed-in user cannot be loaded', async () => {
+    stubApi({ 'GET /api/v1/auth/me': { status: 500, body: { status: 500, detail: 'boom' } } });
+    setToken('admin-token-error');
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <RequireAdminApp>
+            <p>admin content</p>
+          </RequireAdminApp>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check your account.');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByText('admin content')).not.toBeInTheDocument();
+  });
+});

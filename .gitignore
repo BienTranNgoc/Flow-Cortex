@@ -24,6 +24,10 @@ backend/.gradle/
 # Frontend node_modules is covered by frontend/.gitignore, but guard here too.
 **/node_modules/
 
+# frontend/, admin/ and worker/ ignore their own build output in their own
+# .gitignore: dist, coverage and *.tsbuildinfo for the SPAs; .venv and the
+# Python caches for the worker.
+
 # --- Local tooling / planning workspace (not product logic) ---
 # Local assistant/session config.
 .claude/

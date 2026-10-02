@@ -1,9 +1,19 @@
 package com.flowcortex.workflow.infrastructure;
 
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Spring Data JPA repository for {@link WorkflowRun}. {@link #findByIdAndOwnerId} is the
@@ -13,4 +23,28 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> {
 
     Optional<WorkflowRun> findByIdAndOwnerId(UUID id, UUID ownerId);
+
+    /**
+     * Running runs with no step in flight: nothing will move them unless someone advances them
+     * (a pending next step whose advance was lost, or all steps completed but the run not closed).
+     * Runs never swept come first, then the one swept longest ago, so a run that never moves
+     * cannot keep a newer one out of the batch.
+     */
+    @Query(value = "SELECT r.id FROM workflow_run r WHERE r.status = 'running' AND NOT EXISTS "
+            + "(SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running') "
+            + "ORDER BY r.last_swept_at NULLS FIRST, r.started_at", nativeQuery = true)
+    List<UUID> findStalledRunIds(Pageable page);
+
+    /** Stamps the runs one sweep took; {@code last_swept_at} is not mapped, so saving a run never resets it. */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE workflow_run SET last_swept_at = :now WHERE id IN (:ids)", nativeQuery = true)
+    int markSwept(@Param("ids") Collection<UUID> ids, @Param("now") Instant now);
+
+    /** Every owner's runs, newest first, with their workflow's name; {@code status} {@code null} matches all. */
+    @Query(value = "SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE (:status IS NULL OR r.status = :status) ORDER BY r.startedAt DESC, r.id DESC",
+            countQuery = "SELECT count(r) FROM WorkflowRun r WHERE (:status IS NULL OR r.status = :status)")
+    Page<RunWithWorkflowName> findAllNewestFirst(@Param("status") RunStatus status, Pageable page);
 }

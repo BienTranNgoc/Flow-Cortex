@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
@@ -13,6 +16,9 @@ import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,7 +29,10 @@ class WorkflowServiceImplTest {
 
     private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
     private final WorkflowStepRepository workflowStepRepository = mock(WorkflowStepRepository.class);
-    private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository);
+    private final StepExecutorRegistry registry =
+            new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+    private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
+            registry, Validation.buildDefaultValidatorFactory().getValidator());
 
     @Test
     void listVisibleWorkflowsMapsEachWithItsSteps() {
@@ -76,5 +85,54 @@ class WorkflowServiceImplTest {
         assertThat(created.ownerId()).isEqualTo(ownerId);
         assertThat(created.shared()).isTrue();
         assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
+    }
+
+    @Test
+    void createWorkflowRejectsAnUnknownStepTypeNamingItsPositionAndSavesNothing() {
+        List<NewWorkflowStep> steps = List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "transcode", null),
+                new NewWorkflowStep("third", "fail", null),
+                new NewWorkflowStep("fourth", "demucs-typo", null));
+
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Bad", false, steps))
+                .isInstanceOf(ConstraintViolationException.class)
+                .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .containsExactlyInAnyOrder(
+                                "steps[1].type unknown capability 'transcode'; allowed: echo, fail, probe",
+                                "steps[3].type unknown capability 'demucs-typo'; allowed: echo, fail, probe"));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterTheFirstNamingItsPositionAndSavesNothing() {
+        List<NewWorkflowStep> steps = List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "probe", null));
+
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Late media", false, steps))
+                .isInstanceOf(ConstraintViolationException.class)
+                .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .containsExactly("steps[1].type 'probe' can only be the first step: it works on the uploaded file"));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void createWorkflowAcceptsAMediaFirstStepFollowedByInlineSteps() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Media first", false, List.of(
+                new NewWorkflowStep("first", "probe", null),
+                new NewWorkflowStep("second", "echo", null)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("probe", "echo");
+        assertThat(created.steps()).extracting(step -> step.mode()).containsExactly("remote", "inline");
     }
 }

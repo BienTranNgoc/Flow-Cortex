@@ -33,4 +33,11 @@ class RunsController {
         UUID currentUserId = currentUserResolver.require(jwt);
         return ResponseEntity.ok(RunResponse.from(workflowRunService.getRun(currentUserId, id)));
     }
+
+    @GetMapping(value = "/{id}/steps/{order}/outputs/{name}/url", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<OutputUrlResponse> getOutputUrl(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @PathVariable int order, @PathVariable String name) {
+        UUID currentUserId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(OutputUrlResponse.from(workflowRunService.getOutputUrl(currentUserId, id, order, name)));
+    }
 }

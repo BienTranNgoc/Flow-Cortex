@@ -1,10 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateProfile } from '../../api/generated/flowCortexApi';
-import type { ProfileUpdateRequest } from '../../api/generated/flowCortexApi';
-import { authHeaders, unwrap } from '../../api/client';
-import { ApiError } from '../../api/problemDetail';
+import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
+import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 

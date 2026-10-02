@@ -10,6 +10,13 @@ spring:
     url: jdbc:postgresql://localhost:5432/flowcortex
     username: flowcortex
     driver-class-name: org.postgresql.Driver
+    # Each async task can hold two connections at once (a listener's REQUIRES_NEW plus the
+    # step transition it opens), so the pool is at least 2 x task.execution.pool.max-size (16)
+    # plus headroom for HTTP requests, the reaper and heartbeats. Idle connections stay few:
+    # Hikari otherwise holds all 40 open per instance even when nothing runs.
+    hikari:
+      maximum-pool-size: 40
+      minimum-idle: 5
 
   jpa:
     hibernate:
@@ -23,24 +30,111 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  # Bounds Boot's own applicationTaskExecutor, which runs every @Async and
+  # @ApplicationModuleListener and the engine's inline steps. Declaring an
+  # Executor bean instead would switch this one off. A full queue rejects the
+  # task; the claimed step is then closed by the reaper.
+  task:
+    execution:
+      # The trace and the run's baggage follow the after-commit listeners and the outbox.
+      propagate-context: true
+      thread-name-prefix: app-async-
+      pool:
+        core-size: 8
+        max-size: 16
+        queue-capacity: 500
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
+    # Inline-step lease heartbeats share this scheduler with the lease reaper; a second
+    # thread keeps a long reaper pass from delaying heartbeats past the lease.
+    scheduling:
+      pool:
+        size: 2
+
+  # Broker connection from SPRING_RABBITMQ_HOST/PORT/USERNAME/PASSWORD (compose sets them; no
+  # password default is committed here). A listener that cannot record a message tries 3 times in
+  # all, 1 s then 2 s apart, and then the message goes to its dead-letter queue; an invalid message
+  # goes there at once. The media listeners start only after the topology is declared.
+  rabbitmq:
+    # Observed: a sent job carries the W3C trace context, a received result continues it.
+    template:
+      observation-enabled: true
+    listener:
+      simple:
+        observation-enabled: true
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 2
+          initial-interval: 1s
+          multiplier: 2
+
+  # The event publication registry is the outbox for job messages. Outstanding publications are
+  # not republished on restart — a job in flight would be dispatched twice; failed ones are resubmitted
+  # by the media module instead. A completed publication is deleted: the run step is the record.
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: false
+      externalization:
+        enabled: true
+      completion-mode: delete
+      staleness:
+        published: 5m
+        processing: 30m
+        resubmitted: 10m
+
 server:
   port: 8080
 
-# Actuator: expose only health + info over HTTP for now. Widen deliberately.
+# Health, info and metrics live on the management port, which compose only exposes inside the
+# service network. The API port keeps the anonymous probes /livez and /readyz; the container
+# healthchecks use /readyz there, since a probe on another port can be UP while 8080 is broken.
+#
+# Every request and engine action is traced; the run id travels as baggage across the broker and
+# lands in the logs. Spans and log records go out over OTLP only when OTEL_TRACES_EXPORTER /
+# OTEL_LOGS_EXPORTER are otlp (Boot maps the OTEL_* variables); without an endpoint nothing is
+# exported and trace ids still reach the logs. Metrics are scraped, never pushed.
 management:
+  server:
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: when-authorized
+      show-components: always
+      probes:
+        enabled: true
+        add-additional-paths: true
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      remote-fields: runId
+      correlation:
+        fields: runId
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  opentelemetry:
+    tracing:
+      limits:
+        max-attribute-value-length: 4096
+    logging:
+      limits:
+        max-attribute-value-length: 4096
 
-# Contract-first OpenAPI: document the
-# actuator endpoints alongside the app's own controllers in /v3/api-docs so
-# the committed snapshot reflects everything that is actually reachable.
-springdoc:
-  show-actuator: true
+# JDBC observations record the statement, never its parameter values.
+jdbc:
+  datasource-proxy:
+    include-parameter-values: false
 
 # No default here on purpose — a committed real-looking default would trip the
 # security-scan secret scanner (Trivy) and ship a known signing key. Only the
@@ -49,6 +143,10 @@ springdoc:
 flowcortex:
   security:
     jwt-secret: ${JWT_SECRET:}
+  # Kill switch for the admin console's API (/api/v1/admin/**): off answers 503 there, after the
+  # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
+  admin:
+    enabled: ${FLOWCORTEX_ADMIN_ENABLED:true}
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
@@ -57,3 +155,39 @@ flowcortex:
   # DB-backed live toggle.
   workflow:
     enabled: ${FLOWCORTEX_WORKFLOW_ENABLED:true}
+    # A picked-up step must report within this window (a heartbeat every 30 s)
+    # or the reaper closes it as lease_expired; the reaper runs every interval.
+    lease-seconds: 120
+    reaper-interval-ms: 30000
+  # Media engine: the one home of every media timeout and limit (MediaProperties
+  # has no code defaults). The kill switch works like the workflow one above —
+  # env var + restart. S3_* is provider-neutral, so another S3-compatible store
+  # is a configuration change; each service gets its own least-privilege key.
+  media:
+    enabled: ${FLOWCORTEX_MEDIA_ENABLED:true}
+    # How long a dispatched job may wait for a worker to pick it up.
+    queue-timeout: ${FLOWCORTEX_MEDIA_QUEUE_TIMEOUT:30m}
+    max-runtime:
+      probe: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE:5m}
+    # The broker's per-delivery ack deadline; must outlast every max run time.
+    consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
+    presign-ttl: 15m
+    upload:
+      max-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}
+      # Each extension must map to a canonical MIME type in MediaProperties, or startup fails.
+      extensions: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:mp4,mov,webm,mkv,m4a,mp3,wav}
+      url-ttl: 15m
+    s3:
+      endpoint: ${S3_ENDPOINT:}
+      # The host the member's browser reaches; presigned URLs are signed for it.
+      public-endpoint: ${S3_PUBLIC_ENDPOINT:}
+      region: ${S3_REGION:us-east-1}
+      path-style: ${S3_PATH_STYLE:true}
+      upload-bucket: ${S3_UPLOAD_BUCKET:flowcortex-uploads}
+      bucket: ${S3_BUCKET:flowcortex-media}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      # Bound every call the API itself makes to the store, retries included, so a store that
+      # accepts the connection and never answers cannot hold a request or a health check.
+      api-call-timeout: 5s
+      api-call-attempt-timeout: 2s

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/media-result.schema.json",
+  "title": "MediaResult",
+  "description": "The worker's final answer for one delivery of a job: a completed result, or an error result that always carries an `error` block. The two branches share every other field.",
+  "oneOf": [
+    { "$ref": "#/$defs/completedResult" },
+    { "$ref": "#/$defs/errorResult" }
+  ],
+  "$defs": {
+    "completedResult": {
+      "title": "CompletedResult",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "attempt",
+        "deliveryCount",
+        "status",
+        "finishedAt",
+        "workerId"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "deliveryCount": { "type": "integer", "minimum": 0 },
+        "status": { "const": "completed" },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/output" }
+        },
+        "data": { "type": "object" },
+        "finishedAt": { "type": "string", "format": "date-time" },
+        "workerId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "errorResult": {
+      "title": "ErrorResult",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "attempt",
+        "deliveryCount",
+        "status",
+        "error",
+        "finishedAt",
+        "workerId"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "deliveryCount": { "type": "integer", "minimum": 0 },
+        "status": { "const": "error" },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/output" }
+        },
+        "data": { "type": "object" },
+        "error": { "$ref": "#/$defs/error" },
+        "finishedAt": { "type": "string", "format": "date-time" },
+        "workerId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "output": {
+      "title": "MediaOutput",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bucket", "objectKey", "mime", "bytes"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "bucket": { "type": "string", "minLength": 1 },
+        "objectKey": { "type": "string", "minLength": 1 },
+        "mime": { "type": "string", "minLength": 1 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "meta": { "type": "object" }
+      }
+    },
+    "error": {
+      "title": "MediaError",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {
+          "title": "MediaErrorCode",
+          "type": "string",
+          "enum": ["input_rejected", "probe_failed", "contract_violation", "run_timeout"]
+        },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" }
+      }
+    }
+  }
+}

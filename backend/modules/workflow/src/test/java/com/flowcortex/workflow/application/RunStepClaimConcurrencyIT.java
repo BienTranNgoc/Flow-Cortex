@@ -74,7 +74,8 @@ class RunStepClaimConcurrencyIT {
             Callable<Boolean> attempt = () -> {
                 ready.countDown();
                 go.await();
-                return runStepTransactions.claim(step.getId(), Instant.now());
+                return runStepTransactions.claim(step.getRunId(), step.getId(), (short) 1, Instant.now(),
+                        Instant.now().plusSeconds(120), null, () -> { }) == RunStepTransactions.ClaimOutcome.DISPATCHED;
             };
 
             Future<Boolean> first = pool.submit(attempt);

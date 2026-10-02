@@ -4,12 +4,6 @@ info:
   version: v0
 servers:
 - url: /
-tags:
-- name: Actuator
-  description: Monitor and interact
-  externalDocs:
-    description: Spring Boot Actuator Web API Documentation
-    url: https://docs.spring.io/spring-boot/docs/current/actuator-api/html/
 paths:
   /api/v1/users/{id}:
     get:
@@ -142,6 +136,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserResponse"
+  /api/v1/uploads:
+    post:
+      tags:
+      - uploads-controller
+      operationId: requestUpload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
   /api/v1/auth/login:
     post:
       tags:
@@ -212,6 +224,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/runs/{id}/steps/{order}/outputs/{name}/url:
+    get:
+      tags:
+      - runs-controller
+      operationId: getOutputUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutputUrlResponse"
   /api/v1/health:
     get:
       tags:
@@ -236,75 +278,89 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
-  /actuator:
+  /api/v1/admin/runs:
     get:
       tags:
-      - Actuator
-      summary: Actuator root web endpoint
-      operationId: links
+      - admin-runs-controller
+      operationId: listAdminRuns
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - running
+          - completed
+          - error
+          pattern: running|completed|error
       responses:
         "200":
           description: OK
           content:
-            application/vnd.spring-boot.actuator.v3+json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: object
-                  additionalProperties:
-                    $ref: "#/components/schemas/Link"
-            application/vnd.spring-boot.actuator.v2+json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: object
-                  additionalProperties:
-                    $ref: "#/components/schemas/Link"
             application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: object
-                  additionalProperties:
-                    $ref: "#/components/schemas/Link"
-  /actuator/info:
+                $ref: "#/components/schemas/PageViewAdminRunResponse"
+  /api/v1/admin/media/jobs:
     get:
       tags:
-      - Actuator
-      summary: Actuator web endpoint 'info'
-      operationId: info
+      - admin-runs-controller
+      operationId: listAdminMediaJobs
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - error
+          pattern: pending|running|completed|error
       responses:
         "200":
           description: OK
           content:
-            application/vnd.spring-boot.actuator.v3+json:
-              schema:
-                type: object
-            application/vnd.spring-boot.actuator.v2+json:
-              schema:
-                type: object
             application/json:
               schema:
-                type: object
-  /actuator/health:
-    get:
-      tags:
-      - Actuator
-      summary: Actuator web endpoint 'health'
-      operationId: health_1
-      responses:
-        "200":
-          description: OK
-          content:
-            application/vnd.spring-boot.actuator.v3+json:
-              schema:
-                type: object
-            application/vnd.spring-boot.actuator.v2+json:
-              schema:
-                type: object
-            application/json:
-              schema:
-                type: object
+                $ref: "#/components/schemas/PageViewMediaJobResponse"
 components:
   schemas:
     UpdateUserRequest:
@@ -370,6 +426,13 @@ components:
           type: string
           maxLength: 10000
           minLength: 0
+        uploadId:
+          type: string
+          format: uuid
+        originalName:
+          type: string
+          maxLength: 1024
+          minLength: 0
     RunResponse:
       type: object
       properties:
@@ -395,6 +458,20 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunStepResponse"
+    RunStepOutputResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        mime:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+      required:
+      - bytes
+      - mime
+      - name
     RunStepResponse:
       type: object
       properties:
@@ -420,6 +497,34 @@ components:
         finishedAt:
           type: string
           format: date-time
+        progressPercent:
+          type: integer
+          format: int32
+        attempt:
+          type: integer
+          format: int32
+        errorCode:
+          type: string
+        deliveryCount:
+          type: integer
+          format: int32
+        pickedUpAt:
+          type: string
+          format: date-time
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunStepOutputResponse"
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+      required:
+      - attempt
+      - deliveryCount
+      - mode
+      - outputs
     CreateUserRequest:
       type: object
       properties:
@@ -443,6 +548,46 @@ components:
       - name
       - password
       - role
+    UploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    UploadResponse:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+      required:
+      - expiresAt
+      - headers
+      - maxBytes
+      - method
+      - uploadId
+      - url
     LoginRequest:
       type: object
       properties:
@@ -493,6 +638,24 @@ components:
           type: string
         type:
           type: string
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+      required:
+      - mode
+    OutputUrlResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - url
     HealthResponse:
       type: object
       properties:
@@ -504,10 +667,125 @@ components:
           type: string
           description: Identifier of the service reporting its health.
           example: flow-cortex
-    Link:
+    AdminRunResponse:
       type: object
       properties:
-        href:
+        id:
           type: string
-        templated:
-          type: boolean
+          format: uuid
+        workflowName:
+          type: string
+        ownerEmail:
+          type: string
+        status:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - startedAt
+      - status
+      - workflowName
+    PageViewAdminRunResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminRunResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    MediaJobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        capability:
+          type: string
+        status:
+          type: string
+        attempt:
+          type: integer
+          format: int32
+        deliveryCount:
+          type: integer
+          format: int32
+        pickedUpAt:
+          type: string
+          format: date-time
+        queueDeadline:
+          type: string
+          format: date-time
+        leaseUntil:
+          type: string
+          format: date-time
+        runDeadline:
+          type: string
+          format: date-time
+        progressPercent:
+          type: integer
+          format: int32
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - attempt
+      - capability
+      - deliveryCount
+      - jobId
+      - runId
+      - status
+      - stepOrder
+    PageViewMediaJobResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaJobResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total

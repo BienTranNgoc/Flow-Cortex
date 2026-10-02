@@ -3,8 +3,12 @@ package com.flowcortex.user.application;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.UserEmail;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,5 +39,14 @@ class UserDirectoryImpl implements UserDirectory {
             AccountStatusGuard.requireActive(user);
             return AppUserMapper.toCurrentUser(user);
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, String> findEmailsByIds(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findEmailsByIdIn(ids).stream().collect(Collectors.toMap(UserEmail::id, UserEmail::email));
     }
 }

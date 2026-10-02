@@ -6,11 +6,21 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
+    // Telemetry: spans and logs over OTLP (export off unless OTEL_*_EXPORTER=otlp), metrics scraped
+    // from the management port, module and JDBC observations. JDBC parameter values stay out.
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0:${providers.gradleProperty("otelLogbackAppenderVersion").get()}")
+    implementation("org.springframework.modulith:spring-modulith-starter-insight")
+    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:${providers.gradleProperty("datasourceMicrometerVersion").get()}")
+    // The management chain matches actuator endpoints with Boot's EndpointRequest.
+    implementation("org.springframework.boot:spring-boot-starter-security")
     // Pinned exactly: 3.1.1 is where springdoc's Boot 4 / Jackson 3 introspection settled.
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${providers.gradleProperty("springdocVersion").get()}")
     // Every module + shared library, so Modulith scans the whole com.flowcortex tree.
     implementation(project(":modules:user"))
     implementation(project(":modules:workflow"))
+    implementation(project(":modules:media"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -21,6 +31,13 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:rabbitmq")
+    testImplementation("org.testcontainers:minio")
+    testImplementation("com.networknt:json-schema-validator:${providers.gradleProperty("jsonSchemaValidatorVersion").get()}")
+    // The media ITs play the worker: raw AMQP on the broker, raw S3 on the object store.
+    testImplementation("org.springframework.boot:spring-boot-starter-amqp")
+    testImplementation(platform("software.amazon.awssdk:bom:${providers.gradleProperty("awsSdkVersion").get()}"))
+    testImplementation("software.amazon.awssdk:s3")
     // The module convention puts JPA/Flyway/security on the runtime classpath only;
     // this module's own tests compile against them directly.
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -44,4 +61,13 @@ tasks.withType<Test> {
         "flowcortex.openapi.docsFile",
         rootProject.projectDir.parentFile.resolve("docs/openapi.yaml").absolutePath,
     )
+    // The round-trip IT validates the raw job bytes against the committed schema; declared as an
+    // input too, or a schema-only edit would be served from the build cache.
+    systemProperty(
+        "flowcortex.contracts.dir",
+        rootProject.projectDir.parentFile.resolve("contracts").absolutePath,
+    )
+    inputs.dir(rootProject.projectDir.parentFile.resolve("contracts"))
+        .withPropertyName("contracts")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
