@@ -3,430 +3,430 @@ info:
   title: FlowCortex API
   version: v1.0
 servers:
-  - url: /
+- url: /
 security:
-  - BearerAuth: []
+- BearerAuth: []
 paths:
   /api/v1/users/{id}:
     get:
       tags:
-        - users-controller
+      - users-controller
       operationId: get
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: "#/components/schemas/UserResponse"
     put:
       tags:
-        - users-controller
+      - users-controller
       operationId: update
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateUserRequest'
+              $ref: "#/components/schemas/UpdateUserRequest"
         required: true
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: "#/components/schemas/UserResponse"
     delete:
       tags:
-        - users-controller
+      - users-controller
       operationId: delete
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '204':
+        "204":
           description: No Content
   /api/v1/auth/profile:
     put:
       tags:
-        - auth-controller
+      - auth-controller
       operationId: updateProfile
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProfileUpdateRequest'
+              $ref: "#/components/schemas/ProfileUpdateRequest"
         required: true
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MeResponse'
+                $ref: "#/components/schemas/MeResponse"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
-        - workflows-controller
+      - workflows-controller
       operationId: startRun
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StartRunRequest'
+              $ref: "#/components/schemas/StartRunRequest"
         required: true
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RunResponse'
+                $ref: "#/components/schemas/RunResponse"
   /api/v1/users:
     get:
       tags:
-        - users-controller
+      - users-controller
       operationId: list
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/UserResponse'
+                  $ref: "#/components/schemas/UserResponse"
     post:
       tags:
-        - users-controller
+      - users-controller
       operationId: create
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateUserRequest'
+              $ref: "#/components/schemas/CreateUserRequest"
         required: true
       responses:
-        '201':
+        "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: "#/components/schemas/UserResponse"
   /api/v1/uploads:
     post:
       tags:
-        - uploads-controller
+      - uploads-controller
       operationId: requestUpload
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadRequest'
+              $ref: "#/components/schemas/UploadRequest"
         required: true
       responses:
-        '201':
+        "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadResponse'
+                $ref: "#/components/schemas/UploadResponse"
   /api/v1/review-tasks/{taskId}/reject:
     post:
       tags:
-        - review-tasks-controller
+      - review-tasks-controller
       operationId: rejectTask
       parameters:
-        - name: taskId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReviewTaskResponse'
+                $ref: "#/components/schemas/ReviewTaskResponse"
   /api/v1/review-tasks/{taskId}/approve:
     post:
       tags:
-        - review-tasks-controller
+      - review-tasks-controller
       operationId: approveTask
       parameters:
-        - name: taskId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ApproveReviewTaskRequest'
+              $ref: "#/components/schemas/ApproveReviewTaskRequest"
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReviewTaskResponse'
+                $ref: "#/components/schemas/ReviewTaskResponse"
   /api/v1/auth/login:
     post:
       tags:
-        - auth-controller
+      - auth-controller
       operationId: login
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
         required: true
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                $ref: "#/components/schemas/LoginResponse"
   /api/v1/workflows:
     get:
       tags:
-        - workflows-controller
+      - workflows-controller
       operationId: listWorkflows
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/WorkflowResponse'
+                  $ref: "#/components/schemas/WorkflowResponse"
   /api/v1/workflows/{id}:
     get:
       tags:
-        - workflows-controller
+      - workflows-controller
       operationId: getWorkflow
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowResponse'
+                $ref: "#/components/schemas/WorkflowResponse"
   /api/v1/runs/{runId}/review-tasks:
     get:
       tags:
-        - review-tasks-controller
+      - review-tasks-controller
       operationId: getReviewTasks
       parameters:
-        - name: runId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ReviewTaskResponse'
+                  $ref: "#/components/schemas/ReviewTaskResponse"
   /api/v1/runs/{id}:
     get:
       tags:
-        - runs-controller
+      - runs-controller
       operationId: getRun
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RunResponse'
+                $ref: "#/components/schemas/RunResponse"
   /api/v1/runs/{id}/steps/{order}/outputs/{name}/url:
     get:
       tags:
-        - runs-controller
+      - runs-controller
       operationId: getOutputUrl
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: order
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int32
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OutputUrlResponse'
+                $ref: "#/components/schemas/OutputUrlResponse"
   /api/v1/health:
     get:
       tags:
-        - health-controller
+      - health-controller
       operationId: health
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: "#/components/schemas/HealthResponse"
   /api/v1/auth/me:
     get:
       tags:
-        - auth-controller
+      - auth-controller
       operationId: me
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MeResponse'
+                $ref: "#/components/schemas/MeResponse"
   /api/v1/admin/runs:
     get:
       tags:
-        - admin-runs-controller
+      - admin-runs-controller
       operationId: listAdminRuns
       parameters:
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-            maximum: 21474836
-            minimum: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 20
-            maximum: 100
-            minimum: 1
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum:
-              - running
-              - completed
-              - error
-            pattern: running|completed|error
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - running
+          - completed
+          - error
+          pattern: running|completed|error
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageViewAdminRunResponse'
+                $ref: "#/components/schemas/PageViewAdminRunResponse"
   /api/v1/admin/media/jobs:
     get:
       tags:
-        - admin-runs-controller
+      - admin-runs-controller
       operationId: listAdminMediaJobs
       parameters:
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-            maximum: 21474836
-            minimum: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 20
-            maximum: 100
-            minimum: 1
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum:
-              - pending
-              - running
-              - completed
-              - error
-            pattern: pending|running|completed|error
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - error
+          pattern: pending|running|completed|error
       responses:
-        '200':
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PageViewMediaJobResponse'
+                $ref: "#/components/schemas/PageViewMediaJobResponse"
 components:
   schemas:
     UpdateUserRequest:
@@ -470,7 +470,7 @@ components:
           type: string
           minLength: 1
       required:
-        - name
+      - name
     MeResponse:
       type: object
       properties:
@@ -523,7 +523,7 @@ components:
         steps:
           type: array
           items:
-            $ref: '#/components/schemas/RunStepResponse'
+            $ref: "#/components/schemas/RunStepResponse"
     RunStepOutputResponse:
       type: object
       properties:
@@ -535,9 +535,9 @@ components:
           type: integer
           format: int64
       required:
-        - bytes
-        - mime
-        - name
+      - bytes
+      - mime
+      - name
     RunStepResponse:
       type: object
       properties:
@@ -580,17 +580,17 @@ components:
         outputs:
           type: array
           items:
-            $ref: '#/components/schemas/RunStepOutputResponse'
+            $ref: "#/components/schemas/RunStepOutputResponse"
         mode:
           type: string
           enum:
-            - inline
-            - remote
+          - inline
+          - remote
       required:
-        - attempt
-        - deliveryCount
-        - mode
-        - outputs
+      - attempt
+      - deliveryCount
+      - mode
+      - outputs
     CreateUserRequest:
       type: object
       properties:
@@ -610,10 +610,10 @@ components:
           minLength: 1
           pattern: ADMIN|MEMBER
       required:
-        - email
-        - name
-        - password
-        - role
+      - email
+      - name
+      - password
+      - role
     UploadRequest:
       type: object
       properties:
@@ -625,8 +625,8 @@ components:
           type: integer
           format: int64
       required:
-        - fileName
-        - size
+      - fileName
+      - size
     UploadResponse:
       type: object
       properties:
@@ -648,12 +648,12 @@ components:
           type: integer
           format: int64
       required:
-        - expiresAt
-        - headers
-        - maxBytes
-        - method
-        - uploadId
-        - url
+      - expiresAt
+      - headers
+      - maxBytes
+      - method
+      - uploadId
+      - url
     ReviewTaskResponse:
       type: object
       properties:
@@ -698,8 +698,8 @@ components:
           type: string
           minLength: 1
       required:
-        - email
-        - password
+      - email
+      - password
     LoginResponse:
       type: object
       properties:
@@ -724,7 +724,7 @@ components:
         steps:
           type: array
           items:
-            $ref: '#/components/schemas/WorkflowStepResponse'
+            $ref: "#/components/schemas/WorkflowStepResponse"
     WorkflowStepResponse:
       type: object
       properties:
@@ -741,10 +741,10 @@ components:
         mode:
           type: string
           enum:
-            - inline
-            - remote
+          - inline
+          - remote
       required:
-        - mode
+      - mode
     OutputUrlResponse:
       type: object
       properties:
@@ -754,8 +754,8 @@ components:
           type: string
           format: date-time
       required:
-        - expiresAt
-        - url
+      - expiresAt
+      - url
     HealthResponse:
       type: object
       properties:
@@ -788,17 +788,17 @@ components:
           type: string
           format: date-time
       required:
-        - id
-        - startedAt
-        - status
-        - workflowName
+      - id
+      - startedAt
+      - status
+      - workflowName
     PageViewAdminRunResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/AdminRunResponse'
+            $ref: "#/components/schemas/AdminRunResponse"
         page:
           type: integer
           format: int32
@@ -809,10 +809,10 @@ components:
           type: integer
           format: int64
       required:
-        - items
-        - page
-        - size
-        - total
+      - items
+      - page
+      - size
+      - total
     MediaJobResponse:
       type: object
       properties:
@@ -861,20 +861,20 @@ components:
           type: string
           format: date-time
       required:
-        - attempt
-        - capability
-        - deliveryCount
-        - jobId
-        - runId
-        - status
-        - stepOrder
+      - attempt
+      - capability
+      - deliveryCount
+      - jobId
+      - runId
+      - status
+      - stepOrder
     PageViewMediaJobResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/MediaJobResponse'
+            $ref: "#/components/schemas/MediaJobResponse"
         page:
           type: integer
           format: int32
@@ -885,10 +885,10 @@ components:
           type: integer
           format: int64
       required:
-        - items
-        - page
-        - size
-        - total
+      - items
+      - page
+      - size
+      - total
   securitySchemes:
     BearerAuth:
       type: http
