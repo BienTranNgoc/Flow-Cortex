@@ -25,6 +25,7 @@ class HandlerOutcome:
 
 
 class Handler(Protocol):
+    # Positional-only: a handler that does not read the job names it `_job`.
     def __call__(
-        self, job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner
+        self, job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner, /
     ) -> HandlerOutcome: ...

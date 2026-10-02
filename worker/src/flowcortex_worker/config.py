@@ -1,14 +1,25 @@
 """Worker settings, read from the environment."""
 
 import socket
+from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
+class StateSettings(BaseSettings):
+    """The worker's private state directory; the healthcheck process reads only this."""
+
     model_config = SettingsConfigDict(extra="ignore")
 
+    worker_state_dir: Path = Path("/run/flowcortex")
+
+    @property
+    def liveness_file(self) -> Path:
+        return self.worker_state_dir / "alive"
+
+
+class Settings(StateSettings):
     amqp_url: SecretStr
     s3_endpoint: str = Field(min_length=1)
     s3_region: str = "us-east-1"

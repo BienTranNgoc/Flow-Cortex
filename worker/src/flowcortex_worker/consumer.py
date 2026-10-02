@@ -41,6 +41,7 @@ JOBS_QUEUE = "media.jobs"
 EXCHANGE = "media"
 RESULT_KEY = "result"
 PROGRESS_KEY = "progress"
+CONNECTION_CLOSED = "connection closed"
 
 log = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -147,7 +148,7 @@ class Consumer:
         finally:
             self._closed.set()
             if self._in_flight is not None:
-                self._in_flight.runner.kill("connection closed")
+                self._in_flight.runner.kill(CONNECTION_CLOSED)
 
     def _on_message(
         self, channel: Any, method: Any, props: pika.BasicProperties, body: bytes
@@ -474,11 +475,11 @@ class Consumer:
                 raise
 
         if self._closed.is_set():
-            raise Abandoned("connection closed")
+            raise Abandoned(CONNECTION_CLOSED)
         try:
             self._connection.add_callback_threadsafe(call)
         except pika.exceptions.AMQPError as exc:
-            raise Abandoned("connection closed") from exc
+            raise Abandoned(CONNECTION_CLOSED) from exc
         while True:
             try:
                 return future.result(timeout=0.25)

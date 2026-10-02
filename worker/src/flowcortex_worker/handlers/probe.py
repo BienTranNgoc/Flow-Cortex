@@ -19,7 +19,7 @@ IMAGE_CODECS = frozenset(
 )
 
 
-def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
+def handle(_job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
     media = inputs.get("media")
     if media is None:
         raise PermanentError("contract_violation", "probe needs an input with key 'media'")

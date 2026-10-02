@@ -154,5 +154,7 @@ def test_progress_kind_outside_started_or_heartbeat_fails() -> None:
     ],
 )
 def test_job_values_outside_the_schema_fail(change: dict[str, Any]) -> None:
+    payload = job() | change
+
     with pytest.raises(ValidationError):
-        MediaJob.model_validate(job() | change)
+        MediaJob.model_validate(payload)

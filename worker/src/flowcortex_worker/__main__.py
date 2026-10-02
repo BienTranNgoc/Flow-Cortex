@@ -15,7 +15,7 @@ import pika
 from . import telemetry
 from .config import Settings
 from .consumer import Consumer
-from .healthcheck import LIVENESS_FILE
+from .healthcheck import prepare_state_dir
 from .runtime import Supervisor
 from .storage import Storage, client_from, remove_leftovers
 
@@ -28,6 +28,8 @@ JOB_THREAD_PREFIX = "job"
 def main() -> int:
     telemetry.configure_logging()
     settings = Settings()
+    prepare_state_dir(settings.worker_state_dir)
+    liveness_file = settings.liveness_file
     tel = telemetry.build()
     tel.install()
 
@@ -55,19 +57,19 @@ def main() -> int:
             heartbeat_seconds=settings.heartbeat_seconds,
             stop=stop,
             executor=executor,
-            liveness_file=LIVENESS_FILE,
+            liveness_file=liveness_file,
         )
 
     def wait_alive(seconds: float) -> None:
         # The reconnect backoff reaches the liveness file's max age, so keep touching it.
         deadline = time.monotonic() + seconds
         while not stop.is_set() and (left := deadline - time.monotonic()) > 0:
-            LIVENESS_FILE.touch()
+            liveness_file.touch()
             stop.wait(min(left, 1.0))
 
     log.info("worker starting", extra={"workerId": settings.worker_id})
     remove_leftovers()
-    LIVENESS_FILE.touch()
+    liveness_file.touch()
     Supervisor(
         connect=lambda: pika.BlockingConnection(params),
         make_consumer=make_consumer,
