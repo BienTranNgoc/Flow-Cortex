@@ -1,14 +1,13 @@
 package com.flowcortex.workflow.api;
 
-import com.flowcortex.workflow.domain.ReviewTask;
 import java.util.List;
 import java.util.UUID;
 
 public interface ReviewTaskService {
 
-    List<ReviewTask> getTasksByRunId(UUID runId);
+    List<ReviewTaskView> getTasksByRunId(UUID runId, UUID ownerId);
 
-    ReviewTask approveTask(UUID taskId, UUID reviewerId, String reviewedPayload);
+    ReviewTaskView approveTask(UUID taskId, UUID reviewerId, String reviewedPayload);
 
-    ReviewTask rejectTask(UUID taskId, UUID reviewerId);
+    ReviewTaskView rejectTask(UUID taskId, UUID reviewerId);
 }

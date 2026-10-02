@@ -1,6 +1,6 @@
 package com.flowcortex.workflow.web;
 
-import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.api.ReviewTaskView;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,18 +16,18 @@ public record ReviewTaskResponse(
     Instant reviewedAt,
     Instant createdAt
 ) {
-    public static ReviewTaskResponse from(ReviewTask task) {
+    public static ReviewTaskResponse from(ReviewTaskView view) {
         return new ReviewTaskResponse(
-            task.getId(),
-            task.getRunId(),
-            task.getRunStepId(),
-            task.getReviewType(),
-            task.getStatus(),
-            task.getOriginalPayload(),
-            task.getReviewedPayload(),
-            task.getReviewedBy(),
-            task.getReviewedAt(),
-            task.getCreatedAt()
+            view.id(),
+            view.runId(),
+            view.runStepId(),
+            view.reviewType(),
+            view.status(),
+            view.originalPayload(),
+            view.reviewedPayload(),
+            view.reviewedBy(),
+            view.reviewedAt(),
+            view.createdAt()
         );
     }
 }

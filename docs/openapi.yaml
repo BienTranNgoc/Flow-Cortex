@@ -1,9 +1,11 @@
 openapi: 3.1.0
 info:
-  title: OpenAPI definition
-  version: v0
+  title: FlowCortex API
+  version: v1.0
 servers:
 - url: /
+security:
+- BearerAuth: []
 paths:
   /api/v1/users/{id}:
     get:
@@ -154,6 +156,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+  /api/v1/review-tasks/{taskId}/reject:
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: rejectTask
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReviewTaskResponse"
+  /api/v1/review-tasks/{taskId}/approve:
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: approveTask
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveReviewTaskRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReviewTaskResponse"
   /api/v1/auth/login:
     post:
       tags:
@@ -205,6 +250,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/runs/{runId}/review-tasks:
+    get:
+      tags:
+      - review-tasks-controller
+      operationId: getReviewTasks
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewTaskResponse"
   /api/v1/runs/{id}:
     get:
       tags:
@@ -588,6 +654,40 @@ components:
       - method
       - uploadId
       - url
+    ReviewTaskResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        runStepId:
+          type: string
+          format: uuid
+        reviewType:
+          type: string
+        status:
+          type: string
+        originalPayload:
+          type: string
+        reviewedPayload:
+          type: string
+        reviewedBy:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ApproveReviewTaskRequest:
+      type: object
+      properties:
+        reviewedPayload:
+          type: string
     LoginRequest:
       type: object
       properties:
@@ -789,3 +889,8 @@ components:
       - page
       - size
       - total
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,9 +1,11 @@
 package com.flowcortex.workflow.domain;
 
+import com.flowcortex.shared.web.ConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -41,10 +43,22 @@ public class ReviewTask {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     public ReviewTask() {
     }
 
-    public ReviewTask(UUID id, UUID runId, UUID runStepId, String reviewType, String status, String originalPayload, Instant createdAt) {
+    public ReviewTask(
+        UUID id,
+        UUID runId,
+        UUID runStepId,
+        String reviewType,
+        String status,
+        String originalPayload,
+        Instant createdAt
+    ) {
         this.id = id;
         this.runId = runId;
         this.runStepId = runStepId;
@@ -58,83 +72,50 @@ public class ReviewTask {
         return id;
     }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
     public UUID getRunId() {
         return runId;
-    }
-
-    public void setRunId(UUID runId) {
-        this.runId = runId;
     }
 
     public UUID getRunStepId() {
         return runStepId;
     }
 
-    public void setRunStepId(UUID runStepId) {
-        this.runStepId = runStepId;
-    }
-
     public String getReviewType() {
         return reviewType;
-    }
-
-    public void setReviewType(String reviewType) {
-        this.reviewType = reviewType;
     }
 
     public String getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
     public String getOriginalPayload() {
         return originalPayload;
-    }
-
-    public void setOriginalPayload(String originalPayload) {
-        this.originalPayload = originalPayload;
     }
 
     public String getReviewedPayload() {
         return reviewedPayload;
     }
 
-    public void setReviewedPayload(String reviewedPayload) {
-        this.reviewedPayload = reviewedPayload;
-    }
-
     public UUID getReviewedBy() {
         return reviewedBy;
-    }
-
-    public void setReviewedBy(UUID reviewedBy) {
-        this.reviewedBy = reviewedBy;
     }
 
     public Instant getReviewedAt() {
         return reviewedAt;
     }
 
-    public void setReviewedAt(Instant reviewedAt) {
-        this.reviewedAt = reviewedAt;
-    }
-
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
+    public Long getVersion() {
+        return version;
     }
 
     public void approve(UUID reviewerId, String updatedPayload) {
+        if (!"pending".equals(this.status)) {
+            throw new ConflictException("ReviewTask " + this.id + " is already " + this.status);
+        }
         this.status = "approved";
         this.reviewedBy = reviewerId;
         this.reviewedPayload = updatedPayload;
@@ -142,6 +123,9 @@ public class ReviewTask {
     }
 
     public void reject(UUID reviewerId) {
+        if (!"pending".equals(this.status)) {
+            throw new ConflictException("ReviewTask " + this.id + " is already " + this.status);
+        }
         this.status = "rejected";
         this.reviewedBy = reviewerId;
         this.reviewedAt = Instant.now();
