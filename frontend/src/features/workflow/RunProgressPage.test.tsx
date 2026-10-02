@@ -326,6 +326,17 @@ describe('RunProgressPage', () => {
     expect(screen.getByRole('main').textContent).not.toContain('null');
   });
 
+  it('leaves out a labelled field whose value is not a plain value', async () => {
+    renderRun(
+      completedCheck('{"durationMs":1000,"videoCodec":{"name":"h264"},"audioCodec":"aac"}'),
+    );
+
+    await screen.findByText('Audio codec');
+    const terms = [...screen.getByRole('main').querySelectorAll('dt')].map((term) => term.textContent);
+    expect(terms).toEqual(['Duration', 'Audio codec']);
+    expect(screen.getByRole('main').textContent).not.toContain('[object Object]');
+  });
+
   it('shows a plain output as text', async () => {
     renderRun(
       run(

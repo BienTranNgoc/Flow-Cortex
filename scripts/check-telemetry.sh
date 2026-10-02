@@ -62,6 +62,7 @@ grafana_container="$(docker ps -q \
 # GET a URL on the overlay network (tempo/loki are expose-only).
 inside() {
   docker exec "$grafana_container" curl -sS --fail-with-body --max-time 20 "$@"
+  return $?
 }
 
 now_s=$(date +%s)

@@ -11,10 +11,12 @@ export interface OutputField {
   value: string;
 }
 
-const text = (key: string) => (report: Report) => {
-  const value = report[key];
-  return value === null || value === undefined ? null : String(value);
-};
+const scalar = (value: unknown) =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+    ? String(value)
+    : null;
+
+const text = (key: string) => (report: Report) => scalar(report[key]);
 
 const seconds = (ms: unknown) => (typeof ms === 'number' ? `${(ms / 1000).toFixed(1)} s` : null);
 
@@ -54,10 +56,8 @@ function otherField(key: string, value: unknown): OutputField | null {
     const size = megabytes(value);
     return size === null ? null : { label: humanise(key.slice(0, -'Bytes'.length)), value: size };
   }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return { label: humanise(key), value: String(value) };
-  }
-  return null;
+  const shown = scalar(value);
+  return shown === null ? null : { label: humanise(key), value: shown };
 }
 
 /** The output parsed as a JSON object, or `null` when it is anything else (plain text, a list…). */

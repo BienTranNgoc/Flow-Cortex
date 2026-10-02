@@ -8,7 +8,7 @@ import { startRunSchema, type StartRunFormValues } from './startRunSchema';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 
 /** Start form of a workflow whose first step runs inline: an optional text input. */
-function InlineStartForm({ workflowId }: { workflowId: string }) {
+function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
   const navigate = useNavigate();
   const startRunMutation = useStartRunMutation(workflowId);
   const { register, handleSubmit } = useForm<StartRunFormValues>({

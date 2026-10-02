@@ -40,12 +40,13 @@ printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin use
 
 # Re-attaching an attached policy is an error on the server; treat it as done.
 attach() {
-    if out=$(mc admin policy attach ROOT "$1" --user "$2" 2>&1); then
+    local policy="$1" user="$2" out
+    if out=$(mc admin policy attach ROOT "$policy" --user "$user" 2>&1); then
         echo "$out"
         return 0
     fi
     case "$out" in
-        *"already in effect"*) echo "policy $1 already attached" ;;
+        *"already in effect"*) echo "policy $policy already attached" ;;
         *) echo "$out" >&2; return 1 ;;
     esac
 }

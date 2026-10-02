@@ -22,7 +22,7 @@ function startButtonLabel(phase: StartPhase | null): string {
  * picked file and then starts the run, as one sequence; Start stays focusable while it runs and a
  * press during it changes nothing.
  */
-export function MediaStartForm({ workflowId }: { workflowId: string }) {
+export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
   const navigate = useNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);

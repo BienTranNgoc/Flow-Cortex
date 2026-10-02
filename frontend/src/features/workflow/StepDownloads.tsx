@@ -17,7 +17,13 @@ interface StepDownloadsProps {
  * fields, then the stored JSON report through a fresh presigned URL opened in this tab, so the
  * browser saves it and the page stays.
  */
-export function StepDownloads({ runId, stepOrder, output, details, fileName }: StepDownloadsProps) {
+export function StepDownloads({
+  runId,
+  stepOrder,
+  output,
+  details,
+  fileName,
+}: Readonly<StepDownloadsProps>) {
   const outputUrl = useOutputUrlMutation(runId, stepOrder, details.name);
   const report = output === undefined ? null : parseReport(output);
 
