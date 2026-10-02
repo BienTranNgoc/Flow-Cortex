@@ -645,7 +645,7 @@ export const rejectTask = async (
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
 
-  const data: rejectTaskResponse['data'] = body !== null ? body : '';
+  const data: rejectTaskResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as rejectTaskResponse;
 };
 
@@ -696,7 +696,7 @@ export const approveTask = async (
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
 
-  const data: approveTaskResponse['data'] = body !== null ? body : '';
+  const data: approveTaskResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as approveTaskResponse;
 };
 
@@ -830,7 +830,7 @@ export const getReviewTasks = async (
 
   const body = [204, 205, 304].includes(res.status) ? null : await res.text();
 
-  const data: getReviewTasksResponse['data'] = body !== null ? body : '';
+  const data: getReviewTasksResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as getReviewTasksResponse;
 };
 
