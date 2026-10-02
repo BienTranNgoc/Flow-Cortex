@@ -1,0 +1,100 @@
+name: ci
+
+# One entry point for the area workflows. Each area runs only when its paths
+# changed; ci-gate always reports, so it is the single required check: a
+# skipped area passes, a failed or cancelled one fails the gate.
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+      worker: ${{ steps.filter.outputs.worker }}
+      smoke: ${{ steps.filter.outputs.smoke }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        # A pull_request checks out the merge commit, whose first parent is the
+        # base tip. A push diffs against the previous tip; when that is missing,
+        # every area runs.
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            files=$(git diff --name-only HEAD^1 HEAD)
+          elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$BEFORE" HEAD)
+          else
+            files=.github/workflows/ci.yml
+          fi
+          printf '%s\n' "$files"
+          area() {
+            if grep -qE '^\.github/workflows/ci\.yml$' <<<"$files" || grep -qE "$2" <<<"$files"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          area backend '^(backend/|docs/openapi\.yaml$|\.github/workflows/backend-ci\.yml$)'
+          area frontend '^(frontend/|admin/|packages/|package\.json$|package-lock\.json$|\.prettierrc$|docs/openapi\.yaml$|\.github/workflows/frontend-ci\.yml$)'
+          area contracts '^(contracts/|backend/modules/media/|worker/|\.github/workflows/contracts-ci\.yml$)'
+          area worker '^(worker/|contracts/|\.github/workflows/worker-ci\.yml$)'
+          area smoke '^(backend/|worker/|contracts/|frontend/|admin/|packages/|infra/|docker-compose\.yml$|\.env\.example$|package\.json$|package-lock\.json$|scripts/smoke-probe\.sh$|\.github/workflows/compose-smoke\.yml$)|(^|/)Dockerfile$'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/backend-ci.yml
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/frontend-ci.yml
+
+  contracts:
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    uses: ./.github/workflows/contracts-ci.yml
+
+  worker:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    uses: ./.github/workflows/worker-ci.yml
+
+  smoke:
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.smoke == 'true'
+    uses: ./.github/workflows/compose-smoke.yml
+
+  ci-gate:
+    needs: [changes, backend, frontend, contracts, worker, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if grep -qE '"(failure|cancelled)"' <<<"$RESULTS"; then
+            echo "::error::a required CI job failed or was cancelled"
+            exit 1
+          fi

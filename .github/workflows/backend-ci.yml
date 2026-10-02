@@ -1,17 +1,7 @@
 name: backend-ci
 
 on:
-  push:
-    branches: [main, development]
-    paths:
-      - 'backend/**'
-      - 'docs/openapi.yaml'
-      - '.github/workflows/backend-ci.yml'
-  pull_request:
-    paths:
-      - 'backend/**'
-      - 'docs/openapi.yaml'
-      - '.github/workflows/backend-ci.yml'
+  workflow_call:
 
 permissions:
   contents: read

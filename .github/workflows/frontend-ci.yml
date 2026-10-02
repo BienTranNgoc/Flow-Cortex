@@ -1,27 +1,7 @@
 name: frontend-ci
 
 on:
-  push:
-    branches: [main, development]
-    paths:
-      - 'frontend/**'
-      - 'admin/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.prettierrc'
-      - 'docs/openapi.yaml'
-      - '.github/workflows/frontend-ci.yml'
-  pull_request:
-    paths:
-      - 'frontend/**'
-      - 'admin/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.prettierrc'
-      - 'docs/openapi.yaml'
-      - '.github/workflows/frontend-ci.yml'
+  workflow_call:
 
 permissions:
   contents: read

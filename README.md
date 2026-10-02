@@ -34,7 +34,7 @@ Flow-Cortex/
 ├─ openspec/     spec-driven change workspace (local, gitignored)
 ├─ scripts/      hook setup, commit-subject validation, smoke-probe.sh (compose smoke), check-telemetry.sh
 ├─ .githooks/    commit-msg (Conventional Commits) · pre-push (protect main)
-├─ .github/      CI workflows (backend, frontend, worker, contracts, compose-smoke, security) · CODEOWNERS
+├─ .github/      CI: `ci` runs the area workflows (backend, frontend, worker, contracts, compose-smoke) behind one `ci-gate` check · security · CODEOWNERS
 └─ .editorconfig
 ```
 

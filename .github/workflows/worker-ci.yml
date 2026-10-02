@@ -4,24 +4,10 @@ name: worker-ci
 # RabbitMQ and Silo images with Testcontainers (Docker is on the hosted runner)
 # and run the real ffprobe, so the runner installs ffmpeg.
 on:
-  push:
-    branches: [main, development]
-    paths:
-      - 'worker/**'
-      - 'contracts/**'
-      - '.github/workflows/worker-ci.yml'
-  pull_request:
-    paths:
-      - 'worker/**'
-      - 'contracts/**'
-      - '.github/workflows/worker-ci.yml'
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   worker:
