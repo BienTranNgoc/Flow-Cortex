@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 #
-# pre-push hook: block direct pushes to protected branches. All changes must go
-# through a feature branch + Pull Request (server-side branch protection is the
-# authoritative enforcement; this is fast local feedback).
+# pre-push hook: block direct pushes to protected branches. `main` is production
+# (it maps to Xood's `production`); work goes feature branch -> PR into
+# `development`, and only `development` is merged into `main` on release.
+# Server-side branch protection is the authoritative enforcement; this is fast
+# local feedback.
 # Enable with:  git config core.hooksPath .githooks   (or run scripts/setup-hooks.sh)
 
 set -euo pipefail
@@ -14,11 +16,12 @@ while read -r _local_ref _local_sha remote_ref _remote_sha; do
       branch="${remote_ref#refs/heads/}"
       echo "✗ Direct pushes to '$branch' are not allowed." >&2
       echo "" >&2
-      echo "  Create a feature branch and open a Pull Request instead:" >&2
-      echo "    git switch -c feat/your-change" >&2
+      echo "  Create a feature branch off 'development' and open a PR into 'development':" >&2
+      echo "    git switch -c feat/your-change origin/development" >&2
       echo "    git push -u origin feat/your-change" >&2
+      echo "    gh pr create --base development" >&2
       echo "" >&2
-      echo "  '$branch' only accepts merges from approved, CI-passing PRs." >&2
+      echo "  '$branch' is production: it only accepts release PRs from 'development'." >&2
       exit 1
       ;;
   esac

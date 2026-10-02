@@ -1,0 +1,32 @@
+# Scrapes the core services on the compose network. The worker's metrics arrive
+# through the collector on the OTLP receiver (job = its service.name), and
+# Tempo's service-graph metrics through remote write.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend:8081"]
+
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: rabbitmq-per-object
+    metrics_path: /metrics/per-object
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: minio
+    scrape_interval: 60s
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["minio:9000"]
+
+  - job_name: postgres-exporter
+    static_configs:
+      - targets: ["postgres-exporter:9187"]

@@ -1,13 +1,20 @@
-# Local end-to-end stack: Postgres, the Spring Boot API, and the React SPA
-# behind nginx on one origin. Day-to-day dev still uses `./gradlew bootRun` +
-# `npm run dev` (LOCAL_SETUP.md); this is the one-command run/demo:
+# Local end-to-end stack: Postgres, RabbitMQ, the S3-compatible object store
+# (Silo) with its one-shot init, the Spring Boot API, the Python media worker,
+# and the member and admin SPAs, each behind nginx. Day-to-day dev still uses
+# `./gradlew bootRun` + `npm run dev` (LOCAL_SETUP.md); this is the one-command
+# run/demo:
 #
-#   cp .env.example .env    # JWT_SECRET, POSTGRES_PASSWORD — compose loads .env
+#   cp .env.example .env    # the full list of variables, with what each does
 #   docker compose up --build
-#   -> frontend  http://localhost:5173   (SPA; proxies /api -> backend)
-#   -> backend   http://localhost:8080   (API + /actuator/health)
+#   -> frontend  http://localhost:5173   (member app; proxies /api -> backend)
+#   -> admin     http://localhost:5174   (admin console; proxies /api -> backend)
+#   -> backend   http://localhost:8080   (API + /livez, /readyz)
+#   -> store     http://localhost:9000   (presigned uploads and downloads)
 #
-# No credential has a default here: a committed value would be a known secret.
+# Every published port binds 127.0.0.1. The worker has no published port and no
+# internet egress. Traces, logs and metrics are the optional overlay
+# compose.observability.yaml. No credential has a default here: a committed
+# value would be a known secret.
 
 services:
   postgres:
@@ -26,12 +33,82 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    # The node name is rabbit@<hostname> and names the data directory; a fixed
+    # hostname keeps queues and messages across container recreation.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks: [default, internal]
+    # AMQP + management UI on loopback only; the metrics port 15692 is never published.
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      # Healthy only once the AMQP listener accepts connections, not merely when the node runs.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
+      # CORS is global and env-only here (PutBucketCors is a no-op) and defaults
+      # to `*`; only the member SPA origins may upload from a browser.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:?Set MINIO_API_CORS_ALLOW_ORIGIN (see .env.example)}
+    volumes:
+      - minio_data:/data
+    networks: [default, internal]
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Buckets, uploads lifecycle, and one least-privilege user per service.
+  # Root credentials exist only here and in `minio`. Idempotent; never restarted.
+  minio-init:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
+      BACKEND_S3_ACCESS_KEY: ${BACKEND_S3_ACCESS_KEY:?Set BACKEND_S3_ACCESS_KEY (see .env.example)}
+      BACKEND_S3_SECRET_KEY: ${BACKEND_S3_SECRET_KEY:?Set BACKEND_S3_SECRET_KEY (see .env.example)}
+      WORKER_S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
+      WORKER_S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+    volumes:
+      - ./infra/minio:/init:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
   backend:
     build:
       context: ./backend
     image: flow-cortex-backend:local
+    # The API on loopback only. Health and metrics answer on 8081 inside the
+    # service network and are never published.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    expose:
+      - "8081"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
@@ -42,30 +119,140 @@ services:
       # backend to refuse new runs (503) without a rebuild:
       #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
       FLOWCORTEX_WORKFLOW_ENABLED: ${FLOWCORTEX_WORKFLOW_ENABLED:-true}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}
+      # Object store: the API's own server calls go to the internal host; upload
+      # and download URLs are signed for the host the browser reaches.
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_PATH_STYLE: "true"
+      S3_UPLOAD_BUCKET: flowcortex-uploads
+      S3_BUCKET: flowcortex-media
+      S3_ACCESS_KEY: ${BACKEND_S3_ACCESS_KEY:?Set BACKEND_S3_ACCESS_KEY (see .env.example)}
+      S3_SECRET_KEY: ${BACKEND_S3_SECRET_KEY:?Set BACKEND_S3_SECRET_KEY (see .env.example)}
+      # Media-engine kill switch and limits, like the workflow switch above:
+      #   FLOWCORTEX_MEDIA_ENABLED=false docker compose up -d backend
+      FLOWCORTEX_MEDIA_ENABLED: ${FLOWCORTEX_MEDIA_ENABLED:-true}
+      # Admin-console kill switch: off answers /api/v1/admin/** with 503; the member API is unaffected.
+      FLOWCORTEX_ADMIN_ENABLED: ${FLOWCORTEX_ADMIN_ENABLED:-true}
+      FLOWCORTEX_MEDIA_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_QUEUE_TIMEOUT:-30m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE:-5m}
+      FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
+      FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:-524288000}
+      FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:-mp4,mov,webm,mkv,m4a,mp3,wav}
+      # Spans and trace ids exist without a collector; the observability
+      # overlay turns the exporters on.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    # Readiness covers the broker topology, so the backend waits for it.
     depends_on:
       postgres:
         condition: service_healthy
-    # The probe Docker uses to gate the frontend below.
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    # The probe Docker uses to gate the frontend below. On 8080, not 8081: the
+    # management port can answer while the API port is broken.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/readyz"]
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 40s
+    # Docker's default 10 s would kill the JVM inside the task executor's 30 s
+    # await, so in-flight inline steps and the outbox would not finish.
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  # Media worker: consumes media.jobs, reads uploads, writes reports. Its only
+  # network is `internal`, so it reaches the broker and the store and nothing on
+  # the internet. No published ports.
+  worker:
+    build:
+      context: ./worker
+    image: flow-cortex-worker:local
+    environment:
+      # The credentials must be URL-safe; they are placed in the URL as is.
+      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_PATH_STYLE: "true"
+      S3_UPLOAD_BUCKET: flowcortex-uploads
+      S3_BUCKET: flowcortex-media
+      S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
+      S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+      WORKER_ID: ${WORKER_ID:-flow-worker-1}
+      OTEL_SERVICE_NAME: flow-worker
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      # Spans and trace ids still exist without a collector; the observability
+      # overlay turns the exporters on.
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+    networks: [internal]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
+    stop_grace_period: 40s
     restart: unless-stopped
 
   frontend:
     build:
-      context: ./frontend
-      args:
-        VITE_API_BASE_URL: /api/v1
+      context: .
+      dockerfile: frontend/Dockerfile
     image: flow-cortex-frontend:local
     ports:
-      - "5173:8080"
+      - "127.0.0.1:5173:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
 
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    image: flow-cortex-admin:local
+    ports:
+      - "127.0.0.1:5174:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default: {}
+  # No internet egress: services here reach only each other.
+  internal:
+    internal: true
+
 volumes:
   postgres_data:
+  rabbitmq_data:
+  minio_data:

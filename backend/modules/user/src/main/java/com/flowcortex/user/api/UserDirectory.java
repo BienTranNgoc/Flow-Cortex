@@ -1,5 +1,7 @@
 package com.flowcortex.user.api;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,4 +19,10 @@ import java.util.UUID;
 public interface UserDirectory {
 
     Optional<CurrentUser> findById(UUID id);
+
+    /**
+     * The email of each id that still has a row, SUSPENDED ones included, in one lookup; an id with
+     * no row is absent from the map. Not the suspension gate {@link #findById} is.
+     */
+    Map<UUID, String> findEmailsByIds(Collection<UUID> ids);
 }

@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-uploads-after-1-day",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "" },
+      "Expiration": { "Days": 1 }
+    }
+  ]
+}

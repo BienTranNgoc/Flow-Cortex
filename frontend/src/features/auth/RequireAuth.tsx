@@ -5,7 +5,7 @@ import { useAuthToken } from './useAuth';
 /**
  * Route guard: no token → redirect to `/login`, remembering the page that
  * was requested so login can return there. Also what a cleared token (a 401
- * from any call, `src/api/client.ts`) redirects through, since this
+ * from any call, `@flow-cortex/api-client`) redirects through, since this
  * component re-renders whenever the token store changes.
  */
 export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {

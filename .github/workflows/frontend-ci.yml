@@ -2,23 +2,29 @@ name: frontend-ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
     paths:
       - 'frontend/**'
+      - 'admin/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.prettierrc'
       - 'docs/openapi.yaml'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     paths:
       - 'frontend/**'
+      - 'admin/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.prettierrc'
       - 'docs/openapi.yaml'
       - '.github/workflows/frontend-ci.yml'
 
 permissions:
   contents: read
-
-defaults:
-  run:
-    working-directory: frontend
 
 jobs:
   build:
@@ -31,7 +37,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -39,20 +45,26 @@ jobs:
       # Contract-first drift check: regenerate the typed client from the committed
       # docs/openapi.yaml and fail if it differs from what's committed.
       - name: Generate API client
-        run: npm run gen:api
+        run: npm run gen:api -w @flow-cortex/api-client
 
+      # diff catches an edited file; status also catches a generated file never committed.
       - name: Check generated API client is in sync
-        working-directory: .
-        run: git diff --exit-code frontend/src/api/generated
+        run: |
+          git diff --exit-code packages/api-client/src/generated
+          drift=$(git status --porcelain packages/api-client/src/generated)
+          if [ -n "$drift" ]; then
+            echo "$drift"
+            exit 1
+          fi
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint --workspaces --if-present
 
       - name: Type-check
-        run: npm run typecheck
+        run: npm run typecheck --workspaces --if-present
 
       - name: Unit tests
-        run: npm run test
+        run: npm run test --workspaces --if-present
 
       - name: Build
-        run: npm run build
+        run: npm run build --workspaces --if-present

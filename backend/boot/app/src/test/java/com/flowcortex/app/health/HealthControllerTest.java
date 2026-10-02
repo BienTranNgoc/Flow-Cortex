@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 // This slice tests only the controller's own JSON body, not the security
 // posture of /api/v1/health (that is SecurityFilterChainIT's job) — disable
 // the servlet filters so :shared:security's now-classpath-present chain
-// (which requires authentication for every path but /actuator/health) does
+// (which requires authentication for every path but the probes) does
 // not turn this request into a 401.
 @AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(HealthController.class)

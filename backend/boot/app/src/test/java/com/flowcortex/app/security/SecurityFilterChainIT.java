@@ -41,8 +41,8 @@ class SecurityFilterChainIT extends AbstractPostgresBootTest {
     }
 
     @Test
-    void actuatorHealthIsReachableWithoutAuthentication() {
-        ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health", String.class);
+    void theReadinessProbeIsReachableWithoutAuthentication() {
+        ResponseEntity<String> response = restTemplate.getForEntity("/readyz", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }

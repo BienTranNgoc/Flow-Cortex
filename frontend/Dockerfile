@@ -1,20 +1,28 @@
 # syntax=docker/dockerfile:1
 
+# Build context is the repo root: the SPA depends on the shared workspace package
+# packages/api-client, installed from the root lockfile.
+
 # --- build stage: produce the static SPA bundle -----------------------------
-FROM node:22-alpine AS build
+# The bundle is platform-independent, so it builds natively on the build host.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 
-# Vite inlines VITE_* at build time; inside compose the SPA is same-origin (nginx proxies /api).
-ARG VITE_API_BASE_URL=/api/v1
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-
+# Manifests first, so the dependency layer is reused until a manifest or the lockfile changes.
+# npm ci needs every workspace's manifest, not only this app's.
 COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
+COPY admin/package.json ./admin/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/ui-kit/package.json ./packages/ui-kit/
 RUN npm ci --ignore-scripts
-COPY . .
-RUN npm run build
+
+COPY packages ./packages
+COPY frontend ./frontend
+RUN npm run build -w frontend
 
 # --- runtime stage: serve the bundle behind an unprivileged nginx (port 8080) --
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 8080

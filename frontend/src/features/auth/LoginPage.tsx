@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ApiError } from '../../api/problemDetail';
+import { ApiError } from '@flow-cortex/api-client';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { useAuthToken, useLoginMutation } from './useAuth';
 

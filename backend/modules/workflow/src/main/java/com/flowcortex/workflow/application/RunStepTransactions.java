@@ -1,30 +1,42 @@
 package com.flowcortex.workflow.application;
 
 import com.flowcortex.shared.web.NotFoundException;
-import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The three short REQUIRES_NEW transactions a step's dispatch splits across: claim, step work,
- * then complete/fail. Each method must be called through this bean's Spring proxy (never {@code
- * this.method()} from {@link WorkflowRunOrchestrator} — that skips the proxy and runs in the
- * caller's transaction, defeating REQUIRES_NEW), so a mid-run failure persists instead of
- * rolling back with the run's own transaction.
+ * The short REQUIRES_NEW transactions a step's life splits across: claim, pickup, lease
+ * extension, then complete or fail. No step work runs inside them — an inline step runs on an
+ * executor thread between pickup and completion, a remote one on the worker. Each method must be
+ * called through this bean's Spring proxy (never {@code this.method()} from {@link RunAdvancer}
+ * — that skips the proxy and joins the caller's transaction), so a transition commits on its own.
  *
- * <p>Note: step work ({@code StepDispatcher.execute}) currently runs inside the REQUIRES_NEW
- * transaction — harmless for the sub-millisecond demo steps. A real provider-backed step should
- * move that call out of the transaction so it doesn't hold a DB connection for the whole run.
+ * <p>Every transition after the claim is a row-count CAS on {@code status = 'running'} and the
+ * step's attempt ({@code RunStepRepository}); a method returns {@code false} when it lost that CAS
+ * and then changes nothing else. A failure copies the step's message onto the run, which the
+ * admin pages show.
  */
 @Component
 class RunStepTransactions {
+
+    /** How a claim ended: someone else holds the step, it was handed on, or it failed in the claim. */
+    enum ClaimOutcome {
+        LOST,
+        DISPATCHED,
+        FAILED
+    }
+
+    private static final Logger LOG = LoggerFactory.getLogger(RunStepTransactions.class);
 
     private final RunStepRepository runStepRepository;
     private final WorkflowRunRepository workflowRunRepository;
@@ -34,42 +46,85 @@ class RunStepTransactions {
         this.workflowRunRepository = workflowRunRepository;
     }
 
-    /** {@code pending -> running}, atomically — see {@code RunStepRepository#claimPending}. */
+    /**
+     * {@code pending -> running}, atomically, then {@code dispatch} inside the same transaction —
+     * a remote job is recorded for publication with the claim, so neither exists without the other.
+     * A {@link StepFailedException} from {@code dispatch} errors the step in this transaction; any
+     * other exception rolls the claim back and propagates.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    boolean claim(UUID stepId, Instant now) {
-        return runStepRepository.claimPending(stepId, now) == 1;
+    ClaimOutcome claim(UUID runId, UUID stepId, short attempt, Instant now, Instant queueDeadline,
+            String resolvedInput, Runnable dispatch) {
+        if (runStepRepository.claimPending(stepId, now, queueDeadline, resolvedInput) != 1) {
+            return ClaimOutcome.LOST;
+        }
+        try {
+            dispatch.run();
+            return ClaimOutcome.DISPATCHED;
+        } catch (StepFailedException e) {
+            failRunning(runId, stepId, attempt, e.code(), e.getMessage(), now);
+            return ClaimOutcome.FAILED;
+        }
+    }
+
+    /** A delivery's pickup; {@code false} if the step is no longer running at this attempt. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    boolean recordPickup(UUID stepId, short attempt, Instant at, Instant leaseUntil, Instant runDeadline,
+            short deliveryCount) {
+        return runStepRepository.recordPickup(stepId, attempt, at, leaseUntil, runDeadline, deliveryCount) == 1;
+    }
+
+    /** A heartbeat; {@code false} if the step is no longer running at this attempt. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    boolean extendLease(UUID stepId, short attempt, Instant now, Instant leaseUntil, Short percent,
+            short deliveryCount, Instant runDeadlineIfUnset) {
+        return runStepRepository.extendLease(stepId, attempt, now, leaseUntil, percent, deliveryCount,
+                runDeadlineIfUnset) == 1;
     }
 
     /** {@code running -> completed}; marks the owning run {@code completed} too if this was the last step. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    void complete(UUID runId, UUID stepId, String resolvedInput, String output, Instant now) {
-        RunStep step = requireStep(stepId);
-        step.markCompleted(resolvedInput, output, now);
-        runStepRepository.save(step);
+    boolean complete(UUID runId, UUID stepId, short attempt, String output, String outputs, Instant now) {
+        if (runStepRepository.completeIfRunning(stepId, runId, attempt, output, outputs, now) != 1) {
+            return false;
+        }
+        completeRunIfAllStepsCompleted(runId, now);
+        return true;
+    }
 
-        boolean anyStepStillOpen = runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED) > 0;
-        if (!anyStepStillOpen) {
-            WorkflowRun run = requireRun(runId);
+    /** {@code running -> error}; marks the owning run {@code error} — halts further dispatch. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    boolean fail(UUID runId, UUID stepId, short attempt, String code, String message, Instant now) {
+        return failRunning(runId, stepId, attempt, code, message, now);
+    }
+
+    /** Completes a still-running run whose steps are all completed (a redelivered start after the last result). */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void completeRunIfDone(UUID runId, Instant now) {
+        completeRunIfAllStepsCompleted(runId, now);
+    }
+
+    private boolean failRunning(UUID runId, UUID stepId, short attempt, String code, String message, Instant now) {
+        if (runStepRepository.failIfRunning(stepId, runId, attempt, code, message, now) != 1) {
+            return false;
+        }
+        WorkflowRun run = requireRun(runId);
+        run.markError(message, now);
+        workflowRunRepository.save(run);
+        LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
+        return true;
+    }
+
+    private void completeRunIfAllStepsCompleted(UUID runId, Instant now) {
+        if (runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED) > 0) {
+            return;
+        }
+        WorkflowRun run = requireRun(runId);
+        if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
+            LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
-    }
-
-    /** {@code running -> error}; marks the owning run {@code error} unconditionally — halts further dispatch. */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    void fail(UUID runId, UUID stepId, String resolvedInput, String errorMessage, Instant now) {
-        RunStep step = requireStep(stepId);
-        step.markError(resolvedInput, errorMessage, now);
-        runStepRepository.save(step);
-
-        WorkflowRun run = requireRun(runId);
-        run.markError(errorMessage, now);
-        workflowRunRepository.save(run);
-    }
-
-    private RunStep requireStep(UUID stepId) {
-        return runStepRepository.findById(stepId)
-                .orElseThrow(() -> new NotFoundException("Run step not found: " + stepId));
     }
 
     private WorkflowRun requireRun(UUID runId) {

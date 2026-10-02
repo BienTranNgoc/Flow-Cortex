@@ -1,0 +1,207 @@
+# Optional observability overlay: traces (Tempo), logs (Loki), metrics
+# (Prometheus + postgres-exporter) and dashboards (Grafana), fed by one
+# OpenTelemetry collector. It attaches to the core stack, and no core service
+# depends on it:
+#
+#   docker compose -f docker-compose.yml -f compose.observability.yaml up -d
+#   -> grafana     http://127.0.0.1:3000   (admin / GF_SECURITY_ADMIN_PASSWORD)
+#   -> prometheus  http://127.0.0.1:9090
+#
+# Only those two ports are published, on loopback. Without this file the core
+# services keep creating spans and trace ids but export nothing.
+
+x-overlay-variables:
+  # Fails `config`/`up` before anything starts; the secret below cannot say why.
+  postgres-exporter-password: ${POSTGRES_EXPORTER_PASSWORD:?Set POSTGRES_EXPORTER_PASSWORD (see .env.example)}
+
+services:
+  # ---- core services: turn the exporters on -------------------------------------
+  backend:
+    environment:
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      # Metrics are scraped from :8081 by Prometheus, never pushed.
+
+  worker:
+    environment:
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+
+  # Lets Prometheus scrape without a token. The metrics then also answer
+  # unauthenticated on the store's published port, 127.0.0.1:9000 (loopback
+  # only); a shared host needs a bearer token instead.
+  minio:
+    environment:
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+
+  # ---- overlay -------------------------------------------------------------------
+  # The Go services below get GOMEMLIMIT at ~80% of mem_limit: the Go runtime does
+  # not read the cgroup limit, and without it Tempo and Grafana grew into the
+  # limit and thrashed or were OOM-killed. Prometheus sets its own from the cgroup.
+
+  # On `internal` too: the worker has no other network to reach it on.
+  # No healthcheck: the image has no shell or HTTP client.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
+    environment:
+      GOMEMLIMIT: 204MiB
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    networks: [default, internal]
+    expose:
+      - "4317"
+      - "4318"
+    mem_limit: 256m
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
+    command: ["-config.file=/etc/tempo.yaml"]
+    environment:
+      GOMEMLIMIT: 600MiB
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    expose:
+      - "3200"
+      - "4317"
+    healthcheck:
+      test: ["CMD", "/tempo", "-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    # 384m thrashed at the limit and timed out pushes and queries.
+    mem_limit: 768m
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    environment:
+      GOMEMLIMIT: 204MiB
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    expose:
+      - "3100"
+    healthcheck:
+      test: ["CMD", "/usr/bin/loki", "-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 256m
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-otlp-receiver
+      # Tempo's service-graph metrics for Grafana's service map. Both write
+      # endpoints are unauthenticated; the published port is loopback only.
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      # The default allows any origin, so any page open in a local browser could
+      # read or write through the published port.
+      - --web.cors.origin=http://127\.0\.0\.1:9090
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: 512m
+    restart: unless-stopped
+
+  # Creates the exporter's login role (member of pg_monitor). Idempotent; never restarted.
+  pg-monitor-init:
+    image: postgres:17@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    entrypoint: ["psql", "-q", "-f", "/init/pg-monitor-init.sql"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: flowcortex
+      PGUSER: flowcortex
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
+    volumes:
+      - ./observability/pg-monitor-init.sql:/init/pg-monitor-init.sql:ro
+    secrets:
+      - postgres_exporter_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 128m
+    restart: "no"
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    # The PostgreSQL dashboard's start-time panel reads this collector.
+    command: ["--collector.postmaster"]
+    environment:
+      DATA_SOURCE_URI: postgres:5432/flowcortex?sslmode=disable
+      DATA_SOURCE_USER: flowcortex_monitor
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres_exporter_password
+    secrets:
+      - postgres_exporter_password
+    expose:
+      - "9187"
+    depends_on:
+      pg-monitor-init:
+        condition: service_completed_successfully
+    mem_limit: 64m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?Set GF_SECURITY_ADMIN_PASSWORD (see .env.example)}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      # Each bundled datasource runs as its own ~25-40 MiB process; only
+      # prometheus, loki and tempo are provisioned.
+      GF_PLUGINS_DISABLE_PLUGINS: elasticsearch,grafana-postgresql-datasource,grafana-pyroscope-datasource,influxdb,jaeger,mssql,mysql,opentsdb,stackdriver,zipkin
+      GOMEMLIMIT: 384MiB
+    volumes:
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    # 256m was OOM-killed while the vendored dashboards rendered.
+    mem_limit: 512m
+    restart: unless-stopped
+
+secrets:
+  postgres_exporter_password:
+    environment: POSTGRES_EXPORTER_PASSWORD
+
+volumes:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:

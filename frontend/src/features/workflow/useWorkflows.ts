@@ -1,9 +1,17 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { getRun, getWorkflow, listWorkflows, startRun } from '../../api/generated/flowCortexApi';
-import type { StartRunRequest } from '../../api/generated/flowCortexApi';
-import { authHeaders, unwrap } from '../../api/client';
+import {
+  authHeaders,
+  getOutputUrl,
+  getRun,
+  getWorkflow,
+  listWorkflows,
+  requestUpload,
+  startRun,
+  unwrap,
+} from '@flow-cortex/api-client';
+import type { StartRunRequest, UploadRequest } from '@flow-cortex/api-client';
 
-/** ALL authenticated users (owner OR shared) — no admin gate, unlike `features/users`. */
+/** ALL authenticated users (owner OR shared) — no admin gate. */
 export function useWorkflowsQuery() {
   return useQuery({
     queryKey: ['workflows'],
@@ -22,6 +30,20 @@ export function useWorkflowQuery(id: string) {
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
     mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+  });
+}
+
+/** Asks for a presigned PUT for one file; the file itself never goes through the API. */
+export function useCreateUploadMutation() {
+  return useMutation({
+    mutationFn: (body: UploadRequest) => unwrap(requestUpload(body, authHeaders())),
+  });
+}
+
+/** A fresh, short-lived download URL for one output of a finished step, requested on demand. */
+export function useOutputUrlMutation(runId: string, stepOrder: number, name: string) {
+  return useMutation({
+    mutationFn: () => unwrap(getOutputUrl(runId, stepOrder, name, authHeaders())),
   });
 }
 

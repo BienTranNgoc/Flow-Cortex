@@ -1,9 +1,15 @@
 import { useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { login as loginRequest, me as meRequest } from '../../api/generated/flowCortexApi';
-import type { LoginRequest } from '../../api/generated/flowCortexApi';
-import { authHeaders, unwrap } from '../../api/client';
-import { getToken, setToken, subscribeToken } from './tokenStore';
+import {
+  authHeaders,
+  getToken,
+  login as loginRequest,
+  me as meRequest,
+  setToken,
+  subscribeToken,
+  unwrap,
+} from '@flow-cortex/api-client';
+import type { LoginRequest } from '@flow-cortex/api-client';
 
 /** Re-renders the calling component whenever the stored token changes. */
 export function useAuthToken(): string | null {

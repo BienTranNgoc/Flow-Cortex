@@ -139,6 +139,23 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void seedsASharedCheckAVideoFileWorkflowWhoseOnlyStepInspectsTheUpload() {
+        UserView viewer = userService.createInitialAdmin(
+                "workflow-seed-media-" + UUID.randomUUID() + "@example.com", "password123", "Media Seed Viewer");
+
+        WorkflowView check = workflowService.listVisibleWorkflows(viewer.id()).stream()
+                .filter(w -> w.name().equals("Check a video file"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Check a video file workflow not seeded"));
+
+        assertThat(check.shared()).isTrue();
+        assertThat(check.steps()).singleElement().satisfies(step -> {
+            assertThat(step.name()).isEqualTo("Inspect the file");
+            assertThat(step.type()).isEqualTo("probe");
+        });
+    }
+
+    @Test
     void reRunningTheWorkflowSeederAgainstAlreadySeededDataDoesNotDuplicate() throws Exception {
         seedDemoWorkflows.run(new DefaultApplicationArguments());
 

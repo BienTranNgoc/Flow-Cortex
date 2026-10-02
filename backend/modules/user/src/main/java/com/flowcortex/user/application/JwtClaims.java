@@ -1,15 +1,15 @@
 package com.flowcortex.user.application;
 
+import com.flowcortex.shared.security.RoleClaimJwtConverter;
+
 /**
- * Claim name(s) this module mints into the JWT ({@link AuthServiceImpl}) and
- * reads back out of it ({@code com.flowcortex.user.web.UserModuleSecurityConfig}'s
- * granted-authorities converter) — the two sides of the same contract, kept
- * in one place rather than as a string literal duplicated in both packages.
+ * Claim name(s) this module mints into the JWT ({@link AuthServiceImpl}). The role claim is the
+ * one {@link RoleClaimJwtConverter} reads back on every chain, so its name is taken from there.
  */
 public final class JwtClaims {
 
     /** Single string claim carrying the domain {@code Role} enum name (e.g. {@code "ADMIN"}). */
-    public static final String ROLE = "role";
+    public static final String ROLE = RoleClaimJwtConverter.ROLE_CLAIM;
 
     private JwtClaims() {
     }
