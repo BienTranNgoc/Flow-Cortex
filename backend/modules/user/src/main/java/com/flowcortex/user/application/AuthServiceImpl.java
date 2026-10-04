@@ -1,13 +1,17 @@
 package com.flowcortex.user.application;
 
+import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.domain.AppUser;
+import com.flowcortex.user.domain.Role;
+import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -41,6 +45,20 @@ class AuthServiceImpl implements AuthService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
+    }
+
+    @Override
+    @Transactional
+    public String register(String email, String rawPassword, String name) {
+        UUID id = UUID.randomUUID();
+        AppUser user = new AppUser(id, id, email, passwordEncoder.encode(rawPassword), name,
+                Role.MEMBER, UserStatus.ACTIVE);
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("A user with email '" + email + "' already exists");
+        }
+        return mintToken(user);
     }
 
     @Override

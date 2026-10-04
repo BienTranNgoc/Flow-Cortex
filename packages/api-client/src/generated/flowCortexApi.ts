@@ -154,6 +154,18 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  /** @minLength 1 */
+  email: string;
+  /**
+   * @minLength 8
+   * @maxLength 72
+   */
+  password: string;
+  /** @minLength 1 */
+  name: string;
+}
+
 export interface LoginResponse {
   token?: string;
 }
@@ -748,6 +760,56 @@ export const login = async (
 
   const data: loginResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as loginResponse;
+};
+
+export type registerResponse201 = {
+  data: LoginResponse;
+  status: 201;
+};
+
+export type registerResponseSuccess = registerResponse201 & {
+  headers: Headers;
+};
+export type registerResponse = registerResponseSuccess;
+
+export const getRegisterUrl = () => {
+  return `/api/v1/auth/register`;
+};
+
+export const register = async (
+  registerRequest: RegisterRequest,
+  options?: RequestInit,
+): Promise<registerResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getRegisterUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: registerResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as registerResponse;
 };
 
 export type listWorkflowsResponse200 = {

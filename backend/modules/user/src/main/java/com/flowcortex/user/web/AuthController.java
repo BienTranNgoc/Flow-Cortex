@@ -40,6 +40,12 @@ class AuthController {
         return ResponseEntity.ok(new LoginResponse(token));
     }
 
+    @PostMapping(value = "/register", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        String token = authService.register(request.email(), request.password(), request.name());
+        return ResponseEntity.status(201).body(new LoginResponse(token));
+    }
+
     @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<MeResponse> me(@AuthenticationPrincipal Jwt jwt) {
         UUID id = subjectId(jwt);
@@ -61,6 +67,11 @@ class AuthController {
     }
 
     record LoginRequest(@NotBlank String email, @NotBlank String password) {
+    }
+
+    record RegisterRequest(@NotBlank @jakarta.validation.constraints.Email String email,
+            @NotBlank @jakarta.validation.constraints.Size(min = 8, max = 72) String password,
+            @NotBlank String name) {
     }
 
     record LoginResponse(String token) {

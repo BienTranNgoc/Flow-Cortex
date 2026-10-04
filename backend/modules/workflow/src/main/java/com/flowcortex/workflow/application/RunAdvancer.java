@@ -12,6 +12,7 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
+import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.Counter;
@@ -85,6 +86,8 @@ class RunAdvancer {
     private final Counter lateResults;
     private final Duration lease;
     private final Clock clock;
+    private final ReviewTaskRepository reviewTaskRepository;
+    private final ReviewCheckpointTransactions checkpointTransactions;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -92,11 +95,12 @@ class RunAdvancer {
             InputResolver inputResolver, StepExecutorRegistry registry,
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
-            @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds) {
+            @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
+            ReviewTaskRepository reviewTaskRepository, ReviewCheckpointTransactions checkpointTransactions) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC());
+                Clock.systemUTC(), reviewTaskRepository, checkpointTransactions);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -104,6 +108,16 @@ class RunAdvancer {
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
             Duration lease, Clock clock) {
+        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
+                taskExecutor, scheduler, tracer, observations, meters, lease, clock, null, null);
+    }
+
+    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
+            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
+            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
+            Duration lease, Clock clock, ReviewTaskRepository reviewTaskRepository,
+            ReviewCheckpointTransactions checkpointTransactions) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -122,6 +136,8 @@ class RunAdvancer {
                 .register(meters);
         this.lease = lease;
         this.clock = clock;
+        this.reviewTaskRepository = reviewTaskRepository;
+        this.checkpointTransactions = checkpointTransactions;
     }
 
     @ApplicationModuleListener
@@ -149,6 +165,13 @@ class RunAdvancer {
                 applyProgress(progress);
             }
         });
+    }
+
+    @ApplicationModuleListener
+    void onReviewApproved(ReviewTaskApprovedEvent event) {
+        if (checkpointTransactions != null && checkpointTransactions.resume(event, clock.instant())) {
+            reviewTaskRepository.findById(event.taskId()).ifPresent(task -> advance(task.getRunId()));
+        }
     }
 
     /** Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight. */
@@ -185,6 +208,11 @@ class RunAdvancer {
         }
         if (next.getStatus() != RunStepStatus.PENDING) {
             LOG.info("Step {} already {} — waiting for its result", next.getStepOrder(), next.getStatus());
+            return;
+        }
+        if ("APPROVAL_CHECKPOINT".equals(next.getType())) {
+            String payload = outputsByOrder.get((int) next.getStepOrder() - 1);
+            checkpointTransactions.pause(run, next, payload, clock.instant());
             return;
         }
         dispatch(run, next, outputsByOrder);

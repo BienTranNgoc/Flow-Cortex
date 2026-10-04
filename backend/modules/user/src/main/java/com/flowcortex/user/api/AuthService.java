@@ -8,6 +8,12 @@ import java.util.UUID;
 public interface AuthService {
 
     /**
+     * Creates an active self-owned member account and mints a signed JWT.
+     * @throws com.flowcortex.shared.web.ConflictException if the email is already taken
+     */
+    String register(String email, String rawPassword, String name);
+
+    /**
      * Verifies the email/password pair and mints a signed JWT (subject = the user's id).
      * @throws BadCredentialsException if the email is unknown or password doesn't match (same exception either way)
      * @throws AccessDeniedException if the account is {@code SUSPENDED} — no token is minted

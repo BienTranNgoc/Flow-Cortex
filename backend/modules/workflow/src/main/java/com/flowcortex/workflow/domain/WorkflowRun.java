@@ -74,6 +74,15 @@ public class WorkflowRun {
         return status;
     }
 
+    public void markWaitingApproval() {
+        this.status = RunStatus.WAITING_APPROVAL;
+    }
+
+    public void resume() {
+        this.status = RunStatus.RUNNING;
+        this.finishedAt = null;
+    }
+
     public String getInput() {
         return input;
     }

@@ -7,5 +7,6 @@ package com.flowcortex.user.domain;
  */
 public enum Role {
     ADMIN,
-    MEMBER
+    MEMBER,
+    CREATOR
 }

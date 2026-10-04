@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.domain.AppUser;
@@ -53,6 +54,35 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service.login("nobody@example.com", RAW_PASSWORD))
                 .isInstanceOf(BadCredentialsException.class);
+        verify(jwtEncoder, never()).encode(any());
+    }
+
+    @Test
+    void registerCreatesSelfOwnedMemberAndMintsToken() {
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtEncoder.encode(any())).thenReturn(
+                Jwt.withTokenValue("registered-token").header("alg", "HS256")
+                        .claim("sub", UUID.randomUUID().toString()).build());
+
+        String token = service.register("new@example.com", RAW_PASSWORD, "New Person");
+
+        assertThat(token).isEqualTo("registered-token");
+        ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
+        verify(repository).saveAndFlush(captor.capture());
+        AppUser saved = captor.getValue();
+        assertThat(saved.getOwnerId()).isEqualTo(saved.getId());
+        assertThat(saved.getRole()).isEqualTo(Role.MEMBER);
+        assertThat(saved.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(saved.getPasswordHash()).isNotEqualTo(RAW_PASSWORD);
+    }
+
+    @Test
+    void registerDuplicateEmailIsTranslatedToConflict() {
+        when(repository.saveAndFlush(any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_app_user_email"));
+
+        assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken"))
+                .isInstanceOf(ConflictException.class);
         verify(jwtEncoder, never()).encode(any());
     }
 

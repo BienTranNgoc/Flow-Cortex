@@ -10,6 +10,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -18,13 +19,16 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
 
     private final ReviewTaskRepository reviewTaskRepository;
     private final WorkflowRunRepository workflowRunRepository;
+    private final ApplicationEventPublisher events;
 
     ReviewTaskServiceImpl(
         ReviewTaskRepository reviewTaskRepository,
-        WorkflowRunRepository workflowRunRepository
+        WorkflowRunRepository workflowRunRepository,
+        ApplicationEventPublisher events
     ) {
         this.reviewTaskRepository = reviewTaskRepository;
         this.workflowRunRepository = workflowRunRepository;
+        this.events = events;
     }
 
     @Override
@@ -49,7 +53,9 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
             .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
 
         task.approve(reviewerId, reviewedPayload);
-        return toView(reviewTaskRepository.save(task));
+        ReviewTaskView view = toView(reviewTaskRepository.save(task));
+        events.publishEvent(new ReviewTaskApprovedEvent(task.getId(), task.getReviewedPayload()));
+        return view;
     }
 
     @Override

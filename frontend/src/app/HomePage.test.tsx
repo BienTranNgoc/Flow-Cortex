@@ -1,5 +1,5 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route } from 'react-router-dom';
 import { renderRoute, settled, stubApi } from '../test/fakeApi';
 import { HomePage } from './HomePage';
@@ -63,7 +63,10 @@ describe('HomePage', () => {
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
-        body: [workflow('echo', 'Echo Demo', ['echo']), workflow('mixed', 'Mixed', ['probe', 'echo'])],
+        body: [
+          workflow('echo', 'Echo Demo', ['echo']),
+          workflow('mixed', 'Mixed', ['probe', 'echo']),
+        ],
       },
     });
 
@@ -90,6 +93,40 @@ describe('HomePage', () => {
     await screen.findByRole('heading', { name: 'Welcome, Member One' });
     expect(screen.queryByRole('link', { name: LINE })).not.toBeInTheDocument();
     release();
-    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute('href', '/workflows/check');
+    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
+      'href',
+      '/workflows/check',
+    );
+  });
+
+  it('starts the first URL-capable workflow instead of an upload workflow', async () => {
+    const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [
+          workflow('upload', 'Check a video file', ['probe']),
+          workflow('url', 'TikTok URL Pipeline', ['echo']),
+        ],
+      },
+      'POST /api/v1/workflows/url/runs': {
+        status: 200,
+        body: { id: 'run-url', status: 'running' },
+      },
+    });
+
+    renderHome();
+
+    const input = await screen.findByLabelText('Source URL');
+    fireEvent.change(input, { target: { value: 'https://www.tiktok.com/@creator/video/123' } });
+    fireEvent.click(screen.getByRole('button', { name: /Generate pipeline/ }));
+
+    await waitFor(() =>
+      expect(calls).toContainEqual({
+        method: 'POST',
+        path: '/api/v1/workflows/url/runs',
+        body: { input: 'https://www.tiktok.com/@creator/video/123' },
+      }),
+    );
   });
 });
