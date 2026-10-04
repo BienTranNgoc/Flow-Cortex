@@ -5,7 +5,7 @@ import { StepDownloads } from './StepDownloads';
 import { NO_MESSAGE, stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { useRunQuery } from './useWorkflows';
-
+import { StoredOutputDownload } from './StoredOutputDownload';
 const STEP_LABELS: Record<string, string> = {
   pending: 'Pending',
   running: 'Running',
@@ -84,7 +84,11 @@ export function RunProgressPage() {
           const status = step.status ?? 'pending';
           const waiting = status === 'running' && !step.pickedUpAt;
           const deliveries = step.deliveryCount ?? 0;
-          const details = (step.outputs ?? []).find((output) => output.mime === 'application/json');
+          // const details = (step.outputs ?? []).find((output) => output.mime === 'application/json');
+          const outputs = step.outputs ?? [];
+          const details = outputs.find((output) => output.mime === 'application/json');
+          const artifacts = outputs.filter((output) => output.mime !== 'application/json');
+          const stepOrder = step.stepOrder;
           return (
             <li key={step.id} className={`run-step run-step-${status}`}>
               <div className="run-step-head">
@@ -96,15 +100,25 @@ export function RunProgressPage() {
               </div>
               <StepProgress step={step} />
               {status === 'completed' && step.output && <StepOutput output={step.output} />}
-              {status === 'completed' && details && step.stepOrder !== undefined && (
-                <StepDownloads
+              {status === 'completed' && details && stepOrder !== undefined && (
+              <StepDownloads
+                runId={runId}
+                stepOrder={stepOrder}
+                output={step.output}
+                details={details}
+                fileName={fileName}
+              />
+            )}
+
+            {status === 'completed' && stepOrder !== undefined &&
+              artifacts.map((artifact) => (
+                <StoredOutputDownload
+                  key={artifact.name}
                   runId={runId}
-                  stepOrder={step.stepOrder}
-                  output={step.output}
-                  details={details}
-                  fileName={fileName}
+                  stepOrder={stepOrder}
+                  output={artifact}
                 />
-              )}
+              ))}
               {status === 'error' && (
                 <div className="run-step-failure">
                   <p role="alert" className="run-step-error">

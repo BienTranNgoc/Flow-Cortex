@@ -108,23 +108,22 @@ class WorkflowServiceImplTest {
     }
 
     @Test
-    void createWorkflowRefusesAMediaStepAfterTheFirstNamingItsPositionAndSavesNothing() {
-        List<NewWorkflowStep> steps = List.of(
-                new NewWorkflowStep("first", "echo", null),
-                new NewWorkflowStep("second", "probe", null));
+    void createWorkflowAcceptsConsecutiveMediaStepsWhenTheFirstStepIsRemote() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Late media", false, steps))
-                .isInstanceOf(ConstraintViolationException.class)
-                .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
-                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
-                        .containsExactly("steps[1].type 'probe' can only be the first step: it works on the uploaded file"));
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Analyze media", false, List.of(
+                new NewWorkflowStep("Inspect media", "probe", null),
+                new NewWorkflowStep("Extract audio", "extract_audio", null)));
 
-        verify(workflowRepository, never()).save(any());
-        verify(workflowStepRepository, never()).saveAll(any());
+        assertThat(created.steps()).extracting(step -> step.type())
+                .containsExactly("probe", "extract_audio");
+        assertThat(created.steps()).extracting(step -> step.mode())
+                .containsExactly("remote", "remote");
     }
 
     @Test
-        void aRemoteMediaStepCanOnlyBeFirst() {
+    void createWorkflowRejectsARemoteStepWhenTheWorkflowStartsInline() {
         List<NewWorkflowStep> steps = List.of(
                 new NewWorkflowStep("first", "echo", null),
                 new NewWorkflowStep("extract", "extract_audio", null));
@@ -132,9 +131,11 @@ class WorkflowServiceImplTest {
         assertThatThrownBy(() -> service.createWorkflow(
                 UUID.randomUUID(), "Bad order", false, steps))
                 .isInstanceOf(ConstraintViolationException.class)
-                .hasMessageContaining(
-                        "'extract_audio' can only be the first step");
-        }
+                .hasMessageContaining("workflow must start with a media step");
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
+    }
 
     @Test
     void createWorkflowAcceptsAMediaFirstStepFollowedByInlineSteps() {
