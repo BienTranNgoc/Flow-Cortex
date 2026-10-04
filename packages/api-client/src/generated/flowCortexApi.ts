@@ -7,7 +7,7 @@
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
-  /** @pattern ADMIN|MEMBER */
+  /** @pattern ADMIN|MEMBER|CREATOR */
   role?: string;
   /** @pattern ACTIVE|SUSPENDED */
   status?: string;
@@ -105,7 +105,7 @@ export interface CreateUserRequest {
   name: string;
   /**
    * @minLength 1
-   * @pattern ADMIN|MEMBER
+   * @pattern ADMIN|MEMBER|CREATOR
    */
   role: string;
 }
@@ -147,13 +147,6 @@ export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
 }
 
-export interface LoginRequest {
-  /** @minLength 1 */
-  email: string;
-  /** @minLength 1 */
-  password: string;
-}
-
 export interface RegisterRequest {
   /** @minLength 1 */
   email: string;
@@ -168,6 +161,13 @@ export interface RegisterRequest {
 
 export interface LoginResponse {
   token?: string;
+}
+
+export interface LoginRequest {
+  /** @minLength 1 */
+  email: string;
+  /** @minLength 1 */
+  password: string;
 }
 
 export type WorkflowStepResponseMode =
@@ -712,6 +712,56 @@ export const approveTask = async (
   return { data, status: res.status, headers: res.headers } as approveTaskResponse;
 };
 
+export type registerResponse200 = {
+  data: LoginResponse;
+  status: 200;
+};
+
+export type registerResponseSuccess = registerResponse200 & {
+  headers: Headers;
+};
+export type registerResponse = registerResponseSuccess;
+
+export const getRegisterUrl = () => {
+  return `/api/v1/auth/register`;
+};
+
+export const register = async (
+  registerRequest: RegisterRequest,
+  options?: RequestInit,
+): Promise<registerResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getRegisterUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: registerResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as registerResponse;
+};
+
 export type loginResponse200 = {
   data: LoginResponse;
   status: 200;
@@ -760,56 +810,6 @@ export const login = async (
 
   const data: loginResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as loginResponse;
-};
-
-export type registerResponse201 = {
-  data: LoginResponse;
-  status: 201;
-};
-
-export type registerResponseSuccess = registerResponse201 & {
-  headers: Headers;
-};
-export type registerResponse = registerResponseSuccess;
-
-export const getRegisterUrl = () => {
-  return `/api/v1/auth/register`;
-};
-
-export const register = async (
-  registerRequest: RegisterRequest,
-  options?: RequestInit,
-): Promise<registerResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  const res = await fetch(getRegisterUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(registerRequest),
-  });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: registerResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as registerResponse;
 };
 
 export type listWorkflowsResponse200 = {
