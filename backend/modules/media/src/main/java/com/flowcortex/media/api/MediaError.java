@@ -10,6 +10,7 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
     public enum Code {
         INPUT_REJECTED("input_rejected"),
         PROBE_FAILED("probe_failed"),
+        AUDIO_EXTRACTION_FAILED("audio_extraction_failed"),
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout");
 

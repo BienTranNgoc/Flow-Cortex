@@ -101,16 +101,42 @@ class Storage:
             )
             yield path
 
-    def put(self, key: str, body: bytes, mime: str, abort: Abort) -> None:
+    def put(self, key: str, body: bytes | Path, mime: str, abort: Abort) -> int:
         # Outputs are small in-memory reports; the check stops a killed job before it writes.
         abort.check()
+        size = len(body) if isinstance(body, bytes) else body.stat().st_size
         try:
-            self._client.put_object(Bucket=self.bucket, Key=key, Body=body, ContentType=mime)
+            if isinstance(body, bytes):
+                self._client.put_object(
+                    Bucket=self.bucket,
+                    Key=key,
+                    Body=body,
+                    ContentType=mime
+                )
+            else:
+                with body.open("rb") as stream:
+                    abort.on_kill(stream.close)
+                    self._client.put_object(
+                        Bucket=self.bucket,
+                        Key=key,
+                        Body=stream,
+                        ContentType=mime
+                        )
         except (BotoCoreError, ClientError) as exc:
-            raise TransientError(f"{type(exc).__name__} storing {self.bucket}/{key}") from exc
+            raise TransientError(
+                f"{type(exc).__name__} storing {self.bucket}/{key}"
+                ) from exc
+        abort.check()
         log.info(
-            "output stored", extra={"bucket": self.bucket, "objectKey": key, "bytes": len(body)}
+            "output stored",
+            extra={
+                "bucket": self.bucket,
+                "objectKey": key,
+                "bytes": size
+            },
         )
+        return size
+
 
     def _head(self, ref: MediaJobInput) -> tuple[int, str]:
         try:

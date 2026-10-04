@@ -100,8 +100,8 @@ class WorkflowServiceImplTest {
                 .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
-                                "steps[1].type unknown capability 'transcode'; allowed: echo, fail, probe",
-                                "steps[3].type unknown capability 'demucs-typo'; allowed: echo, fail, probe"));
+                                "steps[1].type unknown capability 'transcode'; allowed: echo, extract_audio, fail, probe",
+                                "steps[3].type unknown capability 'demucs-typo'; allowed: echo, extract_audio, fail, probe"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
@@ -122,6 +122,19 @@ class WorkflowServiceImplTest {
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
     }
+
+    @Test
+        void aRemoteMediaStepCanOnlyBeFirst() {
+        List<NewWorkflowStep> steps = List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("extract", "extract_audio", null));
+
+        assertThatThrownBy(() -> service.createWorkflow(
+                UUID.randomUUID(), "Bad order", false, steps))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining(
+                        "'extract_audio' can only be the first step");
+        }
 
     @Test
     void createWorkflowAcceptsAMediaFirstStepFollowedByInlineSteps() {

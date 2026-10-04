@@ -34,13 +34,13 @@ FAIL_ONCE_AFTER_PUT: set[str] = set()
 class FailOnceAfterPut(Storage):
     """Stores the output, then fails once for chosen runs, so the broker redelivers the job."""
 
-    def put(self, key: str, body: bytes, mime: str, abort: Any) -> None:
-        super().put(key, body, mime, abort)
+    def put(self, key: str, body: bytes | Path, mime: str, abort: Any) -> int:
+        size = super().put(key, body, mime, abort)
         run_id = key.split("/")[1]
         if run_id in FAIL_ONCE_AFTER_PUT:
             FAIL_ONCE_AFTER_PUT.discard(run_id)
             raise TransientError("store hiccup after the output was written")
-
+        return size
 
 @pytest.fixture(scope="module")
 def worker(rabbitmq: pika.ConnectionParameters, silo: Silo) -> Iterator[None]:
@@ -137,9 +137,38 @@ def upload_clip(silo: Silo, tmp_path: Path) -> str:
     return key
 
 
-def media_job(key: str) -> dict[str, Any]:
-    return job_body(inputs=[{"key": "media", "bucket": UPLOAD_BUCKET, "objectKey": key}])
+def media_job(key: str, capability: str = "probe") -> dict[str, Any]:
+    return job_body(
+        capability=capability,
+        inputs=[{"key": "media", "bucket": UPLOAD_BUCKET, "objectKey": key}],
+    )
 
+def test_uploaded_object_is_extracted_as_wav(
+    worker: None,
+    rabbitmq: pika.ConnectionParameters,
+    silo: Silo,
+    tmp_path: Path,
+) -> None:
+    body = media_job(upload_clip(silo, tmp_path), capability="extract_audio")
+    publish_job(rabbitmq, body)
+
+    [(_, result)] = collect(rabbitmq, "media.results", body["jobId"], 1)
+
+    assert_valid(json.dumps(result).encode(), "media-result")
+    assert result["status"] == "completed"
+    assert result["data"] == {
+        "sampleRate": 16000,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "timelineOriginMs": 0,
+    }
+    key = f"runs/{body['runId']}/steps/1/source-audio.wav"
+    assert [output["objectKey"] for output in result["outputs"]] == [key]
+    stored = silo.client().get_object(Bucket=MEDIA_BUCKET, Key=key)
+    content = stored["Body"].read()
+    assert stored["ContentType"] == "audio/wav"
+    assert content.startswith(b"RIFF")
+    assert result["outputs"][0]["bytes"] == len(content)
 
 def test_uploaded_object_is_probed_and_reported(
     worker: None, rabbitmq: pika.ConnectionParameters, silo: Silo, tmp_path: Path

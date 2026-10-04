@@ -67,6 +67,7 @@ class MediaJobsImplTest {
         "flowcortex.media.enabled=true",
         "flowcortex.media.queue-timeout=30m",
         "flowcortex.media.max-runtime.probe=5m",
+        "flowcortex.media.max-runtime.extract_audio=10m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.presign-ttl=15m",
         "flowcortex.media.upload.max-bytes=524288000",
@@ -151,6 +152,14 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void limitsForExtractAudioReturnTheConfiguredValues() {
+        runner.withPropertyValues("flowcortex.media.max-runtime.extract_audio=8m")
+        .run(
+            context -> assertThat(context.getBean(MediaJobs.class).limitsFor("extract_audio"))
+                    .isEqualTo(new MediaLimits(Duration.ofMinutes(30), Duration.ofMinutes(8), 524_288_000L)));
+    }
+
+    @Test
     void limitsForAnUnknownCapabilityIsRefused() {
         runner.run(context -> assertThatThrownBy(() -> context.getBean(MediaJobs.class).limitsFor("transcode"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -179,10 +188,20 @@ class MediaJobsImplTest {
                 });
     }
 
+    // @Test
+    // void aCapabilityWithoutAMaxRuntimeFailsStartup() {
+    //     runner.withPropertyValues("flowcortex.media.max-runtime.probe=")
+    //             .run(context -> assertThat(context).hasFailed());
+    // }
     @Test
     void aCapabilityWithoutAMaxRuntimeFailsStartup() {
-        runner.withPropertyValues("flowcortex.media.max-runtime.probe=")
-                .run(context -> assertThat(context).hasFailed());
+        runner.withPropertyValues("flowcortex.media.max-runtime.extract_audio=")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("max-runtime.extract_audio");
+                });
     }
 
     @Test
@@ -201,12 +220,21 @@ class MediaJobsImplTest {
 
     @Test
     void aConsumerTimeoutThatDoesNotOutlastTheLongestRunPlusBackoffAndMarginFailsStartup() {
-        runner.withPropertyValues("flowcortex.media.max-runtime.probe=5m", "flowcortex.media.consumer-timeout=7m")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("consumer-timeout");
-                });
-        runner.withPropertyValues("flowcortex.media.max-runtime.probe=5m", "flowcortex.media.consumer-timeout=421s")
+        runner.withPropertyValues(
+        "flowcortex.media.max-runtime.probe=5m",
+        "flowcortex.media.max-runtime.extract_audio=5m",
+        "flowcortex.media.consumer-timeout=7m")
+        .run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .rootCause()
+                    .hasMessageContaining("consumer-timeout");
+        });
+
+        runner.withPropertyValues(
+                "flowcortex.media.max-runtime.probe=5m",
+                "flowcortex.media.max-runtime.extract_audio=5m",
+                "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
     }
 
