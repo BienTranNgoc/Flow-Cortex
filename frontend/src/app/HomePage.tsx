@@ -24,8 +24,8 @@ export function HomePage() {
   const navigate = useNavigate();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  const mediaWorkflow = workflowsQuery.data?.find(
-    (workflow) => workflow.steps?.length === 1 && workflow.steps[0]?.type === 'probe',
+  const uploadWorkflow = workflowsQuery.data?.find(
+    (workflow) => workflow.steps?.[0]?.mode === 'remote',
   );
   const workflow = workflowsQuery.data ? selectUrlWorkflow(workflowsQuery.data) : undefined;
   const startRunMutation = useStartRunMutation(workflow?.id ?? '');
@@ -127,8 +127,8 @@ export function HomePage() {
       </section>
       <section className="launchpad-footer">
         <p>Welcome, {meQuery.data.name}</p>
-        {mediaWorkflow?.id && (
-          <Link className="action-link" to={`/workflows/${mediaWorkflow.id}`}>
+        {uploadWorkflow?.id && (
+          <Link className="action-link" to={`/workflows/${uploadWorkflow.id}`}>
             Have a video or audio file? Check it →
           </Link>
         )}

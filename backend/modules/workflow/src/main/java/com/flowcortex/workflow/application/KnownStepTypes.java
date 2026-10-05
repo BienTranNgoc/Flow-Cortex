@@ -52,16 +52,19 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             HibernateConstraintValidatorContext hibernateContext =
                     context.unwrap(HibernateConstraintValidatorContext.class);
             context.disableDefaultConstraintViolation();
+
             List<NewWorkflowStep> steps = definition.steps();
+
+            boolean startsRemote = !steps.isEmpty() && definition.remoteTypes().contains(steps.get(0).type());
+
             for (int i = 0; i < steps.size(); i++) {
                 String type = steps.get(i).type();
                 if (!allowedTypes.contains(type)) {
                     valid = false;
                     violation(hibernateContext, template, type, i);
-                } else if (i > 0 && definition.remoteTypes().contains(type)) {
+                } else if (definition.remoteTypes().contains(type) && !startsRemote) {
                     valid = false;
-                    violation(hibernateContext, "'{type}' can only be the first step: it works on the uploaded file",
-                            type, i);
+                    violation(hibernateContext, "'{type}' needs an uploaded file, so the workflow must start with a media step", type, i);
                 }
             }
             return valid;

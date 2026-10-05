@@ -14,6 +14,8 @@ Thumbs.db
 # --- Backend (Gradle) ---
 backend/build/
 backend/.gradle/
+backend/**/bin/
+
 # The wrapper jar + scripts ARE committed on purpose (reproducible builds).
 
 # --- Secrets / local env ---
@@ -37,7 +39,12 @@ docs/PLAN.md
 docs/jira-backlog.csv
 *-Plan.pdf
 
+<<<<<<< HEAD
 # Local docker compose override
 docker-compose.override.yml
 
 **/bin/
+=======
+private_docs/
+tmp/
+>>>>>>> origin/development

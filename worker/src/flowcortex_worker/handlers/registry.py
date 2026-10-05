@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 from ..errors import PermanentError
-from . import Handler, HandlerOutcome, OutputFile, probe
+from . import Handler, HandlerOutcome, OutputFile, extract_audio, probe
 
-__all__ = ["HANDLERS", "Handler", "HandlerOutcome", "OutputFile", "resolve"]
+__all__ = [
+    "HANDLERS",
+    "Handler",
+    "HandlerOutcome",
+    "OutputFile",
+    "resolve"
+    ]
 
-HANDLERS: dict[str, Handler] = {"probe": probe.handle}
+HANDLERS: dict[str, Handler] = {
+    "probe": probe.handle,
+    "extract_audio": extract_audio.handle,
+    }
 
 
 def resolve(capability: str) -> Handler:

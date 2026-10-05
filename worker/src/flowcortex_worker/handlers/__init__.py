@@ -15,7 +15,7 @@ from ..runtime import ProcessRunner
 class OutputFile:
     name: str
     mime: str
-    body: bytes
+    body: bytes | Path
 
 
 @dataclass(frozen=True)

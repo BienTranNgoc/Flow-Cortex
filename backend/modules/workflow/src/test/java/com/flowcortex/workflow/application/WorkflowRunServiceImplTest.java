@@ -183,7 +183,7 @@ class WorkflowRunServiceImplTest {
     }
 
     @Test
-    void aResolvedUploadIsTheRemoteStepsOnlyInputAndTheRunKeepsTheCleanedFileName() {
+    void aResolvedUploadMakesTheRunKeepTheCleanedFileName() {
         WorkflowRunServiceImpl service = newService(true);
         UUID ownerId = UUID.randomUUID();
         UUID uploadId = UUID.randomUUID();
@@ -196,8 +196,27 @@ class WorkflowRunServiceImplTest {
                 "../a\u0007b.mp4");
 
         assertThat(started.input()).isEqualTo("..ab.mp4");
-        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput).isEqualTo(
-                "{\"key\":\"media\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"" + ownerId + "/" + uploadId + "\"}");
+    }
+
+    @Test
+    void oneResolvedUploadBecomesTheInputOfEveryRemoteStep() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "probe", "extract_audio", "echo");
+        MediaJobInput input = new MediaJobInput(
+                "media", "flowcortex-uploads", ownerId + "/" + uploadId);
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        when(mediaJobs.resolveUpload(ownerId, uploadId)).thenReturn(input);
+
+        service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+
+        List<RunStep> steps = List.copyOf(savedSteps());
+        String expected = "{\"key\":\"media\",\"bucket\":\"flowcortex-uploads\","
+                + "\"objectKey\":\"" + ownerId + "/" + uploadId + "\"}";
+        assertThat(steps).extracting(RunStep::getInput)
+                .containsExactly(expected, expected, null);
+        verify(mediaJobs).resolveUpload(ownerId, uploadId);
     }
 
     @Test

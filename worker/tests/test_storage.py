@@ -130,6 +130,31 @@ def test_output_keys_are_deterministic_and_overwrite(silo: Silo) -> None:
     listed = silo.client().list_objects_v2(Bucket=MEDIA_BUCKET, Prefix=f"runs/{job.runId}/")
     assert [o["Key"] for o in listed["Contents"]] == [key]
 
+def test_path_output_is_streamed_and_reports_its_size(tmp_path: Path) -> None:
+    content = b"wave-data" * 1024
+    output = tmp_path / "source-audio.wav"
+    output.write_bytes(content)
+    captured: dict[str, Any] = {}
+
+    def consume_body(**kwargs: Any) -> None:
+        body = kwargs["Body"]
+        assert not isinstance(body, bytes)
+        captured["content"] = body.read()
+        captured["mime"] = kwargs["ContentType"]
+
+    client = mock.Mock()
+    client.put_object.side_effect = consume_body
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    size = storage.put(
+        "runs/r/steps/1/source-audio.wav",
+        output,
+        "audio/wav",
+        ProcessRunner(),
+    )
+
+    assert size == len(content)
+    assert captured == {"content": content, "mime": "audio/wav"}
 
 class StalledBody:
     """A response body whose read blocks until the stream is closed, like a stuck socket."""

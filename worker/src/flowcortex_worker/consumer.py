@@ -61,7 +61,7 @@ class ObjectStore(Protocol):
         self, ref: MediaJobInput, max_bytes: int, abort: ProcessRunner
     ) -> AbstractContextManager[Path]: ...
 
-    def put(self, key: str, body: bytes, mime: str, abort: ProcessRunner) -> None: ...
+    def put(self, key: str, body: bytes | Path, mime: str, abort: ProcessRunner) -> int: ...
 
 
 class Abandoned(Exception):
@@ -345,14 +345,14 @@ class Consumer:
             outputs = []
             for file in outcome.files:
                 key = output_key(job, file.name)
-                self._storage.put(key, file.body, file.mime, runner)
+                size = self._storage.put(key, file.body, file.mime, runner)
                 outputs.append(
                     MediaOutput(
                         name=file.name,
                         bucket=self._storage.bucket,
                         objectKey=key,
                         mime=file.mime,
-                        bytes=len(file.body),
+                        bytes=size,
                     )
                 )
             return CompletedResult(

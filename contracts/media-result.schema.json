@@ -93,7 +93,13 @@
         "code": {
           "title": "MediaErrorCode",
           "type": "string",
-          "enum": ["input_rejected", "probe_failed", "contract_violation", "run_timeout"]
+          "enum": [
+            "input_rejected",
+            "probe_failed",
+            "audio_extraction_failed",
+            "contract_violation",
+            "run_timeout"
+          ]
         },
         "message": { "type": "string" },
         "retryable": { "type": "boolean" }
