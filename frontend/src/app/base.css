@@ -17,9 +17,11 @@ body,
 }
 
 body {
-  font-family: system-ui, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: #1a1a1a;
+  color: #e8f1f2;
   background: #fff;
+  background: #080c13;
   overflow-x: hidden;
 }
 
@@ -35,7 +37,8 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #26313d;
+  background: #0d131c;
 }
 
 .app-title {
@@ -50,7 +53,7 @@ body {
 
 .app-header nav a {
   text-decoration: none;
-  color: #333;
+  color: #9eacb6;
   padding: 0.25rem 0.5rem;
 }
 
@@ -68,10 +71,8 @@ body {
 }
 
 .app-content {
-  padding: 1rem;
-  max-width: 960px;
-  width: 100%;
-  margin: 0 auto;
+  max-width: 1180px;
+  padding: 1.5rem;
 }
 
 /* A link that is a page's next action gets the same 44px target as a button. */
@@ -97,7 +98,9 @@ body {
 .field select {
   padding: 0.5rem;
   min-height: 44px;
-  border: 1px solid #999;
+  border: 1px solid #2e3b49;
+  background: #0b1119;
+  color: #e8f1f2;
   border-radius: 4px;
   font-size: 1rem;
   width: 100%;
@@ -109,8 +112,9 @@ button {
   padding: 0.5rem 1rem;
   margin-right: 0.5rem;
   border-radius: 4px;
-  border: 1px solid #333;
+  border: 1px solid #334352;
   background: #fff;
+  background: #141d28;
   color: inherit;
   cursor: pointer;
   font-size: 1rem;
@@ -122,5 +126,134 @@ button:disabled {
 }
 
 [role='alert'] {
-  color: #b00020;
+  color: #ff9a9a;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background: radial-gradient(circle at 80% 20%, #152b38 0, transparent 35%), #080c13;
+}
+
+.auth-card {
+  width: min(100%, 470px);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid #233443;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #101a24, #0c111a);
+  box-shadow: 0 24px 70px #0008;
+}
+
+.auth-card h1 {
+  margin: 0.5rem 0;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+}
+
+.auth-subtitle,
+.auth-footer {
+  color: #9eacb6;
+}
+
+.auth-footer a,
+.launchpad a {
+  color: #35e5e0;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #35e5e0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+.primary-button {
+  width: 100%;
+  margin: 0.5rem 0 0;
+  border: 0;
+  color: #061016;
+  font-weight: 800;
+  background: linear-gradient(100deg, #1be0d1, #5174ff);
+}
+
+.form-error {
+  color: #ff9a9a;
+}
+
+.launchpad {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.launchpad-hero {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 2rem;
+}
+
+.launchpad-hero h1 {
+  font-size: clamp(2.1rem, 6vw, 4.1rem);
+  line-height: 1.05;
+  margin: 0.8rem 0;
+}
+
+.launchpad-hero h1 span {
+  color: #5f9cff;
+}
+
+.launchpad-hero p:not(.eyebrow) {
+  color: #9eacb6;
+}
+
+.launchpad-card {
+  padding: clamp(1.2rem, 4vw, 2rem);
+  border: 1px solid #253746;
+  border-radius: 14px;
+  background: #101721;
+  box-shadow: 0 20px 60px #0005;
+}
+
+.launchpad-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.launchpad-card h2 {
+  margin: 0.35rem 0 1.5rem;
+}
+
+.launchpad .field {
+  max-width: none;
+}
+
+.launch-button {
+  max-width: 280px;
+  display: block;
+  margin-left: auto;
+}
+
+.launchpad-footer {
+  margin-top: 1.25rem;
+  color: #81919e;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 680px) {
+  .launchpad {
+    padding: 1.5rem 0;
+  }
+
+  .launchpad-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .launch-button {
+    max-width: none;
+  }
 }

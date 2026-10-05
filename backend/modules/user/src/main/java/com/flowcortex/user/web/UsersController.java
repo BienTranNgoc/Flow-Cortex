@@ -91,18 +91,18 @@ class UsersController {
 
     record CreateUserRequest(
             @NotBlank @Email String email,
-            // BCrypt silently truncates input past 72 bytes — bounding the max
-            // here means two different long passwords can never collide.
-            @NotBlank @Size(min = 8, max = 72) String password,
+            // max = 72 characters only publishes a length bound in the OpenAPI schema; BCrypt's
+            // real limit is bytes, enforced by @MaxUtf8Bytes.
+            @NotBlank @Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password,
             @NotBlank String name,
-            @NotBlank @Pattern(regexp = "ADMIN|MEMBER") String role) {
+            @NotBlank @Pattern(regexp = "ADMIN|MEMBER|CREATOR") String role) {
     }
 
     /** Partial update — a {@code null} field is left unchanged. */
     record UpdateUserRequest(
             @Email String email,
             String name,
-            @Pattern(regexp = "ADMIN|MEMBER") String role,
+            @Pattern(regexp = "ADMIN|MEMBER|CREATOR") String role,
             @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {
     }
 

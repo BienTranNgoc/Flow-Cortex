@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { useAuthToken, useLoginMutation } from './useAuth';
@@ -36,32 +36,38 @@ export function LoginPage() {
 
   return (
     <main className="auth-page">
-      <form onSubmit={onSubmit} noValidate aria-label="Sign in">
-        <h1>Sign in</h1>
-        <div className="field">
-          <label htmlFor="login-email">Email</label>
-          <input id="login-email" type="email" autoComplete="username" {...register('email')} />
-          {errors.email && <p role="alert">{errors.email.message}</p>}
-        </div>
-        <div className="field">
-          <label htmlFor="login-password">Password</label>
-          <input
-            id="login-password"
-            type="password"
-            autoComplete="current-password"
-            {...register('password')}
-          />
-          {errors.password && <p role="alert">{errors.password.message}</p>}
-        </div>
-        {serverError && (
-          <p role="alert" className="form-error">
-            {serverError}
-          </p>
-        )}
-        <button type="submit" disabled={loginMutation.isPending}>
-          {loginMutation.isPending ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+      <section className="auth-card">
+        <p className="eyebrow">FLOW-CORTEX · CREATOR STUDIO</p>
+        <form onSubmit={onSubmit} noValidate aria-label="Sign in">
+          <h1>Sign in</h1>
+          <div className="field">
+            <label htmlFor="login-email">Email</label>
+            <input id="login-email" type="email" autoComplete="username" {...register('email')} />
+            {errors.email && <p role="alert">{errors.email.message}</p>}
+          </div>
+          <div className="field">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              {...register('password')}
+            />
+            {errors.password && <p role="alert">{errors.password.message}</p>}
+          </div>
+          {serverError && (
+            <p role="alert" className="form-error">
+              {serverError}
+            </p>
+          )}
+          <button className="primary-button" type="submit" disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? 'Signing in…' : 'Sign in to Studio →'}
+          </button>
+        </form>
+        <p className="auth-footer">
+          New to Flow-Cortex? <Link to="/register">Create a free account</Link>
+        </p>
+      </section>
     </main>
   );
 }

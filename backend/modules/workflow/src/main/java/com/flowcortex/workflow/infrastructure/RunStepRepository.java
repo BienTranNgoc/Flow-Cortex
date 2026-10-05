@@ -76,6 +76,22 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
             @Param("output") String output, @Param("outputs") String outputs, @Param("now") Instant now);
 
     @Modifying
+    @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.COMPLETED, "
+            + "r.output = :output, r.finishedAt = :now "
+            + "WHERE r.id = :id AND r.runId = :runId "
+            + "AND r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING")
+    int completePendingApproval(@Param("id") UUID id, @Param("runId") UUID runId,
+            @Param("output") String output, @Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.ERROR, "
+            + "r.errorCode = :code, r.errorMessage = :message, r.finishedAt = :now "
+            + "WHERE r.id = :id AND r.runId = :runId "
+            + "AND r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING")
+    int failPendingApproval(@Param("id") UUID id, @Param("runId") UUID runId, @Param("code") String code,
+            @Param("message") String message, @Param("now") Instant now);
+
+    @Modifying
     @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.ERROR, r.errorCode = :code, "
             + "r.errorMessage = :message, r.finishedAt = :now "
             + "WHERE r.id = :id AND r.runId = :runId AND r.attempt = :attempt "

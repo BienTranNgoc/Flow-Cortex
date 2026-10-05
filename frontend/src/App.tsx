@@ -6,6 +6,7 @@ import { HomePage } from './app/HomePage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { LoginPage } from './features/auth/LoginPage';
+import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
@@ -28,6 +29,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route
             element={
               <RequireAuth>
@@ -41,6 +43,7 @@ export function App() {
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
+              <Route path="runs/:runId" element={<RunProgressPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

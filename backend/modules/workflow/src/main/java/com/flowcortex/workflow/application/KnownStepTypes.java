@@ -25,6 +25,8 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 @Constraint(validatedBy = KnownStepTypes.Validator.class)
 @interface KnownStepTypes {
 
+    String APPROVAL_CHECKPOINT = "APPROVAL_CHECKPOINT";
+
     String message() default "unknown step type";
 
     Class<?>[] groups() default {};
@@ -43,8 +45,9 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             boolean valid = true;
             // The caller's type goes in as a message parameter, which is inserted literally rather
             // than interpolated; the template itself holds only the registry's own type names.
-            String template = "unknown capability '{type}'; allowed: "
-                    + String.join(", ", new TreeSet<>(definition.knownTypes()));
+            Set<String> allowedTypes = new TreeSet<>(definition.knownTypes());
+            allowedTypes.add(APPROVAL_CHECKPOINT);
+            String template = "unknown capability '{type}'; allowed: " + String.join(", ", allowedTypes);
             HibernateConstraintValidatorContext hibernateContext =
                     context.unwrap(HibernateConstraintValidatorContext.class);
             context.disableDefaultConstraintViolation();
@@ -55,7 +58,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
             for (int i = 0; i < steps.size(); i++) {
                 String type = steps.get(i).type();
-                if (!definition.knownTypes().contains(type)) {
+                if (!allowedTypes.contains(type)) {
                     valid = false;
                     violation(hibernateContext, template, type, i);
                 } else if (definition.remoteTypes().contains(type) && !startsRemote) {
