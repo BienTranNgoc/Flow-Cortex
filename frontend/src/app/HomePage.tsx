@@ -6,22 +6,9 @@ import { useMeQuery } from '../features/auth/useAuth';
 import { launchpadSchema, type LaunchpadFormValues } from '../features/workflow/launchpadSchema';
 import { useStartRunMutation, useWorkflowsQuery } from '../features/workflow/useWorkflows';
 
-const URL_WORKFLOW_NAME = /\b(?:url|link|tiktok|douyin)\b/i;
-
+/** A workflow whose first step runs on the media engine needs an uploaded file, not a link. */
 function isUploadWorkflow(workflow: WorkflowResponse) {
-  return (
-    workflow.steps?.[0]?.mode === 'remote' &&
-    workflow.steps?.[0]?.type === 'probe' &&
-    workflow.steps?.[1]?.type === 'extract_audio'
-  );
-}
-
-function selectUrlWorkflow(workflows: WorkflowResponse[]) {
-  return (
-    workflows.find(
-      (workflow) => URL_WORKFLOW_NAME.test(workflow.name ?? '') && !isUploadWorkflow(workflow),
-    ) ?? workflows.find((workflow) => !isUploadWorkflow(workflow))
-  );
+  return workflow.steps?.[0]?.mode === 'remote';
 }
 
 export function HomePage() {
@@ -29,7 +16,7 @@ export function HomePage() {
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
   const uploadWorkflow = workflowsQuery.data?.find(isUploadWorkflow);
-  const workflow = workflowsQuery.data ? selectUrlWorkflow(workflowsQuery.data) : undefined;
+  const workflow = workflowsQuery.data?.find((candidate) => !isUploadWorkflow(candidate));
   const startRunMutation = useStartRunMutation(workflow?.id ?? '');
   const {
     register,
@@ -58,7 +45,6 @@ export function HomePage() {
 
   return (
     <main className="launchpad">
-      <h2 className="visually-hidden">Welcome, {meQuery.data.name}</h2>
       <section className="launchpad-hero">
         <p className="eyebrow">CREATOR LAUNCHPAD · READY TO CREATE</p>
         <h1>
@@ -70,13 +56,8 @@ export function HomePage() {
         </p>
       </section>
       <section className="launchpad-card">
-        <div className="launchpad-card-header">
-          <div>
-            <p className="eyebrow">1 · SOURCE INPUT</p>
-            <h2>Drop a TikTok or Douyin link</h2>
-          </div>
-          <span className="status-pill">● Pipeline online</span>
-        </div>
+        <p className="eyebrow">1 · SOURCE INPUT</p>
+        <h2>Drop a TikTok or Douyin link</h2>
         <form onSubmit={onSubmit} noValidate aria-label="Start media pipeline">
           <div className="field">
             <label htmlFor="source-url">Source URL</label>
@@ -86,29 +67,6 @@ export function HomePage() {
               {...register('sourceUrl')}
             />
             {errors.sourceUrl && <p role="alert">{errors.sourceUrl.message}</p>}
-          </div>
-          <div className="preset-grid">
-            <label className="preset-control">
-              <span>Voice AI</span>
-              <select defaultValue="natural">
-                <option value="natural">Natural · Nova</option>
-                <option value="studio">Studio · Atlas</option>
-                <option value="warm">Warm · Aura</option>
-              </select>
-            </label>
-            <label className="preset-control">
-              <span>Aspect ratio</span>
-              <select defaultValue="vertical">
-                <option value="vertical">9:16 · Vertical</option>
-                <option value="square">1:1 · Square</option>
-                <option value="wide">16:9 · Wide</option>
-              </select>
-            </label>
-            <label className="toggle-control">
-              <input type="checkbox" defaultChecked />
-              <span>Human review</span>
-              <small>Quality gate before delivery</small>
-            </label>
           </div>
           {serverError && (
             <p role="alert" className="form-error">

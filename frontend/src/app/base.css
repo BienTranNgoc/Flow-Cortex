@@ -169,18 +169,6 @@ button:disabled {
   letter-spacing: 0.13em;
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .primary-button {
   width: 100%;
   margin: 0.5rem 0 0;
@@ -228,7 +216,6 @@ button:disabled {
   box-shadow: 0 20px 60px #0005;
 }
 
-.launchpad-card-header,
 .launchpad-footer {
   display: flex;
   align-items: center;
@@ -240,54 +227,8 @@ button:disabled {
   margin: 0.35rem 0 1.5rem;
 }
 
-.status-pill {
-  color: #35e5e0;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
 .launchpad .field {
   max-width: none;
-}
-
-.preset-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  margin: 1rem 0;
-}
-
-.preset-control,
-.toggle-control {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.8rem;
-  border: 1px solid #263744;
-  border-radius: 8px;
-  background: #0b1119;
-}
-
-.preset-control span,
-.toggle-control span {
-  font-weight: 700;
-}
-
-.preset-control select {
-  min-height: 36px;
-  padding: 0.35rem;
-}
-
-.toggle-control {
-  justify-content: center;
-}
-
-.toggle-control input {
-  accent-color: #25ddd4;
-}
-
-.toggle-control small {
-  color: #81919e;
 }
 
 .launch-button {
@@ -303,15 +244,10 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
-  .preset-grid {
-    grid-template-columns: 1fr;
-  }
-
   .launchpad {
     padding: 1.5rem 0;
   }
 
-  .launchpad-card-header,
   .launchpad-footer {
     align-items: flex-start;
     flex-direction: column;

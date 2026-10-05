@@ -6,6 +6,13 @@ import { NO_MESSAGE, stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { useRunQuery } from './useWorkflows';
 import { StoredOutputDownload } from './StoredOutputDownload';
+import { ApprovalPanel } from './ApprovalPanel';
+
+const RUN_HEADINGS: Record<string, string> = {
+  running: 'Run in progress',
+  waiting_approval: 'Waiting for your approval',
+};
+
 const STEP_LABELS: Record<string, string> = {
   pending: 'Pending',
   running: 'Running',
@@ -38,7 +45,11 @@ function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
   }
   return (
     <p className="run-step-progress">
-      <progress max={100} value={step.progressPercent} aria-label={`Step ${step.stepOrder} progress`} />
+      <progress
+        max={100}
+        value={step.progressPercent}
+        aria-label={`Step ${step.stepOrder} progress`}
+      />
       <span>{step.progressPercent} %</span>
     </p>
   );
@@ -72,13 +83,14 @@ export function RunProgressPage() {
 
   return (
     <main>
-      <h1>Run {run.status === 'running' ? 'in progress' : run.status}</h1>
+      <h1>{RUN_HEADINGS[run.status ?? ''] ?? `Run ${run.status}`}</h1>
       {failedWithoutStep && (
         <p role="alert" className="run-step-error">
           {NO_MESSAGE}
         </p>
       )}
       {fileName && <p className="run-file">File: {fileName}</p>}
+      {run.status === 'waiting_approval' && <ApprovalPanel runId={runId} />}
       <ol className="run-steps">
         {(run.steps ?? []).map((step) => {
           const status = step.status ?? 'pending';
@@ -101,24 +113,25 @@ export function RunProgressPage() {
               <StepProgress step={step} />
               {status === 'completed' && step.output && <StepOutput output={step.output} />}
               {status === 'completed' && details && stepOrder !== undefined && (
-              <StepDownloads
-                runId={runId}
-                stepOrder={stepOrder}
-                output={step.output}
-                details={details}
-                fileName={fileName}
-              />
-            )}
-
-            {status === 'completed' && stepOrder !== undefined &&
-              artifacts.map((artifact) => (
-                <StoredOutputDownload
-                  key={artifact.name}
+                <StepDownloads
                   runId={runId}
                   stepOrder={stepOrder}
-                  output={artifact}
+                  output={step.output}
+                  details={details}
+                  fileName={fileName}
                 />
-              ))}
+              )}
+
+              {status === 'completed' &&
+                stepOrder !== undefined &&
+                artifacts.map((artifact) => (
+                  <StoredOutputDownload
+                    key={artifact.name}
+                    runId={runId}
+                    stepOrder={stepOrder}
+                    output={artifact}
+                  />
+                ))}
               {status === 'error' && (
                 <div className="run-step-failure">
                   <p role="alert" className="run-step-error">

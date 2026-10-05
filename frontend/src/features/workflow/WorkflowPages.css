@@ -194,6 +194,39 @@
   margin: 0.25rem 0 0;
 }
 
+.approval-panel {
+  margin: 0.75rem 0;
+}
+
+.approval-panel .field {
+  max-width: 100%;
+}
+
+.approval-panel textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #2e3b49;
+  border-radius: 4px;
+  background: #0b1119;
+  color: #e8f1f2;
+  font: inherit;
+  resize: vertical;
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.approval-actions button {
+  margin-right: 0;
+}
+
+.approval-error {
+  margin: 0.5rem 0 0;
+}
+
 @media (max-width: 480px) {
   .output-fields {
     grid-template-columns: 1fr;
@@ -204,11 +237,13 @@
     margin-bottom: 0.5rem;
   }
 
-  .run-step-downloads {
+  .run-step-downloads,
+  .approval-actions {
     flex-direction: column;
   }
 
   .run-step-downloads button,
+  .approval-actions button,
   .media-start-form button {
     width: 100%;
   }

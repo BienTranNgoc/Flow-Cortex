@@ -45,7 +45,7 @@ export function RegisterPage() {
             {errors.email && <p role="alert">{errors.email.message}</p>}
           </div>
           <div className="field">
-            <label htmlFor="register-password">Master password</label>
+            <label htmlFor="register-password">Password</label>
             <input
               id="register-password"
               type="password"

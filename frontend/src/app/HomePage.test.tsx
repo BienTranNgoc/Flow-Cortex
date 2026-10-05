@@ -6,6 +6,7 @@ import { HomePage } from './HomePage';
 
 const ME = { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
 const LINE = 'Have a video or audio file? Check it →';
+const SOURCE = 'https://www.tiktok.com/@creator/video/123';
 
 function workflow(id: string, name: string, types: string[]): WorkflowResponse {
   return {
@@ -38,7 +39,7 @@ describe('HomePage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('links to the first listed upload workflow, whatever it is called', async () => {
+  it('links to the first listed workflow whose first step is remote, whatever it is called', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
@@ -47,7 +48,6 @@ describe('HomePage', () => {
           workflow('echo', 'Echo Demo', ['echo']),
           workflow('mixed', 'Probe then echo', ['probe', 'echo']),
           workflow('check', 'Renamed by its owner', ['probe', 'extract_audio']),
-          workflow('check-2', 'Another check', ['probe', 'extract_audio']),
         ],
       },
     });
@@ -55,24 +55,24 @@ describe('HomePage', () => {
     renderHome();
 
     const link = await screen.findByRole('link', { name: LINE });
-    expect(link).toHaveAttribute('href', '/workflows/check');
+    expect(link).toHaveAttribute('href', '/workflows/mixed');
   });
 
-  it('omits the line when no upload workflow is available', async () => {
+  it('omits the line when no workflow starts with a remote step', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
         body: [
           workflow('echo', 'Echo Demo', ['echo']),
-          workflow('mixed', 'Mixed', ['probe', 'echo']),
+          workflow('echo-probe', 'Echo then probe', ['echo', 'probe']),
         ],
       },
     });
 
     const { queryClient } = renderHome();
 
-    await screen.findByRole('heading', { name: 'Welcome, Member One' });
+    await screen.findByText('Welcome, Member One');
     await settled(queryClient);
     expect(screen.queryByText(LINE)).not.toBeInTheDocument();
   });
@@ -84,13 +84,16 @@ describe('HomePage', () => {
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': async () => {
         await gate;
-        return { status: 200, body: [workflow('check', 'Check a video file', ['probe', 'extract_audio'])] };
+        return {
+          status: 200,
+          body: [workflow('check', 'Check a video file', ['probe', 'extract_audio'])],
+        };
       },
     });
 
     renderHome();
 
-    await screen.findByRole('heading', { name: 'Welcome, Member One' });
+    await screen.findByText('Welcome, Member One');
     expect(screen.queryByRole('link', { name: LINE })).not.toBeInTheDocument();
     release();
     expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
@@ -99,34 +102,61 @@ describe('HomePage', () => {
     );
   });
 
-  it('starts the first URL-capable workflow instead of an upload workflow', async () => {
+  it('starts the first workflow whose first step is not remote, never a probe-only one, whatever the names say', async () => {
     const calls = stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
         body: [
-          workflow('upload', 'Check a video file', ['probe', 'extract_audio']),
+          workflow('probe-only', 'TikTok link probe', ['probe']),
+          workflow('echo', 'Echo Demo', ['echo']),
           workflow('url', 'TikTok URL Pipeline', ['echo']),
         ],
       },
-      'POST /api/v1/workflows/url/runs': {
+      'POST /api/v1/workflows/echo/runs': {
         status: 200,
-        body: { id: 'run-url', status: 'running' },
+        body: { id: 'run-echo', status: 'running' },
       },
     });
 
     renderHome();
 
-    const input = await screen.findByLabelText('Source URL');
-    fireEvent.change(input, { target: { value: 'https://www.tiktok.com/@creator/video/123' } });
+    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
+      'href',
+      '/workflows/probe-only',
+    );
+    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
     fireEvent.click(screen.getByRole('button', { name: /Generate pipeline/ }));
 
     await waitFor(() =>
       expect(calls).toContainEqual({
         method: 'POST',
-        path: '/api/v1/workflows/url/runs',
-        body: { input: 'https://www.tiktok.com/@creator/video/123' },
+        path: '/api/v1/workflows/echo/runs',
+        body: { input: SOURCE },
       }),
     );
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+  });
+
+  it('disables the launch when every workflow starts with a remote step', async () => {
+    const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('probe-only', 'Probe only', ['probe'])],
+      },
+    });
+
+    const { queryClient } = renderHome();
+
+    expect(
+      await screen.findByText('No workflow is available for this account yet.'),
+    ).toBeInTheDocument();
+    await settled(queryClient);
+    const button = screen.getByRole('button', { name: /Generate pipeline/ });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
+    fireEvent.click(button);
+    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
   });
 });
