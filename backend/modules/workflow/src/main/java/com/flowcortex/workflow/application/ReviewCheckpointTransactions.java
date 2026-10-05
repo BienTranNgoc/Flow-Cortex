@@ -37,7 +37,7 @@ class ReviewCheckpointTransactions {
             return false;
         }
         reviewTaskRepository.save(new ReviewTask(UUID.randomUUID(), run.getId(), step.getId(),
-                "APPROVAL_CHECKPOINT", "pending", payload == null ? "" : payload, now));
+                "APPROVAL_CHECKPOINT", "pending", payload, now));
         run.markWaitingApproval();
         workflowRunRepository.save(run);
         return true;

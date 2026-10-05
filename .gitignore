@@ -39,3 +39,5 @@ docs/jira-backlog.csv
 
 # Local docker compose override
 docker-compose.override.yml
+
+**/bin/

@@ -38,10 +38,12 @@ class DevDataSeeder {
     private static final String ADMIN_1_EMAIL = "admin1@flowcortex.dev";
     private static final String ADMIN_2_EMAIL = "admin2@flowcortex.dev";
     private static final String MEMBER_1_EMAIL = "member1@flowcortex.dev";
+    private static final String TEST_EMAIL = "test@flowcortex.io";
 
     /** Deliberately obvious dev-only credentials — never a real password. */
     private static final String ADMIN_PASSWORD = "AdminPass123!";
     private static final String MEMBER_PASSWORD = "MemberPass123!";
+    private static final String TEST_PASSWORD = "TestPass123!";
 
     // Synthetic, fixed "seed" identity for the two shared demo workflows' owner_id — not tied to
     // a real app_user row (workflow.owner_id has no FK constraint, and shared-workflow
@@ -54,6 +56,7 @@ class DevDataSeeder {
         return args -> {
             UserView admin1 = seedAdmin(userService, ADMIN_1_EMAIL, "Demo Admin One");
             seedAdmin(userService, ADMIN_2_EMAIL, "Demo Admin Two");
+            seedAdmin(userService, TEST_EMAIL, TEST_PASSWORD, "FlowCortex Test User");
 
             if (admin1 != null) {
                 seedMember(userService, admin1.id());
@@ -65,8 +68,12 @@ class DevDataSeeder {
     }
 
     private static UserView seedAdmin(UserService userService, String email, String name) {
+        return seedAdmin(userService, email, ADMIN_PASSWORD, name);
+    }
+
+    private static UserView seedAdmin(UserService userService, String email, String password, String name) {
         try {
-            UserView admin = userService.createInitialAdmin(email, ADMIN_PASSWORD, name);
+            UserView admin = userService.createInitialAdmin(email, password, name);
             LOG.info("[dev-seed] created ADMIN {} (owner scope {})", email, admin.id());
             return admin;
         } catch (ConflictException e) {
