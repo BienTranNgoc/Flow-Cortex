@@ -217,6 +217,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+      security: []
   /api/v1/auth/login:
     post:
       tags:
@@ -235,6 +236,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+      security: []
   /api/v1/workflows:
     get:
       tags:

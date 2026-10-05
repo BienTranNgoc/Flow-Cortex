@@ -11,7 +11,10 @@ import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -19,12 +22,15 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Implementation of {@link AuthService}.
  */
 @Service
 class AuthServiceImpl implements AuthService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     /**
      * Token lifetime — no refresh flow exists yet; a fixed, generous session
@@ -37,21 +43,26 @@ class AuthServiceImpl implements AuthService {
     /** Same message for "unknown email" and "wrong password" — never discloses which. */
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
 
+    private static final String REGISTRATION_CLOSED = "Self-registration is not available";
+
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+    private final RegistrationProperties registration;
 
-    AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder) {
+    AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder,
+            RegistrationProperties registration) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
+        this.registration = registration;
     }
 
     @Override
     @Transactional
     public String register(String email, String rawPassword, String name) {
-        UUID id = UUID.randomUUID();
-        AppUser user = new AppUser(id, id, email, passwordEncoder.encode(rawPassword), name,
+        AppUser owner = requireRegistrationOwner();
+        AppUser user = new AppUser(UUID.randomUUID(), owner.getId(), email, passwordEncoder.encode(rawPassword), name,
                 Role.MEMBER, UserStatus.ACTIVE);
         try {
             userRepository.saveAndFlush(user);
@@ -59,6 +70,28 @@ class AuthServiceImpl implements AuthService {
             throw new ConflictException("A user with email '" + email + "' already exists");
         }
         return mintToken(user);
+    }
+
+    /**
+     * The configured registration owner, read on every attempt so a suspended or demoted owner
+     * closes registration at once; anything but an active ADMIN closes it.
+     */
+    private AppUser requireRegistrationOwner() {
+        String ownerEmail = registration.ownerEmail() == null ? "" : registration.ownerEmail().trim();
+        if (ownerEmail.isEmpty()) {
+            LOG.info("Registration refused: reason=owner_not_configured");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+        }
+        AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
+        String unusable = owner == null ? "owner_not_found"
+                : owner.getRole() != Role.ADMIN ? "owner_not_admin"
+                : owner.getStatus() != UserStatus.ACTIVE ? "owner_not_active"
+                : null;
+        if (unusable != null) {
+            LOG.warn("Registration refused: reason={} (check flowcortex.registration.owner-email)", unusable);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+        }
+        return owner;
     }
 
     @Override

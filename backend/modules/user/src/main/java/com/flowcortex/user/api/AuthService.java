@@ -8,8 +8,9 @@ import java.util.UUID;
 public interface AuthService {
 
     /**
-     * Creates an active self-owned member account and mints a signed JWT.
+     * Creates an active member account owned by the configured registration owner and mints a signed JWT.
      * @throws com.flowcortex.shared.web.ConflictException if the email is already taken
+     * @throws org.springframework.web.server.ResponseStatusException 403 if no active ADMIN owner is configured
      */
     String register(String email, String rawPassword, String name);
 

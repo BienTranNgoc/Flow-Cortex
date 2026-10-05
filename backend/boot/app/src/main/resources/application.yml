@@ -86,6 +86,9 @@ spring:
 
 server:
   port: 8080
+  # The remote address is the client's when nginx (a private-network proxy) sends X-Forwarded-For;
+  # Tomcat trusts that header only from private and loopback addresses. The registration limits key on it.
+  forward-headers-strategy: native
 
 # Health, info and metrics live on the management port, which compose only exposes inside the
 # service network. The API port keeps the anonymous probes /livez and /readyz; the container
@@ -147,6 +150,18 @@ flowcortex:
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
     enabled: ${FLOWCORTEX_ADMIN_ENABLED:true}
+  # Public self-registration. Accounts belong to the ADMIN named here, who lists and suspends them
+  # under /api/v1/users; empty, unknown, not an ADMIN or not ACTIVE closes registration (403).
+  # Each client IP and each email (trimmed, lower-cased) gets `capacity` attempts per `period`,
+  # refilled gradually; over it answers 429 with Retry-After. Limits are per backend instance.
+  registration:
+    owner-email: ${FLOWCORTEX_REGISTRATION_OWNER_EMAIL:}
+    per-ip:
+      capacity: ${FLOWCORTEX_REGISTRATION_PER_IP_CAPACITY:5}
+      period: ${FLOWCORTEX_REGISTRATION_PER_IP_PERIOD:1h}
+    per-email:
+      capacity: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY:3}
+      period: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD:1h}
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the

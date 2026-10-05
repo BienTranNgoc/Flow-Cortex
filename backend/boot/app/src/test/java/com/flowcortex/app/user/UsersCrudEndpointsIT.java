@@ -54,6 +54,22 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
     }
 
     @Test
+    void createUserPasswordOver72Utf8BytesReturns400NamingTheField() {
+        UserView admin = seedAdmin("admin-long-password");
+        String token = adminToken(admin);
+        // 25 characters but 73 UTF-8 bytes: within a character limit of 72, past BCrypt's byte limit.
+        String password = "ế".repeat(24) + "a";
+
+        ResponseEntity<String> response = post("/api/v1/users", token,
+                new CreateUserRequestView(uniqueEmail("long-password"), password, "New Member", "MEMBER"),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
+        assertThat(response.getBody()).contains("\"password\"");
+    }
+
+    @Test
     void createUserInvalidEmailReturns400NamingTheField() {
         UserView admin = seedAdmin("admin-invalid-email");
         String token = adminToken(admin);

@@ -15,16 +15,19 @@ import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Authored before {@link AuthServiceImpl} existed. {@link JwtEncoder} is
@@ -39,13 +42,38 @@ class AuthServiceImplTest {
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
     private static final String RAW_PASSWORD = "correct horse battery staple";
 
+    private static final String OWNER_EMAIL = "owner@example.com";
+    private static final RegistrationProperties.Limit HOURLY = new RegistrationProperties.Limit(5, Duration.ofHours(1));
+
     private final AppUserRepository repository = mock(AppUserRepository.class);
     private final JwtEncoder jwtEncoder = mock(JwtEncoder.class);
-    private final AuthServiceImpl service = new AuthServiceImpl(repository, ENCODER, jwtEncoder);
+    private final AuthServiceImpl service = serviceWithOwner(OWNER_EMAIL);
+
+    private AuthServiceImpl serviceWithOwner(String ownerEmail) {
+        return new AuthServiceImpl(repository, ENCODER, jwtEncoder,
+                new RegistrationProperties(ownerEmail, HOURLY, HOURLY));
+    }
 
     private static AppUser activeUser(UUID id, Role role) {
         return new AppUser(id, id, "person@example.com", ENCODER.encode(RAW_PASSWORD), "Person", role,
                 UserStatus.ACTIVE);
+    }
+
+    private AppUser givenOwner(Role role, UserStatus status) {
+        UUID id = UUID.randomUUID();
+        AppUser owner = new AppUser(id, id, OWNER_EMAIL, "hash", "Owner", role, status);
+        when(repository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        return owner;
+    }
+
+    private void assertRegistrationClosed(AuthServiceImpl closed) {
+        assertThatThrownBy(() -> closed.register("new@example.com", RAW_PASSWORD, "New Person"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(e.getReason()).isEqualTo("Self-registration is not available");
+                });
+        verify(repository, never()).saveAndFlush(any());
+        verify(jwtEncoder, never()).encode(any());
     }
 
     @Test
@@ -58,7 +86,8 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void registerCreatesSelfOwnedMemberAndMintsToken() {
+    void registerCreatesAMemberOwnedByTheConfiguredOwnerAndMintsToken() {
+        AppUser owner = givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(jwtEncoder.encode(any())).thenReturn(
                 Jwt.withTokenValue("registered-token").header("alg", "HS256")
@@ -70,14 +99,44 @@ class AuthServiceImplTest {
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(repository).saveAndFlush(captor.capture());
         AppUser saved = captor.getValue();
-        assertThat(saved.getOwnerId()).isEqualTo(saved.getId());
+        assertThat(saved.getOwnerId()).isEqualTo(owner.getId());
+        assertThat(saved.getId()).isNotEqualTo(owner.getId());
         assertThat(saved.getRole()).isEqualTo(Role.MEMBER);
         assertThat(saved.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(saved.getPasswordHash()).isNotEqualTo(RAW_PASSWORD);
     }
 
     @Test
+    void registerWithNoOwnerConfiguredIsClosed() {
+        assertRegistrationClosed(serviceWithOwner(null));
+        assertRegistrationClosed(serviceWithOwner("  "));
+        verify(repository, never()).findByEmail(any());
+    }
+
+    @Test
+    void registerWithAnUnknownOwnerIsClosed() {
+        when(repository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.empty());
+
+        assertRegistrationClosed(service);
+    }
+
+    @Test
+    void registerWithANonAdminOwnerIsClosed() {
+        givenOwner(Role.MEMBER, UserStatus.ACTIVE);
+
+        assertRegistrationClosed(service);
+    }
+
+    @Test
+    void registerWithASuspendedOwnerIsClosed() {
+        givenOwner(Role.ADMIN, UserStatus.SUSPENDED);
+
+        assertRegistrationClosed(service);
+    }
+
+    @Test
     void registerDuplicateEmailIsTranslatedToConflict() {
+        givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any()))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_app_user_email"));
 
