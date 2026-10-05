@@ -39,12 +39,8 @@ docs/PLAN.md
 docs/jira-backlog.csv
 *-Plan.pdf
 
-<<<<<<< HEAD
-# Local docker compose override
-docker-compose.override.yml
-
-**/bin/
-=======
 private_docs/
 tmp/
->>>>>>> origin/development
+
+# Local docker compose override
+docker-compose.override.yml
