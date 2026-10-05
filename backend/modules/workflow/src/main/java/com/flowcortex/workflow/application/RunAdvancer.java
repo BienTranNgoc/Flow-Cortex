@@ -12,7 +12,6 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
-import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.Counter;
@@ -86,7 +85,6 @@ class RunAdvancer {
     private final Counter lateResults;
     private final Duration lease;
     private final Clock clock;
-    private final ReviewTaskRepository reviewTaskRepository;
     private final ReviewCheckpointTransactions checkpointTransactions;
 
     @Autowired
@@ -96,28 +94,18 @@ class RunAdvancer {
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
-            ReviewTaskRepository reviewTaskRepository, ReviewCheckpointTransactions checkpointTransactions) {
+            ReviewCheckpointTransactions checkpointTransactions) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), reviewTaskRepository, checkpointTransactions);
+                Clock.systemUTC(), checkpointTransactions);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock) {
-        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
-                taskExecutor, scheduler, tracer, observations, meters, lease, clock, null, null);
-    }
-
-    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
-            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewTaskRepository reviewTaskRepository,
-            ReviewCheckpointTransactions checkpointTransactions) {
+            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -136,7 +124,6 @@ class RunAdvancer {
                 .register(meters);
         this.lease = lease;
         this.clock = clock;
-        this.reviewTaskRepository = reviewTaskRepository;
         this.checkpointTransactions = checkpointTransactions;
     }
 
@@ -169,8 +156,8 @@ class RunAdvancer {
 
     @ApplicationModuleListener
     void onReviewApproved(ReviewTaskApprovedEvent event) {
-        if (checkpointTransactions != null && checkpointTransactions.resume(event, clock.instant())) {
-            reviewTaskRepository.findById(event.taskId()).ifPresent(task -> advance(task.getRunId()));
+        if (checkpointTransactions.resume(event, clock.instant())) {
+            advance(event.runId());
         }
     }
 

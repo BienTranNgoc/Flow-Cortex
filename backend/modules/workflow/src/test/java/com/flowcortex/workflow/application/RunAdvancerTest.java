@@ -82,11 +82,12 @@ class RunAdvancerTest {
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
+    private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
         return new RunAdvancer(workflowRunRepository, runStepRepository, workflowStepRepository, transactions,
                 new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters,
-                LEASE, clock);
+                LEASE, clock, checkpoints);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
@@ -180,6 +181,41 @@ class RunAdvancerTest {
                 Map.of("videoCodec", "h264"), null)));
 
         verify(runStepRepository).claimPending(eq(step2.getId()), any(), any(), any());
+    }
+
+    @Test
+    void aCheckpointStepPausesTheRunWithThePreviousStepsOutputInsteadOfDispatching() {
+        RunStep step1 = completed(1, UUID.randomUUID(), null);
+        RunStep checkpoint = pending(2, "APPROVAL_CHECKPOINT");
+        givenRun(List.of(def(1, "echo"), def(2, "APPROVAL_CHECKPOINT")), List.of(step1, checkpoint));
+
+        advancer.advance(runId);
+
+        verify(checkpoints).pause(run, checkpoint, null, NOW);
+        verify(runStepRepository, never()).claimPending(any(), any(), any(), any());
+    }
+
+    @Test
+    void anApprovalThatResumesTheCheckpointAdvancesTheEventsRun() {
+        RunStep step1 = completed(1, UUID.randomUUID(), "hello");
+        RunStep step2 = pending(2, "echo");
+        givenRun(List.of(def(1, "echo"), def(2, "echo")), List.of(step1, step2));
+        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello");
+        when(checkpoints.resume(event, NOW)).thenReturn(true);
+
+        advancer.onReviewApproved(event);
+
+        verify(runStepRepository).claimPending(eq(step2.getId()), any(), any(), any());
+    }
+
+    @Test
+    void anApprovalThatDoesNotResumeLeavesTheRunAlone() {
+        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello");
+        when(checkpoints.resume(event, NOW)).thenReturn(false);
+
+        advancer.onReviewApproved(event);
+
+        verify(workflowRunRepository, never()).findById(any());
     }
 
     private void givenMediaEnabled() {

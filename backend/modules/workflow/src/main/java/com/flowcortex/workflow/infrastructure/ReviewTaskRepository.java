@@ -11,6 +11,4 @@ public interface ReviewTaskRepository extends JpaRepository<ReviewTask, UUID> {
     List<ReviewTask> findByRunId(UUID runId);
 
     Optional<ReviewTask> findByRunStepId(UUID runStepId);
-
-    List<ReviewTask> findByStatus(String status);
 }

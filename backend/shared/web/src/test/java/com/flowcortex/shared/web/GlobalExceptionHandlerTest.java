@@ -42,6 +42,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void aLostOptimisticLockReturns409() throws Exception {
+        mockMvc.perform(get("/test/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.type").value("https://flow-cortex.dev/problems/conflict"));
+    }
+
+    @Test
     void validationViolationReturns400NamingTheField() throws Exception {
         mockMvc.perform(post("/test/validate")
                         .contentType(MediaType.APPLICATION_JSON)

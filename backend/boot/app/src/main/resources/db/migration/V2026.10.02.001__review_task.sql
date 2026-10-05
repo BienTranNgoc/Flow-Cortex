@@ -5,7 +5,7 @@ CREATE TABLE review_task (
     run_step_id       uuid         NOT NULL REFERENCES run_step (id) ON DELETE CASCADE,
     review_type       varchar(50)  NOT NULL,
     status            varchar(20)  NOT NULL DEFAULT 'pending',
-    original_payload  text         NOT NULL,
+    original_payload  text,
     reviewed_payload  text,
     reviewed_by       uuid,
     reviewed_at       timestamptz,
@@ -16,4 +16,3 @@ CREATE TABLE review_task (
 );
 
 CREATE INDEX idx_review_task_run_id ON review_task (run_id);
-CREATE INDEX idx_review_task_status ON review_task (status);

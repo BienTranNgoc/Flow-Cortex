@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -26,9 +27,10 @@ public class ReviewTask {
     private String reviewType;
 
     @Column(name = "status", length = 20, nullable = false)
-    private String status;
+    private ReviewTaskStatus status;
 
-    @Column(name = "original_payload", nullable = false, columnDefinition = "text")
+    /** The previous step's output, which may legitimately be null (a run started without input). */
+    @Column(name = "original_payload", columnDefinition = "text")
     private String originalPayload;
 
     @Column(name = "reviewed_payload", columnDefinition = "text")
@@ -55,7 +57,6 @@ public class ReviewTask {
         UUID runId,
         UUID runStepId,
         String reviewType,
-        String status,
         String originalPayload,
         Instant createdAt
     ) {
@@ -63,7 +64,7 @@ public class ReviewTask {
         this.runId = runId;
         this.runStepId = runStepId;
         this.reviewType = reviewType;
-        this.status = status;
+        this.status = ReviewTaskStatus.PENDING;
         this.originalPayload = originalPayload;
         this.createdAt = createdAt;
     }
@@ -84,7 +85,7 @@ public class ReviewTask {
         return reviewType;
     }
 
-    public String getStatus() {
+    public ReviewTaskStatus getStatus() {
         return status;
     }
 
@@ -112,22 +113,25 @@ public class ReviewTask {
         return version;
     }
 
-    public void approve(UUID reviewerId, String updatedPayload) {
-        if (!"pending".equals(this.status)) {
-            throw new ConflictException("ReviewTask " + this.id + " is already " + this.status);
-        }
-        this.status = "approved";
+    public void approve(UUID reviewerId, String updatedPayload, Instant now) {
+        requirePending();
+        this.status = ReviewTaskStatus.APPROVED;
         this.reviewedBy = reviewerId;
         this.reviewedPayload = updatedPayload;
-        this.reviewedAt = Instant.now();
+        this.reviewedAt = now;
     }
 
-    public void reject(UUID reviewerId) {
-        if (!"pending".equals(this.status)) {
-            throw new ConflictException("ReviewTask " + this.id + " is already " + this.status);
-        }
-        this.status = "rejected";
+    public void reject(UUID reviewerId, Instant now) {
+        requirePending();
+        this.status = ReviewTaskStatus.REJECTED;
         this.reviewedBy = reviewerId;
-        this.reviewedAt = Instant.now();
+        this.reviewedAt = now;
+    }
+
+    private void requirePending() {
+        if (this.status != ReviewTaskStatus.PENDING) {
+            throw new ConflictException("ReviewTask " + this.id + " is already "
+                    + this.status.name().toLowerCase(Locale.ROOT));
+        }
     }
 }

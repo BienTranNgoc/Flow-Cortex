@@ -47,8 +47,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             // than interpolated; the template itself holds only the registry's own type names.
             Set<String> allowedTypes = new TreeSet<>(definition.knownTypes());
             allowedTypes.add(APPROVAL_CHECKPOINT);
-            String template = "unknown capability '{type}'; allowed: "
-                    + String.join(", ", new TreeSet<>(definition.knownTypes()));
+            String template = "unknown capability '{type}'; allowed: " + String.join(", ", allowedTypes);
             HibernateConstraintValidatorContext hibernateContext =
                     context.unwrap(HibernateConstraintValidatorContext.class);
             context.disableDefaultConstraintViolation();

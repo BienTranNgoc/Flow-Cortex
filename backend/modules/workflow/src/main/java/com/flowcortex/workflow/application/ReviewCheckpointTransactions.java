@@ -4,6 +4,7 @@ import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.domain.ReviewTaskStatus;
 import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
@@ -37,7 +38,7 @@ class ReviewCheckpointTransactions {
             return false;
         }
         reviewTaskRepository.save(new ReviewTask(UUID.randomUUID(), run.getId(), step.getId(),
-                "APPROVAL_CHECKPOINT", "pending", payload, now));
+                "APPROVAL_CHECKPOINT", payload, now));
         run.markWaitingApproval();
         workflowRunRepository.save(run);
         return true;
@@ -46,7 +47,7 @@ class ReviewCheckpointTransactions {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     boolean resume(ReviewTaskApprovedEvent event, Instant now) {
         ReviewTask task = reviewTaskRepository.findById(event.taskId()).orElse(null);
-        if (task == null || !"approved".equals(task.getStatus())) {
+        if (task == null || task.getStatus() != ReviewTaskStatus.APPROVED) {
             return false;
         }
         WorkflowRun run = workflowRunRepository.findById(task.getRunId()).orElse(null);
