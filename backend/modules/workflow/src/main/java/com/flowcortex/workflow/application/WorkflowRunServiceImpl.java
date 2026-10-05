@@ -123,26 +123,31 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
         }
 
-        boolean mediaFirst = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
+        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
         String runInput = input;
-        String firstStepInput = null;
-        if (mediaFirst) {
+        String remoteStepInput = null;
+        if (mediaWorkflow) {
             if (uploadId == null) {
                 throw new UploadRejectedException("uploadId", "Choose a video or audio file to upload");
             }
-            firstStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
+            remoteStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
             runInput = displayName(originalName);
         }
 
         String displayedInput = runInput;
-        String stepOneInput = firstStepInput;
+        String storedRemoteInput = remoteStepInput;
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(UUID.randomUUID(), workflow.getId(),
                     currentUserId, displayedInput, Instant.now()));
             List<RunStep> runSteps = new ArrayList<>();
             for (WorkflowStep stepDef : stepDefs) {
-                runSteps.add(new RunStep(UUID.randomUUID(), run.getId(), stepDef.getStepOrder(), stepDef.getType(),
-                        stepDef.getStepOrder() == 1 ? stepOneInput : null));
+                String stepInput = registry.isRemote(stepDef.getType()) ? storedRemoteInput : null;
+                runSteps.add(new RunStep(
+                        UUID.randomUUID(),
+                        run.getId(),
+                        stepDef.getStepOrder(),
+                        stepDef.getType(),
+                        stepInput));
             }
             runSteps = runStepRepository.saveAll(runSteps);
 

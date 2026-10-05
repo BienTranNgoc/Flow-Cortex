@@ -7,8 +7,11 @@ export function HomePage() {
   const workflowsQuery = useWorkflowsQuery();
   // Found by step type: a workflow's name and its place in the list belong to its owner.
   const mediaCheck = workflowsQuery.data?.find(
-    (workflow) => workflow.steps?.length === 1 && workflow.steps[0]?.type === 'probe',
-  );
+  (workflow) =>
+    workflow.steps?.length === 2 &&
+    workflow.steps[0]?.type === 'probe' &&
+    workflow.steps[1]?.type === 'extract_audio',
+);
 
   if (meQuery.isLoading) {
     return <output>Loading…</output>;

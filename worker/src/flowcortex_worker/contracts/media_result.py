@@ -33,7 +33,13 @@ class MediaError(BaseModel):
         extra="forbid",
     )
     code: Annotated[
-        Literal["input_rejected", "probe_failed", "contract_violation", "run_timeout"],
+        Literal[
+            "input_rejected",
+            "probe_failed",
+            "audio_extraction_failed",
+            "contract_violation",
+            "run_timeout",
+        ],
         Field(title="MediaErrorCode"),
     ]
     message: StrictStr

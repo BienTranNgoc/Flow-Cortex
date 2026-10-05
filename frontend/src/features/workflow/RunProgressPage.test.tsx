@@ -16,7 +16,9 @@ const MEMBER_PATH_WORDS = ['probe', 'engine', 'capability'];
 const PROBE_OUTPUT =
   '{"container":"mov,mp4,m4a,3gp,3g2,mj2","durationMs":1000,"width":320,"height":240,"videoCodec":"h264","audioCodec":"aac"}';
 const DETAILS = { name: 'video-details.json', mime: 'application/json', bytes: 4200 };
+const AUDIO = { name: 'source-audio.wav', mime: 'audio/wav', bytes: 32044 };
 const URL_PATH = '/api/v1/runs/r1/steps/1/outputs/video-details.json/url';
+const AUDIO_URL_PATH = '/api/v1/runs/r1/steps/2/outputs/source-audio.wav/url';
 
 function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
   return {
@@ -45,6 +47,31 @@ function completedCheck(output = PROBE_OUTPUT): RunResponse {
         progressPercent: 100,
         output,
         outputs: [DETAILS],
+      }),
+    ],
+    { status: 'completed' },
+  );
+}
+
+function completedPipeline(): RunResponse {
+  return run(
+    [
+      step({
+        status: 'completed',
+        pickedUpAt: '2026-10-01T10:00:01Z',
+        progressPercent: 100,
+        output: PROBE_OUTPUT,
+        outputs: [DETAILS],
+      }),
+      step({
+        id: 's2',
+        stepOrder: 2,
+        type: 'extract_audio',
+        status: 'completed',
+        pickedUpAt: '2026-10-01T10:00:02Z',
+        progressPercent: 100,
+        output: '{"sampleRate":16000,"channels":1,"codec":"pcm_s16le","timelineOriginMs":0}',
+        outputs: [AUDIO],
       }),
     ],
     { status: 'completed' },
@@ -441,6 +468,59 @@ describe('RunProgressPage', () => {
     expect(await screen.findByText('Could not get download link')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Download technical details (JSON file)' }),
+    ).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('renders metadata and WAV download button for a completed extract_audio step', async () => {
+    renderRun(completedPipeline());
+
+    await screen.findByText('Sample rate');
+    expect(screen.getByText('16000')).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('pcm_s16le')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'Download extracted audio (WAV)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download summary (.txt)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download technical details (JSON file)' })).toBeInTheDocument();
+  });
+
+  it('requests the extracted audio WAV URL on demand and opens it in the current tab', async () => {
+    const user = userEvent.setup();
+    let answer!: (reply: FakeReply) => void;
+    const reply = new Promise<FakeReply>((resolve) => (answer = resolve));
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { calls } = renderRun(completedPipeline(), { [`GET ${AUDIO_URL_PATH}`]: () => reply });
+
+    await user.click(await screen.findByRole('button', { name: 'Download extracted audio (WAV)' }));
+
+    const busy = await screen.findByRole('button', { name: 'Getting the file…' });
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).toBeEnabled();
+    busy.focus();
+    expect(busy).toHaveFocus();
+    await user.click(busy);
+    answer({
+      status: 200,
+      body: { url: 'http://localhost:9000/flowcortex-media/wav?sig=2', expiresAt: '2026-10-01T10:15:00Z' },
+    });
+
+    await waitFor(() =>
+      expect(openInCurrentTab).toHaveBeenCalledWith('http://localhost:9000/flowcortex-media/wav?sig=2'),
+    );
+    expect(calls.filter((call) => call.path === AUDIO_URL_PATH)).toHaveLength(1);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('says "Could not get download link" inline and re-enables the WAV download action when the request fails', async () => {
+    const user = userEvent.setup();
+    renderRun(completedPipeline(), { [`GET ${AUDIO_URL_PATH}`]: { status: 404, body: { status: 404 } } });
+
+    await user.click(await screen.findByRole('button', { name: 'Download extracted audio (WAV)' }));
+
+    expect(await screen.findByText('Could not get download link')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Download extracted audio (WAV)' }),
     ).not.toHaveAttribute('aria-disabled', 'true');
   });
 
