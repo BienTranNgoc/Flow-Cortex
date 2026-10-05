@@ -38,7 +38,7 @@ describe('HomePage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('links to the first listed workflow whose only step is probe, whatever it is called', async () => {
+  it('links to the first listed upload workflow, whatever it is called', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
@@ -58,7 +58,7 @@ describe('HomePage', () => {
     expect(link).toHaveAttribute('href', '/workflows/check');
   });
 
-  it('omits the line when no workflow has probe as its only step', async () => {
+  it('omits the line when no upload workflow is available', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
@@ -105,7 +105,7 @@ describe('HomePage', () => {
       'GET /api/v1/workflows': {
         status: 200,
         body: [
-          workflow('upload', 'Check a video file', ['probe']),
+          workflow('upload', 'Check a video file', ['probe', 'extract_audio']),
           workflow('url', 'TikTok URL Pipeline', ['echo']),
         ],
       },

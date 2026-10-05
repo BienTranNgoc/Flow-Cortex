@@ -9,7 +9,11 @@ import { useStartRunMutation, useWorkflowsQuery } from '../features/workflow/use
 const URL_WORKFLOW_NAME = /\b(?:url|link|tiktok|douyin)\b/i;
 
 function isUploadWorkflow(workflow: WorkflowResponse) {
-  return workflow.steps?.[0]?.mode === 'remote';
+  return (
+    workflow.steps?.[0]?.mode === 'remote' &&
+    workflow.steps?.[0]?.type === 'probe' &&
+    workflow.steps?.[1]?.type === 'extract_audio'
+  );
 }
 
 function selectUrlWorkflow(workflows: WorkflowResponse[]) {
@@ -24,9 +28,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  const uploadWorkflow = workflowsQuery.data?.find(
-    (workflow) => workflow.steps?.[0]?.mode === 'remote',
-  );
+  const uploadWorkflow = workflowsQuery.data?.find(isUploadWorkflow);
   const workflow = workflowsQuery.data ? selectUrlWorkflow(workflowsQuery.data) : undefined;
   const startRunMutation = useStartRunMutation(workflow?.id ?? '');
   const {
