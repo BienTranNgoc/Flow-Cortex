@@ -2,7 +2,13 @@
 
 from typing import Literal
 
-ErrorCode = Literal["input_rejected", "probe_failed", "contract_violation", "run_timeout"]
+ErrorCode = Literal[
+    "input_rejected",
+    "probe_failed",
+    "audio_extraction_failed",
+    "contract_violation",
+    "run_timeout"
+    ]
 
 
 class PermanentError(Exception):

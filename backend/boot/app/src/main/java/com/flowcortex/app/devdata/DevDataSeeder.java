@@ -109,7 +109,9 @@ class DevDataSeeder {
                     new NewWorkflowStep("Deliberate failure", "fail", null),
                     new NewWorkflowStep("Never reached", "echo", null)));
             seedWorkflowIfAbsent(workflowService, "Check a video file", List.of(
-                    new NewWorkflowStep("Inspect the file", "probe", null)));
+                    new NewWorkflowStep("Inspect the file", "probe", null),
+                    new NewWorkflowStep("Extract source audio", "extract_audio", null)
+                ));
         };
     }
 

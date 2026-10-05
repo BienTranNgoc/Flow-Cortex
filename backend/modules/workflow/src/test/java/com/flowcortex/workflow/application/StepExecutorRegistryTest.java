@@ -25,15 +25,30 @@ class StepExecutorRegistryTest {
 
     @Test
     void theDemoTypesAndEveryMediaCapabilityAreKnown() {
-        assertThat(registry.knownTypes()).containsExactlyInAnyOrder("echo", "fail", "probe");
+        assertThat(registry.knownTypes()).containsExactlyInAnyOrder("echo", "fail", "probe", "extract_audio");
     }
 
     @Test
-    void echoAndFailRunInlineAndProbeRunsRemotely() {
-        assertThat(registry.find("echo")).get().extracting(StepExecutor::mode).isEqualTo(StepExecutor.Mode.INLINE);
-        assertThat(registry.find("fail")).get().extracting(StepExecutor::mode).isEqualTo(StepExecutor.Mode.INLINE);
-        assertThat(registry.find("probe")).get().extracting(StepExecutor::mode).isEqualTo(StepExecutor.Mode.REMOTE);
+    void echoAndFailRunInlineAndMediaCapabilitiesRunRemotely() {
+        assertThat(registry.find("echo"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.INLINE);
+        assertThat(registry.find("fail"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.INLINE);
+        assertThat(registry.find("probe"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.REMOTE);
+        assertThat(registry.find("extract_audio"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.REMOTE);
+
         assertThat(registry.isRemote("probe")).isTrue();
+        assertThat(registry.isRemote("extract_audio")).isTrue();
         assertThat(registry.isRemote("echo")).isFalse();
     }
 

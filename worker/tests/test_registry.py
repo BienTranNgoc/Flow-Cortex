@@ -8,12 +8,14 @@ import pytest
 from conftest import FakeConnection, assert_valid, job_body, published, run_consumer, settled
 
 from flowcortex_worker.errors import PermanentError
-from flowcortex_worker.handlers import probe, registry
+from flowcortex_worker.handlers import extract_audio, probe, registry
 
 
 def test_probe_is_registered() -> None:
     assert registry.resolve("probe") is probe.handle
 
+def test_extract_audio_is_registered() -> None:
+    assert registry.resolve("extract_audio") is extract_audio.handle
 
 @pytest.mark.parametrize("capability", ["unknown-thing", "", "echo"])
 def test_unknown_capability_is_a_contract_violation(capability: str) -> None:

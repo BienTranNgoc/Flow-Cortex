@@ -149,10 +149,12 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
                 .orElseThrow(() -> new AssertionError("Check a video file workflow not seeded"));
 
         assertThat(check.shared()).isTrue();
-        assertThat(check.steps()).singleElement().satisfies(step -> {
-            assertThat(step.name()).isEqualTo("Inspect the file");
-            assertThat(step.type()).isEqualTo("probe");
-        });
+        assertThat(check.steps()).extracting(step -> step.name())
+            .containsExactly("Inspect the file", "Extract source audio");
+        assertThat(check.steps()).extracting(step -> step.type())
+            .containsExactly("probe", "extract_audio");
+        assertThat(check.steps()).extracting(step -> step.mode())
+            .containsExactly("remote", "remote");
     }
 
     @Test

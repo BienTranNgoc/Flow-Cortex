@@ -17,7 +17,7 @@ function workflow(id: string, name: string, types: string[]): WorkflowResponse {
       stepOrder: index + 1,
       name: `Step ${index + 1}`,
       type,
-      mode: type === 'probe' ? 'remote' : 'inline',
+      mode: type === 'probe' || type === 'extract_audio' ? 'remote' : 'inline',
     })),
   };
 }
@@ -46,8 +46,8 @@ describe('HomePage', () => {
         body: [
           workflow('echo', 'Echo Demo', ['echo']),
           workflow('mixed', 'Probe then echo', ['probe', 'echo']),
-          workflow('check', 'Renamed by its owner', ['probe']),
-          workflow('check-2', 'Another check', ['probe']),
+          workflow('check', 'Renamed by its owner', ['probe', 'extract_audio']),
+          workflow('check-2', 'Another check', ['probe', 'extract_audio']),
         ],
       },
     });
@@ -81,7 +81,7 @@ describe('HomePage', () => {
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': async () => {
         await gate;
-        return { status: 200, body: [workflow('check', 'Check a video file', ['probe'])] };
+        return { status: 200, body: [workflow('check', 'Check a video file', ['probe', 'extract_audio'])] };
       },
     });
 

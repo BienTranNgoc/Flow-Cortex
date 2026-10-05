@@ -75,9 +75,12 @@ class RunAdvancerTest {
     private final TaskScheduler scheduler = mock(TaskScheduler.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-    private final StepExecutorRegistry registry = new StepExecutorRegistry(List.of(new EchoStepExecutor(),
-            new FailStepExecutor(), new UpperStepExecutor(),
-            new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock)));
+        private final StepExecutorRegistry registry = new StepExecutorRegistry(List.of(
+                new EchoStepExecutor(),
+                new FailStepExecutor(),
+                new UpperStepExecutor(),
+                new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
+                new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
@@ -300,6 +303,50 @@ class RunAdvancerTest {
         verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
         verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
     }
+
+        @Test
+        void aCompletedProbeDispatchesExtractAudioWithTheOriginalUploadReference() {
+        givenMediaEnabled();
+        when(mediaJobs.limitsFor("extract_audio"))
+                .thenReturn(new MediaLimits(PROBE_QUEUE, PROBE_RUNTIME, 1000L));
+
+        RunStep probe = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
+        probe.markRunning(NOW);
+        RunStep completedProbe = new RunStep(probe.getId(), runId, (short) 1, "probe", UPLOAD_REF);
+        completedProbe.markRunning(NOW);
+        completedProbe.markCompleted(UPLOAD_REF, "{}", NOW);
+        RunStep extractAudio = new RunStep(
+                UUID.randomUUID(), runId, (short) 2, "extract_audio", UPLOAD_REF);
+
+        givenRun(
+                List.of(def(1, "probe"), def(2, "extract_audio")),
+                List.of(completedProbe, extractAudio));
+        when(runStepRepository.findById(probe.getId())).thenReturn(Optional.of(probe));
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any()))
+                .thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED))
+                .thenReturn(1L);
+        when(runStepRepository.claimPending(
+                extractAudio.getId(), NOW, NOW.plus(PROBE_QUEUE), UPLOAD_REF))
+                .thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(
+                probe,
+                MediaResult.Status.COMPLETED,
+                null,
+                Map.of("videoCodec", "h264"),
+                null)));
+
+        verify(runStepRepository).claimPending(
+                extractAudio.getId(), NOW, NOW.plus(PROBE_QUEUE), UPLOAD_REF);
+        ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+        verify(mediaJobs).enqueue(job.capture());
+        assertThat(job.getValue().jobId()).isEqualTo(extractAudio.getId());
+        assertThat(job.getValue().capability()).isEqualTo(MediaCapability.EXTRACT_AUDIO);
+        assertThat(job.getValue().inputs())
+                .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
+        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/");
+        }
 
     @Test
     void aJobThatBreaksTheContractFailsTheStepWithContractViolationInsteadOfLeavingItPending() {

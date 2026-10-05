@@ -88,6 +88,20 @@ def test_job_without_capability_fails() -> None:
     with pytest.raises(ValidationError):
         MediaJob.model_validate(message)
 
+def test_extract_audio_contract_values_validate() -> None:
+    MediaJob.model_validate(job() | {"capability": "extract_audio"})
+    MediaResult.model_validate(
+        result()
+        | {
+            "status": "error",
+            "outputs": [],
+            "error": {
+                "code": "audio_extraction_failed",
+                "message": "no audio",
+                "retryable": False,
+            },
+        }
+    )
 
 @pytest.mark.parametrize(
     ("model", "message"),
