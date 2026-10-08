@@ -8,6 +8,7 @@ package com.flowcortex.workflow.domain;
  */
 public enum RunStatus {
     RUNNING,
+    WAITING_APPROVAL,
     COMPLETED,
     ERROR
 }

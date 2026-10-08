@@ -155,6 +155,22 @@ class MediaContractSchemaTest {
         assertThat(jobSchema.validate(tree)).isNotEmpty();
     }
 
+    @Test
+        void extractAudioCapabilityAndErrorConformToTheSchemas() {
+        MediaJob source = job();
+        MediaJob extract = new MediaJob(source.schemaVersion(), source.jobId(), source.runId(),
+                source.correlationId(), source.stepOrder(), MediaCapability.EXTRACT_AUDIO,
+                source.inputs(), source.params(), source.outputPrefix(), source.attempt(),
+                source.maxRuntimeSeconds(), source.maxInputBytes(), source.issuedAt());
+        MediaResult failed = new MediaResult("1", JOB_ID, RUN_ID, 1, 0,
+                MediaResult.Status.ERROR, null, null,
+                new MediaError(MediaError.Code.AUDIO_EXTRACTION_FAILED, "no audio", false),
+                AT, "worker-1");
+
+        assertThat(errors(jobSchema, extract)).isEmpty();
+        assertThat(errors(resultSchema, failed)).isEmpty();
+        }
+
     static Stream<Arguments> invalidRecords() {
         MediaJob j = job();
         MediaResult r = completedResult();

@@ -43,6 +43,7 @@ def test_clip_is_summarised(clip: Path) -> None:
     assert outcome.data["audioCodec"] == "aac"
     [report] = outcome.files
     assert (report.name, report.mime) == ("video-details.json", "application/json")
+    assert isinstance(report.body, bytes)
     details = json.loads(report.body)
     assert {s["codec_type"] for s in details["streams"]} == {"video", "audio"}
     assert "format" in details
@@ -93,7 +94,11 @@ def test_cover_art_of_an_audio_file_is_not_reported_as_video(tmp_path: Path) -> 
         None,
     )
     [report] = outcome.files
-    assert any(s["disposition"]["attached_pic"] == 1 for s in json.loads(report.body)["streams"])
+    assert isinstance(report.body, bytes)
+    assert any(
+    stream["disposition"]["attached_pic"] == 1
+    for stream in json.loads(report.body)["streams"]
+)
 
 
 def test_a_video_listed_after_its_cover_art_is_the_one_summarised() -> None:

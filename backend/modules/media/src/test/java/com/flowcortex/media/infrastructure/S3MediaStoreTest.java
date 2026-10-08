@@ -33,7 +33,11 @@ class S3MediaStoreTest {
     private static MediaProperties properties(String endpoint, Duration apiCallTimeout,
             Duration apiCallAttemptTimeout) {
         return new MediaProperties(true, Duration.ofMinutes(30),
-                Map.of("probe", Duration.ofMinutes(5)), Duration.ofMinutes(20), Duration.ofMinutes(15),
+                Map.of(
+                    "probe", Duration.ofMinutes(5),
+                    "extract_audio", Duration.ofMinutes(10)),
+                Duration.ofMinutes(20), Duration.ofMinutes(15),
+
                 new MediaProperties.Upload(524_288_000L, List.of("mp4"), Duration.ofMinutes(15)),
                 new MediaProperties.S3(endpoint, "http://localhost:9000", "us-east-1", true,
                         "flowcortex-uploads", "flowcortex-media", "backend-key", "backend-secret-value",

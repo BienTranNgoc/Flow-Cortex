@@ -1,0 +1,17 @@
+# One certificate per site. reverse_proxy passes the Host header through
+# unchanged, which the store relies on: presigned URLs are signed for
+# media.{$DOMAIN} and fail verification under any other host.
+
+app.{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:8080
+}
+
+admin.{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy admin:8080
+}
+
+media.{$DOMAIN} {
+	reverse_proxy minio:9000
+}

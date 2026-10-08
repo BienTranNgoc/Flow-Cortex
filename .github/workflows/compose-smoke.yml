@@ -4,30 +4,11 @@ name: compose-smoke
 # scripts/smoke-probe.sh: upload a clip, check it on the worker, download the
 # report, see the run in the admin list, and fail a text file with probe_failed.
 on:
-  pull_request:
-    paths:
-      - 'backend/**'
-      - 'worker/**'
-      - 'contracts/**'
-      - 'frontend/**'
-      - 'admin/**'
-      - 'packages/**'
-      - 'infra/**'
-      - 'docker-compose.yml'
-      - '.env.example'
-      - 'package.json'
-      - 'package-lock.json'
-      - '**/Dockerfile'
-      - '.github/workflows/compose-smoke.yml'
-      - 'scripts/smoke-probe.sh'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   smoke:

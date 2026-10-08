@@ -3,10 +3,20 @@ package com.flowcortex.app.user;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserView;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
+import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,12 +24,62 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * {@code /api/v1/auth} against the real, fully-wired app. Covers login + me,
- * suspended login (403), and self profile update.
+ * suspended login (403), self profile update, and self-registration with its
+ * owner and rate limits.
+ *
+ * <p>Every register request names its client through {@code X-Forwarded-For}, which the server
+ * honours from a loopback proxy, so each test fills its own per-IP bucket rather than 127.0.0.1's.
  */
 @Testcontainers
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT,
+        properties = "flowcortex.registration.owner-email=" + UserAuthEndpointsIT.OWNER_EMAIL)
 @AutoConfigureTestRestTemplate
 class UserAuthEndpointsIT extends AbstractUserModuleIT {
+
+    static final String OWNER_EMAIL = "registration-owner@example.com";
+    private static final String OWNER_PASSWORD = "owner-password-1";
+    /** The application.yml defaults: 5 per IP and 3 per email, each per hour. */
+    private static final int PER_IP_CAPACITY = 5;
+    private static final int PER_EMAIL_CAPACITY = 3;
+    private static final AtomicInteger NEXT_CLIENT = new AtomicInteger(1);
+
+    /**
+     * The default Apache client retries a 429 after sleeping its whole Retry-After (up to an hour
+     * here); the JDK client returns the 429 as is.
+     */
+    private TestRestTemplate registerClient;
+
+    record ProblemView(int status, String detail) {
+    }
+
+    /** The configured owner: an active self-owned ADMIN, created once per database. */
+    private String ownerToken() {
+        String token = login(OWNER_EMAIL, OWNER_PASSWORD);
+        if (token != null) {
+            return token;
+        }
+        userService.createInitialAdmin(OWNER_EMAIL, OWNER_PASSWORD, "Registration Owner");
+        return login(OWNER_EMAIL, OWNER_PASSWORD);
+    }
+
+    private static String newClientIp() {
+        return "198.51.100." + NEXT_CLIENT.getAndIncrement();
+    }
+
+    private <T> ResponseEntity<T> register(String clientIp, RegisterRequest body, Class<T> responseType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Forwarded-For", clientIp);
+        return registerClient.exchange("/api/v1/auth/register", HttpMethod.POST, new HttpEntity<>(body, headers),
+                responseType);
+    }
+
+    @BeforeEach
+    void ensureOwnerExists() {
+        registerClient = new TestRestTemplate(new RestTemplateBuilder()
+                .requestFactoryBuilder(ClientHttpRequestFactoryBuilder.jdk())
+                .rootUri(restTemplate.getRootUri()));
+        assertThat(ownerToken()).isNotBlank();
+    }
 
     @Test
     void loginSuccessReturnsTokenAndMeReflectsItWithoutPassword() {
@@ -147,6 +207,118 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         assertThat(meAfter.getBody().name()).isEqualTo("New Display Name");
     }
 
+    @Test
+    void registerNewEmailReturns201WithTokenAndTheAccountCanLogIn() {
+        String email = uniqueEmail("self-registered");
+
+        ResponseEntity<TokenResponse> response = register(newClientIp(),
+                new RegisterRequest(email, "register-password-1", "Self Registered"), TokenResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String token = response.getBody().token();
+        assertThat(token).isNotBlank();
+        MeView me = get("/api/v1/auth/me", token, MeView.class).getBody();
+        assertThat(me.email()).isEqualTo(email);
+        assertThat(me.role()).isEqualTo("MEMBER");
+
+        assertThat(login(email, "register-password-1")).isNotBlank();
+    }
+
+    @Test
+    void aRegisteredAccountIsListedByTheConfiguredOwnerWhoCanSuspendIt() {
+        String email = uniqueEmail("register-owned");
+        register(newClientIp(), new RegisterRequest(email, "register-password-1", "Owned"), TokenResponse.class);
+        String ownerToken = ownerToken();
+
+        ResponseEntity<UserResponseView[]> list = get("/api/v1/users", ownerToken, UserResponseView[].class);
+
+        assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
+        UserResponseView registered = Arrays.stream(list.getBody())
+                .filter(user -> user.email().equals(email))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("registered user not listed by the owner"));
+        assertThat(registered.role()).isEqualTo("MEMBER");
+        assertThat(registered.status()).isEqualTo("ACTIVE");
+
+        ResponseEntity<String> suspend = put("/api/v1/users/" + registered.id(), ownerToken,
+                new UpdateUserRequestView(null, null, null, "SUSPENDED"), String.class);
+
+        assertThat(suspend.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(loginRaw(email, "register-password-1").getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void registerOverThePerIpLimitReturns429WithRetryAfterWhileAnotherClientStillRegisters() {
+        String clientIp = newClientIp();
+        for (int attempt = 1; attempt <= PER_IP_CAPACITY; attempt++) {
+            ResponseEntity<String> accepted = register(clientIp,
+                    new RegisterRequest(uniqueEmail("register-ip"), "register-password-1", "Ip " + attempt),
+                    String.class);
+            assertThat(accepted.getStatusCode()).as("attempt %d", attempt).isEqualTo(HttpStatus.CREATED);
+        }
+
+        ResponseEntity<ProblemView> limited = register(clientIp,
+                new RegisterRequest(uniqueEmail("register-ip"), "register-password-1", "Ip over"), ProblemView.class);
+
+        assertThat(limited.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(limited.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(limited.getBody().detail()).isEqualTo("Too many registration attempts; try again later");
+        assertThat(Long.parseLong(limited.getHeaders().getFirst(HttpHeaders.RETRY_AFTER))).isBetween(1L, 3600L);
+
+        ResponseEntity<String> otherClient = register(newClientIp(),
+                new RegisterRequest(uniqueEmail("register-ip-other"), "register-password-1", "Other"),
+                String.class);
+        assertThat(otherClient.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void registerOverThePerEmailLimitReturns429EvenFromFreshClientsAndAnyLetterCase() {
+        String email = uniqueEmail("register-email-limit");
+        for (int attempt = 1; attempt <= PER_EMAIL_CAPACITY; attempt++) {
+            ResponseEntity<String> passed = register(newClientIp(),
+                    new RegisterRequest(email, "register-password-1", "Email " + attempt), String.class);
+            assertThat(passed.getStatusCode()).as("attempt %d", attempt)
+                    .isEqualTo(attempt == 1 ? HttpStatus.CREATED : HttpStatus.CONFLICT);
+        }
+
+        ResponseEntity<String> limited = register(newClientIp(),
+                new RegisterRequest(email.toUpperCase(Locale.ROOT), "register-password-1", "Email over"),
+                String.class);
+
+        assertThat(limited.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(limited.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isNotBlank();
+    }
+
+    @Test
+    void registerDuplicateEmailReturns409() {
+        String email = uniqueEmail("register-duplicate");
+        String clientIp = newClientIp();
+        register(clientIp, new RegisterRequest(email, "register-password-1", "First"), String.class);
+
+        ResponseEntity<String> second = register(clientIp,
+                new RegisterRequest(email, "register-password-2", "Second"), String.class);
+
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(second.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
+    }
+
+    @Test
+    void registerPasswordOver72Utf8BytesReturns400NamingTheField() {
+        // 25 characters but 73 UTF-8 bytes: within a character limit of 72, past BCrypt's byte limit.
+        String password = "ế".repeat(24) + "a";
+
+        ResponseEntity<String> response = register(newClientIp(),
+                new RegisterRequest(uniqueEmail("register-long-password"), password, "Long Password"),
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
+        assertThat(response.getBody()).contains("\"password\"");
+    }
+
     record ProfileUpdateRequest(String name) {
+    }
+
+    record RegisterRequest(String email, String password, String name) {
     }
 }

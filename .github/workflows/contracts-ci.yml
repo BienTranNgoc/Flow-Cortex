@@ -4,26 +4,10 @@ name: contracts-ci
 # records must still validate against it and the committed Python models must
 # match a fresh generation. Either side drifting fails this workflow.
 on:
-  push:
-    branches: [main, development]
-    paths:
-      - 'contracts/**'
-      - 'backend/modules/media/**'
-      - 'worker/**'
-      - '.github/workflows/contracts-ci.yml'
-  pull_request:
-    paths:
-      - 'contracts/**'
-      - 'backend/modules/media/**'
-      - 'worker/**'
-      - '.github/workflows/contracts-ci.yml'
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   java:

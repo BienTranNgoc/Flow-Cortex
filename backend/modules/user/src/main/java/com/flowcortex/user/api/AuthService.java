@@ -8,6 +8,13 @@ import java.util.UUID;
 public interface AuthService {
 
     /**
+     * Creates an active member account owned by the configured registration owner and mints a signed JWT.
+     * @throws com.flowcortex.shared.web.ConflictException if the email is already taken
+     * @throws org.springframework.web.server.ResponseStatusException 403 if no active ADMIN owner is configured
+     */
+    String register(String email, String rawPassword, String name);
+
+    /**
      * Verifies the email/password pair and mints a signed JWT (subject = the user's id).
      * @throws BadCredentialsException if the email is unknown or password doesn't match (same exception either way)
      * @throws AccessDeniedException if the account is {@code SUSPENDED} — no token is minted

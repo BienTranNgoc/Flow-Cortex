@@ -1,5 +1,6 @@
 package com.flowcortex.shared.web;
 
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -9,6 +10,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -51,6 +53,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ProblemDetail handleConflict(ConflictException ex) {
         return problem(HttpStatus.CONFLICT, "conflict", ex.getMessage());
+    }
+
+    /**
+     * Two requests changed the same versioned row at once and this one lost; Spring's {@link
+     * OptimisticLockingFailureException} covers a lost {@code @Version} check at commit.
+     */
+    @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ProblemDetail handleOptimisticLock(Exception ex, HttpServletRequest request) {
+        LOG.info("Concurrent update lost on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return problem(HttpStatus.CONFLICT, "conflict",
+                "The resource was changed by another request; reload it and try again");
     }
 
     @ExceptionHandler(AuthenticationException.class)

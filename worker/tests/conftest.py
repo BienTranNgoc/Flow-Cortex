@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import queue
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -267,17 +268,17 @@ class FakeStorage:
         while self.stall and abort.killed is None:
             time.sleep(0.01)
         abort.check()
-        path = Path(f"/tmp/fake-input-{uuid.uuid4()}")
-        path.write_bytes(self.content)
-        self.fetched_paths.append(path)
-        try:
+        with tempfile.TemporaryDirectory(prefix="flowcortex-test-job-") as directory:
+            path = Path(directory) / "input"
+            path.write_bytes(self.content)
+            self.fetched_paths.append(path)
             yield path
-        finally:
-            path.unlink()
 
-    def put(self, key: str, body: bytes, mime: str, abort: Any) -> None:
+    def put(self, key: str, body: bytes | Path, mime: str, abort: Any) -> int:
         abort.check()
-        self.puts[key] = (body, mime)
+        content = body if isinstance(body, bytes) else body.read_bytes()
+        self.puts[key] = (content, mime)
+        return len(content)
 
 
 def wait_for(predicate: Callable[[], bool], timeout: float = 5.0) -> None:

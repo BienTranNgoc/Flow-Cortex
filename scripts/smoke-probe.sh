@@ -113,9 +113,17 @@ pass "PUT with a wrong byte count refused (403)"
 
 run="$(start_run "$work/clip.mp4" clip.mp4)" || fail "start a run on the clip"
 body="$(await_run "$run")"
-step="$(jq -c '.steps[0]' <<<"$body")"
-[[ "$(jq -r .status <<<"$body")" == completed ]] || fail "clip run $run ended $(jq -c '{status, errorMessage}' <<<"$body"), step $step"
-codec="$(jq -r '.output | if type == "string" then fromjson else . end | .videoCodec' <<<"$step")"
+probe_step="$(jq -c '.steps[0]' <<<"$body")"
+audio_step="$(jq -c '.steps[1]' <<<"$body")"
+
+[[ "$(jq -r .status <<<"$body")" == completed ]] \
+  || fail "clip run $run did not complete: $(jq -c '{status, errorMessage}' <<<"$body")"
+[[ "$(jq -r .status <<<"$probe_step")" == completed ]] \
+  || fail "probe step did not complete: $probe_step"
+[[ "$(jq -r .status <<<"$audio_step")" == completed ]] \
+  || fail "extract audio step did not complete: $audio_step"
+
+codec="$(jq -r '.output | if type == "string" then fromjson else . end | .videoCodec' <<<"$probe_step")"
 [[ "$codec" == h264 ]] || fail "clip run $run: videoCodec is '$codec', expected h264"
 pass "clip run $run completed, videoCodec h264"
 
@@ -129,6 +137,20 @@ disposition="$(tr -d '\r' <"$work/headers" | awk 'tolower($1) == "content-dispos
 jq -e . "$work/video-details.json" >/dev/null || fail "video-details.json is not JSON"
 pass "technical details downloaded (200, $disposition)"
 
+url="$(api "$member" "/api/v1/runs/$run/steps/2/outputs/source-audio.wav/url" | jq -er .url)" \
+  || fail "download URL for source-audio.wav"
+code="$(curl -sS -D "$work/audio-headers" -o "$work/source-audio.wav" -w '%{http_code}' "$url")"
+[[ "$code" == 200 ]] || fail "audio download answered $code"
+
+docker compose cp "$work/source-audio.wav" worker:/tmp/source-audio.wav >/dev/null
+audio="$(docker compose exec -T worker ffprobe -v error -select_streams a:0 \
+  -show_entries stream=codec_name,sample_rate,channels -of json /tmp/source-audio.wav)"
+jq -e '.streams[0] | .codec_name == "pcm_s16le"
+  and .sample_rate == "16000"
+  and .channels == 1' <<<"$audio" >/dev/null \
+  || fail "source-audio.wav is not mono 16 kHz pcm_s16le: $audio"
+pass "source audio downloaded and verified"
+
 api "$admin" "/api/v1/admin/runs?size=100" | jq -e --arg r "$run" 'any(.items[]; .id == $r)' >/dev/null \
   || fail "admin Runs list does not show run $run"
 pass "admin Runs list shows run $run"
@@ -137,8 +159,9 @@ printf 'not a video' >"$work/bad.mp4"
 run="$(start_run "$work/bad.mp4" bad.mp4)" || fail "start a run on the text file"
 body="$(await_run "$run")"
 error_code="$(jq -r '.steps[0].errorCode' <<<"$body")"
-[[ "$(jq -r .status <<<"$body")" == error && "$error_code" == probe_failed ]] \
-  || fail "text-file run $run ended $(jq -c '{status, step: .steps[0] | {status, errorCode}}' <<<"$body"), expected error/probe_failed"
+audio_status="$(jq -r '.steps[1].status' <<<"$body")"
+[[ "$(jq -r .status <<<"$body")" == error && "$error_code" == probe_failed && "$audio_status" == pending ]] \
+  || fail "text-file run $run ended $(jq -c '{status, step1: .steps[0] | {status, errorCode}, step2: .steps[1] | {status}}' <<<"$body"), expected error/probe_failed and pending step 2"
 pass "text-file run $run ended with probe_failed"
 
 echo "smoke-probe: all checks passed"

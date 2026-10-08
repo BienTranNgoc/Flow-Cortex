@@ -85,6 +85,7 @@ class RunAdvancer {
     private final Counter lateResults;
     private final Duration lease;
     private final Clock clock;
+    private final ReviewCheckpointTransactions checkpointTransactions;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -92,18 +93,19 @@ class RunAdvancer {
             InputResolver inputResolver, StepExecutorRegistry registry,
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
-            @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds) {
+            @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
+            ReviewCheckpointTransactions checkpointTransactions) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC());
+                Clock.systemUTC(), checkpointTransactions);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock) {
+            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -122,6 +124,7 @@ class RunAdvancer {
                 .register(meters);
         this.lease = lease;
         this.clock = clock;
+        this.checkpointTransactions = checkpointTransactions;
     }
 
     @ApplicationModuleListener
@@ -149,6 +152,13 @@ class RunAdvancer {
                 applyProgress(progress);
             }
         });
+    }
+
+    @ApplicationModuleListener
+    void onReviewApproved(ReviewTaskApprovedEvent event) {
+        if (checkpointTransactions.resume(event, clock.instant())) {
+            advance(event.runId());
+        }
     }
 
     /** Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight. */
@@ -185,6 +195,11 @@ class RunAdvancer {
         }
         if (next.getStatus() != RunStepStatus.PENDING) {
             LOG.info("Step {} already {} — waiting for its result", next.getStepOrder(), next.getStatus());
+            return;
+        }
+        if ("APPROVAL_CHECKPOINT".equals(next.getType())) {
+            String payload = outputsByOrder.get((int) next.getStepOrder() - 1);
+            checkpointTransactions.pause(run, next, payload, clock.instant());
             return;
         }
         dispatch(run, next, outputsByOrder);
