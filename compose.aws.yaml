@@ -1,0 +1,47 @@
+# Public deploy overlay: Caddy terminates TLS on one host for the member app,
+# the admin console and the object store, each on a subdomain of DOMAIN, with
+# Let's Encrypt certificates. Point the app., admin. and media. A records at the
+# host before the first start, or the certificate requests fail.
+#
+#   docker compose -f docker-compose.yml -f compose.aws.yaml up -d --build
+#   -> https://app.$DOMAIN    member app
+#   -> https://admin.$DOMAIN  admin console
+#   -> https://media.$DOMAIN  presigned uploads and downloads
+#
+# Only 80 and 443 are public; every other port stays on loopback. Uploads go
+# straight to media.$DOMAIN, so the store's signing host and its allowed upload
+# origin follow DOMAIN here instead of the localhost values.
+
+services:
+  caddy:
+    image: caddy:2.11.6-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN (see .env.example)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  minio:
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)}
+
+  backend:
+    environment:
+      S3_PUBLIC_ENDPOINT: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
+
+volumes:
+  # Certificates and the ACME account: losing them re-requests every certificate.
+  caddy_data:
+  caddy_config:
