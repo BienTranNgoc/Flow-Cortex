@@ -1,0 +1,60 @@
+name: deploy
+
+# Deploys main to the EC2 host once ci passes on it. The job runs on a
+# self-hosted runner installed on that host (label flow-cortex-ec2), which
+# connects out to GitHub: no inbound port and no cloud credentials. It checks
+# out the commit ci passed in the host's checkout and rebuilds with
+# docker-compose.yml + compose.aws.yaml; the host's .env never leaves it.
+#
+# Repository variable: DEPLOY_URL (the member app, checked after the deploy).
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A deploy never cancels another mid-build; the next one waits.
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: [self-hosted, flow-cortex-ec2]
+    timeout-minutes: 45
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      COMPOSE_FILE: docker-compose.yml:compose.aws.yaml
+    defaults:
+      run:
+        working-directory: /home/ubuntu/flow-cortex
+    steps:
+      - name: Check out the commit ci passed
+        run: |
+          git fetch --quiet origin main
+          git checkout --quiet --detach "$SHA"
+
+      - name: Build and start
+        # Old containers keep serving until their replacements are healthy.
+        run: docker compose up -d --build --remove-orphans --wait --wait-timeout 300
+
+      - name: Show service status
+        if: always()
+        run: |
+          docker compose ps --format '{{.Service}}: {{.Status}}'
+
+      - name: Drop dangling images
+        run: docker image prune -f
+
+      - name: Check the member app answers
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+        run: curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null "$DEPLOY_URL"
