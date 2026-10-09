@@ -1,6 +1,5 @@
-/* Functional MVP only — no design tokens yet. Keeps every viewport
-   (375px/768px/1280px) free of horizontal scroll and touch targets
-   >=44px. */
+/* Keeps every viewport (375px/768px/1280px) free of horizontal scroll and
+   touch targets >=44px. Colours, radii and sizes come from styles/tokens.css. */
 
 *,
 *::before,
@@ -18,11 +17,18 @@ body,
 
 body {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #1a1a1a;
-  color: #e8f1f2;
-  background: #fff;
-  background: #080c13;
+  color: var(--ink);
+  background: var(--paper);
   overflow-x: hidden;
+}
+
+a {
+  color: var(--primary);
+}
+
+::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1;
 }
 
 .app-shell {
@@ -37,8 +43,8 @@ body {
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #26313d;
-  background: #0d131c;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
 }
 
 .app-title {
@@ -53,7 +59,7 @@ body {
 
 .app-header nav a {
   text-decoration: none;
-  color: #9eacb6;
+  color: var(--ink-3);
   padding: 0.25rem 0.5rem;
 }
 
@@ -79,7 +85,7 @@ body {
 .action-link {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--target-min);
 }
 
 .field {
@@ -97,24 +103,23 @@ body {
 .field input,
 .field select {
   padding: 0.5rem;
-  min-height: 44px;
-  border: 1px solid #2e3b49;
-  background: #0b1119;
-  color: #e8f1f2;
-  border-radius: 4px;
+  min-height: var(--target-min);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   width: 100%;
 }
 
 button {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
   padding: 0.5rem 1rem;
   margin-right: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #334352;
-  background: #fff;
-  background: #141d28;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--btn-bg);
   color: inherit;
   cursor: pointer;
   font-size: 1rem;
@@ -126,7 +131,7 @@ button:disabled {
 }
 
 [role='alert'] {
-  color: #ff9a9a;
+  color: var(--red);
 }
 
 .auth-page {
@@ -134,16 +139,16 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 2rem 1rem;
-  background: radial-gradient(circle at 80% 20%, #152b38 0, transparent 35%), #080c13;
+  background: var(--gradient-page-glow), var(--paper);
 }
 
 .auth-card {
   width: min(100%, 470px);
   padding: clamp(1.5rem, 5vw, 3rem);
-  border: 1px solid #233443;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #101a24, #0c111a);
-  box-shadow: 0 24px 70px #0008;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--gradient-card);
+  box-shadow: var(--shadow-lg);
 }
 
 .auth-card h1 {
@@ -153,17 +158,12 @@ button:disabled {
 
 .auth-subtitle,
 .auth-footer {
-  color: #9eacb6;
-}
-
-.auth-footer a,
-.launchpad a {
-  color: #35e5e0;
+  color: var(--ink-3);
 }
 
 .eyebrow {
   margin: 0;
-  color: #35e5e0;
+  color: var(--primary);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -173,13 +173,13 @@ button:disabled {
   width: 100%;
   margin: 0.5rem 0 0;
   border: 0;
-  color: #061016;
+  color: var(--primary-foreground);
   font-weight: 800;
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
+  background: var(--gradient-cta);
 }
 
 .form-error {
-  color: #ff9a9a;
+  color: var(--red);
 }
 
 .launchpad {
@@ -201,19 +201,19 @@ button:disabled {
 }
 
 .launchpad-hero h1 span {
-  color: #5f9cff;
+  color: var(--accent);
 }
 
 .launchpad-hero p:not(.eyebrow) {
-  color: #9eacb6;
+  color: var(--ink-3);
 }
 
 .launchpad-card {
   padding: clamp(1.2rem, 4vw, 2rem);
-  border: 1px solid #253746;
-  border-radius: 14px;
-  background: #101721;
-  box-shadow: 0 20px 60px #0005;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper-3);
+  box-shadow: var(--shadow);
 }
 
 .launchpad-footer {
@@ -221,6 +221,9 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  margin-top: 1.25rem;
+  color: var(--ink-3);
+  font-size: 0.9rem;
 }
 
 .launchpad-card h2 {
@@ -235,12 +238,6 @@ button:disabled {
   max-width: 280px;
   display: block;
   margin-left: auto;
-}
-
-.launchpad-footer {
-  margin-top: 1.25rem;
-  color: #81919e;
-  font-size: 0.9rem;
 }
 
 @media (max-width: 680px) {

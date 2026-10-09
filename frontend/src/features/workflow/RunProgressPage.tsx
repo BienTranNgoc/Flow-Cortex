@@ -96,7 +96,6 @@ export function RunProgressPage() {
           const status = step.status ?? 'pending';
           const waiting = status === 'running' && !step.pickedUpAt;
           const deliveries = step.deliveryCount ?? 0;
-          // const details = (step.outputs ?? []).find((output) => output.mime === 'application/json');
           const outputs = step.outputs ?? [];
           const details = outputs.find((output) => output.mime === 'application/json');
           const artifacts = outputs.filter((output) => output.mime !== 'application/json');

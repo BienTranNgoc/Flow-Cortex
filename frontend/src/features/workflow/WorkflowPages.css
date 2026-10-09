@@ -16,17 +16,17 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   max-width: 100%;
 }
 
 .workflow-badge {
   font-size: 0.75rem;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  background: #eef;
-  color: #334;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
   white-space: nowrap;
 }
 
@@ -44,8 +44,8 @@
 }
 
 .run-step {
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
   max-width: 100%;
   overflow-wrap: break-word;
@@ -60,27 +60,27 @@
   text-transform: capitalize;
   font-size: 0.85rem;
   padding: 0.1rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 
 .run-step-pending .run-step-status {
-  background: #eee;
-  color: #555;
+  background: var(--line);
+  color: var(--ink-3);
 }
 
 .run-step-running .run-step-status {
-  background: #fff3cd;
-  color: #7a5b00;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .run-step-completed .run-step-status {
-  background: #d4f5dd;
-  color: #14532d;
+  background: var(--green-soft);
+  color: var(--green);
 }
 
 .run-step-error .run-step-status {
-  background: #fde2e2;
-  color: #7a1f1f;
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .run-step-output,
@@ -99,13 +99,13 @@
 
 .run-step-retried,
 .run-step-code {
-  color: #555;
+  color: var(--ink-3);
   font-size: 0.85rem;
 }
 
 .run-step-waiting {
   margin: 0.35rem 0 0;
-  color: #555;
+  color: var(--ink-3);
 }
 
 .run-step-progress {
@@ -151,8 +151,8 @@
   max-width: 100%;
   overflow-x: auto;
   padding: 0.5rem;
-  background: #f6f6f6;
-  border-radius: 4px;
+  background: var(--input-bg);
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
 
@@ -162,7 +162,7 @@
   background: none;
   padding: 0.5rem 0;
   text-decoration: underline;
-  color: #333;
+  color: var(--ink-3);
 }
 
 .run-step-downloads {
@@ -205,10 +205,10 @@
 .approval-panel textarea {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid #2e3b49;
-  border-radius: 4px;
-  background: #0b1119;
-  color: #e8f1f2;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
   font: inherit;
   resize: vertical;
 }

@@ -1,6 +1,7 @@
 import { ErrorBoundary } from '@flow-cortex/ui-kit';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import './styles/tokens.css';
 import './app/base.css';
 import { HomePage } from './app/HomePage';
 import { Layout } from './app/Layout';
