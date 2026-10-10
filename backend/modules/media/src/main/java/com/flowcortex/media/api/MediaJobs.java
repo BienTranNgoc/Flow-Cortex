@@ -1,6 +1,7 @@
 package com.flowcortex.media.api;
 
 import java.util.UUID;
+import java.util.List;
 
 /** Port of the media engine for the modules that dispatch remote work. */
 public interface MediaJobs {
@@ -32,6 +33,19 @@ public interface MediaJobs {
      * @throws UploadRejectedException on field {@code uploadId} if the object is missing, too large or of another type
      */
     MediaJobInput resolveUpload(UUID ownerId, UUID uploadId);
+
+    /** Resolves and registers 1-10 uploads, preserving their order as {@code image_1..image_N}. */
+    List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds);
+
+    /** Snapshots already owner-verified assets against a run in the caller's transaction. */
+    void bindRunInputs(UUID runId, List<MediaAssetInput> inputs);
+
+    /**
+     * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after
+     * winning the workflow completion CAS and inside the same transaction.
+     */
+    void registerOutputs(UUID ownerId, UUID runId, UUID runStepId, int stepOrder, short attempt,
+            List<MediaOutput> outputs);
 
     /**
      * A time-limited GET of the stored output {@code bucket}/{@code key} that the browser saves as

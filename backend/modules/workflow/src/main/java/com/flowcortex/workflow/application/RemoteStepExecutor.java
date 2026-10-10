@@ -65,8 +65,8 @@ class RemoteStepExecutor implements StepExecutor {
         }
         MediaLimits limits = mediaJobs.limitsFor(capability);
         MediaJob job = new MediaJob("1", context.stepId(), context.runId(), context.runId(), context.stepOrder(),
-                MediaCapability.fromValue(capability), List.of(jobInput(context.input())), params(context.config()),
-                MediaJob.outputPrefix(context.runId(), context.stepOrder()), (int) context.attempt(),
+                MediaCapability.fromValue(capability), jobInputs(context.input()), params(context.config()),
+                MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()), (int) context.attempt(),
                 Math.toIntExact(limits.maxRuntime().toSeconds()), limits.maxInputBytes(), clock.instant());
         try {
             mediaJobs.enqueue(job);
@@ -78,15 +78,22 @@ class RemoteStepExecutor implements StepExecutor {
     }
 
     /** The {@code {key, bucket, objectKey}} reference stored on the step when its run started. */
-    private MediaJobInput jobInput(String storedInput) {
+    private List<MediaJobInput> jobInputs(String storedInput) {
         if (storedInput == null || storedInput.isBlank()) {
             throw new StepFailedException("contract_violation", "The step has no input object to process");
         }
         try {
-            return objectMapper.readValue(storedInput, MediaJobInput.class);
+            if (objectMapper.readTree(storedInput).isArray()) {
+                List<MediaJobInput> inputs = objectMapper.readValue(storedInput, new TypeReference<>() { });
+                if (inputs.isEmpty() || inputs.size() > 10) {
+                    throw new StepFailedException("contract_violation", "The step must have between 1 and 10 inputs");
+                }
+                return inputs;
+            }
+            return List.of(objectMapper.readValue(storedInput, MediaJobInput.class));
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation",
-                    "The step input is not an object reference {key, bucket, objectKey}", e);
+                    "The step input is not an object reference or an ordered list of object references", e);
         }
     }
 

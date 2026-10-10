@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.01.002`)
+## Current schema (`V2026.09.22.001` – `V2026.10.10.001`)
 
 ```mermaid
 erDiagram
@@ -15,6 +15,8 @@ erDiagram
   workflow ||--|{ workflow_step : "workflow_id"
   workflow ||--o{ workflow_run : "workflow_id"
   workflow_run ||--|{ run_step : "run_id"
+  workflow_run ||--o{ media_asset_binding : "run_id"
+  media_asset ||--o{ media_asset_binding : "asset_id"
 
   app_user {
     uuid id PK
@@ -76,6 +78,28 @@ erDiagram
     varchar error_code "queue_timeout | lease_expired | run_timeout | media_disabled | input_rejected | probe_failed | contract_violation"
     jsonb outputs "MediaOutput[] {name, bucket, objectKey, mime, bytes, meta} — object keys runs/{runId}/steps/{order}/{name}"
   }
+  media_asset {
+    uuid id PK "upload id for uploaded inputs"
+    uuid owner_id "application-enforced owner scope"
+    varchar kind "image | audio | video | binary"
+    varchar bucket
+    varchar object_key UK
+    varchar mime_type
+    bigint bytes
+    varchar checksum "object-store SHA-256 when available"
+    varchar status "ready"
+    timestamptz expires_at "NULL until a retention policy is assigned"
+    uuid source_run_step_id "output provenance; NULL for uploads"
+    smallint source_attempt "attempt fence; NULL for uploads"
+    timestamptz created_at
+  }
+  media_asset_binding {
+    uuid run_id PK,FK
+    varchar binding_key PK "image_1 .. image_10"
+    uuid asset_id FK
+    smallint position "UNIQUE (run_id, position), preserves request order"
+    timestamptz created_at
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -108,7 +132,6 @@ the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex
 | Table | Purpose | Arrives with |
 |---|---|---|
 | `provider` | provider catalogue + fallback order per capability | Providers page / first real capability |
-| `media_asset` | first-class assets (sha256, size, expiry) for retention and dedup | first download/demucs capability |
 | `usage_event` | per-step provider units and cost | first paid provider |
 | `audit_log` | admin actions with before/after | first admin write beyond Users |
 | `app_setting`, `settings_audit` | DB-backed runtime settings (override > env > default) | Settings page |

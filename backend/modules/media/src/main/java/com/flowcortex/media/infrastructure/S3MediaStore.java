@@ -102,7 +102,7 @@ public class S3MediaStore implements AutoCloseable {
     public Optional<StoredObject> head(String bucket, String key) {
         try {
             HeadObjectResponse head = client.headObject(request -> request.bucket(bucket).key(key));
-            return Optional.of(new StoredObject(head.contentLength(), head.contentType()));
+            return Optional.of(new StoredObject(head.contentLength(), head.contentType(), head.checksumSHA256()));
         } catch (NoSuchKeyException e) {
             return Optional.empty();
         }
@@ -151,6 +151,10 @@ public class S3MediaStore implements AutoCloseable {
         }
     }
 
-    public record StoredObject(long size, String contentType) {
+    public record StoredObject(long size, String contentType, String checksum) {
+
+        public StoredObject(long size, String contentType) {
+            this(size, contentType, null);
+        }
     }
 }

@@ -43,7 +43,7 @@ class Abort(Protocol):
 
 
 def output_key(job: MediaJob, name: str) -> str:
-    return f"runs/{job.runId}/steps/{job.stepOrder}/{name}"
+    return f"{job.outputPrefix}{name}"
 
 
 def client_from(settings: Settings) -> Any:

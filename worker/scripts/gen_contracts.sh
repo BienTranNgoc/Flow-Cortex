@@ -4,15 +4,16 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-out=src/flowcortex_worker/contracts
-
-schemas=(../contracts/media-*.schema.json)
-if [[ ! -e "${schemas[0]}" ]]; then
-    echo "gen_contracts: no ../contracts/*.schema.json found" >&2
-    exit 1
-fi
-
-for schema in "${schemas[@]}"; do
+generate() {
+    local pattern=$1
+    local out=$2
+    local schemas=(../contracts/${pattern}-*.schema.json)
+    if [[ ! -e "${schemas[0]}" ]]; then
+        echo "gen_contracts: no ../contracts/${pattern}-*.schema.json found" >&2
+        exit 1
+    fi
+    mkdir -p "${out}"
+    for schema in "${schemas[@]}"; do
     name=$(basename "${schema}" .schema.json)
     uv run --frozen datamodel-codegen \
         --input "${schema}" \
@@ -32,4 +33,8 @@ for schema in "${schemas[@]}"; do
         --use-schema-description \
         --disable-timestamp \
         --formatters ruff-format
-done
+    done
+}
+
+generate media src/flowcortex_worker/contracts
+generate provider src/flowcortex_worker/provider/contracts

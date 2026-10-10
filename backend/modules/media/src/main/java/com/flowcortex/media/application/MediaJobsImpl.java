@@ -1,17 +1,24 @@
 package com.flowcortex.media.application;
 
 import com.flowcortex.media.api.MediaCapability;
+import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
+import com.flowcortex.media.domain.MediaAsset;
+import com.flowcortex.media.domain.MediaAssetBinding;
+import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
+import com.flowcortex.media.infrastructure.MediaAssetRepository;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -30,6 +37,7 @@ class MediaJobsImpl implements MediaJobs {
 
     private static final Logger LOG = LoggerFactory.getLogger(MediaJobsImpl.class);
     private static final long MEGABYTE = 1024L * 1024;
+    private static final long MAX_IMAGE_BYTES = 10L * MEGABYTE;
     /** The key of the one input a job built from an upload carries. */
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
@@ -38,13 +46,17 @@ class MediaJobsImpl implements MediaJobs {
     private final Validator validator;
     private final MediaProperties properties;
     private final S3MediaStore store;
+    private final MediaAssetRepository assets;
+    private final MediaAssetBindingRepository bindings;
 
     MediaJobsImpl(ApplicationEventPublisher events, Validator validator, MediaProperties properties,
-            S3MediaStore store) {
+            S3MediaStore store, MediaAssetRepository assets, MediaAssetBindingRepository bindings) {
         this.events = events;
         this.validator = validator;
         this.properties = properties;
         this.store = store;
+        this.assets = assets;
+        this.bindings = bindings;
     }
 
     // MANDATORY: outside a transaction the after-commit externalization never fires and the job
@@ -89,7 +101,69 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
+    @Transactional
     public MediaJobInput resolveUpload(UUID ownerId, UUID uploadId) {
+        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, null, properties.upload().maxBytes())
+                .input();
+    }
+
+    @Override
+    @Transactional
+    public List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds) {
+        if (uploadIds == null || uploadIds.isEmpty() || uploadIds.size() > 10
+                || uploadIds.stream().distinct().count() != uploadIds.size()) {
+            throw new UploadRejectedException("uploadIds", "Choose between 1 and 10 different images");
+        }
+        List<MediaAssetInput> resolved = new java.util.ArrayList<>();
+        for (int index = 0; index < uploadIds.size(); index++) {
+            resolved.add(resolveAndRegister(ownerId, uploadIds.get(index), "image_" + (index + 1), "image/",
+                    MAX_IMAGE_BYTES));
+        }
+        return List.copyOf(resolved);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void bindRunInputs(UUID runId, List<MediaAssetInput> inputs) {
+        if (inputs == null || inputs.isEmpty() || inputs.size() > 10) {
+            throw new IllegalArgumentException("A run must bind between 1 and 10 assets");
+        }
+        Instant now = Instant.now();
+        List<MediaAssetBinding> rows = new java.util.ArrayList<>();
+        for (int index = 0; index < inputs.size(); index++) {
+            MediaAssetInput input = inputs.get(index);
+            rows.add(new MediaAssetBinding(runId, input.input().key(), input.assetId(), (short) index, now));
+        }
+        bindings.saveAll(rows);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registerOutputs(UUID ownerId, UUID runId, UUID runStepId, int stepOrder, short attempt,
+            List<MediaOutput> outputs) {
+        if (outputs == null || outputs.isEmpty()) {
+            return;
+        }
+        String expectedPrefix = MediaJob.outputPrefix(runId, stepOrder, attempt);
+        Instant now = Instant.now();
+        List<MediaAsset> registered = outputs.stream().map(output -> {
+            if (!properties.s3().bucket().equals(output.bucket())
+                    || !MediaJob.isBelow(expectedPrefix, output.objectKey())) {
+                throw new IllegalArgumentException("Worker output is outside the current run prefix");
+            }
+            return new MediaAsset(UUID.randomUUID(), ownerId, mediaKind(output.mime()), output.bucket(),
+                    output.objectKey(), output.mime(), output.bytes(), null, runStepId, attempt, now);
+        }).toList();
+        assets.saveAll(registered);
+    }
+
+    private MediaAssetInput resolveAndRegister(UUID ownerId, UUID uploadId, String inputKey,
+            String requiredMimePrefix, long maxBytes) {
+        Optional<MediaAsset> existing = assets.findById(uploadId);
+        if (existing.isPresent() && !existing.orElseThrow().getOwnerId().equals(ownerId)) {
+            throw refused(properties.s3().uploadBucket(), objectKey(ownerId, uploadId), "another owner",
+                    "Upload the file again");
+        }
         String bucket = properties.s3().uploadBucket();
         String key = objectKey(ownerId, uploadId);
         S3MediaStore.StoredObject stored = store.head(bucket, key)
@@ -100,7 +174,22 @@ class MediaJobsImpl implements MediaJobs {
         if (!properties.upload().mimeTypes().containsValue(stored.contentType())) {
             throw refused(bucket, key, "type " + stored.contentType(), typeSentence());
         }
-        return new MediaJobInput(UPLOAD_INPUT_KEY, bucket, key);
+        if (requiredMimePrefix != null && !stored.contentType().startsWith(requiredMimePrefix)) {
+            throw new UploadRejectedException("uploadIds", "Every product asset must be an image");
+        }
+        if (stored.size() > maxBytes) {
+            throw new UploadRejectedException("uploadIds", "Each product image must be no larger than 10 MB");
+        }
+        MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, mediaKind(stored.contentType()), bucket, key,
+                stored.contentType(), stored.size(), stored.checksum(), Instant.now()));
+        asset.refresh(stored.contentType(), stored.size(), stored.checksum());
+        assets.save(asset);
+        return new MediaAssetInput(asset.getId(), new MediaJobInput(inputKey, bucket, key));
+    }
+
+    private static String mediaKind(String mimeType) {
+        int separator = mimeType.indexOf('/');
+        return separator > 0 ? mimeType.substring(0, separator) : "binary";
     }
 
     @Override

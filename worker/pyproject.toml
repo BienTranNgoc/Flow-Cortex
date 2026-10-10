@@ -34,7 +34,7 @@ build-backend = "uv_build"
 target-version = "py312"
 line-length = 100
 # Generated from contracts/*.schema.json by scripts/gen_contracts.sh; CI diffs it instead.
-extend-exclude = ["src/flowcortex_worker/contracts"]
+extend-exclude = ["src/flowcortex_worker/contracts", "src/flowcortex_worker/provider/contracts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

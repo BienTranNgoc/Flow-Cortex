@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobInput;
+import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -217,6 +218,26 @@ class WorkflowRunServiceImplTest {
         assertThat(steps).extracting(RunStep::getInput)
                 .containsExactly(expected, expected, null);
         verify(mediaJobs).resolveUpload(ownerId, uploadId);
+    }
+
+    @Test
+    void orderedImageUploadsAreSnapshottedAndBoundToTheCreatedRun() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        List<UUID> uploadIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        Workflow workflow = givenWorkflow(ownerId, "render_video");
+        List<MediaAssetInput> assets = List.of(
+                new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "uploads", "a")),
+                new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "uploads", "b")));
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        when(mediaJobs.resolveImageUploads(ownerId, uploadIds)).thenReturn(assets);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), null, null, uploadIds, null);
+
+        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput)
+                .isEqualTo("[{\"key\":\"image_1\",\"bucket\":\"uploads\",\"objectKey\":\"a\"},"
+                        + "{\"key\":\"image_2\",\"bucket\":\"uploads\",\"objectKey\":\"b\"}]");
+        verify(mediaJobs).bindRunInputs(started.id(), assets);
     }
 
     @Test

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJob;
-import com.flowcortex.media.api.MediaJobInput;
+import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -108,6 +108,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     // transaction opens, so a slow store never holds a database connection.
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName) {
+        return startRun(currentUserId, workflowId, input, uploadId, null, originalName);
+    }
+
+    @Override
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -126,19 +132,28 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
         String runInput = input;
         String remoteStepInput = null;
+        List<MediaAssetInput> assetInputs = List.of();
         if (mediaWorkflow) {
-            if (uploadId == null) {
+            if (uploadIds != null && !uploadIds.isEmpty()) {
+                assetInputs = mediaJobs.resolveImageUploads(currentUserId, uploadIds);
+                remoteStepInput = json(assetInputs.stream().map(MediaAssetInput::input).toList());
+            } else if (uploadId != null) {
+                remoteStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
+            } else {
                 throw new UploadRejectedException("uploadId", "Choose a video or audio file to upload");
             }
-            remoteStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
             runInput = displayName(originalName);
         }
 
         String displayedInput = runInput;
         String storedRemoteInput = remoteStepInput;
+        List<MediaAssetInput> storedAssetInputs = assetInputs;
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(UUID.randomUUID(), workflow.getId(),
                     currentUserId, displayedInput, Instant.now()));
+            if (!storedAssetInputs.isEmpty()) {
+                mediaJobs.bindRunInputs(run.getId(), storedAssetInputs);
+            }
             List<RunStep> runSteps = new ArrayList<>();
             for (WorkflowStep stepDef : stepDefs) {
                 String stepInput = registry.isRemote(stepDef.getType()) ? storedRemoteInput : null;
@@ -158,7 +173,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         });
     }
 
-    private String json(MediaJobInput reference) {
+    private String json(Object reference) {
         try {
             return objectMapper.writeValueAsString(reference);
         } catch (JsonProcessingException e) {

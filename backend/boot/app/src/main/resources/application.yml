@@ -192,7 +192,7 @@ flowcortex:
     upload:
       max-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}
       # Each extension must map to a canonical MIME type in MediaProperties, or startup fails.
-      extensions: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:mp4,mov,webm,mkv,m4a,mp3,wav}
+      extensions: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:mp4,mov,webm,mkv,m4a,mp3,wav,jpg,jpeg,png,webp}
       url-ttl: 15m
     s3:
       endpoint: ${S3_ENDPOINT:}

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJobCompleted;
 import com.flowcortex.media.api.MediaJobProgressed;
+import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.workflow.domain.RunStatus;
@@ -86,6 +87,7 @@ class RunAdvancer {
     private final Duration lease;
     private final Clock clock;
     private final ReviewCheckpointTransactions checkpointTransactions;
+    private final MediaJobs mediaJobs;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -94,11 +96,11 @@ class RunAdvancer {
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
-            ReviewCheckpointTransactions checkpointTransactions) {
+            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), checkpointTransactions);
+                Clock.systemUTC(), checkpointTransactions, mediaJobs);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -106,6 +108,15 @@ class RunAdvancer {
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
             Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions) {
+        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
+                taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null);
+    }
+
+    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
+            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
+            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
+            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -125,6 +136,7 @@ class RunAdvancer {
         this.lease = lease;
         this.clock = clock;
         this.checkpointTransactions = checkpointTransactions;
+        this.mediaJobs = mediaJobs;
     }
 
     @ApplicationModuleListener
@@ -351,7 +363,8 @@ class RunAdvancer {
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {
             if (transactions.complete(result.runId(), result.jobId(), attempt, json(result.data()),
-                    json(result.outputs()), now)) {
+                    json(result.outputs()), now,
+                    () -> registerOutputs(result, step.orElseThrow(), attempt))) {
                 LOG.info("Job result applied: runId={} jobId={} capability={} attempt={} deliveryCount={} "
                         + "outcome=completed durationMs={} worker={}", result.runId(), result.jobId(), capability,
                         attempt, result.deliveryCount(), durationMs, result.workerId());
@@ -369,6 +382,16 @@ class RunAdvancer {
         // A redelivered result may be the only event left for a run whose first delivery completed
         // the step but died before advancing; advancing is idempotent.
         advance(result.runId());
+    }
+
+    private void registerOutputs(MediaResult result, RunStep step, short attempt) {
+        if (mediaJobs == null || result.outputs() == null || result.outputs().isEmpty()) {
+            return;
+        }
+        WorkflowRun run = workflowRunRepository.findById(result.runId())
+                .orElseThrow(() -> new IllegalStateException("Workflow run disappeared: " + result.runId()));
+        mediaJobs.registerOutputs(run.getOwnerId(), result.runId(), result.jobId(), step.getStepOrder(), attempt,
+                result.outputs());
     }
 
     private void applyProgress(MediaProgress progress) {

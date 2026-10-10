@@ -65,7 +65,7 @@ class GenerateScriptJob(BaseModel):
         StrictStr,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
-            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
     attempt: Annotated[StrictInt, Field(ge=1)]
@@ -93,7 +93,7 @@ class GenerateSpeechJob(BaseModel):
         StrictStr,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
-            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
     attempt: Annotated[StrictInt, Field(ge=1)]

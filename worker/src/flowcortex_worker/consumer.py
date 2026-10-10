@@ -332,7 +332,9 @@ class Consumer:
         watchdog.daemon = True
         watchdog.start()
         try:
-            if job.outputPrefix != output_key(job, ""):
+            legacy_prefix = f"runs/{job.runId}/steps/{job.stepOrder}/"
+            attempt_prefix = f"{legacy_prefix}attempts/{job.attempt}/"
+            if job.outputPrefix not in (legacy_prefix, attempt_prefix):
                 raise PermanentError("contract_violation", "outputPrefix does not match the step")
             handler = self._resolve(job.capability)
             inputs = {

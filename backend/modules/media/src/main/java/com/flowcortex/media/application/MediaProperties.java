@@ -57,14 +57,18 @@ public record MediaProperties(
     /** Upload limits; each allowed extension maps to one canonical MIME type. */
     public record Upload(@Positive long maxBytes, @NotEmpty List<String> extensions, @NotNull Duration urlTtl) {
 
-        private static final Map<String, String> CANONICAL_MIME_TYPES = Map.of(
-                "mp4", "video/mp4",
-                "mov", "video/quicktime",
-                "webm", "video/webm",
-                "mkv", "video/x-matroska",
-                "m4a", "audio/mp4",
-                "mp3", "audio/mpeg",
-                "wav", "audio/wav");
+        private static final Map<String, String> CANONICAL_MIME_TYPES = Map.ofEntries(
+                Map.entry("mp4", "video/mp4"),
+                Map.entry("mov", "video/quicktime"),
+                Map.entry("webm", "video/webm"),
+                Map.entry("mkv", "video/x-matroska"),
+                Map.entry("m4a", "audio/mp4"),
+                Map.entry("mp3", "audio/mpeg"),
+                Map.entry("wav", "audio/wav"),
+                Map.entry("jpg", "image/jpeg"),
+                Map.entry("jpeg", "image/jpeg"),
+                Map.entry("png", "image/png"),
+                Map.entry("webp", "image/webp"));
 
         public Upload {
             if (extensions != null) {

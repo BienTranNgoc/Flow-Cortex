@@ -20,7 +20,7 @@
       "stepOrder": { "type": "integer", "minimum": 1 },
       "outputPrefix": {
         "type": "string",
-        "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
+        "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         "description": "The only object-key prefix under which this job may publish outputs."
       },
       "attempt": { "type": "integer", "minimum": 1 },

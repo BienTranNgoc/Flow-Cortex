@@ -302,7 +302,7 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         return "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.stepId() + "\",\"runId\":\"" + run.runId() + "\","
                 + "\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\",\"outputs\":[{\"name\":"
                 + "\"video-details.json\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/" + run.runId()
-                + "/steps/1/video-details.json\",\"mime\":\"application/json\",\"bytes\":42}],"
+                + "/steps/1/attempts/1/video-details.json\",\"mime\":\"application/json\",\"bytes\":42}],"
                 + "\"data\":{\"durationMs\":1000},\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"test-worker\"}";
     }
 

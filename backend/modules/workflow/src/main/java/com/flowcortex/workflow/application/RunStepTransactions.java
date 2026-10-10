@@ -85,9 +85,16 @@ class RunStepTransactions {
     /** {@code running -> completed}; marks the owning run {@code completed} too if this was the last step. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     boolean complete(UUID runId, UUID stepId, short attempt, String output, String outputs, Instant now) {
+        return complete(runId, stepId, attempt, output, outputs, now, () -> { });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    boolean complete(UUID runId, UUID stepId, short attempt, String output, String outputs, Instant now,
+            Runnable afterAccepted) {
         if (runStepRepository.completeIfRunning(stepId, runId, attempt, output, outputs, now) != 1) {
             return false;
         }
+        afterAccepted.run();
         completeRunIfAllStepsCompleted(runId, now);
         return true;
     }

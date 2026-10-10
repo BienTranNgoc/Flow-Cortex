@@ -515,6 +515,13 @@ components:
         uploadId:
           type: string
           format: uuid
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
         originalName:
           type: string
           maxLength: 1024

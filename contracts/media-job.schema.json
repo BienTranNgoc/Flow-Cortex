@@ -39,8 +39,8 @@
     "params": { "type": "object" },
     "outputPrefix": {
       "type": "string",
-      "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
-      "description": "The only key prefix the worker writes under: runs/{runId}/steps/{stepOrder}/."
+      "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/(?:attempts/[1-9][0-9]*/)?$",
+      "description": "The only key prefix the worker writes under. New jobs use runs/{runId}/steps/{stepOrder}/attempts/{attempt}/; the shorter legacy shape remains readable during rollout."
     },
     "attempt": { "type": "integer", "minimum": 1 },
     "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },

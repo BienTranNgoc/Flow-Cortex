@@ -329,7 +329,7 @@ class RunAdvancerTest {
         assertThat(job.getValue().capability()).isEqualTo(MediaCapability.PROBE);
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
-        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/1/");
+        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/1/attempts/1/");
         assertThat(job.getValue().attempt()).isEqualTo(1);
         assertThat(job.getValue().maxRuntimeSeconds()).isEqualTo(300);
         assertThat(job.getValue().maxInputBytes()).isEqualTo(1000L);
@@ -381,7 +381,7 @@ class RunAdvancerTest {
         assertThat(job.getValue().capability()).isEqualTo(MediaCapability.EXTRACT_AUDIO);
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
-        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/");
+        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/attempts/1/");
         }
 
     @Test
