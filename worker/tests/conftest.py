@@ -348,7 +348,7 @@ def run_consumer(
         "heartbeat_seconds": 30.0,
         "stop": stop,
         "executor": executor,
-        "liveness_file": Path(f"/tmp/fake-alive-{uuid.uuid4()}"),
+        "liveness_file": Path(tempfile.gettempdir()) / f"fake-alive-{uuid.uuid4()}",
         "grace_seconds": 5.0,
     }
     if resolve is not None:

@@ -35,7 +35,8 @@ class S3MediaStoreTest {
         return new MediaProperties(true, Duration.ofMinutes(30),
                 Map.of(
                     "probe", Duration.ofMinutes(5),
-                    "extract_audio", Duration.ofMinutes(10)),
+                    "extract_audio", Duration.ofMinutes(10),
+                    "render_video", Duration.ofMinutes(10)),
                 Duration.ofMinutes(20), Duration.ofMinutes(15),
 
                 new MediaProperties.Upload(524_288_000L, List.of("mp4"), Duration.ofMinutes(15)),

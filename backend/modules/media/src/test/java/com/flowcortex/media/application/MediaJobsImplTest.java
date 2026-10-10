@@ -68,6 +68,7 @@ class MediaJobsImplTest {
         "flowcortex.media.queue-timeout=30m",
         "flowcortex.media.max-runtime.probe=5m",
         "flowcortex.media.max-runtime.extract_audio=10m",
+        "flowcortex.media.max-runtime.render_video=10m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.presign-ttl=15m",
         "flowcortex.media.upload.max-bytes=524288000",
@@ -223,6 +224,7 @@ class MediaJobsImplTest {
         runner.withPropertyValues(
         "flowcortex.media.max-runtime.probe=5m",
         "flowcortex.media.max-runtime.extract_audio=5m",
+        "flowcortex.media.max-runtime.render_video=5m",
         "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
             assertThat(context).hasFailed();
@@ -234,6 +236,7 @@ class MediaJobsImplTest {
         runner.withPropertyValues(
                 "flowcortex.media.max-runtime.probe=5m",
                 "flowcortex.media.max-runtime.extract_audio=5m",
+                "flowcortex.media.max-runtime.render_video=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
     }

@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out=src/flowcortex_worker/contracts
 
-schemas=(../contracts/*.schema.json)
+schemas=(../contracts/media-*.schema.json)
 if [[ ! -e "${schemas[0]}" ]]; then
     echo "gen_contracts: no ../contracts/*.schema.json found" >&2
     exit 1

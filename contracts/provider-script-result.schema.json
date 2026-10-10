@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-script-result.schema.json",
+  "title": "ProviderScriptData",
+  "description": "The completed MediaResult.data payload returned by generate_script/product_ad_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "language", "script"],
+  "properties": {
+    "profile": { "const": "product_ad_v1" },
+    "language": { "const": "vi" },
+    "script": { "type": "string", "minLength": 1, "maxLength": 8000 }
+  }
+}

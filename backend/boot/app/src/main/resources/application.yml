@@ -185,6 +185,7 @@ flowcortex:
     max-runtime:
       probe: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE:5m}
       extract_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:10m}
+      render_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:5m}
     # The broker's per-delivery ack deadline; must outlast every max run time.
     consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
     presign-ttl: 15m

@@ -34,7 +34,9 @@ class MediaJob(BaseModel):
         ),
     ]
     stepOrder: Annotated[StrictInt, Field(ge=1)]
-    capability: Annotated[Literal["probe", "extract_audio"], Field(title="MediaCapability")]
+    capability: Annotated[
+        Literal["probe", "extract_audio", "render_video"], Field(title="MediaCapability")
+    ]
     inputs: Annotated[list[MediaJobInput], Field(min_length=1)]
     params: dict[str, Any]
     outputPrefix: Annotated[
