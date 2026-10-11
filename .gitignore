@@ -42,5 +42,8 @@ docs/jira-backlog.csv
 private_docs/
 tmp/
 
+# Master Khoi rules: personal notes & reference docs, not part of the shared source.
+rulekhoi/
+
 # Local docker compose override
 docker-compose.override.yml
