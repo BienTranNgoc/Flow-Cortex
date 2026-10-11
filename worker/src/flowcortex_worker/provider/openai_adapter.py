@@ -16,7 +16,7 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from .adapter import SpeechArtifact
 from .contracts.provider_job import ProductAdPayload
@@ -172,7 +172,7 @@ class OpenAIProviderAdapter:
         key = getattr(self.client, "api_key", None)
         if not key:
             raise RuntimeError("OpenAI client has no api_key configured")
-        return key
+        return cast(str, key)
 
     def _base_url(self) -> str:
         # `openai.OpenAI` stores its `base_url` on a private `_base_url` (v1) or as a public
@@ -181,7 +181,7 @@ class OpenAIProviderAdapter:
         base = getattr(self.client, "base_url", None) or getattr(self.client, "_base_url", None)
         if base is None:
             return _OPENAI_BASE_URL or "https://api.openai.com/v1"
-        return str(base)
+        return str(cast(str, base))
 
     @staticmethod
     def _user_message(payload: ProductAdPayload) -> str:

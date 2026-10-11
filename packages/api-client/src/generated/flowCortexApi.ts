@@ -55,45 +55,6 @@ export interface StartRunRequest {
   originalName?: string;
 }
 
-export interface VideoConfig {
-  /** @pattern 9:16 */
-  aspectRatio: string;
-}
-
-export interface ProductVideoRunRequest {
-  /**
-   * @minLength 1
-   * @maxLength 200
-   */
-  productName: string;
-  /**
-   * @minLength 1
-   * @maxLength 4000
-   */
-  description: string;
-  /**
-   * @minLength 1
-   * @maxLength 500
-   */
-  cta: string;
-  /**
-   * @minLength 0
-   * @maxLength 200
-   */
-  price?: string;
-  /**
-   * @minLength 0
-   * @maxLength 500
-   */
-  promotion?: string;
-  /**
-   * @minItems 1
-   * @maxItems 10
-   */
-  uploadIds: string[];
-  video: VideoConfig;
-}
-
 export interface RunStepOutputResponse {
   name: string;
   mime: string;
@@ -191,6 +152,45 @@ export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
 }
 
+export interface VideoConfig {
+  /** @pattern 9:16 */
+  aspectRatio: string;
+}
+
+export interface ProductVideoRunRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  productName: string;
+  /**
+   * @minLength 0
+   * @maxLength 4000
+   */
+  description: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  cta: string;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  price?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  promotion?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds: string[];
+  video: VideoConfig;
+}
+
 export interface RegisterRequest {
   /** @minLength 1 */
   email: string;
@@ -244,18 +244,16 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
-export interface CapabilitiesResponse {
-  /** Whether the media engine and its queues are live. */
-  mediaEnabled: boolean;
-  /** Whether the Product Video flow accepts new runs. */
-  productVideoEnabled: boolean;
-}
-
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
   /** Identifier of the service reporting its health. */
   service?: string;
+}
+
+export interface CapabilitiesResponse {
+  mediaEnabled?: boolean;
+  productVideoEnabled?: boolean;
 }
 
 export interface AdminRunResponse {
@@ -557,56 +555,6 @@ export const startRun = async (
   return { data, status: res.status, headers: res.headers } as startRunResponse;
 };
 
-export type startProductVideoRunResponse200 = {
-  data: RunResponse;
-  status: 200;
-};
-
-export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
-  headers: Headers;
-};
-export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
-
-export const getStartProductVideoRunUrl = () => {
-  return `/api/v1/product-videos/runs`;
-};
-
-export const startProductVideoRun = async (
-  productVideoRunRequest: ProductVideoRunRequest,
-  options?: RequestInit,
-): Promise<startProductVideoRunResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  const res = await fetch(getStartProductVideoRunUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(productVideoRunRequest),
-  });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: startProductVideoRunResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as startProductVideoRunResponse;
-};
-
 export type listResponse200 = {
   data: UserResponse[];
   status: 200;
@@ -811,6 +759,56 @@ export const approveTask = async (
 
   const data: approveTaskResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as approveTaskResponse;
+};
+
+export type startProductVideoRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
+  headers: Headers;
+};
+export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+
+export const getStartProductVideoRunUrl = () => {
+  return `/api/v1/product-videos/runs`;
+};
+
+export const startProductVideoRun = async (
+  productVideoRunRequest: ProductVideoRunRequest,
+  options?: RequestInit,
+): Promise<startProductVideoRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getStartProductVideoRunUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productVideoRunRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startProductVideoRunResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as startProductVideoRunResponse;
 };
 
 export type registerResponse200 = {

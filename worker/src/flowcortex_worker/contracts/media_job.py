@@ -42,7 +42,7 @@ class MediaJob(BaseModel):
     outputPrefix: Annotated[
         StrictStr,
         Field(
-            description="The attempt-scoped prefix; the shorter legacy shape remains readable during rollout.",
+            description="The only key prefix the worker writes under. New jobs use runs/{runId}/steps/{stepOrder}/attempts/{attempt}/; the shorter legacy shape remains readable during rollout.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/(?:attempts/[1-9][0-9]*/)?$",
         ),
     ]

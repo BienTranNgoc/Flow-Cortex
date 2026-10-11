@@ -1,6 +1,6 @@
 package com.flowcortex.app.capabilities;
 
-import com.flowcortex.media.application.MediaProperties;
+import com.flowcortex.media.api.MediaJobs;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -9,7 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Tells the SPA which opt-in flows are live, so the UI can hide entry points whose backend would
  * otherwise refuse the run. Lives in {@code :boot:app} (composition root) by Modulith's
- * module-boundary rules: it reads {@link MediaProperties} for the media kill switch and the
+ * module-boundary rules: it reads the media kill switch through the exported {@link MediaJobs}
+ * port and the
  * {@code flowcortex.product-video.enabled} flag owned by {@code :modules:workflow}.
  *
  * <p>The same data also lives on the per-endpoint failure mode
@@ -20,20 +21,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class CapabilitiesController {
 
-    private final MediaProperties mediaProperties;
+    private final MediaJobs mediaJobs;
     private final boolean productVideoEnabled;
 
     public CapabilitiesController(
-            MediaProperties mediaProperties,
+            MediaJobs mediaJobs,
             @org.springframework.beans.factory.annotation.Value(
                     "${flowcortex.product-video.enabled:false}") boolean productVideoEnabled) {
-        this.mediaProperties = mediaProperties;
+        this.mediaJobs = mediaJobs;
         this.productVideoEnabled = productVideoEnabled;
     }
 
     @GetMapping(value = "/capabilities", produces = MediaType.APPLICATION_JSON_VALUE)
     public CapabilitiesResponse capabilities() {
-        return new CapabilitiesResponse(mediaProperties.enabled(), productVideoEnabled);
+        return new CapabilitiesResponse(mediaJobs.isEnabled(), productVideoEnabled);
     }
 
     public record CapabilitiesResponse(boolean mediaEnabled, boolean productVideoEnabled) {

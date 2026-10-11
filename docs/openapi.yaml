@@ -107,24 +107,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
-  /api/v1/product-videos/runs:
-    post:
-      tags:
-      - product-videos-controller
-      operationId: startProductVideoRun
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ProductVideoRunRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RunResponse"
   /api/v1/users:
     get:
       tags:
@@ -217,6 +199,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewTaskResponse"
+  /api/v1/product-videos/runs:
+    post:
+      tags:
+      - product-videos-controller
+      operationId: startProductVideoRun
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVideoRunRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
   /api/v1/auth/register:
     post:
       tags:
@@ -556,52 +556,6 @@ components:
           type: string
           maxLength: 1024
           minLength: 0
-    ProductVideoRunRequest:
-      type: object
-      properties:
-        productName:
-          type: string
-          maxLength: 200
-          minLength: 1
-        description:
-          type: string
-          maxLength: 4000
-          minLength: 1
-        cta:
-          type: string
-          maxLength: 500
-          minLength: 1
-        price:
-          type: string
-          maxLength: 200
-          minLength: 0
-        promotion:
-          type: string
-          maxLength: 500
-          minLength: 0
-        uploadIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          maxItems: 10
-          minItems: 1
-        video:
-          $ref: "#/components/schemas/VideoConfig"
-      required:
-      - cta
-      - description
-      - productName
-      - uploadIds
-      - video
-    VideoConfig:
-      type: object
-      properties:
-        aspectRatio:
-          type: string
-          pattern: 9:16
-      required:
-      - aspectRatio
     RunResponse:
       type: object
       properties:
@@ -791,6 +745,52 @@ components:
       properties:
         reviewedPayload:
           type: string
+    ProductVideoRunRequest:
+      type: object
+      properties:
+        productName:
+          type: string
+          maxLength: 200
+          minLength: 0
+        description:
+          type: string
+          maxLength: 4000
+          minLength: 0
+        cta:
+          type: string
+          maxLength: 500
+          minLength: 0
+        price:
+          type: string
+          maxLength: 200
+          minLength: 0
+        promotion:
+          type: string
+          maxLength: 500
+          minLength: 0
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
+        video:
+          $ref: "#/components/schemas/VideoConfig"
+      required:
+      - cta
+      - description
+      - productName
+      - uploadIds
+      - video
+    VideoConfig:
+      type: object
+      properties:
+        aspectRatio:
+          type: string
+          pattern: 9:16
+      required:
+      - aspectRatio
     RegisterRequest:
       type: object
       properties:
@@ -877,18 +877,6 @@ components:
       required:
       - expiresAt
       - url
-    CapabilitiesResponse:
-      type: object
-      properties:
-        mediaEnabled:
-          type: boolean
-          description: Whether the media engine and its queues are live.
-        productVideoEnabled:
-          type: boolean
-          description: Whether the Product Video flow accepts new runs.
-      required:
-      - mediaEnabled
-      - productVideoEnabled
     HealthResponse:
       type: object
       properties:
@@ -900,6 +888,13 @@ components:
           type: string
           description: Identifier of the service reporting its health.
           example: flow-cortex
+    CapabilitiesResponse:
+      type: object
+      properties:
+        mediaEnabled:
+          type: boolean
+        productVideoEnabled:
+          type: boolean
     AdminRunResponse:
       type: object
       properties:

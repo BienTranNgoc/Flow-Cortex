@@ -12,7 +12,9 @@ from __future__ import annotations
 import importlib
 import io
 import json
-from typing import Any
+import urllib.error
+import urllib.request
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -42,12 +44,18 @@ def _ok_body(content: str) -> dict[str, Any]:
         "object": "chat.completion",
         "created": 0,
         "model": "test",
-        "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": content}}],
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": content},
+            }
+        ],
     }
 
 
 def _patch_urlopen(monkeypatch: pytest.MonkeyPatch, response: MagicMock) -> dict[str, Any]:
-    """Replace `urllib.request.urlopen` with a fake that records the request and returns `response`."""
+    """Replace `urllib.request.urlopen` with a fake that records the request."""
     captured: dict[str, Any] = {}
 
     def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
@@ -58,7 +66,7 @@ def _patch_urlopen(monkeypatch: pytest.MonkeyPatch, response: MagicMock) -> dict
         captured["url"] = request.full_url
         return response
 
-    monkeypatch.setattr(openai_adapter.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     return captured
 
 
@@ -94,9 +102,9 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
     assert "cta: Đặt mua ngay" in messages[1]["content"]
 
 
-def test_generate_script_ignores_proxy_specific_extra_content(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A Google-style `extra_content` block in the response (added by the Vilao proxy on top of
-    the OpenAI shape) must not break parsing — the adapter reads only `choices[0].message.content`."""
+def test_generate_script_ignores_proxy_extra_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A Google-style `extra_content` block (added by the Vilao proxy on top of the OpenAI
+    shape) must not break parsing — the adapter reads only `choices[0].message.content`."""
     body = _ok_body(json.dumps({"script": "Hook. Lợi ích. Đặt mua ngay"}))
     body["choices"][0]["message"]["extra_content"] = {
         "google": {"thought_signature": "EmkKZwFpFH0TF1Uvm5uSzlFg..."}
@@ -121,7 +129,7 @@ def test_generate_script_quotes_confirmed_price_and_promotion_only(
         captured["bodies"].append(json.loads(request.data.decode("utf-8")))
         return response
 
-    monkeypatch.setattr(openai_adapter.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
     client = MagicMock()
     client.api_key = "sk-test"
@@ -193,17 +201,17 @@ def test_generate_script_surfaces_http_errors_with_response_body(
     body = b'{"error":{"code":"bad_request","message":"schema rejected"}}'
 
     def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
-        raise openai_adapter.urllib.error.HTTPError(
-            request.full_url, 400, "Bad Request", {}, io.BytesIO(body)
+        raise urllib.error.HTTPError(
+            request.full_url, 400, "Bad Request", cast(Any, {}), io.BytesIO(body)
         )
 
-    monkeypatch.setattr(openai_adapter.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     client = MagicMock()
     client.api_key = "sk-test"
     client.base_url = "https://example.invalid/v1"
     adapter = openai_adapter.OpenAIProviderAdapter(client=client)
 
-    with pytest.raises(openai_adapter.urllib.error.HTTPError):
+    with pytest.raises(urllib.error.HTTPError):
         adapter.generate_script(SAMPLE_PAYLOAD)
     assert any("schema rejected" in record.getMessage() for record in caplog.records)
 
