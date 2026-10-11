@@ -33,7 +33,7 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: (input: LoginRequest) => unwrap(loginRequest(input)),
     onSuccess: (data) => {
-      setToken(data.token ?? null);
+      setToken(data.accessToken ?? null);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
