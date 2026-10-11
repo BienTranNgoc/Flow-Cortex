@@ -48,6 +48,7 @@ const textPairs: [string, string][] = [
   ['primary-foreground', 'cta-from'],
   ['primary-foreground', 'cta-to'],
   ['ink-3', 'line'],
+  ['primary', 'primary-soft'],
   ['warning', 'warning-soft'],
   ['green', 'green-soft'],
   ['red', 'red-soft'],
@@ -61,6 +62,12 @@ const borderPairs: [string, string][] = [
   'card-from',
   'card-to',
 ].map((s) => ['input-border', s]);
+borderPairs.push(
+  ['edge', 'paper-2'],
+  ['edge', 'paper-3'],
+  ['green', 'paper-2'],
+  ['primary', 'paper-2'],
+);
 
 describe('token contrast', () => {
   it.each(textPairs)('text --%s on --%s is at least 4.5:1', (text, background) => {

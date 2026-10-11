@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ApiError, type WorkflowResponse } from '@flow-cortex/api-client';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { launchpadSchema, type LaunchpadFormValues } from '../features/workflow/launchpadSchema';
 import { useStartRunMutation, useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import { useTransitionNavigate } from './useTransitionNavigate';
 
 /** A workflow whose first step runs on the media engine needs an uploaded file, not a link. */
 function isUploadWorkflow(workflow: WorkflowResponse) {
@@ -12,7 +13,7 @@ function isUploadWorkflow(workflow: WorkflowResponse) {
 }
 
 export function HomePage() {
-  const navigate = useNavigate();
+  const { go } = useTransitionNavigate();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
   const uploadWorkflow = workflowsQuery.data?.find(isUploadWorkflow);
@@ -35,7 +36,7 @@ export function HomePage() {
       { input: sourceUrl.trim() },
       {
         onSuccess: (run) => {
-          if (run.id) navigate(`/runs/${run.id}`);
+          if (run.id) go(`/runs/${run.id}`);
         },
       },
     );
@@ -77,6 +78,7 @@ export function HomePage() {
             className="primary-button launch-button"
             type="submit"
             disabled={startRunMutation.isPending || !workflow}
+            aria-busy={startRunMutation.isPending}
           >
             {startRunMutation.isPending ? 'Starting pipeline…' : 'Generate pipeline →'}
           </button>

@@ -30,74 +30,12 @@
   white-space: nowrap;
 }
 
-.workflow-steps {
-  padding-left: 1.25rem;
-}
-
-.run-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.run-step {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.75rem;
-  max-width: 100%;
-  overflow-wrap: break-word;
-}
-
-.run-step-order {
-  font-weight: 600;
-  margin-right: 0.5rem;
-}
-
-.run-step-status {
-  text-transform: capitalize;
-  font-size: 0.85rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: var(--radius-full);
-}
-
-.run-step-pending .run-step-status {
-  background: var(--line);
-  color: var(--ink-3);
-}
-
-.run-step-running .run-step-status {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-
-.run-step-completed .run-step-status {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.run-step-error .run-step-status {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
 .run-step-output,
 .run-step-error {
   margin: 0.35rem 0 0;
   overflow-wrap: anywhere;
 }
 
-/* A step is a row — order, status, notes on one line, details below — and stacks on a phone. */
-.run-step-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.run-step-retried,
 .run-step-code {
   color: var(--ink-3);
   font-size: 0.85rem;

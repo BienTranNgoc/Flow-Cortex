@@ -1,7 +1,7 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Route } from 'react-router-dom';
-import { renderRoute, settled, stubApi } from '../test/fakeApi';
+import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
 import { HomePage } from './HomePage';
 
 const ME = { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
@@ -33,7 +33,10 @@ function renderHome() {
 }
 
 describe('HomePage', () => {
-  beforeEach(() => setToken('t'));
+  beforeEach(() => {
+    setToken('t');
+    vi.stubGlobal('scrollTo', vi.fn());
+  });
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
@@ -136,6 +139,27 @@ describe('HomePage', () => {
       }),
     );
     expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+  });
+
+  it('disables the launch button and marks it busy while the start request is in flight', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [workflow('echo', 'Echo Demo', ['echo'])] },
+      'POST /api/v1/workflows/echo/runs': () => new Promise<FakeReply>(() => {}),
+    });
+
+    renderHome();
+
+    await screen.findByText('Welcome, Member One');
+    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
+    const button = screen.getByRole('button', { name: /Generate pipeline/ });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).not.toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(button);
+
+    const busy = await screen.findByRole('button', { name: 'Starting pipeline…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
   });
 
   it('disables the launch when every workflow starts with a remote step', async () => {

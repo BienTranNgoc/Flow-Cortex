@@ -88,6 +88,19 @@ a {
   min-height: var(--target-min);
 }
 
+/* Read by assistive technology, invisible on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -128,6 +141,32 @@ button {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+button,
+.action-link {
+  transition: transform var(--dur-standard) var(--ease-standard);
+}
+
+/* A touch screen keeps :hover after a tap, which would leave the control lifted. */
+@media (hover: hover) {
+  button:not(:disabled, [aria-disabled='true']):hover,
+  .action-link:hover {
+    transform: translateY(-1px);
+    transition-duration: var(--dur-quick);
+  }
+}
+
+button:not(:disabled, [aria-disabled='true']):active,
+.action-link:active {
+  transform: scale(0.98);
+  transition-duration: var(--dur-quick);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 [role='alert'] {
@@ -180,6 +219,30 @@ button:disabled {
 
 .form-error {
   color: var(--red);
+  animation: form-error-shake var(--dur-slow) var(--ease-standard);
+}
+
+@keyframes form-error-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  14%,
+  43%,
+  71% {
+    transform: translateX(-6px);
+  }
+  28%,
+  57%,
+  86% {
+    transform: translateX(6px);
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-standard);
+  animation-timing-function: var(--ease-standard);
 }
 
 .launchpad {
@@ -252,5 +315,22 @@ button:disabled {
 
   .launch-button {
     max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .action-link {
+    transition: none;
+  }
+
+  .form-error {
+    animation: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
   }
 }

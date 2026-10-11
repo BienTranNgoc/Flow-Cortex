@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
+import { Pipeline } from './Pipeline';
+import { stepKey } from './stepDisplay';
 import { startRunSchema, type StartRunFormValues } from './startRunSchema';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 
 /** Start form of a workflow whose first step runs inline: an optional text input. */
 function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
-  const navigate = useNavigate();
+  const { go } = useTransitionNavigate();
   const startRunMutation = useStartRunMutation(workflowId);
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
@@ -28,7 +31,7 @@ function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
     startRunMutation.mutate(trimmedInput ? { input: trimmedInput } : {}, {
       onSuccess: (run) => {
         if (run.id) {
-          navigate(`/workflows/${workflowId}/runs/${run.id}`);
+          go(`/workflows/${workflowId}/runs/${run.id}`);
         }
       },
     });
@@ -85,11 +88,12 @@ export function WorkflowDetailPage() {
       <h1>{workflow.name}</h1>
       {workflow.isShared && <p>Shared with every member.</p>}
       {workflow.steps && workflow.steps.length > 0 && (
-        <ol className="workflow-steps">
-          {workflow.steps.map((step) => (
-            <li key={step.id}>{step.name ?? `Step ${step.stepOrder}`}</li>
-          ))}
-        </ol>
+        <Pipeline
+          steps={workflow.steps.map((step) => ({
+            id: stepKey(step),
+            name: step.name ?? `Step ${step.stepOrder}`,
+          }))}
+        />
       )}
       {startsWithUpload ? <MediaStartForm workflowId={id} /> : <InlineStartForm workflowId={id} />}
     </main>

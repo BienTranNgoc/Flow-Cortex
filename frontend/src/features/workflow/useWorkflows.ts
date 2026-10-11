@@ -73,6 +73,12 @@ export function useReviewTasksQuery(runId: string) {
   return useQuery({
     queryKey: ['runs', runId, 'review-tasks'],
     queryFn: () => unwrap(getReviewTasks(runId, authHeaders())),
+    // A review can be created a moment after the run already reads as waiting for it.
+    refetchInterval: (query) =>
+      query.state.status === 'success' &&
+      !query.state.data?.some((task) => task.status === 'pending')
+        ? 1000
+        : false,
   });
 }
 

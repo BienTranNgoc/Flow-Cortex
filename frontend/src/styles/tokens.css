@@ -21,6 +21,7 @@
   --line: #26313d;
   --line-2: #334352;
   --input-border: #62727f;
+  --edge: var(--input-border);
 
   /* Brand */
   --primary: #35e5e0;
@@ -29,6 +30,7 @@
   --cta-to: #5174ff;
   --accent: #5f9cff;
   --accent-soft: #1b2440;
+  --primary-soft: #0b2a2c;
 
   /* Status */
   --red: #ff9a9a;
@@ -51,7 +53,14 @@
 
   /* Shape and size */
   --radius-sm: 4px;
+  --radius-md: 8px;
   --radius-lg: 14px;
   --radius-full: 9999px;
   --target-min: 44px;
+
+  /* Motion */
+  --dur-quick: 120ms;
+  --dur-standard: 220ms;
+  --dur-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
