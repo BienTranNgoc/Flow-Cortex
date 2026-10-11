@@ -56,12 +56,11 @@ export function LoginPage() {
   const serverError =
     loginMutation.error instanceof ApiError ? loginMutation.error.problem?.detail : undefined;
 
-  const buttonLabel =
-    submitState === 'success'
-      ? '✓ Signed in'
-      : submitState === 'pending'
-        ? 'Signing in…'
-        : 'Sign in to Studio →';
+  const buttonLabel = (() => {
+    if (submitState === 'success') return '✓ Signed in';
+    if (submitState === 'pending') return 'Signing in…';
+    return 'Sign in to Studio →';
+  })();
 
   return (
     <div className="auth-page">
@@ -78,15 +77,15 @@ export function LoginPage() {
           <ul className="brand-panel__bullets">
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Three production pipelines ready out of the box
+              <span>Three production pipelines ready out of the box</span>
             </li>
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Human review gates built into every multi-step run
+              <span>Human review gates built into every multi-step run</span>
             </li>
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Output retention and signed download links by default
+              <span>Output retention and signed download links by default</span>
             </li>
           </ul>
         </div>

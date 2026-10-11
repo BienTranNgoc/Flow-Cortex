@@ -7,7 +7,7 @@ import './AppShell.css';
  * this shell is only for the sign-in / sign-up flow so we never flash
  * auth chrome on a public page.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { readonly children: React.ReactNode }) {
   return (
     <div className="public-shell">
       <div className="aurora-bg" aria-hidden="true">

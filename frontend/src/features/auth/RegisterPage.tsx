@@ -47,12 +47,11 @@ export function RegisterPage() {
       ? registerMutation.error.problem?.detail
       : undefined;
 
-  const buttonLabel =
-    submitState === 'success'
-      ? '✓ Account created'
-      : submitState === 'pending'
-        ? 'Creating account…'
-        : 'Get started free →';
+  const buttonLabel = (() => {
+    if (submitState === 'success') return '✓ Account created';
+    if (submitState === 'pending') return 'Creating account…';
+    return 'Get started free →';
+  })();
 
   return (
     <div className="auth-page">
@@ -69,15 +68,15 @@ export function RegisterPage() {
           <ul className="brand-panel__bullets">
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Three production pipelines ready out of the box
+              <span>Three production pipelines ready out of the box</span>
             </li>
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Human review gates built into every multi-step run
+              <span>Human review gates built into every multi-step run</span>
             </li>
             <li>
               <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              Output retention and signed download links by default
+              <span>Output retention and signed download links by default</span>
             </li>
           </ul>
         </div>

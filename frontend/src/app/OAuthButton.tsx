@@ -3,9 +3,9 @@
 // `onSelect` body when OAuth is added to the API.
 
 export interface OAuthButtonProps {
-  provider: 'google' | 'github' | 'microsoft';
-  label: string;
-  onSelect?: (provider: OAuthButtonProps['provider']) => void;
+  readonly provider: 'google' | 'github' | 'microsoft';
+  readonly label: string;
+  readonly onSelect?: (provider: OAuthButtonProps['provider']) => void;
 }
 
 const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {

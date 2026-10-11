@@ -246,7 +246,6 @@
 /* Eyebrow — gradient text that slowly pans. */
 .eyebrow {
   margin: 0 0 0.5rem;
-  color: #35e5e0;
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -477,7 +476,7 @@
 .primary-button:disabled {
   cursor: not-allowed;
   background: linear-gradient(100deg, #1a3540, #2a3a55);
-  color: #5a6b78;
+  color: #7a8a96;
   animation: none;
 }
 
