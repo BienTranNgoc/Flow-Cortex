@@ -1,86 +1,55 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { ApiError } from '@flow-cortex/api-client';
+import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
-import { useAuthToken, useRegisterMutation } from './useAuth';
-
-type SubmitState = 'idle' | 'pending' | 'success';
+import {
+  detailFrom,
+  useAuthToken,
+  useRegisterMutation,
+  useSubmitState,
+} from './useAuth';
 
 export function RegisterPage() {
   const token = useAuthToken();
   const navigate = useNavigate();
   const registerMutation = useRegisterMutation();
-  const [submitState, setSubmitState] = useState<SubmitState>('idle');
+  const submit = useSubmitState(registerMutation);
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
 
-  useEffect(() => {
-    if (registerMutation.isError) {
-      setSubmitState('idle');
-    }
-  }, [registerMutation.isError]);
-
   if (token) {
     return <Navigate to="/" replace />;
   }
 
   const onSubmit = handleSubmit(({ confirmPassword: _confirmPassword, ...values }) => {
-    setSubmitState('pending');
+    submit.setState('pending');
     registerMutation.mutate(values, {
       onSuccess: () => {
-        setSubmitState('success');
+        submit.setState('success');
         window.setTimeout(() => navigate('/', { replace: true }), 220);
       },
       onError: () => {
-        setSubmitState('idle');
+        submit.setState('idle');
       },
     });
   });
-  const serverError =
-    registerMutation.error instanceof ApiError
-      ? registerMutation.error.problem?.detail
-      : undefined;
+
+  const serverError = detailFrom(registerMutation);
 
   const buttonLabel = (() => {
-    if (submitState === 'success') return '✓ Account created';
-    if (submitState === 'pending') return 'Creating account…';
+    if (submit.state === 'success') return '✓ Account created';
+    if (submit.state === 'pending') return 'Creating account…';
     return 'Get started free →';
   })();
 
   return (
     <div className="auth-page">
-      <aside className="brand-panel" aria-hidden="false">
-        <div className="brand-panel__inner">
-          <p className="eyebrow">FLOWCORTEX AI 2.5</p>
-          <h2 className="brand-panel__headline">
-            Your AI media <span>studio</span> for production-grade pipelines.
-          </h2>
-          <p className="brand-panel__lede">
-            Source, process, review and export media in one click — built for creators
-            who need consistent output, not another toy.
-          </p>
-          <ul className="brand-panel__bullets">
-            <li>
-              <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              <span>Three production pipelines ready out of the box</span>
-            </li>
-            <li>
-              <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              <span>Human review gates built into every multi-step run</span>
-            </li>
-            <li>
-              <span className="brand-panel__bullet-dot" aria-hidden="true" />
-              <span>Output retention and signed download links by default</span>
-            </li>
-          </ul>
-        </div>
-      </aside>
+      <BrandPanel />
 
       <section className="auth-card">
         <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
@@ -153,8 +122,8 @@ export function RegisterPage() {
           <button
             className="primary-button"
             type="submit"
-            data-state={submitState}
-            disabled={submitState !== 'idle'}
+            data-state={submit.state}
+            disabled={submit.state !== 'idle'}
           >
             {buttonLabel}
           </button>
