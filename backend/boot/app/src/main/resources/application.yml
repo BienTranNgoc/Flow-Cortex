@@ -2,6 +2,15 @@ spring:
   application:
     name: flow-cortex
 
+  # Two class-path candidates register the same bean 'rabbitTemplateCustomizer':
+  #   org.springframework.modulith.events.amqp.RabbitJacksonConfiguration
+  #   org.springframework.modulith.events.amqp.RabbitJackson2Configuration
+  # Both come in transitively via spring-boot-starter-amqp (test classpath), and Boot 4
+  # fails fast on the duplicate. The last one to register wins — the behavior is identical
+  # (both bind a Jackson 2 message converter) and we don't otherwise customize the bean.
+  main:
+    allow-bean-definition-overriding: true
+
   # Local defaults for a bare `./gradlew bootRun` against a manually-started
   # Postgres; SPRING_DATASOURCE_* env vars (docker compose) and Testcontainers
   # @ServiceConnection (tests) override them. The password is never defaulted
@@ -146,6 +155,25 @@ jdbc:
 flowcortex:
   security:
     jwt-secret: ${JWT_SECRET:}
+    # Google OAuth 2.0 — empty client-id/secret is allowed in dev (the OAuth
+    # endpoints answer 503); the prod deployment sets the real values from
+    # Google Cloud Console. Redirect URIs is a hard allow-list — anything
+    # outside returns 400 from /authorize.
+    oauth:
+      google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+        redirect-uris: ${GOOGLE_REDIRECT_URIS:http://localhost:5173/oauth/google/callback}
+        state-ttl: ${OAUTH_STATE_TTL:10m}
+        require-explicit-link: ${OAUTH_REQUIRE_EXPLICIT_LINK:true}
+    # Access JWT lifetime. Refresh-token TTLs and the per-user cap live one
+    # level deeper; defaults match the proposal §G2/G3.
+    jwt:
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+    refresh-token:
+      ttl: ${REFRESH_TOKEN_TTL:7d}
+      remember-me-ttl: ${REFRESH_TOKEN_REMEMBER_ME_TTL:30d}
+      max-active-per-user: ${REFRESH_TOKEN_MAX_ACTIVE_PER_USER:10}
   # Kill switch for the admin console's API (/api/v1/admin/**): off answers 503 there, after the
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
@@ -203,7 +231,10 @@ flowcortex:
       bucket: ${S3_BUCKET:flowcortex-media}
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
-      # Bound every call the API itself makes to the store, retries included, so a store that
-      # accepts the connection and never answers cannot hold a request or a health check.
+    # Bound every call the API itself makes to the store, retries included, so a store that
+    # accepts the connection and never answers cannot hold a request or a health check.
       api-call-timeout: 5s
       api-call-attempt-timeout: 2s
+    cors:
+      allowed-origins: ${FLOWCORTEX_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+      allow-credentials: ${FLOWCORTEX_CORS_ALLOW_CREDENTIALS:true}
