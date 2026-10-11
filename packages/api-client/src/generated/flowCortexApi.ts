@@ -157,10 +157,22 @@ export interface RegisterRequest {
   password: string;
   /** @minLength 1 */
   name: string;
+  rememberMe?: boolean;
 }
 
-export interface LoginResponse {
-  token?: string;
+export interface TokenPairResponse {
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
+}
+
+export interface RefreshRequest {
+  refreshToken?: string;
+}
+
+export interface LogoutRequest {
+  refreshToken?: string;
 }
 
 export interface LoginRequest {
@@ -168,6 +180,7 @@ export interface LoginRequest {
   email: string;
   /** @minLength 1 */
   password: string;
+  rememberMe?: boolean;
 }
 
 export type WorkflowStepResponseMode =
@@ -249,6 +262,17 @@ export interface PageViewMediaJobResponse {
   size: number;
   total: number;
 }
+
+export type CallbackParams = {
+  code: string;
+  state: string;
+  redirect_uri?: string;
+  rememberMe?: boolean;
+};
+
+export type AuthorizeParams = {
+  redirect_uri: string;
+};
 
 export type ListAdminRunsParams = {
   /**
@@ -713,7 +737,7 @@ export const approveTask = async (
 };
 
 export type registerResponse200 = {
-  data: LoginResponse;
+  data: TokenPairResponse;
   status: 200;
 };
 
@@ -762,8 +786,108 @@ export const register = async (
   return { data, status: res.status, headers: res.headers } as registerResponse;
 };
 
+export type refreshResponse200 = {
+  data: TokenPairResponse;
+  status: 200;
+};
+
+export type refreshResponseSuccess = refreshResponse200 & {
+  headers: Headers;
+};
+export type refreshResponse = refreshResponseSuccess;
+
+export const getRefreshUrl = () => {
+  return `/api/v1/auth/refresh`;
+};
+
+export const refresh = async (
+  refreshRequest?: RefreshRequest,
+  options?: RequestInit,
+): Promise<refreshResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getRefreshUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(refreshRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: refreshResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as refreshResponse;
+};
+
+export type logoutResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type logoutResponseSuccess = logoutResponse200 & {
+  headers: Headers;
+};
+export type logoutResponse = logoutResponseSuccess;
+
+export const getLogoutUrl = () => {
+  return `/api/v1/auth/logout`;
+};
+
+export const logout = async (
+  logoutRequest?: LogoutRequest,
+  options?: RequestInit,
+): Promise<logoutResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getLogoutUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(logoutRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: logoutResponse['data'] = body ? JSON.parse(body) : undefined;
+  return { data, status: res.status, headers: res.headers } as logoutResponse;
+};
+
 export type loginResponse200 = {
-  data: LoginResponse;
+  data: TokenPairResponse;
   status: 200;
 };
 
@@ -977,6 +1101,88 @@ export const health = async (options?: RequestInit): Promise<healthResponse> => 
 
   const data: healthResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as healthResponse;
+};
+
+export type callbackResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type callbackResponseSuccess = callbackResponse200 & {
+  headers: Headers;
+};
+export type callbackResponse = callbackResponseSuccess;
+
+export const getCallbackUrl = (params: CallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/auth/oauth/google/callback?${stringifiedParams}`
+    : `/api/v1/auth/oauth/google/callback`;
+};
+
+export const callback = async (
+  params: CallbackParams,
+  options?: RequestInit,
+): Promise<callbackResponse> => {
+  const res = await fetch(getCallbackUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: callbackResponse['data'] = body ? JSON.parse(body) : undefined;
+  return { data, status: res.status, headers: res.headers } as callbackResponse;
+};
+
+export type authorizeResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type authorizeResponseSuccess = authorizeResponse200 & {
+  headers: Headers;
+};
+export type authorizeResponse = authorizeResponseSuccess;
+
+export const getAuthorizeUrl = (params: AuthorizeParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/auth/oauth/google/authorize?${stringifiedParams}`
+    : `/api/v1/auth/oauth/google/authorize`;
+};
+
+export const authorize = async (
+  params: AuthorizeParams,
+  options?: RequestInit,
+): Promise<authorizeResponse> => {
+  const res = await fetch(getAuthorizeUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: authorizeResponse['data'] = body ? JSON.parse(body) : undefined;
+  return { data, status: res.status, headers: res.headers } as authorizeResponse;
 };
 
 export type meResponse200 = {
