@@ -476,7 +476,7 @@
 .primary-button:disabled {
   cursor: not-allowed;
   background: linear-gradient(100deg, #1a3540, #2a3a55);
-  color: #7a8a96;
+  color: #a8b6c2;
   animation: none;
 }
 
