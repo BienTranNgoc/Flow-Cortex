@@ -45,6 +45,24 @@ public class AppUser {
     @Column(name = "status", nullable = false)
     private UserStatus status;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    private short failedLoginAttempts;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion;
+
+    @Column(name = "google_subject")
+    private String googleSubject;
+
+    @Column(name = "has_password", nullable = false)
+    private boolean hasPassword;
+
+    @Column(name = "oauth_provider")
+    private String oauthProvider;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -57,13 +75,21 @@ public class AppUser {
 
     public AppUser(UUID id, UUID ownerId, String email, String passwordHash, String name, Role role,
             UserStatus status) {
+        this(id, ownerId, email, passwordHash, name, role, status, true);
+    }
+
+    /** Constructor that exposes {@code hasPassword} — used by the OAuth-only path. */
+    public AppUser(UUID id, UUID ownerId, String email, String passwordHash, String name, Role role,
+            UserStatus status, boolean hasPassword) {
         this.id = id;
         this.ownerId = ownerId;
         this.email = email;
-        this.passwordHash = passwordHash;
+        this.passwordHash = passwordHash == null ? "" : passwordHash;
         this.name = name;
         this.role = role;
         this.status = status;
+        this.hasPassword = hasPassword;
+        this.tokenVersion = 0L;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
@@ -95,6 +121,30 @@ public class AppUser {
 
     public UserStatus getStatus() {
         return status;
+    }
+
+    public short getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public Instant getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public String getGoogleSubject() {
+        return googleSubject;
+    }
+
+    public boolean hasPassword() {
+        return hasPassword;
+    }
+
+    public String getOauthProvider() {
+        return oauthProvider;
     }
 
     public Instant getCreatedAt() {
@@ -132,6 +182,48 @@ public class AppUser {
 
     public void changeStatus(UserStatus status) {
         this.status = status;
+        touch();
+    }
+
+    /**
+     * Increments the failed-login counter and locks the account once it reaches {@code
+     * maxAttempts}. A lockout window already in effect is left as-is — a lock-out during a
+     * lock-out would just slide the wall forward, which an attacker would use to keep the
+     * account permanently locked.
+     */
+    public void recordFailedLogin(int maxAttempts, java.time.Duration lockoutDuration, Instant now) {
+        this.failedLoginAttempts = (short) Math.min(this.failedLoginAttempts + 1, Short.MAX_VALUE);
+        touch();
+        if (this.lockedUntil == null && this.failedLoginAttempts >= maxAttempts) {
+            this.lockedUntil = now.plus(lockoutDuration);
+        }
+    }
+
+    /** Successful login clears the counter and any in-effect lockout window. */
+    public void resetFailedLoginAttempts(Instant now) {
+        this.failedLoginAttempts = 0;
+        this.lockedUntil = null;
+        this.updatedAt = now;
+    }
+
+    /** Bump after a logout so previously-issued access JWTs (carrying the old `tv`) fail validation. */
+    public void bumpTokenVersion() {
+        this.tokenVersion = this.tokenVersion + 1L;
+        touch();
+    }
+
+    /** Link a verified Google subject to this account. Idempotent on the same subject. */
+    public void linkGoogle(String subject) {
+        this.googleSubject = subject;
+        if (this.oauthProvider == null) {
+            this.oauthProvider = "google";
+        }
+        touch();
+    }
+
+    public void unlinkGoogle() {
+        this.googleSubject = null;
+        this.oauthProvider = null;
         touch();
     }
 }

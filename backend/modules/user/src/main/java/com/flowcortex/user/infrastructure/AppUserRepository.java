@@ -23,6 +23,10 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
 
     Optional<AppUser> findByEmail(String email);
 
+    Optional<AppUser> findByEmailAndHasPasswordTrue(String email);
+
+    Optional<AppUser> findByGoogleSubject(String googleSubject);
+
     Optional<AppUser> findByOwnerIdAndEmail(UUID ownerId, String email);
 
     Optional<AppUser> findByOwnerIdAndId(UUID ownerId, UUID id);
