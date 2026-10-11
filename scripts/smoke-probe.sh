@@ -40,7 +40,7 @@ login() {
   local email=$1 password=$2
   curl -sS --fail-with-body -H 'Content-Type: application/json' \
     -d "$(jq -n --arg e "$email" --arg p "$password" '{email: $e, password: $p}')" \
-    "$API_URL/api/v1/auth/login" | jq -er .token
+    "$API_URL/api/v1/auth/login" | jq -er .accessToken
 }
 
 # GET or POST (with a JSON body) as the given token; prints the response body.
