@@ -1,162 +1,124 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { Route } from 'react-router-dom';
-import { renderRoute, settled, stubApi } from '../test/fakeApi';
+import { renderRoute, stubApi } from '../test/fakeApi';
 import { HomePage } from './HomePage';
 
 const ME = { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
-const LINE = 'Have a video or audio file? Check it →';
-const SOURCE = 'https://www.tiktok.com/@creator/video/123';
 
-function workflow(id: string, name: string, types: string[]): WorkflowResponse {
+function echoWorkflow(id: string, name: string): WorkflowResponse {
   return {
     id,
     name,
     isShared: true,
-    steps: types.map((type, index) => ({
-      id: `${id}-s${index + 1}`,
-      stepOrder: index + 1,
-      name: `Step ${index + 1}`,
-      type,
-      mode: type === 'probe' || type === 'extract_audio' ? 'remote' : 'inline',
-    })),
+    steps: [
+      { id: `${id}-s1`, stepOrder: 1, name: 'Step 1', type: 'echo', mode: 'inline' },
+      { id: `${id}-s2`, stepOrder: 2, name: 'Step 2', type: 'echo', mode: 'inline' },
+    ],
   };
 }
 
-function renderHome() {
-  return renderRoute(
-    '/',
-    '/',
-    <HomePage />,
-    <Route path="/workflows/:id" element={<p>Start form</p>} />,
-  );
+function probeWorkflow(id: string, name: string): WorkflowResponse {
+  return {
+    id,
+    name,
+    isShared: true,
+    steps: [
+      { id: `${id}-s1`, stepOrder: 1, name: 'Inspect the file', type: 'probe', mode: 'remote' },
+      { id: `${id}-s2`, stepOrder: 2, name: 'Extract source audio', type: 'extract_audio', mode: 'remote' },
+    ],
+  };
 }
 
-describe('HomePage', () => {
+describe('HomePage — launchpad cards', () => {
   beforeEach(() => setToken('t'));
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
   });
 
-  it('links to the first listed workflow whose first step is remote, whatever it is called', async () => {
+  function renderHome() {
+    return renderRoute(
+      '/',
+      '/',
+      <HomePage />,
+      <Route path="/workflows/:id" element={<p>Detail page</p>} />,
+    );
+  }
+
+  it('renders all three showcase cards regardless of API', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('mixed', 'Probe then echo', ['probe', 'echo']),
-          workflow('check', 'Renamed by its owner', ['probe', 'extract_audio']),
-        ],
-      },
+      'GET /api/v1/workflows': { status: 200, body: [] },
     });
 
     renderHome();
-
-    const link = await screen.findByRole('link', { name: LINE });
-    expect(link).toHaveAttribute('href', '/workflows/mixed');
-  });
-
-  it('omits the line when no workflow starts with a remote step', async () => {
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('echo-probe', 'Echo then probe', ['echo', 'probe']),
-        ],
-      },
-    });
-
-    const { queryClient } = renderHome();
-
-    await screen.findByText('Welcome, Member One');
-    await settled(queryClient);
-    expect(screen.queryByText(LINE)).not.toBeInTheDocument();
-  });
-
-  it('shows no link while the list is still loading', async () => {
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': async () => {
-        await gate;
-        return {
-          status: 200,
-          body: [workflow('check', 'Check a video file', ['probe', 'extract_audio'])],
-        };
-      },
-    });
-
-    renderHome();
-
-    await screen.findByText('Welcome, Member One');
-    expect(screen.queryByRole('link', { name: LINE })).not.toBeInTheDocument();
-    release();
-    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
-      'href',
-      '/workflows/check',
-    );
-  });
-
-  it('starts the first workflow whose first step is not remote, never a probe-only one, whatever the names say', async () => {
-    const calls = stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [
-          workflow('probe-only', 'TikTok link probe', ['probe']),
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('url', 'TikTok URL Pipeline', ['echo']),
-        ],
-      },
-      'POST /api/v1/workflows/echo/runs': {
-        status: 200,
-        body: { id: 'run-echo', status: 'running' },
-      },
-    });
-
-    renderHome();
-
-    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
-      'href',
-      '/workflows/probe-only',
-    );
-    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
-    fireEvent.click(screen.getByRole('button', { name: /Generate pipeline/ }));
-
-    await waitFor(() =>
-      expect(calls).toContainEqual({
-        method: 'POST',
-        path: '/api/v1/workflows/echo/runs',
-        body: { input: SOURCE },
-      }),
-    );
-    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
-  });
-
-  it('disables the launch when every workflow starts with a remote step', async () => {
-    const calls = stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [workflow('probe-only', 'Probe only', ['probe'])],
-      },
-    });
-
-    const { queryClient } = renderHome();
 
     expect(
-      await screen.findByText('No workflow is available for this account yet.'),
+      await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' }),
     ).toBeInTheDocument();
-    await settled(queryClient);
-    const button = screen.getByRole('button', { name: /Generate pipeline/ });
-    expect(button).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
-    fireEvent.click(button);
-    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
+    expect(
+      screen.getByRole('heading', { name: 'Product Content & Video' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Check Video' }),
+    ).toBeInTheDocument();
+  });
+
+  it('disables every card when no workflow matches a card name', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [echoWorkflow('wf-other', 'Some Other')] },
+    });
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' });
+    expect(screen.queryAllByRole('link', { name: /Launch Workflow/ })).toHaveLength(0);
+    expect(screen.getAllByText('Coming soon')).toHaveLength(3);
+  });
+
+  it('links a card to its API workflow when one with the exact name exists', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [probeWorkflow('wf-check', 'Check Video')],
+      },
+    });
+
+    renderHome();
+
+    const link = await screen.findByRole('link', { name: /Launch Workflow/ });
+    expect(link).toHaveAttribute('href', '/workflows/wf-check');
+  });
+
+  it('renders the stage chips for each card', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [] },
+    });
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' });
+    expect(screen.getByText('Video Ingest')).toBeInTheDocument();
+    expect(screen.getByText('Demucs BGM Separation')).toBeInTheDocument();
+    expect(screen.getByText('ElevenLabs V6 Dub')).toBeInTheDocument();
+    expect(screen.getByText('Shopee/Shop Scrape')).toBeInTheDocument();
+    expect(screen.getByText('USF Feature Extraction')).toBeInTheDocument();
+    expect(screen.getByText('Inspect the file')).toBeInTheDocument();
+    expect(screen.getByText('Extract source audio')).toBeInTheDocument();
+  });
+
+  it('shows a load error when the API fails', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 500, body: { detail: 'boom' } },
+    });
+
+    renderHome();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load workflows');
   });
 });

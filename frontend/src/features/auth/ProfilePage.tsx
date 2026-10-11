@@ -3,12 +3,14 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
+import { Navigate, useLocation } from 'react-router-dom';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 
 /** Fix my own display name; email/role/status are not self-service. */
 export function ProfilePage() {
   const meQuery = useMeQuery();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const {
     register,
@@ -32,7 +34,7 @@ export function ProfilePage() {
     return <output>Loading…</output>;
   }
   if (meQuery.isError || !meQuery.data) {
-    return <p role="alert">Could not load your profile.</p>;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));

@@ -1,97 +1,224 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ApiError, type WorkflowResponse } from '@flow-cortex/api-client';
-import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { type WorkflowResponse } from '@flow-cortex/api-client';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
-import { launchpadSchema, type LaunchpadFormValues } from '../features/workflow/launchpadSchema';
-import { useStartRunMutation, useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import './HomePage.css';
 
-/** A workflow whose first step runs on the media engine needs an uploaded file, not a link. */
-function isUploadWorkflow(workflow: WorkflowResponse) {
-  return workflow.steps?.[0]?.mode === 'remote';
+type Stage = { label: string; tone: 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'rose' };
+
+type CardSpec = {
+  /** Matches against `workflow.name` returned by the API. */
+  name: string;
+  icon: string;
+  iconTone: 'blue' | 'cyan' | 'amber';
+  priority: 'P0' | 'P1' | 'P2';
+  category: string;
+  categoryTone: 'gold' | 'cyan' | 'violet';
+  status: 'Ready' | 'Live' | 'Beta';
+  statusTone: 'green' | 'cyan' | 'amber';
+  etaSeconds: number;
+  stages: readonly Stage[];
+  gpuCredits: number;
+};
+
+/** Three showcase cards. Each card picks its real workflow by `name` from the API list. */
+const CARDS: readonly CardSpec[] = [
+  {
+    name: 'Dougyin Translation & Dubbing',
+    icon: 'DT',
+    iconTone: 'blue',
+    priority: 'P0',
+    category: 'CORE MVP',
+    categoryTone: 'gold',
+    status: 'Ready',
+    statusTone: 'green',
+    etaSeconds: 45,
+    stages: [
+      { label: 'Video Ingest', tone: 'blue' },
+      { label: 'Scrap', tone: 'cyan' },
+      { label: 'Demucs BGM Separation', tone: 'violet' },
+      { label: 'Human Gate Review', tone: 'amber' },
+      { label: 'ElevenLabs V6 Dub', tone: 'blue' },
+    ],
+    gpuCredits: 1,
+  },
+  {
+    name: 'Product Content & Video',
+    icon: 'PV',
+    iconTone: 'cyan',
+    priority: 'P1',
+    category: 'E-COMMERCE',
+    categoryTone: 'cyan',
+    status: 'Live',
+    statusTone: 'cyan',
+    etaSeconds: 60,
+    stages: [
+      { label: 'Shopee/Shop Scrape', tone: 'cyan' },
+      { label: 'USF Feature Extraction', tone: 'violet' },
+      { label: 'Script Approval Gate', tone: 'amber' },
+      { label: 'Multi-Aspect', tone: 'blue' },
+    ],
+    gpuCredits: 1,
+  },
+  {
+    name: 'Check Video',
+    icon: 'CV',
+    iconTone: 'amber',
+    priority: 'P1',
+    category: 'MEDIA INTAKE',
+    categoryTone: 'violet',
+    status: 'Live',
+    statusTone: 'cyan',
+    etaSeconds: 30,
+    stages: [
+      { label: 'Inspect the file', tone: 'blue' },
+      { label: 'Extract source audio', tone: 'cyan' },
+    ],
+    gpuCredits: 0,
+  },
+];
+
+function findWorkflowByName(
+  workflows: readonly WorkflowResponse[] | undefined,
+  name: string,
+): WorkflowResponse | undefined {
+  return workflows?.find((wf) => wf.name === name);
+}
+
+function formatEta(seconds: number): string {
+  return `~${seconds}s`;
 }
 
 export function HomePage() {
-  const navigate = useNavigate();
+  const location = useLocation();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  const uploadWorkflow = workflowsQuery.data?.find(isUploadWorkflow);
-  const workflow = workflowsQuery.data?.find((candidate) => !isUploadWorkflow(candidate));
-  const startRunMutation = useStartRunMutation(workflow?.id ?? '');
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LaunchpadFormValues>({ resolver: zodResolver(launchpadSchema) });
 
   if (meQuery.isLoading) return <output>Loading…</output>;
   if (meQuery.isError || !meQuery.data) {
-    return <p role="alert">Could not load your account.</p>;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
-
-  const onSubmit = handleSubmit(({ sourceUrl }) => {
-    if (!workflow?.id) return;
-    startRunMutation.mutate(
-      { input: sourceUrl.trim() },
-      {
-        onSuccess: (run) => {
-          if (run.id) navigate(`/runs/${run.id}`);
-        },
-      },
-    );
-  });
-  const serverError =
-    startRunMutation.error instanceof ApiError ? startRunMutation.error.problem?.detail : undefined;
 
   return (
     <main className="launchpad">
       <section className="launchpad-hero">
         <p className="eyebrow">CREATOR LAUNCHPAD · READY TO CREATE</p>
         <h1>
-          Turn any link or prompt into AI media <span>pipeline</span>
+          Your AI media <span>studio</span>
         </h1>
         <p>
-          Automate scripting, voiceover, visuals and video composition in seconds with your
-          production-ready workflows.
+          One click launches a production-ready pipeline: source, process, review, export.
         </p>
       </section>
-      <section className="launchpad-card">
-        <p className="eyebrow">1 · SOURCE INPUT</p>
-        <h2>Drop a TikTok or Douyin link</h2>
-        <form onSubmit={onSubmit} noValidate aria-label="Start media pipeline">
-          <div className="field">
-            <label htmlFor="source-url">Source URL</label>
-            <input
-              id="source-url"
-              placeholder="https://www.tiktok.com/@creator/video/..."
-              {...register('sourceUrl')}
-            />
-            {errors.sourceUrl && <p role="alert">{errors.sourceUrl.message}</p>}
-          </div>
-          {serverError && (
-            <p role="alert" className="form-error">
-              {serverError}
-            </p>
-          )}
-          <button
-            className="primary-button launch-button"
-            type="submit"
-            disabled={startRunMutation.isPending || !workflow}
-          >
-            {startRunMutation.isPending ? 'Starting pipeline…' : 'Generate pipeline →'}
-          </button>
-          {!workflow && !workflowsQuery.isLoading && (
-            <p role="alert">No workflow is available for this account yet.</p>
-          )}
-        </form>
-      </section>
-      <section className="launchpad-footer">
-        <p>Welcome, {meQuery.data.name}</p>
-        {uploadWorkflow?.id && (
-          <Link className="action-link" to={`/workflows/${uploadWorkflow.id}`}>
-            Have a video or audio file? Check it →
-          </Link>
+
+      <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
+        <h2 id="launchpad-cards-title" className="launchpad-section-title">
+          Pick a pipeline
+        </h2>
+        {workflowsQuery.isLoading && <output>Loading workflows…</output>}
+        {workflowsQuery.isError && (
+          <p role="alert" className="form-error">
+            Could not load workflows.
+          </p>
         )}
+        {!workflowsQuery.isLoading && !workflowsQuery.isError && (
+          <div className="workflow-grid">
+            {CARDS.map((card) => {
+              const workflow = findWorkflowByName(workflowsQuery.data, card.name);
+              const linkTo = workflow ? `/workflows/${workflow.id}` : '/workflows';
+              const disabled = !workflow;
+              return (
+                <article
+                  key={card.name}
+                  className={`workflow-card-tile${disabled ? ' is-disabled' : ''}`}
+                >
+                  <header className="workflow-card-header">
+                    <span className={`workflow-card-icon tone-${card.iconTone}`} aria-hidden="true">
+                      {card.icon}
+                    </span>
+                    <span className="workflow-card-priority">{card.priority}</span>
+                    <span className={`workflow-card-category tone-${card.categoryTone}`}>
+                      {card.category}
+                    </span>
+                    <span className={`workflow-card-status tone-${card.statusTone}`}>
+                      <span className="workflow-card-dot" aria-hidden="true" />
+                      {card.status}
+                    </span>
+                    <span className="workflow-card-eta" aria-label="Estimated duration">
+                      {formatEta(card.etaSeconds)}
+                    </span>
+                  </header>
+
+                  <h3 className="workflow-card-title">{card.name}</h3>
+
+                  <ul className="workflow-card-stages">
+                    {card.stages.map((stage) => (
+                      <li key={stage.label} className={`workflow-card-stage tone-${stage.tone}`}>
+                        {stage.label}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <footer className="workflow-card-footer">
+                    <span className="workflow-card-cost" aria-label="GPU credit cost">
+                      <span aria-hidden="true">⚡</span> {card.gpuCredits} GPU Credit
+                      {card.gpuCredits === 1 ? '' : 's'}
+                    </span>
+                    {disabled ? (
+                      <span className="workflow-card-launch disabled" aria-disabled="true">
+                        Coming soon
+                      </span>
+                    ) : (
+                      <Link className="workflow-card-launch" to={linkTo}>
+                        Launch Workflow →
+                      </Link>
+                    )}
+                  </footer>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="launchpad-stages" aria-labelledby="launchpad-stages-title">
+        <h2 id="launchpad-stages-title">How Flow-Cortex Handles Your Video Runs</h2>
+        <ol className="launchpad-stages-list">
+          <li className="launchpad-stage">
+            <span className="launchpad-stage-order" aria-hidden="true">
+              1
+            </span>
+            <h3>Source</h3>
+            <p>Submit a link or upload a media file. Required fields and limits are checked up front.</p>
+          </li>
+          <li className="launchpad-stage">
+            <span className="launchpad-stage-order" aria-hidden="true">
+              2
+            </span>
+            <h3>Process</h3>
+            <p>Workers run each step in order. Status, attempts and errors are saved on every node.</p>
+          </li>
+          <li className="launchpad-stage">
+            <span className="launchpad-stage-order" aria-hidden="true">
+              3
+            </span>
+            <h3>Review</h3>
+            <p>Pauses at the review gates you configured. Edit content, then approve to continue.</p>
+          </li>
+          <li className="launchpad-stage">
+            <span className="launchpad-stage-order" aria-hidden="true">
+              4
+            </span>
+            <h3>Export</h3>
+            <p>Download the finished output while it is still within the asset retention window.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section className="launchpad-footer">
+        <p>
+          Welcome, {meQuery.data.name} · <Link to="/workflows">View all workflows</Link>
+        </p>
       </section>
     </main>
   );

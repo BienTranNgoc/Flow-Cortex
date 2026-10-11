@@ -248,3 +248,123 @@
     width: 100%;
   }
 }
+
+/* /workflows landing — hero, 4-stage explainer, then the existing
+   workflow list, then a signed-in greeting. Mirrors the Launchpad rhythm
+   on HomePage so the two pages feel like one product. */
+
+.workflows {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.workflows-hero {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 2.5rem;
+}
+
+.workflows-hero h1 {
+  font-size: clamp(2rem, 5.5vw, 3.6rem);
+  line-height: 1.08;
+  margin: 0.8rem 0;
+}
+
+.workflows-hero h1 span {
+  color: #5f9cff;
+}
+
+.workflows-hero p:not(.eyebrow) {
+  color: #9eacb6;
+  margin: 0;
+}
+
+.workflows-stages {
+  margin: 0 0 2.5rem;
+  padding: clamp(1.2rem, 4vw, 2rem);
+  border: 1px solid #253746;
+  border-radius: 14px;
+  background: #101721;
+  box-shadow: 0 20px 60px #0005;
+}
+
+.workflows-stages h2 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  color: #e8f1f2;
+}
+
+.workflows-stages-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.workflows-stage {
+  padding: 0.85rem;
+  border: 1px solid #233443;
+  border-radius: 10px;
+  background: #0b1119;
+}
+
+.workflows-stage h3 {
+  margin: 0.35rem 0 0.35rem;
+  font-size: 0.95rem;
+  color: #e8f1f2;
+}
+
+.workflows-stage p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #9eacb6;
+  line-height: 1.4;
+}
+
+.workflows-stage-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(100deg, #1be0d1, #5174ff);
+  color: #061016;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.workflows-list-section {
+  margin: 0 0 1.5rem;
+}
+
+.workflows-list-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1rem, 2.3vw, 1.2rem);
+  color: #e8f1f2;
+}
+
+.workflows-footer {
+  margin: 1.25rem 0 0;
+  color: #81919e;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .workflows-stages-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .workflows {
+    padding: 1.5rem 0;
+  }
+
+  .workflows-stages-list {
+    grid-template-columns: 1fr;
+  }
+}
