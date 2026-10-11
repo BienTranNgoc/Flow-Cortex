@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.10.001`)
+## Current schema (`V2026.09.22.001` – `V2026.10.11.001`)
 
 ```mermaid
 erDiagram
@@ -16,6 +16,7 @@ erDiagram
   workflow ||--o{ workflow_run : "workflow_id"
   workflow_run ||--|{ run_step : "run_id"
   workflow_run ||--o{ media_asset_binding : "run_id"
+  workflow_run ||--o| product_video_input : "run_id"
   media_asset ||--o{ media_asset_binding : "asset_id"
 
   app_user {
@@ -42,7 +43,7 @@ erDiagram
     uuid workflow_id FK
     smallint step_order "UNIQUE (workflow_id, step_order), contiguous from 1"
     varchar name
-    varchar type "capability key: echo | fail (inline) | probe (remote, first step only)"
+    varchar type "inline, provider remote, media remote, or APPROVAL_CHECKPOINT"
     jsonb config
     varchar input_ref "{step:K.field}; NULL = previous step's output"
   }
@@ -98,6 +99,16 @@ erDiagram
     varchar binding_key PK "image_1 .. image_10"
     uuid asset_id FK
     smallint position "UNIQUE (run_id, position), preserves request order"
+    timestamptz created_at
+  }
+  product_video_input {
+    uuid run_id PK,FK
+    varchar product_name
+    varchar description
+    varchar cta
+    varchar price "optional confirmed claim"
+    varchar promotion "optional confirmed claim"
+    varchar aspect_ratio "9:16 in MVP"
     timestamptz created_at
   }
   event_publication {

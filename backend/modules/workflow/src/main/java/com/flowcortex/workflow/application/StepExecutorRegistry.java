@@ -42,6 +42,10 @@ class StepExecutorRegistry {
 
     private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock) {
         List<StepExecutor> executors = new ArrayList<>(List.of(new EchoStepExecutor(), new FailStepExecutor()));
+        executors.add(new ProviderStepExecutor("generate_script", "product_ad_v1", mediaJobs, clock,
+                java.time.Duration.ofMinutes(2), java.time.Duration.ofMinutes(5)));
+        executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock,
+                java.time.Duration.ofMinutes(2), java.time.Duration.ofMinutes(5)));
         Arrays.stream(MediaCapability.values())
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);
@@ -56,11 +60,19 @@ class StepExecutorRegistry {
         return find(type).map(executor -> executor.mode() == StepExecutor.Mode.REMOTE).orElse(false);
     }
 
+    boolean usesStoredInput(String type) {
+        return find(type).map(executor -> executor.inputPolicy() == StepExecutor.InputPolicy.STORED).orElse(false);
+    }
+
     Set<String> knownTypes() {
         return byType.keySet();
     }
 
     Set<String> remoteTypes() {
         return byType.keySet().stream().filter(this::isRemote).collect(Collectors.toUnmodifiableSet());
+    }
+
+    Set<String> storedInputTypes() {
+        return byType.keySet().stream().filter(this::usesStoredInput).collect(Collectors.toUnmodifiableSet());
     }
 }

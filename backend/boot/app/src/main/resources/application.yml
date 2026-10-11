@@ -174,6 +174,10 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+  # Product Video is opt-in outside development. Turning it off blocks only new
+  # Product Video runs; existing runs remain readable and continue advancing.
+  product-video:
+    enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store

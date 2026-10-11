@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +56,7 @@ class WorkflowServiceImpl implements WorkflowService {
     public WorkflowView createWorkflow(UUID ownerId, String name, boolean shared, List<NewWorkflowStep> steps) {
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations =
                 validator.validate(new KnownStepTypes.Definition(steps, registry.knownTypes(),
-                        registry.knownTypes().stream().filter(registry::isRemote).collect(Collectors.toSet())));
+                        registry.storedInputTypes()));
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }

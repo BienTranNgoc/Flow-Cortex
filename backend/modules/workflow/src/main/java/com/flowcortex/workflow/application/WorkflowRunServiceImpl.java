@@ -120,6 +120,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Workflow execution is currently disabled");
         }
+        if (ProductVideoService.WORKFLOW_ID.equals(workflowId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start Product Video through /api/v1/product-videos/runs");
+        }
 
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException("Workflow not found: " + workflowId));

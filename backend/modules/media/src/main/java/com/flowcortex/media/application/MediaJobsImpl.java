@@ -8,6 +8,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
+import com.flowcortex.media.api.ProviderJob;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
@@ -70,6 +71,16 @@ class MediaJobsImpl implements MediaJobs {
             throw new ConstraintViolationException(violations);
         }
         events.publishEvent(new MediaJobRequested(job));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = ConstraintViolationException.class)
+    public void enqueueProvider(ProviderJob job) {
+        Set<ConstraintViolation<ProviderJob>> violations = validator.validate(job);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        events.publishEvent(new ProviderJobRequested(job));
     }
 
     @Override

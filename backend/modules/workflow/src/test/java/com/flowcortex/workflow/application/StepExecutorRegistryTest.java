@@ -30,7 +30,8 @@ class StepExecutorRegistryTest {
     @Test
     void theDemoTypesAndEveryMediaCapabilityAreKnown() {
         assertThat(registry.knownTypes())
-                .containsExactlyInAnyOrder("echo", "fail", "probe", "extract_audio", "render_video");
+                .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_speech", "probe",
+                        "extract_audio", "render_video");
     }
 
     @Test
@@ -51,10 +52,16 @@ class StepExecutorRegistryTest {
                 .get()
                 .extracting(StepExecutor::mode)
                 .isEqualTo(StepExecutor.Mode.REMOTE);
+        assertThat(registry.find("generate_script"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.REMOTE);
 
         assertThat(registry.isRemote("probe")).isTrue();
         assertThat(registry.isRemote("extract_audio")).isTrue();
         assertThat(registry.isRemote("echo")).isFalse();
+        assertThat(registry.usesStoredInput("render_video")).isTrue();
+        assertThat(registry.usesStoredInput("generate_script")).isFalse();
     }
 
     @Test

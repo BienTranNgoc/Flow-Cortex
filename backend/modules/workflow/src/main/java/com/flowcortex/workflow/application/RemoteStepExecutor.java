@@ -49,6 +49,11 @@ class RemoteStepExecutor implements StepExecutor {
     }
 
     @Override
+    public InputPolicy inputPolicy() {
+        return InputPolicy.STORED;
+    }
+
+    @Override
     public Duration maxRuntime() {
         return mediaJobs.limitsFor(capability).maxRuntime();
     }

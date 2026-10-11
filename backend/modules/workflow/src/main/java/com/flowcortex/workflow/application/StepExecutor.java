@@ -15,9 +15,19 @@ interface StepExecutor {
         REMOTE
     }
 
+    enum InputPolicy {
+        RESOLVED,
+        STORED
+    }
+
     String type();
 
     Mode mode();
+
+    /** STORED is reserved for media assets snapshotted when the run starts. */
+    default InputPolicy inputPolicy() {
+        return InputPolicy.RESOLVED;
+    }
 
     /** How long one run of this step may take once picked up; bounds its run deadline. */
     Duration maxRuntime();

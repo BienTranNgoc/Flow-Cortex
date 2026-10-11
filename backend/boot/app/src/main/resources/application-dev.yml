@@ -12,3 +12,5 @@ flowcortex:
   # passes the variable even when unset (empty), so .env names it too.
   registration:
     owner-email: ${FLOWCORTEX_REGISTRATION_OWNER_EMAIL:admin1@flowcortex.dev}
+  product-video:
+    enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:true}

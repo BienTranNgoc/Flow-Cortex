@@ -237,7 +237,7 @@ class RunAdvancer {
         Runnable inClaim;
         try {
             // A remote step takes only the object its run start resolved from the caller's upload.
-            resolvedInput = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent()
+            resolvedInput = executor.filter(e -> e.inputPolicy() == StepExecutor.InputPolicy.STORED).isPresent()
                     ? step.getInput()
                     : inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
                             run.getInput(), outputsByOrder);

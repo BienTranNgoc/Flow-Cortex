@@ -44,10 +44,54 @@ export interface StartRunRequest {
   input?: string;
   uploadId?: string;
   /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds?: string[];
+  /**
    * @minLength 0
    * @maxLength 1024
    */
   originalName?: string;
+}
+
+export interface VideoConfig {
+  /** @pattern 9:16 */
+  aspectRatio: string;
+}
+
+export interface ProductVideoRunRequest {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  productName: string;
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   */
+  description: string;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  cta: string;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  price?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  promotion?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds: string[];
+  video: VideoConfig;
 }
 
 export interface RunStepOutputResponse {
@@ -504,6 +548,56 @@ export const startRun = async (
 
   const data: startRunResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as startRunResponse;
+};
+
+export type startProductVideoRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
+  headers: Headers;
+};
+export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+
+export const getStartProductVideoRunUrl = () => {
+  return `/api/v1/product-videos/runs`;
+};
+
+export const startProductVideoRun = async (
+  productVideoRunRequest: ProductVideoRunRequest,
+  options?: RequestInit,
+): Promise<startProductVideoRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getStartProductVideoRunUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productVideoRunRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startProductVideoRunResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as startProductVideoRunResponse;
 };
 
 export type listResponse200 = {

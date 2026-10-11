@@ -14,6 +14,9 @@ public interface MediaJobs {
      */
     void enqueue(MediaJob job);
 
+    /** Validates and records a provider job in the caller's transaction. */
+    void enqueueProvider(ProviderJob job);
+
     /** {@code flowcortex.media.enabled}: whether remote steps and uploads are accepted. */
     boolean isEnabled();
 

@@ -107,6 +107,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/product-videos/runs:
+    post:
+      tags:
+      - product-videos-controller
+      operationId: startProductVideoRun
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVideoRunRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
   /api/v1/users:
     get:
       tags:
@@ -526,6 +544,52 @@ components:
           type: string
           maxLength: 1024
           minLength: 0
+    ProductVideoRunRequest:
+      type: object
+      properties:
+        productName:
+          type: string
+          maxLength: 200
+          minLength: 1
+        description:
+          type: string
+          maxLength: 4000
+          minLength: 1
+        cta:
+          type: string
+          maxLength: 500
+          minLength: 1
+        price:
+          type: string
+          maxLength: 200
+          minLength: 0
+        promotion:
+          type: string
+          maxLength: 500
+          minLength: 0
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
+        video:
+          $ref: "#/components/schemas/VideoConfig"
+      required:
+      - cta
+      - description
+      - productName
+      - uploadIds
+      - video
+    VideoConfig:
+      type: object
+      properties:
+        aspectRatio:
+          type: string
+          pattern: 9:16
+      required:
+      - aspectRatio
     RunResponse:
       type: object
       properties:
