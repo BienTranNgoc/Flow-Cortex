@@ -382,7 +382,46 @@ class RunAdvancerTest {
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
         assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/attempts/1/");
-        }
+    }
+
+    @Test
+    void aProviderResultThatBreaksTheJsonSchemaFailsTheStepAtTheTrustBoundaryWithContractViolation(
+            CapturedOutput output) {
+        givenMediaEnabled();
+        RunStep step = pending(1, "generate_script");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        // profile wrong, script missing — ProviderScriptData requires profile="product_ad_v1",
+        // language="vi", and a non-empty script up to 8000 chars.
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                Map.of("profile", "product_ad_v1", "language", "fr", "note", "bonjour"), null)));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1), eq("contract_violation"),
+                contains("Provider generate_script data is not valid"), eq(NOW));
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+        assertThat(run.getStatus().name()).isEqualTo("ERROR");
+        assertThat(output).contains("Provider result rejected at trust boundary");
+    }
+
+    @Test
+    void aProviderResultThatConformsToTheJsonSchemaIsAcceptedWithoutRejection() {
+        givenMediaEnabled();
+        RunStep step = pending(1, "generate_script");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                Map.of("profile", "product_ad_v1", "language", "vi", "script",
+                        "Khám phá Bình giữ nhiệt. Giữ đồ uống tiện lợi. Đặt mua ngay"), null)));
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
 
     @Test
     void aJobThatBreaksTheContractFailsTheStepWithContractViolationInsteadOfLeavingItPending() {

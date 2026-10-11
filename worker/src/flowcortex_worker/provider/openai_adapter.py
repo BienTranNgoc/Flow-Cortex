@@ -1,0 +1,220 @@
+"""Provider adapter for OpenAI's Chat Completions API and any OpenAI-compatible endpoint
+(Azure OpenAI, an internal proxy). Picks structured-output JSON Schema so the model returns the
+product script fields directly — no second parse pass.
+
+The adapter is conversation-blind: every call rebuilds the message list from the immutable
+product payload. Prompt content, response body and the API key never leave this file's logging
+boundary, and the worker redaction rule is enforced by the runtime logger (see
+:mod:`flowcortex_worker.telemetry`).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from typing import Any
+
+from .adapter import SpeechArtifact
+from .contracts.provider_job import ProductAdPayload
+
+log = logging.getLogger("flowcortex_provider_worker.openai")
+
+PROVIDER_OPENAI = "openai"
+
+# Script-only today; TTS uses OpenAI's audio/speech endpoint and lives behind a different
+# capability.
+_OPENAI_SCRIPT_MODEL = os.environ.get("FLOWCORTEX_PROVIDER_SCRIPT_MODEL", "gpt-4o-mini")
+# Default keeps the OpenAI endpoint. Set to a different `https://.../v1` URL to route through an
+# OpenAI-compatible proxy (e.g. https://api.vilao.ai/v1); the worker still sends the standard
+# `Authorization: Bearer` header.
+_OPENAI_BASE_URL = os.environ.get("FLOWCORTEX_PROVIDER_BASE_URL") or "https://api.openai.com/v1"
+# OpenAI or a proxy may sit behind a slow upstream — keep a generous read timeout so the broker's
+# lease runs out, not the urllib call. The broker still owns redelivery on transient I/O.
+_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS", "60"))
+
+# JSON Schema the model must return. Mirrors `ProductAdScript` from
+# `contracts/provider-script-result.schema.json` — language and profile are not on the wire;
+# only `script` is.
+_SCRIPT_SCHEMA_NAME = "product_ad_script_v1"
+_SCRIPT_RESPONSE_FORMAT: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": _SCRIPT_SCHEMA_NAME,
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["script"],
+            "properties": {
+                "script": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000,
+                    "description": (
+                        "Vietnamese ad script: hook, benefits derived only from "
+                        "confirmed inputs, and the call-to-action."
+                    ),
+                }
+            },
+        },
+    },
+}
+
+_SYSTEM_PROMPT = (
+    "You write short Vietnamese product-ad scripts.\n"
+    "Output a JSON object with a single string field `script`.\n"
+    "Rules:\n"
+    "- Hook first, one sentence.\n"
+    "- Then 1-3 sentences about benefits, using ONLY the product description provided.\n"
+    "- If and only if a price is provided, append one short sentence that quotes it.\n"
+    "- If and only if a promotion is provided, append one short sentence that quotes it.\n"
+    "- End with the call-to-action sentence, exactly as provided.\n"
+    "- Never invent a price, promotion, feature, capacity or guarantee that is not in the input.\n"
+    "- Keep the script under 8000 characters."
+)
+
+
+@dataclass(frozen=True)
+class OpenAIProviderAdapter:
+    """Sends a Chat Completions request with structured-output JSON Schema.
+
+    The HTTP call is hand-rolled with `urllib.request` instead of the OpenAI SDK so the adapter
+    tolerates proxy responses that include fields the SDK model does not know about (e.g. a
+    Google-style `extra_content.thought_signature` on a Gemini-via-OpenAI proxy): the SDK raises
+    a `TypeError` on parse before the adapter sees the body, which surfaces as an opaque
+    `BadRequest`/timeout to the broker. Pulling JSON by hand and reading only the documented
+    `choices[0].message.content` path keeps the adapter portable across OpenAI, Azure OpenAI,
+    and any OpenAI-compatible proxy without pinning the wire contract to a particular SDK
+    version.
+    """
+
+    client: Any  # openai.OpenAI — only `api_key` and the optional `base_url` are read.
+
+    def generate_script(self, payload: ProductAdPayload) -> str:
+        script = self._request_script(payload)
+        # One last defensive cap: the JSON Schema is `maxLength=8000` but the SDK does not enforce
+        # server-side values — a future schema edit must keep the cap in lockstep.
+        if not isinstance(script, str) or not script:
+            raise ValueError("OpenAI returned an empty script")
+        if len(script) > 8000:
+            raise ValueError("OpenAI script exceeds 8000 characters: re-check the schema cap")
+        return script
+
+    def generate_speech(self, script: str) -> SpeechArtifact:
+        """Place the TTS call here (next slice). For now, mirror the fixture so the runtime can
+        attach `OpenAIProviderAdapter` to the same `ProviderAdapter` protocol without a
+        NotImplemented switch in `capabilities.py`. Slice 4 replaces this with
+        `audio.speech.create`."""
+        frames = min(30_000, max(15_000, len(script) * 55))
+        return SpeechArtifact(body=b"", duration_ms=frames)
+
+    def _request_script(self, payload: ProductAdPayload) -> str:
+        body = json.dumps({
+            "model": _OPENAI_SCRIPT_MODEL,
+            "messages": [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": self._user_message(payload)},
+            ],
+            "response_format": _SCRIPT_RESPONSE_FORMAT,
+            "temperature": 0.4,
+        }).encode("utf-8")
+        api_key = self._api_key()
+        base_url = self._base_url()
+        url = f"{base_url.rstrip('/')}/chat/completions"
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT_SECONDS) as response:
+                payload_bytes = response.read()
+        except urllib.error.HTTPError as exc:
+            # Proxy returns structured errors as JSON (code/message/type); read the body for the
+            # log so a future operator can see whether the model refused, the schema was rejected,
+            # or the upstream quota is exhausted.
+            detail = exc.read().decode("utf-8", errors="replace")
+            log.warning("Provider HTTP %s at %s: %s", exc.code, url, detail)
+            raise
+        except (urllib.error.URLError, TimeoutError) as exc:
+            log.warning("Provider call to %s failed: errorType=%s message=%s", url,
+                    type(exc).__name__, exc)
+            raise
+
+        try:
+            parsed = json.loads(payload_bytes)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Provider response was not valid JSON") from exc
+        try:
+            raw = parsed["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("Provider response did not contain a message content path") from exc
+        try:
+            script_obj = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError("OpenAI response_format was not honoured") from exc
+        if not isinstance(script_obj, dict) or "script" not in script_obj:
+            raise ValueError("OpenAI JSON did not contain the expected `script` field")
+        script_value = script_obj["script"]
+        if not isinstance(script_value, str):
+            raise ValueError("OpenAI `script` field is not a string")
+        return script_value
+
+    def _api_key(self) -> str:
+        key = getattr(self.client, "api_key", None)
+        if not key:
+            raise RuntimeError("OpenAI client has no api_key configured")
+        return key
+
+    def _base_url(self) -> str:
+        # `openai.OpenAI` stores its `base_url` on a private `_base_url` (v1) or as a public
+        # `base_url` (v2+); both should be honoured. Falls back to the env default, then to
+        # api.openai.com when neither is set.
+        base = getattr(self.client, "base_url", None) or getattr(self.client, "_base_url", None)
+        if base is None:
+            return _OPENAI_BASE_URL or "https://api.openai.com/v1"
+        return str(base)
+
+    @staticmethod
+    def _user_message(payload: ProductAdPayload) -> str:
+        # Stripped to the wire contract fields the model is allowed to quote. Anything not in here
+        # is invented content by definition, and the JSON-Schema `additionalProperties=false` keeps
+        # the model honest on field names; the `script` field itself is free text but bounded.
+        parts = [
+            f"productName: {payload.productName}",
+            f"description: {payload.description}",
+            f"cta: {payload.cta}",
+        ]
+        if payload.price is not None:
+            parts.append(f"price: {payload.price}")
+        if payload.promotion is not None:
+            parts.append(f"promotion: {payload.promotion}")
+        return "\n".join(parts)
+
+
+def openai_client(api_key: str, *, base_url: str | None = None) -> Any:
+    """Build an OpenAI client; `base_url` lets the same SDK drive Azure OpenAI or an internal
+    proxy that speaks the Chat Completions wire format."""
+    import openai
+
+    if base_url:
+        return openai.OpenAI(api_key=api_key, base_url=base_url)
+    return openai.OpenAI(api_key=api_key)
+
+
+def select_adapter(provider: str, openai_key: str) -> OpenAIProviderAdapter:
+    """Switch on the runtime env. The fixture adapter remains the default when no key is set so a
+    developer without secrets can still demo the slice end-to-end."""
+    if provider == PROVIDER_OPENAI:
+        if not openai_key:
+            raise RuntimeError("PROVIDER_ADAPTER=openai requires OPENAI_API_KEY")
+        return OpenAIProviderAdapter(client=openai_client(openai_key, base_url=_OPENAI_BASE_URL))
+    raise ValueError(f"Unknown provider adapter: {provider}")

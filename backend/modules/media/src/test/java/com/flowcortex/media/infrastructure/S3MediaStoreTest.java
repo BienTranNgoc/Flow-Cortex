@@ -39,7 +39,7 @@ class S3MediaStoreTest {
                     "render_video", Duration.ofMinutes(10)),
                 Duration.ofMinutes(20), Duration.ofMinutes(15),
 
-                new MediaProperties.Upload(524_288_000L, List.of("mp4"), Duration.ofMinutes(15)),
+                new MediaProperties.Upload(524_288_000L, List.of("mp4"), List.of("jpg"), Duration.ofMinutes(15)),
                 new MediaProperties.S3(endpoint, "http://localhost:9000", "us-east-1", true,
                         "flowcortex-uploads", "flowcortex-media", "backend-key", "backend-secret-value",
                         apiCallTimeout, apiCallAttemptTimeout));

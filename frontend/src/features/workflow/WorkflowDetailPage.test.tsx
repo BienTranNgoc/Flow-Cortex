@@ -2,7 +2,7 @@ import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route } from 'react-router-dom';
-import { renderRoute, stubApi, type FakeReply, type Handler, type RecordedCall } from '../../test/fakeApi';
+import { renderRoute, settled, stubApi, type FakeReply, type Handler, type RecordedCall } from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
 import { WorkflowDetailPage } from './WorkflowDetailPage';
 
@@ -46,7 +46,7 @@ function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> 
     'POST /api/v1/workflows/w1/runs': { status: 200, body: { id: 'r1', status: 'running' } },
     ...routes,
   });
-  renderRoute(
+  const view = renderRoute(
     '/workflows/:id',
     '/workflows/w1',
     <>
@@ -58,7 +58,10 @@ function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> 
       <Route path="/workflows" element={<p>Workflows list</p>} />
     </>,
   );
-  return calls;
+  // `calls` is the array tests care about; `queryClient` is exposed so a test can `await
+  // settled(queryClient)` to wait for the workflow fetch before interacting with the Start
+  // button (which stays disabled until the workflow definition lands).
+  return Object.assign(calls, { queryClient: view.queryClient });
 }
 
 function sent(calls: RecordedCall[]) {
@@ -92,8 +95,11 @@ describe('WorkflowDetailPage', () => {
     it('asks for a file when Start is pressed without one, and sends nothing', async () => {
       const user = userEvent.setup();
       const calls = renderForm(CHECK);
+      await settled(calls.queryClient);
 
-      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+      const button = await screen.findByRole('button', { name: 'Start run' });
+      expect(button).not.toBeDisabled();
+      await user.click(button);
 
       expect(await screen.findByText('Choose a video or audio file to upload')).toBeInTheDocument();
       expect(sent(calls)).toEqual([]);
@@ -326,14 +332,17 @@ describe('WorkflowDetailPage', () => {
 
     it('shows the 503 detail when present, with the next action', async () => {
       const user = userEvent.setup();
-      renderForm(ECHO, {
+      const calls = renderForm(ECHO, {
         'POST /api/v1/workflows/w1/runs': {
           status: 503,
           body: { status: 503, detail: 'Runs are paused for maintenance' },
         },
       });
+      await settled(calls.queryClient);
 
-      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+      const button = await screen.findByRole('button', { name: 'Start run' });
+      expect(button).not.toBeDisabled();
+      await user.click(button);
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('Runs are paused for maintenance');

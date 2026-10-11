@@ -244,6 +244,13 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export interface CapabilitiesResponse {
+  /** Whether the media engine and its queues are live. */
+  mediaEnabled: boolean;
+  /** Whether the Product Video flow accepts new runs. */
+  productVideoEnabled: boolean;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -1071,6 +1078,32 @@ export const health = async (options?: RequestInit): Promise<healthResponse> => 
 
   const data: healthResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as healthResponse;
+};
+
+export type capabilitiesResponse200 = {
+  data: CapabilitiesResponse;
+  status: 200;
+};
+
+export type capabilitiesResponseSuccess = capabilitiesResponse200 & {
+  headers: Headers;
+};
+export type capabilitiesResponse = capabilitiesResponseSuccess;
+
+export const getCapabilitiesUrl = () => {
+  return `/api/v1/capabilities`;
+};
+
+export const capabilities = async (options?: RequestInit): Promise<capabilitiesResponse> => {
+  const res = await fetch(getCapabilitiesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: capabilitiesResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as capabilitiesResponse;
 };
 
 export type meResponse200 = {

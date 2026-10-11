@@ -370,6 +370,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/v1/capabilities:
+    get:
+      tags:
+      - capabilities-controller
+      operationId: capabilities
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilitiesResponse"
   /api/v1/auth/me:
     get:
       tags:
@@ -865,6 +877,18 @@ components:
       required:
       - expiresAt
       - url
+    CapabilitiesResponse:
+      type: object
+      properties:
+        mediaEnabled:
+          type: boolean
+          description: Whether the media engine and its queues are live.
+        productVideoEnabled:
+          type: boolean
+          description: Whether the Product Video flow accepts new runs.
+      required:
+      - mediaEnabled
+      - productVideoEnabled
     HealthResponse:
       type: object
       properties:

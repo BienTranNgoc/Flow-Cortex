@@ -7,6 +7,8 @@ import com.flowcortex.media.api.MediaJobProgressed;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.media.api.ProviderScriptData;
+import com.flowcortex.media.api.ProviderSpeechData;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -362,6 +364,19 @@ class RunAdvancer {
                 .map(pickedUpAt -> String.valueOf(Duration.between(pickedUpAt, result.finishedAt()).toMillis()))
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {
+            String validationError = validateProviderData(capability, result.data());
+            if (validationError != null) {
+                if (transactions.fail(result.runId(), result.jobId(), attempt, "contract_violation",
+                        validationError, now)) {
+                    LOG.warn("Provider result rejected at trust boundary: runId={} jobId={} capability={} "
+                            + "attempt={} reason={}", result.runId(), result.jobId(), capability, attempt,
+                            validationError);
+                } else {
+                    discardLate(result.jobId(), attempt, result.status().value());
+                }
+                advance(result.runId());
+                return;
+            }
             if (transactions.complete(result.runId(), result.jobId(), attempt, json(result.data()),
                     json(result.outputs()), now,
                     () -> registerOutputs(result, step.orElseThrow(), attempt))) {
@@ -382,6 +397,27 @@ class RunAdvancer {
         // A redelivered result may be the only event left for a run whose first delivery completed
         // the step but died before advancing; advancing is idempotent.
         advance(result.runId());
+    }
+
+    /** Returns a validation-error message when a provider step's {@code data} payload does not match
+     * its JSON Schema, otherwise {@code null}. A non-provider step (probe, extract_audio,
+     * render_video, …) is left to media's {@code MediaContractSchemaTest} — the field set there is
+     * heterogeneous and its own layer owns those contracts. */
+    private String validateProviderData(String capability, Map<String, Object> data) {
+        if (data == null) {
+            return "provider result has no data";
+        }
+        try {
+            switch (capability) {
+                case "generate_script" -> objectMapper.convertValue(data, ProviderScriptData.class);
+                case "generate_speech" -> objectMapper.convertValue(data, ProviderSpeechData.class);
+                default -> { /* not a provider step — media contract layer handles it */ }
+            }
+            return null;
+        } catch (IllegalArgumentException e) {
+            String reason = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            return "Provider " + capability + " data is not valid for its schema: " + reason;
+        }
     }
 
     private void registerOutputs(MediaResult result, RunStep step, short attempt) {

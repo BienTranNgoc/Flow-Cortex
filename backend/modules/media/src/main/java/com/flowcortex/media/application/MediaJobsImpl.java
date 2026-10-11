@@ -247,7 +247,9 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     private String typeSentence() {
-        List<String> extensions = properties.upload().extensions().stream().map(e -> "." + e).toList();
+        List<String> extensions = new java.util.ArrayList<>();
+        properties.upload().mediaExtensions().stream().map(e -> "." + e).forEach(extensions::add);
+        properties.upload().productImageExtensions().stream().map(e -> "." + e).forEach(extensions::add);
         String allowed = extensions.size() == 1 ? extensions.getFirst()
                 : String.join(", ", extensions.subList(0, extensions.size() - 1)) + " or " + extensions.getLast();
         return "This file type can't be checked yet. Use " + allowed + ".";

@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Flow-Cortex media worker: consumes media jobs from RabbitMQ and reads/writes the object store."
 requires-python = ">=3.12"
 # No HTTP client of its own: the worker fetches nothing by URL, only objects from the store.
-# (The OTLP exporter brings `requests`, which only ever talks to the telemetry collector.)
+# OpenAI SDK is used by the provider container (a separate runtime); it shares this same image
+# because the worker import graph and the provider import graph share `flowcortex_worker.*`.
 dependencies = [
     "pika>=1.3",
     "boto3>=1.40",
@@ -14,6 +15,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http==1.44.0",
     "opentelemetry-instrumentation-botocore==0.65b0",
     "opentelemetry-instrumentation-logging==0.65b0",
+    "openai>=1.50,<2",
 ]
 
 [dependency-groups]

@@ -19,9 +19,13 @@ from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
 from flowcortex_worker.storage import Storage, client_from
 
-from .adapter import FixtureProviderAdapter
+from .adapter import FixtureProviderAdapter, ProviderAdapter
 from .capabilities import execute
 from .contracts.provider_job import ProviderJob
+from .openai_adapter import (
+    PROVIDER_OPENAI,
+    select_adapter,
+)
 
 log = logging.getLogger("flowcortex_provider_worker")
 
@@ -50,7 +54,7 @@ def main() -> int:
     params.blocked_connection_timeout = 300
     params.client_properties = {"connection_name": f"provider-worker {settings.worker_id}"}
     storage = Storage(client_from(settings), settings.s3_bucket, settings.s3_upload_bucket)
-    adapter = FixtureProviderAdapter()
+    adapter: ProviderAdapter = _build_adapter()
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=JOB_THREAD_PREFIX)
 
     def parse_job(body: bytes) -> Any:
@@ -102,6 +106,19 @@ def main() -> int:
         logging.shutdown()
         os._exit(0)
     return 0
+
+
+def _build_adapter() -> ProviderAdapter:
+    """Pick the adapter from env. Missing secrets fall back to the fixture so a fresh checkout still
+    boots deterministically — the worker log records which one was chosen."""
+    provider = os.environ.get("PROVIDER_ADAPTER", PROVIDER_OPENAI).strip().lower()
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if provider == PROVIDER_OPENAI:
+        chosen = select_adapter(provider, openai_key)
+        log.info("provider adapter selected", extra={"provider": provider})
+        return chosen
+    log.info("provider adapter selected", extra={"provider": "fixture"})
+    return FixtureProviderAdapter()
 
 
 if __name__ == "__main__":

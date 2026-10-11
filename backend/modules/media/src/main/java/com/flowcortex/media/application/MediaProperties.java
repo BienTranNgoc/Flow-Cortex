@@ -54,8 +54,15 @@ public record MediaProperties(
         }
     }
 
-    /** Upload limits; each allowed extension maps to one canonical MIME type. */
-    public record Upload(@Positive long maxBytes, @NotEmpty List<String> extensions, @NotNull Duration urlTtl) {
+    /**
+     * Upload limits. {@code extensions} covers audio/video (worker render); {@code productImageExtensions}
+     * covers images (product-video feature). Each entry maps to one canonical MIME type.
+     */
+    public record Upload(
+            @Positive long maxBytes,
+            @NotEmpty List<String> extensions,
+            @NotEmpty List<String> productImageExtensions,
+            @NotNull Duration urlTtl) {
 
         private static final Map<String, String> CANONICAL_MIME_TYPES = Map.ofEntries(
                 Map.entry("mp4", "video/mp4"),
@@ -71,23 +78,42 @@ public record MediaProperties(
                 Map.entry("webp", "image/webp"));
 
         public Upload {
-            if (extensions != null) {
-                extensions = extensions.stream().map(e -> e.trim().toLowerCase(Locale.ROOT)).toList();
-                for (String extension : extensions) {
-                    if (!CANONICAL_MIME_TYPES.containsKey(extension)) {
-                        throw new IllegalArgumentException("flowcortex.media.upload.extensions: '" + extension
-                                + "' has no canonical MIME type; allowed: "
-                                + new TreeSet<>(CANONICAL_MIME_TYPES.keySet()));
-                    }
-                }
-            }
+            extensions = normalize(extensions, "flowcortex.media.upload.extensions");
+            productImageExtensions = normalize(productImageExtensions,
+                    "flowcortex.media.upload.product-image-extensions");
         }
 
-        /** Configured extension → canonical MIME type, in configuration order. */
+        private static List<String> normalize(List<String> extensions, String source) {
+            List<String> normalized = extensions.stream()
+                    .map(e -> e.trim().toLowerCase(Locale.ROOT))
+                    .toList();
+            for (String extension : normalized) {
+                if (!CANONICAL_MIME_TYPES.containsKey(extension)) {
+                    throw new IllegalArgumentException(source + ": '" + extension
+                            + "' has no canonical MIME type; allowed: "
+                            + new TreeSet<>(CANONICAL_MIME_TYPES.keySet()));
+                }
+            }
+            return normalized;
+        }
+
+        /** Configured extension → canonical MIME type, covering both lists, in configuration order. */
         public Map<String, String> mimeTypes() {
             Map<String, String> mimeTypes = new LinkedHashMap<>();
             extensions.forEach(extension -> mimeTypes.put(extension, CANONICAL_MIME_TYPES.get(extension)));
+            productImageExtensions.forEach(extension -> mimeTypes.putIfAbsent(extension,
+                    CANONICAL_MIME_TYPES.get(extension)));
             return mimeTypes;
+        }
+
+        /** Only the audio/video extensions, in configuration order, for the worker's allowlist. */
+        public List<String> mediaExtensions() {
+            return List.copyOf(extensions);
+        }
+
+        /** Only the product-image extensions, in configuration order, for the product-video allowlist. */
+        public List<String> productImageExtensions() {
+            return List.copyOf(productImageExtensions);
         }
     }
 

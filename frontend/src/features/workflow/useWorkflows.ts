@@ -9,10 +9,15 @@ import {
   listWorkflows,
   rejectTask,
   requestUpload,
+  startProductVideoRun,
   startRun,
   unwrap,
 } from '@flow-cortex/api-client';
-import type { StartRunRequest, UploadRequest } from '@flow-cortex/api-client';
+import type {
+  ProductVideoRunRequest,
+  StartRunRequest,
+  UploadRequest,
+} from '@flow-cortex/api-client';
 
 /** ALL authenticated users (owner OR shared) — no admin gate. */
 export function useWorkflowsQuery() {
@@ -33,6 +38,16 @@ export function useWorkflowQuery(id: string) {
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
     mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+  });
+}
+
+/** Product Video has its own endpoint: typed request (product input + ordered upload ids) and a
+ * fixed 9:16 video config. The same call goes through the orchestration layer used by the demo
+ * workflows, so the run-progress page and approval checkpoint pick it up unchanged. */
+export function useStartProductVideoRunMutation() {
+  return useMutation({
+    mutationFn: (body: ProductVideoRunRequest) =>
+      unwrap(startProductVideoRun(body, authHeaders())),
   });
 }
 
