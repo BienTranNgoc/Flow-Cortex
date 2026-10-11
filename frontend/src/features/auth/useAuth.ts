@@ -35,20 +35,24 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: LoginRequest) => unwrap(loginRequest(input)),
-    onSuccess: (data) => {
-      setToken(data.token ?? null);
+    mutationFn: ({ remember: _remember, ...credentials }: LoginVariables) =>
+      unwrap(loginRequest(credentials)),
+    onSuccess: (data, vars) => {
+      setToken(data.token ?? null, vars.remember);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
+
+type LoginVariables = LoginRequest & { remember: boolean };
+export type { LoginVariables };
 
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: RegisterRequest) => unwrap(registerRequest(input)),
     onSuccess: (data) => {
-      setToken(data.token ?? null);
+      setToken(data.token ?? null, true);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
@@ -56,4 +60,30 @@ export function useRegisterMutation() {
 
 export function logout(): void {
   setToken(null);
+}
+
+const REMEMBERED_EMAIL_KEY = 'flowcortex.auth.rememberedEmail';
+
+export function getRememberedEmail(): string {
+  try {
+    return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function setRememberedEmail(email: string): void {
+  try {
+    window.localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+  } catch {
+    // private mode / disabled — skip silently
+  }
+}
+
+export function clearRememberedEmail(): void {
+  try {
+    window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+  } catch {
+    // private mode / disabled — skip silently
+  }
 }

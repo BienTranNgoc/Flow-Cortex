@@ -14,7 +14,7 @@ vi.mock('./app/HomePage', () => ({
 describe('App', () => {
   it('redirects an unauthenticated visitor to the sign-in page', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'SIGN IN' })).toBeInTheDocument();
   });
 
   it('contains a page that throws inside the layout, with Reload and one structured event', async () => {
