@@ -19,7 +19,7 @@ afterEach(() => {
 describe('RequireAdminApp', () => {
   it('sends a signed-out visitor to /login and back to /runs after an ADMIN login', async () => {
     stubApi({
-      'POST /api/v1/auth/login': { status: 200, body: { token: 'admin-token' } },
+      'POST /api/v1/auth/login': { status: 200, body: { accessToken: 'admin-token' } },
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
     });
