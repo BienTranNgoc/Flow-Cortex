@@ -216,8 +216,39 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                $ref: "#/components/schemas/TokenPairResponse"
       security: []
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - auth-controller
+      operationId: refresh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+      security: []
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth-controller
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          description: OK
   /api/v1/auth/login:
     post:
       tags:
@@ -235,7 +266,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                $ref: "#/components/schemas/TokenPairResponse"
       security: []
   /api/v1/workflows:
     get:
@@ -352,6 +383,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/v1/auth/oauth/google/callback:
+    get:
+      tags:
+      - o-auth-controller
+      operationId: callback
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: redirect_uri
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: rememberMe
+        in: query
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: OK
+      security: []
+  /api/v1/auth/oauth/google/authorize:
+    get:
+      tags:
+      - o-auth-controller
+      operationId: authorize
+      parameters:
+      - name: redirect_uri
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      security: []
   /api/v1/auth/me:
     get:
       tags:
@@ -722,14 +798,34 @@ components:
         name:
           type: string
           minLength: 1
+        rememberMe:
+          type: boolean
       required:
       - email
       - name
       - password
-    LoginResponse:
+    TokenPairResponse:
       type: object
       properties:
-        token:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+    RefreshRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
           type: string
     LoginRequest:
       type: object
@@ -740,6 +836,8 @@ components:
         password:
           type: string
           minLength: 1
+        rememberMe:
+          type: boolean
       required:
       - email
       - password

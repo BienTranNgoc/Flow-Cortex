@@ -90,7 +90,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
                 restTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, "correct-password-1"),
                         TokenResponse.class);
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String token = loginResponse.getBody().token();
+        String token = loginResponse.getBody().accessToken();
         assertThat(token).isNotBlank();
 
         ResponseEntity<MeView> meResponse = get("/api/v1/auth/me", token, MeView.class);
@@ -215,7 +215,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
                 new RegisterRequest(email, "register-password-1", "Self Registered"), TokenResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        String token = response.getBody().token();
+        String token = response.getBody().accessToken();
         assertThat(token).isNotBlank();
         MeView me = get("/api/v1/auth/me", token, MeView.class).getBody();
         assertThat(me.email()).isEqualTo(email);
