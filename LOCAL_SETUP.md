@@ -151,17 +151,18 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows seven services `healthy` and `minio-init`
+`docker compose ps -a` then shows eight services `healthy` and `minio-init`
 `Exited (0)`:
 
 | Service | What it is | Address (all bound to 127.0.0.1) |
 |---|---|---|
 | `postgres` | the database | not published |
-| `rabbitmq` | the broker: queue `media.jobs` and the result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
+| `rabbitmq` | the broker: `media.*` and `provider.*` job/result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
 | `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle and one least-privilege user per service, then exits | — |
 | `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
 | `worker` | the Python media worker | none — and no internet access |
+| `provider-worker` | the Python provider worker (fixture adapter until OpenAI is connected) | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
 | `admin` | the admin console (same) | <http://localhost:5174> |
 
@@ -214,9 +215,9 @@ What to know about the media path:
   internal compose network with the broker and the store.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
   management port 8081 and the broker's metrics port 15692 are not published.
-- **Store keys.** The backend and the worker each have their own store user
-  (`BACKEND_S3_*`, `WORKER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
-  `minio` and `minio-init`. The backend and the worker share the broker account.
+- **Store keys.** The backend, media worker and provider worker each have their own store user
+  (`BACKEND_S3_*`, `WORKER_S3_*`, `PROVIDER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
+  `minio` and `minio-init`. The services currently share the local broker account.
 
 **Kill switches (rollout notes).** Each is an env var in `.env`, read at startup;
 apply a change with `docker compose up -d backend`.

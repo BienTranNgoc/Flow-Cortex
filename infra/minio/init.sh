@@ -8,6 +8,7 @@ set -eu
 : "${MINIO_ROOT_USER:?}" "${MINIO_ROOT_PASSWORD:?}"
 : "${BACKEND_S3_ACCESS_KEY:?}" "${BACKEND_S3_SECRET_KEY:?}"
 : "${WORKER_S3_ACCESS_KEY:?}" "${WORKER_S3_SECRET_KEY:?}"
+: "${PROVIDER_S3_ACCESS_KEY:?}" "${PROVIDER_S3_SECRET_KEY:?}"
 
 DIR=$(dirname "$0")
 
@@ -37,6 +38,7 @@ mc admin policy create ROOT flowcortex-backend "$DIR/backend-policy.json"
 mc admin policy create ROOT flowcortex-worker "$DIR/worker-policy.json"
 printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
+printf '%s\n%s\n' "$PROVIDER_S3_ACCESS_KEY" "$PROVIDER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 
 # Re-attaching an attached policy is an error on the server; treat it as done.
 attach() {
@@ -53,5 +55,6 @@ attach() {
 
 attach flowcortex-backend "$BACKEND_S3_ACCESS_KEY"
 attach flowcortex-worker "$WORKER_S3_ACCESS_KEY"
+attach flowcortex-worker "$PROVIDER_S3_ACCESS_KEY"
 
 echo "minio-init: done"

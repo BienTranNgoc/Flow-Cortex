@@ -100,6 +100,10 @@ class Consumer:
         liveness_file: Path,
         grace_seconds: float = 30.0,
         resolve: Callable[[str], Handler] | None = None,
+        queue: str = JOBS_QUEUE,
+        exchange: str = EXCHANGE,
+        parse_job: Callable[[bytes], Any] | None = None,
+        execute_job: Callable[[Any, ProcessRunner], Any] | None = None,
         wait: Callable[[float], Any] | None = None,
     ) -> None:
         self._connection = connection
@@ -111,6 +115,10 @@ class Consumer:
         self._liveness_file = liveness_file
         self._grace_seconds = grace_seconds
         self._resolve = resolve or resolve_capability
+        self._queue = queue
+        self._exchange = exchange
+        self._parse_job = parse_job or MediaJob.model_validate_json
+        self._execute_job = execute_job
         self._wait = wait or self._backoff_wait
         self._closed = threading.Event()
         self._cancelled = False
@@ -131,10 +139,10 @@ class Consumer:
             self._publish_channel = self._connection.channel()
             self._publish_channel.confirm_delivery()
             self._consumer_tag = self._consume_channel.basic_consume(
-                JOBS_QUEUE, self._on_message, auto_ack=False
+                self._queue, self._on_message, auto_ack=False
             )
             self.consuming = True
-            log.info("consuming", extra={"queue": JOBS_QUEUE, "workerId": self._worker_id})
+            log.info("consuming", extra={"queue": self._queue, "workerId": self._worker_id})
             while True:
                 if self._stop.is_set():
                     self._drain()
@@ -160,7 +168,7 @@ class Consumer:
         self._executor.submit(self._process, delivery).add_done_callback(_log_crash)
 
     def _on_cancel(self, frame: Any) -> None:
-        log.warning("the broker cancelled the consumer; reconnecting", extra={"queue": JOBS_QUEUE})
+        log.warning("the broker cancelled the consumer; reconnecting", extra={"queue": self._queue})
         self._cancelled = True
         if self._in_flight is not None:
             self._in_flight.runner.kill("consumer cancelled")
@@ -214,17 +222,17 @@ class Consumer:
 
     def _process_in(self, delivery: Delivery, parent: otel_context.Context) -> None:
         with tracer.start_as_current_span(
-            "process media.jobs",
+            f"process {self._queue}",
             context=parent,
             kind=SpanKind.CONSUMER,
             attributes={
                 "messaging.system": "rabbitmq",
                 "messaging.operation.type": "process",
-                "messaging.destination.name": JOBS_QUEUE,
+                "messaging.destination.name": self._queue,
             },
         ) as span:
             try:
-                job = MediaJob.model_validate_json(delivery.body)
+                job = self._parse_job(delivery.body)
             except ValidationError as exc:
                 self._refuse(delivery, span, exc)
                 return
@@ -272,7 +280,7 @@ class Consumer:
         ids: dict[str, Any],
         run_id: UUID,
         build: Callable[[ExitStack], Result],
-        job: MediaJob | None,
+        job: Any | None,
     ) -> None:
         """Publishes `started`, builds and publishes the result, then acks; retries on failure."""
         began = time.monotonic()
@@ -326,7 +334,7 @@ class Consumer:
             jobs_finished.add(1, attributes)
             job_duration.record(time.monotonic() - began, attributes)
 
-    def _execute(self, job: MediaJob, delivery: Delivery, stack: ExitStack) -> Result:
+    def _execute(self, job: Any, delivery: Delivery, stack: ExitStack) -> Result:
         runner = delivery.runner
         watchdog = threading.Timer(job.maxRuntimeSeconds, runner.kill, args=("run_timeout",))
         watchdog.daemon = True
@@ -336,12 +344,17 @@ class Consumer:
             attempt_prefix = f"{legacy_prefix}attempts/{job.attempt}/"
             if job.outputPrefix not in (legacy_prefix, attempt_prefix):
                 raise PermanentError("contract_violation", "outputPrefix does not match the step")
-            handler = self._resolve(job.capability)
-            inputs = {
-                ref.key: stack.enter_context(self._storage.fetched(ref, job.maxInputBytes, runner))
-                for ref in job.inputs
-            }
-            outcome = handler(job, inputs, runner)
+            if self._execute_job is None:
+                handler = self._resolve(job.capability)
+                inputs = {
+                    ref.key: stack.enter_context(
+                        self._storage.fetched(ref, job.maxInputBytes, runner)
+                    )
+                    for ref in job.inputs
+                }
+                outcome = handler(job, inputs, runner)
+            else:
+                outcome = self._execute_job(job, runner)
             if runner.killed is not None:
                 raise ProcessKilled(runner.killed)
             outputs = []
@@ -456,7 +469,7 @@ class Consumer:
         body = message.model_dump_json(exclude_none=True).encode()
         self._call_in_main(
             lambda: self._publish_channel.basic_publish(
-                EXCHANGE, routing_key, body, props, mandatory=True
+                self._exchange, routing_key, body, props, mandatory=True
             )
         )
 
