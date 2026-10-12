@@ -1,5 +1,6 @@
 package com.flowcortex.media.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -15,11 +16,13 @@ public record ProviderScriptData(
         @NotBlank @Size(max = 8000) String script) {
 
     @AssertTrue(message = "language must be 'vi'")
+    @JsonIgnore
     public boolean isVietnamese() {
         return language != null && language.equals("vi");
     }
 
     @AssertTrue(message = "profile must be 'product_ad_v1'")
+    @JsonIgnore
     public boolean isProductAdV1() {
         return profile != null && profile.equals("product_ad_v1");
     }

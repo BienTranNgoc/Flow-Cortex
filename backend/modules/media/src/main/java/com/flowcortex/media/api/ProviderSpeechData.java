@@ -1,5 +1,6 @@
 package com.flowcortex.media.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +15,7 @@ public record ProviderSpeechData(
         @NotNull @Min(1) Integer durationMs) {
 
     @AssertTrue(message = "profile must be 'vi_voice_v1'")
+    @JsonIgnore
     public boolean isVietnameseVoiceV1() {
         return profile != null && profile.equals("vi_voice_v1");
     }

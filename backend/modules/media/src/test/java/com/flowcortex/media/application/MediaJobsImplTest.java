@@ -20,6 +20,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
+import com.flowcortex.media.api.ProviderJob;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
@@ -142,6 +143,58 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.enqueue(job(MediaCapability.PROBE)))
                     .isInstanceOf(IllegalTransactionStateException.class);
             assertThat(context.getBean(EventCapture.class).events).isEmpty();
+        });
+    }
+
+    private static ProviderJob providerJob(String capability, Map<String, Object> params) {
+        UUID runId = UUID.randomUUID();
+        return new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, capability, params,
+                "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
+    }
+
+    private static Map<String, Object> scriptParams(Map<String, Object> payload) {
+        return Map.of("profile", "product_ad_v1", "payload", payload);
+    }
+
+    @Test
+    void validProviderJobPublishesExactlyOneProviderJobRequested() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            ProviderJob job = providerJob("generate_script", scriptParams(Map.of(
+                    "productName", "Máy lọc nước", "description", "Lọc sạch", "cta", "Mua ngay")));
+
+            tx.executeWithoutResult(status -> jobs.enqueueProvider(job));
+
+            EventCapture capture = context.getBean(EventCapture.class);
+            assertThat(capture.providerEvents).containsExactly(new ProviderJobRequested(job));
+        });
+    }
+
+    @Test
+    void providerJobWhosePayloadBreaksItsContractIsRefusedAndNothingIsPublished() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(
+                    providerJob("generate_script", scriptParams(Map.of(
+                            "productName", "x".repeat(201), "description", "Lọc sạch", "cta", "Mua ngay"))))))
+                    .isInstanceOf(ConstraintViolationException.class);
+            assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
+        });
+    }
+
+    @Test
+    void speechProviderJobWhosePayloadHasNoScriptIsRefused() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(
+                    providerJob("generate_speech", Map.of("profile", "vi_voice_v1", "payload", Map.of())))))
+                    .isInstanceOf(ConstraintViolationException.class);
+            assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
         });
     }
 
@@ -558,11 +611,17 @@ class MediaJobsImplTest {
 
         final List<MediaJobRequested> events = new ArrayList<>();
         final List<Boolean> publishedInTransaction = new ArrayList<>();
+        final List<ProviderJobRequested> providerEvents = new ArrayList<>();
 
         @EventListener
         void on(MediaJobRequested event) {
             events.add(event);
             publishedInTransaction.add(TransactionSynchronizationManager.isActualTransactionActive());
+        }
+
+        @EventListener
+        void on(ProviderJobRequested event) {
+            providerEvents.add(event);
         }
     }
 

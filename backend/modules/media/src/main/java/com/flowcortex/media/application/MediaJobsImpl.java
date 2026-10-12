@@ -9,6 +9,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.ProviderJobPayload;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
@@ -32,6 +33,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 class MediaJobsImpl implements MediaJobs {
@@ -42,6 +45,7 @@ class MediaJobsImpl implements MediaJobs {
     /** The key of the one input a job built from an upload carries. */
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
+    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -80,7 +84,32 @@ class MediaJobsImpl implements MediaJobs {
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
+        validateProviderParams(job);
         events.publishEvent(new ProviderJobRequested(job));
+    }
+
+    /** {@code params} is a map no annotation can bound, so its payload is checked against the
+     * {@code productAdPayload}/{@code speechPayload} definitions the provider job schema names. */
+    private void validateProviderParams(ProviderJob job) {
+        Class<?> type = switch (job.capability()) {
+            case "generate_script" -> ProviderJobPayload.ProductAd.class;
+            case "generate_speech" -> ProviderJobPayload.Speech.class;
+            default -> null;
+        };
+        if (type == null) {
+            return;
+        }
+        Object payload;
+        try {
+            payload = MAPPER.convertValue(job.params().get("payload"), type);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("params.payload does not match the "
+                    + job.capability() + " contract", e);
+        }
+        Set<? extends ConstraintViolation<?>> violations = validator.validate(payload);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
     }
 
     @Override
