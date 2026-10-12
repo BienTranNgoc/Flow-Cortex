@@ -25,7 +25,7 @@ describe('App', () => {
         body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
       },
     });
-    setToken('t');
+    setToken('t', true);
     window.history.pushState({}, '', '/');
 
     render(<App />);
@@ -49,7 +49,7 @@ describe('App', () => {
         body: { id: 'a1', email: 'admin@flowcortex.dev', name: 'Admin', role: 'ADMIN' },
       },
     });
-    setToken('admin-token');
+    setToken('admin-token', true);
     window.history.pushState({}, '', '/users');
 
     render(<App />);

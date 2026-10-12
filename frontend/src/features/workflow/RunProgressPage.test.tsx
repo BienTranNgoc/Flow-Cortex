@@ -125,7 +125,7 @@ function occurrences(text: string, part: string): number {
 }
 
 describe('RunProgressPage', () => {
-  beforeEach(() => setToken('t'));
+  beforeEach(() => setToken('t', true));
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();

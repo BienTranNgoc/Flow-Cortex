@@ -35,7 +35,7 @@ function detailOf(jobId: string): HTMLElement {
   return within(row).getByTestId('job-detail');
 }
 
-beforeEach(() => setToken('admin-token-jobs'));
+beforeEach(() => setToken('admin-token-jobs', true));
 afterEach(() => {
   setToken(null);
   vi.unstubAllGlobals();

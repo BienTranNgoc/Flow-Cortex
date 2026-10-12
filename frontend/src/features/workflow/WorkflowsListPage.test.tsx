@@ -21,7 +21,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
 
 describe('WorkflowsListPage', () => {
   beforeEach(() => {
-    setToken('t');
+    setToken('t', false);
   });
   afterEach(() => {
     setToken(null);

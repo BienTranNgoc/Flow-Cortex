@@ -71,7 +71,7 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
 
 describe('ProductVideoStartForm', () => {
   beforeEach(() => {
-    setToken('t');
+    setToken('t', false);
     FakeXhr.instances.length = 0;
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
   });

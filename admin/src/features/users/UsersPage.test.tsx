@@ -7,7 +7,7 @@ import { UsersPage } from './UsersPage';
 const ALICE = { id: 'u1', email: 'alice@flowcortex.dev', name: 'Alice', role: 'MEMBER', status: 'ACTIVE' };
 const BOB = { id: 'u2', email: 'bob@flowcortex.dev', name: 'Bob', role: 'MEMBER', status: 'ACTIVE' };
 
-beforeEach(() => setToken('admin-token-users'));
+beforeEach(() => setToken('admin-token-users', true));
 afterEach(() => {
   setToken(null);
   vi.unstubAllGlobals();
