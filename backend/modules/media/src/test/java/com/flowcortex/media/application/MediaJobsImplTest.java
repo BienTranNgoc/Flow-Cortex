@@ -231,6 +231,42 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void outputWrittenBeforeTheAttemptScopedPrefixLandedIsStillRegisteredOnAttemptOne() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            MediaAssetRepository repository = context.getBean(MediaAssetRepository.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID stepId = UUID.randomUUID();
+            MediaOutput legacy = new MediaOutput("video", "flowcortex-media",
+                    "runs/" + runId + "/steps/4/video.mp4", "video/mp4", 42L, null);
+
+            tx.executeWithoutResult(status -> jobs.registerOutputs(UUID.randomUUID(), runId, stepId, 4, (short) 1,
+                    List.of(legacy)));
+
+            org.mockito.ArgumentCaptor<Iterable<MediaAsset>> saved = org.mockito.ArgumentCaptor.forClass(Iterable.class);
+            verify(repository).saveAll(saved.capture());
+            assertThat(saved.getValue().iterator().next().getObjectKey()).isEqualTo(legacy.objectKey());
+        });
+    }
+
+    @Test
+    void legacyPrefixIsRefusedOnAnyAttemptAfterTheFirst() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            UUID runId = UUID.randomUUID();
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.registerOutputs(UUID.randomUUID(),
+                    runId, UUID.randomUUID(), 4, (short) 2,
+                    List.of(new MediaOutput("video", "flowcortex-media",
+                            "runs/" + runId + "/steps/4/video.mp4", "video/mp4", 42L, null)))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Worker output is outside the current run prefix");
+        });
+    }
+
+    @Test
     void outputOutsideTheCurrentRunPrefixIsRejected() {
         runner.run(context -> {
             MediaJobs jobs = context.getBean(MediaJobs.class);

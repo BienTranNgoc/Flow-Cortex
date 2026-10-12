@@ -185,10 +185,15 @@ class MediaJobsImpl implements MediaJobs {
             return;
         }
         String expectedPrefix = MediaJob.outputPrefix(runId, stepOrder, attempt);
+        // A job dispatched before the attempt-scoped prefix landed still writes under
+        // runs/<run>/steps/<n>/. Only attempt 1 ever used that shape, so accepting it there cannot let
+        // one attempt overwrite another's outputs.
+        String legacyPrefix = attempt == 1 ? MediaJob.outputPrefix(runId, stepOrder) : null;
         Instant now = Instant.now();
         List<MediaAsset> registered = outputs.stream().map(output -> {
             if (!properties.s3().bucket().equals(output.bucket())
-                    || !MediaJob.isBelow(expectedPrefix, output.objectKey())) {
+                    || !(MediaJob.isBelow(expectedPrefix, output.objectKey())
+                            || legacyPrefix != null && MediaJob.isBelow(legacyPrefix, output.objectKey()))) {
                 throw new IllegalArgumentException("Worker output is outside the current run prefix");
             }
             return new MediaAsset(UUID.randomUUID(), ownerId, mediaKind(output.mime()), output.bucket(),
