@@ -1,8 +1,6 @@
 /* HomePage — hero + 3 launchpad cards + 4-stage explainer. */
 
 .launchpad {
-  max-width: 1120px;
-  margin: 0 auto;
   padding: 3rem 0;
 }
 
