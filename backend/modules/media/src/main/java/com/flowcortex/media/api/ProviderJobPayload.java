@@ -2,7 +2,6 @@ package com.flowcortex.media.api;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.util.Map;
 
 /**
  * The {@code params.payload} of a {@link ProviderJob}, as {@code contracts/provider-job.schema.json}

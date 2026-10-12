@@ -95,6 +95,7 @@ def test_fixture_is_deterministic_vertical_mp4_with_audio(tmp_path: Path) -> Non
         "height": 640,
         "imageCount": 2,
         "profile": "vertical_ad_v1",
+        "renderer": "fixture",
         "width": 360,
     }
     assert first.data == expected
