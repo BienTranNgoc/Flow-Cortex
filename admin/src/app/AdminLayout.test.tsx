@@ -21,7 +21,7 @@ afterAll(() => consoleError.mockRestore());
 describe('AdminLayout', () => {
   it('contains a page that throws inside the shell, with Reload and one structured event', async () => {
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
-    setToken('admin-token-layout');
+    setToken('admin-token-layout', true);
     window.history.pushState({}, '', '/runs');
 
     render(

@@ -31,8 +31,21 @@ export function ProfilePage() {
   if (meQuery.isLoading) {
     return <output>Loading…</output>;
   }
-  if (meQuery.isError || !meQuery.data) {
-    return <p role="alert">Could not load your profile.</p>;
+  if (meQuery.isError) {
+    return (
+      <main className="profile-page">
+        <h1>My profile</h1>
+        <p role="alert">
+          Could not load your profile.{' '}
+          <button type="button" onClick={() => void meQuery.refetch()}>
+            Retry
+          </button>
+        </p>
+      </main>
+    );
+  }
+  if (!meQuery.data) {
+    return <output>Loading…</output>;
   }
 
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));

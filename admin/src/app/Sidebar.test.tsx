@@ -63,7 +63,7 @@ describe('Sidebar', () => {
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
     });
-    setToken('admin-token-providers');
+    setToken('admin-token-providers', true);
     window.history.pushState({}, '', '/providers');
     render(<App />);
 

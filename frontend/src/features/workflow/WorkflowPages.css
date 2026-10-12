@@ -248,3 +248,31 @@
     width: 100%;
   }
 }
+
+.workflows {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.workflows-list-section {
+  margin: 0 0 1.5rem;
+}
+
+.workflows-list-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1rem, 2.3vw, 1.2rem);
+  color: #e8f1f2;
+}
+
+.workflows-footer {
+  margin: 1.25rem 0 0;
+  color: #81919e;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 680px) {
+  .workflows {
+    padding: 1.5rem 0;
+  }
+}

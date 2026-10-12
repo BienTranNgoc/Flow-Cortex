@@ -29,7 +29,7 @@ function page(items: AdminRunResponse[], total = items.length, pageNumber = 0) {
   return { status: 200, body: { items, page: pageNumber, size: 20, total } };
 }
 
-beforeEach(() => setToken('admin-token-runs'));
+beforeEach(() => setToken('admin-token-runs', true));
 afterEach(() => {
   setToken(null);
   vi.unstubAllGlobals();

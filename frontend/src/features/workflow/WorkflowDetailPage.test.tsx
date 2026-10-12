@@ -67,7 +67,7 @@ function sent(calls: RecordedCall[]) {
 
 describe('WorkflowDetailPage', () => {
   beforeEach(() => {
-    setToken('t');
+    setToken('t', true);
     FakeXhr.instances.length = 0;
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
   });
