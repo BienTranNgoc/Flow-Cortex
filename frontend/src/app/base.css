@@ -251,9 +251,11 @@ button:disabled {
 
 /* ----- Eyebrow (animated gradient text) -------------------------------- */
 
+/* ----- Eyebrow (animated gradient text) -------------------------------- */
+
 .eyebrow {
   margin: 0;
-  color: #35e5e0;
+  color: #c8d4dc;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -261,8 +263,13 @@ button:disabled {
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
-  animation: ai-gradient-pan 6s linear infinite;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-contrast: no-preference) {
+  .eyebrow {
+    animation: ai-gradient-pan 6s linear infinite;
+  }
 }
 
 @keyframes ai-gradient-pan {

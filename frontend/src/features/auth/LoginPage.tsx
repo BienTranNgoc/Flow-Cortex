@@ -10,6 +10,7 @@ import {
   detailFrom,
   getRememberedEmail,
   setRememberedEmail,
+  submitState,
   useAuthToken,
   useLoginMutation,
   type LoginVariables,
@@ -49,7 +50,7 @@ export function LoginPage() {
 
   const serverError = detailFrom(loginMutation);
   const isPending = loginMutation.isPending;
-  const dataState = submitSucceeded ? 'success' : isPending ? 'pending' : 'idle';
+  const dataState = submitState(submitSucceeded, isPending);
 
   const buttonLabel = (() => {
     if (submitSucceeded) return '✓ Signed in';

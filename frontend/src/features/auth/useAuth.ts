@@ -92,3 +92,12 @@ export function clearRememberedEmail(): void {
 export function detailFrom(mutation: { readonly error: unknown }): string | undefined {
   return mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
 }
+
+export type SubmitDataState = 'idle' | 'pending' | 'success';
+
+/** Resolves the form's `data-state` from a success flag and the mutation's pending flag. */
+export function submitState(succeeded: boolean, isPending: boolean): SubmitDataState {
+  if (succeeded) return 'success';
+  if (isPending) return 'pending';
+  return 'idle';
+}

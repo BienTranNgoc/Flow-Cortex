@@ -7,6 +7,7 @@ import { OAuthButton } from '../../app/OAuthButton';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
   detailFrom,
+  submitState,
   useAuthToken,
   useRegisterMutation,
 } from './useAuth';
@@ -35,7 +36,7 @@ export function RegisterPage() {
 
   const serverError = detailFrom(registerMutation);
   const isPending = registerMutation.isPending;
-  const dataState = submitSucceeded ? 'success' : isPending ? 'pending' : 'idle';
+  const dataState = submitState(submitSucceeded, isPending);
 
   const buttonLabel = (() => {
     if (submitSucceeded) return '✓ Account created';

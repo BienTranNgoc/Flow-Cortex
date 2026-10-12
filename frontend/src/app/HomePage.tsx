@@ -35,7 +35,7 @@ export function HomePage() {
     return (
       <main className="launchpad">
         <p role="alert" className="form-error">
-          Could not load your profile.
+          Could not load your profile.{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
             Retry
           </button>
