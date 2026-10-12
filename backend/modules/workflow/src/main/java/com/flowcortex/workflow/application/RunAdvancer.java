@@ -143,7 +143,7 @@ class RunAdvancer {
 
     @ApplicationModuleListener
     void on(WorkflowRunStartedEvent event) {
-        inRun(event.runId(), () -> advanceInRun(event.runId(), true));
+        inRun(event.runId(), () -> advance(event.runId(), true));
     }
 
     @ApplicationModuleListener
@@ -175,9 +175,21 @@ class RunAdvancer {
         }
     }
 
-    /** Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight. */
+/**
+     * Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight.
+     *
+     * <p>Runs inside {@link RunStepTransactions#inNewTransaction}: a step transition is a bulk
+     * {@code UPDATE} on its own transaction, so a {@link RunStep} loaded earlier in the caller's
+     * transaction still carries its pre-transition status. Reading the ladder from that context
+     * would report a closed step as still running and stall the run between steps, and the caller
+     * here is this class itself, so the proxy a {@code @Transactional} here would need is skipped.
+     */
     void advance(UUID runId) {
-        inRun(runId, () -> advanceInRun(runId, false));
+        advance(runId, false);
+    }
+
+    private void advance(UUID runId, boolean starting) {
+        transactions.inNewTransaction(() -> inRun(runId, () -> advanceInRun(runId, starting)));
     }
 
     private void advanceInRun(UUID runId, boolean starting) {

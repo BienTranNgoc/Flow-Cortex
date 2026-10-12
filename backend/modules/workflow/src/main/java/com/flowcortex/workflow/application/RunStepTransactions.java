@@ -47,6 +47,19 @@ class RunStepTransactions {
     }
 
     /**
+     * Runs a callback in this bean's own {@code REQUIRES_NEW} transaction, whose persistence context
+     * has nothing already loaded in it. {@link RunAdvancer} reads the step ladder right after it
+     * closes a step, and that read inherits whatever the caller had loaded — the step still sits in
+     * the first-level cache at its pre-transition status. An {@code @Transactional} method on
+     * {@code RunAdvancer} cannot fix that: every call to it is a self-invocation that skips the
+     * proxy, exactly as this class's own Javadoc warns for its methods.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    void inNewTransaction(Runnable action) {
+        action.run();
+    }
+
+    /**
      * {@code pending -> running}, atomically, then {@code dispatch} inside the same transaction —
      * a remote job is recorded for publication with the claim, so neither exists without the other.
      * A {@link StepFailedException} from {@code dispatch} errors the step in this transaction; any

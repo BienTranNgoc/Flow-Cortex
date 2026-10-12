@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.11.001`)
+## Current schema (`V2026.09.22.001` – `V2026.10.11.002`)
 
 ```mermaid
 erDiagram
@@ -17,6 +17,9 @@ erDiagram
   workflow_run ||--|{ run_step : "run_id"
   workflow_run ||--o{ media_asset_binding : "run_id"
   workflow_run ||--o| product_video_input : "run_id"
+  workflow_run ||--o{ review_task : "run_id"
+  run_step ||--o| review_task : "run_step_id, UNIQUE — one checkpoint per step"
+  review_task ||--o{ script_revision : "review_task_id"
   media_asset ||--o{ media_asset_binding : "asset_id"
 
   app_user {
@@ -111,6 +114,30 @@ erDiagram
     varchar aspect_ratio "9:16 in MVP"
     timestamptz created_at
   }
+  review_task {
+    uuid id PK
+    uuid run_id FK "ON DELETE CASCADE"
+    uuid run_step_id FK,UK "ON DELETE CASCADE — a step pauses at most once"
+    varchar review_type "APPROVAL_CHECKPOINT"
+    varchar status "pending | approved | rejected"
+    text original_payload "the checkpoint's input, unwrapped from the provider result"
+    text reviewed_payload "plain checkpoints only; a script task approves a revision instead"
+    uuid reviewed_by
+    timestamptz reviewed_at
+    timestamptz created_at
+    bigint version "JPA @Version — the decision's optimistic lock"
+    uuid current_revision_id FK "the revision on screen; NULL = task keeps no revisions"
+    uuid approved_revision_id FK "the revision that was approved; NULL until a decision"
+  }
+  script_revision {
+    uuid id PK
+    uuid run_id FK "ON DELETE CASCADE"
+    uuid review_task_id FK "ON DELETE CASCADE"
+    integer revision_number "UNIQUE (review_task_id, revision_number), CHECK > 0"
+    text content "CHECK length(btrim(content)) > 0 — revisions are never blank"
+    uuid created_by "NULL for revision 1, which the provider wrote"
+    timestamptz created_at
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -127,7 +154,8 @@ erDiagram
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
-the reaper scan), `idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
+the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
+`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is
@@ -138,6 +166,11 @@ no upload table either — an upload is an object at a server-derived key. `inpu
 object was missing or over size when the worker checked it. Objects never live in the database: uploads in
 the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex-media`.
 
+`script_revision` is append-only: an edit inserts a row and moves `review_task.current_revision_id`
+forward, never overwrites one. Approval names a revision id and the task `version` it read, so a browser
+tab holding older text loses the approval with a 409 instead of approving something it never showed. The
+payload `generate_speech` consumes is the approved revision's content, not whatever sits in the task.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
@@ -147,4 +180,3 @@ the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex
 | `audit_log` | admin actions with before/after | first admin write beyond Users |
 | `app_setting`, `settings_audit` | DB-backed runtime settings (override > env > default) | Settings page |
 | `channel_account` | publish targets with encrypted tokens | Publish step |
-| `run_step.status += awaiting_review` (+ `reviewed_by`, `reviewed_at`) | manual approval checkpoint — a ladder change, not a new table | Review checkpoint change |

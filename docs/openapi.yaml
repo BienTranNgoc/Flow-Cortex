@@ -156,6 +156,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+  /api/v1/review-tasks/{taskId}/revisions:
+    get:
+      tags:
+      - review-tasks-controller
+      operationId: getRevisions
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScriptRevisionResponse"
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: saveRevision
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScriptRevisionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptRevisionResponse"
   /api/v1/review-tasks/{taskId}/reject:
     post:
       tags:
@@ -711,6 +756,45 @@ components:
       - method
       - uploadId
       - url
+    CreateScriptRevisionRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 8000
+          minLength: 0
+        expectedVersion:
+          type: integer
+          format: int64
+      required:
+      - content
+      - expectedVersion
+    ScriptRevisionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        reviewTaskId:
+          type: string
+          format: uuid
+        revisionNumber:
+          type: integer
+          format: int32
+        content:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        reviewTaskVersion:
+          type: integer
+          format: int64
     ReviewTaskResponse:
       type: object
       properties:
@@ -740,11 +824,26 @@ components:
         createdAt:
           type: string
           format: date-time
+        version:
+          type: integer
+          format: int64
+        currentRevisionId:
+          type: string
+          format: uuid
+        approvedRevisionId:
+          type: string
+          format: uuid
     ApproveReviewTaskRequest:
       type: object
       properties:
         reviewedPayload:
           type: string
+        revisionId:
+          type: string
+          format: uuid
+        expectedVersion:
+          type: integer
+          format: int64
     ProductVideoRunRequest:
       type: object
       properties:
