@@ -57,7 +57,10 @@ describe('App', () => {
     expect(await screen.findByText('admin@flowcortex.dev')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(nav).toHaveTextContent('Workflows');
+    // Header exposes the public nav (Home, Profile, Docs, API) — it does not
+    // link the Workflows list because the home page itself is the launchpad.
+    expect(nav).toHaveTextContent('Home');
+    expect(nav).toHaveTextContent('Profile');
     expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
 
     setToken(null);
