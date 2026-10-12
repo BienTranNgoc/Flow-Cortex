@@ -100,14 +100,19 @@ export function LoginPage() {
             />
             {errors.password && <p role="alert">{errors.password.message}</p>}
           </div>
-          <label className="remember-row" htmlFor="login-remember">
-            <input
-              id="login-remember"
-              type="checkbox"
-              {...register('rememberMe')}
-            />
-            <span>Remember me on this device</span>
-          </label>
+          <div className="login-meta-row">
+            <label className="remember-row" htmlFor="login-remember">
+              <input
+                id="login-remember"
+                type="checkbox"
+                {...register('rememberMe')}
+              />
+              <span>Remember me</span>
+            </label>
+            <Link to="/forgot-password" className="forgot-password-link">
+              Forgot password?
+            </Link>
+          </div>
           {serverError && (
             <p role="alert" className="form-error">
               {serverError}

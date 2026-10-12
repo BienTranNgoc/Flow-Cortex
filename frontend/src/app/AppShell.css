@@ -311,6 +311,33 @@
   user-select: none;
 }
 
+.login-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.25rem 0 0.85rem;
+}
+
+.login-meta-row .remember-row {
+  margin: 0;
+}
+
+.forgot-password-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #5a6b78;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.forgot-password-link:hover {
+  color: #00e5db;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .remember-row input[type='checkbox'] {
   width: 16px;
   height: 16px;
