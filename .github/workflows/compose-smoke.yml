@@ -22,7 +22,8 @@ jobs:
         # store credentials are placed in URLs.
         run: |
           cp .env.example .env
-          for key in JWT_SECRET POSTGRES_PASSWORD RABBITMQ_DEFAULT_PASS MINIO_ROOT_PASSWORD \
+          for key in JWT_SECRET POSTGRES_PASSWORD RABBITMQ_DEFAULT_PASS \
+                     PROVIDER_RABBITMQ_PASS MINIO_ROOT_PASSWORD \
                      BACKEND_S3_SECRET_KEY WORKER_S3_SECRET_KEY PROVIDER_S3_SECRET_KEY \
                      GF_SECURITY_ADMIN_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
             sed -i "s|^$key=.*|$key=$(openssl rand -hex 24)|" .env

@@ -57,6 +57,23 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # Creates the restricted broker identity used by provider-worker. The shared data volume gives
+  # rabbitmqctl the node cookie; no management password is passed on a command line.
+  rabbitmq-init:
+    image: rabbitmq:4.3.6-management
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbitmq
+      PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
+      PROVIDER_RABBITMQ_PASS: ${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq:/init:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: "no"
+
   minio:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
     command: ["server", "/data", "--console-address", ":9001"]
@@ -232,7 +249,7 @@ services:
       target: provider-runtime
     image: flow-cortex-provider-worker:local
     environment:
-      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
+      AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
       S3_PATH_STYLE: "true"
@@ -256,8 +273,8 @@ services:
       FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
       FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
     healthcheck:

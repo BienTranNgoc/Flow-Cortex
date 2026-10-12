@@ -36,6 +36,7 @@ mc ilm import ROOT/flowcortex-uploads < "$DIR/uploads-lifecycle.json"
 # shell builtin), so no secret appears on a command line.
 mc admin policy create ROOT flowcortex-backend "$DIR/backend-policy.json"
 mc admin policy create ROOT flowcortex-worker "$DIR/worker-policy.json"
+mc admin policy create ROOT flowcortex-provider "$DIR/provider-policy.json"
 printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$PROVIDER_S3_ACCESS_KEY" "$PROVIDER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
@@ -53,8 +54,23 @@ attach() {
     esac
 }
 
+detach_if_present() {
+    local policy="$1" user="$2" out
+    if out=$(mc admin policy detach ROOT "$policy" --user "$user" 2>&1); then
+        echo "$out"
+        return 0
+    fi
+    case "$out" in
+        *"not attached"*|*"not found"*) echo "policy $policy was not attached" ;;
+        *) echo "$out" >&2; return 1 ;;
+    esac
+}
+
 attach flowcortex-backend "$BACKEND_S3_ACCESS_KEY"
 attach flowcortex-worker "$WORKER_S3_ACCESS_KEY"
-attach flowcortex-worker "$PROVIDER_S3_ACCESS_KEY"
+# Upgrade an existing local volume safely: older releases attached the broad media-worker policy
+# to this user. Merely attaching the new policy would leave those old read permissions effective.
+detach_if_present flowcortex-worker "$PROVIDER_S3_ACCESS_KEY"
+attach flowcortex-provider "$PROVIDER_S3_ACCESS_KEY"
 
 echo "minio-init: done"
