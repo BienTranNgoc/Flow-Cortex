@@ -74,6 +74,7 @@ class RunAdvancer {
     private static final short INLINE_DELIVERY = 0;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final StoredWithOutputsResolver storedWithOutputsResolver = new StoredWithOutputsResolver();
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
     private final WorkflowStepRepository workflowStepRepository;
@@ -207,6 +208,7 @@ class RunAdvancer {
             LOG.info("Workflow run started: runId={} steps={}", runId, runSteps.size());
         }
         Map<Integer, String> outputsByOrder = new LinkedHashMap<>();
+        Map<Integer, String> assetOutputsByOrder = new LinkedHashMap<>();
         RunStep next = null;
         for (RunStep runStep : runSteps) {
             if (runStep.getStatus() != RunStepStatus.COMPLETED) {
@@ -214,6 +216,7 @@ class RunAdvancer {
                 break;
             }
             outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
+            assetOutputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
         }
         if (next == null) {
             transactions.completeRunIfDone(runId, clock.instant());
@@ -228,10 +231,11 @@ class RunAdvancer {
             checkpointTransactions.pause(run, next, payload, clock.instant());
             return;
         }
-        dispatch(run, next, outputsByOrder);
+        dispatch(run, next, outputsByOrder, assetOutputsByOrder);
     }
 
-    private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder) {
+    private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
+            Map<Integer, String> assetOutputsByOrder) {
         int order = step.getStepOrder();
         WorkflowStep definition = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(run.getWorkflowId())
                 .stream()
@@ -240,21 +244,26 @@ class RunAdvancer {
         Optional<StepExecutor> executor = registry.find(step.getType());
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), remote, step.getAttempt(), null)) {
-            dispatch(run, step, definition, executor, outputsByOrder);
+            dispatch(run, step, definition, executor, outputsByOrder, assetOutputsByOrder);
         }
     }
 
     private void dispatch(WorkflowRun run, RunStep step, WorkflowStep definition, Optional<StepExecutor> executor,
-            Map<Integer, String> outputsByOrder) {
+            Map<Integer, String> outputsByOrder, Map<Integer, String> assetOutputsByOrder) {
         int order = step.getStepOrder();
         String resolvedInput = null;
         Runnable inClaim;
         try {
-            // A remote step takes only the object its run start resolved from the caller's upload.
-            resolvedInput = executor.filter(e -> e.inputPolicy() == StepExecutor.InputPolicy.STORED).isPresent()
-                    ? step.getInput()
-                    : inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
-                            run.getInput(), outputsByOrder);
+            String stepConfig = definition == null ? null : definition.getConfig();
+            StepExecutor.InputPolicy inputPolicy = executor.map(value -> value.inputPolicy(stepConfig))
+                    .orElse(StepExecutor.InputPolicy.RESOLVED);
+            resolvedInput = switch (inputPolicy) {
+                case STORED -> step.getInput();
+                case STORED_WITH_OUTPUTS -> storedWithOutputsResolver.resolve(step.getInput(),
+                        stepConfig, assetOutputsByOrder, run.getId(), order);
+                case RESOLVED -> inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
+                        run.getInput(), outputsByOrder);
+            };
             StepContext context = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
                     resolvedInput, definition == null ? null : definition.getConfig());
             if (executor.isEmpty()) {

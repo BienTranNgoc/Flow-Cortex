@@ -61,7 +61,7 @@ class StepExecutorRegistry {
     }
 
     boolean usesStoredInput(String type) {
-        return find(type).map(executor -> executor.inputPolicy() == StepExecutor.InputPolicy.STORED).orElse(false);
+        return find(type).map(executor -> executor.inputPolicy() != StepExecutor.InputPolicy.RESOLVED).orElse(false);
     }
 
     Set<String> knownTypes() {

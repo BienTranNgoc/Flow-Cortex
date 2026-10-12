@@ -17,16 +17,21 @@ interface StepExecutor {
 
     enum InputPolicy {
         RESOLVED,
-        STORED
+        STORED,
+        STORED_WITH_OUTPUTS
     }
 
     String type();
 
     Mode mode();
 
-    /** STORED is reserved for media assets snapshotted when the run starts. */
+    /** Stored policies are reserved for media assets snapshotted when the run starts. */
     default InputPolicy inputPolicy() {
         return InputPolicy.RESOLVED;
+    }
+
+    default InputPolicy inputPolicy(String config) {
+        return inputPolicy();
     }
 
     /** How long one run of this step may take once picked up; bounds its run deadline. */

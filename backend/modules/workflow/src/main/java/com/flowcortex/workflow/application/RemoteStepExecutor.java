@@ -20,8 +20,9 @@ import java.util.Map;
  * transaction — a claim that rolls back publishes nothing. The {@code media} module owns the
  * kill switch and the per-capability limits; this class only reads them.
  *
- * <p>The job's input is the step's stored input: the object reference the run start resolved
- * from the caller's own upload. Nothing a client sent and no earlier step's output reaches it.
+ * <p>The job's input starts with the asset references snapshotted at run creation. Capabilities
+ * that declare {@link InputPolicy#STORED_WITH_OUTPUTS} also receive configured outputs of earlier
+ * completed steps after {@link RunAdvancer} validates and appends them.
  */
 class RemoteStepExecutor implements StepExecutor {
 
@@ -51,6 +52,20 @@ class RemoteStepExecutor implements StepExecutor {
     @Override
     public InputPolicy inputPolicy() {
         return InputPolicy.STORED;
+    }
+
+    @Override
+    public InputPolicy inputPolicy(String config) {
+        if (config == null || config.isBlank()) {
+            return InputPolicy.STORED;
+        }
+        try {
+            return objectMapper.readTree(config).has("outputInputs")
+                    ? InputPolicy.STORED_WITH_OUTPUTS
+                    : InputPolicy.STORED;
+        } catch (JsonProcessingException e) {
+            throw new StepFailedException("contract_violation", "The step config is not a JSON object", e);
+        }
     }
 
     @Override
@@ -90,8 +105,10 @@ class RemoteStepExecutor implements StepExecutor {
         try {
             if (objectMapper.readTree(storedInput).isArray()) {
                 List<MediaJobInput> inputs = objectMapper.readValue(storedInput, new TypeReference<>() { });
-                if (inputs.isEmpty() || inputs.size() > 10) {
-                    throw new StepFailedException("contract_violation", "The step must have between 1 and 10 inputs");
+                int maximum = capability.equals("render_video") ? 11 : 10;
+                if (inputs.isEmpty() || inputs.size() > maximum) {
+                    throw new StepFailedException("contract_violation",
+                            "The step must have between 1 and " + maximum + " inputs");
                 }
                 return inputs;
             }

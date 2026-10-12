@@ -27,6 +27,8 @@ def handle(
     processes: ProcessRunner,
 ) -> HandlerOutcome:
     image_count, speech = _validate_inputs(job, inputs)
+    if not speech.is_file() or speech.stat().st_size == 0:
+        raise PermanentError("contract_violation", "render_video requires a non-empty speech input")
     video = speech.parent / VIDEO_NAME
     completed = processes.run(
         [
@@ -98,6 +100,7 @@ def handle(
         "height": HEIGHT,
         "imageCount": image_count,
         "profile": PROFILE,
+        "renderer": "fixture",
         "width": WIDTH,
     }
     encoded_manifest = json.dumps(

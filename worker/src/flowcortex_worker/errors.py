@@ -8,6 +8,7 @@ ErrorCode = Literal[
     "audio_extraction_failed",
     "audio_alignment_failed",
     "audio_alignment_out_of_range",
+    "provider_capability_unavailable",
     "contract_violation",
     "run_timeout"
     ]

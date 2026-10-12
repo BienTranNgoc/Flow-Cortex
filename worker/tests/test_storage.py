@@ -1,4 +1,4 @@
-"""Inputs come from the uploads bucket by reference; outputs land at deterministic keys."""
+"""Inputs come from configured media buckets; outputs land at deterministic keys."""
 
 from __future__ import annotations
 
@@ -103,16 +103,24 @@ def test_unreachable_store_is_transient() -> None:
         pass
 
 
-def test_input_outside_the_uploads_bucket_is_a_contract_violation(silo: Silo) -> None:
-    ref = MediaJobInput(key="media", bucket=MEDIA_BUCKET, objectKey="runs/x/steps/1/a")
+def test_output_asset_can_be_used_as_a_later_step_input(silo: Silo) -> None:
+    key = "runs/one/steps/3/attempts/1/speech.wav"
+    silo.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"speech")
+    ref = MediaJobInput(key="speech", bucket=MEDIA_BUCKET, objectKey=key)
     storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with (
-        pytest.raises(PermanentError) as rejected,
-        storage.fetched(ref, max_bytes=10, abort=ProcessRunner()),
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner()) as path:
+        assert path.read_bytes() == b"speech"
+
+
+def test_input_outside_configured_media_buckets_is_a_contract_violation(silo: Silo) -> None:
+    ref = MediaJobInput(key="media", bucket="foreign-bucket", objectKey="runs/x/steps/1/a")
+    storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with pytest.raises(PermanentError) as rejected, storage.fetched(
+        ref, max_bytes=10, abort=ProcessRunner()
     ):
         pass
-
     assert rejected.value.code == "contract_violation"
 
 

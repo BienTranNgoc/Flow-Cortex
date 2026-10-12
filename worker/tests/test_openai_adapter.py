@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from flowcortex_worker.errors import PermanentError
 from flowcortex_worker.provider import openai_adapter
 from flowcortex_worker.provider.contracts.provider_job import ProductAdPayload
 
@@ -219,6 +220,15 @@ def test_generate_script_surfaces_http_errors_with_response_body(
 def test_select_adapter_requires_openai_key_for_openai_provider() -> None:
     with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
         openai_adapter.select_adapter(openai_adapter.PROVIDER_OPENAI, "")
+
+
+def test_generate_speech_fails_instead_of_returning_an_empty_artifact() -> None:
+    adapter = openai_adapter.OpenAIProviderAdapter(client=MagicMock())
+
+    with pytest.raises(PermanentError) as raised:
+        adapter.generate_speech("Đặt mua ngay")
+
+    assert raised.value.code == "provider_capability_unavailable"
 
 
 def test_select_adapter_rejects_unknown_provider() -> None:

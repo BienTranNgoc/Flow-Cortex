@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, cast
 
+from ..errors import PermanentError
 from .adapter import SpeechArtifact
 from .contracts.provider_job import ProductAdPayload
 
@@ -143,12 +144,10 @@ class OpenAIProviderAdapter:
         return script
 
     def generate_speech(self, script: str) -> SpeechArtifact:
-        """Place the TTS call here (next slice). For now, mirror the fixture so the runtime can
-        attach `OpenAIProviderAdapter` to the same `ProviderAdapter` protocol without a
-        NotImplemented switch in `capabilities.py`. Slice 4 replaces this with
-        `audio.speech.create`."""
-        frames = min(30_000, max(15_000, len(script) * 55))
-        return SpeechArtifact(body=b"", duration_ms=frames)
+        raise PermanentError(
+            "provider_capability_unavailable",
+            "OpenAI speech generation is not implemented",
+        )
 
     def _request_script(self, payload: ProductAdPayload) -> str:
         body = json.dumps({

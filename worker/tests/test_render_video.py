@@ -159,3 +159,15 @@ def test_resolved_inputs_must_match_declared_inputs(tmp_path: Path) -> None:
         render_video.handle(make_job(keys), inputs, ProcessRunner())
 
     assert failed.value.code == "contract_violation"
+
+
+def test_empty_speech_is_rejected(tmp_path: Path) -> None:
+    inputs = make_inputs(tmp_path, ["image_1", "speech"])
+    inputs["speech"].write_bytes(b"")
+
+    with pytest.raises(PermanentError, match="non-empty speech"):
+        render_video.handle(
+            make_job(["image_1", "speech"]),
+            inputs,
+            ProcessRunner(),
+        )

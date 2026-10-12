@@ -80,7 +80,8 @@ class RunAdvancerTest {
                 new FailStepExecutor(),
                 new UpperStepExecutor(),
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
-                new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock)));
+                new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
+                new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
 
@@ -382,6 +383,35 @@ class RunAdvancerTest {
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
         assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/attempts/1/");
+    }
+
+    @Test
+    void renderVideoCombinesStoredImagesWithTheAcceptedSpeechOutput() {
+        givenMediaEnabled();
+        when(mediaJobs.limitsFor("render_video"))
+                .thenReturn(new MediaLimits(PROBE_QUEUE, PROBE_RUNTIME, 1000L));
+        String images = "[{\"key\":\"image_1\",\"bucket\":\"uploads\",\"objectKey\":\"owner/image\"}]";
+        String speechKey = "runs/" + runId + "/steps/3/attempts/1/speech.wav";
+        String speechOutputs = "[{\"name\":\"speech.wav\",\"bucket\":\"media\",\"objectKey\":\""
+                + speechKey + "\",\"mime\":\"audio/wav\",\"bytes\":42}]";
+        RunStep speech = new RunStep(UUID.randomUUID(), runId, (short) 3, "generate_speech");
+        speech.markRunning(NOW);
+        speech.markCompleted("script", "{\"durationMs\":15000}", NOW, speechOutputs);
+        RunStep render = new RunStep(UUID.randomUUID(), runId, (short) 4, "render_video", images);
+        WorkflowStep definition = mock(WorkflowStep.class);
+        when(definition.getStepOrder()).thenReturn((short) 4);
+        when(definition.getConfig()).thenReturn("{\"profile\":\"vertical_ad_v1\",\"outputInputs\":["
+                + "{\"stepOrder\":3,\"outputName\":\"speech.wav\",\"inputKey\":\"speech\"}]}");
+        givenRun(List.of(definition), List.of(speech, render));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+        verify(mediaJobs).enqueue(job.capture());
+        assertThat(job.getValue().inputs()).containsExactly(
+                new MediaJobInput("image_1", "uploads", "owner/image"),
+                new MediaJobInput("speech", "media", speechKey));
     }
 
     @Test
