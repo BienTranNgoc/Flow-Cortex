@@ -7,8 +7,8 @@ import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 import './ProfilePage.css';
 
-function initialsFrom(name: string | null | undefined, email: string): string {
-  const source = (name ?? '').trim() || email;
+function initialsFrom(name: string | null | undefined, email: string | null | undefined): string {
+  const source = (name ?? '').trim() || email || '';
   const parts = source.split(/[\s@.]+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
