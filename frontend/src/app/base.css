@@ -82,73 +82,28 @@ body {
   min-height: 44px;
 }
 
-/* ----- Form field design language --------------------------------------- */
-
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-  max-width: none;
-  animation: field-rise 0.4s ease-out backwards;
-  animation-delay: calc(var(--i, 0) * 80ms + 240ms);
-}
-
-@keyframes field-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  max-width: 420px;
 }
 
 .field label {
   font-weight: 600;
-  font-size: 0.88rem;
-  color: #c8d4dc;
 }
 
 .field input,
-.field select,
-.field textarea {
-  padding: 0.65rem 0.75rem;
-  min-height: 46px;
+.field select {
+  padding: 0.5rem;
+  min-height: 44px;
   border: 1px solid #2e3b49;
-  background: rgba(11, 17, 25, 0.7);
+  background: #0b1119;
   color: #e8f1f2;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 1rem;
   width: 100%;
-  transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
-}
-
-.field input:hover,
-.field select:hover,
-.field textarea:hover {
-  border-color: #3a4a5b;
-}
-
-.field input:focus,
-.field input:focus-visible,
-.field select:focus,
-.field select:focus-visible,
-.field textarea:focus,
-.field textarea:focus-visible {
-  outline: none;
-  border-color: #1be0d1;
-  background: rgba(11, 17, 25, 0.95);
-  box-shadow:
-    0 0 0 1px #1be0d1,
-    0 0 0 4px rgba(27, 224, 209, 0.18),
-    0 0 24px rgba(27, 224, 209, 0.25);
-}
-
-.field input[aria-invalid='true'],
-.field select[aria-invalid='true'] {
-  border-color: #ff7a7a;
 }
 
 button {
@@ -172,8 +127,6 @@ button:disabled {
 
 [role='alert'] {
   color: #ff9a9a;
-  font-size: 0.85rem;
-  margin: 0.15rem 0 0;
 }
 
 .form-error {
@@ -251,8 +204,6 @@ button:disabled {
 
 /* ----- Eyebrow (animated gradient text) -------------------------------- */
 
-/* ----- Eyebrow (animated gradient text) -------------------------------- */
-
 .eyebrow {
   margin: 0;
   color: #c8d4dc;
@@ -264,12 +215,7 @@ button:disabled {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-@media (prefers-contrast: no-preference) {
-  .eyebrow {
-    animation: ai-gradient-pan 6s linear infinite;
-  }
+  animation: ai-gradient-pan 6s linear infinite;
 }
 
 @keyframes ai-gradient-pan {
@@ -284,7 +230,6 @@ button:disabled {
 /* ----- Reduced motion --------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .field,
   .primary-button,
   .eyebrow,
   button {

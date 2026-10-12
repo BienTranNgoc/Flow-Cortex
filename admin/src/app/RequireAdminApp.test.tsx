@@ -39,7 +39,7 @@ describe('RequireAdminApp', () => {
 
   it('shows a MEMBER "No access" with sign-out and makes no admin API call', async () => {
     const calls = stubApi({ 'GET /api/v1/auth/me': { status: 200, body: MEMBER_ME } });
-    setToken('member-token');
+    setToken('member-token', true);
     window.history.pushState({}, '', '/runs');
     render(<App />);
 
@@ -58,7 +58,7 @@ describe('RequireAdminApp', () => {
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
     });
-    setToken('admin-token-signout');
+    setToken('admin-token-signout', true);
     window.history.pushState({}, '', '/runs');
     render(<App />);
     expect(await screen.findByText('No runs yet.')).toBeInTheDocument();
@@ -73,7 +73,7 @@ describe('RequireAdminApp', () => {
 
   it('renders its children for an ADMIN', async () => {
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
-    setToken('admin-token-children');
+    setToken('admin-token-children', true);
     render(
       <QueryClientProvider client={testQueryClient()}>
         <MemoryRouter initialEntries={['/runs']}>
@@ -89,7 +89,7 @@ describe('RequireAdminApp', () => {
 
   it('shows a retryable error when the signed-in user cannot be loaded', async () => {
     stubApi({ 'GET /api/v1/auth/me': { status: 500, body: { status: 500, detail: 'boom' } } });
-    setToken('admin-token-error');
+    setToken('admin-token-error', true);
     render(
       <QueryClientProvider client={testQueryClient()}>
         <MemoryRouter initialEntries={['/runs']}>

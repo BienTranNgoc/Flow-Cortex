@@ -242,6 +242,64 @@
   text-decoration: underline;
 }
 
+/* ----- Auth form fields ------------------------------------------------- */
+
+.auth-card .field {
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  max-width: none;
+  animation: field-rise 0.4s ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 80ms + 240ms);
+}
+
+@keyframes field-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card .field label {
+  font-size: 0.88rem;
+  color: #c8d4dc;
+}
+
+.auth-card .field input {
+  padding: 0.65rem 0.75rem;
+  min-height: 46px;
+  background: rgba(11, 17, 25, 0.7);
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
+}
+
+.auth-card .field input:hover {
+  border-color: #3a4a5b;
+}
+
+.auth-card .field input:focus,
+.auth-card .field input:focus-visible {
+  outline: none;
+  border-color: #1be0d1;
+  background: rgba(11, 17, 25, 0.95);
+  box-shadow:
+    0 0 0 1px #1be0d1,
+    0 0 0 4px rgba(27, 224, 209, 0.18),
+    0 0 24px rgba(27, 224, 209, 0.25);
+}
+
+.auth-card .field input[aria-invalid='true'] {
+  border-color: #ff7a7a;
+}
+
+.auth-card .field [role='alert'] {
+  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+}
+
 .remember-row {
   display: flex;
   align-items: center;
@@ -355,6 +413,8 @@
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
   .auth-card,
+  .auth-card .field,
+  .auth-card .field input,
   .brand-panel__inner,
   .oauth-button::before {
     animation: none !important;

@@ -13,7 +13,6 @@ import {
   submitState,
   useAuthToken,
   useLoginMutation,
-  type LoginVariables,
 } from './useAuth';
 
 export function LoginPage() {
@@ -41,7 +40,7 @@ export function LoginPage() {
     } else {
       clearRememberedEmail();
     }
-    loginMutation.mutate(values as unknown as LoginVariables, {
+    loginMutation.mutate(values, {
       onSuccess: () => {
         setSubmitSucceeded(true);
       },

@@ -36,17 +36,16 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ remember: _remember, ...credentials }: LoginVariables) =>
+    mutationFn: ({ rememberMe: _rememberMe, ...credentials }: LoginVariables) =>
       unwrap(loginRequest(credentials)),
     onSuccess: (data, vars) => {
-      setToken(data.token ?? null, vars.remember);
+      setToken(data.token ?? null, vars.rememberMe);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
 
-type LoginVariables = LoginRequest & { remember: boolean };
-export type { LoginVariables };
+export type LoginVariables = LoginRequest & { rememberMe: boolean };
 
 export function useRegisterMutation() {
   const queryClient = useQueryClient();

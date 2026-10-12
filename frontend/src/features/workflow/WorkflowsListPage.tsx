@@ -29,9 +29,7 @@ export function WorkflowsListPage() {
       </section>
 
       {meQuery.data?.name && (
-        <p className="workflows-footer" aria-label="Signed-in user">
-          Welcome, {meQuery.data.name}
-        </p>
+        <p className="workflows-footer">Welcome, {meQuery.data.name}</p>
       )}
     </main>
   );

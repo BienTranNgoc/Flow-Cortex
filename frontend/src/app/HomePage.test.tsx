@@ -14,8 +14,14 @@ function workflow(
   return { id, name, isShared: true, steps };
 }
 
+const DOUYIN_STEPS: WorkflowStepResponse[] = [
+  { id: 'a-1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
+  { id: 'a-2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
+  { id: 'a-3', stepOrder: 3, name: 'echo_output', type: 'echo', mode: 'inline' },
+];
+
 describe('HomePage — launchpad cards', () => {
-  beforeEach(() => setToken('t'));
+  beforeEach(() => setToken('t', true));
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
@@ -36,16 +42,13 @@ describe('HomePage — launchpad cards', () => {
       'GET /api/v1/workflows': {
         status: 200,
         body: [
-          workflow('wf-a', 'Douyin Video Repurpose', [
-            { id: 'a-1', stepOrder: 1, name: 'Scrape source', type: 'echo', mode: 'inline' },
-            { id: 'a-2', stepOrder: 2, name: 'Demucs BGM', type: 'echo', mode: 'inline' },
-          ]),
-          workflow('wf-b', 'Product Video', [
-            { id: 'b-1', stepOrder: 1, name: 'Render', type: 'echo', mode: 'remote' },
+          workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS),
+          workflow('wf-b', 'Echo Demo (all steps succeed)', [
+            { id: 'b-1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
           ]),
           workflow('wf-c', 'Check a video file', [
-            { id: 'c-1', stepOrder: 1, name: 'Inspect', type: 'probe', mode: 'remote' },
-            { id: 'c-2', stepOrder: 2, name: 'Extract audio', type: 'extract_audio', mode: 'remote' },
+            { id: 'c-1', stepOrder: 1, name: 'Inspect the file', type: 'probe', mode: 'remote' },
+            { id: 'c-2', stepOrder: 2, name: 'Extract source audio', type: 'extract_audio', mode: 'remote' },
           ]),
         ],
       },
@@ -56,7 +59,9 @@ describe('HomePage — launchpad cards', () => {
     expect(
       await screen.findByRole('heading', { name: 'Douyin Video Repurpose' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Product Video' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Echo Demo (all steps succeed)' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Check a video file' })).toBeInTheDocument();
     expect(screen.queryAllByText('Coming soon')).toHaveLength(0);
   });
@@ -81,20 +86,16 @@ describe('HomePage — launchpad cards', () => {
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
-        body: [
-          workflow('wf-a', 'Douyin Video Repurpose', [
-            { id: 'a-1', stepOrder: 1, name: 'Scrape source', type: 'echo', mode: 'inline' },
-            { id: 'a-2', stepOrder: 2, name: 'Demucs BGM', type: 'echo', mode: 'inline' },
-          ]),
-        ],
+        body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)],
       },
     });
 
     renderHome();
 
     await screen.findByRole('heading', { name: 'Douyin Video Repurpose' });
-    expect(screen.getByText('Scrape source')).toBeInTheDocument();
-    expect(screen.getByText('Demucs BGM')).toBeInTheDocument();
+    expect(screen.getByText('echo_input')).toBeInTheDocument();
+    expect(screen.getByText('approval_checkpoint')).toBeInTheDocument();
+    expect(screen.getByText('echo_output')).toBeInTheDocument();
   });
 
   it('does not render ETA, status, priority, or credit fields', async () => {

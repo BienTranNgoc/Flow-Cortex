@@ -40,7 +40,9 @@ export function getToken(): string | null {
   return token;
 }
 
-export function setToken(next: string | null, persistent: boolean = true): void {
+export function setToken(next: null): void;
+export function setToken(next: string | null, persistent: boolean): void;
+export function setToken(next: string | null, persistent = false): void {
   token = next;
   try {
     window.localStorage.removeItem(PERSISTENT_KEY);
