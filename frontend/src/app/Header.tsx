@@ -74,7 +74,12 @@ export function Header({ me }: HeaderProps) {
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
             Home
           </NavLink>
-          <a href="#pricing">Pricing</a>
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => (isActive ? 'active' : '')}
+          >
+            Profile
+          </NavLink>
           <a href="#docs">Docs</a>
           <a href="#api">API</a>
         </nav>
