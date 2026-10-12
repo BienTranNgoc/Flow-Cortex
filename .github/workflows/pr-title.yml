@@ -1,0 +1,36 @@
+name: pr-title
+
+# Squash merges use the PR title as the commit subject on development, so the title
+# must follow Conventional Commits. pull_request_target only reads the title; nothing
+# from the PR is checked out or run.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            refactor
+            perf
+            chore
+            docs
+            test
+            ci
+            build
+            style
+            revert
+          subjectPattern: ^[^A-Z].+$
+          subjectPatternError: |
+            The subject "{subject}" of PR title "{title}" must not start with an uppercase letter,
+            e.g. "feat(auth): add password reset", not "Feat/password reset".
