@@ -1,13 +1,39 @@
 /* HomePage — hero + 3 launchpad cards + 4-stage explainer. */
 
 .launchpad {
-  padding: 3rem 0;
+  padding: 3rem 0 0;
+}
+
+/* Ambient gradient glow at top of page content */
+.launchpad::before {
+  content: '';
+  position: fixed;
+  top: -10vmax;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70vmax;
+  height: 40vmax;
+  background: radial-gradient(ellipse, rgba(18, 0, 116, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .launchpad-hero {
   text-align: center;
   max-width: 720px;
   margin: 0 auto 2.5rem;
+  position: relative;
+}
+
+.launchpad-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.25), transparent);
 }
 
 .launchpad-hero h1 {
