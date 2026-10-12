@@ -64,19 +64,6 @@ _SCRIPT_RESPONSE_FORMAT: dict[str, Any] = {
     },
 }
 
-# _SYSTEM_PROMPT = (
-#     "You write short Vietnamese product-ad scripts.\n"
-#     "Output a JSON object with a single string field `script`.\n"
-#     "Rules:\n"
-#     "- Hook first, one sentence.\n"
-#     "- Then 1-3 sentences about benefits, using ONLY the product description provided.\n"
-#     "- If and only if a price is provided, append one short sentence that quotes it.\n"
-#     "- If and only if a promotion is provided, append one short sentence that quotes it.\n"
-#     "- End with the call-to-action sentence, exactly as provided.\n"
-#     "- Never invent a price, promotion, feature, capacity or guarantee that is not in the input.\n"
-#     "- Keep the script under 8000 characters."
-# )
-
 _SYSTEM_PROMPT = (
     "You are an expert Vietnamese short-form video advertising copywriter "
     "specializing in TikTok, Facebook Reels, and YouTube Shorts.\n"
