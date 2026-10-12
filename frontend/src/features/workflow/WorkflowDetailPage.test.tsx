@@ -2,7 +2,14 @@ import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route } from 'react-router-dom';
-import { renderRoute, settled, stubApi, type FakeReply, type Handler, type RecordedCall } from '../../test/fakeApi';
+import {
+  renderRoute,
+  settled,
+  stubApi,
+  type FakeReply,
+  type Handler,
+  type RecordedCall,
+} from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
 import { WorkflowDetailPage } from './WorkflowDetailPage';
 
@@ -79,6 +86,26 @@ describe('WorkflowDetailPage', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not show the Product Video form while another workflow is loading', () => {
+    renderForm(CHECK);
+
+    expect(screen.getByText('Loading workflow…')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('form', { name: 'Start a product video run' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show the Product Video form when another workflow fails to load', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/workflows/w1': { status: 500, body: { status: 500 } },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this workflow');
+    expect(
+      screen.queryByRole('form', { name: 'Start a product video run' }),
+    ).not.toBeInTheDocument();
+  });
+
   describe('a workflow whose first step is remote', () => {
     it('asks for a required "Media file" that accepts any file and never shows the step type', async () => {
       renderForm(CHECK);
@@ -131,7 +158,10 @@ describe('WorkflowDetailPage', () => {
       const user = userEvent.setup();
       renderForm(CHECK);
 
-      await user.upload(await screen.findByLabelText('Media file'), file('IMG_0412.MOV', 1_200_000));
+      await user.upload(
+        await screen.findByLabelText('Media file'),
+        file('IMG_0412.MOV', 1_200_000),
+      );
 
       expect(screen.queryByText(TYPE_SENTENCE)).not.toBeInTheDocument();
       expect(screen.queryByText(SIZE_SENTENCE)).not.toBeInTheDocument();
@@ -171,7 +201,10 @@ describe('WorkflowDetailPage', () => {
 
       act(() => put.progress(5, 10));
       expect(screen.getByRole('button', { name: 'Uploading… 50 %' })).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { name: 'Upload progress' })).toHaveAttribute('value', '50');
+      expect(screen.getByRole('progressbar', { name: 'Upload progress' })).toHaveAttribute(
+        'value',
+        '50',
+      );
 
       act(() => put.respond(200));
       expect(await screen.findByRole('button', { name: 'Starting…' })).toBeInTheDocument();
@@ -179,7 +212,11 @@ describe('WorkflowDetailPage', () => {
 
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
       expect(sent(calls)).toEqual([
-        { method: 'POST', path: '/api/v1/uploads', body: { fileName: 'holiday clip.mp4', size: 10 } },
+        {
+          method: 'POST',
+          path: '/api/v1/uploads',
+          body: { fileName: 'holiday clip.mp4', size: 10 },
+        },
         {
           method: 'POST',
           path: '/api/v1/workflows/w1/runs',
@@ -203,7 +240,10 @@ describe('WorkflowDetailPage', () => {
       act(() => FakeXhr.instances[0]!.respond(200));
 
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
-      expect(sent(calls).map((call) => call.path)).toEqual(['/api/v1/uploads', '/api/v1/workflows/w1/runs']);
+      expect(sent(calls).map((call) => call.path)).toEqual([
+        '/api/v1/uploads',
+        '/api/v1/workflows/w1/runs',
+      ]);
       expect(FakeXhr.instances).toHaveLength(1);
       expect(screen.queryByText('Upload the file again')).not.toBeInTheDocument();
     });
@@ -221,7 +261,10 @@ describe('WorkflowDetailPage', () => {
       act(() => FakeXhr.instances[0]!.respond(200));
 
       await waitFor(() =>
-        expect(sent(calls).map((call) => call.path)).toEqual(['/api/v1/uploads', '/api/v1/workflows/w1/runs']),
+        expect(sent(calls).map((call) => call.path)).toEqual([
+          '/api/v1/uploads',
+          '/api/v1/workflows/w1/runs',
+        ]),
       );
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(screen.getByText('Workflows list')).toBeInTheDocument();
@@ -242,7 +285,10 @@ describe('WorkflowDetailPage', () => {
       expect(screen.getByRole('button', { name: /Uploading/ })).toBeInTheDocument();
       act(() => FakeXhr.instances[0]!.respond(200));
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
-      expect(sent(calls).at(-1)?.body).toEqual({ uploadId: 'up-1', originalName: 'holiday clip.mp4' });
+      expect(sent(calls).at(-1)?.body).toEqual({
+        uploadId: 'up-1',
+        originalName: 'holiday clip.mp4',
+      });
     });
 
     it('says the upload did not finish and Retry starts again from /uploads', async () => {
@@ -272,7 +318,10 @@ describe('WorkflowDetailPage', () => {
     it('shows a 400 from /uploads on the form', async () => {
       const user = userEvent.setup();
       renderForm(CHECK, {
-        'POST /api/v1/uploads': { status: 400, body: { status: 400, errors: { fileName: TYPE_SENTENCE } } },
+        'POST /api/v1/uploads': {
+          status: 400,
+          body: { status: 400, errors: { fileName: TYPE_SENTENCE } },
+        },
       });
 
       await user.upload(await screen.findByLabelText('Media file'), file('holiday clip.mp4'));

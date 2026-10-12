@@ -114,9 +114,9 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           ))}
         </ol>
       )}
-      {!workflow || isProductVideo ? (
+      {isProductVideo ? (
         <ProductVideoStartForm disabled={startDisabled} />
-      ) : startsWithUpload ? (
+      ) : !workflow ? null : startsWithUpload ? (
         <MediaStartForm workflowId={workflowId} disabled={startDisabled} />
       ) : (
         <InlineStartForm workflowId={workflowId} disabled={startDisabled} />

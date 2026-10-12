@@ -30,6 +30,12 @@ SAMPLE_PAYLOAD = ProductAdPayload(
 )
 
 
+def _adapter(base_url: str = "https://example.invalid/v1") -> openai_adapter.OpenAIProviderAdapter:
+    return openai_adapter.OpenAIProviderAdapter(
+        openai_adapter.OpenAIConfig(api_key="sk-test", base_url=base_url)
+    )
+
+
 def _http_response(body: dict[str, Any]) -> MagicMock:
     """Stand-in for an `http.client.HTTPResponse` returned by `urllib.request.urlopen`."""
     response = MagicMock()
@@ -77,10 +83,7 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
         _http_response(_ok_body(json.dumps({"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}))),
     )
 
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     script = adapter.generate_script(SAMPLE_PAYLOAD)
 
@@ -112,10 +115,7 @@ def test_generate_script_ignores_proxy_extra_content(monkeypatch: pytest.MonkeyP
     }
     _patch_urlopen(monkeypatch, _http_response(body))
 
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://api.vilao.ai/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter("https://api.vilao.ai/v1")
 
     assert adapter.generate_script(SAMPLE_PAYLOAD) == "Hook. Lợi ích. Đặt mua ngay"
 
@@ -132,10 +132,7 @@ def test_generate_script_quotes_confirmed_price_and_promotion_only(
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     priced = ProductAdPayload(
         productName="Bình giữ nhiệt",
@@ -162,10 +159,7 @@ def test_generate_script_quotes_confirmed_price_and_promotion_only(
 
 def test_generate_script_rejects_an_empty_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_urlopen(monkeypatch, _http_response(_ok_body(json.dumps({"script": ""}))))
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     with pytest.raises(PermanentError, match="empty"):
         adapter.generate_script(SAMPLE_PAYLOAD)
@@ -176,10 +170,7 @@ def test_generate_script_rejects_oversize_payload_at_boundary(
 ) -> None:
     too_long = "a" * 8001
     _patch_urlopen(monkeypatch, _http_response(_ok_body(json.dumps({"script": too_long}))))
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     with pytest.raises(PermanentError, match="exceeds 8000"):
         adapter.generate_script(SAMPLE_PAYLOAD)
@@ -187,10 +178,7 @@ def test_generate_script_rejects_oversize_payload_at_boundary(
 
 def test_generate_script_rejects_response_that_is_not_json(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_urlopen(monkeypatch, _http_response(_ok_body("not json")))
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     with pytest.raises(PermanentError, match="response format"):
         adapter.generate_script(SAMPLE_PAYLOAD)
@@ -208,10 +196,7 @@ def test_generate_script_classifies_non_retryable_http_error_without_logging_bod
         )
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    client = MagicMock()
-    client.api_key = "sk-test"
-    client.base_url = "https://example.invalid/v1"
-    adapter = openai_adapter.OpenAIProviderAdapter(client=client)
+    adapter = _adapter()
 
     with pytest.raises(PermanentError) as raised:
         adapter.generate_script(SAMPLE_PAYLOAD)
@@ -239,10 +224,8 @@ def test_generate_script_classifies_retryable_http_errors(
         )
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    client = MagicMock(api_key="sk-test", base_url="https://example.invalid/v1")
-
     with pytest.raises(TransientError) as raised:
-        openai_adapter.OpenAIProviderAdapter(client=client).generate_script(SAMPLE_PAYLOAD)
+        _adapter().generate_script(SAMPLE_PAYLOAD)
 
     expected = 17.0 if status == 429 else None
     assert raised.value.retry_after_seconds == expected
@@ -254,7 +237,7 @@ def test_select_adapter_requires_openai_key_for_openai_provider() -> None:
 
 
 def test_generate_speech_fails_instead_of_returning_an_empty_artifact() -> None:
-    adapter = openai_adapter.OpenAIProviderAdapter(client=MagicMock())
+    adapter = _adapter()
 
     with pytest.raises(PermanentError) as raised:
         adapter.generate_speech("Đặt mua ngay")
@@ -288,12 +271,10 @@ def test_build_adapter_uses_openai_when_provider_is_openai(
     monkeypatch.setenv("PROVIDER_ADAPTER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
-    # Force `import openai` inside openai_client to succeed with a MagicMock so we do not need a
-    # real network library installed.
-    monkeypatch.setitem(__import__("sys").modules, "openai", MagicMock())
-
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
     adapter = provider_main._build_adapter()
     assert isinstance(adapter, openai_adapter.OpenAIProviderAdapter)
+    assert adapter.config.api_key == "sk-test"
+    assert adapter.config.base_url == openai_adapter._OPENAI_BASE_URL

@@ -18,7 +18,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any, cast
+from typing import Any
 
 from ..errors import PermanentError, TransientError
 from .adapter import SpeechArtifact
@@ -118,6 +118,13 @@ _SYSTEM_PROMPT = (
 )
 
 
+@dataclass(frozen=True)
+class OpenAIConfig:
+    """The two values needed by the urllib adapter; no provider SDK is required."""
+
+    api_key: str
+    base_url: str = _OPENAI_BASE_URL
+
 
 @dataclass(frozen=True)
 class OpenAIProviderAdapter:
@@ -133,12 +140,12 @@ class OpenAIProviderAdapter:
     version.
     """
 
-    client: Any  # openai.OpenAI — only `api_key` and the optional `base_url` are read.
+    config: OpenAIConfig
 
     def generate_script(self, payload: ProductAdPayload) -> str:
         script = self._request_script(payload)
-        # One last defensive cap: the JSON Schema is `maxLength=8000` but the SDK does not enforce
-        # server-side values — a future schema edit must keep the cap in lockstep.
+        # One last defensive cap: an OpenAI-compatible server may ignore the requested schema, so
+        # a future schema edit must keep this boundary check in lockstep.
         if not isinstance(script, str) or not script:
             raise PermanentError("provider_response_invalid", "provider returned an empty script")
         if len(script) > 8000:
@@ -163,8 +170,8 @@ class OpenAIProviderAdapter:
             "response_format": _SCRIPT_RESPONSE_FORMAT,
             "temperature": 0.4,
         }).encode("utf-8")
-        api_key = self._api_key()
-        base_url = self._base_url()
+        api_key = self.config.api_key
+        base_url = self.config.base_url
         url = f"{base_url.rstrip('/')}/chat/completions"
         request = urllib.request.Request(
             url,
@@ -225,21 +232,6 @@ class OpenAIProviderAdapter:
             )
         return script_value
 
-    def _api_key(self) -> str:
-        key = getattr(self.client, "api_key", None)
-        if not key:
-            raise RuntimeError("OpenAI client has no api_key configured")
-        return cast(str, key)
-
-    def _base_url(self) -> str:
-        # `openai.OpenAI` stores its `base_url` on a private `_base_url` (v1) or as a public
-        # `base_url` (v2+); both should be honoured. Falls back to the env default, then to
-        # api.openai.com when neither is set.
-        base = getattr(self.client, "base_url", None) or getattr(self.client, "_base_url", None)
-        if base is None:
-            return _OPENAI_BASE_URL or "https://api.openai.com/v1"
-        return str(cast(str, base))
-
     @staticmethod
     def _user_message(payload: ProductAdPayload) -> str:
         # Stripped to the wire contract fields the model is allowed to quote. Anything not in here
@@ -283,21 +275,11 @@ def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
             return None
 
 
-def openai_client(api_key: str, *, base_url: str | None = None) -> Any:
-    """Build an OpenAI client; `base_url` lets the same SDK drive Azure OpenAI or an internal
-    proxy that speaks the Chat Completions wire format."""
-    import openai
-
-    if base_url:
-        return openai.OpenAI(api_key=api_key, base_url=base_url)
-    return openai.OpenAI(api_key=api_key)
-
-
 def select_adapter(provider: str, openai_key: str) -> OpenAIProviderAdapter:
     """Switch on the runtime env. The fixture adapter remains the default when no key is set so a
     developer without secrets can still demo the slice end-to-end."""
     if provider == PROVIDER_OPENAI:
         if not openai_key:
             raise RuntimeError("PROVIDER_ADAPTER=openai requires OPENAI_API_KEY")
-        return OpenAIProviderAdapter(client=openai_client(openai_key, base_url=_OPENAI_BASE_URL))
+        return OpenAIProviderAdapter(OpenAIConfig(api_key=openai_key, base_url=_OPENAI_BASE_URL))
     raise ValueError(f"Unknown provider adapter: {provider}")
