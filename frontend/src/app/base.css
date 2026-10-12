@@ -2,6 +2,15 @@
    (375px/768px/1280px) free of horizontal scroll and touch targets
    >=44px. */
 
+html {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 *,
 *::before,
 *::after {
