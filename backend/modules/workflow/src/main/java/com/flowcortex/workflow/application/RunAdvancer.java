@@ -23,6 +23,8 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.BaggageInScope;
 import io.micrometer.tracing.Tracer;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
@@ -91,6 +94,7 @@ class RunAdvancer {
     private final Clock clock;
     private final ReviewCheckpointTransactions checkpointTransactions;
     private final MediaJobs mediaJobs;
+    private final Validator validator;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -99,27 +103,29 @@ class RunAdvancer {
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
-            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs) {
+            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), checkpointTransactions, mediaJobs);
+                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions) {
+            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, Validator validator) {
         this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
-                taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null);
+                taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
+                validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
             InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
             TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs) {
+            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs,
+            Validator validator) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -140,6 +146,7 @@ class RunAdvancer {
         this.clock = clock;
         this.checkpointTransactions = checkpointTransactions;
         this.mediaJobs = mediaJobs;
+        this.validator = validator;
     }
 
     @ApplicationModuleListener
@@ -429,10 +436,21 @@ class RunAdvancer {
             return "provider result has no data";
         }
         try {
-            switch (capability) {
+            Object parsed = switch (capability) {
                 case "generate_script" -> objectMapper.convertValue(data, ProviderScriptData.class);
                 case "generate_speech" -> objectMapper.convertValue(data, ProviderSpeechData.class);
-                default -> { /* not a provider step — media contract layer handles it */ }
+                default -> null;
+            };
+            if (parsed == null) {
+                return null;
+            }
+            Set<ConstraintViolation<Object>> violations = validator.validate(parsed);
+            if (!violations.isEmpty()) {
+                String reason = violations.stream()
+                        .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .sorted()
+                        .collect(Collectors.joining(", "));
+                return "Provider " + capability + " data is not valid for its schema: " + reason;
             }
             return null;
         } catch (IllegalArgumentException e) {

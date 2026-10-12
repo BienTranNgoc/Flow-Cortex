@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from flowcortex_worker.errors import PermanentError
+from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import openai_adapter
 from flowcortex_worker.provider.contracts.provider_job import ProductAdPayload
 
@@ -167,7 +167,7 @@ def test_generate_script_rejects_an_empty_payload(monkeypatch: pytest.MonkeyPatc
     client.base_url = "https://example.invalid/v1"
     adapter = openai_adapter.OpenAIProviderAdapter(client=client)
 
-    with pytest.raises(ValueError, match="empty"):
+    with pytest.raises(PermanentError, match="empty"):
         adapter.generate_script(SAMPLE_PAYLOAD)
 
 
@@ -181,7 +181,7 @@ def test_generate_script_rejects_oversize_payload_at_boundary(
     client.base_url = "https://example.invalid/v1"
     adapter = openai_adapter.OpenAIProviderAdapter(client=client)
 
-    with pytest.raises(ValueError, match="exceeds 8000"):
+    with pytest.raises(PermanentError, match="exceeds 8000"):
         adapter.generate_script(SAMPLE_PAYLOAD)
 
 
@@ -192,18 +192,19 @@ def test_generate_script_rejects_response_that_is_not_json(monkeypatch: pytest.M
     client.base_url = "https://example.invalid/v1"
     adapter = openai_adapter.OpenAIProviderAdapter(client=client)
 
-    with pytest.raises(ValueError, match="not honoured"):
+    with pytest.raises(PermanentError, match="response format"):
         adapter.generate_script(SAMPLE_PAYLOAD)
 
 
-def test_generate_script_surfaces_http_errors_with_response_body(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize("status", [400, 401, 403])
+def test_generate_script_classifies_non_retryable_http_error_without_logging_body(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, status: int
 ) -> None:
     body = b'{"error":{"code":"bad_request","message":"schema rejected"}}'
 
     def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
         raise urllib.error.HTTPError(
-            request.full_url, 400, "Bad Request", cast(Any, {}), io.BytesIO(body)
+            request.full_url, status, "Rejected", cast(Any, {}), io.BytesIO(body)
         )
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
@@ -212,9 +213,39 @@ def test_generate_script_surfaces_http_errors_with_response_body(
     client.base_url = "https://example.invalid/v1"
     adapter = openai_adapter.OpenAIProviderAdapter(client=client)
 
-    with pytest.raises(urllib.error.HTTPError):
+    with pytest.raises(PermanentError) as raised:
         adapter.generate_script(SAMPLE_PAYLOAD)
-    assert any("schema rejected" in record.getMessage() for record in caplog.records)
+    assert raised.value.code == "provider_request_failed"
+    assert any(getattr(record, "status", None) == status for record in caplog.records)
+    assert any(
+        getattr(record, "providerErrorCode", None) == "bad_request" for record in caplog.records
+    )
+    assert all("schema rejected" not in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 503])
+def test_generate_script_classifies_retryable_http_errors(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    headers = {"Retry-After": "17"} if status == 429 else {}
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        raise urllib.error.HTTPError(
+            request.full_url,
+            status,
+            "upstream failure",
+            cast(Any, headers),
+            io.BytesIO(b'{"error":{"code":"upstream_busy","message":"secret detail"}}'),
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    client = MagicMock(api_key="sk-test", base_url="https://example.invalid/v1")
+
+    with pytest.raises(TransientError) as raised:
+        openai_adapter.OpenAIProviderAdapter(client=client).generate_script(SAMPLE_PAYLOAD)
+
+    expected = 17.0 if status == 429 else None
+    assert raised.value.retry_after_seconds == expected
 
 
 def test_select_adapter_requires_openai_key_for_openai_provider() -> None:

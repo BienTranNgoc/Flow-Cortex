@@ -9,6 +9,8 @@ ErrorCode = Literal[
     "audio_alignment_failed",
     "audio_alignment_out_of_range",
     "provider_capability_unavailable",
+    "provider_request_failed",
+    "provider_response_invalid",
     "contract_violation",
     "run_timeout"
     ]
@@ -25,6 +27,10 @@ class PermanentError(Exception):
 
 class TransientError(Exception):
     """Store or broker I/O that a later delivery may get past."""
+
+    def __init__(self, message: str, *, retry_after_seconds: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
 
 
 def backoff_seconds(delivery_count: int) -> float:

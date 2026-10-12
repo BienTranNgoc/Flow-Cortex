@@ -251,7 +251,7 @@ services:
       # (GitHub Models sunset, removed 2026-10-11); any other value (or unset) keeps the
       # deterministic stub for local-only demos. The worker refuses to boot when the
       # secret does not match the chosen adapter (see `select_adapter`).
-      PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-openai}
+      PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
       FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}

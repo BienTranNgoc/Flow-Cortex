@@ -73,6 +73,20 @@ def test_backoff_doubles_from_five_seconds_and_caps_at_sixty(
     assert backoff_seconds(delivery_count) == expected
 
 
+def test_transient_error_retry_after_overrides_exponential_backoff() -> None:
+    waits: list[float] = []
+    conn = FakeConnection()
+    conn.deliver(job_body())
+    run_consumer(
+        conn,
+        storage=FakeStorage(error=TransientError("rate limited", retry_after_seconds=23)),
+        wait=waits.append,
+        until=settled,
+    )
+
+    assert waits == [23]
+
+
 @pytest.mark.parametrize(
     ("props", "expected_wait", "expected_count"),
     [

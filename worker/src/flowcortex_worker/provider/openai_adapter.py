@@ -16,9 +16,11 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, cast
 
-from ..errors import PermanentError
+from ..errors import PermanentError, TransientError
 from .adapter import SpeechArtifact
 from .contracts.provider_job import ProductAdPayload
 
@@ -138,9 +140,11 @@ class OpenAIProviderAdapter:
         # One last defensive cap: the JSON Schema is `maxLength=8000` but the SDK does not enforce
         # server-side values — a future schema edit must keep the cap in lockstep.
         if not isinstance(script, str) or not script:
-            raise ValueError("OpenAI returned an empty script")
+            raise PermanentError("provider_response_invalid", "provider returned an empty script")
         if len(script) > 8000:
-            raise ValueError("OpenAI script exceeds 8000 characters: re-check the schema cap")
+            raise PermanentError(
+                "provider_response_invalid", "provider script exceeds 8000 characters"
+            )
         return script
 
     def generate_speech(self, script: str) -> SpeechArtifact:
@@ -175,34 +179,50 @@ class OpenAIProviderAdapter:
             with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT_SECONDS) as response:
                 payload_bytes = response.read()
         except urllib.error.HTTPError as exc:
-            # Proxy returns structured errors as JSON (code/message/type); read the body for the
-            # log so a future operator can see whether the model refused, the schema was rejected,
-            # or the upstream quota is exhausted.
-            detail = exc.read().decode("utf-8", errors="replace")
-            log.warning("Provider HTTP %s at %s: %s", exc.code, url, detail)
-            raise
+            error_code = _provider_error_code(exc)
+            log.warning(
+                "provider HTTP request failed",
+                extra={"status": exc.code, "providerErrorCode": error_code},
+            )
+            if exc.code in (408, 429) or 500 <= exc.code < 600:
+                raise TransientError(
+                    f"provider HTTP {exc.code}",
+                    retry_after_seconds=_retry_after_seconds(exc),
+                ) from exc
+            raise PermanentError(
+                "provider_request_failed", f"provider rejected the request with HTTP {exc.code}"
+            ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
-            log.warning("Provider call to %s failed: errorType=%s message=%s", url,
-                    type(exc).__name__, exc)
-            raise
+            log.warning("provider connection failed", extra={"errorType": type(exc).__name__})
+            raise TransientError(f"provider connection failed: {type(exc).__name__}") from exc
 
         try:
             parsed = json.loads(payload_bytes)
         except json.JSONDecodeError as exc:
-            raise ValueError("Provider response was not valid JSON") from exc
+            raise PermanentError(
+                "provider_response_invalid", "provider response was not valid JSON"
+            ) from exc
         try:
             raw = parsed["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise ValueError("Provider response did not contain a message content path") from exc
+            raise PermanentError(
+                "provider_response_invalid", "provider response has no message content"
+            ) from exc
         try:
             script_obj = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise ValueError("OpenAI response_format was not honoured") from exc
+            raise PermanentError(
+                "provider_response_invalid", "provider did not honour the response format"
+            ) from exc
         if not isinstance(script_obj, dict) or "script" not in script_obj:
-            raise ValueError("OpenAI JSON did not contain the expected `script` field")
+            raise PermanentError(
+                "provider_response_invalid", "provider response has no script field"
+            )
         script_value = script_obj["script"]
         if not isinstance(script_value, str):
-            raise ValueError("OpenAI `script` field is not a string")
+            raise PermanentError(
+                "provider_response_invalid", "provider script field is not a string"
+            )
         return script_value
 
     def _api_key(self) -> str:
@@ -235,6 +255,32 @@ class OpenAIProviderAdapter:
         if payload.promotion is not None:
             parts.append(f"promotion: {payload.promotion}")
         return "\n".join(parts)
+
+
+def _provider_error_code(exc: urllib.error.HTTPError) -> str:
+    """Extract only the provider's machine-readable code; never retain its message/body."""
+    try:
+        body = json.loads(exc.read())
+        code = body.get("error", {}).get("code")
+        return str(code)[:100] if code else "unknown"
+    except (json.JSONDecodeError, AttributeError, TypeError, UnicodeDecodeError):
+        return "unknown"
+
+
+def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
+    value = exc.headers.get("Retry-After") if exc.headers else None
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+            return max(0.0, (retry_at - datetime.now(UTC)).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 def openai_client(api_key: str, *, base_url: str | None = None) -> Any:

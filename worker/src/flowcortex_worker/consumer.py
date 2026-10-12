@@ -311,7 +311,8 @@ class Consumer:
             log.warning("job abandoned; the broker redelivers it", extra={"reason": str(abandoned)})
         except Exception as exc:
             outcome = "retried"
-            delay = backoff_seconds(delivery.count)
+            retry_after = exc.retry_after_seconds if isinstance(exc, TransientError) else None
+            delay = retry_after if retry_after is not None else backoff_seconds(delivery.count)
             error, reason = _describe(exc)
             span.add_event(
                 "exception", {"exception.type": error, "exception.message": reason or error}

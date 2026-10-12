@@ -34,6 +34,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,8 +46,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -84,11 +90,12 @@ class RunAdvancerTest {
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
+    private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
         return new RunAdvancer(workflowRunRepository, runStepRepository, workflowStepRepository, transactions,
                 new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters,
-                LEASE, clock, checkpoints);
+                LEASE, clock, checkpoints, validator);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
@@ -424,16 +431,26 @@ class RunAdvancerTest {
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
-        // profile wrong, script missing — ProviderScriptData requires profile="product_ad_v1",
-        // language="vi", and a non-empty script up to 8000 chars.
         advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
-                Map.of("profile", "product_ad_v1", "language", "fr", "note", "bonjour"), null)));
+                Map.of("profile", "product_ad_v1", "language", "fr", "script", "Bonjour"), null)));
 
         verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1), eq("contract_violation"),
                 contains("Provider generate_script data is not valid"), eq(NOW));
         verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
         assertThat(run.getStatus().name()).isEqualTo("ERROR");
         assertThat(output).contains("Provider result rejected at trust boundary");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidScriptData")
+    void providerScriptConstraintsAreEnforcedAfterConversion(Map<String, Object> data, String field) {
+        assertProviderDataRejected("generate_script", data, field);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidSpeechData")
+    void providerSpeechConstraintsAreEnforcedAfterConversion(Map<String, Object> data, String field) {
+        assertProviderDataRejected("generate_speech", data, field);
     }
 
     @Test
@@ -647,6 +664,37 @@ class RunAdvancerTest {
         verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
         assertThat(output).contains("Job progress: runId=" + runId + " jobId=" + step.getId()
                 + " capability=probe attempt=1 deliveryCount=2 percent=40");
+    }
+
+    private void assertProviderDataRejected(String capability, Map<String, Object> data, String field) {
+        RunStep step = pending(1, capability);
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, capability)), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(
+                result(step, MediaResult.Status.COMPLETED, null, data, null)));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("contract_violation"), contains(field), eq(NOW));
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    private static Stream<Arguments> invalidScriptData() {
+        return Stream.of(
+                Arguments.of(Map.of("profile", "wrong", "language", "vi", "script", "Hợp lệ"), "profile"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "fr", "script", "Bonjour"),
+                        "language"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "vi", "script", ""), "script"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "vi",
+                        "script", "a".repeat(8001)), "script"));
+    }
+
+    private static Stream<Arguments> invalidSpeechData() {
+        return Stream.of(
+                Arguments.of(Map.of("profile", "wrong", "durationMs", 15_000), "profile"),
+                Arguments.of(Map.of("profile", "vi_voice_v1", "durationMs", 0), "durationMs"));
     }
 
     private MediaResult result(RunStep step, MediaResult.Status status, List<MediaOutput> outputs,

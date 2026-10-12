@@ -27,8 +27,6 @@ jobs:
                      GF_SECURITY_ADMIN_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
             sed -i "s|^$key=.*|$key=$(openssl rand -hex 24)|" .env
           done
-          # Smoke is deterministic and deliberately runs without a real provider secret.
-          sed -i 's|^PROVIDER_ADAPTER=.*|PROVIDER_ADAPTER=fixture|' .env
           if grep -nE '^[A-Z0-9_]+=change-me' .env; then
             echo "::error::.env still holds a change-me placeholder"
             exit 1
