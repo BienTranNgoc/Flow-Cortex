@@ -44,6 +44,7 @@ class MediaResultListenerTest {
             Map.of(
                 "probe", Duration.ofMinutes(5),
                 "extract_audio", Duration.ofMinutes(10),
+                "align_audio", Duration.ofMinutes(10),
                 "render_video", Duration.ofMinutes(10)),
             Duration.ofMinutes(20), Duration.ofMinutes(15),
             new MediaProperties.Upload(524_288_000L, List.of("mp4"), List.of("jpg"), Duration.ofMinutes(15)),

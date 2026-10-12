@@ -100,9 +100,9 @@ class WorkflowServiceImplTest {
                 .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
-                                "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, echo, "
+                                "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, echo, "
                                         + "extract_audio, fail, generate_script, generate_speech, probe, render_video",
-                                "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, echo, "
+                                "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, align_audio, echo, "
                                         + "extract_audio, fail, generate_script, generate_speech, probe, render_video"));
 
         verify(workflowRepository, never()).save(any());

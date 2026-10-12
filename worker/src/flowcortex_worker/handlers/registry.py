@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..errors import PermanentError
-from . import Handler, HandlerOutcome, OutputFile, extract_audio, probe, render_video
+from . import Handler, HandlerOutcome, OutputFile, align_audio, extract_audio, probe, render_video
 
 __all__ = [
     "HANDLERS",
@@ -16,6 +16,7 @@ __all__ = [
 HANDLERS: dict[str, Handler] = {
     "probe": probe.handle,
     "extract_audio": extract_audio.handle,
+    "align_audio": align_audio.handle,
     "render_video": render_video.handle,
     }
 

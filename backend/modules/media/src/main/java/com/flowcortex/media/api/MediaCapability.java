@@ -7,6 +7,7 @@ import java.util.Arrays;
 public enum MediaCapability {
     PROBE("probe"),
     EXTRACT_AUDIO("extract_audio"),
+    ALIGN_AUDIO("align_audio"),
     RENDER_VIDEO("render_video");
 
     private final String value;

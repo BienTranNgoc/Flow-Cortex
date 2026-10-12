@@ -50,6 +50,7 @@ class PresignedGetExpiryIT extends AbstractPostgresBootTest {
         return new MediaProperties(true, Duration.ofMinutes(30), Map.of(
             "probe", Duration.ofMinutes(5),
             "extract_audio", Duration.ofMinutes(10),
+            "align_audio", Duration.ofMinutes(10),
             "render_video", Duration.ofMinutes(10)),
                 Duration.ofMinutes(20), Duration.ofSeconds(1),
                 new MediaProperties.Upload(524_288_000L, List.of("mp4"),

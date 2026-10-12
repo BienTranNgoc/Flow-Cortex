@@ -55,7 +55,7 @@
     "capability": {
       "title": "MediaCapability",
       "type": "string",
-      "enum": ["probe", "extract_audio", "render_video"]
+      "enum": ["probe", "extract_audio", "align_audio", "render_video"]
     },
     "input": {
       "title": "MediaJobInput",

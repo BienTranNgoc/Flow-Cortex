@@ -11,6 +11,8 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         INPUT_REJECTED("input_rejected"),
         PROBE_FAILED("probe_failed"),
         AUDIO_EXTRACTION_FAILED("audio_extraction_failed"),
+        AUDIO_ALIGNMENT_FAILED("audio_alignment_failed"),
+        AUDIO_ALIGNMENT_OUT_OF_RANGE("audio_alignment_out_of_range"),
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout");
 

@@ -31,7 +31,7 @@ class StepExecutorRegistryTest {
     void theDemoTypesAndEveryMediaCapabilityAreKnown() {
         assertThat(registry.knownTypes())
                 .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_speech", "probe",
-                        "extract_audio", "render_video");
+                        "extract_audio", "align_audio", "render_video");
     }
 
     @Test

@@ -37,6 +37,8 @@ class MediaError(BaseModel):
             "input_rejected",
             "probe_failed",
             "audio_extraction_failed",
+            "audio_alignment_failed",
+            "audio_alignment_out_of_range",
             "contract_violation",
             "run_timeout",
         ],
