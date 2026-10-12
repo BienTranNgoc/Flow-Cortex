@@ -26,6 +26,8 @@ public record MediaProperties(
         @NotNull Duration queueTimeout,
         @NotNull Map<String, @NotNull Duration> maxRuntime,
         @NotNull Duration consumerTimeout,
+        @NotNull Duration providerMaxRuntime,
+        @NotNull Duration providerQueueTimeout,
         @NotNull Duration presignTtl,
         @NotNull @Valid Upload upload,
         @NotNull @Valid S3 s3) {
@@ -50,6 +52,14 @@ public record MediaProperties(
             if (consumerTimeout != null && consumerTimeout.compareTo(required) <= 0) {
                 throw new IllegalArgumentException("flowcortex.media.consumer-timeout (" + consumerTimeout
                         + ") must exceed the longest max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
+            }
+        }
+        // The provider runtime shares both queues' ack deadline, so its own ceiling counts too.
+        if (providerMaxRuntime != null && consumerTimeout != null) {
+            Duration required = providerMaxRuntime.plus(MAX_WORKER_BACKOFF).plus(CONSUMER_TIMEOUT_MARGIN);
+            if (consumerTimeout.compareTo(required) <= 0) {
+                throw new IllegalArgumentException("flowcortex.media.consumer-timeout (" + consumerTimeout
+                        + ") must exceed provider-max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
             }
         }
     }

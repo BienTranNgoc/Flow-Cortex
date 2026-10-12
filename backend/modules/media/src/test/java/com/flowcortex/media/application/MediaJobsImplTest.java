@@ -78,6 +78,8 @@ class MediaJobsImplTest {
         "flowcortex.media.max-runtime.align_audio=10m",
         "flowcortex.media.max-runtime.render_video=10m",
         "flowcortex.media.consumer-timeout=20m",
+        "flowcortex.media.provider-max-runtime=2m",
+        "flowcortex.media.provider-queue-timeout=5m",
         "flowcortex.media.presign-ttl=15m",
         "flowcortex.media.upload.max-bytes=524288000",
         "flowcortex.media.upload.extensions=mp4,MOV,webm,mkv,m4a,mp3,wav",
@@ -403,6 +405,41 @@ class MediaJobsImplTest {
             })).doesNotThrowAnyException();
             assertThat(context.getBean(EventCapture.class).events).isEmpty();
         });
+    }
+
+    @Test
+    void aConsumerTimeoutShorterThanTheProviderCeilingFailsStartup() {
+        runner.withPropertyValues(
+"flowcortex.media.max-runtime.probe=5m",
+                "flowcortex.media.max-runtime.extract_audio=5m",
+                "flowcortex.media.max-runtime.align_audio=5m",
+                "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.provider-max-runtime=10m",
+                "flowcortex.media.consumer-timeout=12m")
+        .run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .rootCause()
+                    .hasMessageContaining("provider-max-runtime");
+        });
+    }
+
+    @Test
+    void theProviderLimitsComeFromTheProviderPropertiesNotAMediaCapability() {
+        runner.withPropertyValues(
+                "flowcortex.media.provider-max-runtime=3m",
+                "flowcortex.media.provider-queue-timeout=9m")
+        .run(context -> {
+            MediaLimits limits = context.getBean(MediaJobs.class).providerLimits();
+            assertThat(limits.maxRuntime()).isEqualTo(Duration.ofMinutes(3));
+            assertThat(limits.queueTimeout()).isEqualTo(Duration.ofMinutes(9));
+        });
+    }
+
+    @Test
+    void aMissingProviderCeilingFailsStartupInsteadOfDefaulting() {
+        withoutProperty("flowcortex.media.provider-max-runtime")
+                .run(context -> assertThat(context).hasFailed());
     }
 
     @Test

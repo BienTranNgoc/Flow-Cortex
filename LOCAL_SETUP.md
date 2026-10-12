@@ -239,8 +239,18 @@ fix named in each case, when:
 - **Queue settings changed.** Queue arguments are fixed once a queue exists, so
   changing `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` (or the delivery limit in code) on an
   existing broker makes the backend stay not-ready and log one ERROR naming the
-  queue and the differing argument. Delete that queue in the management UI
-  (<http://localhost:15672>, Queues) and restart the backend, or `down -v`.
+  queue and the differing argument. Delete **both** job queues — `media.jobs` and
+  `provider.jobs` — and restart the backend, or `down -v`:
+
+  ```bash
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue provider.jobs
+  docker compose up -d backend
+  ```
+
+  Deleting a queue drops the messages still waiting in it, so stop the workers first
+  (`docker compose stop worker provider-worker`) if any run is in flight. The queues
+  are recreated by the backend at startup with the new argument.
 - **A store key was rotated.** `minio-init` creates a user for the new
   `BACKEND_S3_ACCESS_KEY` / `WORKER_S3_ACCESS_KEY` but leaves the old one in place.
   Remove it (`<old access key>` is the previous value):

@@ -125,6 +125,12 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
+    public MediaLimits providerLimits() {
+        return new MediaLimits(properties.providerQueueTimeout(), properties.providerMaxRuntime(),
+                properties.upload().maxBytes());
+    }
+
+    @Override
     public UploadGrant prepareUpload(UUID ownerId, String fileName, long size) {
         String contentType = allowedType(fileName)
                 .orElseThrow(() -> new UploadRejectedException("fileName", typeSentence()));

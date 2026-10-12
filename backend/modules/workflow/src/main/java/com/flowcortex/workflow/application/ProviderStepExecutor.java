@@ -22,17 +22,12 @@ class ProviderStepExecutor implements StepExecutor {
     private final String profile;
     private final MediaJobs mediaJobs;
     private final Clock clock;
-    private final Duration maxRuntime;
-    private final Duration queueTimeout;
 
-    ProviderStepExecutor(String capability, String profile, MediaJobs mediaJobs, Clock clock,
-            Duration maxRuntime, Duration queueTimeout) {
+    ProviderStepExecutor(String capability, String profile, MediaJobs mediaJobs, Clock clock) {
         this.capability = capability;
         this.profile = profile;
         this.mediaJobs = mediaJobs;
         this.clock = clock;
-        this.maxRuntime = maxRuntime;
-        this.queueTimeout = queueTimeout;
     }
 
     @Override
@@ -47,12 +42,12 @@ class ProviderStepExecutor implements StepExecutor {
 
     @Override
     public Duration maxRuntime() {
-        return maxRuntime;
+        return mediaJobs.providerLimits().maxRuntime();
     }
 
     @Override
     public Duration queueTimeout(Duration lease) {
-        return queueTimeout;
+        return mediaJobs.providerLimits().queueTimeout();
     }
 
     @Override
@@ -64,7 +59,7 @@ class ProviderStepExecutor implements StepExecutor {
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
                 context.stepOrder(), capability, params,
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
-                (int) context.attempt(), Math.toIntExact(maxRuntime.toSeconds()), clock.instant());
+                (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
         try {
             mediaJobs.enqueueProvider(job);
         } catch (ConstraintViolationException e) {

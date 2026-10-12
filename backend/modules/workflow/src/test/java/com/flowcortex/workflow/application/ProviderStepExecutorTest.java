@@ -3,8 +3,10 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.ProviderJob;
 import java.time.Clock;
 import java.time.Duration;
@@ -51,8 +53,9 @@ class ProviderStepExecutorTest {
     }
 
     private ProviderStepExecutor executor(String capability, String profile) {
-        return new ProviderStepExecutor(capability, profile, jobs, clock, Duration.ofMinutes(2),
-                Duration.ofMinutes(5));
+        when(jobs.providerLimits())
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+        return new ProviderStepExecutor(capability, profile, jobs, clock);
     }
 
     private static StepContext context(String input, String config) {

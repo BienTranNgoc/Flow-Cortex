@@ -24,6 +24,12 @@ public interface MediaJobs {
     MediaLimits limitsFor(String capability);
 
     /**
+     * The same two bounds for the provider runtime (script and speech), which is not a media
+     * capability and so has no entry in {@link #limitsFor(String)}.
+     */
+    MediaLimits providerLimits();
+
+    /**
      * Signs an upload of {@code size} bytes to a key derived from {@code ownerId} and a new upload id.
      * The type comes from the extension of {@code fileName}, which is not stored anywhere.
      * @throws UploadRejectedException for {@code fileName} outside the allowlist or {@code size} out of range

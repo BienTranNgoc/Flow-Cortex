@@ -21,7 +21,13 @@ import org.mockito.ArgumentCaptor;
 class StepExecutorRegistryTest {
 
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
+
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
+
+    StepExecutorRegistryTest() {
+        when(mediaJobs.providerLimits())
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+    }
 
     private static StepContext context(String input) {
         return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null);
@@ -92,6 +98,14 @@ class StepExecutorRegistryTest {
     void inlineStepsWaitForPickupNoLongerThanTheLease() {
         assertThat(registry.find("echo").orElseThrow().queueTimeout(Duration.ofSeconds(120)))
                 .isEqualTo(Duration.ofSeconds(120));
+    }
+
+    @Test
+    void aProviderStepsBoundsComeFromTheProviderLimitsNotAMediaCapability() {
+        StepExecutor script = registry.find("generate_script").orElseThrow();
+
+        assertThat(script.maxRuntime()).isEqualTo(Duration.ofMinutes(2));
+        assertThat(script.queueTimeout(Duration.ofSeconds(120))).isEqualTo(Duration.ofMinutes(5));
     }
 
     @Test
