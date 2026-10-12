@@ -1,103 +1,53 @@
-import { type WorkflowResponse } from '@flow-cortex/api-client';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { type WorkflowResponse, type WorkflowStepResponseMode } from '@flow-cortex/api-client';
+import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
 import './HomePage.css';
 
-type Stage = { label: string; tone: 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'rose' };
+type StageTone = 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'rose';
+type IconTone = 'blue' | 'cyan' | 'amber';
 
-type CardSpec = {
-  /** Matches against `workflow.name` returned by the API. */
-  name: string;
-  icon: string;
-  iconTone: 'blue' | 'cyan' | 'amber';
-  priority: 'P0' | 'P1' | 'P2';
-  category: string;
-  categoryTone: 'gold' | 'cyan' | 'violet';
-  status: 'Ready' | 'Live' | 'Beta';
-  statusTone: 'green' | 'cyan' | 'amber';
-  etaSeconds: number;
-  stages: readonly Stage[];
-  gpuCredits: number;
+const TONE_BY_MODE: Record<WorkflowStepResponseMode, IconTone> = {
+  inline: 'blue',
+  remote: 'cyan',
 };
 
-/** Three showcase cards. Each card picks its real workflow by `name` from the API list. */
-const CARDS: readonly CardSpec[] = [
-  {
-    name: 'Dougyin Translation & Dubbing',
-    icon: 'DT',
-    iconTone: 'blue',
-    priority: 'P0',
-    category: 'CORE MVP',
-    categoryTone: 'gold',
-    status: 'Ready',
-    statusTone: 'green',
-    etaSeconds: 45,
-    stages: [
-      { label: 'Video Ingest', tone: 'blue' },
-      { label: 'Scrap', tone: 'cyan' },
-      { label: 'Demucs BGM Separation', tone: 'violet' },
-      { label: 'Human Gate Review', tone: 'amber' },
-      { label: 'ElevenLabs V6 Dub', tone: 'blue' },
-    ],
-    gpuCredits: 1,
-  },
-  {
-    name: 'Product Content & Video',
-    icon: 'PV',
-    iconTone: 'cyan',
-    priority: 'P1',
-    category: 'E-COMMERCE',
-    categoryTone: 'cyan',
-    status: 'Live',
-    statusTone: 'cyan',
-    etaSeconds: 60,
-    stages: [
-      { label: 'Shopee/Shop Scrape', tone: 'cyan' },
-      { label: 'USF Feature Extraction', tone: 'violet' },
-      { label: 'Script Approval Gate', tone: 'amber' },
-      { label: 'Multi-Aspect', tone: 'blue' },
-    ],
-    gpuCredits: 1,
-  },
-  {
-    name: 'Check Video',
-    icon: 'CV',
-    iconTone: 'amber',
-    priority: 'P1',
-    category: 'MEDIA INTAKE',
-    categoryTone: 'violet',
-    status: 'Live',
-    statusTone: 'cyan',
-    etaSeconds: 30,
-    stages: [
-      { label: 'Inspect the file', tone: 'blue' },
-      { label: 'Extract source audio', tone: 'cyan' },
-    ],
-    gpuCredits: 0,
-  },
-];
+const STAGE_TONE_CYCLE: readonly StageTone[] = ['blue', 'cyan', 'violet', 'amber', 'green', 'rose'];
 
-function findWorkflowByName(
-  workflows: readonly WorkflowResponse[] | undefined,
-  name: string,
-): WorkflowResponse | undefined {
-  return workflows?.find((wf) => wf.name === name);
+function firstStepMode(workflow: WorkflowResponse): WorkflowStepResponseMode | undefined {
+  const first = workflow.steps?.[0];
+  return first?.mode;
 }
 
-function formatEta(seconds: number): string {
-  return `~${seconds}s`;
+function iconFor(workflow: WorkflowResponse): string {
+  return (workflow.name ?? workflow.id ?? '?').slice(0, 2).toUpperCase();
+}
+
+function stageToneAt(index: number): StageTone {
+  return STAGE_TONE_CYCLE[index % STAGE_TONE_CYCLE.length] as StageTone;
 }
 
 export function HomePage() {
-  const location = useLocation();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-
   if (meQuery.isLoading) return <output>Loading…</output>;
-  if (meQuery.isError || !meQuery.data) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (meQuery.isError) {
+    return (
+      <main className="launchpad">
+        <p role="alert" className="form-error">
+          Could not load your profile.
+          <button type="button" onClick={() => void meQuery.refetch()}>
+            Retry
+          </button>
+        </p>
+      </main>
+    );
   }
+  if (!meQuery.data) {
+    return <output>Loading…</output>;
+  }
+
+  const workflows = workflowsQuery.data ?? [];
 
   return (
     <main className="launchpad">
@@ -118,61 +68,47 @@ export function HomePage() {
         {workflowsQuery.isLoading && <output>Loading workflows…</output>}
         {workflowsQuery.isError && (
           <p role="alert" className="form-error">
-            Could not load workflows.
+            Could not load workflows.{' '}
+            <button type="button" onClick={() => void workflowsQuery.refetch()}>
+              Retry
+            </button>
           </p>
         )}
-        {!workflowsQuery.isLoading && !workflowsQuery.isError && (
+        {!workflowsQuery.isLoading && !workflowsQuery.isError && workflows.length === 0 && (
+          <p>No workflows available yet.</p>
+        )}
+        {workflows.length > 0 && (
           <div className="workflow-grid">
-            {CARDS.map((card) => {
-              const workflow = findWorkflowByName(workflowsQuery.data, card.name);
-              const linkTo = workflow ? `/workflows/${workflow.id}` : '/workflows';
-              const disabled = !workflow;
+            {workflows.map((workflow) => {
+              const mode = firstStepMode(workflow);
+              const iconTone: IconTone = mode ? TONE_BY_MODE[mode] : 'amber';
+              const linkTo = workflow.id ? `/workflows/${workflow.id}` : '/workflows';
               return (
-                <article
-                  key={card.name}
-                  className={`workflow-card-tile${disabled ? ' is-disabled' : ''}`}
-                >
+                <article key={workflow.id ?? workflow.name} className="workflow-card-tile">
                   <header className="workflow-card-header">
-                    <span className={`workflow-card-icon tone-${card.iconTone}`} aria-hidden="true">
-                      {card.icon}
+                    <span className={`workflow-card-icon tone-${iconTone}`} aria-hidden="true">
+                      {iconFor(workflow)}
                     </span>
-                    <span className="workflow-card-priority">{card.priority}</span>
-                    <span className={`workflow-card-category tone-${card.categoryTone}`}>
-                      {card.category}
-                    </span>
-                    <span className={`workflow-card-status tone-${card.statusTone}`}>
-                      <span className="workflow-card-dot" aria-hidden="true" />
-                      {card.status}
-                    </span>
-                    <span className="workflow-card-eta" aria-label="Estimated duration">
-                      {formatEta(card.etaSeconds)}
-                    </span>
+                    <h3 className="workflow-card-title">{workflow.name ?? 'Untitled workflow'}</h3>
                   </header>
 
-                  <h3 className="workflow-card-title">{card.name}</h3>
-
-                  <ul className="workflow-card-stages">
-                    {card.stages.map((stage) => (
-                      <li key={stage.label} className={`workflow-card-stage tone-${stage.tone}`}>
-                        {stage.label}
-                      </li>
-                    ))}
-                  </ul>
+                  {workflow.steps && workflow.steps.length > 0 && (
+                    <ul className="workflow-card-stages">
+                      {workflow.steps.map((step, index) => (
+                        <li
+                          key={step.id ?? `${index}-${step.name}`}
+                          className={`workflow-card-stage tone-${stageToneAt(index)}`}
+                        >
+                          {step.name ?? `Step ${step.stepOrder ?? index + 1}`}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
                   <footer className="workflow-card-footer">
-                    <span className="workflow-card-cost" aria-label="GPU credit cost">
-                      <span aria-hidden="true">⚡</span> {card.gpuCredits} GPU Credit
-                      {card.gpuCredits === 1 ? '' : 's'}
-                    </span>
-                    {disabled ? (
-                      <span className="workflow-card-launch disabled" aria-disabled="true">
-                        Coming soon
-                      </span>
-                    ) : (
-                      <Link className="workflow-card-launch" to={linkTo}>
-                        Launch Workflow →
-                      </Link>
-                    )}
+                    <Link className="workflow-card-launch" to={linkTo}>
+                      Launch Workflow →
+                    </Link>
                   </footer>
                 </article>
               );

@@ -1,6 +1,11 @@
 // UI-only OAuth entry point. Wires nothing on the backend — clicking
 // surfaces an informational message; a real provider flow replaces the
 // `onSelect` body when OAuth is added to the API.
+//
+// Hidden by default until the real OAuth flow ships. Set
+// `VITE_OAUTH_ENABLED=true` to surface the button.
+
+const OAUTH_ENABLED = import.meta.env.VITE_OAUTH_ENABLED === 'true';
 
 export interface OAuthButtonProps {
   readonly provider: 'google' | 'github' | 'microsoft';
@@ -63,6 +68,9 @@ const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {
 };
 
 export function OAuthButton({ provider, label, onSelect }: OAuthButtonProps) {
+  if (!OAUTH_ENABLED) {
+    return null;
+  }
   return (
     <button
       type="button"

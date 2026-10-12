@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
@@ -8,14 +9,12 @@ import {
   detailFrom,
   useAuthToken,
   useRegisterMutation,
-  useSubmitState,
 } from './useAuth';
 
 export function RegisterPage() {
   const token = useAuthToken();
-  const navigate = useNavigate();
   const registerMutation = useRegisterMutation();
-  const submit = useSubmitState(registerMutation);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const {
     register,
     handleSubmit,
@@ -27,23 +26,20 @@ export function RegisterPage() {
   }
 
   const onSubmit = handleSubmit(({ confirmPassword: _confirmPassword, ...values }) => {
-    submit.setState('pending');
     registerMutation.mutate(values, {
       onSuccess: () => {
-        submit.setState('success');
-        window.setTimeout(() => navigate('/', { replace: true }), 220);
-      },
-      onError: () => {
-        submit.setState('idle');
+        setSubmitSucceeded(true);
       },
     });
   });
 
   const serverError = detailFrom(registerMutation);
+  const isPending = registerMutation.isPending;
+  const dataState = submitSucceeded ? 'success' : isPending ? 'pending' : 'idle';
 
   const buttonLabel = (() => {
-    if (submit.state === 'success') return '✓ Account created';
-    if (submit.state === 'pending') return 'Creating account…';
+    if (submitSucceeded) return '✓ Account created';
+    if (isPending) return 'Creating account…';
     return 'Get started free →';
   })();
 
@@ -53,7 +49,7 @@ export function RegisterPage() {
 
       <section className="auth-card">
         <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1>Create your free creator account</h1>
+        <h1 className="auth-card__title">Create your free creator account</h1>
         <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
 
         <div className="oauth-row">
@@ -122,8 +118,8 @@ export function RegisterPage() {
           <button
             className="primary-button"
             type="submit"
-            data-state={submit.state}
-            disabled={submit.state !== 'idle'}
+            data-state={dataState}
+            disabled={isPending}
           >
             {buttonLabel}
           </button>

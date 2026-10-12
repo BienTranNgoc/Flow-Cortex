@@ -10,6 +10,7 @@ export function WorkflowsListPage() {
 
   return (
     <main className="workflows">
+      <h1 className="visually-hidden">Workflows</h1>
       <section className="workflows-list-section" aria-labelledby="workflows-list-title">
         <h2 id="workflows-list-title">Your workflows</h2>
         {workflowsQuery.isLoading && <output>Loading workflows…</output>}

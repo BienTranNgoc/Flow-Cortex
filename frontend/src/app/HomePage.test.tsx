@@ -1,4 +1,4 @@
-import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
+import { setToken, type WorkflowResponse, type WorkflowStepResponse } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
 import { Route } from 'react-router-dom';
 import { renderRoute, stubApi } from '../test/fakeApi';
@@ -6,28 +6,12 @@ import { HomePage } from './HomePage';
 
 const ME = { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
 
-function echoWorkflow(id: string, name: string): WorkflowResponse {
-  return {
-    id,
-    name,
-    isShared: true,
-    steps: [
-      { id: `${id}-s1`, stepOrder: 1, name: 'Step 1', type: 'echo', mode: 'inline' },
-      { id: `${id}-s2`, stepOrder: 2, name: 'Step 2', type: 'echo', mode: 'inline' },
-    ],
-  };
-}
-
-function probeWorkflow(id: string, name: string): WorkflowResponse {
-  return {
-    id,
-    name,
-    isShared: true,
-    steps: [
-      { id: `${id}-s1`, stepOrder: 1, name: 'Inspect the file', type: 'probe', mode: 'remote' },
-      { id: `${id}-s2`, stepOrder: 2, name: 'Extract source audio', type: 'extract_audio', mode: 'remote' },
-    ],
-  };
+function workflow(
+  id: string,
+  name: string,
+  steps: WorkflowStepResponse[],
+): WorkflowResponse {
+  return { id, name, isShared: true, steps };
 }
 
 describe('HomePage — launchpad cards', () => {
@@ -46,44 +30,43 @@ describe('HomePage — launchpad cards', () => {
     );
   }
 
-  it('renders all three showcase cards regardless of API', async () => {
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': { status: 200, body: [] },
-    });
-
-    renderHome();
-
-    expect(
-      await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Product Content & Video' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Check Video' }),
-    ).toBeInTheDocument();
-  });
-
-  it('disables every card when no workflow matches a card name', async () => {
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': { status: 200, body: [echoWorkflow('wf-other', 'Some Other')] },
-    });
-
-    renderHome();
-
-    await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' });
-    expect(screen.queryAllByRole('link', { name: /Launch Workflow/ })).toHaveLength(0);
-    expect(screen.getAllByText('Coming soon')).toHaveLength(3);
-  });
-
-  it('links a card to its API workflow when one with the exact name exists', async () => {
+  it('renders one card per workflow returned by the API', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
-        body: [probeWorkflow('wf-check', 'Check Video')],
+        body: [
+          workflow('wf-a', 'Douyin Video Repurpose', [
+            { id: 'a-1', stepOrder: 1, name: 'Scrape source', type: 'echo', mode: 'inline' },
+            { id: 'a-2', stepOrder: 2, name: 'Demucs BGM', type: 'echo', mode: 'inline' },
+          ]),
+          workflow('wf-b', 'Product Video', [
+            { id: 'b-1', stepOrder: 1, name: 'Render', type: 'echo', mode: 'remote' },
+          ]),
+          workflow('wf-c', 'Check a video file', [
+            { id: 'c-1', stepOrder: 1, name: 'Inspect', type: 'probe', mode: 'remote' },
+            { id: 'c-2', stepOrder: 2, name: 'Extract audio', type: 'extract_audio', mode: 'remote' },
+          ]),
+        ],
+      },
+    });
+
+    renderHome();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Douyin Video Repurpose' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Product Video' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Check a video file' })).toBeInTheDocument();
+    expect(screen.queryAllByText('Coming soon')).toHaveLength(0);
+  });
+
+  it('links every card to its API workflow by id', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-check', 'Check a video file', [])],
       },
     });
 
@@ -93,25 +76,45 @@ describe('HomePage — launchpad cards', () => {
     expect(link).toHaveAttribute('href', '/workflows/wf-check');
   });
 
-  it('renders the stage chips for each card', async () => {
+  it('renders a stage chip per workflow step, with the step name', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': { status: 200, body: [] },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [
+          workflow('wf-a', 'Douyin Video Repurpose', [
+            { id: 'a-1', stepOrder: 1, name: 'Scrape source', type: 'echo', mode: 'inline' },
+            { id: 'a-2', stepOrder: 2, name: 'Demucs BGM', type: 'echo', mode: 'inline' },
+          ]),
+        ],
+      },
     });
 
     renderHome();
 
-    await screen.findByRole('heading', { name: 'Dougyin Translation & Dubbing' });
-    expect(screen.getByText('Video Ingest')).toBeInTheDocument();
-    expect(screen.getByText('Demucs BGM Separation')).toBeInTheDocument();
-    expect(screen.getByText('ElevenLabs V6 Dub')).toBeInTheDocument();
-    expect(screen.getByText('Shopee/Shop Scrape')).toBeInTheDocument();
-    expect(screen.getByText('USF Feature Extraction')).toBeInTheDocument();
-    expect(screen.getByText('Inspect the file')).toBeInTheDocument();
-    expect(screen.getByText('Extract source audio')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Douyin Video Repurpose' });
+    expect(screen.getByText('Scrape source')).toBeInTheDocument();
+    expect(screen.getByText('Demucs BGM')).toBeInTheDocument();
   });
 
-  it('shows a load error when the API fails', async () => {
+  it('does not render ETA, status, priority, or credit fields', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'A', [{ id: 'a-1', stepOrder: 1, name: 'Step', type: 'echo', mode: 'inline' }])],
+      },
+    });
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: 'A' });
+    expect(screen.queryByText(/^~\d+s$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/GPU Credit/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/P[012]/)).not.toBeInTheDocument();
+  });
+
+  it('shows a load error with retry when the workflows API fails', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': { status: 500, body: { detail: 'boom' } },
@@ -120,5 +123,15 @@ describe('HomePage — launchpad cards', () => {
     renderHome();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load workflows');
+  });
+
+  it('shows a retry block (not a redirect) when /me returns a 5xx', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 500, body: { detail: 'boom' } },
+    });
+
+    renderHome();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your profile');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
@@ -87,26 +87,6 @@ export function clearRememberedEmail(): void {
   } catch {
     // private mode / disabled — skip silently
   }
-}
-
-export type SubmitState = 'idle' | 'pending' | 'success';
-
-/**
- * Tracks a form submission's lifecycle: pending while a mutation is in flight,
- * success on resolve, and a self-resetting idle when the mutation errors. Returns
- * a setter so the caller can drive transitions explicitly.
- */
-export function useSubmitState(mutation: { readonly isError: boolean }): {
-  readonly state: SubmitState;
-  readonly setState: (next: SubmitState) => void;
-} {
-  const [state, setState] = useState<SubmitState>('idle');
-  useEffect(() => {
-    if (mutation.isError) {
-      setState('idle');
-    }
-  }, [mutation.isError]);
-  return { state, setState };
 }
 
 export function detailFrom(mutation: { readonly error: unknown }): string | undefined {

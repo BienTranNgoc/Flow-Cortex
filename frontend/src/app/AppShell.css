@@ -1,7 +1,7 @@
 /* AppShell — public route layout (login / register).
    Stacks the main panel on top of a fixed aurora background. The aurora
    blobs are absolutely positioned and pointer-event inert so they never
-   block typing. */
+   block typing. The shared form design language lives in ./base.css. */
 
 .public-shell {
   position: relative;
@@ -89,8 +89,6 @@
     transform: translate(4%, -6%) scale(1.1);
   }
 }
-
-/* ----- Layer 1 (was: Top bar — removed) --------------------------------- */
 
 /* ----- Layer 4: Main + auth card ---------------------------------------- */
 
@@ -211,11 +209,12 @@
   }
 }
 
-.auth-card h1 {
+.auth-card__title {
   margin: 0.4rem 0 0.5rem;
   font-size: clamp(1.75rem, 2.4vw, 2.4rem);
   line-height: 1.12;
   letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
 .auth-subtitle {
@@ -243,19 +242,27 @@
   text-decoration: underline;
 }
 
-/* Eyebrow — gradient text that slowly pans. */
-.eyebrow {
-  margin: 0 0 0.5rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  background: linear-gradient(90deg, #1be0d1, #5f9cff, #b3a4ff, #1be0d1);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: ai-gradient-pan 6s linear infinite;
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.25rem 0 0.85rem;
+  font-size: 0.9rem;
+  color: #9eacb6;
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-row input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #1be0d1;
+  cursor: pointer;
+}
+
+.remember-row span {
+  line-height: 1.3;
 }
 
 /* ----- OAuth row + divider --------------------------------------------- */
@@ -343,184 +350,12 @@
   color: #5a6b78;
 }
 
-/* ----- Form fields (LoginPage + RegisterPage) --------------------------- */
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.remember-row {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin: 0.25rem 0 0.85rem;
-  font-size: 0.9rem;
-  color: #9eacb6;
-  cursor: pointer;
-  user-select: none;
-}
-
-.remember-row input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: #1be0d1;
-  cursor: pointer;
-}
-
-.remember-row span {
-  line-height: 1.3;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.85rem;
-  max-width: none;
-  animation: field-rise 0.4s ease-out backwards;
-  animation-delay: calc(var(--i, 0) * 80ms + 240ms);
-}
-
-@keyframes field-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.field label {
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: #c8d4dc;
-}
-
-.field input,
-.field select {
-  padding: 0.65rem 0.75rem;
-  min-height: 46px;
-  border: 1px solid #2e3b49;
-  background: rgba(11, 17, 25, 0.7);
-  color: #e8f1f2;
-  border-radius: 8px;
-  font-size: 1rem;
-  width: 100%;
-  transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
-}
-
-.field input:hover {
-  border-color: #3a4a5b;
-}
-
-.field input:focus,
-.field input:focus-visible {
-  outline: none;
-  border-color: #1be0d1;
-  background: rgba(11, 17, 25, 0.95);
-  box-shadow:
-    0 0 0 1px #1be0d1,
-    0 0 0 4px rgba(27, 224, 209, 0.18),
-    0 0 24px rgba(27, 224, 209, 0.25);
-}
-
-.field input[aria-invalid='true'] {
-  border-color: #ff7a7a;
-}
-
-[role='alert'] {
-  color: #ff9a9a;
-  font-size: 0.85rem;
-  margin: 0.15rem 0 0;
-}
-
-/* ----- Primary button (Sign in / Get started) -------------------------- */
-
-.primary-button {
-  width: 100%;
-  margin: 0.75rem 0 0;
-  min-height: 48px;
-  border: 0;
-  border-radius: 10px;
-  color: #061016;
-  font-weight: 800;
-  font-size: 0.98rem;
-  letter-spacing: 0.01em;
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
-}
-
-.primary-button:not(:disabled) {
-  background-size: 200% 100%;
-  animation: btn-shimmer 3.2s linear infinite;
-  box-shadow: 0 10px 30px rgba(27, 224, 209, 0.18);
-}
-
-.primary-button:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-}
-
-.primary-button:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.primary-button:disabled {
-  cursor: not-allowed;
-  background: linear-gradient(100deg, #1a3540, #2a3a55);
-  color: #a8b6c2;
-  animation: none;
-}
-
-.primary-button[data-state='success'] {
-  background: linear-gradient(100deg, #69f0a8, #1be0d1);
-  animation: btn-success-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes btn-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes btn-success-pop {
-  0% {
-    transform: scale(1);
-  }
-  45% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.form-error {
-  color: #ff9a9a;
-  margin: 0.25rem 0 0;
-  font-size: 0.9rem;
-}
-
 /* ----- Reduced motion --------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob,
-  .eyebrow,
   .auth-card,
   .brand-panel__inner,
-  .field,
-  .primary-button,
   .oauth-button::before {
     animation: none !important;
     transition: none !important;

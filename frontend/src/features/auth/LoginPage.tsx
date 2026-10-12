@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
@@ -11,16 +12,14 @@ import {
   setRememberedEmail,
   useAuthToken,
   useLoginMutation,
-  useSubmitState,
   type LoginVariables,
 } from './useAuth';
 
 export function LoginPage() {
   const token = useAuthToken();
-  const navigate = useNavigate();
   const location = useLocation();
   const loginMutation = useLoginMutation();
-  const submit = useSubmitState(loginMutation);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const {
     register,
     handleSubmit,
@@ -36,7 +35,6 @@ export function LoginPage() {
   }
 
   const onSubmit = handleSubmit((values) => {
-    submit.setState('pending');
     if (values.rememberMe) {
       setRememberedEmail(values.email);
     } else {
@@ -44,20 +42,18 @@ export function LoginPage() {
     }
     loginMutation.mutate(values as unknown as LoginVariables, {
       onSuccess: () => {
-        submit.setState('success');
-        window.setTimeout(() => navigate('/', { replace: true }), 220);
-      },
-      onError: () => {
-        submit.setState('idle');
+        setSubmitSucceeded(true);
       },
     });
   });
 
   const serverError = detailFrom(loginMutation);
+  const isPending = loginMutation.isPending;
+  const dataState = submitSucceeded ? 'success' : isPending ? 'pending' : 'idle';
 
   const buttonLabel = (() => {
-    if (submit.state === 'success') return '✓ Signed in';
-    if (submit.state === 'pending') return 'Signing in…';
+    if (submitSucceeded) return '✓ Signed in';
+    if (isPending) return 'Signing in…';
     return 'Sign in to Studio →';
   })();
 
@@ -66,7 +62,7 @@ export function LoginPage() {
       <BrandPanel />
 
       <section className="auth-card">
-        <h1>SIGN IN</h1>
+        <h1 className="auth-card__title">Sign in</h1>
         <p className="auth-subtitle">Access your creator workspace and run media pipelines.</p>
 
         <div className="oauth-row">
@@ -120,8 +116,8 @@ export function LoginPage() {
           <button
             className="primary-button"
             type="submit"
-            data-state={submit.state}
-            disabled={submit.state !== 'idle'}
+            data-state={dataState}
+            disabled={isPending}
           >
             {buttonLabel}
           </button>
