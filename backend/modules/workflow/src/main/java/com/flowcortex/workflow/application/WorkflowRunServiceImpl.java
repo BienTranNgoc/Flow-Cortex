@@ -135,32 +135,35 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
         String runInput = input;
-        String remoteStepInput = null;
+        final String singleUploadStepInput;
         List<MediaAssetInput> assetInputs = List.of();
         if (mediaWorkflow) {
             if (uploadIds != null && !uploadIds.isEmpty()) {
                 assetInputs = mediaJobs.resolveImageUploads(currentUserId, uploadIds);
-                remoteStepInput = json(assetInputs.stream().map(MediaAssetInput::input).toList());
+                singleUploadStepInput = null;
             } else if (uploadId != null) {
-                remoteStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
+                singleUploadStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
             } else {
                 throw new UploadRejectedException("uploadId", "Choose a video or audio file to upload");
             }
             runInput = displayName(originalName);
+        } else {
+            singleUploadStepInput = null;
         }
 
         String displayedInput = runInput;
-        String storedRemoteInput = remoteStepInput;
         List<MediaAssetInput> storedAssetInputs = assetInputs;
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(UUID.randomUUID(), workflow.getId(),
                     currentUserId, displayedInput, Instant.now()));
+            String stepInputJson = singleUploadStepInput;
             if (!storedAssetInputs.isEmpty()) {
-                mediaJobs.bindRunInputs(run.getId(), storedAssetInputs);
+                stepInputJson = json(mediaJobs.bindRunInputs(run.getId(), storedAssetInputs).stream()
+                        .map(MediaAssetInput::input).toList());
             }
             List<RunStep> runSteps = new ArrayList<>();
             for (WorkflowStep stepDef : stepDefs) {
-                String stepInput = registry.isRemote(stepDef.getType()) ? storedRemoteInput : null;
+                String stepInput = registry.isRemote(stepDef.getType()) ? stepInputJson : null;
                 runSteps.add(new RunStep(
                         UUID.randomUUID(),
                         run.getId(),

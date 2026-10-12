@@ -164,17 +164,24 @@ class MediaJobsImpl implements MediaJobs {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void bindRunInputs(UUID runId, List<MediaAssetInput> inputs) {
+    public List<MediaAssetInput> bindRunInputs(UUID runId, List<MediaAssetInput> inputs) {
         if (inputs == null || inputs.isEmpty() || inputs.size() > 10) {
             throw new IllegalArgumentException("A run must bind between 1 and 10 assets");
         }
         Instant now = Instant.now();
         List<MediaAssetBinding> rows = new java.util.ArrayList<>();
+        List<MediaAssetInput> bound = new java.util.ArrayList<>();
         for (int index = 0; index < inputs.size(); index++) {
             MediaAssetInput input = inputs.get(index);
-            rows.add(new MediaAssetBinding(runId, input.input().key(), input.assetId(), (short) index, now));
+            MediaJobInput source = input.input();
+            String targetKey = "runs/" + runId + "/inputs/" + source.key();
+            store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
+            rows.add(new MediaAssetBinding(runId, source.key(), input.assetId(), (short) index, now));
+            bound.add(new MediaAssetInput(input.assetId(),
+                    new MediaJobInput(source.key(), properties.s3().bucket(), targetKey)));
         }
         bindings.saveAll(rows);
+        return List.copyOf(bound);
     }
 
     @Override

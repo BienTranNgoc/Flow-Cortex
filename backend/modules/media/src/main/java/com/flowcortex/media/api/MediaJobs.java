@@ -40,8 +40,13 @@ public interface MediaJobs {
     /** Resolves and registers 1-10 uploads, preserving their order as {@code image_1..image_N}. */
     List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds);
 
-    /** Snapshots already owner-verified assets against a run in the caller's transaction. */
-    void bindRunInputs(UUID runId, List<MediaAssetInput> inputs);
+    /**
+     * Snapshots already owner-verified assets against a run in the caller's transaction, copying each
+     * object into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket first. The uploads bucket
+     * expires objects after a day while an approval may wait far longer, so only the copy is bound.
+     * @return the bound inputs, each pointing at its copy in the media bucket
+     */
+    List<MediaAssetInput> bindRunInputs(UUID runId, List<MediaAssetInput> inputs);
 
     /**
      * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after

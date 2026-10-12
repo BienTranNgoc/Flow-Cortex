@@ -8,7 +8,7 @@
     },
     {
       "Effect": "Allow",
-      "Action": ["s3:GetObject"],
+      "Action": ["s3:GetObject", "s3:PutObject"],
       "Resource": ["arn:aws:s3:::flowcortex-media/runs/*"]
     },
     {

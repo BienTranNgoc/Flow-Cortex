@@ -81,14 +81,14 @@ public class ProductVideoService {
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(WORKFLOW_ID);
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
         String productJson = productJson(draft);
-        String assetJson = json(assets.stream().map(MediaAssetInput::input).toList());
         Instant now = Instant.now();
 
         return transactions.execute(status -> {
             WorkflowRun run = runs.save(new WorkflowRun(UUID.randomUUID(), WORKFLOW_ID, ownerId, productJson, now));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
-            mediaJobs.bindRunInputs(run.getId(), assets);
+            List<MediaAssetInput> bound = mediaJobs.bindRunInputs(run.getId(), assets);
+            String assetJson = json(bound.stream().map(MediaAssetInput::input).toList());
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
                 String storedInput = registry.usesStoredInput(definition.getType()) ? assetJson : null;

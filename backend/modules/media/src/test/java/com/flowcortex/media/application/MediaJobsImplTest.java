@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -227,6 +228,51 @@ class MediaJobsImplTest {
             assertThat(asset.getSourceRunStepId()).isEqualTo(stepId);
             assertThat(asset.getSourceAttempt()).isEqualTo((short) 3);
             assertThat(asset.getObjectKey()).isEqualTo(output.objectKey());
+        });
+    }
+
+    @Test
+    void bindingCopiesEachUploadIntoTheMediaBucketAndBindsTheCopy() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            List<MediaAssetInput> uploads = List.of(
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "uploads", "a")),
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_2", "uploads", "b")));
+
+            List<MediaAssetInput> bound = tx.execute(status -> jobs.bindRunInputs(runId, uploads));
+
+            assertThat(bound).extracting(MediaAssetInput::input)
+                    .containsExactly(
+                            new MediaJobInput("image_1", "flowcortex-media",
+                                    "runs/" + runId + "/inputs/image_1"),
+                            new MediaJobInput("image_2", "flowcortex-media",
+                                    "runs/" + runId + "/inputs/image_2"));
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store, bindings);
+            order.verify(store).copy("uploads", "a", "flowcortex-media", "runs/" + runId + "/inputs/image_1");
+            order.verify(store).copy("uploads", "b", "flowcortex-media", "runs/" + runId + "/inputs/image_2");
+            order.verify(bindings).saveAll(any());
+        });
+    }
+
+    @Test
+    void aFailedCopyStopsTheRunFromBindingAnything() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            doThrow(new IllegalStateException("store unreachable"))
+                    .when(store).copy("uploads", "a", "flowcortex-media", "runs/" + runId + "/inputs/image_1");
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, List.of(
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "uploads", "a"))))))
+                    .isInstanceOf(IllegalStateException.class);
+            verify(bindings, never()).saveAll(any());
         });
     }
 

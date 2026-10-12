@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -80,6 +81,9 @@ class ProductVideoServiceTest {
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoService.WORKFLOW_ID))
                 .thenReturn(definitions);
         when(media.resolveImageUploads(ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
+        when(media.bindRunInputs(any(), eq(assets))).thenReturn(List.of(
+                new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "media", "runs/x/inputs/image_1")),
+                new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "media", "runs/x/inputs/image_2"))));
         when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(runSteps.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 

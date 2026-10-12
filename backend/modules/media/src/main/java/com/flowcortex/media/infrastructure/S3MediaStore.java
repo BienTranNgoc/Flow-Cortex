@@ -108,6 +108,13 @@ public class S3MediaStore implements AutoCloseable {
         }
     }
 
+    /** A server-side copy; nothing streams through this process. */
+    public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        client.copyObject(request -> request
+                .sourceBucket(sourceBucket).sourceKey(sourceKey)
+                .destinationBucket(targetBucket).destinationKey(targetKey));
+    }
+
     @Override
     public void close() {
         presigner.close();

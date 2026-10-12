@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -231,12 +232,21 @@ class WorkflowRunServiceImplTest {
                 new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "uploads", "b")));
         when(mediaJobs.isEnabled()).thenReturn(true);
         when(mediaJobs.resolveImageUploads(ownerId, uploadIds)).thenReturn(assets);
+        UUID runId = UUID.randomUUID();
+        List<MediaAssetInput> copied = List.of(
+                new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "media",
+                        "runs/" + runId + "/inputs/image_1")),
+                new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "media",
+                        "runs/" + runId + "/inputs/image_2")));
+        when(mediaJobs.bindRunInputs(any(UUID.class), eq(assets))).thenReturn(copied);
 
         RunView started = service.startRun(ownerId, workflow.getId(), null, null, uploadIds, null);
 
         assertThat(savedSteps()).singleElement().extracting(RunStep::getInput)
-                .isEqualTo("[{\"key\":\"image_1\",\"bucket\":\"uploads\",\"objectKey\":\"a\"},"
-                        + "{\"key\":\"image_2\",\"bucket\":\"uploads\",\"objectKey\":\"b\"}]");
+                .isEqualTo("[{\"key\":\"image_1\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId
+                        + "/inputs/image_1\"},"
+                        + "{\"key\":\"image_2\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId
+                        + "/inputs/image_2\"}]");
         verify(mediaJobs).bindRunInputs(started.id(), assets);
     }
 
