@@ -109,9 +109,9 @@ def main() -> int:
 
 
 def _build_adapter() -> ProviderAdapter:
-    """Pick the adapter from env. Missing secrets fall back to the fixture so a fresh checkout still
-    boots deterministically — the worker log records which one was chosen."""
-    provider = os.environ.get("PROVIDER_ADAPTER", PROVIDER_OPENAI).strip().lower()
+    """Pick the adapter from env. Default is `fixture` — no secrets needed, fully deterministic.
+    Set PROVIDER_ADAPTER=openai (and OPENAI_API_KEY) to use the real model."""
+    provider = os.environ.get("PROVIDER_ADAPTER", "fixture").strip().lower()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if provider == PROVIDER_OPENAI:
         chosen = select_adapter(provider, openai_key)
