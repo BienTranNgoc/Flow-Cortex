@@ -100,7 +100,6 @@
   padding: 0;
   position: relative;
   z-index: 1;
-  min-height: calc(100vh - 80px);
   width: 100%;
 }
 
@@ -326,7 +325,7 @@
 .forgot-password-link {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #5a6b78;
+  color: #9eacb6;
   text-decoration: none;
   transition: color 0.15s ease;
   white-space: nowrap;
@@ -443,7 +442,8 @@
   .auth-card .field,
   .auth-card .field input,
   .brand-panel__inner,
-  .oauth-button::before {
+  .oauth-button::before,
+  .forgot-password-link {
     animation: none !important;
     transition: none !important;
   }

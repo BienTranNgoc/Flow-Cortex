@@ -1,11 +1,15 @@
 import { Link, NavLink } from 'react-router-dom';
 import { logout } from '../features/auth/useAuth';
+import { accountStatsEnabled } from './featureFlags';
 
 type HeaderProps = {
-  readonly me?: { readonly email: string } | null;
+  readonly email: string | undefined;
 };
 
-export function Header({ me }: HeaderProps) {
+const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : '');
+
+/** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
+export function Header({ email }: HeaderProps) {
   return (
     <header className="cortex-header">
       <div className="cortex-header__inner">
@@ -18,14 +22,6 @@ export function Header({ me }: HeaderProps) {
             height="34"
             aria-hidden="true"
           >
-            <defs>
-              <linearGradient id="headerLogoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#120074" />
-                <stop offset="45%" stopColor="#1a1c8c" />
-                <stop offset="70%" stopColor="#00a8b5" />
-                <stop offset="100%" stopColor="#00e5db" />
-              </linearGradient>
-            </defs>
             <g fill="none" strokeLinecap="round" strokeLinejoin="round">
               <path
                 d="M 255 110 C 240 106 220 108 200 120 C 180 132 170 148 152 152 C 140 156 128 170 132 195 C 136 215 148 226 172 230"
@@ -71,13 +67,13 @@ export function Header({ me }: HeaderProps) {
 
         {/* Center: Navigation */}
         <nav className="cortex-header__nav" aria-label="Main navigation">
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
+          <NavLink to="/" end className={navClass}>
             Home
           </NavLink>
-          <NavLink
-            to="/profile"
-            className={({ isActive }) => (isActive ? 'active' : '')}
-          >
+          <NavLink to="/workflows" className={navClass}>
+            Workflows
+          </NavLink>
+          <NavLink to="/profile" className={navClass}>
             Profile
           </NavLink>
           <a href="#docs">Docs</a>
@@ -86,31 +82,27 @@ export function Header({ me }: HeaderProps) {
 
         {/* Right: GPU Pill + Auth */}
         <div className="cortex-header__actions">
-          <span className="cortex-gpu-pill" aria-label="GPU credits available">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              width="12"
-              height="12"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
-            </svg>
-            <span>18 GPU Credits</span>
-          </span>
-          {me ? (
-            <div className="cortex-header__user">
-              <span className="cortex-header__email">{me.email}</span>
-              <button type="button" className="cortex-btn cortex-btn--ghost" onClick={logout}>
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <Link to="/login" className="cortex-btn cortex-btn--ghost">
-              Sign in
-            </Link>
+          {accountStatsEnabled() && (
+            <span className="cortex-gpu-pill">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                width="12"
+                height="12"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+              </svg>
+              <span>18 GPU Credits</span>
+            </span>
           )}
+          <div className="cortex-header__user">
+            {email && <span className="cortex-header__email">{email}</span>}
+            <button type="button" className="cortex-btn cortex-btn--ghost" onClick={logout}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </header>

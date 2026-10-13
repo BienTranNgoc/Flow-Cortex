@@ -3,12 +3,8 @@
    >=44px. */
 
 html {
-  scrollbar-width: none;
-}
-
-html::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #2e3b49 #080c13;
 }
 
 *,
@@ -184,7 +180,7 @@ body {
 }
 
 .cortex-header__email {
-  color: #5a6b78;
+  color: #9eacb6;
   font-size: 0.82rem;
   max-width: 160px;
   overflow: hidden;
@@ -227,7 +223,7 @@ body {
 
 .cortex-footer__tagline {
   margin: 0;
-  color: #5a6b78;
+  color: #9eacb6;
   font-size: 0.88rem;
   line-height: 1.55;
   max-width: 28ch;
@@ -248,7 +244,7 @@ body {
   border-radius: 8px;
   background: rgba(94, 234, 212, 0.06);
   border: 1px solid rgba(90, 107, 120, 0.25);
-  color: #5a6b78;
+  color: #9eacb6;
   text-decoration: none;
   transition: all 0.18s ease;
 }
@@ -286,7 +282,7 @@ body {
 }
 
 .cortex-footer__col a {
-  color: #5a6b78;
+  color: #9eacb6;
   text-decoration: none;
   font-size: 0.88rem;
   transition: color 0.15s ease;
@@ -304,7 +300,7 @@ body {
 
 .cortex-footer__bottom p {
   margin: 0;
-  color: #3a4555;
+  color: #9eacb6;
   font-size: 0.8rem;
 }
 
@@ -312,7 +308,6 @@ body {
 
 .cortex-ambient {
   position: relative;
-  overflow: hidden;
 }
 
 .cortex-ambient::before {
@@ -354,8 +349,24 @@ body {
 /* ===== RESPONSIVE ======================================================== */
 
 @media (max-width: 768px) {
+  .cortex-header__inner {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 62px;
+    padding-block: 0.5rem;
+    row-gap: 0.5rem;
+  }
+
   .cortex-header__nav {
-    display: none;
+    order: 3;
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+  }
+
+  .cortex-header__nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
 
   .cortex-header__email {
@@ -375,7 +386,7 @@ body {
 @media (max-width: 480px) {
   .cortex-header__inner {
     gap: 0.75rem;
-    padding: 0 1rem;
+    padding-inline: 1rem;
   }
 
   .cortex-gpu-pill span {
@@ -385,47 +396,6 @@ body {
   .cortex-footer__links {
     grid-template-columns: 1fr;
   }
-}
-
-/* ===== LEGACY (to remove once Layout fully migrated) ==================== */
-
-.app-header { display: none; }
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #26313d;
-  background: #0d131c;
-}
-
-.app-title {
-  font-weight: 600;
-}
-
-.app-header nav {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.app-header nav a {
-  text-decoration: none;
-  color: #9eacb6;
-  padding: 0.25rem 0.5rem;
-}
-
-.app-header nav a.active {
-  font-weight: 600;
-  text-decoration: underline;
-}
-
-.app-user {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .app-content {
@@ -591,9 +561,20 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
   .primary-button,
   .eyebrow,
-  button {
+  button,
+  .cortex-ambient::before,
+  .cortex-ambient::after,
+  .cortex-header__nav a,
+  .cortex-btn,
+  .cortex-gpu-pill,
+  .cortex-footer__social-link,
+  .cortex-footer__col a {
     animation: none !important;
     transition: none !important;
+  }
+
+  .cortex-footer__social-link:hover {
+    transform: none;
   }
 }
 

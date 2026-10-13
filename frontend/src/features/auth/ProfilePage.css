@@ -108,7 +108,7 @@
 
 .profile-identity__email {
   margin: 0 0 0.85rem;
-  color: #5a6b78;
+  color: #9eacb6;
   font-size: 0.88rem;
   word-break: break-all;
 }
@@ -157,7 +157,7 @@
 }
 
 .profile-stats__label {
-  color: #5a6b78;
+  color: #9eacb6;
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -230,7 +230,7 @@
 }
 
 .profile-facts dt {
-  color: #5a6b78;
+  color: #9eacb6;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -297,6 +297,13 @@
 .cortex-btn--danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-avatar__pulse,
+  .profile-saved {
+    animation: none;
+  }
 }
 
 /* ----- Responsive ------------------------------------------------------ */

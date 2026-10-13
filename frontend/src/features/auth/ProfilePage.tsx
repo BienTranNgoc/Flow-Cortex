@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
+import { accountStatsEnabled } from '../../app/featureFlags';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 import './ProfilePage.css';
@@ -46,6 +47,7 @@ export function ProfilePage() {
   if (meQuery.isError) {
     return (
       <main className="profile-page">
+        <h1>Profile</h1>
         <p role="alert" className="form-error">
           Could not load your profile.{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
@@ -64,6 +66,7 @@ export function ProfilePage() {
   }
 
   const me = meQuery.data;
+  const showAccountStats = accountStatsEnabled();
   const initials = initialsFrom(me.name, me.email);
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));
   const onCancel = () => reset({ name: me.name ?? '' });
@@ -94,24 +97,26 @@ export function ProfilePage() {
             <span className="profile-role-pill">{me.role}</span>
           </div>
 
-          <ul className="profile-stats" aria-label="Account statistics">
-            <li>
-              <span className="profile-stats__value">1,248</span>
-              <span className="profile-stats__label">XP</span>
-            </li>
-            <li>
-              <span className="profile-stats__value">14d</span>
-              <span className="profile-stats__label">Streak</span>
-            </li>
-            <li>
-              <span className="profile-stats__value">#42</span>
-              <span className="profile-stats__label">Rank</span>
-            </li>
-            <li>
-              <span className="profile-stats__value">18</span>
-              <span className="profile-stats__label">Credits</span>
-            </li>
-          </ul>
+          {showAccountStats && (
+            <ul className="profile-stats" aria-label="Account statistics">
+              <li>
+                <span className="profile-stats__value">1,248</span>
+                <span className="profile-stats__label">XP</span>
+              </li>
+              <li>
+                <span className="profile-stats__value">14d</span>
+                <span className="profile-stats__label">Streak</span>
+              </li>
+              <li>
+                <span className="profile-stats__value">#42</span>
+                <span className="profile-stats__label">Rank</span>
+              </li>
+              <li>
+                <span className="profile-stats__value">18</span>
+                <span className="profile-stats__label">Credits</span>
+              </li>
+            </ul>
+          )}
         </aside>
 
         {/* Right card — edit form + identity facts */}
@@ -182,22 +187,27 @@ export function ProfilePage() {
             <div>
               <dt>Status</dt>
               <dd>
-                <span className="profile-status-dot" aria-hidden="true" /> Active
+                {me.status === 'ACTIVE' && <span className="profile-status-dot" aria-hidden="true" />}
+                {me.status || '—'}
               </dd>
             </div>
           </dl>
 
-          <hr className="profile-card__divider" />
+          {showAccountStats && (
+            <>
+              <hr className="profile-card__divider" />
 
-          <div className="profile-danger">
-            <div>
-              <h3>Delete account</h3>
-              <p>Permanently remove your account and all associated data.</p>
-            </div>
-            <button type="button" className="cortex-btn cortex-btn--danger" disabled>
-              Request deletion
-            </button>
-          </div>
+              <div className="profile-danger">
+                <div>
+                  <h3>Delete account</h3>
+                  <p>Permanently remove your account and all associated data.</p>
+                </div>
+                <button type="button" className="cortex-btn cortex-btn--danger" disabled>
+                  Request deletion
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </main>
