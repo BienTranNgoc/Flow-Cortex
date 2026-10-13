@@ -51,6 +51,20 @@ describe('LoginPage', () => {
     setToken(null);
     window.localStorage.clear();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('hides "Forgot password?" until VITE_PASSWORD_RESET_ENABLED is true', () => {
+    const { unmount } = renderLogin(null);
+    expect(screen.queryByRole('link', { name: 'Forgot password?' })).not.toBeInTheDocument();
+    unmount();
+
+    vi.stubEnv('VITE_PASSWORD_RESET_ENABLED', 'true');
+    renderLogin(null);
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+      'href',
+      '/forgot-password',
+    );
   });
 
   it('redirects to the `from` page when a token is already present', () => {

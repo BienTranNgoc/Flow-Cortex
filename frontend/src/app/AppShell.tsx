@@ -1,3 +1,4 @@
+import { Footer } from './Footer';
 import './AppShell.css';
 
 /**
@@ -17,6 +18,8 @@ export function AppShell({ children }: { readonly children: React.ReactNode }) {
       </div>
 
       <main className="public-main">{children}</main>
+
+      <Footer />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
+import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import {
@@ -100,14 +101,21 @@ export function LoginPage() {
             />
             {errors.password && <p role="alert">{errors.password.message}</p>}
           </div>
-          <label className="remember-row" htmlFor="login-remember">
-            <input
-              id="login-remember"
-              type="checkbox"
-              {...register('rememberMe')}
-            />
-            <span>Remember me on this device</span>
-          </label>
+          <div className="login-meta-row">
+            <label className="remember-row" htmlFor="login-remember">
+              <input
+                id="login-remember"
+                type="checkbox"
+                {...register('rememberMe')}
+              />
+              <span>Remember me</span>
+            </label>
+            {passwordResetEnabled() && (
+              <Link to="/forgot-password" className="forgot-password-link">
+                Forgot password?
+              </Link>
+            )}
+          </div>
           {serverError && (
             <p role="alert" className="form-error">
               {serverError}
