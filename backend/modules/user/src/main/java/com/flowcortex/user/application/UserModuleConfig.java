@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
  * declares. Without this, the records are parsed but not bound.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({AccessTokenProperties.class, RefreshTokenProperties.class, GoogleOAuthProperties.class})
+@EnableConfigurationProperties({AccessTokenProperties.class, RefreshTokenProperties.class, GoogleOAuthProperties.class,
+        LoginThrottleProperties.class, AuthRetentionProperties.class})
 public class UserModuleConfig {
 }

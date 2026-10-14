@@ -1,10 +1,9 @@
--- Account lockout (G1): failed_login_attempts + locked_until on app_user.
--- Auth audit (G5): auth_event table for the 8 AuthEventType values, user_id nullable (no FK
--- to app_user: keeps the no-FK-cross-module rule from personal.md §1.3 — events for unknown
--- emails still record here with user_id NULL).
+-- Account lockout: failed_login_attempts + locked_until on app_user.
+-- Auth audit: auth_event table, user_id nullable (no FK to app_user, so no cross-module FK;
+-- events for unknown emails still record here with user_id NULL).
 --
--- Two partial/conditional indexes serve the two filter shapes the admin endpoint exposes:
--- user-scoped lookups (user_id + occurred_at DESC) and type-wide reports (type + occurred_at DESC).
+-- Two indexes serve the two filter shapes of audit queries: user-scoped lookups
+-- (user_id + occurred_at DESC) and type-wide reports (type + occurred_at DESC).
 
 ALTER TABLE app_user
     ADD COLUMN failed_login_attempts smallint NOT NULL DEFAULT 0,
@@ -24,3 +23,5 @@ CREATE TABLE auth_event (
 
 CREATE INDEX idx_auth_event_user_id_occurred_at ON auth_event (user_id, occurred_at DESC);
 CREATE INDEX idx_auth_event_type_occurred_at    ON auth_event (type, occurred_at DESC);
+-- Retention deletes by age alone.
+CREATE INDEX idx_auth_event_occurred_at         ON auth_event (occurred_at);

@@ -1,15 +1,14 @@
-// UI-only OAuth entry point. Wires nothing on the backend — clicking
-// surfaces an informational message; a real provider flow replaces the
-// `onSelect` body when OAuth is added to the API.
+// OAuth entry point. Only Google has a backend flow: it is a link to the
+// authorize endpoint (`href`). A provider without `href` stays inert.
 //
-// Hidden by default until the real OAuth flow ships. Set
-// `VITE_OAUTH_ENABLED=true` to surface the button.
+// Hidden by default. Set `VITE_OAUTH_ENABLED=true` to surface the button.
 
-const OAUTH_ENABLED = import.meta.env.VITE_OAUTH_ENABLED === 'true';
+import { oauthEnabled } from './featureFlags';
 
 export interface OAuthButtonProps {
   readonly provider: 'google' | 'github' | 'microsoft';
   readonly label: string;
+  readonly href?: string;
   readonly onSelect?: (provider: OAuthButtonProps['provider']) => void;
 }
 
@@ -67,20 +66,29 @@ const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {
   ),
 };
 
-export function OAuthButton({ provider, label, onSelect }: OAuthButtonProps) {
-  if (!OAUTH_ENABLED) {
+export function OAuthButton({ provider, label, href, onSelect }: OAuthButtonProps) {
+  if (!oauthEnabled()) {
     return null;
   }
-  return (
-    <button
-      type="button"
-      className={`oauth-button oauth-button--${provider}`}
-      onClick={() => onSelect?.(provider)}
-    >
+  const className = `oauth-button oauth-button--${provider}`;
+  const content = (
+    <>
       <span className="oauth-button__icon" aria-hidden="true">
         {ICONS[provider]}
       </span>
       <span className="oauth-button__label">{label}</span>
+    </>
+  );
+  if (href) {
+    return (
+      <a className={className} href={href}>
+        {content}
+      </a>
+    );
+  }
+  return (
+    <button type="button" className={className} onClick={() => onSelect?.(provider)}>
+      {content}
     </button>
   );
 }

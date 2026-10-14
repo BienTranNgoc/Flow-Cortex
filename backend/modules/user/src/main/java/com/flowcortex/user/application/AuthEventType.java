@@ -5,10 +5,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Closed enum of every audit row the user module can write. B1's first 8
- * values; B3's google-oauth-and-refresh-tokens change adds 7 more — see
- * {@code openspec/changes/google-oauth-and-refresh-tokens/specs/identity/spec.md}
- * for each one's contract.
+ * Closed enum of every audit row the user module can write. The stored column is
+ * {@code varchar(40)}, so a constant name must stay within 40 characters.
  */
 public enum AuthEventType {
 
@@ -18,14 +16,9 @@ public enum AuthEventType {
     LOGIN_FAILED_ACCOUNT_SUSPENDED,
     REGISTRATION_ACCEPTED,
     REGISTRATION_REJECTED_RATE_LIMITED,
-    PASSWORD_RESET_REQUESTED,
-    PASSWORD_RESET_COMPLETED,
 
     OAUTH_LOGIN_SUCCESS,
-    OAUTH_ACCOUNT_LINKED,
-    OAUTH_LOGIN_FAILED_INVALID_STATE,
-    OAUTH_LOGIN_FAILED_INVALID_ID_TOKEN,
-    OAUTH_LINK_BLOCKED_PASSWORD_REQUIRED,
+    OAUTH_LOGIN_FAILED,
 
     REFRESH_TOKEN_ROTATED,
     REFRESH_TOKEN_REUSE_DETECTED,

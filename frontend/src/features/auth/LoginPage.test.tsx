@@ -9,13 +9,13 @@ import { LoginPage } from './LoginPage';
 const PERSISTENT_KEY = 'flowcortex.auth.token';
 const SESSION_KEY = 'flowcortex.auth.sessionToken';
 
-function renderLogin(state: unknown) {
+function renderLogin(state: unknown, search = '') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[{ pathname: '/login', state }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/login', search, state }]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<p>Profile landing</p>} />
@@ -28,7 +28,7 @@ function renderLogin(state: unknown) {
 
 async function signIn({ remember }: { remember: boolean }) {
   const calls = stubApi({
-    'POST /api/v1/auth/login': { status: 200, body: { accessToken: 'jwt-1' } },
+    'POST /api/v1/auth/login': { status: 200, body: { accessToken: 'jwt-1', expiresIn: 900 } },
   });
   const user = userEvent.setup();
   renderLogin({ from: '/profile' });
@@ -97,10 +97,72 @@ describe('LoginPage', () => {
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('jwt-1');
   });
 
-  it('sends only the credentials in the login request body', async () => {
-    const calls = await signIn({ remember: false });
+  it.each([true, false])('sends rememberMe=%s with the credentials', async (remember) => {
+    const calls = await signIn({ remember });
 
     const login = calls.find((call) => call.path === '/api/v1/auth/login');
-    expect(login?.body).toEqual({ email: 'member1@flowcortex.dev', password: 'secret' });
+    expect(login?.body).toEqual({
+      email: 'member1@flowcortex.dev',
+      password: 'secret',
+      rememberMe: remember,
+    });
+  });
+
+  describe('Continue with Google', () => {
+    beforeEach(() => {
+      vi.stubEnv('VITE_OAUTH_ENABLED', 'true');
+    });
+
+    function authorizeLink() {
+      const href = screen.getByRole('link', { name: 'Continue with Google' }).getAttribute('href');
+      const url = new URL(href ?? '', 'http://localhost');
+      return { path: url.pathname, params: Object.fromEntries(url.searchParams) };
+    }
+
+    it('starts the authorize flow with the checkbox state and the page login returns to', async () => {
+      const user = userEvent.setup();
+      renderLogin({ from: '/profile' });
+
+      expect(authorizeLink()).toEqual({
+        path: '/api/v1/auth/oauth/google/authorize',
+        params: { remember_me: 'true', return_to: '/profile' },
+      });
+
+      await user.click(screen.getByRole('checkbox', { name: /Remember me/ }));
+
+      expect(authorizeLink().params).toEqual({ remember_me: 'false', return_to: '/profile' });
+    });
+
+    it('returns to "/" when login has no page to return to', () => {
+      renderLogin(null);
+
+      expect(authorizeLink().params.return_to).toBe('/');
+    });
+  });
+
+  describe('oauth_error', () => {
+    it.each([
+      ['cancelled', 'Google sign-in was cancelled.'],
+      ['invalid_state', 'The Google sign-in expired or was invalid. Please try again.'],
+      [
+        'registration_closed',
+        'Registration is closed, so a new account cannot be created with Google.',
+      ],
+      ['link_required', 'This email already has a password account — sign in with your password.'],
+      ['account_inactive', 'This account is not active. Please contact support.'],
+      ['rate_limited', 'Too many attempts. Please try again later.'],
+      ['failed', 'Google sign-in failed. Please try again.'],
+      ['something_new', 'Google sign-in failed. Please try again.'],
+    ])('shows a message for %s', (code, message) => {
+      renderLogin(null, `?oauth_error=${code}`);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+    });
+
+    it('shows no alert without the parameter', () => {
+      renderLogin(null);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });

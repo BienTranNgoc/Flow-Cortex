@@ -12,9 +12,10 @@ vi.mock('./app/HomePage', () => ({
 // An unauthenticated visit to any route redirects to /login rather than
 // rendering a static "Flow-Cortex" heading.
 describe('App', () => {
-  it('redirects an unauthenticated visitor to the sign-in page', () => {
+  it('redirects an unauthenticated visitor to the sign-in page', async () => {
+    stubApi({ 'POST /api/v1/auth/refresh': { status: 401, body: { status: 401 } } });
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
   });
 
   it('contains a page that throws inside the layout, with Reload and one structured event', async () => {

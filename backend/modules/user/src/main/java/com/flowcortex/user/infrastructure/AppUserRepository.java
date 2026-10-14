@@ -1,11 +1,13 @@
 package com.flowcortex.user.infrastructure;
 
 import com.flowcortex.user.domain.AppUser;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,13 +19,20 @@ import org.springframework.data.repository.query.Param;
  * not merely forbidden.
  *
  * <p>{@link #findByEmail} is deliberately NOT owner-scoped: login is by bare email (global
- * uniqueness); the DB's {@code UNIQUE (email)} constraint is the actual race-safe enforcement.
+ * uniqueness) and case-insensitive; the DB's unique index on {@code lower(email)} is the actual
+ * race-safe enforcement.
  */
 public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
 
-    Optional<AppUser> findByEmail(String email);
+    @Query("SELECT u FROM AppUser u WHERE lower(u.email) = lower(:email)")
+    Optional<AppUser> findByEmail(@Param("email") String email);
 
-    Optional<AppUser> findByEmailAndHasPasswordTrue(String email);
+    /** Row-locked read, so concurrent failed logins each see the counter the previous one wrote. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM AppUser u WHERE u.id = :id")
+    Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);
+
+    boolean existsByEmailIgnoreCase(String email);
 
     Optional<AppUser> findByGoogleSubject(String googleSubject);
 

@@ -11,7 +11,8 @@ import java.util.UUID;
  * A stateful refresh token, identified by a SHA-256 hash. The raw token never
  * touches this entity — the application layer hashes before persisting. The
  * {@code familyId} groups rotations: a leak anywhere in the chain revokes the
- * whole family.
+ * whole family. Every rotation keeps the family's {@code expiresAt} and
+ * {@code rememberMe}, so a session has one absolute lifetime.
  */
 @Entity
 @Table(name = "refresh_token")
@@ -36,6 +37,9 @@ public class RefreshToken {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
+    @Column(name = "remember_me", nullable = false, updatable = false)
+    private boolean rememberMe;
+
     @Column(name = "used_at")
     private Instant usedAt;
 
@@ -55,13 +59,14 @@ public class RefreshToken {
     }
 
     public RefreshToken(UUID id, UUID userId, String tokenHash, UUID familyId, Instant issuedAt,
-            Instant expiresAt, String createdIp, String userAgent) {
+            Instant expiresAt, boolean rememberMe, String createdIp, String userAgent) {
         this.id = id;
         this.userId = userId;
         this.tokenHash = tokenHash;
         this.familyId = familyId;
         this.issuedAt = issuedAt;
         this.expiresAt = expiresAt;
+        this.rememberMe = rememberMe;
         this.createdIp = createdIp;
         this.userAgent = userAgent;
     }
@@ -88,6 +93,10 @@ public class RefreshToken {
 
     public Instant getExpiresAt() {
         return expiresAt;
+    }
+
+    public boolean isRememberMe() {
+        return rememberMe;
     }
 
     public Instant getUsedAt() {

@@ -10,19 +10,24 @@ public interface AuthService {
 
     /**
      * Creates an active member account owned by the configured registration
-     * owner and returns a {@link TokenPairResponse} of (access, refresh) tokens.
+     * owner and returns its first {@link AuthSession}.
      * @throws com.flowcortex.shared.web.ConflictException if the email is already taken
      * @throws org.springframework.web.server.ResponseStatusException 403 if no active ADMIN owner is configured
      */
-    TokenPairResponse register(String email, String rawPassword, String name, boolean rememberMe, String ip,
+    AuthSession register(String email, String rawPassword, String name, boolean rememberMe, String ip,
             String userAgent);
 
     /**
-     * Verifies the email/password pair and returns a {@link TokenPairResponse}.
-     * @throws BadCredentialsException if the email is unknown or password doesn't match (same exception either way)
-     * @throws AccessDeniedException if the account is {@code SUSPENDED} — no token is minted
+     * Verifies the email/password pair and returns an {@link AuthSession}. The password is checked
+     * before the account's state is revealed: a wrong password is always the same 401, whatever
+     * the account (unknown, suspended or locked).
+     * @throws org.springframework.security.authentication.BadCredentialsException if the email is unknown or the
+     *         password doesn't match (same exception either way)
+     * @throws org.springframework.security.access.AccessDeniedException if the password is right but the account
+     *         is {@code SUSPENDED} — no token is minted
+     * @throws com.flowcortex.shared.web.AccountLockedException if the password is right but the account is locked
      */
-    TokenPairResponse login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
+    AuthSession login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
 
     /**
      * Updates the caller's own display name only — email/role/status are admin-mediated, not self-service.
@@ -30,19 +35,29 @@ public interface AuthService {
     CurrentUser updateOwnProfile(UUID userId, String name);
 
     /**
-     * Exchanges a Google OAuth authorization code, finds or creates the user,
-     * and returns a {@link TokenPairResponse}.
+     * Exchanges a Google authorization code (with its PKCE verifier and the nonce the id_token must
+     * carry) and signs the Google account in. The account is matched by Google subject only; a new
+     * email is registered through the same gate as {@link #register} (owner + rate limit), and an email
+     * that already belongs to an account is never linked. The Google call runs outside any transaction.
+     * @throws OAuthLoginException when the sign-in is refused (already audited); never an HTTP-mapped error
      */
-    TokenPairResponse loginWithGoogle(String code, String state, boolean rememberMe, String ip, String userAgent);
+    AuthSession loginWithGoogle(String code, String codeVerifier, String nonce, boolean rememberMe, String ip,
+            String userAgent);
+
+    /** Audits a Google sign-in that was refused before the code exchange (cancelled, invalid state, ...). */
+    void recordOAuthFailure(OAuthFailure failure, String ip, String userAgent);
 
     /**
-     * Rotates the given raw refresh token and returns a new {@link TokenPairResponse}.
+     * Rotates the given raw refresh token into a new {@link AuthSession} that keeps the original
+     * session's expiry. Empty when the token is unknown, expired, revoked or already used (the whole
+     * session is then revoked), or when its account is no longer allowed to sign in.
      */
-    TokenPairResponse refresh(String rawToken, String ip, String userAgent);
+    Optional<AuthSession> refresh(String rawToken, String ip, String userAgent);
 
     /**
-     * Revokes the supplied refresh token (if any) and bumps the caller's
-     * {@code token_version} so previously-issued access JWTs fail.
+     * Revokes the session the supplied refresh token belongs to; idempotent, and a no-op when the
+     * token is absent or unknown. Access tokens already issued stay valid until they expire, at most
+     * one access-token lifetime.
      */
-    void logout(UUID callerId, Optional<String> refreshToken, String ip, String userAgent);
+    void logout(Optional<String> refreshToken, String ip, String userAgent);
 }

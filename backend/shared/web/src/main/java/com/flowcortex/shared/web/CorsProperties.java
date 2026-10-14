@@ -26,5 +26,9 @@ public record CorsProperties(List<String> allowedOrigins, List<String> allowedMe
         if (exposedHeaders == null) {
             exposedHeaders = List.of("X-Request-Id");
         }
+        if (allowCredentials && allowedOrigins.contains("*")) {
+            throw new IllegalStateException(
+                    "flowcortex.security.cors.allowed-origins must list literal origins when allow-credentials is true");
+        }
     }
 }

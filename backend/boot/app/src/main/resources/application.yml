@@ -2,15 +2,6 @@ spring:
   application:
     name: flow-cortex
 
-  # Two class-path candidates register the same bean 'rabbitTemplateCustomizer':
-  #   org.springframework.modulith.events.amqp.RabbitJacksonConfiguration
-  #   org.springframework.modulith.events.amqp.RabbitJackson2Configuration
-  # Both come in transitively via spring-boot-starter-amqp (test classpath), and Boot 4
-  # fails fast on the duplicate. The last one to register wins — the behavior is identical
-  # (both bind a Jackson 2 message converter) and we don't otherwise customize the bean.
-  main:
-    allow-bean-definition-overriding: true
-
   # Local defaults for a bare `./gradlew bootRun` against a manually-started
   # Postgres; SPRING_DATASOURCE_* env vars (docker compose) and Testcontainers
   # @ServiceConnection (tests) override them. The password is never defaulted
@@ -155,25 +146,48 @@ jdbc:
 flowcortex:
   security:
     jwt-secret: ${JWT_SECRET:}
-    # Google OAuth 2.0 — empty client-id/secret is allowed in dev (the OAuth
-    # endpoints answer 503); the prod deployment sets the real values from
-    # Google Cloud Console. Redirect URIs is a hard allow-list — anything
-    # outside returns 400 from /authorize.
+    # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
+    # credentials are allowed). The apps reach the API same-origin through a proxy, so this only
+    # matters for a frontend served from another origin.
+    cors:
+      allowed-origins: ${FLOWCORTEX_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+      allow-credentials: ${FLOWCORTEX_CORS_ALLOW_CREDENTIALS:true}
+    # Google OAuth 2.0 — an empty client-id leaves the app booting with Google sign-in off
+    # (/authorize answers 503); the deployment sets the real values from Google Cloud Console.
+    # redirect-uri is the absolute backend callback URL registered at Google; it must be served
+    # on the same origin as the app so the flow cookie reaches it. state-ttl bounds one sign-in
+    # attempt; the timeouts bound every call to Google.
     oauth:
       google:
         client-id: ${GOOGLE_CLIENT_ID:}
         client-secret: ${GOOGLE_CLIENT_SECRET:}
-        redirect-uris: ${GOOGLE_REDIRECT_URIS:http://localhost:5173/oauth/google/callback}
+        redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/api/v1/auth/oauth/google/callback}
         state-ttl: ${OAUTH_STATE_TTL:10m}
-        require-explicit-link: ${OAUTH_REQUIRE_EXPLICIT_LINK:true}
-    # Access JWT lifetime. Refresh-token TTLs and the per-user cap live one
-    # level deeper; defaults match the proposal §G2/G3.
+        connect-timeout: ${GOOGLE_CONNECT_TIMEOUT:5s}
+        read-timeout: ${GOOGLE_READ_TIMEOUT:10s}
+    # Access JWT lifetime; access tokens stay valid until they expire, even after logout.
+    # A refresh session ends `ttl` after login (`remember-me-ttl` when remembered) and rotation
+    # never extends it. A user keeps at most `max-active-per-user` live sessions; a new login
+    # beyond that revokes the oldest.
     jwt:
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
     refresh-token:
       ttl: ${REFRESH_TOKEN_TTL:7d}
       remember-me-ttl: ${REFRESH_TOKEN_REMEMBER_ME_TTL:30d}
       max-active-per-user: ${REFRESH_TOKEN_MAX_ACTIVE_PER_USER:10}
+  auth:
+    # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
+    # `audit-events`, and refresh-token rows that expired or were revoked, every `interval`.
+    retention:
+      interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
+      audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}
+  # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
+  # gradually; over it answers 429 with Retry-After before the password is checked. Limits are per
+  # backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
+  login:
+    failures-per-ip:
+      capacity: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY:20}
+      period: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD:15m}
   # Kill switch for the admin console's API (/api/v1/admin/**): off answers 503 there, after the
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
@@ -250,6 +264,3 @@ flowcortex:
     # accepts the connection and never answers cannot hold a request or a health check.
       api-call-timeout: 5s
       api-call-attempt-timeout: 2s
-    cors:
-      allowed-origins: ${FLOWCORTEX_CORS_ALLOWED_ORIGINS:http://localhost:5173}
-      allow-credentials: ${FLOWCORTEX_CORS_ALLOW_CREDENTIALS:true}

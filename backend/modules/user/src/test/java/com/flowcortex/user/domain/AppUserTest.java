@@ -1,6 +1,7 @@
 package com.flowcortex.user.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,7 +15,6 @@ class AppUserTest {
     void newUserHasPasswordByDefault() {
         AppUser user = newUser();
         assertThat(user.hasPassword()).isTrue();
-        assertThat(user.getTokenVersion()).isZero();
     }
 
     @Test
@@ -30,27 +30,18 @@ class AppUserTest {
         assertThat(user.getGoogleSubject()).isEqualTo("google-sub-123");
         assertThat(user.getOauthProvider()).isEqualTo("google");
 
-        user.linkGoogle("google-sub-456");
-        assertThat(user.getGoogleSubject()).isEqualTo("google-sub-456");
-        assertThat(user.getOauthProvider()).isEqualTo("google");
+        user.linkGoogle("google-sub-123");
+        assertThat(user.getGoogleSubject()).isEqualTo("google-sub-123");
     }
 
     @Test
-    void unlinkGoogleClearsSubjectAndProvider() {
+    void linkGoogleNeverReplacesAnotherSubject() {
         AppUser user = newUser();
-        user.linkGoogle("sub");
-        user.unlinkGoogle();
-        assertThat(user.getGoogleSubject()).isNull();
-        assertThat(user.getOauthProvider()).isNull();
-    }
+        user.linkGoogle("google-sub-123");
 
-    @Test
-    void bumpTokenVersionIncrementsByOne() {
-        AppUser user = newUser();
-        user.bumpTokenVersion();
-        assertThat(user.getTokenVersion()).isEqualTo(1L);
-        user.bumpTokenVersion();
-        assertThat(user.getTokenVersion()).isEqualTo(2L);
+        assertThatThrownBy(() -> user.linkGoogle("google-sub-456"))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(user.getGoogleSubject()).isEqualTo("google-sub-123");
     }
 
     @Test
@@ -69,6 +60,22 @@ class AppUserTest {
         user.recordFailedLogin(3, java.time.Duration.ofMinutes(15), NOW);
         user.recordFailedLogin(3, java.time.Duration.ofMinutes(15), NOW);
         assertThat(user.getLockedUntil()).isEqualTo(NOW.plus(java.time.Duration.ofMinutes(15)));
+    }
+
+    @Test
+    void aFailureAfterTheLockoutWindowEndedStartsANewCountAndCanLockAgain() {
+        AppUser user = newUser();
+        java.time.Duration window = java.time.Duration.ofMinutes(15);
+        user.recordFailedLogin(2, window, NOW);
+        user.recordFailedLogin(2, window, NOW);
+        Instant afterWindow = NOW.plus(window);
+
+        user.recordFailedLogin(2, window, afterWindow);
+
+        assertThat(user.getFailedLoginAttempts()).isEqualTo((short) 1);
+        assertThat(user.getLockedUntil()).isNull();
+        user.recordFailedLogin(2, window, afterWindow);
+        assertThat(user.getLockedUntil()).isEqualTo(afterWindow.plus(window));
     }
 
     @Test

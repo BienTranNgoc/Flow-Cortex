@@ -9,6 +9,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
  * Health, info and metrics answer anonymously on the management port, which only the service
@@ -41,15 +43,14 @@ class ManagementSecurityConfig {
     @Bean
     @Order(3)
     SecurityFilterChain managementSecurityFilterChain(HttpSecurity http) throws Exception {
-        org.springframework.security.web.util.matcher.RequestMatcher probes =
+        RequestMatcher probes =
                 request -> {
                     String path = request.getRequestURI();
                     return "/livez".equals(path) || "/readyz".equals(path);
                 };
-        org.springframework.security.web.util.matcher.RequestMatcher endpoints =
-                EndpointRequest.to("health", "info", "prometheus");
+        RequestMatcher endpoints = EndpointRequest.to("health", "info", "prometheus");
         http
-                .securityMatcher(new org.springframework.security.web.util.matcher.OrRequestMatcher(endpoints, probes))
+                .securityMatcher(new OrRequestMatcher(endpoints, probes))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());

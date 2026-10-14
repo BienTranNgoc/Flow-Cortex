@@ -151,7 +151,3 @@ This repo keeps comments **minimal**. Well-named code is the primary documentati
 - OpenSpec/task traceability in code (`Task N`, `R-xxx`, change ids) — §6 already bans these; they live in git history, never in comments.
 
 **Keep (earns its place):** a non-obvious *why* (a workaround and the constraint that forces it, a deliberate ordering, a spec/RFC citation for a rule that looks wrong but isn't), a public-`api`-port contract note that a caller genuinely needs, and a `//` explaining an intentional deviation from the obvious approach. When in doubt, cut it — a missing junk comment costs nothing; a wrong or stale one misleads.
-
-## 15. Personal rules (Master's, not committed)
-
-Personal overrides live in [rulekhoi/personal.md](rulekhoi/personal.md). Read on every request. The folder is git-ignored, so its contents never reach the team repo or conflict with shared rules.

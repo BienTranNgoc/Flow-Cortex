@@ -51,9 +51,6 @@ public class AppUser {
     @Column(name = "locked_until")
     private Instant lockedUntil;
 
-    @Column(name = "token_version", nullable = false)
-    private long tokenVersion;
-
     @Column(name = "google_subject")
     private String googleSubject;
 
@@ -89,7 +86,6 @@ public class AppUser {
         this.role = role;
         this.status = status;
         this.hasPassword = hasPassword;
-        this.tokenVersion = 0L;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
@@ -129,10 +125,6 @@ public class AppUser {
 
     public Instant getLockedUntil() {
         return lockedUntil;
-    }
-
-    public long getTokenVersion() {
-        return tokenVersion;
     }
 
     public String getGoogleSubject() {
@@ -189,9 +181,14 @@ public class AppUser {
      * Increments the failed-login counter and locks the account once it reaches {@code
      * maxAttempts}. A lockout window already in effect is left as-is — a lock-out during a
      * lock-out would just slide the wall forward, which an attacker would use to keep the
-     * account permanently locked.
+     * account permanently locked. A window that has ended starts the count over, so the account
+     * can lock again without a successful login in between.
      */
     public void recordFailedLogin(int maxAttempts, java.time.Duration lockoutDuration, Instant now) {
+        if (this.lockedUntil != null && !this.lockedUntil.isAfter(now)) {
+            this.failedLoginAttempts = 0;
+            this.lockedUntil = null;
+        }
         this.failedLoginAttempts = (short) Math.min(this.failedLoginAttempts + 1, Short.MAX_VALUE);
         touch();
         if (this.lockedUntil == null && this.failedLoginAttempts >= maxAttempts) {
@@ -206,24 +203,18 @@ public class AppUser {
         this.updatedAt = now;
     }
 
-    /** Bump after a logout so previously-issued access JWTs (carrying the old `tv`) fail validation. */
-    public void bumpTokenVersion() {
-        this.tokenVersion = this.tokenVersion + 1L;
-        touch();
-    }
-
-    /** Link a verified Google subject to this account. Idempotent on the same subject. */
+    /**
+     * Link a verified Google subject to this account. Idempotent on the same subject; an account
+     * already linked to another subject is never re-pointed.
+     */
     public void linkGoogle(String subject) {
+        if (this.googleSubject != null && !this.googleSubject.equals(subject)) {
+            throw new IllegalStateException("Account is already linked to another Google subject");
+        }
         this.googleSubject = subject;
         if (this.oauthProvider == null) {
             this.oauthProvider = "google";
         }
-        touch();
-    }
-
-    public void unlinkGoogle() {
-        this.googleSubject = null;
-        this.oauthProvider = null;
         touch();
     }
 }

@@ -15,6 +15,8 @@ export default defineConfig({
       client: 'fetch',
       clean: true,
       formatter: 'prettier',
+      // Every operation goes through one fetch that renews an expired access token and replays.
+      override: { mutator: { path: './src/customFetch.ts', name: 'customFetch' } },
     },
   },
 });

@@ -4,8 +4,8 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Refresh-token TTLs and the per-user cap on active rows. Defaults match the
- * values declared in proposal §G2/G3.
+ * Refresh-token TTLs and the per-user cap on live sessions. The code defaults apply when
+ * {@code application.yml} leaves a value out.
  */
 @ConfigurationProperties("flowcortex.security.refresh-token")
 public record RefreshTokenProperties(Duration ttl, Duration rememberMeTtl, int maxActivePerUser) {

@@ -15,7 +15,7 @@ export function AdminLayout() {
         {me && (
           <div className="admin-user">
             <span>{me.email}</span>
-            <button type="button" onClick={logout}>
+            <button type="button" onClick={() => void logout()}>
               Sign out
             </button>
           </div>

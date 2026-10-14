@@ -29,17 +29,17 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
             + "WHERE t.familyId = :familyId AND t.revokedAt IS NULL")
     int revokeFamily(@Param("familyId") UUID familyId, @Param("now") Instant now);
 
-    @Query("SELECT COUNT(t) FROM RefreshToken t WHERE t.userId = :userId "
-            + "AND t.revokedAt IS NULL AND t.usedAt IS NULL AND t.expiresAt > :now")
-    int countActiveByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+    @Modifying
+    @Query("UPDATE RefreshToken t SET t.revokedAt = :now WHERE t.userId = :userId AND t.revokedAt IS NULL")
+    int revokeAllByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
 
     @Modifying
-    @Query("DELETE FROM RefreshToken t WHERE t.revokedAt IS NOT NULL AND t.revokedAt < :cutoff "
+    @Query("DELETE FROM RefreshToken t WHERE (t.revokedAt IS NOT NULL AND t.revokedAt < :cutoff) "
             + "OR t.expiresAt < :cutoff")
     int deleteExpiredAndRevokedBefore(@Param("cutoff") Instant cutoff);
 
-    @Query("SELECT t FROM RefreshToken t WHERE t.userId = :userId AND t.familyId = :familyId "
-            + "AND t.revokedAt IS NULL AND t.usedAt IS NULL ORDER BY t.issuedAt ASC")
-    List<RefreshToken> findActiveByUserIdAndFamilyId(@Param("userId") UUID userId,
-            @Param("familyId") UUID familyId);
+    /** One row per live session (rotation retires the previous row), oldest first. */
+    @Query("SELECT t FROM RefreshToken t WHERE t.userId = :userId AND t.revokedAt IS NULL "
+            + "AND t.usedAt IS NULL AND t.expiresAt > :now ORDER BY t.issuedAt ASC")
+    List<RefreshToken> findActiveByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
 }

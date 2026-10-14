@@ -8,6 +8,7 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "gen:api": "orval --config orval.config.ts"
   },
   "devDependencies": {
@@ -15,9 +16,12 @@
     "eslint": "^9.6.0",
     "eslint-config-prettier": "^9.1.0",
     "globals": "^15.8.0",
+    "jsdom": "^24.1.0",
     "orval": "^8.36.0",
     "prettier": "^3.3.2",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.0.0",
+    "vite": "^5.3.2",
+    "vitest": "^1.6.0"
   }
 }

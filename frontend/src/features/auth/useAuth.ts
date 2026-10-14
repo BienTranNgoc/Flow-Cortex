@@ -1,10 +1,12 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   authHeaders,
+  ensureSession,
   getToken,
   login as loginRequest,
+  logout as logoutRequest,
   me as meRequest,
   register as registerRequest,
   setToken,
@@ -16,6 +18,26 @@ import type { LoginRequest, RegisterRequest } from '@flow-cortex/api-client';
 /** Re-renders the calling component whenever the stored token changes. */
 export function useAuthToken(): string | null {
   return useSyncExternalStore(subscribeToken, getToken);
+}
+
+/**
+ * False while a signed-out visit is still trying to turn the refresh cookie into a token (OAuth
+ * landing, expired access token after a reload) — one attempt per mount, so a failure cannot loop.
+ */
+export function useSessionReady(): boolean {
+  const token = useAuthToken();
+  const [attempted, setAttempted] = useState(() => getToken() !== null);
+  useEffect(() => {
+    if (attempted) return;
+    let mounted = true;
+    void ensureSession().then(() => {
+      if (mounted) setAttempted(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [attempted]);
+  return token !== null || attempted;
 }
 
 /**
@@ -36,8 +58,7 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ rememberMe: _rememberMe, ...credentials }: LoginVariables) =>
-      unwrap(loginRequest(credentials)),
+    mutationFn: (credentials: LoginVariables) => unwrap(loginRequest(credentials)),
     onSuccess: (data, vars) => {
       setToken(data.accessToken ?? null, vars.rememberMe);
       queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -50,7 +71,8 @@ export type LoginVariables = LoginRequest & { rememberMe: boolean };
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: RegisterRequest) => unwrap(registerRequest(input)),
+    mutationFn: (input: RegisterRequest) =>
+      unwrap(registerRequest({ ...input, rememberMe: true })),
     onSuccess: (data) => {
       setToken(data.accessToken ?? null, true);
       queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -58,8 +80,15 @@ export function useRegisterMutation() {
   });
 }
 
-export function logout(): void {
-  setToken(null);
+/** Revokes the server session, then forgets the token; local state is cleared even if the call fails. */
+export async function logout(): Promise<void> {
+  try {
+    await logoutRequest();
+  } catch {
+    // Offline: the refresh cookie stays until it expires, but this browser is signed out regardless.
+  } finally {
+    setToken(null);
+  }
 }
 
 const REMEMBERED_EMAIL_KEY = 'flowcortex.auth.rememberedEmail';

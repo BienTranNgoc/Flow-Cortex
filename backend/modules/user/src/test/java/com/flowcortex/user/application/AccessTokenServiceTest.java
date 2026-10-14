@@ -34,42 +34,6 @@ class AccessTokenServiceTest {
     }
 
     @Test
-    void readTokenVersionReturnsZeroForTokenWithoutDots() {
-        assertThat(service.readTokenVersion("not-a-jwt")).isEqualTo(0L);
-    }
-
-    @Test
-    void readTokenVersionReturnsZeroForEmptyPayload() {
-        assertThat(service.readTokenVersion("header.")).isEqualTo(0L);
-    }
-
-    @Test
-    void readTokenVersionReturnsZeroWhenTvClaimIsAbsent() {
-        // readTokenVersion scans the substring after the last '.', so we
-        // prefix a dot to keep the method looking at our raw payload.
-        String rawPayload = ".{\"sub\":\"x\"}";
-        assertThat(service.readTokenVersion(rawPayload)).isEqualTo(0L);
-    }
-
-    @Test
-    void readTokenVersionReturnsZeroWhenTvClaimIsMalformed() {
-        String rawPayload = ".{\"sub\":\"x\",\"tv\":\"not-a-number\"}";
-        assertThat(service.readTokenVersion(rawPayload)).isEqualTo(0L);
-    }
-
-    @Test
-    void readTokenVersionExtractsPositiveInteger() {
-        String rawPayload = ".{\"sub\":\"x\",\"tv\":7}";
-        assertThat(service.readTokenVersion(rawPayload)).isEqualTo(7L);
-    }
-
-    @Test
-    void readTokenVersionExtractsZero() {
-        String rawPayload = ".{\"sub\":\"x\",\"tv\":0}";
-        assertThat(service.readTokenVersion(rawPayload)).isEqualTo(0L);
-    }
-
-    @Test
     void mintDelegatesToEncoderWithExpectedClaims() {
         AppUser user = activeUser();
         Jwt stub = mock(Jwt.class);
@@ -86,23 +50,7 @@ class AccessTokenServiceTest {
         assertThat(claims.getClaims()).containsEntry("iss", "flow-cortex");
         assertThat(claims.getSubject()).isEqualTo(user.getId().toString());
         assertThat(claims.getClaim("role").toString()).isEqualTo(Role.MEMBER.name());
-        assertThat(claims.getClaim("tv").toString()).isEqualTo("0");
-    }
-
-    @Test
-    void mintIncludesCurrentTokenVersion() {
-        AppUser user = activeUser();
-        user.bumpTokenVersion();
-        user.bumpTokenVersion();
-        Jwt stub = mock(Jwt.class);
-        when(stub.getTokenValue()).thenReturn("signed-jwt");
-        when(encoder.encode(any())).thenReturn(stub);
-
-        service.mint(user);
-
-        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
-        verify(encoder).encode(captor.capture());
-        assertThat(captor.getValue().getClaims().getClaim("tv").toString()).isEqualTo("2");
+        assertThat(claims.getClaims()).doesNotContainKey("tv");
     }
 
     private static AppUser activeUser() {

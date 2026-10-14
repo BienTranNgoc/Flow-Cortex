@@ -1,33 +1,33 @@
 package com.flowcortex.shared.web;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * CORS configuration for the API. Applied to {@code /api/v1/**} only. The
- * remember-me cookie flow requires {@code allowCredentials = true}, which
- * means the origin must be a literal value (a list of one or more
- * configured origins, not a wildcard).
+ * The single CORS policy for {@code /api/v1/**}. Every security filter chain enables {@code
+ * cors()} and picks this bean up by name, so a preflight is answered before authentication on
+ * every chain. The remember-me cookie flow requires {@code allowCredentials = true}, which means
+ * the origin must be a literal value (a list of one or more configured origins, not a wildcard).
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(CorsProperties.class)
-public class CorsConfig implements WebMvcConfigurer {
+public class CorsConfig {
 
-    private final CorsProperties properties;
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(CorsProperties properties) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(properties.allowedOrigins());
+        config.setAllowedMethods(properties.allowedMethods());
+        config.setAllowedHeaders(properties.allowedHeaders());
+        config.setExposedHeaders(properties.exposedHeaders());
+        config.setAllowCredentials(properties.allowCredentials());
 
-    public CorsConfig(CorsProperties properties) {
-        this.properties = properties;
-    }
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/v1/**")
-                .allowedOrigins(properties.allowedOrigins().toArray(new String[0]))
-                .allowedMethods(properties.allowedMethods().toArray(new String[0]))
-                .allowedHeaders(properties.allowedHeaders().toArray(new String[0]))
-                .exposedHeaders(properties.exposedHeaders().toArray(new String[0]))
-                .allowCredentials(properties.allowCredentials());
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/v1/**", config);
+        return source;
     }
 }

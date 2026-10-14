@@ -274,44 +274,41 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TokenPairResponse"
+                $ref: "#/components/schemas/AccessTokenResponse"
       security: []
   /api/v1/auth/refresh:
     post:
       tags:
       - auth-controller
       operationId: refresh
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RefreshRequest"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TokenPairResponse"
+                $ref: "#/components/schemas/AccessTokenResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/auth/logout:
     post:
       tags:
       - auth-controller
       operationId: logout
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LogoutRequest"
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
+      security: []
   /api/v1/auth/login:
     post:
       tags:
@@ -329,7 +326,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TokenPairResponse"
+                $ref: "#/components/schemas/AccessTokenResponse"
       security: []
   /api/v1/workflows:
     get:
@@ -466,27 +463,23 @@ paths:
       parameters:
       - name: code
         in: query
-        required: true
+        required: false
         schema:
           type: string
       - name: state
         in: query
-        required: true
+        required: false
         schema:
           type: string
-      - name: redirect_uri
+      - name: error
         in: query
         required: false
         schema:
           type: string
-      - name: rememberMe
-        in: query
-        required: false
-        schema:
-          type: boolean
       responses:
-        "200":
-          description: OK
+        "302":
+          description: "Signed in: refresh cookie set, redirect to the return path.\
+            \ Refused: redirect to /login?oauth_error=<cancelled|invalid_state|registration_closed|link_required|account_inactive|rate_limited|failed>"
       security: []
   /api/v1/auth/oauth/google/authorize:
     get:
@@ -494,14 +487,22 @@ paths:
       - o-auth-controller
       operationId: authorize
       parameters:
-      - name: redirect_uri
+      - name: remember_me
         in: query
-        required: true
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: return_to
+        in: query
+        required: false
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        "302":
+          description: Redirect to Google's consent screen
+        "503":
+          description: Google sign-in is not configured
       security: []
   /api/v1/auth/me:
     get:
@@ -972,7 +973,8 @@ components:
         email:
           type: string
           format: email
-          minLength: 1
+          maxLength: 254
+          minLength: 0
         password:
           type: string
           maxLength: 72
@@ -986,35 +988,40 @@ components:
       - email
       - name
       - password
-    TokenPairResponse:
+    AccessTokenResponse:
       type: object
       properties:
         accessToken:
           type: string
-        refreshToken:
-          type: string
-        accessTokenExpiresAt:
-          type: string
-          format: date-time
-        refreshTokenExpiresAt:
-          type: string
-          format: date-time
-    RefreshRequest:
+        expiresIn:
+          type: integer
+          format: int64
+    ProblemDetail:
       type: object
       properties:
-        refreshToken:
+        type:
           type: string
-    LogoutRequest:
-      type: object
-      properties:
-        refreshToken:
+          format: uri
+        title:
           type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
     LoginRequest:
       type: object
       properties:
         email:
           type: string
-          minLength: 1
+          maxLength: 254
+          minLength: 0
         password:
           type: string
           minLength: 1

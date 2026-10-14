@@ -8,6 +8,7 @@ import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 class AccountStatusGuardTest {
 
-    private static final Instant NOW = Instant.now().minusSeconds(60);
+    private static final Instant NOW = Instant.parse("2026-10-14T00:00:00Z");
 
     @Test
     void requireActivePassesForActiveUser() {
@@ -34,36 +35,47 @@ class AccountStatusGuardTest {
     @Test
     void requireNotLockedPassesWhenNoLockout() {
         AppUser user = newUser(UserStatus.ACTIVE);
-        assertThatCode(() -> AccountStatusGuard.requireNotLocked(user)).doesNotThrowAnyException();
+        assertThatCode(() -> AccountStatusGuard.requireNotLocked(user, NOW)).doesNotThrowAnyException();
     }
 
     @Test
-    void requireNotLockedPassesWhenLockoutAlreadyExpired() {
+    void requireNotLockedPassesOnceTheLockoutWindowEndedAccordingToTheGivenInstant() {
         AppUser user = newUser(UserStatus.ACTIVE);
-        // Lock for 1 second at a clearly-past instant; any real "now" is later.
-        user.recordFailedLogin(1, java.time.Duration.ofSeconds(1), NOW.minusSeconds(3600));
-        assertThatCode(() -> AccountStatusGuard.requireNotLocked(user)).doesNotThrowAnyException();
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+        assertThatCode(() -> AccountStatusGuard.requireNotLocked(user, NOW.plus(Duration.ofMinutes(15))))
+                .doesNotThrowAnyException();
     }
 
     @Test
-    void requireNotLockedRejectsWhenLockoutIsInTheFuture() {
+    void requireNotLockedRejectsWhileTheLockoutWindowIsOpenAccordingToTheGivenInstant() {
         AppUser user = newUser(UserStatus.ACTIVE);
-        user.recordFailedLogin(1, java.time.Duration.ofMinutes(15), NOW);
-        assertThatThrownBy(() -> AccountStatusGuard.requireNotLocked(user))
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+        assertThatThrownBy(() -> AccountStatusGuard.requireNotLocked(user, NOW.plus(Duration.ofMinutes(14))))
                 .isInstanceOf(AccountLockedException.class);
     }
 
     @Test
     void requireNotLockedDoesNotMutateUser() {
         AppUser user = newUser(UserStatus.ACTIVE);
-        user.recordFailedLogin(1, java.time.Duration.ofMinutes(15), NOW);
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
         Instant before = user.getLockedUntil();
         try {
-            AccountStatusGuard.requireNotLocked(user);
+            AccountStatusGuard.requireNotLocked(user, NOW);
         } catch (AccountLockedException expected) {
             // expected
         }
         assertThat(user.getLockedUntil()).isEqualTo(before);
+    }
+
+    @Test
+    void canSignInNeedsAnActiveUnlockedAccount() {
+        AppUser locked = newUser(UserStatus.ACTIVE);
+        locked.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+
+        assertThat(AccountStatusGuard.canSignIn(newUser(UserStatus.ACTIVE), NOW)).isTrue();
+        assertThat(AccountStatusGuard.canSignIn(newUser(UserStatus.SUSPENDED), NOW)).isFalse();
+        assertThat(AccountStatusGuard.canSignIn(locked, NOW)).isFalse();
+        assertThat(AccountStatusGuard.canSignIn(locked, NOW.plus(Duration.ofMinutes(16)))).isTrue();
     }
 
     private static AppUser newUser(UserStatus status) {

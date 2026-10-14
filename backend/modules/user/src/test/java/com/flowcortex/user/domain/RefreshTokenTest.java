@@ -49,7 +49,7 @@ class RefreshTokenTest {
     }
 
     private static RefreshToken newToken(Instant expiresAt) {
-        return new RefreshToken(UUID.randomUUID(), UUID.randomUUID(), "h", UUID.randomUUID(), NOW, expiresAt, "ip",
-                "ua");
+        return new RefreshToken(UUID.randomUUID(), UUID.randomUUID(), "h", UUID.randomUUID(), NOW, expiresAt, false,
+                "ip", "ua");
     }
 }
