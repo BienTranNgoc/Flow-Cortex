@@ -1,7 +1,16 @@
 /* Responsive table -> cards below 768px. */
 @media (max-width: 768px) {
   .users-table thead {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .users-table {
+    min-width: 0;
   }
 
   .users-table,

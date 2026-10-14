@@ -4,8 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { UsersPage } from './UsersPage';
 
-const ALICE = { id: 'u1', email: 'alice@flowcortex.dev', name: 'Alice', role: 'MEMBER', status: 'ACTIVE' };
-const BOB = { id: 'u2', email: 'bob@flowcortex.dev', name: 'Bob', role: 'MEMBER', status: 'ACTIVE' };
+const ALICE = {
+  id: 'u1',
+  email: 'alice@flowcortex.dev',
+  name: 'Alice',
+  role: 'MEMBER',
+  status: 'ACTIVE',
+};
+const BOB = {
+  id: 'u2',
+  email: 'bob@flowcortex.dev',
+  name: 'Bob',
+  role: 'MEMBER',
+  status: 'ACTIVE',
+};
 
 beforeEach(() => setToken('admin-token-users', true));
 afterEach(() => {
@@ -39,7 +51,9 @@ describe('UsersPage', () => {
       name: BOB.name,
       role: 'MEMBER',
     });
-    expect(calls.filter((call) => call.method === 'GET' && call.path === '/api/v1/users')).toHaveLength(2);
+    expect(
+      calls.filter((call) => call.method === 'GET' && call.path === '/api/v1/users'),
+    ).toHaveLength(2);
   });
 
   it('offers Retry when the list cannot be loaded', async () => {
@@ -56,5 +70,22 @@ describe('UsersPage', () => {
 
     await waitFor(() => expect(screen.getByText(ALICE.email)).toBeInTheDocument());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('preserves the Creator role when editing an existing account', async () => {
+    const creator = { ...ALICE, id: 'u3', email: 'creator@flowcortex.dev', role: 'CREATOR' };
+    const calls = stubApi({
+      'GET /api/v1/users': { status: 200, body: [creator] },
+      'PUT /api/v1/users/u3': { status: 200, body: creator },
+    });
+    renderRoute('/users', '/users', <UsersPage />);
+    await screen.findByText(creator.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByLabelText('Role', { selector: '#edit-role-u3' })).toHaveValue('CREATOR');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({ role: 'CREATOR' }),
+    );
   });
 });
