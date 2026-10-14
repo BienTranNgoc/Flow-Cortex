@@ -1,27 +1,52 @@
 import { Link } from 'react-router-dom';
+import { useMeQuery } from '../auth/useAuth';
 import './WorkflowPages.css';
 import { useWorkflowsQuery } from './useWorkflows';
+import { useCapabilitiesQuery } from './useCapabilities';
 
-/** `/workflows` — list = owner OR shared. */
+/** `/workflows` — list = owner OR shared. Hides the Product Video entry when its feature flag is
+ * off, since the start endpoint would 503 the request otherwise. */
 export function WorkflowsListPage() {
   const workflowsQuery = useWorkflowsQuery();
+  const meQuery = useMeQuery();
+  const capabilitiesQuery = useCapabilitiesQuery();
+  const capabilities = capabilitiesQuery.data;
+  // The list waits for the capabilities: before they arrive, the Product Video entry cannot be
+  // told apart, and showing it would flash an entry the flag then removes. If they fail, nothing
+  // is hidden; the start endpoint still refuses a switched-off flow.
+  // Filtered once, so the list and the "No workflows yet" count below cannot disagree: counting the
+  // unfiltered array would claim emptiness for a list hidden only by the flag.
+  const visible = capabilitiesQuery.isPending
+    ? undefined
+    : workflowsQuery.data?.filter(
+        (workflow) =>
+          capabilities?.productVideoEnabled !== false ||
+          workflow.id !== capabilities.productVideoWorkflowId,
+      );
 
   return (
-    <main>
-      <h1>Workflows</h1>
-      {workflowsQuery.isLoading && <output>Loading workflows…</output>}
-      {workflowsQuery.isError && <p role="alert">Could not load workflows.</p>}
-      {workflowsQuery.data?.length === 0 && <p>No workflows yet.</p>}
-      {workflowsQuery.data && workflowsQuery.data.length > 0 && (
-        <ul className="workflow-list">
-          {workflowsQuery.data.map((workflow) => (
-            <li key={workflow.id} className="workflow-card">
-              <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
-              {workflow.isShared && <span className="workflow-badge">Shared</span>}
-            </li>
-          ))}
-        </ul>
-      )}
+    <main className="workflows">
+      <h1 className="visually-hidden">Workflows</h1>
+      <section className="workflows-list-section" aria-labelledby="workflows-list-title">
+        <h2 id="workflows-list-title">Your workflows</h2>
+        {(workflowsQuery.isLoading || (capabilitiesQuery.isPending && !workflowsQuery.isError)) && (
+          <output>Loading workflows…</output>
+        )}
+        {workflowsQuery.isError && <p role="alert">Could not load workflows.</p>}
+        {visible?.length === 0 && <p>No workflows yet.</p>}
+        {visible && visible.length > 0 && (
+          <ul className="workflow-list">
+            {visible.map((workflow) => (
+              <li key={workflow.id} className="workflow-card">
+                <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
+                {workflow.isShared && <span className="workflow-badge">Shared</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {meQuery.data?.name && <p className="workflows-footer">Welcome, {meQuery.data.name}</p>}
     </main>
   );
 }

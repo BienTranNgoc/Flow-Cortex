@@ -27,7 +27,7 @@ describe('a partial grant', () => {
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
     });
-    setToken('admin-token-partial');
+    setToken('admin-token-partial', true);
     window.history.pushState({}, '', '/media-jobs');
     render(<App />);
 

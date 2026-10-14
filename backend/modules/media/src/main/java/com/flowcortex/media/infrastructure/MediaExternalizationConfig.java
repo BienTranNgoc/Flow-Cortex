@@ -1,6 +1,7 @@
 package com.flowcortex.media.infrastructure;
 
 import com.flowcortex.media.application.MediaJobRequested;
+import com.flowcortex.media.application.ProviderJobRequested;
 import org.springframework.amqp.core.Correlation;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -25,6 +26,7 @@ class MediaExternalizationConfig {
         return EventExternalizationConfiguration.externalizing()
                 .select(EventExternalizationConfiguration.annotatedAsExternalized())
                 .mapping(MediaJobRequested.class, MediaJobRequested::job)
+                .mapping(ProviderJobRequested.class, ProviderJobRequested::job)
                 .build();
     }
 
@@ -54,7 +56,9 @@ class MediaExternalizationConfig {
         public Message postProcessMessage(Message message, Correlation correlation, String exchange,
                 String routingKey) {
             MessageProperties properties = message.getMessageProperties();
-            if (!MediaTopologyConfig.EXCHANGE.equals(exchange) || !MediaTopologyConfig.JOB_KEY.equals(routingKey)) {
+            boolean jobExchange = MediaTopologyConfig.EXCHANGE.equals(exchange)
+                    || MediaTopologyConfig.PROVIDER_EXCHANGE.equals(exchange);
+            if (!jobExchange || !MediaTopologyConfig.JOB_KEY.equals(routingKey)) {
                 return message;
             }
             JsonNode job = JSON.readTree(message.getBody());

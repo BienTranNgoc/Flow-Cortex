@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobInput;
+import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -217,6 +219,35 @@ class WorkflowRunServiceImplTest {
         assertThat(steps).extracting(RunStep::getInput)
                 .containsExactly(expected, expected, null);
         verify(mediaJobs).resolveUpload(ownerId, uploadId);
+    }
+
+    @Test
+    void orderedImageUploadsAreSnapshottedAndBoundToTheCreatedRun() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        List<UUID> uploadIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        Workflow workflow = givenWorkflow(ownerId, "render_video");
+        List<MediaAssetInput> assets = List.of(
+                new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "uploads", "a")),
+                new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "uploads", "b")));
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        when(mediaJobs.resolveImageUploads(ownerId, uploadIds)).thenReturn(assets);
+        UUID runId = UUID.randomUUID();
+        List<MediaAssetInput> copied = List.of(
+                new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "media",
+                        "runs/" + runId + "/inputs/image_1")),
+                new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "media",
+                        "runs/" + runId + "/inputs/image_2")));
+        when(mediaJobs.bindRunInputs(any(UUID.class), eq(assets))).thenReturn(copied);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), null, null, uploadIds, null);
+
+        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput)
+                .isEqualTo("[{\"key\":\"image_1\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId
+                        + "/inputs/image_1\"},"
+                        + "{\"key\":\"image_2\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId
+                        + "/inputs/image_2\"}]");
+        verify(mediaJobs).bindRunInputs(started.id(), assets);
     }
 
     @Test

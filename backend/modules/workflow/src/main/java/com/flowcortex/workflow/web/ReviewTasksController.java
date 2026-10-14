@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 @RequestMapping(value = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
 @RestController
@@ -49,10 +50,28 @@ public class ReviewTasksController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         UUID userId = currentUserResolver.require(jwt);
-        String payload = (request != null) ? request.reviewedPayload() : null;
+        String payload = request != null ? request.reviewedPayload() : null;
+        UUID revisionId = request != null ? request.revisionId() : null;
+        Long expectedVersion = request != null ? request.expectedVersion() : null;
 
-        ReviewTaskView approved = reviewTaskService.approveTask(taskId, userId, payload);
+        ReviewTaskView approved = reviewTaskService.approveTask(taskId, userId, payload, revisionId, expectedVersion);
         return ResponseEntity.ok(ReviewTaskResponse.from(approved));
+    }
+
+    @PostMapping("/review-tasks/{taskId}/revisions")
+    public ResponseEntity<ScriptRevisionResponse> saveRevision(@PathVariable UUID taskId,
+            @Valid @RequestBody CreateScriptRevisionRequest request, @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(ScriptRevisionResponse.from(reviewTaskService.saveRevision(taskId, userId,
+                request.content(), request.expectedVersion())));
+    }
+
+    @GetMapping("/review-tasks/{taskId}/revisions")
+    public ResponseEntity<List<ScriptRevisionResponse>> getRevisions(@PathVariable UUID taskId,
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID userId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(reviewTaskService.getRevisions(taskId, userId).stream()
+                .map(ScriptRevisionResponse::from).toList());
     }
 
     @PostMapping("/review-tasks/{taskId}/reject")

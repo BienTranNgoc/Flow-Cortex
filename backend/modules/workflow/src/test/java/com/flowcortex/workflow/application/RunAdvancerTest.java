@@ -34,6 +34,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,8 +46,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -80,14 +86,16 @@ class RunAdvancerTest {
                 new FailStepExecutor(),
                 new UpperStepExecutor(),
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
-                new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock)));
+                new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
+                new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
+    private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
         return new RunAdvancer(workflowRunRepository, runStepRepository, workflowStepRepository, transactions,
                 new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters,
-                LEASE, clock, checkpoints);
+                LEASE, clock, checkpoints, validator);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
@@ -329,7 +337,7 @@ class RunAdvancerTest {
         assertThat(job.getValue().capability()).isEqualTo(MediaCapability.PROBE);
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
-        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/1/");
+        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/1/attempts/1/");
         assertThat(job.getValue().attempt()).isEqualTo(1);
         assertThat(job.getValue().maxRuntimeSeconds()).isEqualTo(300);
         assertThat(job.getValue().maxInputBytes()).isEqualTo(1000L);
@@ -381,8 +389,86 @@ class RunAdvancerTest {
         assertThat(job.getValue().capability()).isEqualTo(MediaCapability.EXTRACT_AUDIO);
         assertThat(job.getValue().inputs())
                 .containsExactly(new MediaJobInput("source", "flowcortex-uploads", "owner/upload"));
-        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/");
-        }
+        assertThat(job.getValue().outputPrefix()).isEqualTo("runs/" + runId + "/steps/2/attempts/1/");
+    }
+
+    @Test
+    void renderVideoCombinesStoredImagesWithTheAcceptedSpeechOutput() {
+        givenMediaEnabled();
+        when(mediaJobs.limitsFor("render_video"))
+                .thenReturn(new MediaLimits(PROBE_QUEUE, PROBE_RUNTIME, 1000L));
+        String images = "[{\"key\":\"image_1\",\"bucket\":\"uploads\",\"objectKey\":\"owner/image\"}]";
+        String speechKey = "runs/" + runId + "/steps/3/attempts/1/speech.wav";
+        String speechOutputs = "[{\"name\":\"speech.wav\",\"bucket\":\"media\",\"objectKey\":\""
+                + speechKey + "\",\"mime\":\"audio/wav\",\"bytes\":42}]";
+        RunStep speech = new RunStep(UUID.randomUUID(), runId, (short) 3, "generate_speech");
+        speech.markRunning(NOW);
+        speech.markCompleted("script", "{\"durationMs\":15000}", NOW, speechOutputs);
+        RunStep render = new RunStep(UUID.randomUUID(), runId, (short) 4, "render_video", images);
+        WorkflowStep definition = mock(WorkflowStep.class);
+        when(definition.getStepOrder()).thenReturn((short) 4);
+        when(definition.getConfig()).thenReturn("{\"profile\":\"vertical_ad_v1\",\"outputInputs\":["
+                + "{\"stepOrder\":3,\"outputName\":\"speech.wav\",\"inputKey\":\"speech\"}]}");
+        givenRun(List.of(definition), List.of(speech, render));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+        verify(mediaJobs).enqueue(job.capture());
+        assertThat(job.getValue().inputs()).containsExactly(
+                new MediaJobInput("image_1", "uploads", "owner/image"),
+                new MediaJobInput("speech", "media", speechKey));
+    }
+
+    @Test
+    void aProviderResultThatBreaksTheJsonSchemaFailsTheStepAtTheTrustBoundaryWithContractViolation(
+            CapturedOutput output) {
+        givenMediaEnabled();
+        RunStep step = pending(1, "generate_script");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                Map.of("profile", "product_ad_v1", "language", "fr", "script", "Bonjour"), null)));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1), eq("contract_violation"),
+                contains("Provider generate_script data is not valid"), eq(NOW));
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+        assertThat(run.getStatus().name()).isEqualTo("ERROR");
+        assertThat(output).contains("Provider result rejected at trust boundary");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidScriptData")
+    void providerScriptConstraintsAreEnforcedAfterConversion(Map<String, Object> data, String field) {
+        assertProviderDataRejected("generate_script", data, field);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidSpeechData")
+    void providerSpeechConstraintsAreEnforcedAfterConversion(Map<String, Object> data, String field) {
+        assertProviderDataRejected("generate_speech", data, field);
+    }
+
+    @Test
+    void aProviderResultThatConformsToTheJsonSchemaIsAcceptedWithoutRejection() {
+        givenMediaEnabled();
+        RunStep step = pending(1, "generate_script");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                Map.of("profile", "product_ad_v1", "language", "vi", "script",
+                        "Khám phá Bình giữ nhiệt. Giữ đồ uống tiện lợi. Đặt mua ngay"), null)));
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
 
     @Test
     void aJobThatBreaksTheContractFailsTheStepWithContractViolationInsteadOfLeavingItPending() {
@@ -578,6 +664,37 @@ class RunAdvancerTest {
         verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
         assertThat(output).contains("Job progress: runId=" + runId + " jobId=" + step.getId()
                 + " capability=probe attempt=1 deliveryCount=2 percent=40");
+    }
+
+    private void assertProviderDataRejected(String capability, Map<String, Object> data, String field) {
+        RunStep step = pending(1, capability);
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, capability)), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(
+                result(step, MediaResult.Status.COMPLETED, null, data, null)));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("contract_violation"), contains(field), eq(NOW));
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    private static Stream<Arguments> invalidScriptData() {
+        return Stream.of(
+                Arguments.of(Map.of("profile", "wrong", "language", "vi", "script", "Hợp lệ"), "profile"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "fr", "script", "Bonjour"),
+                        "language"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "vi", "script", ""), "script"),
+                Arguments.of(Map.of("profile", "product_ad_v1", "language", "vi",
+                        "script", "a".repeat(8001)), "script"));
+    }
+
+    private static Stream<Arguments> invalidSpeechData() {
+        return Stream.of(
+                Arguments.of(Map.of("profile", "wrong", "durationMs", 15_000), "profile"),
+                Arguments.of(Map.of("profile", "vi_voice_v1", "durationMs", 0), "durationMs"));
     }
 
     private MediaResult result(RunStep step, MediaResult.Status status, List<MediaOutput> outputs,

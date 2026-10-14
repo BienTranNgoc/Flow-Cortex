@@ -25,7 +25,7 @@ describe('App', () => {
         body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
       },
     });
-    setToken('t');
+    setToken('t', true);
     window.history.pushState({}, '', '/');
 
     render(<App />);
@@ -49,7 +49,7 @@ describe('App', () => {
         body: { id: 'a1', email: 'admin@flowcortex.dev', name: 'Admin', role: 'ADMIN' },
       },
     });
-    setToken('admin-token');
+    setToken('admin-token', true);
     window.history.pushState({}, '', '/users');
 
     render(<App />);
@@ -57,8 +57,27 @@ describe('App', () => {
     expect(await screen.findByText('admin@flowcortex.dev')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(nav).toHaveTextContent('Home');
     expect(nav).toHaveTextContent('Workflows');
+    expect(nav).toHaveTextContent('Profile');
     expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
+
+    setToken(null);
+    vi.unstubAllGlobals();
+    consoleError.mockRestore();
+  });
+
+  it('keeps Sign out in the header when /me fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    stubApi({ 'GET /api/v1/auth/me': { status: 500, body: { status: 500, detail: 'boom' } } });
+    setToken('t', true);
+    window.history.pushState({}, '', '/profile');
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
 
     setToken(null);
     vi.unstubAllGlobals();

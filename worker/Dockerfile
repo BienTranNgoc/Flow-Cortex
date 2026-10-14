@@ -18,7 +18,7 @@ COPY src ./src
 RUN uv sync --frozen --no-build --no-dev --no-editable
 
 # --- runtime stage: ffmpeg from the distro, unprivileged user -------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim AS media-runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/* \
@@ -35,3 +35,18 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "-m", "flowcortex_worker.healthcheck"]
 
 ENTRYPOINT ["python", "-m", "flowcortex_worker"]
+
+FROM python:3.12-slim AS provider-runtime
+RUN useradd --system --uid 10001 --no-create-home worker \
+ && install -d -m 0700 -o worker -g worker /run/flowcortex
+
+COPY --from=build /app/.venv /app/.venv
+ENV PATH=/app/.venv/bin:$PATH \
+    PYTHONUNBUFFERED=1
+USER 10001
+WORKDIR /tmp
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["python", "-m", "flowcortex_worker.healthcheck"]
+
+ENTRYPOINT ["python", "-m", "flowcortex_worker.provider"]

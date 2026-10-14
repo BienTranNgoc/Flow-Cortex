@@ -20,6 +20,15 @@ class MediaProgressListener {
     // Started by MediaTopologyCheck once the topology is declared.
     @RabbitListener(id = "mediaProgress", queues = MediaTopologyConfig.PROGRESS, autoStartup = "false")
     void onProgress(Message message) {
+        accept(message);
+    }
+
+    @RabbitListener(id = "providerProgress", queues = MediaTopologyConfig.PROVIDER_PROGRESS, autoStartup = "false")
+    void onProviderProgress(Message message) {
+        accept(message);
+    }
+
+    private void accept(Message message) {
         MediaProgress progress = InboundMessages.read(message, MediaProgress.class, "progress");
         try {
             inbound.acceptProgress(progress);

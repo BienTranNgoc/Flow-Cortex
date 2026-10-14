@@ -1,6 +1,9 @@
 package com.flowcortex.workflow.web;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -12,5 +15,18 @@ import java.util.UUID;
  * /api/v1/uploads}) instead, plus the file's {@code originalName}, kept for display only; the
  * server trims it to 255 characters, so a longer name is accepted.
  */
-record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId, @Size(max = 1024) String originalName) {
+record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId,
+        @Size(min = 1, max = 10) List<UUID> uploadIds, @Size(max = 1024) String originalName) {
+
+    @AssertTrue(message = "Use uploadId or uploadIds, not both")
+    @JsonIgnore
+    boolean isUploadSelectionUnambiguous() {
+        return uploadId == null || uploadIds == null;
+    }
+
+    @AssertTrue(message = "uploadIds must not contain duplicates")
+    @JsonIgnore
+    boolean isUploadOrderDistinct() {
+        return uploadIds == null || uploadIds.stream().distinct().count() == uploadIds.size();
+    }
 }

@@ -26,6 +26,8 @@ public record MediaProperties(
         @NotNull Duration queueTimeout,
         @NotNull Map<String, @NotNull Duration> maxRuntime,
         @NotNull Duration consumerTimeout,
+        @NotNull Duration providerMaxRuntime,
+        @NotNull Duration providerQueueTimeout,
         @NotNull Duration presignTtl,
         @NotNull @Valid Upload upload,
         @NotNull @Valid S3 s3) {
@@ -52,38 +54,76 @@ public record MediaProperties(
                         + ") must exceed the longest max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
             }
         }
-    }
-
-    /** Upload limits; each allowed extension maps to one canonical MIME type. */
-    public record Upload(@Positive long maxBytes, @NotEmpty List<String> extensions, @NotNull Duration urlTtl) {
-
-        private static final Map<String, String> CANONICAL_MIME_TYPES = Map.of(
-                "mp4", "video/mp4",
-                "mov", "video/quicktime",
-                "webm", "video/webm",
-                "mkv", "video/x-matroska",
-                "m4a", "audio/mp4",
-                "mp3", "audio/mpeg",
-                "wav", "audio/wav");
-
-        public Upload {
-            if (extensions != null) {
-                extensions = extensions.stream().map(e -> e.trim().toLowerCase(Locale.ROOT)).toList();
-                for (String extension : extensions) {
-                    if (!CANONICAL_MIME_TYPES.containsKey(extension)) {
-                        throw new IllegalArgumentException("flowcortex.media.upload.extensions: '" + extension
-                                + "' has no canonical MIME type; allowed: "
-                                + new TreeSet<>(CANONICAL_MIME_TYPES.keySet()));
-                    }
-                }
+        // The provider runtime shares both queues' ack deadline, so its own ceiling counts too.
+        if (providerMaxRuntime != null && consumerTimeout != null) {
+            Duration required = providerMaxRuntime.plus(MAX_WORKER_BACKOFF).plus(CONSUMER_TIMEOUT_MARGIN);
+            if (consumerTimeout.compareTo(required) <= 0) {
+                throw new IllegalArgumentException("flowcortex.media.consumer-timeout (" + consumerTimeout
+                        + ") must exceed provider-max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
             }
         }
+    }
 
-        /** Configured extension → canonical MIME type, in configuration order. */
+    /**
+     * Upload limits. {@code extensions} covers audio/video (worker render); {@code productImageExtensions}
+     * covers images (product-video feature). Each entry maps to one canonical MIME type.
+     */
+    public record Upload(
+            @Positive long maxBytes,
+            @NotEmpty List<String> extensions,
+            @NotEmpty List<String> productImageExtensions,
+            @NotNull Duration urlTtl) {
+
+        private static final Map<String, String> CANONICAL_MIME_TYPES = Map.ofEntries(
+                Map.entry("mp4", "video/mp4"),
+                Map.entry("mov", "video/quicktime"),
+                Map.entry("webm", "video/webm"),
+                Map.entry("mkv", "video/x-matroska"),
+                Map.entry("m4a", "audio/mp4"),
+                Map.entry("mp3", "audio/mpeg"),
+                Map.entry("wav", "audio/wav"),
+                Map.entry("jpg", "image/jpeg"),
+                Map.entry("jpeg", "image/jpeg"),
+                Map.entry("png", "image/png"),
+                Map.entry("webp", "image/webp"));
+
+        public Upload {
+            extensions = normalize(extensions, "flowcortex.media.upload.extensions");
+            productImageExtensions = normalize(productImageExtensions,
+                    "flowcortex.media.upload.product-image-extensions");
+        }
+
+        private static List<String> normalize(List<String> extensions, String source) {
+            List<String> normalized = extensions.stream()
+                    .map(e -> e.trim().toLowerCase(Locale.ROOT))
+                    .toList();
+            for (String extension : normalized) {
+                if (!CANONICAL_MIME_TYPES.containsKey(extension)) {
+                    throw new IllegalArgumentException(source + ": '" + extension
+                            + "' has no canonical MIME type; allowed: "
+                            + new TreeSet<>(CANONICAL_MIME_TYPES.keySet()));
+                }
+            }
+            return normalized;
+        }
+
+        /** Configured extension → canonical MIME type, covering both lists, in configuration order. */
         public Map<String, String> mimeTypes() {
             Map<String, String> mimeTypes = new LinkedHashMap<>();
             extensions.forEach(extension -> mimeTypes.put(extension, CANONICAL_MIME_TYPES.get(extension)));
+            productImageExtensions.forEach(extension -> mimeTypes.putIfAbsent(extension,
+                    CANONICAL_MIME_TYPES.get(extension)));
             return mimeTypes;
+        }
+
+        /** Only the audio/video extensions, in configuration order, for the worker's allowlist. */
+        public List<String> mediaExtensions() {
+            return List.copyOf(extensions);
+        }
+
+        /** Only the product-image extensions, in configuration order, for the product-video allowlist. */
+        public List<String> productImageExtensions() {
+            return List.copyOf(productImageExtensions);
         }
     }
 

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ApiError,
   authHeaders,
   getToken,
   login as loginRequest,
@@ -35,20 +36,23 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: LoginRequest) => unwrap(loginRequest(input)),
-    onSuccess: (data) => {
-      setToken(data.accessToken ?? null);
+    mutationFn: ({ rememberMe: _rememberMe, ...credentials }: LoginVariables) =>
+      unwrap(loginRequest(credentials)),
+    onSuccess: (data, vars) => {
+      setToken(data.accessToken ?? null, vars.rememberMe);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
+
+export type LoginVariables = LoginRequest & { rememberMe: boolean };
 
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: RegisterRequest) => unwrap(registerRequest(input)),
     onSuccess: (data) => {
-      setToken(data.accessToken ?? null);
+      setToken(data.accessToken ?? null, true);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
@@ -56,4 +60,43 @@ export function useRegisterMutation() {
 
 export function logout(): void {
   setToken(null);
+}
+
+const REMEMBERED_EMAIL_KEY = 'flowcortex.auth.rememberedEmail';
+
+export function getRememberedEmail(): string {
+  try {
+    return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function setRememberedEmail(email: string): void {
+  try {
+    window.localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+  } catch {
+    // private mode / disabled — skip silently
+  }
+}
+
+export function clearRememberedEmail(): void {
+  try {
+    window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+  } catch {
+    // private mode / disabled — skip silently
+  }
+}
+
+export function detailFrom(mutation: { readonly error: unknown }): string | undefined {
+  return mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
+}
+
+export type SubmitDataState = 'idle' | 'pending' | 'success';
+
+/** Resolves the form's `data-state` from a success flag and the mutation's pending flag. */
+export function submitState(succeeded: boolean, isPending: boolean): SubmitDataState {
+  if (succeeded) return 'success';
+  if (isPending) return 'pending';
+  return 'idle';
 }

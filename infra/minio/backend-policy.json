@@ -13,6 +13,11 @@
     },
     {
       "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:PutObjectTagging"],
+      "Resource": ["arn:aws:s3:::flowcortex-media/runs/*/inputs/*"]
+    },
+    {
+      "Effect": "Allow",
       "Action": ["s3:ListBucket"],
       "Resource": ["arn:aws:s3:::flowcortex-media"]
     }

@@ -29,11 +29,16 @@ public record MediaJob(
         @NotNull Instant issuedAt) {
 
     /** Same pattern as {@code outputPrefix} in the job schema: the worker writes only under its step. */
-    public static final String OUTPUT_PREFIX_PATTERN = "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$";
+    public static final String OUTPUT_PREFIX_PATTERN =
+            "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/(?:attempts/[1-9][0-9]*/)?$";
 
     /** The {@code outputPrefix} of step {@code stepOrder} of run {@code runId}. */
     public static String outputPrefix(UUID runId, int stepOrder) {
         return "runs/" + runId + "/steps/" + stepOrder + "/";
+    }
+
+    public static String outputPrefix(UUID runId, int stepOrder, int attempt) {
+        return outputPrefix(runId, stepOrder) + "attempts/" + attempt + "/";
     }
 
     /**

@@ -1,24 +1,34 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ApiError } from '@flow-cortex/api-client';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { BrandPanel } from '../../app/BrandPanel';
+import { passwordResetEnabled } from '../../app/featureFlags';
+import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { useAuthToken, useLoginMutation } from './useAuth';
+import {
+  clearRememberedEmail,
+  detailFrom,
+  getRememberedEmail,
+  setRememberedEmail,
+  submitState,
+  useAuthToken,
+  useLoginMutation,
+} from './useAuth';
 
-/**
- * Email+password → token → guarded route. Functional MVP only — no design
- * tokens yet.
- */
 export function LoginPage() {
   const token = useAuthToken();
-  const navigate = useNavigate();
   const location = useLocation();
   const loginMutation = useLoginMutation();
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: getRememberedEmail(), password: '', rememberMe: true },
+  });
 
   if (token) {
     const from = (location.state as { from?: string } | null)?.from ?? '/';
@@ -26,48 +36,105 @@ export function LoginPage() {
   }
 
   const onSubmit = handleSubmit((values) => {
+    if (values.rememberMe) {
+      setRememberedEmail(values.email);
+    } else {
+      clearRememberedEmail();
+    }
     loginMutation.mutate(values, {
-      onSuccess: () => navigate('/', { replace: true }),
+      onSuccess: () => {
+        setSubmitSucceeded(true);
+      },
     });
   });
 
-  const serverError =
-    loginMutation.error instanceof ApiError ? loginMutation.error.problem?.detail : undefined;
+  const serverError = detailFrom(loginMutation);
+  const isPending = loginMutation.isPending;
+  const dataState = submitState(submitSucceeded, isPending);
+
+  const buttonLabel = (() => {
+    if (submitSucceeded) return '✓ Signed in';
+    if (isPending) return 'Signing in…';
+    return 'Sign in to Studio →';
+  })();
 
   return (
-    <main className="auth-page">
+    <div className="auth-page">
+      <BrandPanel />
+
       <section className="auth-card">
-        <p className="eyebrow">FLOW-CORTEX · CREATOR STUDIO</p>
-        <form onSubmit={onSubmit} noValidate aria-label="Sign in">
-          <h1>Sign in</h1>
-          <div className="field">
+        <h1 className="auth-card__title">Sign in</h1>
+        <p className="auth-subtitle">Access your creator workspace and run media pipelines.</p>
+
+        <div className="oauth-row">
+          <OAuthButton
+            provider="google"
+            label="Continue with Google"
+            onSelect={(p) => window.console.info(`[ui-only] oauth: ${p}`)}
+          />
+        </div>
+
+        <div className="auth-divider" aria-hidden="true">
+          <span>or sign in with email</span>
+        </div>
+
+        <form onSubmit={onSubmit} noValidate aria-label="Sign in" className="auth-form">
+          <div className="field" style={{ '--i': 0 } as React.CSSProperties}>
             <label htmlFor="login-email">Email</label>
-            <input id="login-email" type="email" autoComplete="username" {...register('email')} />
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="username"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              {...register('email')}
+            />
             {errors.email && <p role="alert">{errors.email.message}</p>}
           </div>
-          <div className="field">
+          <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
             <label htmlFor="login-password">Password</label>
             <input
               id="login-password"
               type="password"
               autoComplete="current-password"
+              aria-invalid={errors.password ? 'true' : 'false'}
               {...register('password')}
             />
             {errors.password && <p role="alert">{errors.password.message}</p>}
+          </div>
+          <div className="login-meta-row">
+            <label className="remember-row" htmlFor="login-remember">
+              <input
+                id="login-remember"
+                type="checkbox"
+                {...register('rememberMe')}
+              />
+              <span>Remember me</span>
+            </label>
+            {passwordResetEnabled() && (
+              <Link to="/forgot-password" className="forgot-password-link">
+                Forgot password?
+              </Link>
+            )}
           </div>
           {serverError && (
             <p role="alert" className="form-error">
               {serverError}
             </p>
           )}
-          <button className="primary-button" type="submit" disabled={loginMutation.isPending}>
-            {loginMutation.isPending ? 'Signing in…' : 'Sign in to Studio →'}
+          <button
+            className="primary-button"
+            type="submit"
+            data-state={dataState}
+            disabled={isPending}
+          >
+            {buttonLabel}
           </button>
         </form>
+
         <p className="auth-footer">
           New to Flow-Cortex? <Link to="/register">Create a free account</Link>
         </p>
       </section>
-    </main>
+    </div>
   );
 }

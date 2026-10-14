@@ -85,7 +85,8 @@ class RunOutputsEndpointIT extends AbstractWorkflowHttpIT {
         assertThat(body.expiresAt()).isBetween(before.plus(Duration.ofMinutes(14)), Instant.now().plus(Duration.ofMinutes(16)));
         URI url = URI.create(body.url());
         assertThat(url.getScheme() + "://" + url.getAuthority()).isEqualTo(publicEndpoint());
-        assertThat(url.getPath()).isEqualTo("/" + MEDIA_BUCKET + "/runs/" + run.runId() + "/steps/1/video-details.json");
+        assertThat(url.getPath()).isEqualTo("/" + MEDIA_BUCKET + "/runs/" + run.runId()
+                + "/steps/1/attempts/1/video-details.json");
         assertThat(body.url()).doesNotContain(UPLOAD_BUCKET);
 
         HttpResponse<String> download = fetch(url);
@@ -175,7 +176,7 @@ class RunOutputsEndpointIT extends AbstractWorkflowHttpIT {
         UUID stepId = started.steps().getFirst().id();
         drainJob(stepId);
 
-        String reportKey = "runs/" + runId + "/steps/1/video-details.json";
+        String reportKey = "runs/" + runId + "/steps/1/attempts/1/video-details.json";
         try (S3Client store = objectStore()) {
             store.putObject(o -> o.bucket(MEDIA_BUCKET).key(reportKey).contentType("application/json"),
                     RequestBody.fromString(REPORT));
