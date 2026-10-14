@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
+import { googleAuthorizeUrl, oauthErrorMessage } from './oauth';
 import {
   clearRememberedEmail,
   detailFrom,
@@ -19,20 +20,22 @@ import {
 export function LoginPage() {
   const token = useAuthToken();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const loginMutation = useLoginMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: getRememberedEmail(), password: '', rememberMe: true },
   });
+  const returnTo = (location.state as { from?: string } | null)?.from ?? '/';
 
   if (token) {
-    const from = (location.state as { from?: string } | null)?.from ?? '/';
-    return <Navigate to={from} replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   const onSubmit = handleSubmit((values) => {
@@ -48,7 +51,9 @@ export function LoginPage() {
     });
   });
 
-  const serverError = detailFrom(loginMutation);
+  const oauthError = searchParams.get('oauth_error');
+  const serverError =
+    detailFrom(loginMutation) ?? (oauthError ? oauthErrorMessage(oauthError) : undefined);
   const isPending = loginMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
@@ -70,7 +75,7 @@ export function LoginPage() {
           <OAuthButton
             provider="google"
             label="Continue with Google"
-            onSelect={(p) => window.console.info(`[ui-only] oauth: ${p}`)}
+            href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
           />
         </div>
 

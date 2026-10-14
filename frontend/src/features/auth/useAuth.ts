@@ -1,22 +1,17 @@
-import { useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   authHeaders,
-  getToken,
   login as loginRequest,
   me as meRequest,
   register as registerRequest,
   setToken,
-  subscribeToken,
   unwrap,
+  useAuthToken,
 } from '@flow-cortex/api-client';
 import type { LoginRequest, RegisterRequest } from '@flow-cortex/api-client';
 
-/** Re-renders the calling component whenever the stored token changes. */
-export function useAuthToken(): string | null {
-  return useSyncExternalStore(subscribeToken, getToken);
-}
+export { signOut as logout, useAuthToken, useSessionReady } from '@flow-cortex/api-client';
 
 /**
  * The signed-in user's own record. Disabled while signed out — there's
@@ -36,10 +31,9 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ rememberMe: _rememberMe, ...credentials }: LoginVariables) =>
-      unwrap(loginRequest(credentials)),
+    mutationFn: (credentials: LoginVariables) => unwrap(loginRequest(credentials)),
     onSuccess: (data, vars) => {
-      setToken(data.token ?? null, vars.rememberMe);
+      setToken(data.accessToken ?? null, vars.rememberMe);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
@@ -50,16 +44,13 @@ export type LoginVariables = LoginRequest & { rememberMe: boolean };
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: RegisterRequest) => unwrap(registerRequest(input)),
+    mutationFn: (input: RegisterRequest) =>
+      unwrap(registerRequest({ ...input, rememberMe: true })),
     onSuccess: (data) => {
-      setToken(data.token ?? null, true);
+      setToken(data.accessToken ?? null, true);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
-}
-
-export function logout(): void {
-  setToken(null);
 }
 
 const REMEMBERED_EMAIL_KEY = 'flowcortex.auth.rememberedEmail';

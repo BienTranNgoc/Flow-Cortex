@@ -274,12 +274,40 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessTokenResponse"
+      security: []
+  /api/v1/auth/refresh:
+    post:
+      tags:
+      - auth-controller
+      operationId: refresh
+      responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                $ref: "#/components/schemas/AccessTokenResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth-controller
+      operationId: logout
+      responses:
+        "204":
+          description: No Content
       security: []
   /api/v1/auth/login:
     post:
@@ -298,7 +326,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                $ref: "#/components/schemas/AccessTokenResponse"
       security: []
   /api/v1/workflows:
     get:
@@ -427,6 +455,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/v1/auth/oauth/google/callback:
+    get:
+      tags:
+      - o-auth-controller
+      operationId: callback
+      parameters:
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: "Signed in: refresh cookie set, redirect to the return path.\
+            \ Refused: redirect to /login?oauth_error=<cancelled|invalid_state|registration_closed|link_required|account_inactive|rate_limited|failed>"
+      security: []
+  /api/v1/auth/oauth/google/authorize:
+    get:
+      tags:
+      - o-auth-controller
+      operationId: authorize
+      parameters:
+      - name: remember_me
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: return_to
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to Google's consent screen
+        "503":
+          description: Google sign-in is not configured
+      security: []
   /api/v1/auth/me:
     get:
       tags:
@@ -896,7 +973,8 @@ components:
         email:
           type: string
           format: email
-          minLength: 1
+          maxLength: 254
+          minLength: 0
         password:
           type: string
           maxLength: 72
@@ -904,24 +982,51 @@ components:
         name:
           type: string
           minLength: 1
+        rememberMe:
+          type: boolean
       required:
       - email
       - name
       - password
-    LoginResponse:
+    AccessTokenResponse:
       type: object
       properties:
-        token:
+        accessToken:
           type: string
+        expiresIn:
+          type: integer
+          format: int64
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
     LoginRequest:
       type: object
       properties:
         email:
           type: string
-          minLength: 1
+          maxLength: 254
+          minLength: 0
         password:
           type: string
           minLength: 1
+        rememberMe:
+          type: boolean
       required:
       - email
       - password

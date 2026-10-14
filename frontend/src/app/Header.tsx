@@ -99,7 +99,7 @@ export function Header({ email }: HeaderProps) {
           )}
           <div className="cortex-header__user">
             {email && <span className="cortex-header__email">{email}</span>}
-            <button type="button" className="cortex-btn cortex-btn--ghost" onClick={logout}>
+            <button type="button" className="cortex-btn cortex-btn--ghost" onClick={() => void logout()}>
               Sign out
             </button>
           </div>

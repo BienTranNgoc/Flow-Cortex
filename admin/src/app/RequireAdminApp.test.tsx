@@ -2,7 +2,7 @@ import { setToken } from '@flow-cortex/api-client';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { App } from '../App';
 import { ADMIN_ME, MEMBER_ME, settled, stubApi, testQueryClient } from '../test/fakeApi';
 import { queryClient } from './queryClient';
@@ -18,15 +18,19 @@ afterEach(() => {
 
 describe('RequireAdminApp', () => {
   it('sends a signed-out visitor to /login and back to /runs after an ADMIN login', async () => {
-    stubApi({
-      'POST /api/v1/auth/login': { status: 200, body: { token: 'admin-token' } },
+    const calls = stubApi({
+      'POST /api/v1/auth/refresh': { status: 401, body: { status: 401 } },
+      'POST /api/v1/auth/login': {
+        status: 200,
+        body: { accessToken: 'admin-token', expiresIn: 900 },
+      },
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
     });
     window.history.pushState({}, '', '/runs');
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
 
     await userEvent.type(screen.getByLabelText('Email'), ADMIN_ME.email);
@@ -35,6 +39,58 @@ describe('RequireAdminApp', () => {
 
     expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/runs');
+    expect(calls.find((call) => call.path === '/api/v1/auth/login')?.body).toEqual({
+      email: ADMIN_ME.email,
+      password: 'secret',
+      rememberMe: true,
+    });
+  });
+
+  it('gets a token from the refresh cookie before sending a signed-out visitor to /login', async () => {
+    const calls = stubApi({
+      'POST /api/v1/auth/refresh': {
+        status: 200,
+        body: { accessToken: 'boot-token', expiresIn: 900 },
+      },
+      'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
+    });
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <Routes>
+            <Route
+              path="/runs"
+              element={
+                <RequireAdminApp>
+                  <p>admin content</p>
+                </RequireAdminApp>
+              }
+            />
+            <Route path="/login" element={<p>login page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('admin content')).toBeInTheDocument();
+    expect(calls.filter((call) => call.path === '/api/v1/auth/refresh')).toHaveLength(1);
+  });
+
+  it('calls the logout endpoint on sign-out', async () => {
+    const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: MEMBER_ME },
+      'POST /api/v1/auth/logout': { status: 204 },
+    });
+    setToken('member-token-logout', true);
+    window.history.pushState({}, '', '/runs');
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toContain(
+      'POST /api/v1/auth/logout',
+    );
   });
 
   it('shows a MEMBER "No access" with sign-out and makes no admin API call', async () => {

@@ -25,6 +25,7 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 
 let token: string | null = readStoredToken();
+let tokenPersistent = readStoredPersistence();
 
 function readStoredToken(): string | null {
   try {
@@ -36,14 +37,28 @@ function readStoredToken(): string | null {
   }
 }
 
+function readStoredPersistence(): boolean {
+  try {
+    return window.localStorage.getItem(PERSISTENT_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function getToken(): string | null {
   return token;
+}
+
+/** Whether the current token lives in `localStorage` (the user chose "remember me"). */
+export function isTokenPersistent(): boolean {
+  return tokenPersistent;
 }
 
 export function setToken(next: null): void;
 export function setToken(next: string | null, persistent: boolean): void;
 export function setToken(next: string | null, persistent = false): void {
   token = next;
+  tokenPersistent = next !== null && persistent;
   try {
     window.localStorage.removeItem(PERSISTENT_KEY);
     window.sessionStorage.removeItem(SESSION_KEY);
@@ -58,6 +73,16 @@ export function setToken(next: string | null, persistent = false): void {
     // In-memory token still works for this tab even if persistence fails.
   }
   listeners.forEach((listener) => listener());
+}
+
+/** Adopts a token another tab stored (storage is shared across tabs, memory is not). */
+export function syncTokenFromStorage(): void {
+  const stored = readStoredToken();
+  if (stored !== null && stored !== token) {
+    token = stored;
+    tokenPersistent = readStoredPersistence();
+    listeners.forEach((listener) => listener());
+  }
 }
 
 export function subscribeToken(listener: Listener): () => void {

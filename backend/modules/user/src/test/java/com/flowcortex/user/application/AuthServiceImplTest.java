@@ -2,20 +2,35 @@ package com.flowcortex.user.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.CurrentUser;
+import com.flowcortex.user.api.OAuthFailure;
+import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -24,19 +39,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Authored before {@link AuthServiceImpl} existed. {@link JwtEncoder} is
- * mocked — the concrete
- * encoding is proven by {@code JwtSigningConfig}'s wiring plus the real HTTP
- * round-trip in {@code UserModuleEndpointsIT} (:boot:app); this test locks
- * WHAT gets minted (subject, role claim) and, just as importantly, when it
- * must NOT be minted at all.
- */
 class AuthServiceImplTest {
 
     private static final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
@@ -45,13 +49,25 @@ class AuthServiceImplTest {
     private static final String OWNER_EMAIL = "owner@example.com";
     private static final RegistrationProperties.Limit HOURLY = new RegistrationProperties.Limit(5, Duration.ofHours(1));
 
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-10-29T00:00:00Z"), ZoneOffset.UTC);
+    private static final Instant NOW = Instant.now(FIXED_CLOCK);
+    private static final AuthSession SESSION = new AuthSession("signed-access", 900L, "signed-refresh",
+            Instant.parse("2026-11-05T00:00:00Z"), false);
+
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final JwtEncoder jwtEncoder = mock(JwtEncoder.class);
+    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final LoginAttemptRecorder loginAttempts = mock(LoginAttemptRecorder.class);
+    private final LoginRateLimiter loginRateLimiter = mock(LoginRateLimiter.class);
+    private final RegistrationRateLimiter registrationRateLimiter = mock(RegistrationRateLimiter.class);
+    private final GoogleOAuthClient googleOAuthClient = mock(GoogleOAuthClient.class);
+    private final AuditEventWriter audit = mock(AuditEventWriter.class);
+
     private final AuthServiceImpl service = serviceWithOwner(OWNER_EMAIL);
 
     private AuthServiceImpl serviceWithOwner(String ownerEmail) {
-        return new AuthServiceImpl(repository, ENCODER, jwtEncoder,
-                new RegistrationProperties(ownerEmail, HOURLY, HOURLY));
+        return new AuthServiceImpl(repository, ENCODER, refreshTokenService, loginAttempts, loginRateLimiter,
+                registrationRateLimiter, googleOAuthClient, audit,
+                new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK);
     }
 
     private static AppUser activeUser(UUID id, Role role) {
@@ -66,36 +82,176 @@ class AuthServiceImplTest {
         return owner;
     }
 
+    private AppUser givenMember(UserStatus status) {
+        UUID id = UUID.randomUUID();
+        AppUser user = new AppUser(id, id, "person@example.com", ENCODER.encode(RAW_PASSWORD), "Person", Role.MEMBER,
+                status);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        return user;
+    }
+
     private void assertRegistrationClosed(AuthServiceImpl closed) {
-        assertThatThrownBy(() -> closed.register("new@example.com", RAW_PASSWORD, "New Person"))
+        assertThatThrownBy(() -> closed.register("new@example.com", RAW_PASSWORD, "New Person", false, "127.0.0.1",
+                "ua"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
                     assertThat(e.getReason()).isEqualTo("Self-registration is not available");
                 });
         verify(repository, never()).saveAndFlush(any());
-        verify(jwtEncoder, never()).encode(any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
     }
 
     @Test
-    void loginUnknownEmailThrowsBadCredentialsNotFound() {
+    void loginUnknownEmailIsBadCredentialsAndIsAuditedAndCountedAgainstTheIp() {
         when(repository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login("nobody@example.com", RAW_PASSWORD))
+        assertThatThrownBy(() -> service.login("nobody@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
                 .isInstanceOf(BadCredentialsException.class);
-        verify(jwtEncoder, never()).encode(any());
+
+        verify(loginRateLimiter).recordFailure("127.0.0.1");
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_BAD_CREDENTIALS), isNull(), eq("127.0.0.1"), eq("ua"),
+                eq(Map.of("email", "nobody@example.com")));
+        verifyNoInteractions(loginAttempts);
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
     }
 
     @Test
-    void registerCreatesAMemberOwnedByTheConfiguredOwnerAndMintsToken() {
+    void loginWrongPasswordRecordsTheFailureInItsOwnTransactionAndAuditsIt() {
+        AppUser user = givenMember(UserStatus.ACTIVE);
+
+        assertThatThrownBy(() -> service.login("person@example.com", "totally-wrong-password", false, "127.0.0.1",
+                "ua")).isInstanceOf(BadCredentialsException.class);
+
+        verify(loginAttempts).recordFailure(user.getId());
+        verify(loginRateLimiter).recordFailure("127.0.0.1");
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_BAD_CREDENTIALS), eq(user.getId()), eq("127.0.0.1"),
+                eq("ua"), any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+    }
+
+    @Test
+    void loginAThrottledIpIsRefusedBeforeAnythingIsLookedUp() {
+        doThrow(new LoginRateLimitedException(Duration.ofMinutes(5))).when(loginRateLimiter)
+                .requireWithinLimit("127.0.0.1");
+
+        assertThatThrownBy(() -> service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isInstanceOf(LoginRateLimitedException.class);
+
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void loginLockedAccountWithTheRightPasswordIsRefusedAndAudited() {
+        AppUser user = givenMember(UserStatus.ACTIVE);
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+
+        assertThatThrownBy(() -> service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isInstanceOf(AccountLockedException.class);
+
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_LOCKED), eq(user.getId()), any(), any(), any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+    }
+
+    @Test
+    void loginLockedAccountIsRefusedBeforeThePasswordIsComparedWhateverThePassword() {
+        AppUser user = givenMember(UserStatus.ACTIVE);
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+
+        for (String password : new String[] {RAW_PASSWORD, "wrong-password-x"}) {
+            AccountLockedException refused = catchThrowableOfType(AccountLockedException.class,
+                    () -> service.login("person@example.com", password, false, "127.0.0.1", "ua"));
+            assertThat(refused).isNotNull();
+            assertThat(refused.getLockedUntil()).isEqualTo(user.getLockedUntil());
+        }
+
+        verify(loginAttempts, never()).recordFailure(any());
+        verify(loginRateLimiter, never()).recordFailure(any());
+        verify(audit, times(2)).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_LOCKED), eq(user.getId()), any(), any(),
+                any());
+    }
+
+    @Test
+    void loginForAnAccountWithoutAPasswordIsTheGeneric401AndNeverCountsTowardTheLockout() {
+        UUID id = UUID.randomUUID();
+        AppUser googleOnly = new AppUser(id, id, "person@example.com", "", "Person", Role.MEMBER, UserStatus.ACTIVE,
+                false);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(googleOnly));
+
+        assertThatThrownBy(() -> service.login("person@example.com", "", false, "127.0.0.1", "ua"))
+                .isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verifyNoInteractions(loginAttempts);
+        verify(audit, times(2)).write(eq(AuthEventType.LOGIN_FAILED_BAD_CREDENTIALS), eq(id), any(), any(), any());
+    }
+
+    @Test
+    void loginTrimsAndLowerCasesTheEmailBeforeTheLookup() {
+        UUID id = UUID.randomUUID();
+        AppUser user = activeUser(id, Role.MEMBER);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+
+        assertThat(service.login("  Person@Example.COM ", RAW_PASSWORD, false, "127.0.0.1", "ua")).isEqualTo(SESSION);
+    }
+
+    @Test
+    void loginSuspendedAccountWithTheRightPasswordIsForbiddenAndAudited() {
+        AppUser user = givenMember(UserStatus.SUSPENDED);
+
+        assertThatThrownBy(() -> service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_SUSPENDED), eq(user.getId()), any(), any(), any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+    }
+
+    @Test
+    void loginSuspendedAccountWithAWrongPasswordDoesNotRevealTheSuspension() {
+        givenMember(UserStatus.SUSPENDED);
+
+        assertThatThrownBy(() -> service.login("person@example.com", "wrong-password-x", false, "127.0.0.1", "ua"))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void loginSuccessIssuesTheSessionAndAuditsIt() {
+        UUID id = UUID.randomUUID();
+        AppUser user = activeUser(id, Role.ADMIN);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true)).thenReturn(SESSION);
+
+        AuthSession session = service.login("person@example.com", RAW_PASSWORD, true, "127.0.0.1", "ua");
+
+        assertThat(session).isEqualTo(SESSION);
+        verify(audit).write(eq(AuthEventType.LOGIN_SUCCESS), eq(id), eq("127.0.0.1"), eq("ua"), any());
+        verify(loginAttempts, never()).recordSuccess(any());
+    }
+
+    @Test
+    void loginSuccessAfterFailuresResetsTheCounter() {
+        UUID id = UUID.randomUUID();
+        AppUser user = activeUser(id, Role.MEMBER);
+        user.recordFailedLogin(5, Duration.ofMinutes(15), NOW);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+
+        service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua");
+
+        verify(loginAttempts).recordSuccess(id);
+    }
+
+    @Test
+    void registerCreatesAMemberOwnedByTheConfiguredOwnerAndReturnsTheSession() {
         AppUser owner = givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtEncoder.encode(any())).thenReturn(
-                Jwt.withTokenValue("registered-token").header("alg", "HS256")
-                        .claim("sub", UUID.randomUUID().toString()).build());
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
 
-        String token = service.register("new@example.com", RAW_PASSWORD, "New Person");
+        AuthSession session = service.register("new@example.com", RAW_PASSWORD, "New Person", false, "127.0.0.1",
+                "ua");
 
-        assertThat(token).isEqualTo("registered-token");
+        assertThat(session).isEqualTo(SESSION);
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(repository).saveAndFlush(captor.capture());
         AppUser saved = captor.getValue();
@@ -104,6 +260,38 @@ class AuthServiceImplTest {
         assertThat(saved.getRole()).isEqualTo(Role.MEMBER);
         assertThat(saved.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(saved.getPasswordHash()).isNotEqualTo(RAW_PASSWORD);
+        assertThat(saved.hasPassword()).isTrue();
+        verify(registrationRateLimiter).acquire("127.0.0.1", "new@example.com");
+        verify(audit).write(eq(AuthEventType.REGISTRATION_ACCEPTED), eq(saved.getId()), eq("127.0.0.1"), eq("ua"),
+                any());
+        verify(audit, never()).write(eq(AuthEventType.LOGIN_SUCCESS), any(), any(), any(), any());
+    }
+
+    @Test
+    void registerTrimsAndLowerCasesTheStoredEmail() {
+        givenOwner(Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+
+        service.register(" New@Example.COM ", RAW_PASSWORD, "New Person", false, "127.0.0.1", "ua");
+
+        ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
+        verify(repository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("new@example.com");
+        verify(registrationRateLimiter).acquire("127.0.0.1", "new@example.com");
+    }
+
+    @Test
+    void registerOverTheRateLimitIsAuditedAndRethrown() {
+        doThrow(new RegistrationRateLimitedException(Duration.ofMinutes(1))).when(registrationRateLimiter)
+                .acquire("127.0.0.1", "new@example.com");
+
+        assertThatThrownBy(() -> service.register("new@example.com", RAW_PASSWORD, "New", false, "127.0.0.1", "ua"))
+                .isInstanceOf(RegistrationRateLimitedException.class);
+
+        verify(audit).write(eq(AuthEventType.REGISTRATION_REJECTED_RATE_LIMITED), isNull(), eq("127.0.0.1"),
+                eq("ua"), any());
+        verifyNoInteractions(repository);
     }
 
     @Test
@@ -116,21 +304,18 @@ class AuthServiceImplTest {
     @Test
     void registerWithAnUnknownOwnerIsClosed() {
         when(repository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.empty());
-
         assertRegistrationClosed(service);
     }
 
     @Test
     void registerWithANonAdminOwnerIsClosed() {
         givenOwner(Role.MEMBER, UserStatus.ACTIVE);
-
         assertRegistrationClosed(service);
     }
 
     @Test
     void registerWithASuspendedOwnerIsClosed() {
         givenOwner(Role.ADMIN, UserStatus.SUSPENDED);
-
         assertRegistrationClosed(service);
     }
 
@@ -140,48 +325,214 @@ class AuthServiceImplTest {
         when(repository.saveAndFlush(any()))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_app_user_email"));
 
-        assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken"))
+        assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken", false, "127.0.0.1", "ua"))
                 .isInstanceOf(ConflictException.class);
-        verify(jwtEncoder, never()).encode(any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+    }
+
+    private void givenGoogleIdentity(String sub, String email) {
+        when(googleOAuthClient.exchangeAndVerify("code", "verifier", "nonce"))
+                .thenReturn(new GoogleIdTokenClaims(sub, email, true));
+    }
+
+    private OAuthFailure googleLoginFails() {
+        return catchThrowableOfType(OAuthLoginException.class,
+                () -> service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua")).failure();
+    }
+
+    private void verifyOAuthFailureAudited(OAuthFailure failure) {
+        verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_FAILED), any(), eq("127.0.0.1"), eq("ua"),
+                argThat(metadata -> failure.code().equals(metadata.get("reason"))));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
     }
 
     @Test
-    void loginWrongPasswordThrowsBadCredentials() {
-        UUID id = UUID.randomUUID();
-        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(activeUser(id, Role.MEMBER)));
+    void googleLoginOfALinkedActiveUserIssuesASessionAndAuditsIt() {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        givenGoogleIdentity("sub-1", "person@example.com");
+        when(repository.findByGoogleSubject("sub-1")).thenReturn(Optional.of(user));
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true)).thenReturn(SESSION);
 
-        assertThatThrownBy(() -> service.login("person@example.com", "totally-wrong-password"))
-                .isInstanceOf(BadCredentialsException.class);
-        verify(jwtEncoder, never()).encode(any());
+        AuthSession session = service.loginWithGoogle("code", "verifier", "nonce", true, "127.0.0.1", "ua");
+
+        assertThat(session).isEqualTo(SESSION);
+        verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_SUCCESS), eq(user.getId()), eq("127.0.0.1"), eq("ua"), any());
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
-    void loginSuspendedUserCorrectPasswordThrows403NotAToken() {
-        UUID id = UUID.randomUUID();
-        AppUser suspended = new AppUser(id, id, "person@example.com", ENCODER.encode(RAW_PASSWORD), "Person",
-                Role.MEMBER, UserStatus.SUSPENDED);
-        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(suspended));
+    void googleLoginOfASuspendedLinkedUserIsAccountInactive() {
+        AppUser user = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "person@example.com", "", "P", Role.MEMBER,
+                UserStatus.SUSPENDED, false);
+        givenGoogleIdentity("sub-1", "person@example.com");
+        when(repository.findByGoogleSubject("sub-1")).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> service.login("person@example.com", RAW_PASSWORD))
-                .isInstanceOf(AccessDeniedException.class);
-        verify(jwtEncoder, never()).encode(any());
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.ACCOUNT_INACTIVE);
+        verifyOAuthFailureAudited(OAuthFailure.ACCOUNT_INACTIVE);
     }
 
     @Test
-    void loginSuccessMintsAJwtWithSubjectEqualToUserIdAndRoleClaim() {
-        UUID id = UUID.randomUUID();
-        AppUser admin = activeUser(id, Role.ADMIN);
-        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(admin));
-        when(jwtEncoder.encode(any())).thenReturn(
-                Jwt.withTokenValue("signed-token").header("alg", "HS256").claim("sub", id.toString()).build());
+    void googleLoginOfALockedLinkedUserIsAccountInactive() {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        for (int i = 0; i < 5; i++) {
+            user.recordFailedLogin(5, Duration.ofMinutes(15), NOW);
+        }
+        givenGoogleIdentity("sub-1", "person@example.com");
+        when(repository.findByGoogleSubject("sub-1")).thenReturn(Optional.of(user));
 
-        String token = service.login("person@example.com", RAW_PASSWORD);
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.ACCOUNT_INACTIVE);
+        verifyOAuthFailureAudited(OAuthFailure.ACCOUNT_INACTIVE);
+    }
 
-        assertThat(token).isEqualTo("signed-token");
-        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
-        verify(jwtEncoder).encode(captor.capture());
-        assertThat(captor.getValue().getClaims().getSubject()).isEqualTo(id.toString());
-        assertThat(captor.getValue().getClaims().getClaimAsString(JwtClaims.ROLE)).isEqualTo("ADMIN");
+    @Test
+    void googleLoginWhoseEmailBelongsToAnotherAccountRequiresALinkAndNeverLinksOrCreates() {
+        givenGoogleIdentity("sub-new", "  Person@Example.COM ");
+        when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
+        when(repository.existsByEmailIgnoreCase("person@example.com")).thenReturn(true);
+
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.LINK_REQUIRED);
+
+        verifyOAuthFailureAudited(OAuthFailure.LINK_REQUIRED);
+        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(registrationRateLimiter);
+    }
+
+    @Test
+    void googleLoginOfANewEmailCreatesAGoogleOnlyMemberUnderTheRegistrationOwner() {
+        AppUser owner = givenOwner(Role.ADMIN, UserStatus.ACTIVE);
+        givenGoogleIdentity("sub-new", " New@Example.com ");
+        when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+
+        AuthSession session = service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
+
+        assertThat(session).isEqualTo(SESSION);
+        ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
+        verify(repository).saveAndFlush(captor.capture());
+        AppUser saved = captor.getValue();
+        assertThat(saved.getOwnerId()).isEqualTo(owner.getId());
+        assertThat(saved.getEmail()).isEqualTo("new@example.com");
+        assertThat(saved.getGoogleSubject()).isEqualTo("sub-new");
+        assertThat(saved.hasPassword()).isFalse();
+        assertThat(saved.getRole()).isEqualTo(Role.MEMBER);
+        verify(registrationRateLimiter).acquire("127.0.0.1", "new@example.com");
+        verify(audit).write(eq(AuthEventType.REGISTRATION_ACCEPTED), eq(saved.getId()), any(), any(), any());
+        verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_SUCCESS), eq(saved.getId()), any(), any(), any());
+    }
+
+    @Test
+    void googleSignUpIsClosedWhenRegistrationIsClosed() {
+        givenGoogleIdentity("sub-new", "new@example.com");
+        when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
+        when(repository.findByEmail(OWNER_EMAIL)).thenReturn(Optional.empty());
+
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.REGISTRATION_CLOSED);
+
+        verifyOAuthFailureAudited(OAuthFailure.REGISTRATION_CLOSED);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void googleSignUpIsRateLimitedLikeRegistration() {
+        givenGoogleIdentity("sub-new", "new@example.com");
+        when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
+        doThrow(new RegistrationRateLimitedException(Duration.ofMinutes(1))).when(registrationRateLimiter)
+                .acquire("127.0.0.1", "new@example.com");
+
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.RATE_LIMITED);
+
+        verify(audit).write(eq(AuthEventType.REGISTRATION_REJECTED_RATE_LIMITED), isNull(), any(), any(), any());
+        verifyOAuthFailureAudited(OAuthFailure.RATE_LIMITED);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void googleSignUpLosingARaceOnTheEmailRequiresALink() {
+        givenOwner(Role.ADMIN, UserStatus.ACTIVE);
+        givenGoogleIdentity("sub-new", "new@example.com");
+        when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
+        when(repository.saveAndFlush(any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_app_user_email"));
+
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.LINK_REQUIRED);
+        verifyOAuthFailureAudited(OAuthFailure.LINK_REQUIRED);
+    }
+
+    @Test
+    void aGoogleExchangeOrVerificationFailureIsFailedAndNothingIsRead() {
+        when(googleOAuthClient.exchangeAndVerify("code", "verifier", "nonce"))
+                .thenThrow(new OAuthVerificationException("token endpoint unreachable"));
+
+        assertThat(googleLoginFails()).isEqualTo(OAuthFailure.FAILED);
+
+        verifyOAuthFailureAudited(OAuthFailure.FAILED);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void recordOAuthFailureWritesTheReasonCode() {
+        service.recordOAuthFailure(OAuthFailure.INVALID_STATE, "127.0.0.1", "ua");
+
+        verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_FAILED), isNull(), eq("127.0.0.1"), eq("ua"),
+                eq(Map.of("reason", "invalid_state")));
+    }
+
+    @Test
+    void refreshRotatedAuditsTheRotationAndReturnsTheSession() {
+        UUID userId = UUID.randomUUID();
+        UUID familyId = UUID.randomUUID();
+        when(refreshTokenService.rotate("raw", "127.0.0.1", "ua"))
+                .thenReturn(new RotationResult.Rotated(SESSION, userId, familyId));
+
+        Optional<AuthSession> session = service.refresh("raw", "127.0.0.1", "ua");
+
+        assertThat(session).hasValue(SESSION);
+        verify(audit).write(eq(AuthEventType.REFRESH_TOKEN_ROTATED), eq(userId), eq("127.0.0.1"), eq("ua"),
+                eq(Map.of("userId", userId.toString(), "familyId", familyId.toString())));
+    }
+
+    @Test
+    void refreshReuseIsEmptyAndAuditedAsReuse() {
+        UUID userId = UUID.randomUUID();
+        UUID familyId = UUID.randomUUID();
+        when(refreshTokenService.rotate("raw", "127.0.0.1", "ua"))
+                .thenReturn(new RotationResult.Rejected(RotationResult.Reason.REUSED, userId, familyId));
+
+        assertThat(service.refresh("raw", "127.0.0.1", "ua")).isEmpty();
+
+        verify(audit).write(eq(AuthEventType.REFRESH_TOKEN_REUSE_DETECTED), eq(userId), any(), any(), any());
+    }
+
+    @Test
+    void refreshOtherRejectionsAreEmptyWithoutAnAuditRow() {
+        when(refreshTokenService.rotate("raw", "127.0.0.1", "ua"))
+                .thenReturn(new RotationResult.Rejected(RotationResult.Reason.UNKNOWN_TOKEN, null, null));
+
+        assertThat(service.refresh("raw", "127.0.0.1", "ua")).isEmpty();
+
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void logoutEndsTheSessionAndAuditsIt() {
+        UUID userId = UUID.randomUUID();
+        when(refreshTokenService.endSession("raw")).thenReturn(Optional.of(userId));
+
+        service.logout(Optional.of("raw"), "127.0.0.1", "ua");
+
+        verify(audit).write(eq(AuthEventType.LOGOUT), eq(userId), eq("127.0.0.1"), eq("ua"), any());
+    }
+
+    @Test
+    void logoutWithoutATokenOrWithAnUnknownOneDoesNothing() {
+        when(refreshTokenService.endSession("unknown")).thenReturn(Optional.empty());
+
+        service.logout(Optional.empty(), "127.0.0.1", "ua");
+        service.logout(Optional.of("unknown"), "127.0.0.1", "ua");
+
+        verifyNoInteractions(audit);
     }
 
     @Test

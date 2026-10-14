@@ -17,6 +17,7 @@ dependencies {
     // Registration rate limits: in-memory token buckets, held in a size- and idle-bounded cache.
     implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
     implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation("tools.jackson.core:jackson-databind")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
