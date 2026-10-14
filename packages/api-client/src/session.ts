@@ -2,6 +2,7 @@ import { withClientId } from './clientId';
 import { getToken, isTokenPersistent, setToken, syncTokenFromStorage } from './tokenStore';
 
 export const REFRESH_PATH = '/api/v1/auth/refresh';
+const LOGOUT_PATH = '/api/v1/auth/logout';
 const REFRESH_LOCK = 'flowcortex-auth-refresh';
 
 let inFlight: Promise<string | null> | null = null;
@@ -49,6 +50,17 @@ async function requestNewToken(before: string | null): Promise<string | null> {
   }
   setToken(null);
   return null;
+}
+
+/** Revokes the server session, then forgets the token; local state is cleared even if the call fails. */
+export async function signOut(): Promise<void> {
+  try {
+    await fetch(LOGOUT_PATH, { method: 'POST', headers: withClientId(LOGOUT_PATH) });
+  } catch {
+    // Offline: the refresh cookie stays until it expires, but this browser is signed out regardless.
+  } finally {
+    setToken(null);
+  }
 }
 
 /** Session bootstrap: with no stored token, one refresh attempt; never throws, never retries. */
