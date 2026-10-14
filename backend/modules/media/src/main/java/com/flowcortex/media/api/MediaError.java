@@ -14,6 +14,8 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         AUDIO_ALIGNMENT_FAILED("audio_alignment_failed"),
         AUDIO_ALIGNMENT_OUT_OF_RANGE("audio_alignment_out_of_range"),
         PROVIDER_CAPABILITY_UNAVAILABLE("provider_capability_unavailable"),
+        PROVIDER_REQUEST_FAILED("provider_request_failed"),
+        PROVIDER_RESPONSE_INVALID("provider_response_invalid"),
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout");
 

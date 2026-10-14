@@ -32,9 +32,9 @@ adapter, `provider-speech-result.schema.json`, `ProviderSpeechData`), and the
 | `R-ALIGN-2` | The capability enum shall have **one source of truth**: the JSON Schema, with the Python models regenerated from it rather than hand-edited. | done | `contracts/media-job.schema.json` → `scripts/gen_contracts.sh` → `contracts/media_job.py:38` |
 | `R-ALIGN-3` | The pad/tempo decision shall live in **one pure function**, so the rules are decided in code and fixture-tested rather than implied by ffmpeg flags. | done | `align_audio.plan_alignment`; 8 pure test functions in `test_align_audio.py` |
 | `R-ALIGN-4` | A speech track **shorter** than the target shall be padded with silence, never time-stretched — stretching a voice audibly damages it. | done | `plan_alignment` returns `tempo == 1.0` for a short track; `test_speech_shorter_than_target_is_padded_not_stretched` |
-| `R-ALIGN-5` | A track longer than the target shall be **sped up within a bounded ratio, never truncated**: cutting the tail drops a spoken segment. | done | `plan_alignment` returns `tempo == speech/target`; `test_speech_longer_than_target_is_spped_up_never_truncated` |
-| `R-ALIGN-6` | A ratio needing padding or tempo beyond the supported bound shall fail the step as a **permanent error with its own code**, not publish a misaligned video. | done | `audio_alignment_out_of_range` in `errors.py` + `media-result.schema.json`; 2 range tests |
-| `R-ALIGN-7` | `atempo` shall be applied as **chained filter instances** where a ratio exceeds its 0.5–2.0 window, so a wide ratio stays legal instead of erroring in ffmpeg. | done | `align_audio._chain_tempo`; `test_a_wide_ratio_stays_inside_the_supported_tempo_range` |
+| `R-ALIGN-5` | A track longer than the target shall be **sped up within a bounded ratio, never truncated**: cutting the tail drops a spoken segment. | done | `plan_alignment` returns `tempo == speech/target`; `test_speech_longer_than_target_is_sped_up_never_truncated` |
+| `R-ALIGN-6` | A ratio needing padding beyond `MAX_PAD_RATIO` or a speed-up beyond `MAX_SPEEDUP` (1.5x) shall fail the step as a **permanent error with its own code**, not publish a misaligned video. | done | `audio_alignment_out_of_range` in `errors.py` + `media-result.schema.json`; range tests for pad and speed-up |
+| `R-ALIGN-7` | The speed-up shall be capped at **1.5x in total** — faster speech is unintelligible — which keeps it inside a single `atempo` instance (0.5–2.0), so no filter chaining is needed. | done | `align_audio.MAX_SPEEDUP`; `test_a_speed_up_up_to_the_limit_is_planned_as_is`, `test_a_speed_up_beyond_the_limit_is_a_permanent_error` |
 | `R-ALIGN-8` | The step shall emit an **alignment manifest** recording source duration, target, tempo and pad, so "why does this video look like this" has an answer after the fact. | done | `alignment-manifest.json`; `test_padded_speech_meets_the_target_duration` asserts manifest equals `data` |
 | `R-ALIGN-9` | The step shall refuse a **missing target duration**, a wrong profile, or input keys other than the single `speech` input, at the contract boundary. | done | 3 contract-violation tests |
 | `R-ALIGN-10` | A new error code shall be declared at its **source** (`ErrorCode` **and** `media-result.schema.json`) in the same change, so a worker result never fails schema validation for an undeclared code. | done | both files; `pytest tests/test_contracts.py` 17/17 |
@@ -125,24 +125,22 @@ store container; it is unaffected by this slice and CI still runs it in full.
 The 19 alignment tests split into 8 pure test functions over `plan_alignment` — 14 cases once
 `@parametrize` is counted — and 5 functions over the handler against real ffmpeg. The pure side
 covers short track, long track, equal durations, pad within cap, pad beyond cap, tempo at
-1.0/1.25/1.5/2.0/4.0, a ratio out of range, and non-positive durations. The handler side
-measures the rendered file: padded output is 6.0s, sped-up output is 5.0s, the manifest equals
+1.0/1.25/1.5, a speed-up beyond 1.5x, and non-positive durations. The handler side
+measures the rendered file: padded output is 6.0s, sped-up output is 8.0s, the manifest equals
 `data`, and the four contract-violation refusals hold.
 
 ## 6. What did not change (intentional)
 
-- **`align_audio` is not in any seeded workflow.** This is the load-bearing decision, not an
-  oversight. `RemoteStepExecutor`'s Javadoc states the rule: *"The job's input is the step's
-  stored input: the object reference the run start resolved from the caller's own upload.
-  Nothing a client sent and no earlier step's output reaches it."* `align_audio` needs the WAV
-  that `generate_speech` produced — an earlier step's output — which the current engine forbids.
-  Seeding it would require either a binding mechanism that does not exist on this branch (the
-  plan's "remote input binding" work) or a change to that executor's contract, which is a
-  module-boundary decision and not this slice's to make. The capability is complete and
-  registered; it is simply not reachable from a run yet.
+- **`align_audio` is not in any seeded workflow.** The capability is complete and registered;
+  no seeded step uses it yet. The blocker this slice originally recorded is gone: a step whose
+  config carries `outputInputs` now gets `InputPolicy.STORED_WITH_OUTPUTS`, so
+  `RemoteStepExecutor` passes it configured outputs of earlier completed steps (validated by
+  `StoredWithOutputsResolver`), which is how `render_video` already receives the `generate_speech`
+  WAV. Wiring `align_audio` the same way — a step config binding the speech output to its
+  `speech` input — is a seeding decision that has not been taken.
 - **`segment_needs_revision` is not implemented.** The plan lists it as the flow sending a run
-  back to review. It depends on the input binding above — without a step-to-step asset handoff
-  there is no aligned track to inspect — so it is deferred with the rest.
+  back to review. It needs `align_audio` seeded in a workflow first —
+  until a run produces an aligned track there is nothing to inspect — so it is deferred with it.
 - **No per-segment speech manifest.** The plan's "speech manifest with per-segment assets" is a
   provider-side change to `generate_speech`, which already ships and already satisfies
   `R-REV-8` (the approved revision's content is what the speech job carries). Changing it would
@@ -154,10 +152,10 @@ measures the rendered file: padded output is 6.0s, sped-up output is 5.0s, the m
 
 ## 7. Open follow-ups
 
-- **Remote input binding is the blocker for the rest of the slice.** A mechanism for a remote
-  step to consume an earlier step's output asset — with the ownership and attempt rules Slice 1
-  established for uploads — is required before `align_audio` can be seeded and before
-  `segment_needs_revision` has anything to inspect.
+- **Seed `align_audio` in a workflow.** The step-to-step output binding exists
+  (`outputInputs` + `STORED_WITH_OUTPUTS`); a seeded step config that maps the `generate_speech`
+  output to the `speech` input is what remains before `segment_needs_revision` has anything to
+  inspect.
 - **`render_video` still hard-codes 15 seconds.** `align_audio` produces a track matching the
   target, but the renderer's `DURATION_SECONDS = 15` and `anullsrc` remain. Until the renderer
   takes its duration from the video asset, a run shorter than 15 seconds still ends in silence.

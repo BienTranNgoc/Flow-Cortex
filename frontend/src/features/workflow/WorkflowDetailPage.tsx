@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
@@ -6,9 +7,8 @@ import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
 import { startRunSchema, type StartRunFormValues } from './startRunSchema';
+import { useCapabilitiesQuery } from './useCapabilities';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
-
-const PRODUCT_VIDEO_WORKFLOW_ID = '9aa35334-b672-4b6c-93e8-1a4c2cc14301';
 
 /** Start form of a workflow whose first step runs inline: an optional text input. */
 function InlineStartForm({
@@ -69,11 +69,9 @@ function InlineStartForm({
  * run-progress view so watching it progress is the very next turn. The form follows the first
  * step: one that runs remotely works on an uploaded file, an inline one takes optional text.
  *
- * Renders the form shell as soon as the workflow id resolves, even while the workflow fetch is
- * still in flight or has errored: a first-visit user expects to see something they can start
- * filling in, not a transient `Loading…` or a bare `Could not load this workflow.` that hides
- * the entire page. The form is disabled until the workflow definition arrives; an error keeps
- * the form visible so the user can retry, and the alert sits inline above it.
+ * The Product Video form renders as soon as the capabilities identify it, even while the workflow
+ * fetch is in flight or has errored, disabled until the definition arrives. Any other form waits
+ * for the workflow and for the capabilities to settle; a capabilities error does not block it.
  */
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,18 +84,27 @@ export function WorkflowDetailPage() {
 
 function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   const workflowQuery = useWorkflowQuery(workflowId);
+  const capabilitiesQuery = useCapabilitiesQuery();
   const workflow = workflowQuery.data;
-  // Match the Product Video workflow from the URL, not from the loaded data: the data fetch
-  // races the first paint, and matching from `workflow.id` only kicks in once the fetch
-  // settles, which briefly renders the wrong start form (4 steps + plain input) before
-  // switching to the 5-field product form.
-  const isProductVideo = workflowId === PRODUCT_VIDEO_WORKFLOW_ID;
+  // Until the capabilities settle, no form renders: guessing would briefly show the generic form
+  // (4 steps + plain input) before switching to the 5-field product form. If they fail, the
+  // generic form is safe — the server refuses a Product Video start through the generic route.
+  const productVideoWorkflowId = capabilitiesQuery.data?.productVideoWorkflowId;
+  const isProductVideo =
+    productVideoWorkflowId !== undefined && workflowId === productVideoWorkflowId;
   const startsWithUpload = workflow?.steps?.[0]?.mode === 'remote';
-  // Keep the form rendered and editable from the first paint — a first-visit user expects to
-  // start filling in, not stare at a blank page. The Start button stays disabled while the
-  // workflow is loading (no definition to dispatch to) or has errored (the mutation would
-  // 404 against an unknown workflow id).
+  // A start against a definition that is loading or failed to load would 404.
   const startDisabled = workflowQuery.isLoading || workflowQuery.isError || !workflow;
+  let startForm: ReactNode = null;
+  if (isProductVideo) {
+    startForm = <ProductVideoStartForm disabled={startDisabled} />;
+  } else if (workflow && !capabilitiesQuery.isPending) {
+    startForm = startsWithUpload ? (
+      <MediaStartForm workflowId={workflowId} disabled={startDisabled} />
+    ) : (
+      <InlineStartForm workflowId={workflowId} disabled={startDisabled} />
+    );
+  }
 
   return (
     <main>
@@ -106,7 +113,9 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
       {workflowQuery.isError && (
         <p role="alert">Could not load this workflow. Try again, or pick another one.</p>
       )}
-      {workflowQuery.isLoading && <output>Loading workflow…</output>}
+      {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
+        <output>Loading workflow…</output>
+      )}
       {workflow?.steps && workflow.steps.length > 0 && (
         <ol className="workflow-steps">
           {workflow.steps.map((step) => (
@@ -114,13 +123,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           ))}
         </ol>
       )}
-      {isProductVideo ? (
-        <ProductVideoStartForm disabled={startDisabled} />
-      ) : !workflow ? null : startsWithUpload ? (
-        <MediaStartForm workflowId={workflowId} disabled={startDisabled} />
-      ) : (
-        <InlineStartForm workflowId={workflowId} disabled={startDisabled} />
-      )}
+      {startForm}
     </main>
   );
 }

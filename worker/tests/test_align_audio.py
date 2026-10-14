@@ -1,4 +1,4 @@
-"""The alignment capability pads or tempo-nudges speech onto the source timeline."""
+"""The alignment capability pads or speeds up speech (at most 1.5x) onto the source timeline."""
 
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ def test_padding_within_the_relative_cap_is_allowed() -> None:
     assert pad == pytest.approx(2.0)
 
 
-def test_speech_longer_than_target_is_spped_up_never_truncated() -> None:
+def test_speech_longer_than_target_is_sped_up_never_truncated() -> None:
     tempo, pad = align_audio.plan_alignment(20.0, 15.0)
 
     assert tempo == pytest.approx(20.0 / 15.0)
@@ -99,16 +99,17 @@ def test_equal_durations_need_neither_pad_nor_tempo() -> None:
     assert align_audio.plan_alignment(12.0, 12.0) == (1.0, 0.0)
 
 
-@pytest.mark.parametrize("ratio", [1.0, 1.25, 1.5, 2.0, 4.0])
-def test_a_wide_ratio_stays_inside_the_supported_tempo_range(ratio: float) -> None:
+@pytest.mark.parametrize("ratio", [1.0, 1.25, align_audio.MAX_SPEEDUP])
+def test_a_speed_up_up_to_the_limit_is_planned_as_is(ratio: float) -> None:
     tempo, _ = align_audio.plan_alignment(15.0 * ratio, 15.0)
 
     assert tempo == pytest.approx(ratio)
 
 
-def test_a_ratio_beyond_the_supported_range_is_a_permanent_error() -> None:
+@pytest.mark.parametrize("ratio", [align_audio.MAX_SPEEDUP * 1.01, 2.0, 16.0])
+def test_a_speed_up_beyond_the_limit_is_a_permanent_error(ratio: float) -> None:
     with pytest.raises(PermanentError) as failure:
-        align_audio.plan_alignment(15.0 * align_audio.MAX_TEMPO * 20, 15.0)
+        align_audio.plan_alignment(15.0 * ratio, 15.0)
 
     assert failure.value.code == "audio_alignment_out_of_range"
 
@@ -144,16 +145,16 @@ def test_padded_speech_meets_the_target_duration(tmp_path: Path) -> None:
 
 
 @needs_ffmpeg
-def test_long_speech_is_spped_up_to_the_target_duration(tmp_path: Path) -> None:
+def test_long_speech_is_sped_up_to_the_target_duration(tmp_path: Path) -> None:
     outcome = align_audio.handle(
-        make_job(targetDurationSeconds=5),
+        make_job(targetDurationSeconds=8),
         {"speech": make_speech(tmp_path / "longer", 10.0)},
         ProcessRunner(),
     )
 
-    assert outcome.data["tempo"] == pytest.approx(2.0, abs=0.01)
+    assert outcome.data["tempo"] == pytest.approx(1.25, abs=0.01)
     assert outcome.data["padSeconds"] == 0.0
-    assert measured_seconds(outcome.files[0].body) == pytest.approx(5.0, abs=0.15)
+    assert measured_seconds(outcome.files[0].body) == pytest.approx(8.0, abs=0.15)
 
 
 @needs_ffmpeg

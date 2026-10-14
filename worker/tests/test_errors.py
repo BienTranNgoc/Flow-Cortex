@@ -8,7 +8,7 @@ import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import boto3
 import pika.exceptions
@@ -30,7 +30,8 @@ from conftest import (
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from flowcortex_worker.consumer import Consumer
-from flowcortex_worker.errors import PermanentError, TransientError, backoff_seconds
+from flowcortex_worker.contracts.media_result import MediaError
+from flowcortex_worker.errors import ErrorCode, PermanentError, TransientError, backoff_seconds
 from flowcortex_worker.handlers.registry import HandlerOutcome
 from flowcortex_worker.storage import Storage
 
@@ -64,6 +65,37 @@ def test_permanent_error_publishes_an_error_result_and_acks() -> None:
 
 
 @pytest.mark.parametrize(
+    "code",
+    [
+        "provider_capability_unavailable",
+        "provider_request_failed",
+        "provider_response_invalid",
+    ],
+)
+def test_every_provider_failure_code_is_answered_without_a_retry(code: Any) -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body())
+    waits: list[float] = []
+
+    run_consumer(
+        conn,
+        resolve=failing(PermanentError(code, "provider said no")),
+        until=settled,
+        wait=waits.append,
+    )
+
+    [result] = published(conn, "result")
+    assert assert_valid(result.body, "media-result")["error"]["code"] == code
+    assert conn.consume.acks == [1]
+    assert conn.consume.rejects == []
+    assert waits == []
+
+
+def test_error_codes_match_the_result_contract() -> None:
+    assert set(get_args(ErrorCode)) == set(get_args(MediaError.model_fields["code"].annotation))
+
+
+@pytest.mark.parametrize(
     ("delivery_count", "expected"),
     [(0, 5), (1, 10), (2, 20), (3, 40), (4, 60), (9, 60)],
 )
@@ -85,6 +117,20 @@ def test_transient_error_retry_after_overrides_exponential_backoff() -> None:
     )
 
     assert waits == [23]
+
+
+def test_retry_after_is_capped_at_the_backoff_ceiling() -> None:
+    waits: list[float] = []
+    conn = FakeConnection()
+    conn.deliver(job_body())
+    run_consumer(
+        conn,
+        storage=FakeStorage(error=TransientError("quota", retry_after_seconds=3600)),
+        wait=waits.append,
+        until=settled,
+    )
+
+    assert waits == [60]
 
 
 @pytest.mark.parametrize(

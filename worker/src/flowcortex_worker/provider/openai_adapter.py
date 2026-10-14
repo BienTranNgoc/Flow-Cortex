@@ -32,7 +32,7 @@ PROVIDER_OPENAI = "openai"
 # capability.
 _OPENAI_SCRIPT_MODEL = os.environ.get("FLOWCORTEX_PROVIDER_SCRIPT_MODEL", "gpt-4o-mini")
 # Default keeps the OpenAI endpoint. Set to a different `https://.../v1` URL to route through an
-# OpenAI-compatible proxy (e.g. https://api.vilao.ai/v1); the worker still sends the standard
+# OpenAI-compatible proxy (e.g. https://llm-proxy.example/v1); the worker still sends the standard
 # `Authorization: Bearer` header.
 _OPENAI_BASE_URL = os.environ.get("FLOWCORTEX_PROVIDER_BASE_URL") or "https://api.openai.com/v1"
 # OpenAI or a proxy may sit behind a slow upstream — keep a generous read timeout so the broker's
@@ -130,14 +130,8 @@ class OpenAIConfig:
 class OpenAIProviderAdapter:
     """Sends a Chat Completions request with structured-output JSON Schema.
 
-    The HTTP call is hand-rolled with `urllib.request` instead of the OpenAI SDK so the adapter
-    tolerates proxy responses that include fields the SDK model does not know about (e.g. a
-    Google-style `extra_content.thought_signature` on a Gemini-via-OpenAI proxy): the SDK raises
-    a `TypeError` on parse before the adapter sees the body, which surfaces as an opaque
-    `BadRequest`/timeout to the broker. Pulling JSON by hand and reading only the documented
-    `choices[0].message.content` path keeps the adapter portable across OpenAI, Azure OpenAI,
-    and any OpenAI-compatible proxy without pinning the wire contract to a particular SDK
-    version.
+    Hand-rolled over `urllib`: only `choices[0].message.content` is read, so extra fields from
+    OpenAI-compatible proxies cannot break parsing.
     """
 
     config: OpenAIConfig
@@ -276,8 +270,7 @@ def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
 
 
 def select_adapter(provider: str, openai_key: str) -> OpenAIProviderAdapter:
-    """Switch on the runtime env. The fixture adapter remains the default when no key is set so a
-    developer without secrets can still demo the slice end-to-end."""
+    """Builds the adapter for `provider`; `openai` requires a key, any other name raises."""
     if provider == PROVIDER_OPENAI:
         if not openai_key:
             raise RuntimeError("PROVIDER_ADAPTER=openai requires OPENAI_API_KEY")

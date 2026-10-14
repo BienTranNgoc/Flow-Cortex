@@ -69,6 +69,8 @@ class MediaJobsImplTest {
     private static final String SIZE_SENTENCE = "Files must be between 1 byte and 500 MB.";
     private static final String TYPE_SENTENCE =
             "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3, .wav, .jpg, .jpeg, .png or .webp.";
+    private static final String MEDIA_TYPE_SENTENCE =
+            "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.";
 
     private static final String[] VALID_PROPERTIES = {
         "flowcortex.media.enabled=true",
@@ -197,6 +199,58 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(
                     providerJob("generate_speech", Map.of("profile", "vi_voice_v1", "payload", Map.of())))))
                     .isInstanceOf(ConstraintViolationException.class);
+            assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
+        });
+    }
+
+    @Test
+    void providerJobWithAnOutputPrefixThatIsNotAttemptScopedIsRefused() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            ProviderJob legacy = new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, "generate_script",
+                    scriptParams(Map.of("productName", "Máy lọc nước", "description", "Lọc sạch", "cta", "Mua ngay")),
+                    "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(legacy)))
+                    .isInstanceOf(ConstraintViolationException.class)
+                    .hasMessageContaining("outputPrefix");
+            assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
+        });
+    }
+
+    @Test
+    void providerJobWhoseProfileIsMissingOrBelongsToAnotherCapabilityIsRefused() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            Map<String, Object> payload = Map.of("script", "Mua máy lọc nước ngay hôm nay");
+
+            for (Map<String, Object> params : List.<Map<String, Object>>of(
+                    Map.of("payload", payload),
+                    Map.of("profile", "product_ad_v1", "payload", payload))) {
+                assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(
+                        providerJob("generate_speech", params))))
+                        .as(params.toString())
+                        .isInstanceOf(ConstraintViolationException.class)
+                        .hasMessageContaining("profile");
+            }
+            assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
+        });
+    }
+
+    @Test
+    void providerJobWithAnUnknownParamsKeyIsRefused() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(
+                    providerJob("generate_speech", Map.of("profile", "vi_voice_v1",
+                            "payload", Map.of("script", "Mua ngay"), "voice", "alloy")))))
+                    .isInstanceOf(ConstraintViolationException.class)
+                    .hasMessageContaining("voice");
             assertThat(context.getBean(EventCapture.class).providerEvents).isEmpty();
         });
     }
@@ -410,7 +464,7 @@ class MediaJobsImplTest {
     @Test
     void aConsumerTimeoutShorterThanTheProviderCeilingFailsStartup() {
         runner.withPropertyValues(
-"flowcortex.media.max-runtime.probe=5m",
+                "flowcortex.media.max-runtime.probe=5m",
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
@@ -445,7 +499,7 @@ class MediaJobsImplTest {
     @Test
     void aConsumerTimeoutThatDoesNotOutlastTheLongestRunPlusBackoffAndMarginFailsStartup() {
         runner.withPropertyValues(
-"flowcortex.media.max-runtime.probe=5m",
+                "flowcortex.media.max-runtime.probe=5m",
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
@@ -683,9 +737,28 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(TYPE_SENTENCE);
+                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
                     });
             verify(store, org.mockito.Mockito.times(2)).head(eq("flowcortex-uploads"), anyString());
+        });
+    }
+
+    @Test
+    void anImageIsRefusedAsTheInputOfAMediaCapabilityButStillAcceptedAsAProductImage() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            when(store.head(anyString(), anyString()))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/jpeg")))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+
+            assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
+                    });
+            assertThat(jobs.resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID()))).hasSize(1);
+            verify(context.getBean(MediaAssetRepository.class), org.mockito.Mockito.times(1)).save(any());
         });
     }
 

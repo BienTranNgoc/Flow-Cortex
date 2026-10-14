@@ -38,7 +38,11 @@ function renderForm(routes: Record<string, Handler> = {}) {
     'GET /api/v1/workflows': { status: 200, body: [PRODUCT_VIDEO] },
     'GET /api/v1/capabilities': {
       status: 200,
-      body: { mediaEnabled: true, productVideoEnabled: true },
+      body: {
+        mediaEnabled: true,
+        productVideoEnabled: true,
+        productVideoWorkflowId: PRODUCT_VIDEO_ID,
+      },
     },
     [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: PRODUCT_VIDEO },
     'POST /api/v1/uploads': { status: 201, body: GRANT },

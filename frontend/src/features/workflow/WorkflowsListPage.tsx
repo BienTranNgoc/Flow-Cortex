@@ -6,25 +6,32 @@ import { useCapabilitiesQuery } from './useCapabilities';
 
 /** `/workflows` — list = owner OR shared. Hides the Product Video entry when its feature flag is
  * off, since the start endpoint would 503 the request otherwise. */
-const PRODUCT_VIDEO_WORKFLOW_ID = '9aa35334-b672-4b6c-93e8-1a4c2cc14301';
-
 export function WorkflowsListPage() {
   const workflowsQuery = useWorkflowsQuery();
   const meQuery = useMeQuery();
   const capabilitiesQuery = useCapabilitiesQuery();
-  const productVideoVisible = capabilitiesQuery.data?.productVideoEnabled ?? true;
+  const capabilities = capabilitiesQuery.data;
+  // The list waits for the capabilities: before they arrive, the Product Video entry cannot be
+  // told apart, and showing it would flash an entry the flag then removes. If they fail, nothing
+  // is hidden; the start endpoint still refuses a switched-off flow.
   // Filtered once, so the list and the "No workflows yet" count below cannot disagree: counting the
   // unfiltered array would claim emptiness for a list hidden only by the flag.
-  const visible = workflowsQuery.data?.filter(
-    (workflow) => productVideoVisible || workflow.id !== PRODUCT_VIDEO_WORKFLOW_ID,
-  );
+  const visible = capabilitiesQuery.isPending
+    ? undefined
+    : workflowsQuery.data?.filter(
+        (workflow) =>
+          capabilities?.productVideoEnabled !== false ||
+          workflow.id !== capabilities.productVideoWorkflowId,
+      );
 
   return (
     <main className="workflows">
       <h1 className="visually-hidden">Workflows</h1>
       <section className="workflows-list-section" aria-labelledby="workflows-list-title">
         <h2 id="workflows-list-title">Your workflows</h2>
-        {workflowsQuery.isLoading && <output>Loading workflows…</output>}
+        {(workflowsQuery.isLoading || (capabilitiesQuery.isPending && !workflowsQuery.isError)) && (
+          <output>Loading workflows…</output>
+        )}
         {workflowsQuery.isError && <p role="alert">Could not load workflows.</p>}
         {visible?.length === 0 && <p>No workflows yet.</p>}
         {visible && visible.length > 0 && (

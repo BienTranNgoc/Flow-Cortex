@@ -31,7 +31,7 @@ from . import telemetry
 from .contracts.media_job import MediaJob, MediaJobInput
 from .contracts.media_progress import MediaProgress
 from .contracts.media_result import CompletedResult, ErrorResult, MediaError, MediaOutput
-from .errors import ErrorCode, PermanentError, TransientError, backoff_seconds
+from .errors import MAX_BACKOFF_SECONDS, ErrorCode, PermanentError, TransientError, backoff_seconds
 from .handlers import Handler
 from .handlers.registry import resolve as resolve_capability
 from .runtime import ChannelLost, ProcessKilled, ProcessRunner
@@ -312,7 +312,12 @@ class Consumer:
         except Exception as exc:
             outcome = "retried"
             retry_after = exc.retry_after_seconds if isinstance(exc, TransientError) else None
-            delay = retry_after if retry_after is not None else backoff_seconds(delivery.count)
+            # Retry-After never holds the worker thread past the backoff ceiling.
+            delay = (
+                min(retry_after, MAX_BACKOFF_SECONDS)
+                if retry_after is not None
+                else backoff_seconds(delivery.count)
+            )
             error, reason = _describe(exc)
             span.add_event(
                 "exception", {"exception.type": error, "exception.message": reason or error}

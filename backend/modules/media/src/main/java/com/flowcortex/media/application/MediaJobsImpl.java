@@ -23,8 +23,10 @@ import jakarta.validation.Validator;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -46,6 +48,7 @@ class MediaJobsImpl implements MediaJobs {
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+    private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -88,20 +91,30 @@ class MediaJobsImpl implements MediaJobs {
         events.publishEvent(new ProviderJobRequested(job));
     }
 
-    /** {@code params} is a map no annotation can bound, so its payload is checked against the
-     * {@code productAdPayload}/{@code speechPayload} definitions the provider job schema names. */
+    /** {@code params} is a map no annotation can bound, so it is checked against the
+     * {@code productAdParams}/{@code speechParams} definitions the provider job schema names. */
     private void validateProviderParams(ProviderJob job) {
-        Class<?> type = switch (job.capability()) {
-            case "generate_script" -> ProviderJobPayload.ProductAd.class;
-            case "generate_speech" -> ProviderJobPayload.Speech.class;
+        ProviderParams contract = switch (job.capability()) {
+            case "generate_script" -> new ProviderParams("product_ad_v1", ProviderJobPayload.ProductAd.class);
+            case "generate_speech" -> new ProviderParams("vi_voice_v1", ProviderJobPayload.Speech.class);
             default -> null;
         };
-        if (type == null) {
+        if (contract == null) {
             return;
+        }
+        Set<String> unknown = new TreeSet<>(job.params().keySet());
+        unknown.removeAll(PROVIDER_PARAMS_KEYS);
+        if (!unknown.isEmpty()) {
+            throw new ConstraintViolationException("params has keys the " + job.capability()
+                    + " contract does not define: " + unknown, Set.of());
+        }
+        if (!contract.profile().equals(job.params().get("profile"))) {
+            throw new ConstraintViolationException("params.profile must be " + contract.profile() + " for "
+                    + job.capability(), Set.of());
         }
         Object payload;
         try {
-            payload = MAPPER.convertValue(job.params().get("payload"), type);
+            payload = MAPPER.convertValue(job.params().get("payload"), contract.payload());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("params.payload does not match the "
                     + job.capability() + " contract", e);
@@ -110,6 +123,9 @@ class MediaJobsImpl implements MediaJobs {
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
+    }
+
+    private record ProviderParams(String profile, Class<?> payload) {
     }
 
     @Override
@@ -149,8 +165,8 @@ class MediaJobsImpl implements MediaJobs {
     @Override
     @Transactional
     public MediaJobInput resolveUpload(UUID ownerId, UUID uploadId) {
-        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, null, properties.upload().maxBytes())
-                .input();
+        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null,
+                properties.upload().maxBytes()).input();
     }
 
     @Override
@@ -161,9 +177,10 @@ class MediaJobsImpl implements MediaJobs {
             throw new UploadRejectedException("uploadIds", "Choose between 1 and 10 different images");
         }
         List<MediaAssetInput> resolved = new java.util.ArrayList<>();
+        List<String> anyAllowed = List.copyOf(properties.upload().mimeTypes().keySet());
         for (int index = 0; index < uploadIds.size(); index++) {
-            resolved.add(resolveAndRegister(ownerId, uploadIds.get(index), "image_" + (index + 1), "image/",
-                    MAX_IMAGE_BYTES));
+            resolved.add(resolveAndRegister(ownerId, uploadIds.get(index), "image_" + (index + 1), anyAllowed,
+                    "image/", MAX_IMAGE_BYTES));
         }
         return List.copyOf(resolved);
     }
@@ -216,7 +233,7 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     private MediaAssetInput resolveAndRegister(UUID ownerId, UUID uploadId, String inputKey,
-            String requiredMimePrefix, long maxBytes) {
+            List<String> allowedExtensions, String requiredMimePrefix, long maxBytes) {
         Optional<MediaAsset> existing = assets.findById(uploadId);
         if (existing.isPresent() && !existing.orElseThrow().getOwnerId().equals(ownerId)) {
             throw refused(properties.s3().uploadBucket(), objectKey(ownerId, uploadId), "another owner",
@@ -229,8 +246,9 @@ class MediaJobsImpl implements MediaJobs {
         if (!withinLimit(stored.size())) {
             throw refused(bucket, key, stored.size() + " bytes", sizeSentence());
         }
-        if (!properties.upload().mimeTypes().containsValue(stored.contentType())) {
-            throw refused(bucket, key, "type " + stored.contentType(), typeSentence());
+        Map<String, String> mimeTypes = properties.upload().mimeTypes();
+        if (allowedExtensions.stream().map(mimeTypes::get).noneMatch(type -> type.equals(stored.contentType()))) {
+            throw refused(bucket, key, "type " + stored.contentType(), typeSentence(allowedExtensions));
         }
         if (requiredMimePrefix != null && !stored.contentType().startsWith(requiredMimePrefix)) {
             throw new UploadRejectedException("uploadIds", "Every product asset must be an image");
@@ -294,9 +312,13 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     private String typeSentence() {
-        List<String> extensions = new java.util.ArrayList<>();
-        properties.upload().mediaExtensions().stream().map(e -> "." + e).forEach(extensions::add);
-        properties.upload().productImageExtensions().stream().map(e -> "." + e).forEach(extensions::add);
+        List<String> extensions = new java.util.ArrayList<>(properties.upload().mediaExtensions());
+        extensions.addAll(properties.upload().productImageExtensions());
+        return typeSentence(extensions);
+    }
+
+    private static String typeSentence(List<String> allowedExtensions) {
+        List<String> extensions = allowedExtensions.stream().map(e -> "." + e).toList();
         String allowed = extensions.size() == 1 ? extensions.getFirst()
                 : String.join(", ", extensions.subList(0, extensions.size() - 1)) + " or " + extensions.getLast();
         return "This file type can't be checked yet. Use " + allowed + ".";

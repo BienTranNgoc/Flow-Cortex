@@ -1,6 +1,8 @@
 package com.flowcortex.app.capabilities;
 
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,9 +36,10 @@ public class CapabilitiesController {
 
     @GetMapping(value = "/capabilities", produces = MediaType.APPLICATION_JSON_VALUE)
     public CapabilitiesResponse capabilities() {
-        return new CapabilitiesResponse(mediaJobs.isEnabled(), productVideoEnabled);
+        return new CapabilitiesResponse(mediaJobs.isEnabled(), productVideoEnabled, ProductVideoWorkflow.ID);
     }
 
-    public record CapabilitiesResponse(boolean mediaEnabled, boolean productVideoEnabled) {
+    /** {@code productVideoWorkflowId} lets the SPA tell the Product Video workflow apart without its own copy of the id. */
+    public record CapabilitiesResponse(boolean mediaEnabled, boolean productVideoEnabled, UUID productVideoWorkflowId) {
     }
 }

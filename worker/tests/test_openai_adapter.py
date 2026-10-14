@@ -3,8 +3,8 @@
 The HTTP call is hand-rolled with `urllib.request`; the tests mock `urllib.request.urlopen` to
 return a pre-built response body, so the adapter is exercised through its real call site
 without a network round trip. Regression coverage for the `extra_content.google.thought_signature`
-field that the Vilao proxy injects is intentional: the OpenAI SDK rejects unknown fields on
-parse, so a future rewrite that re-introduces the SDK must keep this assertion green.
+field that an OpenAI-compatible proxy injects is intentional: the OpenAI SDK rejects unknown
+fields on parse, so a future rewrite that re-introduces the SDK must keep this assertion green.
 """
 
 from __future__ import annotations
@@ -107,15 +107,15 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
 
 
 def test_generate_script_ignores_proxy_extra_content(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A Google-style `extra_content` block (added by the Vilao proxy on top of the OpenAI
-    shape) must not break parsing — the adapter reads only `choices[0].message.content`."""
+    """A Google-style `extra_content` block (added by an OpenAI-compatible proxy) must not break
+    parsing — the adapter reads only `choices[0].message.content`."""
     body = _ok_body(json.dumps({"script": "Hook. Lợi ích. Đặt mua ngay"}))
     body["choices"][0]["message"]["extra_content"] = {
         "google": {"thought_signature": "EmkKZwFpFH0TF1Uvm5uSzlFg..."}
     }
     _patch_urlopen(monkeypatch, _http_response(body))
 
-    adapter = _adapter("https://api.vilao.ai/v1")
+    adapter = _adapter("https://llm-proxy.example/v1")
 
     assert adapter.generate_script(SAMPLE_PAYLOAD) == "Hook. Lợi ích. Đặt mua ngay"
 
@@ -250,19 +250,26 @@ def test_select_adapter_rejects_unknown_provider() -> None:
         openai_adapter.select_adapter("anthropic", "k")
 
 
-def test_build_adapter_falls_back_to_fixture_when_provider_is_unrecognised(
+def test_build_adapter_rejects_an_unrecognised_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("PROVIDER_ADAPTER", "anthropic")
+    monkeypatch.setenv("PROVIDER_ADAPTER", "opnai")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
-    adapter = provider_main._build_adapter()
-    assert adapter.__class__.__name__ == "FixtureProviderAdapter"
+    with pytest.raises(RuntimeError, match=r"PROVIDER_ADAPTER.*opnai.*fixture, openai"):
+        provider_main._build_adapter()
 
+
+def test_build_adapter_defaults_to_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PROVIDER_ADAPTER", raising=False)
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    assert provider_main._build_adapter().__class__.__name__ == "FixtureProviderAdapter"
 
 
 def test_build_adapter_uses_openai_when_provider_is_openai(

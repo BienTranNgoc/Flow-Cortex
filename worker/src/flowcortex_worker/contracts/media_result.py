@@ -40,6 +40,8 @@ class MediaError(BaseModel):
             "audio_alignment_failed",
             "audio_alignment_out_of_range",
             "provider_capability_unavailable",
+            "provider_request_failed",
+            "provider_response_invalid",
             "contract_violation",
             "run_timeout",
         ],

@@ -29,6 +29,7 @@ from .openai_adapter import (
 
 log = logging.getLogger("flowcortex_provider_worker")
 
+PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
 
@@ -110,14 +111,19 @@ def main() -> int:
 
 def _build_adapter() -> ProviderAdapter:
     """Pick the adapter from env. Default is `fixture` — no secrets needed, fully deterministic.
-    Set PROVIDER_ADAPTER=openai (and OPENAI_API_KEY) to use the real model."""
+    Set PROVIDER_ADAPTER=openai (and OPENAI_API_KEY) to use the real model; any other value
+    fails at startup rather than silently serving fixture output."""
     provider = os.environ.get("PROVIDER_ADAPTER", "fixture").strip().lower()
-    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if provider == PROVIDER_OPENAI:
-        chosen = select_adapter(provider, openai_key)
+        chosen = select_adapter(provider, os.environ.get("OPENAI_API_KEY", "").strip())
         log.info("provider adapter selected", extra={"provider": provider})
         return chosen
-    log.info("provider adapter selected", extra={"provider": "fixture"})
+    if provider != PROVIDER_FIXTURE:
+        raise RuntimeError(
+            f"Unknown PROVIDER_ADAPTER '{provider}'; accepted values: {PROVIDER_FIXTURE}, "
+            f"{PROVIDER_OPENAI}"
+        )
+    log.info("provider adapter selected", extra={"provider": PROVIDER_FIXTURE})
     return FixtureProviderAdapter()
 
 

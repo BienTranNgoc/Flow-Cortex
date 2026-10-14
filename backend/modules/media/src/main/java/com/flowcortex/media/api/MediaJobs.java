@@ -39,7 +39,8 @@ public interface MediaJobs {
     /**
      * The stored object of {@code ownerId}'s upload {@code uploadId}, re-checked, as a job input.
      * The key is derived from both ids, so another owner's upload id finds nothing.
-     * @throws UploadRejectedException on field {@code uploadId} if the object is missing, too large or of another type
+     * @throws UploadRejectedException on field {@code uploadId} if the object is missing, too large or not one of
+     *         the audio/video types
      */
     MediaJobInput resolveUpload(UUID ownerId, UUID uploadId);
 
@@ -51,6 +52,7 @@ public interface MediaJobs {
      * object into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket first. The uploads bucket
      * expires objects after a day while an approval may wait far longer, so only the copy is bound.
      * @return the bound inputs, each pointing at its copy in the media bucket
+     * @throws UploadRejectedException on field {@code uploadIds} if an upload vanished before it was copied
      */
     List<MediaAssetInput> bindRunInputs(UUID runId, List<MediaAssetInput> inputs);
 

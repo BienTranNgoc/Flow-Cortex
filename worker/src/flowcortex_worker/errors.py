@@ -33,6 +33,9 @@ class TransientError(Exception):
         self.retry_after_seconds = retry_after_seconds
 
 
+MAX_BACKOFF_SECONDS = 60.0
+
+
 def backoff_seconds(delivery_count: int) -> float:
     """Wait before returning a transient failure: 5 s doubling per earlier delivery, capped."""
-    return float(min(5 * 2 ** min(delivery_count, 4), 60))
+    return float(min(5 * 2 ** min(delivery_count, 4), MAX_BACKOFF_SECONDS))

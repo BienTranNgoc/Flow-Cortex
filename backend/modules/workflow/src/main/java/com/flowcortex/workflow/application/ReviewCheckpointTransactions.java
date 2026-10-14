@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.RunStep;
@@ -66,7 +67,7 @@ class ReviewCheckpointTransactions {
     }
 
     private static boolean isProductVideo(WorkflowRun run) {
-        return ProductVideoService.WORKFLOW_ID.equals(run.getWorkflowId());
+        return ProductVideoWorkflow.ID.equals(run.getWorkflowId());
     }
 
     private String scriptFrom(String payload) {

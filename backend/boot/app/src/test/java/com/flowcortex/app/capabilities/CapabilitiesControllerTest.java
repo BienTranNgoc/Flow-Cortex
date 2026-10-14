@@ -36,4 +36,11 @@ class CapabilitiesControllerTest {
                 .andExpect(jsonPath("$.mediaEnabled").value(true))
                 .andExpect(jsonPath("$.productVideoEnabled").value(false));
     }
+
+    @Test
+    void capabilitiesNameTheSeededProductVideoWorkflow() throws Exception {
+        mockMvc.perform(get("/api/v1/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productVideoWorkflowId").value("9aa35334-b672-4b6c-93e8-1a4c2cc14301"));
+    }
 }

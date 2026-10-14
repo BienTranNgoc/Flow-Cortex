@@ -49,6 +49,10 @@ function file(name: string, size = 10) {
 function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> = {}) {
   const calls = stubApi({
     'GET /api/v1/workflows/w1': { status: 200, body: workflow },
+    'GET /api/v1/capabilities': {
+      status: 200,
+      body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'pv' },
+    },
     'POST /api/v1/uploads': { status: 201, body: GRANT },
     'POST /api/v1/workflows/w1/runs': { status: 200, body: { id: 'r1', status: 'running' } },
     ...routes,
@@ -104,6 +108,47 @@ describe('WorkflowDetailPage', () => {
     expect(
       screen.queryByRole('form', { name: 'Start a product video run' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the Product Video form for the workflow the capabilities name as Product Video', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/capabilities': {
+        status: 200,
+        body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'w1' },
+      },
+    });
+
+    expect(
+      await screen.findByRole('form', { name: 'Start a product video run' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Media file')).not.toBeInTheDocument();
+  });
+
+  it('shows no start form until the capabilities say which workflow is Product Video', async () => {
+    let answer: (reply: FakeReply) => void = () => {};
+    const { queryClient } = renderForm(CHECK, {
+      'GET /api/v1/capabilities': () => new Promise<FakeReply>((resolve) => (answer = resolve)),
+    });
+
+    await waitFor(() => expect(queryClient.isFetching()).toBe(1));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(screen.queryByLabelText('Media file')).not.toBeInTheDocument();
+
+    answer({
+      status: 200,
+      body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'pv' },
+    });
+    expect(await screen.findByLabelText('Media file')).toBeInTheDocument();
+  });
+
+  it('still offers the workflow its own start form when the capabilities fail to load', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/capabilities': { status: 500, body: { status: 500 } },
+    });
+
+    expect(await screen.findByLabelText('Media file')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading workflow…')).not.toBeInTheDocument();
   });
 
   describe('a workflow whose first step is remote', () => {

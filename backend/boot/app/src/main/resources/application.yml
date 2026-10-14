@@ -202,10 +202,9 @@ flowcortex:
     upload:
       max-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}
       # Each extension must map to a canonical MIME type in MediaProperties, or startup fails.
-      # `extensions` is the audio/video allowlist (worker render); `product-image-extensions` is
-      # the image allowlist (product-video feature). The two are independent: a deployment that
-      # only does video can keep the image list empty by not setting the env var (and we set a
-      # default of jpg/jpeg/png/webp for safety).
+      # `extensions` is the audio/video allowlist (the only types a media capability takes as
+      # input); `product-image-extensions` is the image allowlist (product-video feature). Neither
+      # may be empty: an empty list fails startup, so leave the env var unset to keep the default.
       extensions: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:mp4,mov,webm,mkv,m4a,mp3,wav}
       product-image-extensions: ${FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS:jpg,jpeg,png,webp}
       url-ttl: 15m

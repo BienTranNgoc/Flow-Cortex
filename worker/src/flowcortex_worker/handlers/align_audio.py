@@ -1,8 +1,8 @@
 """Aligns the TTS speech track to the source video timeline.
 
 The speech asset from ``generate_speech`` has its own natural duration, which rarely matches
-the source video. Rather than stretching the voice audibly, the track is padded or nudged with
-``atempo`` inside a bounded ratio, so segments keep their provider timings and only the
+the source video. Rather than stretching the voice audibly, the track is padded or sped up
+with ``atempo`` by at most 1.5x, so segments keep their provider timings and only the
 silence/overlap at the edges is absorbed.
 """
 
@@ -23,10 +23,9 @@ OUTPUT_NAME = "aligned-speech.wav"
 OUTPUT_MIME = "audio/wav"
 MANIFEST_NAME = "alignment-manifest.json"
 
-# ffmpeg's atempo filter only accepts 0.5-2.0 per instance; chaining keeps wider ratios legal.
-MIN_TEMPO = 0.5
-MAX_TEMPO = 2.0
-MAX_CHAINED_TEMPO = 8
+# Total speed-up allowed; faster speech is unintelligible, so beyond it the run goes back to
+# review. Stays inside a single ffmpeg atempo instance (0.5-2.0).
+MAX_SPEEDUP = 1.5
 
 # A short track is padded with silence rather than stretched; the cap is relative to the
 # source so a two-second clip is not padded to a fixed absolute length. Beyond it the track
@@ -159,11 +158,11 @@ def plan_alignment(speech_seconds: float, target_seconds: float) -> tuple[float,
         return 1.0, pad
 
     tempo = speech_seconds / target_seconds
-    if tempo < MIN_TEMPO or tempo > MAX_TEMPO * MAX_CHAINED_TEMPO:
+    if tempo > MAX_SPEEDUP:
         raise PermanentError(
             "audio_alignment_out_of_range",
-            f"speech is {speech_seconds:.3f}s against a {target_seconds:.3f}s target, "
-            f"beyond the supported tempo range",
+            f"speech is {speech_seconds:.3f}s against a {target_seconds:.3f}s target: "
+            f"it would need a {tempo:.2f}x speed-up, above the {MAX_SPEEDUP}x limit",
         )
     return tempo, 0.0
 
@@ -171,26 +170,12 @@ def plan_alignment(speech_seconds: float, target_seconds: float) -> tuple[float,
 def _filter_graph(tempo: float, pad_seconds: float) -> str:
     parts: list[str] = []
     if abs(tempo - 1.0) > 1e-6:
-        parts.extend(_chain_tempo(tempo))
+        parts.append(f"atempo={tempo:.6f}")
     if pad_seconds > 0:
         parts.append(f"apad=pad_dur={pad_seconds:.3f}")
     # apad extends the tail, so the natural end of the graph is already the target length;
     # trimming here would cut the pad back off.
     return ",".join(parts) if parts else "anull"
-
-
-def _chain_tempo(tempo: float) -> list[str]:
-    """atempo accepts 0.5-2.0, so a wider ratio is applied as repeated filter instances."""
-    remaining = tempo
-    filters: list[str] = []
-    while remaining > MAX_TEMPO:
-        filters.append(f"atempo={MAX_TEMPO}")
-        remaining /= MAX_TEMPO
-    while remaining < MIN_TEMPO:
-        filters.append(f"atempo={MIN_TEMPO}")
-        remaining /= MIN_TEMPO
-    filters.append(f"atempo={remaining:.6f}")
-    return filters
 
 
 def _duration_seconds(path: Path, processes: ProcessRunner) -> float:

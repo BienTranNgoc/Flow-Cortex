@@ -279,6 +279,7 @@ export interface HealthResponse {
 export interface CapabilitiesResponse {
   mediaEnabled?: boolean;
   productVideoEnabled?: boolean;
+  productVideoWorkflowId?: string;
 }
 
 export interface AdminRunResponse {

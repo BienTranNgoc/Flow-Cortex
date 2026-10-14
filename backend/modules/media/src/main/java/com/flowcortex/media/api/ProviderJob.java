@@ -19,10 +19,17 @@ public record ProviderJob(
         @NotNull @Min(1) Integer stepOrder,
         @NotBlank String capability,
         @NotNull Map<String, Object> params,
-        @NotNull @Pattern(regexp = MediaJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
+        @NotNull @Pattern(regexp = ProviderJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,
         @NotNull @Min(1) Integer maxRuntimeSeconds,
         @NotNull Instant issuedAt) {
+
+    /**
+     * Same pattern as {@code outputPrefix} in the provider job schema: attempt-scoped only, unlike
+     * {@link MediaJob#OUTPUT_PREFIX_PATTERN}, which still accepts the shape without an attempt.
+     */
+    public static final String OUTPUT_PREFIX_PATTERN =
+            "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$";
 
     @AssertTrue(message = "correlationId must equal runId")
     @JsonIgnore

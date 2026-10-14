@@ -6,6 +6,7 @@ import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.ProductVideoInput;
 import com.flowcortex.workflow.domain.RunStep;
@@ -33,8 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
 /** Starts the seeded Product Video workflow with an immutable product/asset snapshot. */
 @Service
 public class ProductVideoService {
-
-    public static final UUID WORKFLOW_ID = UUID.fromString("9aa35334-b672-4b6c-93e8-1a4c2cc14301");
 
     private final WorkflowRepository workflows;
     private final WorkflowStepRepository workflowSteps;
@@ -76,15 +75,15 @@ public class ProductVideoService {
         if (!mediaJobs.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
         }
-        Workflow workflow = workflows.findVisibleTo(WORKFLOW_ID, ownerId)
+        Workflow workflow = workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)
                 .orElseThrow(() -> new NotFoundException("Product Video workflow is not installed"));
-        List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(WORKFLOW_ID);
+        List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
         String productJson = productJson(draft);
         Instant now = Instant.now();
 
         return transactions.execute(status -> {
-            WorkflowRun run = runs.save(new WorkflowRun(UUID.randomUUID(), WORKFLOW_ID, ownerId, productJson, now));
+            WorkflowRun run = runs.save(new WorkflowRun(UUID.randomUUID(), ProductVideoWorkflow.ID, ownerId, productJson, now));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
             List<MediaAssetInput> bound = mediaJobs.bindRunInputs(run.getId(), assets);

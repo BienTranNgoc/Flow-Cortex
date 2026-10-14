@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaJob;
@@ -27,6 +28,8 @@ import java.util.Map;
 class RemoteStepExecutor implements StepExecutor {
 
     private static final TypeReference<Map<String, Object>> PARAMS = new TypeReference<>() { };
+    /** A run binds at most this many uploaded assets ({@link MediaJobs#bindRunInputs}). */
+    private static final int MAX_BOUND_ASSETS = 10;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String capability;
@@ -85,7 +88,8 @@ class RemoteStepExecutor implements StepExecutor {
         }
         MediaLimits limits = mediaJobs.limitsFor(capability);
         MediaJob job = new MediaJob("1", context.stepId(), context.runId(), context.runId(), context.stepOrder(),
-                MediaCapability.fromValue(capability), jobInputs(context.input()), params(context.config()),
+                MediaCapability.fromValue(capability), jobInputs(context.input(), context.config()),
+                params(context.config()),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()), (int) context.attempt(),
                 Math.toIntExact(limits.maxRuntime().toSeconds()), limits.maxInputBytes(), clock.instant());
         try {
@@ -97,15 +101,18 @@ class RemoteStepExecutor implements StepExecutor {
         return null;
     }
 
-    /** The {@code {key, bucket, objectKey}} reference stored on the step when its run started. */
-    private List<MediaJobInput> jobInputs(String storedInput) {
+    /**
+     * The {@code {key, bucket, objectKey}} references stored on the step when its run started, plus
+     * one per {@code outputInputs} entry of its config once {@link RunAdvancer} has appended them.
+     */
+    private List<MediaJobInput> jobInputs(String storedInput, String config) {
         if (storedInput == null || storedInput.isBlank()) {
             throw new StepFailedException("contract_violation", "The step has no input object to process");
         }
         try {
             if (objectMapper.readTree(storedInput).isArray()) {
                 List<MediaJobInput> inputs = objectMapper.readValue(storedInput, new TypeReference<>() { });
-                int maximum = capability.equals("render_video") ? 11 : 10;
+                int maximum = MAX_BOUND_ASSETS + outputInputCount(config);
                 if (inputs.isEmpty() || inputs.size() > maximum) {
                     throw new StepFailedException("contract_violation",
                             "The step must have between 1 and " + maximum + " inputs");
@@ -116,6 +123,18 @@ class RemoteStepExecutor implements StepExecutor {
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation",
                     "The step input is not an object reference or an ordered list of object references", e);
+        }
+    }
+
+    private int outputInputCount(String config) {
+        if (config == null || config.isBlank()) {
+            return 0;
+        }
+        try {
+            JsonNode mappings = objectMapper.readTree(config).get("outputInputs");
+            return mappings != null && mappings.isArray() ? mappings.size() : 0;
+        } catch (JsonProcessingException e) {
+            throw new StepFailedException("contract_violation", "The step config is not a JSON object", e);
         }
     }
 

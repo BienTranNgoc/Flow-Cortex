@@ -6,24 +6,30 @@ set -eu
 
 : "${RABBITMQ_NODENAME:?}" "${PROVIDER_RABBITMQ_USER:?}" "${PROVIDER_RABBITMQ_PASS:?}"
 
+# provider-worker puts both values in its AMQP URL as is, and they are embedded in JSON below.
+case "${PROVIDER_RABBITMQ_USER}${PROVIDER_RABBITMQ_PASS}" in
+    *[!A-Za-z0-9._~-]*)
+        echo "rabbitmq-init: PROVIDER_RABBITMQ_USER/PROVIDER_RABBITMQ_PASS may use only letters, digits and . _ ~ -" >&2
+        exit 1
+        ;;
+    *) ;;
+esac
+
 rabbitmqctl -n "$RABBITMQ_NODENAME" await_startup
 
-if rabbitmqctl -n "$RABBITMQ_NODENAME" --silent list_users \
-    | cut -f1 | grep -Fxq "$PROVIDER_RABBITMQ_USER"; then
-    rabbitmqctl -n "$RABBITMQ_NODENAME" change_password \
-        "$PROVIDER_RABBITMQ_USER" "$PROVIDER_RABBITMQ_PASS"
-else
-    rabbitmqctl -n "$RABBITMQ_NODENAME" add_user \
-        "$PROVIDER_RABBITMQ_USER" "$PROVIDER_RABBITMQ_PASS"
-fi
-
-# Remove administrator/management tags if an existing local user was previously over-privileged.
-rabbitmqctl -n "$RABBITMQ_NODENAME" set_user_tags "$PROVIDER_RABBITMQ_USER"
-
-# configure, write, read regexes respectively. Topology is declared by the backend, so the
-# provider needs no configure permission. It publishes only to exchange `provider` and consumes
-# only queue `provider.jobs`.
-rabbitmqctl -n "$RABBITMQ_NODENAME" set_permissions -p / \
-    "$PROVIDER_RABBITMQ_USER" '^$' '^provider$' '^provider\.jobs$'
+# add_user/change_password take the password as an argument, and their stdin prompt needs a
+# terminal, so the identity goes in as a definitions file: a private temp file whose path is
+# the only argument. Importing creates the user or replaces its password, clears its tags
+# (an earlier over-privileged local user loses them) and sets its permissions, so a re-run
+# converges. Permissions are configure, write, read: topology is declared by the backend, so
+# no configure; publish only to exchange `provider`; consume only queue `provider.jobs`.
+umask 077
+DEFS=$(mktemp)
+trap 'rm -f "$DEFS"' EXIT
+printf '%s\n' \
+    "{\"users\":[{\"name\":\"$PROVIDER_RABBITMQ_USER\",\"password\":\"$PROVIDER_RABBITMQ_PASS\",\"tags\":[]}]," \
+    "\"permissions\":[{\"user\":\"$PROVIDER_RABBITMQ_USER\",\"vhost\":\"/\"," \
+    '"configure":"^$","write":"^provider$","read":"^provider\\.jobs$"}]}' >"$DEFS"
+rabbitmqctl -n "$RABBITMQ_NODENAME" import_definitions --format json "$DEFS"
 
 echo "rabbitmq-init: provider identity ready"

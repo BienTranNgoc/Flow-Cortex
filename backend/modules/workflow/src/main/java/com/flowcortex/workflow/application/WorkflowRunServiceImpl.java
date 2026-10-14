@@ -13,6 +13,7 @@ import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
@@ -120,7 +121,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Workflow execution is currently disabled");
         }
-        if (ProductVideoService.WORKFLOW_ID.equals(workflowId)) {
+        if (ProductVideoWorkflow.ID.equals(workflowId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Start Product Video through /api/v1/product-videos/runs");
         }

@@ -13,6 +13,7 @@ import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.ProductVideoDraft;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.ProductVideoInput;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
@@ -67,7 +68,7 @@ class ProductVideoServiceTest {
         UUID ownerId = UUID.randomUUID();
         UUID firstUpload = UUID.randomUUID();
         UUID secondUpload = UUID.randomUUID();
-        Workflow workflow = new Workflow(ProductVideoService.WORKFLOW_ID, UUID.randomUUID(), "Product Video", true);
+        Workflow workflow = new Workflow(ProductVideoWorkflow.ID, UUID.randomUUID(), "Product Video", true);
         List<WorkflowStep> definitions = List.of(
                 step(1, "generate_script"),
                 step(2, "APPROVAL_CHECKPOINT"),
@@ -77,8 +78,8 @@ class ProductVideoServiceTest {
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "uploads", "first")),
                 new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "uploads", "second")));
         when(media.isEnabled()).thenReturn(true);
-        when(workflows.findVisibleTo(ProductVideoService.WORKFLOW_ID, ownerId)).thenReturn(Optional.of(workflow));
-        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoService.WORKFLOW_ID))
+        when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
                 .thenReturn(definitions);
         when(media.resolveImageUploads(ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
         when(media.bindRunInputs(any(), eq(assets))).thenReturn(List.of(
@@ -107,7 +108,7 @@ class ProductVideoServiceTest {
     }
 
     private static WorkflowStep step(int order, String type) {
-        return new WorkflowStep(UUID.randomUUID(), ProductVideoService.WORKFLOW_ID, (short) order,
+        return new WorkflowStep(UUID.randomUUID(), ProductVideoWorkflow.ID, (short) order,
                 "step-" + order, type, null);
     }
 

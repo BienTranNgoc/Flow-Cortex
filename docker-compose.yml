@@ -57,8 +57,8 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Creates the restricted broker identity used by provider-worker. The shared data volume gives
-  # rabbitmqctl the node cookie; no management password is passed on a command line.
+  # Creates the restricted broker identity used by provider-worker. The data volume, read-only,
+  # gives rabbitmqctl the node cookie; no password is passed on a command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
     entrypoint: ["/bin/sh", "/init/init.sh"]
@@ -67,7 +67,7 @@ services:
       PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
       PROVIDER_RABBITMQ_PASS: ${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq:ro
       - ./infra/rabbitmq:/init:ro
     depends_on:
       rabbitmq:
@@ -97,7 +97,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Buckets, uploads lifecycle, and one least-privilege user per service.
+  # Buckets, lifecycles, and one least-privilege user per service.
   # Root credentials exist only here and in `minio`. Idempotent; never restarted.
   minio-init:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
@@ -111,6 +111,8 @@ services:
       WORKER_S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
       PROVIDER_S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
       PROVIDER_S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      # Expiry of run-input copies in the media bucket; must outlast the longest review wait.
+      RUN_INPUT_RETENTION_DAYS: ${RUN_INPUT_RETENTION_DAYS:-30}
     volumes:
       - ./infra/minio:/init:ro
     depends_on:
@@ -170,6 +172,8 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
+      FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
+      FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:-524288000}
       FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:-mp4,mov,webm,mkv,m4a,mp3,wav}
       FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS:-jpg,jpeg,png,webp}
