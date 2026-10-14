@@ -15,8 +15,9 @@ import java.util.TreeSet;
 import org.hibernate.validator.constraintvalidation.HibernateConstraintValidatorContext;
 
 /**
- * Every step of a new workflow names a type the engine can run, and a remote type only as the
- * first step — its input is the caller's uploaded file, which only the first step receives.
+ * Every step of a new workflow names a type the engine can run. A type that consumes assets
+ * snapshotted at run start is valid only when the workflow starts with that input model;
+ * provider-backed remote steps resolve ordinary run/prior-step data and do not share this rule.
  * Violations are reported per step as {@code steps[i].type}, the path the shared 400 handler
  * puts under {@code errors}.
  */
@@ -35,7 +36,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     /** The steps being created, with the types the registry knows and those of them that run remotely. */
     @KnownStepTypes
-    record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> remoteTypes) {
+    record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
@@ -54,14 +55,15 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
             List<NewWorkflowStep> steps = definition.steps();
 
-            boolean startsRemote = !steps.isEmpty() && definition.remoteTypes().contains(steps.get(0).type());
+            boolean startsWithStoredInput = !steps.isEmpty()
+                    && definition.storedInputTypes().contains(steps.get(0).type());
 
             for (int i = 0; i < steps.size(); i++) {
                 String type = steps.get(i).type();
                 if (!allowedTypes.contains(type)) {
                     valid = false;
                     violation(hibernateContext, template, type, i);
-                } else if (definition.remoteTypes().contains(type) && !startsRemote) {
+                } else if (definition.storedInputTypes().contains(type) && !startsWithStoredInput) {
                     valid = false;
                     violation(hibernateContext, "'{type}' needs an uploaded file, so the workflow must start with a media step", type, i);
                 }

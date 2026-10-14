@@ -13,6 +13,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
 
     private static final String SIZE_SENTENCE = "Files must be between 1 byte and 500 MB.";
     private static final String TYPE_SENTENCE =
-            "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.";
+            "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3, .wav, .jpg, .jpeg, .png or .webp.";
     private static final byte[] CLIP = "sixteen bytes!!!".getBytes();
 
     record UploadRequestView(String fileName, Long size) {
@@ -124,6 +125,30 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
             assertThat(head.contentLength()).isEqualTo(CLIP.length);
             assertThat(head.contentType()).isEqualTo("video/mp4");
         }
+    }
+
+    @Test
+    void orderedImageUploadsAreRegisteredAndBoundToTheRun() throws IOException {
+        UserView user = newUser("uploads-images");
+        String token = loginAs(user);
+        WorkflowView workflow = newWorkflow(user.id(), false,
+                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+        UploadResponseView first = grant(token, "first.png", CLIP.length).getBody();
+        UploadResponseView second = grant(token, "second.webp", CLIP.length).getBody();
+        assertThat(put(first, "image/png", CLIP.length, CLIP.length, null)).isEqualTo(200);
+        assertThat(put(second, "image/webp", CLIP.length, CLIP.length, null)).isEqualTo(200);
+
+        ResponseEntity<String> response = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("uploadIds", List.of(first.uploadId(), second.uploadId())), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        UUID runId = jdbc.queryForObject("SELECT id FROM workflow_run WHERE workflow_id = ?", UUID.class,
+                workflow.id());
+        assertThat(jdbc.query("SELECT binding_key, asset_id FROM media_asset_binding WHERE run_id = ? "
+                + "ORDER BY position", (row, index) -> Map.entry(row.getString(1), row.getObject(2, UUID.class)),
+                runId)).containsExactly(Map.entry("image_1", first.uploadId()), Map.entry("image_2", second.uploadId()));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM media_asset WHERE owner_id = ? AND status = 'ready'",
+                Long.class, user.id())).isEqualTo(2L);
     }
 
     @Test

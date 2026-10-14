@@ -4,15 +4,30 @@ import {
   authHeaders,
   getOutputUrl,
   getReviewTasks,
+  getRevisions,
   getRun,
   getWorkflow,
   listWorkflows,
   rejectTask,
   requestUpload,
+  saveRevision,
+  startProductVideoRun,
   startRun,
   unwrap,
 } from '@flow-cortex/api-client';
-import type { StartRunRequest, UploadRequest } from '@flow-cortex/api-client';
+import type {
+  ApproveReviewTaskRequest,
+  ProductVideoRunRequest,
+  StartRunRequest,
+  UploadRequest,
+} from '@flow-cortex/api-client';
+
+/** What a reviewer decided: the edited text for a plain checkpoint, the revision for a script one. */
+export interface ApproveTaskInput {
+  reviewedPayload?: string | undefined;
+  revisionId?: string | undefined;
+  expectedVersion?: number | undefined;
+}
 
 /** ALL authenticated users (owner OR shared) — no admin gate. */
 export function useWorkflowsQuery() {
@@ -33,6 +48,16 @@ export function useWorkflowQuery(id: string) {
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
     mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+  });
+}
+
+/** Product Video has its own endpoint: typed request (product input + ordered upload ids) and a
+ * fixed 9:16 video config. The same call goes through the orchestration layer used by the demo
+ * workflows, so the run-progress page and approval checkpoint pick it up unchanged. */
+export function useStartProductVideoRunMutation() {
+  return useMutation({
+    mutationFn: (body: ProductVideoRunRequest) =>
+      unwrap(startProductVideoRun(body, authHeaders())),
   });
 }
 
@@ -76,20 +101,58 @@ export function useReviewTasksQuery(runId: string) {
   });
 }
 
-/** `reviewedPayload` is sent only when the reviewer changed the content. */
+/**
+ * The task's immutable script revisions, newest number last. Only a task that opted into revisions
+ * (`currentRevisionId` set) has any; the panel reads the list for those alone.
+ */
+export function useRevisionsQuery(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ['review-tasks', taskId, 'revisions'],
+    queryFn: () => unwrap(getRevisions(taskId as string, authHeaders())),
+    enabled: Boolean(taskId),
+  });
+}
+
+/** One revision, appended to the task's own list — the task's `version` comes back on the response. */
+export function useSaveRevisionMutation(runId: string, taskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { content: string; expectedVersion: number }) =>
+      unwrap(saveRevision(taskId, body, authHeaders())),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['review-tasks', taskId, 'revisions'] });
+      queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+}
+
+/**
+ * `reviewedPayload` is sent only when the reviewer changed the content — but a task that keeps
+ * script revisions must always name the revision and the task version it saw, or the server
+ * rejects the decision with a 409 instead of approving something the reviewer never read.
+ */
 export function useApproveTaskMutation(runId: string, taskId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reviewedPayload: string | undefined) =>
-      unwrap(
-        approveTask(
-          taskId,
-          reviewedPayload === undefined ? undefined : { reviewedPayload },
-          authHeaders(),
-        ),
-      ),
+    mutationFn: (input: ApproveTaskInput) =>
+      unwrap(approveTask(taskId, approveBody(input), authHeaders())),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['runs', runId] }),
   });
+}
+
+/**
+ * A plain checkpoint approves the edited text; a script checkpoint names the revision it saw.
+ * `exactOptionalPropertyTypes` rejects an explicit `undefined`, so a field that is not part of
+ * this decision is omitted from the body rather than sent as null.
+ */
+function approveBody(input: ApproveTaskInput): ApproveReviewTaskRequest | undefined {
+  if (input.revisionId !== undefined || input.expectedVersion !== undefined) {
+    return {
+      ...(input.revisionId === undefined ? {} : { revisionId: input.revisionId }),
+      ...(input.expectedVersion === undefined ? {} : { expectedVersion: input.expectedVersion }),
+    };
+  }
+  return input.reviewedPayload === undefined ? undefined : { reviewedPayload: input.reviewedPayload };
 }
 
 export function useRejectTaskMutation(runId: string, taskId: string) {

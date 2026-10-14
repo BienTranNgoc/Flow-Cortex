@@ -141,7 +141,7 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
         assertThat(inFlight.steps().get(0).status()).isEqualTo("running");
 
         MediaOutput details = new MediaOutput("video-details.json", "flowcortex-media",
-                "runs/" + runId + "/steps/1/video-details.json", "application/json", 42L, null);
+                "runs/" + runId + "/steps/1/attempts/1/video-details.json", "application/json", 42L, null);
         publish(new MediaJobCompleted(new MediaResult("1", stepId, runId, 1, 1, MediaResult.Status.COMPLETED,
                 List.of(details), Map.of("videoCodec", "h264"), null, Instant.now(), "worker-it")));
 

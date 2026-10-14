@@ -30,9 +30,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.NestedExceptionUtils;
 
 /**
- * The broker topology the worker expects, declared by this backend only: a direct exchange
- * {@code media} whose unroutable messages are kept on {@code media.unrouted}, three quorum queues
- * that dead-letter to {@code media.dlx} under their original routing key, and a DLQ for each.
+ * The broker topology the media and provider runtimes expect, declared by this backend only.
+ * Each runtime gets a direct exchange, an unrouted queue, job/result/progress quorum queues,
+ * a dedicated dead-letter exchange and a DLQ per route.
  */
 @Configuration(proxyBeanMethods = false)
 class MediaTopologyConfig {
@@ -46,9 +46,15 @@ class MediaTopologyConfig {
     static final String JOB_KEY = "job";
     static final String RESULT_KEY = "result";
     static final String PROGRESS_KEY = "progress";
+    static final String PROVIDER_EXCHANGE = "provider";
+    static final String PROVIDER_UNROUTED = "provider.unrouted";
+    static final String PROVIDER_DEAD_LETTER_EXCHANGE = "provider.dlx";
+    static final String PROVIDER_JOBS = "provider.jobs";
+    static final String PROVIDER_RESULTS = "provider.results";
+    static final String PROVIDER_PROGRESS = "provider.progress";
     /**
      * Returns of a job the broker counts before it dead-letters it. A constant, not a setting: queue
-     * arguments are immutable once the queue exists, so a new value means re-creating {@code media.jobs}.
+     * arguments are immutable once the queue exists, so a new value means re-creating the job queues.
      */
     static final int JOB_DELIVERY_LIMIT = 3;
 
@@ -68,12 +74,38 @@ class MediaTopologyConfig {
         Queue jobsDlq = QueueBuilder.durable(JOBS + ".dlq").quorum().build();
         Queue resultsDlq = QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
         Queue progressDlq = QueueBuilder.durable(PROGRESS + ".dlq").quorum().build();
+        DirectExchange provider = ExchangeBuilder.directExchange(PROVIDER_EXCHANGE).durable(true)
+                .alternate(PROVIDER_UNROUTED).build();
+        FanoutExchange providerUnrouted = ExchangeBuilder.fanoutExchange(PROVIDER_UNROUTED).durable(true).build();
+        DirectExchange providerDeadLetters = ExchangeBuilder.directExchange(PROVIDER_DEAD_LETTER_EXCHANGE)
+                .durable(true).build();
+        Queue providerUnroutedQueue = QueueBuilder.durable(PROVIDER_UNROUTED).quorum().build();
+        Queue providerJobs = QueueBuilder.durable(PROVIDER_JOBS).quorum()
+                .deliveryLimit(JOB_DELIVERY_LIMIT)
+                .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE)
+                .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
+                .build();
+        Queue providerResults = QueueBuilder.durable(PROVIDER_RESULTS).quorum()
+                .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE).build();
+        Queue providerProgress = QueueBuilder.durable(PROVIDER_PROGRESS).quorum()
+                .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE).build();
+        Queue providerJobsDlq = QueueBuilder.durable(PROVIDER_JOBS + ".dlq").quorum().build();
+        Queue providerResultsDlq = QueueBuilder.durable(PROVIDER_RESULTS + ".dlq").quorum().build();
+        Queue providerProgressDlq = QueueBuilder.durable(PROVIDER_PROGRESS + ".dlq").quorum().build();
         return new Declarables(media, unrouted, deadLetters,
                 unroutedQueue, jobs, results, progress, jobsDlq, resultsDlq, progressDlq,
                 BindingBuilder.bind(unroutedQueue).to(unrouted),
                 bind(jobs, media, JOB_KEY), bind(results, media, RESULT_KEY), bind(progress, media, PROGRESS_KEY),
                 bind(jobsDlq, deadLetters, JOB_KEY), bind(resultsDlq, deadLetters, RESULT_KEY),
-                bind(progressDlq, deadLetters, PROGRESS_KEY));
+                bind(progressDlq, deadLetters, PROGRESS_KEY), provider, providerUnrouted, providerDeadLetters,
+                providerUnroutedQueue, providerJobs, providerResults, providerProgress,
+                providerJobsDlq, providerResultsDlq, providerProgressDlq,
+                BindingBuilder.bind(providerUnroutedQueue).to(providerUnrouted),
+                bind(providerJobs, provider, JOB_KEY), bind(providerResults, provider, RESULT_KEY),
+                bind(providerProgress, provider, PROGRESS_KEY),
+                bind(providerJobsDlq, providerDeadLetters, JOB_KEY),
+                bind(providerResultsDlq, providerDeadLetters, RESULT_KEY),
+                bind(providerProgressDlq, providerDeadLetters, PROGRESS_KEY));
     }
 
     /**

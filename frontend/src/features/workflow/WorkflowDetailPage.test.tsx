@@ -2,7 +2,14 @@ import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route } from 'react-router-dom';
-import { renderRoute, stubApi, type FakeReply, type Handler, type RecordedCall } from '../../test/fakeApi';
+import {
+  renderRoute,
+  settled,
+  stubApi,
+  type FakeReply,
+  type Handler,
+  type RecordedCall,
+} from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
 import { WorkflowDetailPage } from './WorkflowDetailPage';
 
@@ -42,11 +49,15 @@ function file(name: string, size = 10) {
 function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> = {}) {
   const calls = stubApi({
     'GET /api/v1/workflows/w1': { status: 200, body: workflow },
+    'GET /api/v1/capabilities': {
+      status: 200,
+      body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'pv' },
+    },
     'POST /api/v1/uploads': { status: 201, body: GRANT },
     'POST /api/v1/workflows/w1/runs': { status: 200, body: { id: 'r1', status: 'running' } },
     ...routes,
   });
-  renderRoute(
+  const view = renderRoute(
     '/workflows/:id',
     '/workflows/w1',
     <>
@@ -58,7 +69,10 @@ function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> 
       <Route path="/workflows" element={<p>Workflows list</p>} />
     </>,
   );
-  return calls;
+  // `calls` is the array tests care about; `queryClient` is exposed so a test can `await
+  // settled(queryClient)` to wait for the workflow fetch before interacting with the Start
+  // button (which stays disabled until the workflow definition lands).
+  return Object.assign(calls, { queryClient: view.queryClient });
 }
 
 function sent(calls: RecordedCall[]) {
@@ -74,6 +88,67 @@ describe('WorkflowDetailPage', () => {
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
+  });
+
+  it('does not show the Product Video form while another workflow is loading', () => {
+    renderForm(CHECK);
+
+    expect(screen.getByText('Loading workflow…')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('form', { name: 'Start a product video run' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show the Product Video form when another workflow fails to load', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/workflows/w1': { status: 500, body: { status: 500 } },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this workflow');
+    expect(
+      screen.queryByRole('form', { name: 'Start a product video run' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the Product Video form for the workflow the capabilities name as Product Video', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/capabilities': {
+        status: 200,
+        body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'w1' },
+      },
+    });
+
+    expect(
+      await screen.findByRole('form', { name: 'Start a product video run' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Media file')).not.toBeInTheDocument();
+  });
+
+  it('shows no start form until the capabilities say which workflow is Product Video', async () => {
+    let answer: (reply: FakeReply) => void = () => {};
+    const { queryClient } = renderForm(CHECK, {
+      'GET /api/v1/capabilities': () => new Promise<FakeReply>((resolve) => (answer = resolve)),
+    });
+
+    await waitFor(() => expect(queryClient.isFetching()).toBe(1));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(screen.queryByLabelText('Media file')).not.toBeInTheDocument();
+
+    answer({
+      status: 200,
+      body: { mediaEnabled: true, productVideoEnabled: true, productVideoWorkflowId: 'pv' },
+    });
+    expect(await screen.findByLabelText('Media file')).toBeInTheDocument();
+  });
+
+  it('still offers the workflow its own start form when the capabilities fail to load', async () => {
+    renderForm(CHECK, {
+      'GET /api/v1/capabilities': { status: 500, body: { status: 500 } },
+    });
+
+    expect(await screen.findByLabelText('Media file')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading workflow…')).not.toBeInTheDocument();
   });
 
   describe('a workflow whose first step is remote', () => {
@@ -92,8 +167,11 @@ describe('WorkflowDetailPage', () => {
     it('asks for a file when Start is pressed without one, and sends nothing', async () => {
       const user = userEvent.setup();
       const calls = renderForm(CHECK);
+      await settled(calls.queryClient);
 
-      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+      const button = await screen.findByRole('button', { name: 'Start run' });
+      expect(button).not.toBeDisabled();
+      await user.click(button);
 
       expect(await screen.findByText('Choose a video or audio file to upload')).toBeInTheDocument();
       expect(sent(calls)).toEqual([]);
@@ -125,7 +203,10 @@ describe('WorkflowDetailPage', () => {
       const user = userEvent.setup();
       renderForm(CHECK);
 
-      await user.upload(await screen.findByLabelText('Media file'), file('IMG_0412.MOV', 1_200_000));
+      await user.upload(
+        await screen.findByLabelText('Media file'),
+        file('IMG_0412.MOV', 1_200_000),
+      );
 
       expect(screen.queryByText(TYPE_SENTENCE)).not.toBeInTheDocument();
       expect(screen.queryByText(SIZE_SENTENCE)).not.toBeInTheDocument();
@@ -165,7 +246,10 @@ describe('WorkflowDetailPage', () => {
 
       act(() => put.progress(5, 10));
       expect(screen.getByRole('button', { name: 'Uploading… 50 %' })).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { name: 'Upload progress' })).toHaveAttribute('value', '50');
+      expect(screen.getByRole('progressbar', { name: 'Upload progress' })).toHaveAttribute(
+        'value',
+        '50',
+      );
 
       act(() => put.respond(200));
       expect(await screen.findByRole('button', { name: 'Starting…' })).toBeInTheDocument();
@@ -173,7 +257,11 @@ describe('WorkflowDetailPage', () => {
 
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
       expect(sent(calls)).toEqual([
-        { method: 'POST', path: '/api/v1/uploads', body: { fileName: 'holiday clip.mp4', size: 10 } },
+        {
+          method: 'POST',
+          path: '/api/v1/uploads',
+          body: { fileName: 'holiday clip.mp4', size: 10 },
+        },
         {
           method: 'POST',
           path: '/api/v1/workflows/w1/runs',
@@ -197,7 +285,10 @@ describe('WorkflowDetailPage', () => {
       act(() => FakeXhr.instances[0]!.respond(200));
 
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
-      expect(sent(calls).map((call) => call.path)).toEqual(['/api/v1/uploads', '/api/v1/workflows/w1/runs']);
+      expect(sent(calls).map((call) => call.path)).toEqual([
+        '/api/v1/uploads',
+        '/api/v1/workflows/w1/runs',
+      ]);
       expect(FakeXhr.instances).toHaveLength(1);
       expect(screen.queryByText('Upload the file again')).not.toBeInTheDocument();
     });
@@ -215,7 +306,10 @@ describe('WorkflowDetailPage', () => {
       act(() => FakeXhr.instances[0]!.respond(200));
 
       await waitFor(() =>
-        expect(sent(calls).map((call) => call.path)).toEqual(['/api/v1/uploads', '/api/v1/workflows/w1/runs']),
+        expect(sent(calls).map((call) => call.path)).toEqual([
+          '/api/v1/uploads',
+          '/api/v1/workflows/w1/runs',
+        ]),
       );
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(screen.getByText('Workflows list')).toBeInTheDocument();
@@ -236,7 +330,10 @@ describe('WorkflowDetailPage', () => {
       expect(screen.getByRole('button', { name: /Uploading/ })).toBeInTheDocument();
       act(() => FakeXhr.instances[0]!.respond(200));
       expect(await screen.findByText('Run page r1')).toBeInTheDocument();
-      expect(sent(calls).at(-1)?.body).toEqual({ uploadId: 'up-1', originalName: 'holiday clip.mp4' });
+      expect(sent(calls).at(-1)?.body).toEqual({
+        uploadId: 'up-1',
+        originalName: 'holiday clip.mp4',
+      });
     });
 
     it('says the upload did not finish and Retry starts again from /uploads', async () => {
@@ -266,7 +363,10 @@ describe('WorkflowDetailPage', () => {
     it('shows a 400 from /uploads on the form', async () => {
       const user = userEvent.setup();
       renderForm(CHECK, {
-        'POST /api/v1/uploads': { status: 400, body: { status: 400, errors: { fileName: TYPE_SENTENCE } } },
+        'POST /api/v1/uploads': {
+          status: 400,
+          body: { status: 400, errors: { fileName: TYPE_SENTENCE } },
+        },
       });
 
       await user.upload(await screen.findByLabelText('Media file'), file('holiday clip.mp4'));
@@ -326,14 +426,17 @@ describe('WorkflowDetailPage', () => {
 
     it('shows the 503 detail when present, with the next action', async () => {
       const user = userEvent.setup();
-      renderForm(ECHO, {
+      const calls = renderForm(ECHO, {
         'POST /api/v1/workflows/w1/runs': {
           status: 503,
           body: { status: 503, detail: 'Runs are paused for maintenance' },
         },
       });
+      await settled(calls.queryClient);
 
-      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+      const button = await screen.findByRole('button', { name: 'Start run' });
+      expect(button).not.toBeDisabled();
+      await user.click(button);
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('Runs are paused for maintenance');

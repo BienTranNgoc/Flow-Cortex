@@ -194,6 +194,12 @@
   margin: 0.25rem 0 0;
 }
 
+.field-hint {
+  color: #555;
+  font-size: 0.85rem;
+  margin: 0.35rem 0 0;
+}
+
 .approval-panel {
   margin: 0.75rem 0;
 }
@@ -225,6 +231,49 @@
 
 .approval-error {
   margin: 0.5rem 0 0;
+}
+
+.script-editor textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #2e3b49;
+  border-radius: 4px;
+  background: #0b1119;
+  color: #e8f1f2;
+  font: inherit;
+  resize: vertical;
+}
+
+.revision-history {
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.revision-history li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #2e3b49;
+}
+
+.revision-number {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.revision-approved {
+  color: #4ade80;
+  white-space: nowrap;
+}
+
+.revision-preview {
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 480px) {

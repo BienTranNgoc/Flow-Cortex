@@ -151,17 +151,19 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows seven services `healthy` and `minio-init`
-`Exited (0)`:
+`docker compose ps -a` then shows eight services `healthy` and `rabbitmq-init` and
+`minio-init` `Exited (0)`:
 
 | Service | What it is | Address (all bound to 127.0.0.1) |
 |---|---|---|
 | `postgres` | the database | not published |
-| `rabbitmq` | the broker: queue `media.jobs` and the result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
+| `rabbitmq` | the broker: `media.*` and `provider.*` job/result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
-| `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle and one least-privilege user per service, then exits | — |
+| `rabbitmq-init` | one-shot: creates the provider worker's restricted broker user (`PROVIDER_RABBITMQ_*`), then exits | — |
+| `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
 | `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
 | `worker` | the Python media worker | none — and no internet access |
+| `provider-worker` | the Python provider worker (fixture adapter until OpenAI is connected) | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
 | `admin` | the admin console (same) | <http://localhost:5174> |
 
@@ -188,8 +190,11 @@ docker compose cp worker:/tmp/clip.mp4 /tmp/clip.mp4
 
 `scripts/smoke-probe.sh` runs the same flow from the command line against the
 running stack (a clip, a wrong-size upload, a text file posing as `.mp4`, the
-download and the admin list) and exits non-zero on any miss. CI runs it on every
-PR that touches the stack (`.github/workflows/compose-smoke.yml`).
+download and the admin list) and exits non-zero on any miss. With
+`FLOWCORTEX_PRODUCT_VIDEO_ENABLED=true` set for both the stack and the script it
+also takes a Product Video run through the provider worker, a script approval and
+the media worker's render to a downloaded `video.mp4`. CI runs it, Product Video
+included, on every PR that touches the stack (`.github/workflows/compose-smoke.yml`).
 
 What to know about the media path:
 
@@ -205,6 +210,9 @@ What to know about the media path:
 - **Upload limits.** `FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES` (500 MB) and
   `FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS` (`mp4,mov,webm,mkv,m4a,mp3,wav`). An upload
   URL is valid for 15 minutes, and uploaded files are deleted after **1 day**.
+  A run keeps its own copy of each input image (`runs/<run>/inputs/` in the media
+  bucket), tagged so the store deletes it after `RUN_INPUT_RETENTION_DAYS` (30);
+  keep that at least as long as a run may wait for its script review.
 - **Browser origins.** `MINIO_API_CORS_ALLOW_ORIGIN` lists the origins allowed to
   upload: `http://localhost:5173,http://127.0.0.1:5173`. Add the production origin
   later; never `*`.
@@ -214,9 +222,11 @@ What to know about the media path:
   internal compose network with the broker and the store.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
   management port 8081 and the broker's metrics port 15692 are not published.
-- **Store keys.** The backend and the worker each have their own store user
-  (`BACKEND_S3_*`, `WORKER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
-  `minio` and `minio-init`. The backend and the worker share the broker account.
+- **Store keys.** The backend, media worker and provider worker each have their own store user
+  (`BACKEND_S3_*`, `WORKER_S3_*`, `PROVIDER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
+  `minio` and `minio-init`. The backend and the media worker share the broker account
+  (`RABBITMQ_DEFAULT_*`); the provider worker has its own (`PROVIDER_RABBITMQ_*`), which
+  can only consume `provider.jobs` and publish to the `provider` exchange.
 
 **Kill switches (rollout notes).** Each is an env var in `.env`, read at startup;
 apply a change with `docker compose up -d backend`.
@@ -238,8 +248,18 @@ fix named in each case, when:
 - **Queue settings changed.** Queue arguments are fixed once a queue exists, so
   changing `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` (or the delivery limit in code) on an
   existing broker makes the backend stay not-ready and log one ERROR naming the
-  queue and the differing argument. Delete that queue in the management UI
-  (<http://localhost:15672>, Queues) and restart the backend, or `down -v`.
+  queue and the differing argument. Delete **both** job queues — `media.jobs` and
+  `provider.jobs` — and restart the backend, or `down -v`:
+
+  ```bash
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue provider.jobs
+  docker compose up -d backend
+  ```
+
+  Deleting a queue drops the messages still waiting in it, so stop the workers first
+  (`docker compose stop worker provider-worker`) if any run is in flight. The queues
+  are recreated by the backend at startup with the new argument.
 - **A store key was rotated.** `minio-init` creates a user for the new
   `BACKEND_S3_ACCESS_KEY` / `WORKER_S3_ACCESS_KEY` but leaves the old one in place.
   Remove it (`<old access key>` is the previous value):
@@ -251,6 +271,28 @@ fix named in each case, when:
 - **Runs from before the media engine.** A database from an earlier checkout can
   hold runs whose input is raw JSON text; they display as such. `down -v` clears
   them.
+
+**Upgrading an existing deployment** (a host with its own `.env` and volumes, such
+as the demo server). Compare the host's `.env` with `.env.example` before pulling a
+new release: compose refuses to start **any** service while a required variable is
+missing, and names it. For the Product Video release:
+
+1. Add to `.env`:
+   - **required:** `PROVIDER_RABBITMQ_USER` and `PROVIDER_RABBITMQ_PASS` — the provider
+     worker's own broker user (letters, digits and `. _ ~ -` only; it goes in a URL);
+   - optional, defaults shown in `.env.example`: `RUN_INPUT_RETENTION_DAYS`,
+     `FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME`, `FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT`.
+2. Re-run both one-shot init services, so the broker user, the store policies and
+   the run-input expiry exist (each is idempotent), then bring the rest up:
+
+   ```bash
+   docker compose up -d --force-recreate rabbitmq-init minio-init
+   docker compose up -d
+   ```
+
+3. If `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` changed, delete `media.jobs` and
+   `provider.jobs` as in **Queue settings changed** above; otherwise the backend
+   stays not-ready.
 
 **Port 5173 already taken** (another local project, say). Publish the member app
 on another port with an override file kept outside the checkout, and list the new

@@ -44,6 +44,11 @@ export interface StartRunRequest {
   input?: string;
   uploadId?: string;
   /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds?: string[];
+  /**
    * @minLength 0
    * @maxLength 1024
    */
@@ -130,6 +135,26 @@ export interface UploadResponse {
   maxBytes: number;
 }
 
+export interface CreateScriptRevisionRequest {
+  /**
+   * @minLength 0
+   * @maxLength 8000
+   */
+  content: string;
+  expectedVersion: number;
+}
+
+export interface ScriptRevisionResponse {
+  id?: string;
+  runId?: string;
+  reviewTaskId?: string;
+  revisionNumber?: number;
+  content?: string;
+  createdBy?: string;
+  createdAt?: string;
+  reviewTaskVersion?: number;
+}
+
 export interface ReviewTaskResponse {
   id?: string;
   runId?: string;
@@ -141,10 +166,54 @@ export interface ReviewTaskResponse {
   reviewedBy?: string;
   reviewedAt?: string;
   createdAt?: string;
+  version?: number;
+  currentRevisionId?: string;
+  approvedRevisionId?: string;
 }
 
 export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
+  revisionId?: string;
+  expectedVersion?: number;
+}
+
+export interface VideoConfig {
+  /** @pattern 9:16 */
+  aspectRatio: string;
+}
+
+export interface ProductVideoRunRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  productName: string;
+  /**
+   * @minLength 0
+   * @maxLength 4000
+   */
+  description: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  cta: string;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  price?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  promotion?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds: string[];
+  video: VideoConfig;
 }
 
 export interface RegisterRequest {
@@ -205,6 +274,12 @@ export interface HealthResponse {
   status?: string;
   /** Identifier of the service reporting its health. */
   service?: string;
+}
+
+export interface CapabilitiesResponse {
+  mediaEnabled?: boolean;
+  productVideoEnabled?: boolean;
+  productVideoWorkflowId?: string;
 }
 
 export interface AdminRunResponse {
@@ -632,6 +707,86 @@ export const requestUpload = async (
   return { data, status: res.status, headers: res.headers } as requestUploadResponse;
 };
 
+export type getRevisionsResponse200 = {
+  data: ScriptRevisionResponse[];
+  status: 200;
+};
+
+export type getRevisionsResponseSuccess = getRevisionsResponse200 & {
+  headers: Headers;
+};
+export type getRevisionsResponse = getRevisionsResponseSuccess;
+
+export const getGetRevisionsUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/revisions`;
+};
+
+export const getRevisions = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<getRevisionsResponse> => {
+  const res = await fetch(getGetRevisionsUrl(taskId), {
+    ...options,
+    method: 'GET',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: getRevisionsResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as getRevisionsResponse;
+};
+
+export type saveRevisionResponse200 = {
+  data: ScriptRevisionResponse;
+  status: 200;
+};
+
+export type saveRevisionResponseSuccess = saveRevisionResponse200 & {
+  headers: Headers;
+};
+export type saveRevisionResponse = saveRevisionResponseSuccess;
+
+export const getSaveRevisionUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/revisions`;
+};
+
+export const saveRevision = async (
+  taskId: string,
+  createScriptRevisionRequest: CreateScriptRevisionRequest,
+  options?: RequestInit,
+): Promise<saveRevisionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getSaveRevisionUrl(taskId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createScriptRevisionRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: saveRevisionResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as saveRevisionResponse;
+};
+
 export type rejectTaskResponse200 = {
   data: ReviewTaskResponse;
   status: 200;
@@ -710,6 +865,56 @@ export const approveTask = async (
 
   const data: approveTaskResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as approveTaskResponse;
+};
+
+export type startProductVideoRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
+  headers: Headers;
+};
+export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+
+export const getStartProductVideoRunUrl = () => {
+  return `/api/v1/product-videos/runs`;
+};
+
+export const startProductVideoRun = async (
+  productVideoRunRequest: ProductVideoRunRequest,
+  options?: RequestInit,
+): Promise<startProductVideoRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  const res = await fetch(getStartProductVideoRunUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productVideoRunRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: startProductVideoRunResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as startProductVideoRunResponse;
 };
 
 export type registerResponse200 = {
@@ -977,6 +1182,32 @@ export const health = async (options?: RequestInit): Promise<healthResponse> => 
 
   const data: healthResponse['data'] = body ? JSON.parse(body) : {};
   return { data, status: res.status, headers: res.headers } as healthResponse;
+};
+
+export type capabilitiesResponse200 = {
+  data: CapabilitiesResponse;
+  status: 200;
+};
+
+export type capabilitiesResponseSuccess = capabilitiesResponse200 & {
+  headers: Headers;
+};
+export type capabilitiesResponse = capabilitiesResponseSuccess;
+
+export const getCapabilitiesUrl = () => {
+  return `/api/v1/capabilities`;
+};
+
+export const capabilities = async (options?: RequestInit): Promise<capabilitiesResponse> => {
+  const res = await fetch(getCapabilitiesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: capabilitiesResponse['data'] = body ? JSON.parse(body) : {};
+  return { data, status: res.status, headers: res.headers } as capabilitiesResponse;
 };
 
 export type meResponse200 = {

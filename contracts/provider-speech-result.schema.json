@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-speech-result.schema.json",
+  "title": "ProviderSpeechData",
+  "description": "The completed MediaResult.data payload returned by generate_speech/vi_voice_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "durationMs"],
+  "properties": {
+    "profile": { "const": "vi_voice_v1" },
+    "durationMs": { "type": "integer", "minimum": 1 }
+  }
+}
