@@ -40,6 +40,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -208,7 +209,7 @@ class RunAdvancerTest {
         RunStep step1 = completed(1, UUID.randomUUID(), "hello");
         RunStep step2 = pending(2, "echo");
         givenRun(List.of(def(1, "echo"), def(2, "echo")), List.of(step1, step2));
-        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello");
+        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello", null);
         when(checkpoints.resume(event, NOW)).thenReturn(true);
 
         advancer.onReviewApproved(event);
@@ -218,7 +219,7 @@ class RunAdvancerTest {
 
     @Test
     void anApprovalThatDoesNotResumeLeavesTheRunAlone() {
-        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello");
+        ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello", null);
         when(checkpoints.resume(event, NOW)).thenReturn(false);
 
         advancer.onReviewApproved(event);
@@ -693,8 +694,22 @@ class RunAdvancerTest {
 
     private static Stream<Arguments> invalidSpeechData() {
         return Stream.of(
-                Arguments.of(Map.of("profile", "wrong", "durationMs", 15_000), "profile"),
-                Arguments.of(Map.of("profile", "vi_voice_v1", "durationMs", 0), "durationMs"));
+                Arguments.of(speechData("profile", "wrong"), "profile"),
+                Arguments.of(speechData("durationMs", 0), "durationMs"));
+    }
+
+    private static Map<String, Object> speechData(String field, Object value) {
+        Map<String, Object> data = new HashMap<>(Map.of(
+                "profile", "vi_voice_v1",
+                "durationMs", 15_000,
+                "provider", "edge",
+                "voice", "vi-VN-HoaiMyNeural",
+                "speed", "+0%",
+                "sourceRevisionId", UUID.fromString("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"),
+                "idempotencyKey", "a".repeat(64),
+                "format", "wav"));
+        data.put(field, value);
+        return data;
     }
 
     private MediaResult result(RunStep step, MediaResult.Status status, List<MediaOutput> outputs,

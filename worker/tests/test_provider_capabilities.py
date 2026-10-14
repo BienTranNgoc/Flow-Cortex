@@ -15,6 +15,7 @@ from flowcortex_worker.provider.contracts.provider_speech_result import Provider
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
+REVISION_ID = "a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"
 
 
 def job(capability: str, profile: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -70,14 +71,21 @@ def test_product_script_includes_confirmed_price_and_promotion() -> None:
 def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
     outcome = execute(
         ProviderJob.model_validate(
-            job("generate_speech", "vi_voice_v1", {"script": "Mua ngay hôm nay"})
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
         ),
         FixtureProviderAdapter(),
     )
 
     ProviderSpeechData.model_validate(outcome.data)
     assert 15_000 <= outcome.data["durationMs"] <= 30_000
-    assert len(outcome.files) == 1
+    assert len(outcome.files) == 2
+    assert outcome.data["sourceRevisionId"] == REVISION_ID
+    assert outcome.data["provider"] == "fixture"
+    assert len(outcome.data["idempotencyKey"]) == 64
     with wave.open(io.BytesIO(outcome.files[0].body), "rb") as wav:
         assert wav.getnchannels() == 1
         assert wav.getframerate() == 16_000
@@ -91,7 +99,11 @@ def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
             "product_ad_v2",
             {"productName": "A", "description": "B", "cta": "C"},
         ),
-        job("generate_speech", "vi_voice_v1", {"script": ""}),
+        job(
+            "generate_speech",
+            "vi_voice_v1",
+            {"script": "", "sourceRevisionId": REVISION_ID},
+        ),
         job(
             "generate_script",
             "product_ad_v1",

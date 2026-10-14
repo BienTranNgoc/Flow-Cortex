@@ -14,6 +14,8 @@ from flowcortex_worker.provider.contracts.provider_speech_result import Provider
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
+REVISION_ID = "a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"
+IDEMPOTENCY_KEY = "a" * 64
 AT = "2026-09-30T12:00:00Z"
 ATTEMPT_PREFIX = f"runs/{RUN_ID}/steps/1/attempts/1/"
 
@@ -82,7 +84,10 @@ def provider_job(capability: str) -> dict[str, Any]:
             },
         }
         if capability == "generate_script"
-        else {"profile": "vi_voice_v1", "payload": {"script": "Mua máy lọc nước ngay"}}
+        else {
+            "profile": "vi_voice_v1",
+            "payload": {"script": "Mua máy lọc nước ngay", "sourceRevisionId": REVISION_ID},
+        }
     )
     return {
         "schemaVersion": "1",
@@ -103,6 +108,19 @@ def provider_result_data() -> dict[str, Any]:
     return {"profile": "product_ad_v1", "language": "vi", "script": "Mua máy lọc nước ngay"}
 
 
+def provider_speech_data() -> dict[str, Any]:
+    return {
+        "profile": "vi_voice_v1",
+        "durationMs": 4200,
+        "provider": "edge",
+        "voice": "vi-VN-HoaiMyNeural",
+        "speed": "+0%",
+        "sourceRevisionId": REVISION_ID,
+        "idempotencyKey": IDEMPOTENCY_KEY,
+        "format": "wav",
+    }
+
+
 def test_reference_messages_validate() -> None:
     MediaJob.model_validate(job())
     MediaResult.model_validate(result())
@@ -113,7 +131,7 @@ def test_provider_jobs_and_result_data_validate() -> None:
     ProviderJob.model_validate(provider_job("generate_script"))
     ProviderJob.model_validate(provider_job("generate_speech"))
     ProviderScriptData.model_validate(provider_result_data())
-    ProviderSpeechData.model_validate({"profile": "vi_voice_v1", "durationMs": 4200})
+    ProviderSpeechData.model_validate(provider_speech_data())
 
 
 @pytest.mark.parametrize(
@@ -121,6 +139,10 @@ def test_provider_jobs_and_result_data_validate() -> None:
     [
         ("generate_script", {"params": {"profile": "product_ad_v1"}}),
         ("generate_speech", {"params": {"profile": "product_ad_v1", "payload": {"script": "x"}}}),
+        (
+            "generate_speech",
+            {"params": {"profile": "vi_voice_v1", "payload": {"script": "x"}}},
+        ),
         (
             "generate_script",
             {"params": {"profile": "product_ad_v1", "payload": {"cta": "Mua ngay"}}},
@@ -143,6 +165,7 @@ def test_provider_jobs_and_result_data_validate() -> None:
     ids=[
         "script-params-missing-payload",
         "speech-params-wrong-profile",
+        "speech-payload-missing-revision",
         "script-payload-missing-required",
         "capability-does-not-match-params",
         "unknown-key-in-params",
@@ -165,8 +188,8 @@ def test_provider_job_values_outside_the_schema_fail(
         ({"profile": "other"}, ProviderScriptData),
         ({"script": "x" * 9000}, ProviderScriptData),
         ({"unexpected": "value"}, ProviderScriptData),
-        ({"profile": "vi_voice_v1", "durationMs": 0}, ProviderSpeechData),
-        ({"profile": "other", "durationMs": 10}, ProviderSpeechData),
+        (provider_speech_data() | {"durationMs": 0}, ProviderSpeechData),
+        (provider_speech_data() | {"profile": "other"}, ProviderSpeechData),
     ],
     ids=[
         "language-not-vi",

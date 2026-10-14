@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .adapter import ProviderAdapter
+from .adapter import ProviderAdapter, SpeechArtifact, SpeechRequest
 from .contracts.provider_job import GenerateScriptJob, GenerateSpeechJob, ProviderJob
 
 
@@ -54,11 +56,39 @@ def _generate_speech(
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateSpeechJob):
         raise UnsupportedCapability("generate_speech received the wrong job shape")
-    speech = adapter.generate_speech(job.params.payload.script)
+    payload = job.params.payload
+    request = SpeechRequest(payload.script, payload.sourceRevisionId)
+    speech = adapter.generate_speech(request)
+    idempotency_key = _speech_idempotency_key(request, speech)
+    data = {
+        "profile": request.profile,
+        "durationMs": speech.duration_ms,
+        "provider": speech.provider,
+        "voice": speech.voice,
+        "speed": speech.speed,
+        "sourceRevisionId": str(request.source_revision_id),
+        "idempotencyKey": idempotency_key,
+        "format": "wav",
+    }
+    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return ProviderOutcome(
-        data={"profile": "vi_voice_v1", "durationMs": speech.duration_ms},
-        files=(ProviderFile("speech.wav", speech.mime, speech.body),),
+        data=data,
+        files=(
+            ProviderFile("speech.wav", speech.mime, speech.body),
+            ProviderFile("manifest.json", "application/json", manifest),
+        ),
     )
+
+
+def _speech_idempotency_key(request: SpeechRequest, speech: SpeechArtifact) -> str:
+    identity = "\0".join((
+        str(request.source_revision_id),
+        request.profile,
+        speech.provider,
+        speech.voice,
+        speech.speed,
+    ))
+    return hashlib.sha256(identity.encode()).hexdigest()
 
 
 _CAPABILITIES: dict[tuple[str, str], Handler] = {

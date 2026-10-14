@@ -40,11 +40,15 @@ class ProviderStepExecutorTest {
     @Test
     void speechJobWrapsApprovedScript() {
         ProviderStepExecutor executor = executor("generate_speech", "vi_voice_v1");
-        executor.execute(context("Kịch bản đã duyệt", "{\"profile\":\"vi_voice_v1\"}"));
+        UUID revisionId = UUID.randomUUID();
+        executor.execute(context("""
+                {"script":"Kịch bản đã duyệt","sourceRevisionId":"%s"}
+                """.formatted(revisionId), "{\"profile\":\"vi_voice_v1\"}"));
 
         ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
         verify(jobs).enqueueProvider(sent.capture());
         assertThat(castPayload(sent.getValue())).containsEntry("script", "Kịch bản đã duyệt");
+        assertThat(castPayload(sent.getValue())).containsEntry("sourceRevisionId", revisionId.toString());
     }
 
     @SuppressWarnings("unchecked")
