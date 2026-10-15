@@ -38,7 +38,7 @@ abstract class AbstractUserModuleIT extends AbstractPostgresBootTest {
                 restTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, password),
                         TokenResponse.class);
         TokenResponse body = response.getBody();
-        return body != null ? body.token() : null;
+        return body != null ? body.accessToken() : null;
     }
 
     protected ResponseEntity<String> loginRaw(String email, String password) {
@@ -72,7 +72,7 @@ abstract class AbstractUserModuleIT extends AbstractPostgresBootTest {
     record LoginRequest(String email, String password) {
     }
 
-    record TokenResponse(String token) {
+    record TokenResponse(String accessToken) {
     }
 
     record MeView(UUID id, String email, String name, String role, String status) {

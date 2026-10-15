@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuthToken, useMeQuery } from '../features/auth/useAuth';
+import { useAuthToken, useMeQuery, useSessionReady } from '../features/auth/useAuth';
 import { NoAccessPage } from './NoAccessPage';
 import { can } from './permissions';
 
@@ -10,9 +10,13 @@ import { can } from './permissions';
  */
 export function RequireAdminApp({ children }: Readonly<{ children: ReactNode }>) {
   const token = useAuthToken();
+  const sessionReady = useSessionReady();
   const location = useLocation();
   const meQuery = useMeQuery();
 
+  if (!sessionReady) {
+    return <output>Checking your session…</output>;
+  }
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }

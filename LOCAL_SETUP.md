@@ -79,7 +79,7 @@ curl http://localhost:8080/readyz
 curl -s -XPOST http://localhost:8080/api/v1/auth/login \
   -H 'content-type: application/json' \
   -d '{"email":"admin1@flowcortex.dev","password":"AdminPass123!"}'
-# -> { "token": "..." }
+# -> { "accessToken": "...", "expiresIn": 900 }  (the refresh token arrives as an HttpOnly cookie)
 ```
 
 The `dev` profile seeds two admins, `admin1@flowcortex.dev` and
