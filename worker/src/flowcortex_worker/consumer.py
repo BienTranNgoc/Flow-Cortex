@@ -396,7 +396,14 @@ class Consumer:
             outputs = []
             for file in outcome.files:
                 key = output_key(job, file.name)
-                size = self._storage.put(key, file.body, file.mime, runner)
+                if getattr(file, "stored", False):
+                    size = (
+                        len(file.body)
+                        if isinstance(file.body, bytes)
+                        else file.body.stat().st_size
+                    )
+                else:
+                    size = self._storage.put(key, file.body, file.mime, runner)
                 outputs.append(
                     MediaOutput(
                         name=file.name,

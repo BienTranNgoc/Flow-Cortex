@@ -105,7 +105,8 @@ class Storage:
         try:
             return dict(self._client.head_object(Bucket=bucket, Key=key))
         except ClientError as exc:
-            if str(exc.response.get("Error", {}).get("Code", "")) in _MISSING:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in _MISSING or code in _FORBIDDEN:
                 return None
             raise TransientError(
                 f"{type(exc).__name__} heading {bucket}/{key}"

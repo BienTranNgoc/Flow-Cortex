@@ -35,7 +35,7 @@ log = logging.getLogger("flowcortex_provider_worker")
 PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
-MAX_TRANSIENT_REDELIVERIES = 4
+MAX_TRANSIENT_REDELIVERIES = 3
 
 
 def main() -> int:

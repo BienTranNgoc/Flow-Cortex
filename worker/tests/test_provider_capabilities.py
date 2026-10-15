@@ -178,6 +178,7 @@ def test_speech_reuses_existing_artifact_when_manifest_matches() -> None:
     ProviderSpeechData.model_validate(outcome.data)
     assert outcome.data == stored_manifest
     assert outcome.files[0].body == stored_wav
+    assert all(file.stored for file in outcome.files)
     assert outcome.files[1].body.decode() == json.dumps(
         stored_manifest, ensure_ascii=False, sort_keys=True
     )

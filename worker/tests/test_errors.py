@@ -136,7 +136,7 @@ def test_retry_after_is_capped_at_the_backoff_ceiling() -> None:
 
 def test_transient_retry_budget_publishes_terminal_error() -> None:
     conn = FakeConnection()
-    conn.deliver(job_body(), headers={"x-delivery-count": 4})
+    conn.deliver(job_body(), headers={"x-delivery-count": 3})
     waits: list[float] = []
 
     def fail(job: Any, runner: Any) -> Any:
@@ -145,7 +145,7 @@ def test_transient_retry_budget_publishes_terminal_error() -> None:
     run_consumer(
         conn,
         execute_job=fail,
-        max_transient_redeliveries=4,
+        max_transient_redeliveries=3,
         wait=waits.append,
         until=settled,
     )
@@ -154,7 +154,7 @@ def test_transient_retry_budget_publishes_terminal_error() -> None:
     message = assert_valid(result.body, "media-result")
     assert message["status"] == "error"
     assert message["error"]["code"] == "provider_request_failed"
-    assert message["deliveryCount"] == 4
+    assert message["deliveryCount"] == 3
     assert conn.consume.acks == [1]
     assert conn.consume.rejects == []
     assert waits == []

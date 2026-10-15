@@ -24,6 +24,7 @@ class ProviderFile:
     name: str
     mime: str
     body: bytes
+    stored: bool = False
 
 
 @dataclass(frozen=True)
@@ -143,8 +144,8 @@ def _reuse_existing_artifact(
     return ProviderOutcome(
         data=stored.model_dump(mode="json"),
         files=(
-            ProviderFile("speech.wav", "audio/wav", wav_body),
-            ProviderFile("manifest.json", "application/json", raw_manifest),
+            ProviderFile("speech.wav", "audio/wav", wav_body, stored=True),
+            ProviderFile("manifest.json", "application/json", raw_manifest, stored=True),
         ),
     )
 
