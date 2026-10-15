@@ -19,7 +19,7 @@ from flowcortex_worker.provider.capabilities import (
     _speech_idempotency_key,
     execute,
 )
-from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+from flowcortex_worker.provider.contracts.provider_job import GenerateSpeechJob, ProviderJob
 from flowcortex_worker.provider.contracts.provider_script_result import ProviderScriptData
 from flowcortex_worker.provider.contracts.provider_speech_result import ProviderSpeechData
 
@@ -140,6 +140,7 @@ def test_speech_reuses_existing_artifact_when_manifest_matches() -> None:
             {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
         )
     )
+    assert isinstance(request.root, GenerateSpeechJob)
     stored_wav = _wav(17_500)
     identity = SpeechIdentity("fixture", "silence", "+0%", 16_000)
     stored_manifest = {
