@@ -101,6 +101,39 @@ class Storage:
             )
             yield path
 
+    def head_object(self, bucket: str, key: str) -> dict[str, Any] | None:
+        try:
+            return dict(self._client.head_object(Bucket=bucket, Key=key))
+        except ClientError as exc:
+            if str(exc.response.get("Error", {}).get("Code", "")) in _MISSING:
+                return None
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+
+    def fetch_bytes(self, bucket: str, key: str, abort: Abort) -> bytes:
+        abort.check()
+        try:
+            response = self._client.get_object(Bucket=bucket, Key=key)
+        except ClientError as exc:
+            if str(exc.response.get("Error", {}).get("Code", "")) in _MISSING:
+                raise TransientError(f"{bucket}/{key} disappeared between head and fetch") from exc
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        try:
+            return bytes(response["Body"].read())
+        finally:
+            response["Body"].close()
+
     def put(self, key: str, body: bytes | Path, mime: str, abort: Abort) -> int:
         # Outputs are small in-memory reports; the check stops a killed job before it writes.
         abort.check()

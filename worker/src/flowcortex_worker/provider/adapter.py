@@ -26,8 +26,18 @@ class SpeechRequest:
     profile: str = "vi_voice_v1"
 
 
+@dataclass(frozen=True)
+class SpeechIdentity:
+    provider: str
+    voice: str
+    speed: str
+    sample_rate: int
+
+
 class ProviderAdapter(Protocol):
     def generate_script(self, payload: ProductAdPayload) -> str: ...
+
+    def speech_identity(self) -> SpeechIdentity: ...
 
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact: ...
 
@@ -47,6 +57,9 @@ class CapabilityProviderAdapter:
     def generate_script(self, payload: ProductAdPayload) -> str:
         return self.script_adapter.generate_script(payload)
 
+    def speech_identity(self) -> SpeechIdentity:
+        return self.speech_adapter.speech_identity()
+
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
         return self.speech_adapter.generate_speech(request)
 
@@ -65,6 +78,9 @@ class FixtureProviderAdapter:
             parts.append(f"Ưu đãi: {payload.promotion}.")
         parts.append(payload.cta)
         return " ".join(parts)
+
+    def speech_identity(self) -> SpeechIdentity:
+        return SpeechIdentity("fixture", "silence", "+0%", 16_000)
 
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
         duration_ms = min(30_000, max(15_000, len(request.script) * 55))

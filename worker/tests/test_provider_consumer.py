@@ -5,7 +5,7 @@ from typing import Any
 from conftest import FakeConnection, FakeStorage, assert_valid, published, run_consumer, settled
 
 from flowcortex_worker.provider.adapter import FixtureProviderAdapter
-from flowcortex_worker.provider.capabilities import execute
+from flowcortex_worker.provider.capabilities import ExecutionContext, execute
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.runtime import ProcessRunner
 
@@ -38,7 +38,17 @@ def run_provider(conn: FakeConnection, storage: FakeStorage) -> None:
 
     def execute_job(job: Any, runner: ProcessRunner) -> Any:
         runner.check()
-        return execute(ProviderJob(root=job), adapter)
+        request = job.root if hasattr(job, "root") else job
+        return execute(
+            ProviderJob(root=job),
+            adapter,
+            ExecutionContext(
+                storage=storage,
+                bucket=storage.bucket,
+                output_prefix=request.outputPrefix,
+                abort=runner,
+            ),
+        )
 
     run_consumer(
         conn,

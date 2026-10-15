@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import io
+import json
 import wave
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import ValidationError
 
-from flowcortex_worker.provider.adapter import FixtureProviderAdapter
-from flowcortex_worker.provider.capabilities import execute
+from flowcortex_worker.provider.adapter import (
+    FixtureProviderAdapter,
+    SpeechIdentity,
+    SpeechRequest,
+)
+from flowcortex_worker.provider.capabilities import (
+    ExecutionContext,
+    _speech_idempotency_key,
+    execute,
+)
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.provider.contracts.provider_script_result import ProviderScriptData
 from flowcortex_worker.provider.contracts.provider_speech_result import ProviderSpeechData
@@ -16,6 +26,33 @@ from flowcortex_worker.provider.contracts.provider_speech_result import Provider
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
 REVISION_ID = "a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"
+BUCKET = "flowcortex-media"
+
+
+def _storage() -> Any:
+    return MagicMock()
+
+
+def _empty_context() -> ExecutionContext:
+    storage = MagicMock()
+    storage.head_object.return_value = None
+    storage.fetch_bytes.return_value = b""
+    return ExecutionContext(
+        storage=storage,
+        bucket=BUCKET,
+        output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+        abort=MagicMock(),
+    )
+
+
+def _wav(duration_ms: int) -> bytes:
+    output = io.BytesIO()
+    with wave.open(output, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16_000)
+        audio.writeframes(b"\0\0" * (duration_ms * 16))
+    return output.getvalue()
 
 
 def job(capability: str, profile: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -43,6 +80,7 @@ def test_product_script_uses_only_confirmed_optional_claims() -> None:
     outcome = execute(
         ProviderJob.model_validate(job("generate_script", "product_ad_v1", payload)),
         FixtureProviderAdapter(),
+        _empty_context(),
     )
 
     ProviderScriptData.model_validate(outcome.data)
@@ -62,6 +100,7 @@ def test_product_script_includes_confirmed_price_and_promotion() -> None:
     outcome = execute(
         ProviderJob.model_validate(job("generate_script", "product_ad_v1", payload)),
         FixtureProviderAdapter(),
+        _empty_context(),
     )
 
     assert "Giá: 299.000đ" in outcome.data["script"]
@@ -78,6 +117,7 @@ def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
             )
         ),
         FixtureProviderAdapter(),
+        _empty_context(),
     )
 
     ProviderSpeechData.model_validate(outcome.data)
@@ -89,6 +129,187 @@ def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
     with wave.open(io.BytesIO(outcome.files[0].body), "rb") as wav:
         assert wav.getnchannels() == 1
         assert wav.getframerate() == 16_000
+
+
+def test_speech_reuses_existing_artifact_when_manifest_matches() -> None:
+    storage = MagicMock()
+    request = ProviderJob.model_validate(
+        job(
+            "generate_speech",
+            "vi_voice_v1",
+            {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+        )
+    )
+    stored_wav = _wav(17_500)
+    identity = SpeechIdentity("fixture", "silence", "+0%", 16_000)
+    stored_manifest = {
+        "profile": "vi_voice_v1",
+        "durationMs": 17_500,
+        "provider": identity.provider,
+        "voice": identity.voice,
+        "speed": "+0%",
+        "sourceRevisionId": REVISION_ID,
+        "idempotencyKey": _speech_idempotency_key(
+            SpeechRequest("Mua ngay hôm nay", request.root.params.payload.sourceRevisionId),
+            identity,
+        ),
+        "format": "wav",
+    }
+    storage.head_object.side_effect = [{}, {}]
+    storage.fetch_bytes.side_effect = [
+        json.dumps(stored_manifest, ensure_ascii=False, sort_keys=True).encode("utf-8"),
+        stored_wav,
+    ]
+
+    adapter = MagicMock()
+    adapter.speech_identity.return_value = identity
+
+    outcome = execute(
+        request,
+        adapter,
+        ExecutionContext(
+            storage=storage,
+            bucket=BUCKET,
+            output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+            abort=MagicMock(),
+        ),
+    )
+
+    ProviderSpeechData.model_validate(outcome.data)
+    assert outcome.data == stored_manifest
+    assert outcome.files[0].body == stored_wav
+    assert outcome.files[1].body.decode() == json.dumps(
+        stored_manifest, ensure_ascii=False, sort_keys=True
+    )
+    adapter.generate_speech.assert_not_called()
+
+
+def test_speech_regenerates_when_manifest_revision_mismatches() -> None:
+    storage = MagicMock()
+    storage.head_object.side_effect = [{}, {}]
+    storage.fetch_bytes.side_effect = [
+        json.dumps(
+            {
+                "profile": "vi_voice_v1",
+                "durationMs": 17_500,
+                "provider": "edge",
+                "voice": "vi-VN-HoaiMyNeural",
+                "speed": "+0%",
+                "sourceRevisionId": "11111111-1111-1111-1111-111111111111",
+                "idempotencyKey": "b" * 64,
+                "format": "wav",
+            }
+        ).encode("utf-8"),
+        b"stale",
+    ]
+
+    adapter = FixtureProviderAdapter()
+    outcome = execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        adapter,
+        ExecutionContext(
+            storage=storage,
+            bucket=BUCKET,
+            output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+            abort=MagicMock(),
+        ),
+    )
+
+    ProviderSpeechData.model_validate(outcome.data)
+    assert outcome.data["sourceRevisionId"] == REVISION_ID
+    assert storage.fetch_bytes.call_count == 1
+
+
+def test_speech_regenerates_when_manifest_missing() -> None:
+    storage = MagicMock()
+    storage.head_object.side_effect = [None]
+
+    outcome = execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        FixtureProviderAdapter(),
+        ExecutionContext(
+            storage=storage,
+            bucket=BUCKET,
+            output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+            abort=MagicMock(),
+        ),
+    )
+
+    ProviderSpeechData.model_validate(outcome.data)
+    assert outcome.data["sourceRevisionId"] == REVISION_ID
+    storage.fetch_bytes.assert_not_called()
+
+
+def test_speech_regenerates_when_idempotency_key_mismatches() -> None:
+    storage = MagicMock()
+    storage.head_object.side_effect = [{}, {}]
+    storage.fetch_bytes.return_value = json.dumps({
+        "profile": "vi_voice_v1",
+        "durationMs": 17_500,
+        "provider": "edge",
+        "voice": "vi-VN-OldVoice",
+        "speed": "+0%",
+        "sourceRevisionId": REVISION_ID,
+        "idempotencyKey": "b" * 64,
+        "format": "wav",
+    }).encode()
+
+    outcome = execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        FixtureProviderAdapter(),
+        ExecutionContext(
+            storage=storage,
+            bucket=BUCKET,
+            output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+            abort=MagicMock(),
+        ),
+    )
+
+    assert outcome.data["provider"] == "fixture"
+    assert storage.fetch_bytes.call_count == 1
+
+
+def test_speech_regenerates_when_stored_manifest_is_invalid() -> None:
+    storage = MagicMock()
+    storage.head_object.side_effect = [{}, {}]
+    storage.fetch_bytes.return_value = b"not-json"
+
+    outcome = execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        FixtureProviderAdapter(),
+        ExecutionContext(
+            storage=storage,
+            bucket=BUCKET,
+            output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+            abort=MagicMock(),
+        ),
+    )
+
+    assert outcome.data["provider"] == "fixture"
 
 
 @pytest.mark.parametrize(

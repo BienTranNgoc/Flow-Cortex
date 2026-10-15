@@ -4,6 +4,7 @@ import importlib
 import io
 import json
 import wave
+from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
@@ -11,11 +12,24 @@ import pytest
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import edge_adapter
 from flowcortex_worker.provider.adapter import SpeechRequest
-from flowcortex_worker.provider.capabilities import execute
+from flowcortex_worker.provider.capabilities import ExecutionContext, execute
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 
 REVISION_ID = UUID("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4")
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
+BUCKET = "flowcortex-media"
+
+
+def _empty_context() -> ExecutionContext:
+    storage = MagicMock()
+    storage.head_object.return_value = None
+    storage.fetch_bytes.return_value = b""
+    return ExecutionContext(
+        storage=storage,
+        bucket=BUCKET,
+        output_prefix=f"runs/{RUN_ID}/steps/3/attempts/1/",
+        abort=MagicMock(),
+    )
 
 
 def _wav(duration_ms: int = 1000) -> bytes:
@@ -59,7 +73,7 @@ def test_edge_speech_produces_valid_wav_and_safe_manifest(
     monkeypatch.setattr(edge_adapter, "_to_wav", lambda body: _wav())
     adapter = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig())
 
-    outcome = execute(_job("Nội dung bí mật"), adapter)
+    outcome = execute(_job("Nội dung bí mật"), adapter, _empty_context())
 
     assert outcome.data["provider"] == "edge"
     assert outcome.data["sourceRevisionId"] == str(REVISION_ID)
@@ -80,10 +94,14 @@ def test_idempotency_key_changes_with_voice(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(edge_adapter, "_to_wav", lambda body: _wav())
 
     first = execute(
-        _job(), edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(voice="vi-VN-HoaiMyNeural"))
+        _job(),
+        edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(voice="vi-VN-HoaiMyNeural")),
+        _empty_context(),
     )
     second = execute(
-        _job(), edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(voice="vi-VN-NamMinhNeural"))
+        _job(),
+        edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(voice="vi-VN-NamMinhNeural")),
+        _empty_context(),
     )
 
     assert first.data["idempotencyKey"] != second.data["idempotencyKey"]
@@ -103,7 +121,8 @@ def test_network_failure_is_transient(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_handshake_failure_logs_only_status(monkeypatch: pytest.MonkeyPatch) -> None:
     def download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
-        raise edge_adapter.WSServerHandshakeError(
+        from aiohttp import WSServerHandshakeError
+        raise WSServerHandshakeError(
             request_info=None,  # type: ignore[arg-type]
             history=(),
             status=403,

@@ -280,6 +280,12 @@ class FakeStorage:
         self.puts[key] = (content, mime)
         return len(content)
 
+    def head_object(self, bucket: str, key: str) -> dict[str, Any] | None:
+        return None
+
+    def fetch_bytes(self, bucket: str, key: str, abort: Any) -> bytes:
+        return b""
+
 
 def wait_for(predicate: Callable[[], bool], timeout: float = 5.0) -> None:
     deadline = time.monotonic() + timeout

@@ -105,6 +105,8 @@ class Consumer:
         parse_job: Callable[[bytes], Any] | None = None,
         execute_job: Callable[[Any, ProcessRunner], Any] | None = None,
         wait: Callable[[float], Any] | None = None,
+        max_transient_redeliveries: int | None = None,
+        transient_exhausted_code: ErrorCode = "provider_request_failed",
     ) -> None:
         self._connection = connection
         self._storage = storage
@@ -120,6 +122,8 @@ class Consumer:
         self._parse_job = parse_job or MediaJob.model_validate_json
         self._execute_job = execute_job
         self._wait = wait or self._backoff_wait
+        self._max_transient_redeliveries = max_transient_redeliveries
+        self._transient_exhausted_code = transient_exhausted_code
         self._closed = threading.Event()
         self._cancelled = False
         self._in_flight: Delivery | None = None
@@ -310,6 +314,32 @@ class Consumer:
         except Abandoned as abandoned:
             log.warning("job abandoned; the broker redelivers it", extra={"reason": str(abandoned)})
         except Exception as exc:
+            if (
+                isinstance(exc, TransientError)
+                and job is not None
+                and self._max_transient_redeliveries is not None
+                and delivery.count >= self._max_transient_redeliveries
+            ):
+                heartbeat.stop(join=True)
+                result = self._error(
+                    job.jobId,
+                    job.runId,
+                    job.attempt,
+                    delivery.count,
+                    self._transient_exhausted_code,
+                    "transient retry budget exhausted",
+                )
+                self._publish(
+                    run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
+                )
+                self._call_in_main(lambda: self._settle_now(delivery, "ack"))
+                outcome = result.error.code
+                span.set_status(Status(StatusCode.ERROR, result.error.code))
+                log.warning(
+                    "transient retry budget exhausted",
+                    extra={"deliveryCount": delivery.count},
+                )
+                return
             outcome = "retried"
             retry_after = exc.retry_after_seconds if isinstance(exc, TransientError) else None
             # Retry-After never holds the worker thread past the backoff ceiling.

@@ -20,7 +20,7 @@ from aiohttp import ClientError, WSServerHandshakeError
 from edge_tts.exceptions import NoAudioReceived
 
 from ..errors import PermanentError, TransientError
-from .adapter import FixtureProviderAdapter, SpeechArtifact, SpeechRequest
+from .adapter import FixtureProviderAdapter, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 PROVIDER_EDGE = "edge"
@@ -45,6 +45,9 @@ class EdgeSpeechAdapter:
         # Edge is a speech provider. Keep Product Video runnable in demo mode by retaining the
         # deterministic script implementation until a separately selectable LLM adapter lands.
         return FixtureProviderAdapter().generate_script(payload)
+
+    def speech_identity(self) -> SpeechIdentity:
+        return SpeechIdentity(PROVIDER_EDGE, self.config.voice, self.config.rate, 24_000)
 
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
         if not request.script.strip():

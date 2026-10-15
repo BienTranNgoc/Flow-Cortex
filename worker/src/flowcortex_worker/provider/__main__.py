@@ -20,13 +20,13 @@ from flowcortex_worker.runtime import ProcessRunner, Supervisor
 from flowcortex_worker.storage import Storage, client_from
 
 from .adapter import CapabilityProviderAdapter, FixtureProviderAdapter, ProviderAdapter
-from .capabilities import execute
+from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
 from .openai_adapter import (
-    PROVIDER_OPENAI,
     _OPENAI_BASE_URL,
     _OPENAI_SCRIPT_MODEL,
+    PROVIDER_OPENAI,
     select_adapter,
 )
 
@@ -35,6 +35,7 @@ log = logging.getLogger("flowcortex_provider_worker")
 PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
+MAX_TRANSIENT_REDELIVERIES = 4
 
 
 def main() -> int:
@@ -66,7 +67,14 @@ def main() -> int:
 
     def execute_job(job: Any, runner: ProcessRunner) -> Any:
         runner.check()
-        outcome = execute(ProviderJob(root=job), adapter)
+        request = job.root if hasattr(job, "root") else job
+        context = ExecutionContext(
+            storage=storage,
+            bucket=storage.bucket,
+            output_prefix=request.outputPrefix,
+            abort=runner,
+        )
+        outcome = execute(ProviderJob(root=job), adapter, context)
         runner.check()
         return outcome
 
@@ -83,6 +91,7 @@ def main() -> int:
             exchange="provider",
             parse_job=parse_job,
             execute_job=execute_job,
+            max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
         )
 
     def wait_alive(seconds: float) -> None:

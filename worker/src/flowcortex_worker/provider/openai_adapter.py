@@ -21,7 +21,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from ..errors import PermanentError, TransientError
-from .adapter import SpeechArtifact, SpeechRequest
+from .adapter import SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
@@ -148,6 +148,12 @@ class OpenAIProviderAdapter:
                 "provider_response_invalid", "provider script exceeds 8000 characters"
             )
         return script
+
+    def speech_identity(self) -> SpeechIdentity:
+        raise PermanentError(
+            "provider_capability_unavailable",
+            "OpenAI speech generation is not implemented",
+        )
 
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
         raise PermanentError(
@@ -281,5 +287,7 @@ def select_adapter(
     if provider == PROVIDER_OPENAI:
         if not openai_key:
             raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
-        return OpenAIProviderAdapter(OpenAIConfig(api_key=openai_key, base_url=base_url, model=model))
+        return OpenAIProviderAdapter(
+            OpenAIConfig(api_key=openai_key, base_url=base_url, model=model)
+        )
     raise ValueError(f"Unknown provider adapter: {provider}")

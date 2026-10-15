@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import time
 from collections.abc import Mapping
@@ -133,6 +134,32 @@ def test_retry_after_is_capped_at_the_backoff_ceiling() -> None:
     assert waits == [60]
 
 
+def test_transient_retry_budget_publishes_terminal_error() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body(), headers={"x-delivery-count": 4})
+    waits: list[float] = []
+
+    def fail(job: Any, runner: Any) -> Any:
+        raise TransientError("provider unavailable")
+
+    run_consumer(
+        conn,
+        execute_job=fail,
+        max_transient_redeliveries=4,
+        wait=waits.append,
+        until=settled,
+    )
+
+    [result] = published(conn, "result")
+    message = assert_valid(result.body, "media-result")
+    assert message["status"] == "error"
+    assert message["error"]["code"] == "provider_request_failed"
+    assert message["deliveryCount"] == 4
+    assert conn.consume.acks == [1]
+    assert conn.consume.rejects == []
+    assert waits == []
+
+
 @pytest.mark.parametrize(
     ("props", "expected_wait", "expected_count"),
     [
@@ -257,7 +284,7 @@ def test_backoff_wait_ends_when_the_connection_is_lost() -> None:
         heartbeat_seconds=30.0,
         stop=stop,
         executor=executor,
-        liveness_file=Path("/tmp/fake-alive-backoff"),
+        liveness_file=Path(tempfile.gettempdir()) / "fake-alive-backoff",
     )
     with pytest.raises(pika.exceptions.StreamLostError):
         consumer.run()
