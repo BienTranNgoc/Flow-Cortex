@@ -31,6 +31,7 @@ from .openai_adapter import (
 )
 from .seedance_adapter import PROVIDER_SEEDANCE, SeedanceAdapter, SeedanceConfig
 from .veo_adapter import PROVIDER_VEO, VeoAdapter, VeoConfig
+from .wan_adapter import PROVIDER_WAN, WanAdapter, WanConfig
 
 log = logging.getLogger("flowcortex_provider_worker")
 
@@ -168,6 +169,10 @@ def _build_adapter() -> CapabilityProviderAdapter:
         video_api_key = os.environ.get("VEO_API_KEY", "").strip() or generic_video_key
         video_base_url = os.environ.get("VEO_BASE_URL", "").strip() or generic_video_url
         video_model = os.environ.get("VEO_MODEL", "").strip() or generic_video_model
+    elif video_provider == PROVIDER_WAN:
+        video_api_key = os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
+        video_base_url = os.environ.get("WAN_BASE_URL", "").strip() or generic_video_url
+        video_model = os.environ.get("WAN_MODEL", "").strip() or generic_video_model
     else:
         video_api_key = generic_video_key
         video_base_url = generic_video_url
@@ -267,11 +272,33 @@ def _build_video_adapter(
                 ),
             )
         )
+    if provider == PROVIDER_WAN:
+        if not api_key:
+            raise RuntimeError("Wan video provider requires WAN_API_KEY")
+        return WanAdapter(
+            WanConfig(
+                api_key=api_key,
+                base_url=base_url or "https://api.replicate.com/v1",
+                model=model or "wan-video/wan-2.2-5b-fast",
+                resolution=os.environ.get("WAN_RESOLUTION", "480p").strip().lower(),
+                frames_per_second=int(os.environ.get("WAN_FRAMES_PER_SECOND", "24")),
+                num_frames=int(os.environ.get("WAN_NUM_FRAMES", "121")),
+                request_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
+                ),
+                poll_interval_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_INTERVAL_SECONDS", "5")
+                ),
+                poll_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS", "480")
+                ),
+            )
+        )
     if provider == PROVIDER_FIXTURE:
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown VIDEO_PROVIDER '{provider}'; accepted values: "
-        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}"
+        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}, {PROVIDER_WAN}"
     )
 
 

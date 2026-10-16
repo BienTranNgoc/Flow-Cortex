@@ -12,7 +12,7 @@ import java.util.UUID;
 public record ProviderVideoData(
         @NotBlank @Pattern(regexp = "vertical_ad_clip_v1") String profile,
         @NotNull Integer durationSeconds,
-        @NotBlank @Pattern(regexp = "seedance|veo") String provider,
+        @NotBlank @Pattern(regexp = "seedance|veo|wan") String provider,
         @NotBlank @Size(max = 200) String model,
         @NotBlank @Pattern(regexp = "9:16") String aspectRatio,
         @NotBlank @Pattern(regexp = "480p|720p") String resolution,

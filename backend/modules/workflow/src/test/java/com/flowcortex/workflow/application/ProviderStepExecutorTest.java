@@ -51,6 +51,27 @@ class ProviderStepExecutorTest {
         assertThat(castPayload(sent.getValue())).containsEntry("sourceRevisionId", revisionId.toString());
     }
 
+    @Test
+    void videoJobAppendsConfiguredVisualDirection() {
+        ProviderStepExecutor executor = executor("generate_video", "vertical_ad_clip_v1");
+        UUID revisionId = UUID.randomUUID();
+        executor.execute(context("""
+                {"script":"Approved copy","sourceRevisionId":"%s"}
+                """.formatted(revisionId), """
+                {"profile":"vertical_ad_clip_v1",
+                 "payloadFields":{"prompt":"script","sourceRevisionId":"sourceRevisionId"},
+                 "promptInstruction":"Opening product hero shot"}
+                """));
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(castPayload(sent.getValue()).get("prompt").toString())
+                .contains("Approved copy")
+                .contains("Visual direction: Opening product hero shot");
+        assertThat(castPayload(sent.getValue()))
+                .containsEntry("sourceRevisionId", revisionId.toString());
+    }
+
     @SuppressWarnings("unchecked")
     private static java.util.Map<String, Object> castPayload(ProviderJob job) {
         return (java.util.Map<String, Object>) job.params().get("payload");

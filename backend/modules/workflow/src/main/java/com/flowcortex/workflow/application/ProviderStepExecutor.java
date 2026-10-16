@@ -118,9 +118,23 @@ class ProviderStepExecutor implements StepExecutor {
                 }
                 result.put(target, input.get(source));
             }
+            appendPromptInstruction(result, objectMapper.readValue(config, OBJECT));
             return result;
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
         }
+    }
+
+    private void appendPromptInstruction(Map<String, Object> payload, Map<String, Object> config) {
+        Object instruction = config.get("promptInstruction");
+        if (instruction == null) {
+            return;
+        }
+        if (!(instruction instanceof String text) || text.isBlank()
+                || !(payload.get("prompt") instanceof String prompt) || prompt.isBlank()) {
+            throw new StepFailedException("contract_violation",
+                    "Provider promptInstruction requires a non-empty prompt and instruction");
+        }
+        payload.put("prompt", prompt + "\n\nVisual direction: " + text);
     }
 }

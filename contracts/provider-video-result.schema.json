@@ -20,7 +20,7 @@
   "properties": {
     "profile": { "const": "vertical_ad_clip_v1" },
     "durationSeconds": { "const": 5 },
-    "provider": { "enum": ["seedance", "veo"] },
+    "provider": { "enum": ["seedance", "veo", "wan"] },
     "model": { "type": "string", "minLength": 1, "maxLength": 200 },
     "aspectRatio": { "const": "9:16" },
     "resolution": { "enum": ["480p", "720p"] },

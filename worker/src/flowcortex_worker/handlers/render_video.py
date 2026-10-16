@@ -15,8 +15,8 @@ PROFILE = "vertical_ad_v1"
 VIDEO_NAME = "video.mp4"
 MANIFEST_NAME = "manifest.json"
 VIDEO_MIME = "video/mp4"
-MIN_DURATION_SECONDS = 15
-MAX_DURATION_SECONDS = 30
+TARGET_DURATION_SECONDS = 10
+CLIP_DURATION_SECONDS = 5
 WIDTH = 360
 HEIGHT = 640
 MAX_IMAGES = 10
@@ -27,13 +27,14 @@ def handle(
     inputs: Mapping[str, Path],
     processes: ProcessRunner,
 ) -> HandlerOutcome:
-    image_count, speech, generated_video = _validate_inputs(job, inputs)
+    image_count, speech, generated_video_1, generated_video_2 = _validate_inputs(job, inputs)
     if not speech.is_file() or speech.stat().st_size == 0:
         raise PermanentError("contract_violation", "render_video requires a non-empty speech input")
-    if not generated_video.is_file() or generated_video.stat().st_size == 0:
-        raise PermanentError(
-            "contract_violation", "render_video requires a non-empty generated video input"
-        )
+    for generated_video in (generated_video_1, generated_video_2):
+        if not generated_video.is_file() or generated_video.stat().st_size == 0:
+            raise PermanentError(
+                "contract_violation", "render_video requires two non-empty generated videos"
+            )
     video = speech.parent / VIDEO_NAME
     completed = processes.run(
         [
@@ -43,23 +44,30 @@ def handle(
             "-loglevel",
             "error",
             "-y",
-            "-stream_loop",
-            "-1",
             "-i",
-            str(generated_video),
+            str(generated_video_1),
+            "-i",
+            str(generated_video_2),
             "-i",
             str(speech),
             "-filter_complex",
             f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
-            f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[v];"
-            f"[1:a]apad=whole_dur={MIN_DURATION_SECONDS}[a]",
+            f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
+            f"fps=30,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
+            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v0];"
+            f"[1:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
+            f"fps=30,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
+            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v1];"
+            f"[v0][v1]concat=n=2:v=1:a=0[v];"
+            f"[2:a]apad=whole_dur={TARGET_DURATION_SECONDS},"
+            f"atrim=duration={TARGET_DURATION_SECONDS},asetpts=PTS-STARTPTS[a]",
             "-map",
             "[v]",
             "-map",
             "[a]",
             "-t",
-            str(MAX_DURATION_SECONDS),
-            "-shortest",
+            str(TARGET_DURATION_SECONDS),
             "-c:v",
             "libx264",
             "-preset",
@@ -116,7 +124,9 @@ def handle(
     )
 
 
-def _validate_inputs(job: MediaJob, inputs: Mapping[str, Path]) -> tuple[int, Path, Path]:
+def _validate_inputs(
+    job: MediaJob, inputs: Mapping[str, Path]
+) -> tuple[int, Path, Path, Path]:
     if job.params.get("profile") != PROFILE:
         raise PermanentError(
             "contract_violation",
@@ -129,7 +139,12 @@ def _validate_inputs(job: MediaJob, inputs: Mapping[str, Path]) -> tuple[int, Pa
 
     image_keys = [key for key in keys if key.startswith("image_")]
     expected_images = [f"image_{position}" for position in range(1, len(image_keys) + 1)]
-    expected_keys = {*expected_images, "speech", "generated_video"}
+    expected_keys = {
+        *expected_images,
+        "speech",
+        "generated_video_1",
+        "generated_video_2",
+    }
     if not 1 <= len(image_keys) <= MAX_IMAGES:
         raise PermanentError(
             "contract_violation",
@@ -138,14 +153,19 @@ def _validate_inputs(job: MediaJob, inputs: Mapping[str, Path]) -> tuple[int, Pa
     if image_keys != expected_images or set(keys) != expected_keys:
         raise PermanentError(
             "contract_violation",
-            "render_video requires contiguous image inputs, speech and generated_video",
+            "render_video requires contiguous images, speech and two generated videos",
         )
     if set(inputs) != expected_keys:
         raise PermanentError(
             "contract_violation",
             "render_video resolved inputs do not match the declared inputs",
         )
-    return len(image_keys), inputs["speech"], inputs["generated_video"]
+    return (
+        len(image_keys),
+        inputs["speech"],
+        inputs["generated_video_1"],
+        inputs["generated_video_2"],
+    )
 
 
 def _verify_video(video: Path, processes: ProcessRunner) -> float:
@@ -172,7 +192,7 @@ def _verify_video(video: Path, processes: ProcessRunner) -> float:
         valid_video = len(video_streams) == 1 and video_streams[0].get("codec_name") == "h264"
         valid_size = valid_video and video_streams[0].get("width") == WIDTH \
             and video_streams[0].get("height") == HEIGHT
-        valid_duration = MIN_DURATION_SECONDS - 0.1 <= duration <= MAX_DURATION_SECONDS + 0.1
+        valid_duration = abs(duration - TARGET_DURATION_SECONDS) <= 0.1
         if not valid_size or len(audio_streams) != 1 or not valid_duration:
             raise ValueError
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:

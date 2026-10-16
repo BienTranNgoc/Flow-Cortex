@@ -19,7 +19,7 @@ class ProviderVideoData(BaseModel):
     )
     profile: Literal["vertical_ad_clip_v1"]
     durationSeconds: Literal[5]
-    provider: Literal["seedance", "veo"]
+    provider: Literal["seedance", "veo", "wan"]
     model: Annotated[str, Field(max_length=200, min_length=1)]
     aspectRatio: Literal["9:16"]
     resolution: Literal["480p", "720p"]

@@ -54,7 +54,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
-    void fixtureArtifactsCarryAProductVideoThroughAllFourSteps() throws Exception {
+    void fixtureArtifactsCarryAProductVideoThroughTwoGeneratedClips() throws Exception {
         UserView owner = newUser("product-round-trip");
         String token = loginAs(owner);
         List<UUID> uploads = List.of(uploadImage(owner), uploadImage(owner));
@@ -92,22 +92,48 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                         + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
+        JsonNode firstVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
+        put(MEDIA_BUCKET, firstClipKey, "video/mp4", "fixture clip one");
+        publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
+
+        JsonNode secondVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        String secondClipKey = outputKey(secondVideoJob, "clip.mp4");
+        put(MEDIA_BUCKET, secondClipKey, "video/mp4", "fixture clip two");
+        publishVideoResult(runId, secondVideoJob, secondClipKey, "c");
+
         JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
-                renderInputs.get(2).get("key").asString()))
-                .containsExactly("image_1", "image_2", "speech");
+                renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString(),
+                renderInputs.get(4).get("key").asString()))
+                .containsExactly("image_1", "image_2", "speech", "generated_video_1", "generated_video_2");
         assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(speechKey);
+        assertThat(renderJob.get("inputs").get(3).get("objectKey").asString()).isEqualTo(firstClipKey);
+        assertThat(renderJob.get("inputs").get(4).get("objectKey").asString()).isEqualTo(secondClipKey);
 
         String videoKey = outputKey(renderJob, "video.mp4");
         put(MEDIA_BUCKET, videoKey, "video/mp4", "fixture mp4");
         publishResult("media", runId, renderJob, output("video.mp4", videoKey, "video/mp4", 11),
-                "{\"profile\":\"vertical_ad_v1\",\"aspectRatio\":\"9:16\",\"durationSeconds\":15}");
+                "{\"profile\":\"vertical_ad_v1\",\"aspectRatio\":\"9:16\",\"durationSeconds\":10}");
 
         assertThat(pollUntil(owner.id(), runId, run -> "completed".equals(run.status()), WAIT).steps())
                 .allMatch(step -> "completed".equals(step.status()));
-        assertThat(get("/api/v1/runs/" + runId + "/steps/4/outputs/video.mp4/url", token, String.class)
+        assertThat(get("/api/v1/runs/" + runId + "/steps/6/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private void publishVideoResult(UUID runId, JsonNode job, String clipKey, String hashCharacter) {
+        publishResult("provider", runId, job,
+                output("clip.mp4", clipKey, "video/mp4", 16),
+                "{\"profile\":\"vertical_ad_clip_v1\",\"durationSeconds\":5,"
+                        + "\"provider\":\"wan\",\"model\":\"wan-video/wan-2.2-5b-fast\","
+                        + "\"aspectRatio\":\"9:16\",\"resolution\":\"480p\","
+                        + "\"sourceRevisionId\":\"" + job.path("params").path("payload")
+                                .path("sourceRevisionId").asString() + "\","
+                        + "\"idempotencyKey\":\"" + hashCharacter.repeat(64) + "\","
+                        + "\"providerTaskId\":\"prediction-" + job.get("stepOrder").asInt() + "\","
+                        + "\"format\":\"mp4\"}");
     }
 
     private JsonNode receiveJob(String queue, UUID runId, String capability) throws Exception {
