@@ -20,7 +20,16 @@ from aiohttp import ClientError, WSServerHandshakeError
 from edge_tts.exceptions import NoAudioReceived
 
 from ..errors import PermanentError, TransientError
-from .adapter import FixtureProviderAdapter, SpeechArtifact, SpeechIdentity, SpeechRequest
+from .adapter import (
+    FixtureProviderAdapter,
+    SpeechArtifact,
+    SpeechIdentity,
+    SpeechRequest,
+    VideoAbort,
+    VideoArtifact,
+    VideoIdentity,
+    VideoRequest,
+)
 from .contracts.provider_job import ProductAdPayload
 
 PROVIDER_EDGE = "edge"
@@ -77,6 +86,21 @@ class EdgeSpeechAdapter:
             provider=PROVIDER_EDGE,
             voice=self.config.voice,
             speed=self.config.rate,
+        )
+
+    def video_identity(self) -> VideoIdentity:
+        raise PermanentError(
+            "provider_capability_unavailable", "Edge video generation is not implemented"
+        )
+
+    def submit_video(self, request: VideoRequest) -> str:
+        raise PermanentError(
+            "provider_capability_unavailable", "Edge video generation is not implemented"
+        )
+
+    def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "Edge video generation is not implemented"
         )
 
 

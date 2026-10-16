@@ -3,15 +3,23 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import tempfile
 import wave
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from .adapter import ProviderAdapter, SpeechIdentity, SpeechRequest
-from .contracts.provider_job import GenerateScriptJob, GenerateSpeechJob, ProviderJob
+from ..errors import PermanentError
+from .adapter import ProviderAdapter, SpeechIdentity, SpeechRequest, VideoIdentity, VideoRequest
+from .contracts.provider_job import (
+    GenerateScriptJob,
+    GenerateSpeechJob,
+    GenerateVideoJob,
+    ProviderJob,
+)
 from .contracts.provider_speech_result import ProviderSpeechData
 
 
@@ -38,6 +46,8 @@ class ObjectStore(Protocol):
 
     def fetch_bytes(self, bucket: str, key: str, abort: Any) -> bytes: ...
 
+    def put(self, key: str, body: bytes, mime: str, abort: Any) -> int: ...
+
 
 @dataclass(frozen=True)
 class ExecutionContext:
@@ -48,7 +58,12 @@ class ExecutionContext:
 
 
 Handler = Callable[
-    [GenerateScriptJob | GenerateSpeechJob, ProviderAdapter, ExecutionContext], ProviderOutcome
+    [
+        GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+        ProviderAdapter,
+        ExecutionContext,
+    ],
+    ProviderOutcome,
 ]
 
 
@@ -65,7 +80,9 @@ def execute(
 
 
 def _generate_script(
-    job: GenerateScriptJob | GenerateSpeechJob, adapter: ProviderAdapter, context: ExecutionContext
+    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    adapter: ProviderAdapter,
+    context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateScriptJob):
         raise UnsupportedCapability("generate_script received the wrong job shape")
@@ -76,7 +93,9 @@ def _generate_script(
 
 
 def _generate_speech(
-    job: GenerateScriptJob | GenerateSpeechJob, adapter: ProviderAdapter, context: ExecutionContext
+    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    adapter: ProviderAdapter,
+    context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateSpeechJob):
         raise UnsupportedCapability("generate_speech received the wrong job shape")
@@ -111,6 +130,142 @@ def _generate_speech(
             ProviderFile("manifest.json", "application/json", manifest),
         ),
     )
+
+
+def _generate_video(
+    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    adapter: ProviderAdapter,
+    context: ExecutionContext,
+) -> ProviderOutcome:
+    if not isinstance(job, GenerateVideoJob):
+        raise UnsupportedCapability("generate_video received the wrong job shape")
+    payload = job.params.payload
+    request = VideoRequest(payload.prompt, payload.sourceRevisionId)
+    identity = adapter.video_identity()
+    idempotency_key = _video_idempotency_key(request, identity)
+    task_id = _load_video_task(context, idempotency_key, identity)
+    if task_id is None:
+        task_id = adapter.submit_video(request)
+        _store_video_task(context, task_id, idempotency_key, identity)
+    video = adapter.await_video(task_id, context.abort)
+    if video.provider_task_id != task_id:
+        raise PermanentError(
+            "provider_response_invalid",
+            "video adapter returned a different provider task id",
+        )
+    data = {
+        "profile": request.profile,
+        "durationSeconds": identity.duration_seconds,
+        "provider": identity.provider,
+        "model": identity.model,
+        "aspectRatio": identity.aspect_ratio,
+        "resolution": identity.resolution,
+        "sourceRevisionId": str(request.source_revision_id),
+        "idempotencyKey": idempotency_key,
+        "providerTaskId": task_id,
+        "format": "mp4",
+    }
+    normalized = _normalize_video(video.body, context)
+    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return ProviderOutcome(
+        data=data,
+        files=(
+            ProviderFile("clip.mp4", video.mime, normalized),
+            ProviderFile("manifest.json", "application/json", manifest),
+        ),
+    )
+
+
+def _load_video_task(
+    context: ExecutionContext, idempotency_key: str, identity: VideoIdentity
+) -> str | None:
+    key = f"{context.output_prefix}manifest.json"
+    if context.storage.head_object(context.bucket, key) is None:
+        return None
+    raw = context.storage.fetch_bytes(context.bucket, key, context.abort)
+    try:
+        checkpoint = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise PermanentError(
+            "provider_response_invalid", "stored video task checkpoint is invalid"
+        ) from exc
+    expected = {
+        "idempotencyKey": idempotency_key,
+        "model": identity.model,
+        "provider": identity.provider,
+    }
+    if not isinstance(checkpoint, dict) or any(checkpoint.get(k) != v for k, v in expected.items()):
+        raise PermanentError(
+            "provider_response_invalid",
+            "stored video task checkpoint does not match this request",
+        )
+    task_id = checkpoint.get("providerTaskId")
+    if not isinstance(task_id, str) or not task_id:
+        raise PermanentError(
+            "provider_response_invalid", "stored video task checkpoint has no provider task id"
+        )
+    return task_id
+
+
+def _store_video_task(
+    context: ExecutionContext,
+    task_id: str,
+    idempotency_key: str,
+    identity: VideoIdentity,
+) -> None:
+    checkpoint = json.dumps(
+        {
+            "idempotencyKey": idempotency_key,
+            "model": identity.model,
+            "provider": identity.provider,
+            "providerTaskId": task_id,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+    ).encode("utf-8")
+    context.storage.put(
+        f"{context.output_prefix}manifest.json",
+        checkpoint,
+        "application/json",
+        context.abort,
+    )
+
+
+def _normalize_video(body: bytes, context: ExecutionContext) -> bytes:
+    with tempfile.TemporaryDirectory(prefix="flowcortex-video-") as directory:
+        source = Path(directory) / "source.mp4"
+        output = Path(directory) / "clip.mp4"
+        source.write_bytes(body)
+        completed = context.abort.run([
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-t",
+            "5",
+            "-vf",
+            "scale=720:1280:force_original_aspect_ratio=decrease,"
+            "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(output),
+        ])
+        if completed.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+            raise PermanentError(
+                "provider_response_invalid", "generated video could not be normalized"
+            )
+        return output.read_bytes()
 
 
 def _reuse_existing_artifact(
@@ -177,7 +332,22 @@ def _speech_idempotency_key(request: SpeechRequest, identity: SpeechIdentity) ->
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> str:
+    value = "\0".join((
+        str(request.source_revision_id),
+        request.profile,
+        identity.provider,
+        identity.model,
+        str(identity.duration_seconds),
+        identity.aspect_ratio,
+        identity.resolution,
+        str(identity.generate_audio).lower(),
+    ))
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
 _CAPABILITIES: dict[tuple[str, str], Handler] = {
     ("generate_script", "product_ad_v1"): _generate_script,
     ("generate_speech", "vi_voice_v1"): _generate_speech,
+    ("generate_video", "vertical_ad_clip_v1"): _generate_video,
 }

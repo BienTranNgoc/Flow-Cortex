@@ -5,7 +5,8 @@
   "description": "A typed provider job. Product content is carried only in params.payload and must not be logged.",
   "oneOf": [
     { "$ref": "#/$defs/generateScriptJob" },
-    { "$ref": "#/$defs/generateSpeechJob" }
+    { "$ref": "#/$defs/generateSpeechJob" },
+    { "$ref": "#/$defs/generateVideoJob" }
   ],
   "$defs": {
     "commonProperties": {
@@ -70,6 +71,26 @@
         "payload": { "$ref": "#/$defs/speechPayload" }
       }
     },
+    "videoPayload": {
+      "title": "VideoPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "sourceRevisionId"],
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 2500 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "videoParams": {
+      "title": "VideoParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "vertical_ad_clip_v1" },
+        "payload": { "$ref": "#/$defs/videoPayload" }
+      }
+    },
     "generateScriptJob": {
       "title": "GenerateScriptJob",
       "type": "object",
@@ -126,6 +147,37 @@
         "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
         "capability": { "const": "generate_speech" },
         "params": { "$ref": "#/$defs/speechParams" },
+        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
+        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
+        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
+        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+      }
+    },
+    "generateVideoJob": {
+      "title": "GenerateVideoJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "correlationId",
+        "stepOrder",
+        "capability",
+        "params",
+        "outputPrefix",
+        "attempt",
+        "maxRuntimeSeconds",
+        "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
+        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
+        "runId": { "$ref": "#/$defs/commonProperties/runId" },
+        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
+        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "capability": { "const": "generate_video" },
+        "params": { "$ref": "#/$defs/videoParams" },
         "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
         "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
         "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },

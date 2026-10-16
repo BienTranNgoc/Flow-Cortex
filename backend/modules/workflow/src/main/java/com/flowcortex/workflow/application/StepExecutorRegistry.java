@@ -44,6 +44,7 @@ class StepExecutorRegistry {
         List<StepExecutor> executors = new ArrayList<>(List.of(new EchoStepExecutor(), new FailStepExecutor()));
         executors.add(new ProviderStepExecutor("generate_script", "product_ad_v1", mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
+        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock));
         Arrays.stream(MediaCapability.values())
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);

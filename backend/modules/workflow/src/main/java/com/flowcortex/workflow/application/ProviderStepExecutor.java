@@ -12,7 +12,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Dispatches provider-neutral script and speech jobs to the isolated provider runtime. */
+/** Dispatches provider-neutral script, speech and generated-video jobs. */
 class ProviderStepExecutor implements StepExecutor {
 
     private static final TypeReference<Map<String, Object>> OBJECT = new TypeReference<>() { };

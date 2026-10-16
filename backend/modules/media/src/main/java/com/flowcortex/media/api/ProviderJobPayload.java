@@ -27,4 +27,8 @@ public final class ProviderJobPayload {
     /** {@code speechParams.payload} of a {@code generate_speech/vi_voice_v1} step. */
     public record Speech(@NotBlank @Size(max = 8000) String script, @NotNull UUID sourceRevisionId) {
     }
+
+    /** {@code videoParams.payload} of a {@code generate_video/vertical_ad_clip_v1} step. */
+    public record Video(@NotBlank @Size(max = 2500) String prompt, @NotNull UUID sourceRevisionId) {
+    }
 }

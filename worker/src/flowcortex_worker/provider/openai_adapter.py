@@ -21,7 +21,15 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from ..errors import PermanentError, TransientError
-from .adapter import SpeechArtifact, SpeechIdentity, SpeechRequest
+from .adapter import (
+    SpeechArtifact,
+    SpeechIdentity,
+    SpeechRequest,
+    VideoAbort,
+    VideoArtifact,
+    VideoIdentity,
+    VideoRequest,
+)
 from .contracts.provider_job import ProductAdPayload
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
@@ -159,6 +167,21 @@ class OpenAIProviderAdapter:
         raise PermanentError(
             "provider_capability_unavailable",
             "OpenAI speech generation is not implemented",
+        )
+
+    def video_identity(self) -> VideoIdentity:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def submit_video(self, request: VideoRequest) -> str:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
         )
 
     def _request_script(self, payload: ProductAdPayload) -> str:

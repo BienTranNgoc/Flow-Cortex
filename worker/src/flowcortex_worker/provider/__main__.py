@@ -29,6 +29,8 @@ from .openai_adapter import (
     PROVIDER_OPENAI,
     select_adapter,
 )
+from .seedance_adapter import PROVIDER_SEEDANCE, SeedanceAdapter, SeedanceConfig
+from .veo_adapter import PROVIDER_VEO, VeoAdapter, VeoConfig
 
 log = logging.getLogger("flowcortex_provider_worker")
 
@@ -130,6 +132,7 @@ def _build_adapter() -> CapabilityProviderAdapter:
     legacy = os.environ.get("PROVIDER_ADAPTER", PROVIDER_FIXTURE).strip().lower()
     script_provider = os.environ.get("SCRIPT_PROVIDER", "").strip().lower() or legacy
     speech_provider = os.environ.get("SPEECH_PROVIDER", "").strip().lower() or legacy
+    video_provider = os.environ.get("VIDEO_PROVIDER", PROVIDER_FIXTURE).strip().lower()
     legacy_openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     script_api_key = (
         os.environ.get("SCRIPT_PROVIDER_API_KEY", "").strip() or legacy_openai_key
@@ -154,6 +157,21 @@ def _build_adapter() -> CapabilityProviderAdapter:
         or _OPENAI_BASE_URL
     )
     speech_model = os.environ.get("SPEECH_PROVIDER_MODEL", "").strip() or _OPENAI_SCRIPT_MODEL
+    generic_video_key = os.environ.get("VIDEO_PROVIDER_API_KEY", "").strip()
+    generic_video_url = os.environ.get("VIDEO_PROVIDER_BASE_URL", "").strip()
+    generic_video_model = os.environ.get("VIDEO_PROVIDER_MODEL", "").strip()
+    if video_provider == PROVIDER_SEEDANCE:
+        video_api_key = os.environ.get("SEEDANCE_API_KEY", "").strip() or generic_video_key
+        video_base_url = os.environ.get("SEEDANCE_BASE_URL", "").strip() or generic_video_url
+        video_model = os.environ.get("SEEDANCE_MODEL", "").strip() or generic_video_model
+    elif video_provider == PROVIDER_VEO:
+        video_api_key = os.environ.get("VEO_API_KEY", "").strip() or generic_video_key
+        video_base_url = os.environ.get("VEO_BASE_URL", "").strip() or generic_video_url
+        video_model = os.environ.get("VEO_MODEL", "").strip() or generic_video_model
+    else:
+        video_api_key = generic_video_key
+        video_base_url = generic_video_url
+        video_model = generic_video_model
 
     script_adapter = _build_script_adapter(
         script_provider, script_api_key, script_base_url, script_model
@@ -161,11 +179,18 @@ def _build_adapter() -> CapabilityProviderAdapter:
     speech_adapter = _build_speech_adapter(
         speech_provider, speech_api_key, speech_base_url, speech_model
     )
+    video_adapter = _build_video_adapter(
+        video_provider, video_api_key, video_base_url, video_model
+    )
     log.info(
         "provider adapters selected",
-        extra={"scriptProvider": script_provider, "speechProvider": speech_provider},
+        extra={
+            "scriptProvider": script_provider,
+            "speechProvider": speech_provider,
+            "videoProvider": video_provider,
+        },
     )
-    return CapabilityProviderAdapter(script_adapter, speech_adapter)
+    return CapabilityProviderAdapter(script_adapter, speech_adapter, video_adapter)
 
 
 def _build_script_adapter(
@@ -195,6 +220,57 @@ def _build_speech_adapter(
     raise RuntimeError(
         f"Unknown SPEECH_PROVIDER '{provider}'; accepted values: "
         f"{PROVIDER_FIXTURE}, {PROVIDER_EDGE}, {PROVIDER_OPENAI}"
+    )
+
+
+def _build_video_adapter(
+    provider: str, api_key: str, base_url: str, model: str
+) -> ProviderAdapter:
+    if provider == PROVIDER_SEEDANCE:
+        if not api_key:
+            raise RuntimeError("Seedance video provider requires SEEDANCE_API_KEY")
+        if not base_url:
+            raise RuntimeError("Seedance video provider requires SEEDANCE_BASE_URL")
+        return SeedanceAdapter(
+            SeedanceConfig(
+                api_key=api_key,
+                base_url=base_url,
+                model=model or "ByteDance-Seedance-1.5-pro",
+                request_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
+                ),
+                poll_interval_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_INTERVAL_SECONDS", "5")
+                ),
+                poll_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS", "480")
+                ),
+            )
+        )
+    if provider == PROVIDER_VEO:
+        if not api_key:
+            raise RuntimeError("Veo video provider requires VEO_API_KEY")
+        return VeoAdapter(
+            VeoConfig(
+                api_key=api_key,
+                base_url=base_url or "https://generativelanguage.googleapis.com/v1beta",
+                model=model or "veo-3.1-fast-generate-preview",
+                request_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
+                ),
+                poll_interval_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_INTERVAL_SECONDS", "10")
+                ),
+                poll_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS", "480")
+                ),
+            )
+        )
+    if provider == PROVIDER_FIXTURE:
+        return FixtureProviderAdapter()
+    raise RuntimeError(
+        f"Unknown VIDEO_PROVIDER '{provider}'; accepted values: "
+        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}"
     )
 
 

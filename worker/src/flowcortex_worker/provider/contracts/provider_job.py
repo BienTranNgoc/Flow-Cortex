@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from typing import Annotated, Any, Literal
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 from uuid import UUID
 
 
@@ -15,11 +15,11 @@ class ProductAdPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    productName: Annotated[StrictStr, Field(max_length=200, min_length=1)]
-    description: Annotated[StrictStr, Field(max_length=4000, min_length=1)]
-    cta: Annotated[StrictStr, Field(max_length=500, min_length=1)]
-    price: Annotated[StrictStr | None, Field(max_length=200, min_length=1)] = None
-    promotion: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
+    productName: Annotated[str, Field(max_length=200, min_length=1)]
+    description: Annotated[str, Field(max_length=4000, min_length=1)]
+    cta: Annotated[str, Field(max_length=500, min_length=1)]
+    price: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    promotion: Annotated[str | None, Field(max_length=500, min_length=1)] = None
 
 
 class ProductAdParams(BaseModel):
@@ -34,7 +34,7 @@ class SpeechPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
+    script: Annotated[str, Field(max_length=8000, min_length=1)]
     sourceRevisionId: UUID
 
 
@@ -44,6 +44,22 @@ class SpeechParams(BaseModel):
     )
     profile: Literal["vi_voice_v1"]
     payload: SpeechPayload
+
+
+class VideoPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prompt: Annotated[str, Field(max_length=2500, min_length=1)]
+    sourceRevisionId: UUID
+
+
+class VideoParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["vertical_ad_clip_v1"]
+    payload: VideoPayload
 
 
 class GenerateScriptJob(BaseModel):
@@ -59,18 +75,18 @@ class GenerateScriptJob(BaseModel):
             description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
         ),
     ]
-    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    stepOrder: Annotated[int, Field(ge=1)]
     capability: Literal["generate_script"]
     params: ProductAdParams
     outputPrefix: Annotated[
-        StrictStr,
+        str,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
-    attempt: Annotated[StrictInt, Field(ge=1)]
-    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    attempt: Annotated[int, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
     issuedAt: AwareDatetime
 
 
@@ -87,24 +103,52 @@ class GenerateSpeechJob(BaseModel):
             description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
         ),
     ]
-    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    stepOrder: Annotated[int, Field(ge=1)]
     capability: Literal["generate_speech"]
     params: SpeechParams
     outputPrefix: Annotated[
-        StrictStr,
+        str,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
-    attempt: Annotated[StrictInt, Field(ge=1)]
-    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    attempt: Annotated[int, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
     issuedAt: AwareDatetime
 
 
-class ProviderJob(RootModel[GenerateScriptJob | GenerateSpeechJob]):
+class GenerateVideoJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: Annotated[
+        UUID,
+        Field(
+            description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        ),
+    ]
+    stepOrder: Annotated[int, Field(ge=1)]
+    capability: Literal["generate_video"]
+    params: VideoParams
+    outputPrefix: Annotated[
+        str,
+        Field(
+            description="The only object-key prefix under which this job may publish outputs.",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+        ),
+    ]
+    attempt: Annotated[int, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
+    issuedAt: AwareDatetime
+
+
+class ProviderJob(RootModel[GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob]):
     root: Annotated[
-        GenerateScriptJob | GenerateSpeechJob,
+        GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
         Field(
             description="A typed provider job. Product content is carried only in params.payload and must not be logged.",
             title="ProviderJob",
