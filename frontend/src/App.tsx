@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import './styles/tokens.css';
 import './app/base.css';
+import { AppShell } from './app/AppShell';
 import { HomePage } from './app/HomePage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
@@ -29,8 +30,16 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            element={
+              <AppShell>
+                <Outlet />
+              </AppShell>
+            }
+          >
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
           <Route
             element={
               <RequireAuth>

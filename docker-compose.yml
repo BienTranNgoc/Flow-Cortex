@@ -1,6 +1,6 @@
 # Local end-to-end stack: Postgres, RabbitMQ, the S3-compatible object store
-# (Silo) with its one-shot init, the Spring Boot API, the Python media worker,
-# and the member and admin SPAs, each behind nginx. Day-to-day dev still uses
+# (Silo) with its one-shot init, the Spring Boot API, the Python media/provider
+# workers, and the member and admin SPAs, each behind nginx. Day-to-day dev still uses
 # `./gradlew bootRun` + `npm run dev` (LOCAL_SETUP.md); this is the one-command
 # run/demo:
 #
@@ -57,6 +57,23 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # Creates the restricted broker identity used by provider-worker. The data volume, read-only,
+  # gives rabbitmqctl the node cookie; no password is passed on a command line.
+  rabbitmq-init:
+    image: rabbitmq:4.3.6-management
+    entrypoint: ["/bin/sh", "/init/init.sh"]
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbitmq
+      PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
+      PROVIDER_RABBITMQ_PASS: ${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq:ro
+      - ./infra/rabbitmq:/init:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: "no"
+
   minio:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
     command: ["server", "/data", "--console-address", ":9001"]
@@ -80,7 +97,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # Buckets, uploads lifecycle, and one least-privilege user per service.
+  # Buckets, lifecycles, and one least-privilege user per service.
   # Root credentials exist only here and in `minio`. Idempotent; never restarted.
   minio-init:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
@@ -92,6 +109,10 @@ services:
       BACKEND_S3_SECRET_KEY: ${BACKEND_S3_SECRET_KEY:?Set BACKEND_S3_SECRET_KEY (see .env.example)}
       WORKER_S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
       WORKER_S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+      PROVIDER_S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
+      PROVIDER_S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      # Expiry of run-input copies in the media bucket; must outlast the longest review wait.
+      RUN_INPUT_RETENTION_DAYS: ${RUN_INPUT_RETENTION_DAYS:-30}
     volumes:
       - ./infra/minio:/init:ro
     depends_on:
@@ -119,6 +140,7 @@ services:
       # backend to refuse new runs (503) without a rebuild:
       #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
       FLOWCORTEX_WORKFLOW_ENABLED: ${FLOWCORTEX_WORKFLOW_ENABLED:-true}
+      FLOWCORTEX_PRODUCT_VIDEO_ENABLED: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}
@@ -144,12 +166,25 @@ services:
       FLOWCORTEX_REGISTRATION_PER_IP_PERIOD: ${FLOWCORTEX_REGISTRATION_PER_IP_PERIOD:-1h}
       FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY:-3}
       FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD:-1h}
+      # Password-login throttle per client IP, and how long auth audit rows are kept.
+      FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY:-20}
+      FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD:-15m}
+      FLOWCORTEX_AUTH_AUDIT_RETENTION: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:-90d}
+      # Sign in with Google; an empty client id switches it off.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/api/v1/auth/oauth/google/callback}
       FLOWCORTEX_MEDIA_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_QUEUE_TIMEOUT:-30m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_PROBE:-5m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:-10m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
+      FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
+      FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:-524288000}
       FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:-mp4,mov,webm,mkv,m4a,mp3,wav}
+      FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS:-jpg,jpeg,png,webp}
       # Spans and trace ids exist without a collector; the observability
       # overlay turns the exporters on.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
@@ -183,6 +218,7 @@ services:
   worker:
     build:
       context: ./worker
+      target: media-runtime
     image: flow-cortex-worker:local
     environment:
       # The credentials must be URL-safe; they are placed in the URL as is.
@@ -216,6 +252,49 @@ services:
       retries: 3
       start_period: 20s
     # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  provider-worker:
+    build:
+      context: ./worker
+      target: provider-runtime
+    image: flow-cortex-provider-worker:local
+    environment:
+      AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_PATH_STYLE: "true"
+      S3_UPLOAD_BUCKET: flowcortex-uploads
+      S3_BUCKET: flowcortex-media
+      S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
+      S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      WORKER_ID: ${PROVIDER_WORKER_ID:-provider-worker-1}
+      OTEL_SERVICE_NAME: provider-worker
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_TRACES_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      # Provider adapter for `generate_script`. `openai` is the only real adapter now
+      # (GitHub Models sunset, removed 2026-10-11); any other value (or unset) keeps the
+      # deterministic stub for local-only demos. The worker refuses to boot when the
+      # secret does not match the chosen adapter (see `select_adapter`).
+      PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
+      FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}
+    depends_on:
+      rabbitmq-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     stop_grace_period: 40s
     restart: unless-stopped
 

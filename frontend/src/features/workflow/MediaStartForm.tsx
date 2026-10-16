@@ -22,7 +22,10 @@ function startButtonLabel(phase: StartPhase | null): string {
  * picked file and then starts the run, as one sequence; Start stays focusable while it runs and a
  * press during it changes nothing.
  */
-export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
+export function MediaStartForm({
+  workflowId,
+  disabled,
+}: Readonly<{ workflowId: string; disabled: boolean }>) {
   const { go } = useTransitionNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);
@@ -146,7 +149,7 @@ export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>)
           <p>{NEXT_ACTION}</p>
         </div>
       )}
-      <button type="submit" aria-busy={phase !== null}>
+      <button type="submit" aria-busy={phase !== null} disabled={disabled}>
         {startButtonLabel(phase)}
       </button>
     </form>

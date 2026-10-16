@@ -17,6 +17,7 @@ function submitRegistration() {
 describe('RegisterPage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it.each<[string, FakeReply]>([
@@ -48,8 +49,19 @@ describe('RegisterPage', () => {
           name: 'New Creator',
           email: 'new.creator@example.com',
           password: 'register-password-1',
+          rememberMe: true,
         },
       },
     ]);
+  });
+
+  it('starts the Google authorize flow remembered and returning to "/"', () => {
+    vi.stubEnv('VITE_OAUTH_ENABLED', 'true');
+    renderRoute('/register', '/register', <RegisterPage />);
+
+    const href = screen.getByRole('link', { name: 'Sign up with Google' }).getAttribute('href');
+    const url = new URL(href ?? '', 'http://localhost');
+    expect(url.pathname).toBe('/api/v1/auth/oauth/google/authorize');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ remember_me: 'true', return_to: '/' });
   });
 });

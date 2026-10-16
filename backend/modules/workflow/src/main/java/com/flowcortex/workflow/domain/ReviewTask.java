@@ -42,6 +42,12 @@ public class ReviewTask {
     @Column(name = "reviewed_at")
     private Instant reviewedAt;
 
+    @Column(name = "current_revision_id")
+    private UUID currentRevisionId;
+
+    @Column(name = "approved_revision_id")
+    private UUID approvedRevisionId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -113,6 +119,32 @@ public class ReviewTask {
         return version;
     }
 
+    public UUID getCurrentRevisionId() {
+        return currentRevisionId;
+    }
+
+    public UUID getApprovedRevisionId() {
+        return approvedRevisionId;
+    }
+
+    public void attachRevision(UUID revisionId, long expectedVersion) {
+        requirePending();
+        requireVersion(expectedVersion);
+        this.currentRevisionId = revisionId;
+    }
+
+    public void approveRevision(UUID reviewerId, UUID revisionId, long expectedVersion, Instant now) {
+        requirePending();
+        requireVersion(expectedVersion);
+        if (currentRevisionId == null || !currentRevisionId.equals(revisionId)) {
+            throw new ConflictException("Only the current script revision can be approved");
+        }
+        this.status = ReviewTaskStatus.APPROVED;
+        this.reviewedBy = reviewerId;
+        this.approvedRevisionId = revisionId;
+        this.reviewedAt = now;
+    }
+
     public void approve(UUID reviewerId, String updatedPayload, Instant now) {
         requirePending();
         this.status = ReviewTaskStatus.APPROVED;
@@ -132,6 +164,14 @@ public class ReviewTask {
         if (this.status != ReviewTaskStatus.PENDING) {
             throw new ConflictException("ReviewTask " + this.id + " is already "
                     + this.status.name().toLowerCase(Locale.ROOT));
+        }
+    }
+
+    private void requireVersion(long expectedVersion) {
+        long actual = version == null ? 0L : version;
+        if (actual != expectedVersion) {
+            throw new ConflictException("ReviewTask " + id + " changed; expected version "
+                    + expectedVersion + " but was " + actual);
         }
     }
 }

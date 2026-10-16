@@ -43,7 +43,7 @@ class Abort(Protocol):
 
 
 def output_key(job: MediaJob, name: str) -> str:
-    return f"runs/{job.runId}/steps/{job.stepOrder}/{name}"
+    return f"{job.outputPrefix}{name}"
 
 
 def client_from(settings: Settings) -> Any:
@@ -82,9 +82,9 @@ class Storage:
     @contextmanager
     def fetched(self, ref: MediaJobInput, max_bytes: int, abort: Abort) -> Iterator[Path]:
         """Downloads one input to a private temporary file that is removed on exit."""
-        if ref.bucket != self.upload_bucket:
+        if ref.bucket not in {self.upload_bucket, self.bucket}:
             raise PermanentError(
-                "contract_violation", f"input '{ref.key}' is not in the uploads bucket"
+                "contract_violation", f"input '{ref.key}' is not in an allowed media bucket"
             )
         size, etag = self._head(ref)
         if size > max_bytes:

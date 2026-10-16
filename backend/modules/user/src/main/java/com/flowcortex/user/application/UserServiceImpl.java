@@ -27,10 +27,13 @@ class UserServiceImpl implements UserService {
 
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
-    UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder) {
+    UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
+            RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
@@ -89,7 +92,12 @@ class UserServiceImpl implements UserService {
             user.changeRole(parseRole(role));
         }
         if (status != null && !status.isBlank()) {
-            user.changeStatus(parseStatus(status));
+            UserStatus newStatus = parseStatus(status);
+            user.changeStatus(newStatus);
+            if (newStatus == UserStatus.SUSPENDED) {
+                // Refresh tokens would otherwise keep minting access tokens for a suspended account.
+                refreshTokenService.revokeAllFor(id);
+            }
         }
         return save(user, email);
     }

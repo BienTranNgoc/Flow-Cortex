@@ -1,186 +1,138 @@
-import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { setToken, type WorkflowResponse, type WorkflowStepResponse } from '@flow-cortex/api-client';
+import { screen } from '@testing-library/react';
 import { Route } from 'react-router-dom';
-import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
+import { renderRoute, stubApi } from '../test/fakeApi';
 import { HomePage } from './HomePage';
 
 const ME = { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
-const LINE = 'Have a video or audio file? Check it →';
-const SOURCE = 'https://www.tiktok.com/@creator/video/123';
 
-function workflow(id: string, name: string, types: string[]): WorkflowResponse {
-  return {
-    id,
-    name,
-    isShared: true,
-    steps: types.map((type, index) => ({
-      id: `${id}-s${index + 1}`,
-      stepOrder: index + 1,
-      name: `Step ${index + 1}`,
-      type,
-      mode: type === 'probe' || type === 'extract_audio' ? 'remote' : 'inline',
-    })),
-  };
+function workflow(
+  id: string,
+  name: string,
+  steps: WorkflowStepResponse[],
+): WorkflowResponse {
+  return { id, name, isShared: true, steps };
 }
 
-function renderHome() {
-  return renderRoute(
-    '/',
-    '/',
-    <HomePage />,
-    <Route path="/workflows/:id" element={<p>Start form</p>} />,
-  );
-}
+const DOUYIN_STEPS: WorkflowStepResponse[] = [
+  { id: 'a-1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
+  { id: 'a-2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
+  { id: 'a-3', stepOrder: 3, name: 'echo_output', type: 'echo', mode: 'inline' },
+];
 
-describe('HomePage', () => {
-  beforeEach(() => {
-    setToken('t');
-    vi.stubGlobal('scrollTo', vi.fn());
-  });
+describe('HomePage — launchpad cards', () => {
+  beforeEach(() => setToken('t', true));
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
   });
 
-  it('links to the first listed workflow whose first step is remote, whatever it is called', async () => {
+  function renderHome() {
+    return renderRoute(
+      '/',
+      '/',
+      <HomePage />,
+      <Route path="/workflows/:id" element={<p>Detail page</p>} />,
+    );
+  }
+
+  it('renders one card per workflow returned by the API', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': {
         status: 200,
         body: [
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('mixed', 'Probe then echo', ['probe', 'echo']),
-          workflow('check', 'Renamed by its owner', ['probe', 'extract_audio']),
+          workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS),
+          workflow('wf-b', 'Echo Demo (all steps succeed)', [
+            { id: 'b-1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
+          ]),
+          workflow('wf-c', 'Check a video file', [
+            { id: 'c-1', stepOrder: 1, name: 'Inspect the file', type: 'probe', mode: 'remote' },
+            { id: 'c-2', stepOrder: 2, name: 'Extract source audio', type: 'extract_audio', mode: 'remote' },
+          ]),
         ],
       },
     });
 
     renderHome();
-
-    const link = await screen.findByRole('link', { name: LINE });
-    expect(link).toHaveAttribute('href', '/workflows/mixed');
-  });
-
-  it('omits the line when no workflow starts with a remote step', async () => {
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('echo-probe', 'Echo then probe', ['echo', 'probe']),
-        ],
-      },
-    });
-
-    const { queryClient } = renderHome();
-
-    await screen.findByText('Welcome, Member One');
-    await settled(queryClient);
-    expect(screen.queryByText(LINE)).not.toBeInTheDocument();
-  });
-
-  it('shows no link while the list is still loading', async () => {
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': async () => {
-        await gate;
-        return {
-          status: 200,
-          body: [workflow('check', 'Check a video file', ['probe', 'extract_audio'])],
-        };
-      },
-    });
-
-    renderHome();
-
-    await screen.findByText('Welcome, Member One');
-    expect(screen.queryByRole('link', { name: LINE })).not.toBeInTheDocument();
-    release();
-    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
-      'href',
-      '/workflows/check',
-    );
-  });
-
-  it('starts the first workflow whose first step is not remote, never a probe-only one, whatever the names say', async () => {
-    const calls = stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [
-          workflow('probe-only', 'TikTok link probe', ['probe']),
-          workflow('echo', 'Echo Demo', ['echo']),
-          workflow('url', 'TikTok URL Pipeline', ['echo']),
-        ],
-      },
-      'POST /api/v1/workflows/echo/runs': {
-        status: 200,
-        body: { id: 'run-echo', status: 'running' },
-      },
-    });
-
-    renderHome();
-
-    expect(await screen.findByRole('link', { name: LINE })).toHaveAttribute(
-      'href',
-      '/workflows/probe-only',
-    );
-    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
-    fireEvent.click(screen.getByRole('button', { name: /Generate pipeline/ }));
-
-    await waitFor(() =>
-      expect(calls).toContainEqual({
-        method: 'POST',
-        path: '/api/v1/workflows/echo/runs',
-        body: { input: SOURCE },
-      }),
-    );
-    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
-  });
-
-  it('disables the launch button and marks it busy while the start request is in flight', async () => {
-    stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': { status: 200, body: [workflow('echo', 'Echo Demo', ['echo'])] },
-      'POST /api/v1/workflows/echo/runs': () => new Promise<FakeReply>(() => {}),
-    });
-
-    renderHome();
-
-    await screen.findByText('Welcome, Member One');
-    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
-    const button = screen.getByRole('button', { name: /Generate pipeline/ });
-    await waitFor(() => expect(button).toBeEnabled());
-    expect(button).not.toHaveAttribute('aria-busy', 'true');
-    fireEvent.click(button);
-
-    const busy = await screen.findByRole('button', { name: 'Starting pipeline…' });
-    expect(busy).toBeDisabled();
-    expect(busy).toHaveAttribute('aria-busy', 'true');
-  });
-
-  it('disables the launch when every workflow starts with a remote step', async () => {
-    const calls = stubApi({
-      'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': {
-        status: 200,
-        body: [workflow('probe-only', 'Probe only', ['probe'])],
-      },
-    });
-
-    const { queryClient } = renderHome();
 
     expect(
-      await screen.findByText('No workflow is available for this account yet.'),
+      await screen.findByRole('heading', { name: 'Douyin Video Repurpose' }),
     ).toBeInTheDocument();
-    await settled(queryClient);
-    const button = screen.getByRole('button', { name: /Generate pipeline/ });
-    expect(button).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Source URL'), { target: { value: SOURCE } });
-    fireEvent.click(button);
-    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
+    expect(
+      screen.getByRole('heading', { name: 'Echo Demo (all steps succeed)' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Check a video file' })).toBeInTheDocument();
+    expect(screen.queryAllByText('Coming soon')).toHaveLength(0);
+  });
+
+  it('links every card to its API workflow by id', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-check', 'Check a video file', [])],
+      },
+    });
+
+    renderHome();
+
+    const link = await screen.findByRole('link', { name: /Launch Workflow/ });
+    expect(link).toHaveAttribute('href', '/workflows/wf-check');
+  });
+
+  it('renders a stage chip per workflow step, with the step name', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)],
+      },
+    });
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: 'Douyin Video Repurpose' });
+    expect(screen.getByText('echo_input')).toBeInTheDocument();
+    expect(screen.getByText('approval_checkpoint')).toBeInTheDocument();
+    expect(screen.getByText('echo_output')).toBeInTheDocument();
+  });
+
+  it('does not render ETA, status, priority, or credit fields', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'A', [{ id: 'a-1', stepOrder: 1, name: 'Step', type: 'echo', mode: 'inline' }])],
+      },
+    });
+
+    renderHome();
+
+    await screen.findByRole('heading', { name: 'A' });
+    expect(screen.queryByText(/^~\d+s$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/GPU Credit/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/P[012]/)).not.toBeInTheDocument();
+  });
+
+  it('shows a load error with retry when the workflows API fails', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 500, body: { detail: 'boom' } },
+    });
+
+    renderHome();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load workflows');
+  });
+
+  it('shows a retry block (not a redirect) when /me returns a 5xx', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 500, body: { detail: 'boom' } },
+    });
+
+    renderHome();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your profile');
   });
 });

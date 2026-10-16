@@ -53,6 +53,33 @@ const textPairs: [string, string][] = [
   ['green', 'green-soft'],
   ['red', 'red-soft'],
   ['accent', 'accent-soft'],
+  ...['paper', 'paper-3', 'input-bg'].map((s): [string, string] => ['ink-2', s]),
+  ['ink-4', 'paper'],
+  ['ink-4', 'paper-3'],
+  ['accent', 'paper-3'],
+  ['nav-ink', 'header-bg'],
+  ['ink', 'header-bg'],
+  ['ink', 'footer-bg'],
+  ['ink-3', 'footer-bg'],
+  ['teal', 'footer-bg'],
+  ['teal-bright', 'paper-2'],
+  ['teal-bright', 'paper-3'],
+  ['ink-disabled', 'disabled-from'],
+  ['ink-disabled', 'disabled-to'],
+  ['primary-foreground', 'green-bright'],
+  ['green-bright', 'paper-3'],
+  ['green-vivid', 'paper'],
+  ['green-vivid', 'paper-3'],
+  ['red-light', 'paper-3'],
+  ['tone-blue-text', 'tone-blue-bg'],
+  ['tone-cyan-text', 'tone-cyan-bg'],
+  ['tone-violet-text', 'tone-violet-bg'],
+  ['tone-amber-text', 'tone-amber-bg'],
+  ['green-bright', 'tone-green-bg'],
+  ['tone-rose-text', 'tone-rose-bg'],
+  ['primary-foreground', 'tone-cyan-from'],
+  ['tone-amber-on', 'tone-amber-from'],
+  ['tone-amber-on', 'tone-amber-to'],
 ];
 
 const borderPairs: [string, string][] = [
@@ -67,6 +94,7 @@ borderPairs.push(
   ['edge', 'paper-3'],
   ['green', 'paper-2'],
   ['primary', 'paper-2'],
+  ['red-strong', 'input-bg'],
 );
 
 describe('token contrast', () => {

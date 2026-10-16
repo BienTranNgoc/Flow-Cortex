@@ -1,0 +1,297 @@
+/* HomePage — hero + 3 launchpad cards + 4-stage explainer. */
+
+.launchpad {
+  padding: 3rem 0 0;
+}
+
+/* Ambient gradient glow at top of page content */
+.launchpad::before {
+  content: '';
+  position: fixed;
+  top: -10vmax;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70vmax;
+  height: 40vmax;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--indigo) 22%, transparent) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.launchpad-hero {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 2.5rem;
+  position: relative;
+}
+
+.launchpad-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal-glow) 25%, transparent), transparent);
+}
+
+.launchpad-hero h1 {
+  font-size: clamp(2.1rem, 6vw, 4.1rem);
+  line-height: 1.05;
+  margin: 0.8rem 0;
+}
+
+.launchpad-hero h1 span {
+  color: var(--accent);
+}
+
+.launchpad-hero p:not(.eyebrow) {
+  color: var(--ink-3);
+  margin: 0;
+}
+
+.launchpad-section-title {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  color: var(--ink);
+}
+
+.launchpad-cards {
+  margin: 0 0 2.5rem;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.workflow-card-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem 1.1rem 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--paper-3);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.workflow-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.workflow-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--primary-foreground);
+}
+
+.workflow-card-icon.tone-blue {
+  background: linear-gradient(135deg, var(--cta-from), var(--cta-to));
+}
+
+.workflow-card-icon.tone-cyan {
+  background: linear-gradient(135deg, var(--tone-cyan-from), var(--tone-cyan-to));
+}
+
+.workflow-card-icon.tone-amber {
+  background: linear-gradient(135deg, var(--tone-amber-from), var(--tone-amber-to));
+  color: var(--tone-amber-on);
+}
+
+.workflow-card-title {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.workflow-card-stages {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.workflow-card-stage {
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+}
+
+.workflow-card-stage.tone-blue {
+  color: var(--tone-blue-text);
+  background: var(--tone-blue-bg);
+  border-color: var(--tone-blue-line);
+}
+
+.workflow-card-stage.tone-cyan {
+  color: var(--tone-cyan-text);
+  background: var(--tone-cyan-bg);
+  border-color: var(--tone-cyan-line);
+}
+
+.workflow-card-stage.tone-violet {
+  color: var(--tone-violet-text);
+  background: var(--tone-violet-bg);
+  border-color: var(--tone-violet-line);
+}
+
+.workflow-card-stage.tone-amber {
+  color: var(--tone-amber-text);
+  background: var(--tone-amber-bg);
+  border-color: var(--tone-amber-line);
+}
+
+.workflow-card-stage.tone-green {
+  color: var(--green-bright);
+  background: var(--tone-green-bg);
+  border-color: var(--tone-green-line);
+}
+
+.workflow-card-stage.tone-rose {
+  color: var(--tone-rose-text);
+  background: var(--tone-rose-bg);
+  border-color: var(--tone-rose-line);
+}
+
+.workflow-card-footer {
+  margin-top: auto;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.workflow-card-launch {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: filter 0.15s ease;
+}
+
+.workflow-card-launch:hover {
+  filter: brightness(1.08);
+}
+
+.launchpad-stages {
+  margin: 0 0 2.5rem;
+  padding: clamp(1.2rem, 4vw, 2rem);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: var(--paper-3);
+  box-shadow: var(--shadow);
+}
+
+.launchpad-stages h2 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+  color: var(--ink);
+}
+
+.launchpad-stages-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.launchpad-stage {
+  padding: 0.85rem;
+  border: 1px solid var(--line-subtle);
+  border-radius: 10px;
+  background: var(--input-bg);
+}
+
+.launchpad-stage h3 {
+  margin: 0.35rem 0 0.35rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.launchpad-stage p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
+.launchpad-stage-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.launchpad-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  color: var(--ink-4);
+  font-size: 0.9rem;
+}
+
+.launchpad-footer a {
+  color: var(--accent);
+}
+
+@media (max-width: 1024px) {
+  .workflow-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .launchpad-stages-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .launchpad {
+    padding: 1.5rem 0;
+  }
+
+  .launchpad-stages-list {
+    grid-template-columns: 1fr;
+  }
+
+  .launchpad-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

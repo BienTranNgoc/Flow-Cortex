@@ -108,6 +108,23 @@ class RunStepTransactionsTest {
     }
 
     @Test
+    void completionSideEffectRunsOnlyAfterWinningTheCas() {
+        AtomicBoolean registered = new AtomicBoolean();
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", "[]", NOW))
+                .thenReturn(1, 0);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "out", "[]", NOW,
+                () -> registered.set(true))).isTrue();
+        assertThat(registered).isTrue();
+
+        registered.set(false);
+        assertThat(transactions.complete(runId, stepId, (short) 1, "out", "[]", NOW,
+                () -> registered.set(true))).isFalse();
+        assertThat(registered).isFalse();
+    }
+
+    @Test
     void aWonFailureErrorsTheRunWithTheStepsMessage() {
         when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));

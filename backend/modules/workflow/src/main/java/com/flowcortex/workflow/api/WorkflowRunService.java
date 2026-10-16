@@ -2,6 +2,7 @@ package com.flowcortex.workflow.api;
 
 import com.flowcortex.shared.web.PageView;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * Public API backing {@code /api/v1/workflows/{id}/runs} (start), {@code /api/v1/runs/{id}}
@@ -23,6 +24,10 @@ public interface WorkflowRunService {
      * @throws NotFoundException if {@code workflowId} is not visible to {@code currentUserId}
      */
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName);
+
+    /** Starts a run with ordered image uploads while keeping the single-upload API compatible. */
+    RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName);
 
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input);

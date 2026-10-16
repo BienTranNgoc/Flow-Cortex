@@ -1,4 +1,9 @@
-import { setToken, type RunResponse, type RunStepResponse } from '@flow-cortex/api-client';
+import {
+  setToken,
+  type RunResponse,
+  type RunStepResponse,
+  type ScriptRevisionResponse,
+} from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -125,7 +130,7 @@ describe('RunProgressPage', () => {
   // jsdom has no layout, so it has no scrollIntoView either.
   const scrollIntoView = vi.fn();
   beforeEach(() => {
-    setToken('t');
+    setToken('t', true);
     scrollIntoView.mockClear();
     Object.assign(Element.prototype, { scrollIntoView });
   });
@@ -756,10 +761,10 @@ describe('RunProgressPage', () => {
       expect(calls.some((call) => call.path.endsWith('/approve'))).toBe(false);
     });
 
-    it('says the approval failed when the task was already decided', async () => {
+    it('says the approval failed when the request itself broke', async () => {
       const user = userEvent.setup();
       renderWaiting({
-        [APPROVE]: { status: 409, body: { status: 409, detail: 'Review task is not pending' } },
+        [APPROVE]: { status: 500, body: { status: 500, detail: 'boom' } },
       });
 
       await screen.findByLabelText('Content to approve');
@@ -769,6 +774,20 @@ describe('RunProgressPage', () => {
       expect(screen.getByRole('button', { name: 'Approve' })).toHaveAttribute('aria-busy', 'false');
     });
 
+    it('says the step was already decided when the approval loses the race', async () => {
+      const user = userEvent.setup();
+      renderWaiting({
+        [APPROVE]: { status: 409, body: { status: 409, detail: 'Review task is not pending' } },
+      });
+
+      await screen.findByLabelText('Content to approve');
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'This step was already decided elsewhere.',
+      );
+    });
+
     it('shows no review for a finished run', async () => {
       const { calls, queryClient } = renderRun(completedCheck());
 
@@ -776,6 +795,206 @@ describe('RunProgressPage', () => {
       await settled(queryClient);
       expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
       expect(calls.some((call) => call.path === TASKS_PATH)).toBe(false);
+    });
+  });
+
+  describe('a product video script checkpoint', () => {
+    const REVISIONS = '/api/v1/review-tasks/t1/revisions';
+    const APPROVE = 'POST /api/v1/review-tasks/t1/approve';
+    const SCRIPT_TASK = {
+      id: 't1',
+      runId: 'r1',
+      runStepId: 's2',
+      reviewType: 'APPROVAL_CHECKPOINT',
+      status: 'pending',
+      originalPayload: 'Draft caption',
+      version: 3,
+      currentRevisionId: 'rev1',
+    };
+    const REVISION = {
+      id: 'rev1',
+      runId: 'r1',
+      reviewTaskId: 't1',
+      revisionNumber: 1,
+      content: 'Draft caption',
+      createdBy: 'u1',
+      createdAt: '2026-10-11T00:00:00Z',
+    };
+
+    /** Serves a script checkpoint whose revisions the test can grow as the reviewer edits. */
+    function renderScript(
+      revisions: ScriptRevisionResponse[],
+      extra: Record<string, Handler> = {},
+    ) {
+      const calls = stubApi({
+        'GET /api/v1/runs/r1': {
+          status: 200,
+          body: run(
+            [
+              step({
+                type: 'generate_script',
+                mode: 'remote',
+                status: 'completed',
+                output: 'Draft caption',
+              }),
+              step({
+                id: 's2',
+                stepOrder: 2,
+                type: 'APPROVAL_CHECKPOINT',
+                mode: 'inline',
+                status: 'pending',
+              }),
+            ],
+            { status: 'waiting_approval', input: 'Draft caption' },
+          ),
+        },
+        'GET /api/v1/runs/r1/review-tasks': { status: 200, body: [SCRIPT_TASK] },
+        [`GET ${REVISIONS}`]: { status: 200, body: revisions },
+        ...extra,
+      });
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+      return calls;
+    }
+
+    it('lists the revisions and edits into a new one instead of a local draft', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION], {
+        [`POST ${REVISIONS}`]: {
+          status: 200,
+          body: {
+            ...REVISION,
+            id: 'rev2',
+            revisionNumber: 2,
+            content: 'Kịch bản mới',
+            reviewTaskVersion: 4,
+          },
+        },
+      });
+
+      expect(await screen.findByLabelText('Script to approve')).toHaveValue('Draft caption');
+      expect(screen.getByRole('list', { name: 'Script revisions' })).toHaveTextContent(
+        'Revision 1',
+      );
+
+      await user.clear(screen.getByLabelText('Script to approve'));
+      await user.type(screen.getByLabelText('Script to approve'), 'Kịch bản mới');
+      await user.click(screen.getByRole('button', { name: 'Save revision' }));
+
+      await waitFor(() =>
+        expect(calls).toContainEqual({
+          method: 'POST',
+          path: REVISIONS,
+          body: { content: 'Kịch bản mới', expectedVersion: 3 },
+        }),
+      );
+    });
+
+    it('approves the revision it is showing, not the text in the box', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION], {
+        [APPROVE]: {
+          status: 200,
+          body: { ...SCRIPT_TASK, status: 'approved', approvedRevisionId: 'rev1' },
+        },
+      });
+
+      await screen.findByLabelText('Script to approve');
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      await waitFor(() =>
+        expect(calls).toContainEqual({
+          method: 'POST',
+          path: '/api/v1/review-tasks/t1/approve',
+          body: { revisionId: 'rev1', expectedVersion: 3 },
+        }),
+      );
+    });
+
+    it('says the script moved on when a stale tab loses the approval', async () => {
+      const user = userEvent.setup();
+      renderScript([REVISION], {
+        [APPROVE]: { status: 409, body: { status: 409, detail: 'Revision is no longer current' } },
+      });
+
+      await screen.findByLabelText('Script to approve');
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'This script moved on in another tab.',
+      );
+    });
+
+    it('marks an unsaved edit and keeps the save button live only while dirty', async () => {
+      const user = userEvent.setup();
+      renderScript([REVISION]);
+
+      await screen.findByLabelText('Script to approve');
+      expect(screen.queryByText(/Unsaved changes/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save revision' })).toBeDisabled();
+
+      await user.type(screen.getByLabelText('Script to approve'), '!');
+
+      expect(await screen.findByText(/Unsaved changes/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save revision' })).toBeEnabled();
+    });
+
+    it('does not create a duplicate revision when save is clicked without changes', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION]);
+
+      await screen.findByLabelText('Script to approve');
+      await user.click(screen.getByRole('button', { name: 'Save revision' }));
+
+      expect(calls.some((call) => call.method === 'POST' && call.path === REVISIONS)).toBe(false);
+    });
+
+    it('does not approve an older revision while the editor has unsaved changes', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION]);
+
+      await screen.findByLabelText('Script to approve');
+      await user.type(screen.getByLabelText('Script to approve'), '!');
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Approve' })).toHaveAttribute(
+          'aria-disabled',
+          'true',
+        ),
+      );
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      expect(calls.some((call) => call.method === 'POST' && call.path.endsWith('/approve'))).toBe(
+        false,
+      );
+    });
+
+    it('warns before leaving the page while an edit is unsaved', async () => {
+      const user = userEvent.setup();
+      renderScript([REVISION]);
+
+      await screen.findByLabelText('Script to approve');
+      await user.type(screen.getByLabelText('Script to approve'), '!');
+
+      const leaving = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(leaving);
+      expect(leaving.defaultPrevented).toBe(true);
+    });
+
+    it('keeps the reviewer on the page when an internal link would discard unsaved changes', async () => {
+      const user = userEvent.setup();
+      const confirm = vi.fn(() => false);
+      vi.stubGlobal('confirm', confirm);
+      renderScript([REVISION]);
+
+      await screen.findByLabelText('Script to approve');
+      await user.type(screen.getByLabelText('Script to approve'), '!');
+      await user.click(screen.getByRole('link', { name: 'Back to workflow' }));
+
+      expect(confirm).toHaveBeenCalledOnce();
+      expect(screen.getByLabelText('Script to approve')).toBeInTheDocument();
     });
   });
 
