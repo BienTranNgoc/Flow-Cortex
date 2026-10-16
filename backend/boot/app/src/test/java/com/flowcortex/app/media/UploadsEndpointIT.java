@@ -41,7 +41,8 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
     @Autowired
     private JdbcTemplate jdbc;
 
-    private static final String SIZE_SENTENCE = "Files must be between 1 byte and 500 MB.";
+    private static final String SIZE_SENTENCE =
+            "Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.";
     private static final String TYPE_SENTENCE =
             "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3, .wav, .jpg, .jpeg, .png or .webp.";
     private static final byte[] CLIP = "sixteen bytes!!!".getBytes();

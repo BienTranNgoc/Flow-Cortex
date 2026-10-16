@@ -3,6 +3,7 @@ package com.flowcortex.shared.web;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
+import java.util.Map;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +26,12 @@ class ThrowawayTestController {
     @GetMapping("/test/conflict")
     String triggerConflict() {
         throw new ConflictException("thing conflicts");
+    }
+
+    @GetMapping("/test/unprocessable")
+    String triggerUnprocessable() {
+        throw new UnprocessableEntityException("thing is incomplete", "THING_INCOMPLETE",
+                Map.of("steps[1].config", "is missing"));
     }
 
     @GetMapping("/test/optimistic-lock")

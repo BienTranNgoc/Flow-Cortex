@@ -83,6 +83,13 @@ button.pipeline-node {
   --bar: var(--warning);
 }
 
+/* The step a refused start named as not fully configured. */
+.pipeline-node[data-problem='true'] {
+  --bar: var(--red);
+  border-color: var(--red);
+  border-left-color: var(--bar);
+}
+
 .pipeline-order {
   grid-area: order;
   min-width: 1.5rem;
@@ -145,6 +152,16 @@ button.pipeline-node {
 .pipeline-node .run-step-status[data-state='needs-you'] {
   background: var(--warning-soft);
   color: var(--warning);
+}
+
+.pipeline-node[data-state='skipped'] {
+  --bar: var(--line-2);
+  opacity: 0.6;
+}
+
+.pipeline-node .run-step-status[data-state='skipped'] {
+  background: transparent;
+  border: 1px dashed var(--line-2);
 }
 
 .pipeline-meta {

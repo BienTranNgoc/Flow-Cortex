@@ -27,6 +27,7 @@ export const NAV: NavGroup[] = [
     label: 'Administration',
     items: [
       { label: 'Users', path: '/users', icon: '●', action: 'users.manage' },
+      { label: 'SMS outbox', path: '/sms-outbox', icon: '✉', action: 'users.manage' },
       { label: 'Settings', path: '/settings', icon: '⚙', action: 'users.manage', disabled: true },
       { label: 'Audit log', path: '/audit', icon: '☰', action: 'users.manage', disabled: true },
     ],

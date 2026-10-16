@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  ApiError,
   approveTask,
   authHeaders,
+  cancelRun,
   getOutputUrl,
   getReviewTasks,
   getRevisions,
@@ -76,10 +78,11 @@ export function useOutputUrlMutation(runId: string, stepOrder: number, name: str
 }
 
 /**
- * Polls `/api/v1/runs/{id}` while the run is still `running` or `waiting_approval` — the start
- * call returns before steps finish, so this is what actually shows a step
+ * Polls `/api/v1/runs/{id}` while the run is still `running`, `waiting_approval` or `cancelling`
+ * — the start call returns before steps finish, so this is what actually shows a step
  * advancing pending -> running -> completed|error, and a review decided elsewhere still moves
- * the page on. Stops polling once the run reaches either terminal status.
+ * the page on. A stopping run settles once its in-flight step finishes. Stops polling once the
+ * run reaches a terminal status.
  */
 export function useRunQuery(runId: string | undefined) {
   return useQuery({
@@ -88,7 +91,30 @@ export function useRunQuery(runId: string | undefined) {
     enabled: Boolean(runId),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'running' || status === 'waiting_approval' ? 1000 : false;
+      return status === 'running' || status === 'waiting_approval' || status === 'cancelling'
+        ? 1000
+        : false;
+    },
+  });
+}
+
+/**
+ * The answer is the run itself (`cancelling` or `cancelled`), so it replaces the polled copy; a
+ * poll already in flight is dropped first so its older status cannot land on top. A refusal
+ * (e.g. 409, the run already finished) reloads the run to show where it actually is.
+ */
+export function useCancelRunMutation(runId: string) {
+  const queryClient = useQueryClient();
+  const runKey = ['runs', runId];
+  return useMutation({
+    mutationFn: () => unwrap(cancelRun(runId, authHeaders())),
+    onMutate: () => queryClient.cancelQueries({ queryKey: runKey, exact: true }),
+    onSuccess: (run) => queryClient.setQueryData(runKey, run),
+    onError: (error) => {
+      if (error instanceof ApiError && error.status < 500) {
+        return queryClient.invalidateQueries({ queryKey: runKey, exact: true });
+      }
+      return undefined;
     },
   });
 }

@@ -1,9 +1,11 @@
-import type { RunResponse } from '@flow-cortex/api-client';
+import { ApiError, type RunResponse } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
 import { StepDetail } from './StepDetail';
+import { StopRunDialog } from './StopRunDialog';
 import {
   choiceTakenBack,
   needsYouStep,
@@ -15,12 +17,83 @@ import {
   type StepChoice,
 } from './stepDisplay';
 import { NO_MESSAGE } from './stepErrorMessages';
-import { useRunQuery } from './useWorkflows';
+import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
 const RUN_HEADINGS: Record<string, string> = {
   running: 'Run in progress',
   waiting_approval: 'Waiting for your approval',
+  cancelling: 'Stopping…',
+  cancelled: 'Run cancelled',
 };
+
+const STOPPABLE: ReadonlySet<string> = new Set(['running', 'waiting_approval']);
+
+/** A refusal keeps the server's own sentence; a broken request or a server fault gets ours. */
+function stopProblem(error: unknown): string {
+  const refusal =
+    error instanceof ApiError && error.status < 500 ? error.problem?.detail : undefined;
+  return refusal ?? "Couldn't stop the run. Try again.";
+}
+
+interface StopControlProps {
+  runId: string;
+  chargedCredits: number | null | undefined;
+  onStopped: () => void;
+}
+
+/** "Stop workflow", its confirmation, and what a failed stop says. Mounted only on a stoppable run. */
+function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlProps>) {
+  const { runCancellation } = useFeatures();
+  const cancel = useCancelRunMutation(runId);
+  const [open, setOpen] = useState(false);
+  const [creditsAtOpen, setCreditsAtOpen] = useState<number | null | undefined>();
+  // `isPending` lands a render later than a second press of a double click.
+  const sending = useRef(false);
+
+  if (!runCancellation) {
+    return null;
+  }
+
+  const onOpen = () => {
+    cancel.reset();
+    setCreditsAtOpen(chargedCredits);
+    setOpen(true);
+  };
+  const onStop = async () => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await cancel.mutateAsync();
+      setOpen(false);
+      onStopped();
+    } catch {
+      // The mutation holds the error, which the alert below reads.
+      setOpen(false);
+    } finally {
+      sending.current = false;
+    }
+  };
+
+  return (
+    <div className="run-stop">
+      <button type="button" className="run-stop-button" aria-haspopup="dialog" onClick={onOpen}>
+        Stop workflow
+      </button>
+      {cancel.isError && (
+        <p role="alert" className="run-stop-error">
+          {stopProblem(cancel.error)}
+        </p>
+      )}
+      <StopRunDialog
+        open={open}
+        chargedCredits={creditsAtOpen}
+        stopping={cancel.isPending}
+        onKeep={() => setOpen(false)}
+        onStop={() => void onStop()}
+      />
+    </div>
+  );
+}
 
 /**
  * Runs written before uploads existed may hold a JSON reference as their input; that is never a
@@ -72,6 +145,12 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       });
     }
   }, [asksForFocus, location.pathname, location.search, location.hash, navigate]);
+  // "Stop workflow" leaves with the status it was offered under, so focus moves to the heading.
+  const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    if (stopped) headingRef.current?.focus();
+  }, [stopped]);
+
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
     selected && selectedState ? `${stepLabel(selected)}, ${STATE_WORDS[selectedState]}` : '';
@@ -111,6 +190,13 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       <h1 ref={headingRef} tabIndex={-1}>
         {RUN_HEADINGS[run.status ?? ''] ?? `Run ${run.status}`}
       </h1>
+      {STOPPABLE.has(run.status ?? '') && (
+        <StopControl
+          runId={runId}
+          chargedCredits={run.chargedCredits}
+          onStopped={() => setStopped(true)}
+        />
+      )}
       <div role="status" className="visually-hidden">
         {announced}
       </div>

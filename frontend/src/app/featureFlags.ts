@@ -1,6 +1,6 @@
 /** Build-time UI flags, off unless set to `true`; read per call so tests can stub them. */
 
-/** Demo only: credits/XP/rank are placeholders until a credits API exists — never enable in production. */
+/** Demo only: XP/streak/rank and account deletion are placeholders — never enable in production. */
 export const accountStatsEnabled = (): boolean =>
   import.meta.env.VITE_ACCOUNT_STATS_ENABLED === 'true';
 

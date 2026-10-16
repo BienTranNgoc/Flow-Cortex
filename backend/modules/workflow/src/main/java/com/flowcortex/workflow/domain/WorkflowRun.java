@@ -105,10 +105,17 @@ public class WorkflowRun {
         this.finishedAt = now;
     }
 
-    /** Reached the moment any {@link RunStep} errors — halts further dispatch. */
-    public void markError(String errorMessage, Instant now) {
+    /**
+     * Reached the moment any {@link RunStep} errors — halts further dispatch. Only a {@code RUNNING} or
+     * {@code WAITING_APPROVAL} run moves; any other is left as it is and {@code false} returned.
+     */
+    public boolean markError(String errorMessage, Instant now) {
+        if (status != RunStatus.RUNNING && status != RunStatus.WAITING_APPROVAL) {
+            return false;
+        }
         this.status = RunStatus.ERROR;
         this.errorMessage = errorMessage;
         this.finishedAt = now;
+        return true;
     }
 }

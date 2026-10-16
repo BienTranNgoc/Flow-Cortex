@@ -1,6 +1,7 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
 
-export type StepState = 'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'needs-you';
+export type StepState =
+  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'skipped' | 'needs-you';
 export type EdgeState = 'done' | 'active' | 'broken' | 'pending';
 
 /** The member's own pick, with the run status and the step waiting for approval at that moment. */
@@ -21,6 +22,7 @@ export const STATE_WORDS: Record<StepState, string> = {
   running: 'Running',
   completed: 'Completed',
   error: 'Error',
+  skipped: 'Skipped',
   'needs-you': 'Needs you',
 };
 
@@ -64,6 +66,7 @@ export function stepState(
       return step.pickedUpAt ? 'running' : 'waiting';
     case 'completed':
     case 'error':
+    case 'skipped':
       return step.status;
     default:
       return 'pending';

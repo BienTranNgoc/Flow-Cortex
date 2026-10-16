@@ -14,9 +14,12 @@ import java.util.UUID;
  * <p>A workflow whose first step processes media takes {@code uploadId} (from {@code POST
  * /api/v1/uploads}) instead, plus the file's {@code originalName}, kept for display only; the
  * server trims it to 255 characters, so a longer name is accepted.
+ *
+ * <p>{@code acknowledgeCost} is the member's confirmation of the run's cost; absent means not confirmed.
  */
 record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId,
-        @Size(min = 1, max = 10) List<UUID> uploadIds, @Size(max = 1024) String originalName) {
+        @Size(min = 1, max = 10) List<UUID> uploadIds, @Size(max = 1024) String originalName,
+        Boolean acknowledgeCost) {
 
     @AssertTrue(message = "Use uploadId or uploadIds, not both")
     @JsonIgnore

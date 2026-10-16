@@ -120,6 +120,15 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Mail sink for the email-confirmation demo: the backend sends SMTP to 1025 and every
+  # message shows up in the web UI at http://localhost:8025. Nothing leaves the machine.
+  mailpit:
+    image: axllent/mailpit:v1.20
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -182,9 +191,24 @@ services:
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
-      FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:-524288000}
+      FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES:-524288000}
+      FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES:-104857600}
+      FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES:-10485760}
       FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:-mp4,mov,webm,mkv,m4a,mp3,wav}
       FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS:-jpg,jpeg,png,webp}
+      # Demo switches, all on here (application.yml keeps the first four off). Each one is read
+      # at startup; flip one and restart the backend, e.g.
+      #   FLOWCORTEX_CREDITS_ENABLED=false docker compose up -d backend
+      # GET /api/v1/features shows what the running backend has.
+      FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED: ${FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED:-true}
+      FLOWCORTEX_PHONE_VERIFICATION_ENABLED: ${FLOWCORTEX_PHONE_VERIFICATION_ENABLED:-true}
+      FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED: ${FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED:-true}
+      FLOWCORTEX_WORKFLOW_CANCEL_ENABLED: ${FLOWCORTEX_WORKFLOW_CANCEL_ENABLED:-true}
+      FLOWCORTEX_CREDITS_ENABLED: ${FLOWCORTEX_CREDITS_ENABLED:-true}
+      # Confirmation mail goes to the Mailpit sink; links in it point at the member app.
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      FLOWCORTEX_APP_PUBLIC_URL: ${FLOWCORTEX_APP_PUBLIC_URL:-http://localhost:5173}
       # Spans and trace ids exist without a collector; the observability
       # overlay turns the exporters on.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318

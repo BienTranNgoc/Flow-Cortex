@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.application.ProductVideoService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -18,10 +19,13 @@ class ProductVideosController {
 
     private final ProductVideoService productVideos;
     private final CurrentUserResolver currentUserResolver;
+    private final CreditAccounts creditAccounts;
 
-    ProductVideosController(ProductVideoService productVideos, CurrentUserResolver currentUserResolver) {
+    ProductVideosController(ProductVideoService productVideos, CurrentUserResolver currentUserResolver,
+            CreditAccounts creditAccounts) {
         this.productVideos = productVideos;
         this.currentUserResolver = currentUserResolver;
+        this.creditAccounts = creditAccounts;
     }
 
     @PostMapping(value = "/runs", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -29,6 +33,7 @@ class ProductVideosController {
     ResponseEntity<RunResponse> startProductVideoRun(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ProductVideoRunRequest request) {
         UUID ownerId = currentUserResolver.require(jwt);
-        return ResponseEntity.ok(RunResponse.from(productVideos.start(ownerId, request.draft(), request.uploadIds())));
+        return ResponseEntity.ok(RunResponse.from(productVideos.start(ownerId, request.draft(), request.uploadIds(),
+                Boolean.TRUE.equals(request.acknowledgeCost())), creditAccounts));
     }
 }

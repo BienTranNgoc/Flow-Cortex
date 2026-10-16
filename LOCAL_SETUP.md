@@ -151,7 +151,7 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows eight services `healthy` and `rabbitmq-init` and
+`docker compose ps -a` then shows nine services `healthy` and `rabbitmq-init` and
 `minio-init` `Exited (0)`:
 
 | Service | What it is | Address (all bound to 127.0.0.1) |
@@ -161,6 +161,7 @@ line for any shared or deployed stack.
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
 | `rabbitmq-init` | one-shot: creates the provider worker's restricted broker user (`PROVIDER_RABBITMQ_*`), then exits | — |
 | `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
+| `mailpit` | the mail sink: catches every email the backend sends (confirmation links); nothing is delivered | web UI <http://localhost:8025>, SMTP `localhost:1025` |
 | `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
 | `worker` | the Python media worker | none — and no internet access |
 | `provider-worker` | the Python provider worker (fixture adapter until OpenAI is connected) | none |
@@ -207,8 +208,11 @@ What to know about the media path:
   caps request bodies at 100 MB; a later move to Cloudflare R2 would use
   `https://<account>.r2.cloudflarestorage.com`, because R2 presigned URLs cannot
   use custom domains.
-- **Upload limits.** `FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES` (500 MB) and
-  `FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS` (`mp4,mov,webm,mkv,m4a,mp3,wav`). An upload
+- **Upload limits.** `FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES` (500 MB),
+  `FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES` (100 MB), `FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES`
+  (10 MB) and `FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS` (`mp4,mov,webm,mkv,m4a,mp3,wav`). The server
+  also reads each file's first bytes and refuses one whose content does not match its extension
+  (`FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED`). An upload
   URL is valid for 15 minutes, and uploaded files are deleted after **1 day**.
   A run keeps its own copy of each input image (`runs/<run>/inputs/` in the media
   bucket), tagged so the store deletes it after `RUN_INPUT_RETENTION_DAYS` (30);
@@ -240,6 +244,33 @@ apply a change with `docker compose up -d backend`.
   member app is unaffected.
 - `FLOWCORTEX_WORKFLOW_ENABLED=false`: no new runs (503); started and finished runs
   stay readable.
+
+**Demo switches.** Compose turns all five on; `application.yml` keeps the first four
+off for a bare `bootRun` and any environment that does not set them. Same mechanism
+as the kill switches: env var in `.env`, then `docker compose up -d backend`.
+`GET /api/v1/features` (no sign-in needed) answers what the running backend has, and
+the member app reads it once per session.
+
+| Variable | On | Off |
+|---|---|---|
+| `FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED` | a new registration must open the emailed link before it can sign in | accounts are confirmed on creation and registering signs in |
+| `FLOWCORTEX_PHONE_VERIFICATION_ENABLED` | the profile offers phone verification by SMS code | the phone endpoints answer 503 and the profile hides the section |
+| `FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED` | an upload whose first bytes do not match its type is refused | the bytes are not checked (the size caps still apply) |
+| `FLOWCORTEX_WORKFLOW_CANCEL_ENABLED` | a member can stop a running run | stopping answers 503 and the button is hidden |
+| `FLOWCORTEX_CREDITS_ENABLED` | runs are charged per step from a 1000-credit signup grant, and refunded on system failures | no balance check, charge or refund, and no balance in the header |
+
+- **Email.** Every email the backend sends lands in Mailpit at
+  <http://localhost:8025>; open the confirmation link from there. The link points
+  at `FLOWCORTEX_APP_PUBLIC_URL` (default `http://localhost:5173`). A bare `bootRun`
+  sends to `localhost:1025`, so start the sink first:
+  `docker compose up -d mailpit`.
+- **SMS.** No SMS is delivered. Each code goes to the `sms_outbox` table, which
+  admins read in the console (`GET /api/v1/admin/sms-outbox`), or:
+
+  ```bash
+  docker compose exec postgres psql -U flowcortex flowcortex \
+    -c "SELECT phone_e164, body, created_at FROM sms_outbox ORDER BY created_at DESC LIMIT 5"
+  ```
 
 **Resetting state.** `docker compose down -v` deletes every volume (database,
 broker, store), so the next `up` seeds from scratch. You need it, or the narrower

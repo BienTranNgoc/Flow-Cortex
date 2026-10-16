@@ -25,6 +25,16 @@ describe('App', () => {
         status: 200,
         body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
       },
+      'GET /api/v1/features': {
+        status: 200,
+        body: {
+          emailConfirmation: false,
+          phoneVerification: false,
+          uploadContentCheck: false,
+          runCancellation: false,
+          credits: false,
+        },
+      },
     });
     setToken('t', true);
     window.history.pushState({}, '', '/');
