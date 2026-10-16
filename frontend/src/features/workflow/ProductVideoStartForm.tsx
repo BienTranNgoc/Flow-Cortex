@@ -1,6 +1,6 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import {
   createMultiUpload,
   firstImageProblem,
@@ -45,7 +45,7 @@ function startButtonLabel(phase: MultiUploadPhase | null): string {
 export function ProductVideoStartForm({
   disabled,
 }: Readonly<{ disabled: boolean }>) {
-  const navigate = useNavigate();
+  const { go } = useTransitionNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartProductVideoRunMutation();
   const uploadAll = useMemo(
@@ -123,7 +123,7 @@ export function ProductVideoStartForm({
         video: { aspectRatio: '9:16' },
       });
       if (runResponse.id && mounted.current) {
-        navigate(`/runs/${runResponse.id}`);
+        go(`/runs/${runResponse.id}`);
       }
     } catch (error) {
       setPhase(null);

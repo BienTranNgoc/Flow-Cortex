@@ -1,6 +1,6 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import { mediaFileProblem, NO_FILE, type FileProblem } from './startRunSchema';
 import { createStartWithUpload, StartStageError, type StartPhase } from './startWithUpload';
 import { uploadFile } from './uploadFile';
@@ -26,7 +26,7 @@ export function MediaStartForm({
   workflowId,
   disabled,
 }: Readonly<{ workflowId: string; disabled: boolean }>) {
-  const navigate = useNavigate();
+  const { go } = useTransitionNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);
   const start = useMemo(
@@ -85,7 +85,7 @@ export function MediaStartForm({
       const runId = await start(picked, setPhase);
       // `null`: this press came while a start was already running, which owns the form state.
       if (runId !== null && mounted.current) {
-        navigate(`/workflows/${workflowId}/runs/${runId}`);
+        go(`/workflows/${workflowId}/runs/${runId}`);
       }
     } catch (error) {
       setPhase(null);

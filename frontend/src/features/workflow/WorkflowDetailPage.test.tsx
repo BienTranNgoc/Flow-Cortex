@@ -1,5 +1,5 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Route } from 'react-router-dom';
 import {
@@ -84,10 +84,45 @@ describe('WorkflowDetailPage', () => {
     setToken('t', true);
     FakeXhr.instances.length = 0;
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    vi.stubGlobal('scrollTo', vi.fn());
   });
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
+  });
+
+  describe('the steps of a workflow', () => {
+    const THREE: WorkflowResponse = {
+      id: 'w1',
+      name: 'Three steps',
+      isShared: true,
+      steps: [
+        { id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' },
+        { id: 'ws2', stepOrder: 2, name: 'Pull the audio', type: 'extract_audio', mode: 'remote' },
+        { stepOrder: 3, type: 'echo', mode: 'inline' },
+      ],
+    };
+
+    it('are drawn as the pipeline, in order, with no status word and nothing to press', async () => {
+      renderForm(THREE);
+
+      const pipeline = await screen.findByRole('region', { name: 'Steps' });
+      const items = within(pipeline).getAllByRole('listitem');
+      expect(items.map((item) => item.textContent)).toEqual([
+        expect.stringContaining('Check the file'),
+        expect.stringContaining('Pull the audio'),
+        expect.stringContaining('Step 3'),
+      ]);
+      expect(within(pipeline).queryByRole('button')).not.toBeInTheDocument();
+      expect(pipeline.textContent).not.toMatch(/Pending|Running|Waiting|Completed|Error|Needs you/);
+    });
+
+    it('draw no pipeline for a workflow with no steps', async () => {
+      renderForm({ ...ECHO, steps: [] });
+
+      await screen.findByRole('heading', { name: 'Echo Demo' });
+      expect(screen.queryByRole('region', { name: 'Steps' })).not.toBeInTheDocument();
+    });
   });
 
   it('does not show the Product Video form while another workflow is loading', () => {

@@ -78,6 +78,7 @@ describe('ProductVideoStartForm', () => {
     setToken('t', false);
     FakeXhr.instances.length = 0;
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    vi.stubGlobal('scrollTo', vi.fn());
   });
   afterEach(() => {
     setToken(null);
