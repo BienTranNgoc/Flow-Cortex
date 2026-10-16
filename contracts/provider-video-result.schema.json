@@ -23,7 +23,7 @@
     "provider": { "enum": ["seedance", "veo"] },
     "model": { "type": "string", "minLength": 1, "maxLength": 200 },
     "aspectRatio": { "const": "9:16" },
-    "resolution": { "const": "720p" },
+    "resolution": { "enum": ["480p", "720p"] },
     "sourceRevisionId": { "type": "string", "format": "uuid" },
     "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "providerTaskId": { "type": "string", "minLength": 1, "maxLength": 200 },

@@ -2,9 +2,11 @@
 #   filename:  provider-video-result.schema.json
 
 from __future__ import annotations
+
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProviderVideoData(BaseModel):
@@ -20,7 +22,7 @@ class ProviderVideoData(BaseModel):
     provider: Literal["seedance", "veo"]
     model: Annotated[str, Field(max_length=200, min_length=1)]
     aspectRatio: Literal["9:16"]
-    resolution: Literal["720p"]
+    resolution: Literal["480p", "720p"]
     sourceRevisionId: UUID
     idempotencyKey: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
     providerTaskId: Annotated[str, Field(max_length=200, min_length=1)]

@@ -70,11 +70,13 @@ class EdgeSpeechAdapter:
         except (TimeoutError, ConnectionError, OSError, ClientError) as exc:
             raise TransientError(f"Edge TTS connection failed: {type(exc).__name__}") from exc
         except NoAudioReceived as exc:
-            raise PermanentError("provider_response_invalid", "Edge TTS returned no audio") from exc
+            raise TransientError("Edge TTS returned no audio") from exc
         except ValueError as exc:
             raise PermanentError(
                 "provider_request_failed", "Edge TTS rejected the request"
             ) from exc
+        except TransientError:
+            raise
         except Exception as exc:
             raise PermanentError("provider_response_invalid", "Edge TTS returned no audio") from exc
 
@@ -123,7 +125,7 @@ async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
         if chunk.get("type") == "audio":
             chunks.extend(chunk["data"])
     if not chunks:
-        raise RuntimeError("Edge TTS produced no audio")
+        raise NoAudioReceived("Edge TTS produced no audio")
     return bytes(chunks)
 
 

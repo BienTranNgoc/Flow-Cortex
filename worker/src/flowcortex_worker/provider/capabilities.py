@@ -248,8 +248,8 @@ def _normalize_video(body: bytes, context: ExecutionContext) -> bytes:
             "-t",
             "5",
             "-vf",
-            "scale=720:1280:force_original_aspect_ratio=decrease,"
-            "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black",
+            "scale=360:640:force_original_aspect_ratio=decrease,"
+            "pad=360:640:(ow-iw)/2:(oh-ih)/2:black",
             "-an",
             "-c:v",
             "libx264",

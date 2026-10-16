@@ -52,7 +52,7 @@ class ProviderStepExecutor implements StepExecutor {
 
     @Override
     public String execute(StepContext context) {
-        Map<String, Object> payload = payload(context.input());
+        Map<String, Object> payload = mappedPayload(payload(context.input()), context.config());
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("profile", profile(context.config()));
         params.put("payload", payload);
@@ -90,6 +90,35 @@ class ProviderStepExecutor implements StepExecutor {
                 return value;
             }
             throw new StepFailedException("contract_violation", "Provider step config needs a profile");
+        } catch (JsonProcessingException e) {
+            throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
+        }
+    }
+
+    private Map<String, Object> mappedPayload(Map<String, Object> input, String config) {
+        if (config == null || config.isBlank()) {
+            return input;
+        }
+        try {
+            Object mapping = objectMapper.readValue(config, OBJECT).get("payloadFields");
+            if (mapping == null) {
+                return input;
+            }
+            if (!(mapping instanceof Map<?, ?> fields) || fields.isEmpty()) {
+                throw new StepFailedException("contract_violation",
+                        "Provider payloadFields must be a non-empty object");
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> field : fields.entrySet()) {
+                if (!(field.getKey() instanceof String target) || target.isBlank()
+                        || !(field.getValue() instanceof String source) || source.isBlank()
+                        || !input.containsKey(source)) {
+                    throw new StepFailedException("contract_violation",
+                            "Provider payloadFields contains an invalid or missing source field");
+                }
+                result.put(target, input.get(source));
+            }
+            return result;
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
         }

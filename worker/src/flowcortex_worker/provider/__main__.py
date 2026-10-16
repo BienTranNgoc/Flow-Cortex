@@ -235,7 +235,8 @@ def _build_video_adapter(
             SeedanceConfig(
                 api_key=api_key,
                 base_url=base_url,
-                model=model or "ByteDance-Seedance-1.5-pro",
+                model=model or "doubao-seedance-1-5-pro-251215",
+                resolution=os.environ.get("SEEDANCE_RESOLUTION", "480p").strip().lower(),
                 request_timeout_seconds=float(
                     os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
                 ),

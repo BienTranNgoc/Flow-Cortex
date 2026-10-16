@@ -15,7 +15,7 @@ public record ProviderVideoData(
         @NotBlank @Pattern(regexp = "seedance|veo") String provider,
         @NotBlank @Size(max = 200) String model,
         @NotBlank @Pattern(regexp = "9:16") String aspectRatio,
-        @NotBlank @Pattern(regexp = "720p") String resolution,
+        @NotBlank @Pattern(regexp = "480p|720p") String resolution,
         @NotNull UUID sourceRevisionId,
         @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String idempotencyKey,
         @NotBlank @Size(max = 200) String providerTaskId,
