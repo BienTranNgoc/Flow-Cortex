@@ -55,6 +55,9 @@ class MediaTopologyConfig {
     /**
      * Returns of a job the broker counts before it dead-letters it. A constant, not a setting: queue
      * arguments are immutable once the queue exists, so a new value means re-creating the job queues.
+     * {@code providerJobDeliveryLimit} in {@code contracts/limits.json} mirrors it, and the provider
+     * worker's transient-retry budget equals it, so its terminal result arrives before the broker
+     * dead-letters the job; change all three together.
      */
     static final int JOB_DELIVERY_LIMIT = 3;
 

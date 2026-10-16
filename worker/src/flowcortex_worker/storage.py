@@ -106,8 +106,16 @@ class Storage:
             return dict(self._client.head_object(Bucket=bucket, Key=key))
         except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in _MISSING or code in _FORBIDDEN:
+            if code in _MISSING:
                 return None
+            if code in _FORBIDDEN:
+                # Silo answers 404 for a missing key this identity may read, so 403 is the store
+                # policy, not absence. AWS S3 answers 403 there unless the caller holds
+                # s3:ListBucket: moving to AWS means revisiting the provider policy first.
+                log.warning(
+                    "head forbidden; check the provider store policy",
+                    extra={"bucket": bucket, "objectKey": key, "code": code},
+                )
             raise TransientError(
                 f"{type(exc).__name__} heading {bucket}/{key}"
             ) from exc

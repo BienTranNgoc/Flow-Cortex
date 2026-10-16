@@ -243,7 +243,8 @@ def test_generate_speech_fails_instead_of_returning_an_empty_artifact() -> None:
 
     with pytest.raises(PermanentError) as raised:
         adapter.generate_speech(
-            SpeechRequest("Đặt mua ngay", UUID("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"))
+            SpeechRequest("Đặt mua ngay", UUID("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4")),
+            MagicMock(),
         )
 
     assert raised.value.code == "provider_capability_unavailable"

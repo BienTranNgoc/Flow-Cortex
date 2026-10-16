@@ -314,32 +314,6 @@ class Consumer:
         except Abandoned as abandoned:
             log.warning("job abandoned; the broker redelivers it", extra={"reason": str(abandoned)})
         except Exception as exc:
-            if (
-                isinstance(exc, TransientError)
-                and job is not None
-                and self._max_transient_redeliveries is not None
-                and delivery.count >= self._max_transient_redeliveries
-            ):
-                heartbeat.stop(join=True)
-                result = self._error(
-                    job.jobId,
-                    job.runId,
-                    job.attempt,
-                    delivery.count,
-                    self._transient_exhausted_code,
-                    "transient retry budget exhausted",
-                )
-                self._publish(
-                    run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
-                )
-                self._call_in_main(lambda: self._settle_now(delivery, "ack"))
-                outcome = result.error.code
-                span.set_status(Status(StatusCode.ERROR, result.error.code))
-                log.warning(
-                    "transient retry budget exhausted",
-                    extra={"deliveryCount": delivery.count},
-                )
-                return
             outcome = "retried"
             retry_after = exc.retry_after_seconds if isinstance(exc, TransientError) else None
             # Retry-After never holds the worker thread past the backoff ceiling.
@@ -431,6 +405,21 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
+        except TransientError as exc:
+            if runner.killed is not None:
+                return self._killed(job, delivery, runner.killed)
+            budget = self._max_transient_redeliveries
+            if budget is None or delivery.count < budget:
+                raise
+            log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+            return self._error(
+                job.jobId,
+                job.runId,
+                job.attempt,
+                delivery.count,
+                self._transient_exhausted_code,
+                f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+            )
         except Exception:
             if runner.killed is None:
                 raise

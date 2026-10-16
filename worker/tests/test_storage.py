@@ -217,7 +217,23 @@ def test_a_kill_before_the_output_upload_stops_it() -> None:
     client.put_object.assert_not_called()
 
 
-def test_reuse_head_treats_silo_forbidden_missing_object_as_absent() -> None:
+def test_reuse_head_treats_a_missing_object_as_absent() -> None:
+    client = boto3.client(
+        "s3",
+        endpoint_url="http://127.0.0.1:1",
+        region_name="us-east-1",
+        aws_access_key_id="x",
+        aws_secret_access_key="y",
+    )
+    stubber = Stubber(client)
+    stubber.add_client_error("head_object", service_error_code="404", http_status_code=404)
+
+    with stubber:
+        storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+        assert storage.head_object(MEDIA_BUCKET, "missing") is None
+
+
+def test_reuse_head_forbidden_is_transient_and_logged_for_the_operator() -> None:
     client = boto3.client(
         "s3",
         endpoint_url="http://127.0.0.1:1",
@@ -227,10 +243,16 @@ def test_reuse_head_treats_silo_forbidden_missing_object_as_absent() -> None:
     )
     stubber = Stubber(client)
     stubber.add_client_error("head_object", service_error_code="403", http_status_code=403)
+    key = "runs/r/steps/3/attempts/1/speech.wav"
 
-    with stubber:
-        storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
-        assert storage.head_object(MEDIA_BUCKET, "missing") is None
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+    with stubber, captured_logs() as lines, pytest.raises(TransientError):
+        storage.head_object(MEDIA_BUCKET, key)
+
+    [warning] = [line for line in lines if line["level"] == "WARNING"]
+    assert warning["bucket"] == MEDIA_BUCKET
+    assert warning["objectKey"] == key
+    assert "http" not in str(warning)
 
 
 def test_forbidden_input_is_transient_and_logged_for_the_operator() -> None:

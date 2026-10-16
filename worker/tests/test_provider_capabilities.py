@@ -131,6 +131,26 @@ def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
         assert wav.getframerate() == 16_000
 
 
+def test_speech_generation_receives_the_job_kill_switch() -> None:
+    adapter = MagicMock(wraps=FixtureProviderAdapter())
+    context = _empty_context()
+
+    execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_speech",
+                "vi_voice_v1",
+                {"script": "Mua ngay hôm nay", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        adapter,
+        context,
+    )
+
+    [(_, abort)] = [call.args for call in adapter.generate_speech.call_args_list]
+    assert abort is context.abort
+
+
 def test_speech_reuses_existing_artifact_when_manifest_matches() -> None:
     storage = MagicMock()
     request = ProviderJob.model_validate(

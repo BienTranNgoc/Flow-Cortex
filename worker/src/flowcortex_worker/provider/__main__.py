@@ -17,7 +17,7 @@ from flowcortex_worker.config import Settings
 from flowcortex_worker.consumer import Consumer
 from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
-from flowcortex_worker.storage import Storage, client_from
+from flowcortex_worker.storage import Storage, client_from, remove_leftovers
 
 from .adapter import CapabilityProviderAdapter, FixtureProviderAdapter, ProviderAdapter
 from .capabilities import ExecutionContext, execute
@@ -35,6 +35,9 @@ log = logging.getLogger("flowcortex_provider_worker")
 PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
+# Mirrors providerJobDeliveryLimit in contracts/limits.json, the x-delivery-limit the backend
+# declares on provider.jobs. Equal values put the terminal error on the broker's last delivery;
+# a higher value lets the broker dead-letter first, so the backend never receives a result.
 MAX_TRANSIENT_REDELIVERIES = 3
 
 
@@ -101,6 +104,7 @@ def main() -> int:
             stop.wait(min(left, 1.0))
 
     log.info("provider worker starting", extra={"workerId": settings.worker_id})
+    remove_leftovers()
     liveness_file.touch()
     Supervisor(
         connect=lambda: pika.BlockingConnection(params),
@@ -128,7 +132,8 @@ def _build_adapter() -> CapabilityProviderAdapter:
     deployments should set `SCRIPT_PROVIDER` and `SPEECH_PROVIDER` explicitly.
     """
     legacy = os.environ.get("PROVIDER_ADAPTER", PROVIDER_FIXTURE).strip().lower()
-    script_provider = os.environ.get("SCRIPT_PROVIDER", "").strip().lower() or legacy
+    explicit_script_provider = os.environ.get("SCRIPT_PROVIDER", "").strip().lower()
+    script_provider = explicit_script_provider or legacy
     speech_provider = os.environ.get("SPEECH_PROVIDER", "").strip().lower() or legacy
     legacy_openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     script_api_key = (
@@ -156,7 +161,11 @@ def _build_adapter() -> CapabilityProviderAdapter:
     speech_model = os.environ.get("SPEECH_PROVIDER_MODEL", "").strip() or _OPENAI_SCRIPT_MODEL
 
     script_adapter = _build_script_adapter(
-        script_provider, script_api_key, script_base_url, script_model
+        script_provider,
+        script_api_key,
+        script_base_url,
+        script_model,
+        from_legacy=not explicit_script_provider,
     )
     speech_adapter = _build_speech_adapter(
         speech_provider, speech_api_key, speech_base_url, speech_model
@@ -169,12 +178,17 @@ def _build_adapter() -> CapabilityProviderAdapter:
 
 
 def _build_script_adapter(
-    provider: str, api_key: str, base_url: str, model: str
+    provider: str, api_key: str, base_url: str, model: str, *, from_legacy: bool
 ) -> ProviderAdapter:
     if provider == PROVIDER_OPENAI:
         return select_adapter(provider, api_key, base_url=base_url, model=model)
-    if provider in {PROVIDER_FIXTURE, PROVIDER_EDGE}:
-        # `edge` preserves the old PROVIDER_ADAPTER=edge behaviour for existing environments.
+    if provider == PROVIDER_FIXTURE:
+        return FixtureProviderAdapter()
+    if provider == PROVIDER_EDGE and from_legacy:
+        log.warning(
+            "script provider falls back to fixture because PROVIDER_ADAPTER=edge names a "
+            "speech-only provider; set SCRIPT_PROVIDER explicitly",
+        )
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown SCRIPT_PROVIDER '{provider}'; accepted values: "

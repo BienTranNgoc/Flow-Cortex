@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 import io
+import subprocess
 import wave
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from .contracts.provider_job import ProductAdPayload
+
+
+class Abort(Protocol):
+    """The job's kill switch: subprocesses and transfers must stop when it fires."""
+
+    def check(self) -> None: ...
+
+    def on_kill(self, callback: Callable[[], None]) -> None: ...
+
+    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]: ...
 
 
 @dataclass(frozen=True)
@@ -39,7 +51,7 @@ class ProviderAdapter(Protocol):
 
     def speech_identity(self) -> SpeechIdentity: ...
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact: ...
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact: ...
 
 
 @dataclass(frozen=True)
@@ -60,8 +72,8 @@ class CapabilityProviderAdapter:
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
-        return self.speech_adapter.generate_speech(request)
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
+        return self.speech_adapter.generate_speech(request, abort)
 
 
 class FixtureProviderAdapter:
@@ -82,7 +94,7 @@ class FixtureProviderAdapter:
     def speech_identity(self) -> SpeechIdentity:
         return SpeechIdentity("fixture", "silence", "+0%", 16_000)
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         duration_ms = min(30_000, max(15_000, len(request.script) * 55))
         frames = duration_ms * 16
         output = io.BytesIO()

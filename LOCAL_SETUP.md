@@ -163,7 +163,7 @@ line for any shared or deployed stack.
 | `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
 | `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
 | `worker` | the Python media worker | none — and no internet access |
-| `provider-worker` | the Python provider worker (fixture adapter until OpenAI is connected) | none |
+| `provider-worker` | the Python provider worker: `SCRIPT_PROVIDER` (fixture or openai) and `SPEECH_PROVIDER` (fixture or edge). Edge TTS is demo-only — it calls Microsoft's undocumented Edge Read Aloud endpoint (no SLA, it has broken before) and sends the approved script there; keep the pinned `edge-tts` current and move production speech to a contracted provider | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
 | `admin` | the admin console (same) | <http://localhost:5174> |
 
@@ -293,6 +293,38 @@ missing, and names it. For the Product Video release:
 3. If `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` changed, delete `media.jobs` and
    `provider.jobs` as in **Queue settings changed** above; otherwise the backend
    stays not-ready.
+
+**Upgrading across the speech contract change** (the Edge TTS release). Speech jobs
+and results now carry the approved script revision and its provenance, and neither
+side accepts the old shape, so an old message must not meet a new service:
+
+1. **Before pulling or building the release**, so the old images are still the ones
+   compose starts: stop new Product Video work by setting
+   `FLOWCORTEX_PRODUCT_VIDEO_ENABLED=false` and running `docker compose up -d backend`,
+   and hold off script approvals for the window.
+2. Keep the **old** backend and provider worker running until both provider queues
+   show `0`. The old backend is what consumes `provider.results`, so stopping it
+   first leaves old results behind for the new one to reject:
+
+   ```bash
+   docker compose exec rabbitmq rabbitmqctl list_queues name messages
+   ```
+
+3. Stop both, pull the release, then start the backend and the provider worker together,
+   re-running `minio-init` so the narrowed provider store policy is applied:
+
+   ```bash
+   docker compose stop backend provider-worker
+   docker compose up -d --build --force-recreate minio-init backend provider-worker
+   ```
+
+   Then set `FLOWCORTEX_PRODUCT_VIDEO_ENABLED` back and apply it with
+   `docker compose up -d backend`.
+
+The migration `V2026.10.14.004__product_video_speech_input_backfill.sql` gives runs
+whose script was approved before the upgrade the revision the new speech step needs.
+A run that reached the speech step on the old contract and was not backfilled fails
+with `contract_violation`; start it again.
 
 **Port 5173 already taken** (another local project, say). Publish the member app
 on another port with an override file kept outside the checkout, and list the new

@@ -74,6 +74,7 @@ class RunAdvancerTest {
     private static final Duration PROBE_RUNTIME = Duration.ofMinutes(5);
     private static final String UPLOAD_REF =
             "{\"key\":\"source\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"owner/upload\"}";
+    private static final UUID SPEECH_REVISION = UUID.fromString("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4");
 
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
@@ -472,6 +473,58 @@ class RunAdvancerTest {
     }
 
     @Test
+    void speechForTheJobsApprovedRevisionIsAccepted() {
+        RunStep step = speechStep("{\"script\":\"Xin chào\",\"sourceRevisionId\":\"" + SPEECH_REVISION + "\"}");
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("format", "wav"), null)));
+
+        verify(runStepRepository).completeIfRunning(eq(step.getId()), eq(runId), eq((short) 1), any(), any(),
+                eq(NOW));
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void speechForAnotherRevisionThanTheJobsFailsTheStepWithContractViolation() {
+        UUID jobRevision = UUID.fromString("0d3b5a3e-55c1-4f0e-9d1c-6f2b7f3d2a10");
+        RunStep step = speechStep("{\"script\":\"Xin chào\",\"sourceRevisionId\":\"" + jobRevision + "\"}");
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("format", "wav"), null)));
+
+        verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "contract_violation",
+                "Provider generate_speech data is not valid for its schema: sourceRevisionId " + SPEECH_REVISION
+                        + " does not match the job's " + jobRevision, NOW);
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void speechForAJobInputWithoutARevisionFailsTheStepWithContractViolation() {
+        RunStep step = speechStep("{\"script\":\"Xin chào\"}");
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("format", "wav"), null)));
+
+        verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "contract_violation",
+                "Provider generate_speech data is not valid for its schema: sourceRevisionId " + SPEECH_REVISION
+                        + " cannot be matched: the job input has no sourceRevisionId", NOW);
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    private RunStep speechStep(String input) {
+        givenMediaEnabled();
+        RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "generate_speech", input);
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(def(1, "generate_speech")), List.of(step));
+        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        return step;
+    }
+
+    @Test
     void aJobThatBreaksTheContractFailsTheStepWithContractViolationInsteadOfLeavingItPending() {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
@@ -705,7 +758,7 @@ class RunAdvancerTest {
                 "provider", "edge",
                 "voice", "vi-VN-HoaiMyNeural",
                 "speed", "+0%",
-                "sourceRevisionId", UUID.fromString("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"),
+                "sourceRevisionId", SPEECH_REVISION,
                 "idempotencyKey", "a".repeat(64),
                 "format", "wav"));
         data.put(field, value);

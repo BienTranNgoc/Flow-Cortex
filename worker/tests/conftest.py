@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import queue
 import subprocess
@@ -32,6 +33,7 @@ SILO_IMAGE = (
 UPLOAD_BUCKET = "flowcortex-uploads"
 MEDIA_BUCKET = "flowcortex-media"
 CONTRACTS = Path(__file__).resolve().parents[2] / "contracts"
+PROVIDER_POLICY = Path(__file__).resolve().parents[2] / "infra" / "minio" / "provider-policy.json"
 
 SPANS = InMemorySpanExporter()
 
@@ -413,6 +415,52 @@ def silo() -> Iterator[Silo]:
         for bucket in (UPLOAD_BUCKET, MEDIA_BUCKET):
             client.create_bucket(Bucket=bucket)
         yield store
+
+
+@dataclass(frozen=True)
+class ProviderSilo:
+    root: Silo
+    provider: Silo
+
+
+# The mc steps infra/minio/init.sh runs for the provider identity. Values arrive as environment
+# variables so neither the policy text nor a secret has to survive shell quoting.
+_PROVIDER_SETUP = """
+set -e
+printf '%s' "$POLICY_B64" | base64 -d > /tmp/provider-policy.json
+mc alias set ROOT http://127.0.0.1:9000 "$ROOT_KEY" "$ROOT_SECRET"
+mc admin policy create ROOT flowcortex-provider /tmp/provider-policy.json
+printf '%s\\n%s\\n' "$PROVIDER_KEY" "$PROVIDER_SECRET" | mc admin user add ROOT
+mc admin policy attach ROOT flowcortex-provider --user "$PROVIDER_KEY"
+"""
+
+
+@pytest.fixture(scope="session")
+def provider_silo() -> Iterator[ProviderSilo]:
+    """A store whose provider user holds infra/minio/provider-policy.json as it is on disk."""
+    from testcontainers.community.minio import MinioContainer
+
+    container = MinioContainer(image=SILO_IMAGE)
+    container.with_env("MINIO_ROOT_USER", container.access_key)
+    container.with_env("MINIO_ROOT_PASSWORD", container.secret_key)
+    with container:
+        config = container.get_config()
+        root = Silo(f"http://{config['endpoint']}", config["access_key"], config["secret_key"])
+        root.client().create_bucket(Bucket=MEDIA_BUCKET)
+        provider = Silo(root.endpoint, "provider-test", "provider-test-secret")
+        exit_code, output = container.get_wrapped_container().exec_run(
+            ["sh", "-c", _PROVIDER_SETUP],
+            environment={
+                "POLICY_B64": base64.b64encode(PROVIDER_POLICY.read_bytes()).decode(),
+                "ROOT_KEY": root.access_key,
+                "ROOT_SECRET": root.secret_key,
+                "PROVIDER_KEY": provider.access_key,
+                "PROVIDER_SECRET": provider.secret_key,
+            },
+        )
+        if exit_code != 0:
+            raise RuntimeError(f"provider policy setup failed: {output.decode()}")
+        yield ProviderSilo(root, provider)
 
 
 def declare_topology(channel: Any, consumer_timeout_ms: int = 1_200_000) -> None:

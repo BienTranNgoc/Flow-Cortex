@@ -21,7 +21,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from ..errors import PermanentError, TransientError
-from .adapter import SpeechArtifact, SpeechIdentity, SpeechRequest
+from .adapter import Abort, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
@@ -155,7 +155,7 @@ class OpenAIProviderAdapter:
             "OpenAI speech generation is not implemented",
         )
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         raise PermanentError(
             "provider_capability_unavailable",
             "OpenAI speech generation is not implemented",

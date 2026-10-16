@@ -86,7 +86,7 @@ def _generate_speech(
     reused = _reuse_existing_artifact(context, request, identity)
     if reused is not None:
         return reused
-    speech = adapter.generate_speech(request)
+    speech = adapter.generate_speech(request, context.abort)
     if (speech.provider, speech.voice, speech.speed) != (
         identity.provider,
         identity.voice,
