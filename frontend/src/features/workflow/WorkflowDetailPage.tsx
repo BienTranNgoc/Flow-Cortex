@@ -1,11 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
+import { Pipeline } from './Pipeline';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
+import { stepKey } from './stepDisplay';
 import { startRunSchema, type StartRunFormValues } from './startRunSchema';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
@@ -15,7 +18,7 @@ function InlineStartForm({
   workflowId,
   disabled,
 }: Readonly<{ workflowId: string; disabled: boolean }>) {
-  const navigate = useNavigate();
+  const { go } = useTransitionNavigate();
   const startRunMutation = useStartRunMutation(workflowId);
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
@@ -34,7 +37,7 @@ function InlineStartForm({
     startRunMutation.mutate(trimmedInput ? { input: trimmedInput } : {}, {
       onSuccess: (run) => {
         if (run.id) {
-          navigate(`/workflows/${workflowId}/runs/${run.id}`);
+          go(`/workflows/${workflowId}/runs/${run.id}`);
         }
       },
     });
@@ -117,11 +120,12 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
         <output>Loading workflow…</output>
       )}
       {workflow?.steps && workflow.steps.length > 0 && (
-        <ol className="workflow-steps">
-          {workflow.steps.map((step) => (
-            <li key={step.id}>{step.name ?? `Step ${step.stepOrder}`}</li>
-          ))}
-        </ol>
+        <Pipeline
+          steps={workflow.steps.map((step) => ({
+            id: stepKey(step),
+            name: step.name ?? `Step ${step.stepOrder}`,
+          }))}
+        />
       )}
       {startForm}
     </main>

@@ -1,10 +1,9 @@
-/* Functional MVP only — no design tokens yet. Keeps every viewport
-   (375px/768px/1280px) free of horizontal scroll and touch targets
-   >=44px. */
+/* Keeps every viewport (375px/768px/1280px) free of horizontal scroll and
+   touch targets >=44px. Colours, radii and sizes come from styles/tokens.css. */
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: #2e3b49 #080c13;
+  scrollbar-color: var(--line-3) var(--paper);
 }
 
 *,
@@ -23,11 +22,18 @@ body,
 
 body {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #1a1a1a;
-  color: #e8f1f2;
-  background: #fff;
-  background: #080c13;
+  color: var(--ink);
+  background: var(--paper);
   overflow-x: hidden;
+}
+
+a {
+  color: var(--primary);
+}
+
+::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1;
 }
 
 .app-shell {
@@ -39,8 +45,8 @@ body {
 /* ===== HEADER — FlowCortex brand bar ==================================== */
 
 .cortex-header {
-  background: #0f0f1e;
-  border-bottom: 1px solid rgba(18, 0, 116, 0.45);
+  background: var(--header-bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--indigo) 45%, transparent);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -70,7 +76,7 @@ body {
   font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
-  background: linear-gradient(90deg, #00e5db, #5f9cff);
+  background: linear-gradient(90deg, var(--teal), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -86,7 +92,7 @@ body {
 .cortex-header__nav a {
   padding: 0.35rem 0.75rem;
   border-radius: 8px;
-  color: #8a9ab5;
+  color: var(--nav-ink);
   text-decoration: none;
   font-size: 0.88rem;
   font-weight: 500;
@@ -95,8 +101,8 @@ body {
 
 .cortex-header__nav a:hover,
 .cortex-header__nav a.active {
-  color: #e8f1f2;
-  background: rgba(94, 234, 212, 0.08);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--teal-glow) 8%, transparent);
 }
 
 .cortex-header__nav a.active {
@@ -116,10 +122,10 @@ body {
   align-items: center;
   gap: 0.4rem;
   padding: 0.3rem 0.75rem;
-  background: rgba(13, 19, 28, 0.85);
-  border: 1px solid rgba(94, 234, 212, 0.25);
+  background: color-mix(in srgb, var(--paper-2) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--teal-glow) 25%, transparent);
   border-radius: 999px;
-  color: #5ef0e0;
+  color: var(--teal-bright);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -128,12 +134,12 @@ body {
 }
 
 .cortex-gpu-pill:hover {
-  border-color: rgba(94, 234, 212, 0.45);
-  box-shadow: 0 0 12px rgba(94, 234, 212, 0.15);
+  border-color: color-mix(in srgb, var(--teal-glow) 45%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--teal-glow) 15%, transparent);
 }
 
 .cortex-gpu-pill svg {
-  color: #00e5db;
+  color: var(--teal);
 }
 
 .cortex-btn {
@@ -152,25 +158,25 @@ body {
 
 .cortex-btn--ghost {
   background: transparent;
-  color: #8a9ab5;
-  border: 1px solid rgba(90, 107, 120, 0.35);
+  color: var(--nav-ink);
+  border: 1px solid color-mix(in srgb, var(--ink-5) 35%, transparent);
 }
 
 .cortex-btn--ghost:hover {
-  color: #e8f1f2;
-  background: rgba(94, 234, 212, 0.06);
-  border-color: rgba(94, 234, 212, 0.3);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
+  border-color: color-mix(in srgb, var(--teal-glow) 30%, transparent);
 }
 
 .cortex-btn--primary {
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
-  color: #061016;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
   border: none;
 }
 
 .cortex-btn--primary:hover {
   filter: brightness(1.1);
-  box-shadow: 0 4px 18px rgba(27, 224, 209, 0.25);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--cta-from) 25%, transparent);
 }
 
 .cortex-header__user {
@@ -180,7 +186,7 @@ body {
 }
 
 .cortex-header__email {
-  color: #9eacb6;
+  color: var(--ink-3);
   font-size: 0.82rem;
   max-width: 160px;
   overflow: hidden;
@@ -191,8 +197,8 @@ body {
 /* ===== FOOTER =========================================================== */
 
 .cortex-footer {
-  background: #080812;
-  border-top: 1px solid rgba(18, 0, 116, 0.3);
+  background: var(--footer-bg);
+  border-top: 1px solid color-mix(in srgb, var(--indigo) 30%, transparent);
   margin-top: 4rem;
 }
 
@@ -215,7 +221,7 @@ body {
   font-weight: 800;
   font-size: 1.1rem;
   letter-spacing: -0.01em;
-  background: linear-gradient(90deg, #00e5db, #5f9cff);
+  background: linear-gradient(90deg, var(--teal), var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -223,7 +229,7 @@ body {
 
 .cortex-footer__tagline {
   margin: 0;
-  color: #9eacb6;
+  color: var(--ink-3);
   font-size: 0.88rem;
   line-height: 1.55;
   max-width: 28ch;
@@ -242,19 +248,19 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: rgba(94, 234, 212, 0.06);
-  border: 1px solid rgba(90, 107, 120, 0.25);
-  color: #9eacb6;
+  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink-5) 25%, transparent);
+  color: var(--ink-3);
   text-decoration: none;
   transition: all 0.18s ease;
 }
 
 .cortex-footer__social-link:hover {
-  color: #00e5db;
-  background: rgba(94, 234, 212, 0.1);
-  border-color: rgba(94, 234, 212, 0.35);
+  color: var(--teal);
+  background: color-mix(in srgb, var(--teal-glow) 10%, transparent);
+  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0, 229, 219, 0.12);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--teal) 12%, transparent);
 }
 
 .cortex-footer__links {
@@ -265,7 +271,7 @@ body {
 
 .cortex-footer__col h4 {
   margin: 0 0 0.85rem;
-  color: #e8f1f2;
+  color: var(--ink);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -282,25 +288,25 @@ body {
 }
 
 .cortex-footer__col a {
-  color: #9eacb6;
+  color: var(--ink-3);
   text-decoration: none;
   font-size: 0.88rem;
   transition: color 0.15s ease;
 }
 
 .cortex-footer__col a:hover {
-  color: #00e5db;
+  color: var(--teal);
 }
 
 .cortex-footer__bottom {
-  border-top: 1px solid rgba(18, 0, 116, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--indigo) 20%, transparent);
   padding: 1.25rem 1.5rem;
   text-align: center;
 }
 
 .cortex-footer__bottom p {
   margin: 0;
-  color: #9eacb6;
+  color: var(--ink-3);
   font-size: 0.8rem;
 }
 
@@ -317,7 +323,11 @@ body {
   left: -20vmax;
   width: 60vmax;
   height: 60vmax;
-  background: radial-gradient(circle, rgba(18, 0, 116, 0.18) 0%, transparent 65%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--indigo) 18%, transparent) 0%,
+    transparent 65%
+  );
   pointer-events: none;
   z-index: -1;
   animation: ambient-pulse 20s ease-in-out infinite;
@@ -330,7 +340,11 @@ body {
   right: -15vmax;
   width: 55vmax;
   height: 55vmax;
-  background: radial-gradient(circle, rgba(0, 212, 206, 0.07) 0%, transparent 65%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--teal-deep) 7%, transparent) 0%,
+    transparent 65%
+  );
   pointer-events: none;
   z-index: -1;
   animation: ambient-pulse-b 28s ease-in-out infinite reverse;
@@ -408,7 +422,20 @@ body {
 .action-link {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--target-min);
+}
+
+/* Read by assistive technology, invisible on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .field {
@@ -426,24 +453,23 @@ body {
 .field input,
 .field select {
   padding: 0.5rem;
-  min-height: 44px;
-  border: 1px solid #2e3b49;
-  background: #0b1119;
-  color: #e8f1f2;
-  border-radius: 4px;
+  min-height: var(--target-min);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   width: 100%;
 }
 
 button {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
   padding: 0.5rem 1rem;
   margin-right: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #334352;
-  background: #fff;
-  background: #141d28;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--btn-bg);
   color: inherit;
   cursor: pointer;
   font-size: 1rem;
@@ -454,14 +480,64 @@ button:disabled {
   opacity: 0.6;
 }
 
+button,
+.action-link {
+  transition: transform var(--dur-standard) var(--ease-standard);
+}
+
+/* A touch screen keeps :hover after a tap, which would leave the control lifted. */
+@media (hover: hover) {
+  button:not(:disabled, [aria-disabled='true']):hover,
+  .action-link:hover {
+    transform: translateY(-1px);
+    transition-duration: var(--dur-quick);
+  }
+}
+
+button:not(:disabled, [aria-disabled='true']):active,
+.action-link:active {
+  transform: scale(0.98);
+  transition-duration: var(--dur-quick);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 [role='alert'] {
-  color: #ff9a9a;
+  color: var(--red);
 }
 
 .form-error {
-  color: #ff9a9a;
+  color: var(--red);
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
+  animation: form-error-shake var(--dur-slow) var(--ease-standard);
+}
+
+@keyframes form-error-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  14%,
+  43%,
+  71% {
+    transform: translateX(-6px);
+  }
+  28%,
+  57%,
+  86% {
+    transform: translateX(6px);
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-standard);
+  animation-timing-function: var(--ease-standard);
 }
 
 /* ----- Primary button (gradient) --------------------------------------- */
@@ -472,11 +548,11 @@ button:disabled {
   min-height: 48px;
   border: 0;
   border-radius: 10px;
-  color: #061016;
+  color: var(--primary-foreground);
   font-weight: 800;
   font-size: 0.98rem;
   letter-spacing: 0.01em;
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
+  background: var(--gradient-cta);
   position: relative;
   overflow: hidden;
   cursor: pointer;
@@ -486,7 +562,7 @@ button:disabled {
 .primary-button:not(:disabled) {
   background-size: 200% 100%;
   animation: btn-shimmer 3.2s linear infinite;
-  box-shadow: 0 10px 30px rgba(27, 224, 209, 0.18);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--cta-from) 18%, transparent);
 }
 
 .primary-button:hover:not(:disabled) {
@@ -500,13 +576,13 @@ button:disabled {
 
 .primary-button:disabled {
   cursor: not-allowed;
-  background: linear-gradient(100deg, #1a3540, #2a3a55);
-  color: #a8b6c2;
+  background: linear-gradient(100deg, var(--disabled-from), var(--disabled-to));
+  color: var(--ink-disabled);
   animation: none;
 }
 
 .primary-button[data-state='success'] {
-  background: linear-gradient(100deg, #69f0a8, #1be0d1);
+  background: linear-gradient(100deg, var(--green-bright), var(--cta-from));
   animation: btn-success-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -535,11 +611,11 @@ button:disabled {
 
 .eyebrow {
   margin: 0;
-  color: #c8d4dc;
+  color: var(--ink-2);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.13em;
-  background: linear-gradient(90deg, #1be0d1, #5f9cff, #b3a4ff, #1be0d1);
+  background: linear-gradient(90deg, var(--cta-from), var(--accent), var(--violet), var(--cta-from));
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -562,6 +638,8 @@ button:disabled {
   .primary-button,
   .eyebrow,
   button,
+  .action-link,
+  .form-error,
   .cortex-ambient::before,
   .cortex-ambient::after,
   .cortex-header__nav a,
@@ -573,21 +651,14 @@ button:disabled {
     transition: none !important;
   }
 
+  /* Kept apart: a browser without view transitions would drop the whole list above. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
   .cortex-footer__social-link:hover {
     transform: none;
   }
-}
-
-/* ----- A11y utilities --------------------------------------------------- */
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }

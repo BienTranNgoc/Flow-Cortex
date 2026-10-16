@@ -13,7 +13,7 @@
   transform: translateX(-50%);
   width: 70vmax;
   height: 40vmax;
-  background: radial-gradient(ellipse, rgba(18, 0, 116, 0.22) 0%, transparent 70%);
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--indigo) 22%, transparent) 0%, transparent 70%);
   pointer-events: none;
   z-index: -1;
 }
@@ -33,7 +33,7 @@
   transform: translateX(-50%);
   width: 60%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.25), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal-glow) 25%, transparent), transparent);
 }
 
 .launchpad-hero h1 {
@@ -43,18 +43,18 @@
 }
 
 .launchpad-hero h1 span {
-  color: #5f9cff;
+  color: var(--accent);
 }
 
 .launchpad-hero p:not(.eyebrow) {
-  color: #9eacb6;
+  color: var(--ink-3);
   margin: 0;
 }
 
 .launchpad-section-title {
   margin: 0 0 1.25rem;
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-  color: #e8f1f2;
+  color: var(--ink);
 }
 
 .launchpad-cards {
@@ -71,10 +71,10 @@
   display: flex;
   flex-direction: column;
   padding: 1.1rem 1.1rem 1rem;
-  border: 1px solid #253746;
+  border: 1px solid var(--card-border);
   border-radius: 14px;
-  background: #101721;
-  box-shadow: 0 20px 60px #0005;
+  background: var(--paper-3);
+  box-shadow: var(--shadow);
   min-width: 0;
 }
 
@@ -96,26 +96,26 @@
   font-weight: 800;
   font-size: 0.8rem;
   letter-spacing: 0.02em;
-  color: #061016;
+  color: var(--primary-foreground);
 }
 
 .workflow-card-icon.tone-blue {
-  background: linear-gradient(135deg, #1be0d1, #5174ff);
+  background: linear-gradient(135deg, var(--cta-from), var(--cta-to));
 }
 
 .workflow-card-icon.tone-cyan {
-  background: linear-gradient(135deg, #5cd0ff, #7a5bff);
+  background: linear-gradient(135deg, var(--tone-cyan-from), var(--tone-cyan-to));
 }
 
 .workflow-card-icon.tone-amber {
-  background: linear-gradient(135deg, #ffb46b, #ff7a59);
-  color: #2a1106;
+  background: linear-gradient(135deg, var(--tone-amber-from), var(--tone-amber-to));
+  color: var(--tone-amber-on);
 }
 
 .workflow-card-title {
   margin: 0 0 0.85rem;
   font-size: 1.15rem;
-  color: #e8f1f2;
+  color: var(--ink);
   line-height: 1.25;
 }
 
@@ -138,45 +138,45 @@
 }
 
 .workflow-card-stage.tone-blue {
-  color: #9fc4ff;
-  background: #0a1a2c;
-  border-color: #1d3a66;
+  color: var(--tone-blue-text);
+  background: var(--tone-blue-bg);
+  border-color: var(--tone-blue-line);
 }
 
 .workflow-card-stage.tone-cyan {
-  color: #7fe1f5;
-  background: #062028;
-  border-color: #175663;
+  color: var(--tone-cyan-text);
+  background: var(--tone-cyan-bg);
+  border-color: var(--tone-cyan-line);
 }
 
 .workflow-card-stage.tone-violet {
-  color: #c0b0ff;
-  background: #16102a;
-  border-color: #382c6a;
+  color: var(--tone-violet-text);
+  background: var(--tone-violet-bg);
+  border-color: var(--tone-violet-line);
 }
 
 .workflow-card-stage.tone-amber {
-  color: #ffcd6b;
-  background: #2a200a;
-  border-color: #5a4416;
+  color: var(--tone-amber-text);
+  background: var(--tone-amber-bg);
+  border-color: var(--tone-amber-line);
 }
 
 .workflow-card-stage.tone-green {
-  color: #69f0a8;
-  background: #0a2618;
-  border-color: #1f4d34;
+  color: var(--green-bright);
+  background: var(--tone-green-bg);
+  border-color: var(--tone-green-line);
 }
 
 .workflow-card-stage.tone-rose {
-  color: #ff9bb0;
-  background: #2a0e16;
-  border-color: #6a2536;
+  color: var(--tone-rose-text);
+  background: var(--tone-rose-bg);
+  border-color: var(--tone-rose-line);
 }
 
 .workflow-card-footer {
   margin-top: auto;
   padding-top: 0.85rem;
-  border-top: 1px solid #1c2935;
+  border-top: 1px solid var(--line-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -186,8 +186,8 @@
 .workflow-card-launch {
   padding: 0.45rem 0.85rem;
   border-radius: 8px;
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
-  color: #061016;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
   font-weight: 700;
   font-size: 0.82rem;
   text-decoration: none;
@@ -201,16 +201,16 @@
 .launchpad-stages {
   margin: 0 0 2.5rem;
   padding: clamp(1.2rem, 4vw, 2rem);
-  border: 1px solid #253746;
+  border: 1px solid var(--card-border);
   border-radius: 14px;
-  background: #101721;
-  box-shadow: 0 20px 60px #0005;
+  background: var(--paper-3);
+  box-shadow: var(--shadow);
 }
 
 .launchpad-stages h2 {
   margin: 0 0 1rem;
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-  color: #e8f1f2;
+  color: var(--ink);
 }
 
 .launchpad-stages-list {
@@ -224,21 +224,21 @@
 
 .launchpad-stage {
   padding: 0.85rem;
-  border: 1px solid #233443;
+  border: 1px solid var(--line-subtle);
   border-radius: 10px;
-  background: #0b1119;
+  background: var(--input-bg);
 }
 
 .launchpad-stage h3 {
   margin: 0.35rem 0 0.35rem;
   font-size: 0.95rem;
-  color: #e8f1f2;
+  color: var(--ink);
 }
 
 .launchpad-stage p {
   margin: 0;
   font-size: 0.85rem;
-  color: #9eacb6;
+  color: var(--ink-3);
   line-height: 1.4;
 }
 
@@ -249,8 +249,8 @@
   min-width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: linear-gradient(100deg, #1be0d1, #5174ff);
-  color: #061016;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
   font-weight: 800;
   font-size: 0.85rem;
 }
@@ -261,12 +261,12 @@
   justify-content: space-between;
   gap: 1rem;
   margin-top: 1.25rem;
-  color: #81919e;
+  color: var(--ink-4);
   font-size: 0.9rem;
 }
 
 .launchpad-footer a {
-  color: #5f9cff;
+  color: var(--accent);
 }
 
 @media (max-width: 1024px) {

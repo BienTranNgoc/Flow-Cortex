@@ -4,8 +4,10 @@ import {
   type RunStepResponse,
   type ScriptRevisionResponse,
 } from '@flow-cortex/api-client';
-import { screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
 import { renderRoute, settled, stubApi, type FakeReply, type Handler } from '../../test/fakeApi';
 import { openInCurrentTab } from './browser';
@@ -125,8 +127,15 @@ function occurrences(text: string, part: string): number {
 }
 
 describe('RunProgressPage', () => {
-  beforeEach(() => setToken('t', true));
+  // jsdom has no layout, so it has no scrollIntoView either.
+  const scrollIntoView = vi.fn();
+  beforeEach(() => {
+    setToken('t', true);
+    scrollIntoView.mockClear();
+    Object.assign(Element.prototype, { scrollIntoView });
+  });
   afterEach(() => {
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
     setToken(null);
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -345,6 +354,10 @@ describe('RunProgressPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This step stopped with an error.');
     expect(memberText()).not.toContain(engineMessage);
+    expect(screen.getByRole('button', { name: /Inspect the file/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('renders a structured output as labelled fields with the technical ones hidden', async () => {
@@ -526,16 +539,19 @@ describe('RunProgressPage', () => {
   });
 
   it('renders metadata and WAV download button for a completed extract_audio step', async () => {
+    const user = userEvent.setup();
     renderRun(completedPipeline());
 
     await screen.findByText('Sample rate');
-    expect(screen.getByText('16000')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('pcm_s16le')).toBeInTheDocument();
+    const panel = within(screen.getByRole('region', { name: 'Extract source audio' }));
+    expect(panel.getByText('16000')).toBeInTheDocument();
+    expect(panel.getByText('1')).toBeInTheDocument();
+    expect(panel.getByText('pcm_s16le')).toBeInTheDocument();
 
     expect(
       screen.getByRole('button', { name: 'Download extracted audio (WAV)' }),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Inspect the file/ }));
     expect(screen.getByRole('button', { name: 'Download summary (.txt)' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Download technical details (JSON file)' }),
@@ -679,6 +695,9 @@ describe('RunProgressPage', () => {
       expect(await screen.findByLabelText('Content to approve')).toHaveValue('Draft caption');
       expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+      const review = screen.getByRole('button', { name: /Review/ });
+      expect(review).toHaveTextContent('Needs you');
+      expect(review).toHaveAttribute('aria-pressed', 'true');
       await vi.advanceTimersByTimeAsync(2500);
       expect(calls.filter((call) => call.path === '/api/v1/runs/r1').length).toBeGreaterThan(1);
     });
@@ -1040,6 +1059,378 @@ describe('RunProgressPage', () => {
       expect(screen.queryByText(/Retried/)).not.toBeInTheDocument();
       expect(screen.queryByText(/^File:/)).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Download/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('the pipeline and its detail panel', () => {
+    const TASKS_PATH = '/api/v1/runs/r1/review-tasks';
+    const APPROVED_CONTENT = 'https://www.douyin.com/video/7123456789';
+    const node = (name: RegExp) => screen.getByRole('button', { name });
+
+    function checkpointRun(
+      checkpoint: Partial<RunStepResponse>,
+      overrides: Partial<RunResponse>,
+    ): RunResponse {
+      return run(
+        [
+          step({ type: 'echo', mode: 'inline', status: 'completed', output: 'Draft caption' }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'APPROVAL_CHECKPOINT',
+            mode: 'inline',
+            ...checkpoint,
+          }),
+        ],
+        overrides,
+      );
+    }
+
+    it('opens a finished run on its last step and shows another step after one activation', async () => {
+      const user = userEvent.setup();
+      renderRun(completedPipeline());
+
+      await screen.findByRole('region', { name: 'Extract source audio' });
+      expect(node(/Extract source audio/)).toHaveAttribute('aria-pressed', 'true');
+      expect(
+        within(screen.getByRole('region', { name: 'Extract source audio' })).getByText(
+          'Sample rate',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Select a step to see its result.')).toBeInTheDocument();
+
+      await user.click(node(/Inspect the file/));
+
+      const panel = screen.getByRole('region', { name: 'Inspect the file' });
+      expect(node(/Inspect the file/)).toHaveAttribute('aria-pressed', 'true');
+      expect(node(/Extract source audio/)).toHaveAttribute('aria-pressed', 'false');
+      expect(within(panel).getByText('Duration')).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Show raw' })).toBeInTheDocument();
+      expect(
+        within(panel).getByRole('button', { name: 'Download summary (.txt)' }),
+      ).toBeInTheDocument();
+      expect(
+        within(panel).getByRole('button', { name: 'Download technical details (JSON file)' }),
+      ).toBeInTheDocument();
+    });
+
+    it('reads a rejected run later: the checkpoint in error, the sentence and the code, no form', async () => {
+      renderRun(
+        checkpointRun(
+          { status: 'error', errorCode: 'APPROVAL_REJECTED', errorMessage: 'Approval rejected' },
+          { status: 'error' },
+        ),
+      );
+
+      const panel = await screen.findByRole('region', { name: 'Review' });
+      expect(node(/Review/)).toHaveTextContent('Error');
+      expect(node(/Review/)).toHaveAttribute('aria-pressed', 'true');
+      expect(within(panel).getByRole('alert')).toHaveTextContent(
+        'You rejected this content, so the run stopped.',
+      );
+      expect(panel.querySelector('.run-step-code')?.textContent).toBe('APPROVAL_REJECTED');
+      expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
+    });
+
+    it('reads an approved run later: the checkpoint completed and its content as text', async () => {
+      const user = userEvent.setup();
+      renderRun(
+        checkpointRun({ status: 'completed', output: APPROVED_CONTENT }, { status: 'completed' }),
+      );
+
+      await user.click(await screen.findByRole('button', { name: /Review/ }));
+
+      expect(node(/Review/)).toHaveTextContent('Completed');
+      expect(
+        within(screen.getByRole('region', { name: 'Review' })).getByText(APPROVED_CONTENT),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
+    });
+
+    it('says in the panel when the content to approve cannot be loaded', async () => {
+      renderRun(checkpointRun({ status: 'pending' }, { status: 'waiting_approval' }), {
+        [`GET ${TASKS_PATH}`]: { status: 500, body: { status: 500 } },
+      });
+
+      const panel = await screen.findByRole('region', { name: 'Review' });
+      expect(node(/Review/)).toHaveTextContent('Needs you');
+      expect(await within(panel).findByRole('alert')).toHaveTextContent(
+        'Could not load the step to review.',
+      );
+      expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
+    });
+
+    it('hides the form while another step is selected and brings it back, unsaved edit included, with the Review node', async () => {
+      const user = userEvent.setup();
+      renderRun(checkpointRun({ status: 'pending' }, { status: 'waiting_approval' }), {
+        [`GET ${TASKS_PATH}`]: {
+          status: 200,
+          body: [{ id: 't1', runId: 'r1', status: 'pending', originalPayload: 'Draft caption' }],
+        },
+      });
+
+      const content = await screen.findByLabelText('Content to approve');
+      await user.clear(content);
+      await user.type(content, 'Edited caption');
+      await user.click(node(/Step 1/));
+      expect(screen.getByLabelText('Content to approve')).not.toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Waiting for your approval' }),
+      ).toBeInTheDocument();
+
+      await user.click(node(/Review/));
+      expect(screen.getByLabelText('Content to approve')).toBeVisible();
+      expect(screen.getByLabelText('Content to approve')).toHaveValue('Edited caption');
+      expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    });
+
+    it('shows the next review with its own content when the run goes straight from one checkpoint to the next', async () => {
+      const user = userEvent.setup();
+      const checkpoint = (id: string, stepOrder: number, status: string) =>
+        step({ id, stepOrder, type: 'APPROVAL_CHECKPOINT', mode: 'inline', status });
+      const atFirst = run([checkpoint('s1', 1, 'pending'), checkpoint('s2', 2, 'pending')], {
+        status: 'waiting_approval',
+      });
+      const atSecond = run([checkpoint('s1', 1, 'completed'), checkpoint('s2', 2, 'pending')], {
+        status: 'waiting_approval',
+      });
+      const first = { id: 't1', runId: 'r1', status: 'pending', originalPayload: 'First draft' };
+      const second = { id: 't2', runId: 'r1', status: 'pending', originalPayload: 'Second draft' };
+      let approved = false;
+      let readsSinceApproval = 0;
+      renderRun(atFirst, {
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: approved ? atSecond : atFirst }),
+        // The second review is created a moment after the first is approved.
+        [`GET ${TASKS_PATH}`]: () => {
+          if (!approved) return { status: 200, body: [first] };
+          readsSinceApproval += 1;
+          const decided = { ...first, status: 'approved' };
+          return { status: 200, body: readsSinceApproval === 1 ? [decided] : [decided, second] };
+        },
+        'POST /api/v1/review-tasks/t1/approve': () => {
+          approved = true;
+          return { status: 200, body: { ...first, status: 'approved' } };
+        },
+      });
+
+      const content = await screen.findByLabelText('Content to approve');
+      await user.clear(content);
+      await user.type(content, 'Edited first');
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      expect(await screen.findByDisplayValue('Second draft', {}, { timeout: 4000 })).toBe(
+        screen.getByLabelText('Content to approve'),
+      );
+    });
+
+    it('shows the heading and no pipeline for a run with no steps', async () => {
+      renderRun(run([], { status: 'completed' }));
+
+      expect(await screen.findByRole('heading', { name: 'Run completed' })).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Steps' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+      expect(document.querySelector('.step-detail')).toBeNull();
+    });
+
+    it('offers the way back from the run itself when opened at /runs/<id>', async () => {
+      const calls = stubApi({ 'GET /api/v1/runs/r1': { status: 200, body: completedCheck() } });
+      const { queryClient } = renderRoute('/runs/:runId', '/runs/r1', <RunProgressPage />);
+
+      expect(await screen.findByRole('link', { name: 'Back to workflow' })).toHaveAttribute(
+        'href',
+        '/workflows/w1',
+      );
+      await settled(queryClient);
+      expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
+    });
+
+    it('announces the step the page selects after a poll, and nothing on first render', async () => {
+      const user = userEvent.setup();
+      let current = checkpointRun({ status: 'pending' }, { status: 'running' });
+      stubApi({
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: current }),
+        [`GET ${TASKS_PATH}`]: {
+          status: 200,
+          body: [{ id: 't1', runId: 'r1', status: 'pending', originalPayload: 'Draft caption' }],
+        },
+      });
+      const { queryClient } = renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+      const announcement = () => screen.getByRole('main').querySelector('[role="status"]');
+
+      await screen.findByRole('region', { name: 'Step 1' });
+      expect(announcement()).toBeEmptyDOMElement();
+      await user.click(node(/Step 1/));
+      expect(announcement()).toBeEmptyDOMElement();
+
+      current = checkpointRun({ status: 'pending' }, { status: 'waiting_approval' });
+      await queryClient.invalidateQueries();
+
+      await waitFor(() => expect(node(/Review/)).toHaveAttribute('aria-pressed', 'true'));
+      expect(announcement()).toHaveTextContent('Review, Needs you');
+    });
+
+    it('scrolls the panel into view when a node is activated and never on first render', async () => {
+      const user = userEvent.setup();
+      const scrolled: Element[] = [];
+      scrollIntoView.mockImplementation(function (this: Element) {
+        scrolled.push(this);
+      });
+      renderRun(completedPipeline());
+
+      await screen.findByRole('region', { name: 'Extract source audio' });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      await user.click(node(/Inspect the file/));
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'nearest' }));
+      expect(scrolled[0]).toBe(screen.getByRole('region', { name: 'Inspect the file' }));
+    });
+
+    it('scrolls without animation when the visitor asks for reduced motion', async () => {
+      const user = userEvent.setup();
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+      }));
+      renderRun(completedPipeline());
+
+      await screen.findByRole('region', { name: 'Extract source audio' });
+      await user.click(node(/Inspect the file/));
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
+    });
+
+    it('announces the step the member picks', async () => {
+      const user = userEvent.setup();
+      renderRun(completedPipeline());
+
+      await screen.findByRole('region', { name: 'Extract source audio' });
+      await user.click(node(/Inspect the file/));
+
+      expect(screen.getByRole('main').querySelector('[role="status"]')).toHaveTextContent(
+        'Inspect the file, Completed',
+      );
+    });
+
+    it('does not bring a pick back after the run waited for approval and then continued', async () => {
+      const user = userEvent.setup();
+      const echo = (id: string, stepOrder: number, status: string) =>
+        step({ id, stepOrder, type: 'echo', mode: 'inline', status, output: `out ${id}` });
+      const checkpoint = (status: string) =>
+        step({ id: 's3', stepOrder: 3, type: 'APPROVAL_CHECKPOINT', mode: 'inline', status });
+      let current = run([
+        echo('s1', 1, 'completed'),
+        echo('s2', 2, 'running'),
+        checkpoint('pending'),
+      ]);
+      stubApi({
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: current }),
+        [`GET ${TASKS_PATH}`]: {
+          status: 200,
+          body: [{ id: 't1', runId: 'r1', status: 'pending', originalPayload: 'Draft caption' }],
+        },
+      });
+      const { queryClient } = renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      await screen.findByRole('region', { name: 'Step 2' });
+      await user.click(node(/Step 1/));
+      expect(node(/Step 1/)).toHaveAttribute('aria-pressed', 'true');
+
+      current = run(
+        [echo('s1', 1, 'completed'), echo('s2', 2, 'completed'), checkpoint('pending')],
+        {
+          status: 'waiting_approval',
+        },
+      );
+      await queryClient.invalidateQueries();
+      await waitFor(() => expect(node(/Review/)).toHaveAttribute('aria-pressed', 'true'));
+
+      current = run([
+        echo('s1', 1, 'completed'),
+        echo('s2', 2, 'completed'),
+        checkpoint('completed'),
+        echo('s4', 4, 'running'),
+      ]);
+      await queryClient.invalidateQueries();
+
+      await waitFor(() => expect(node(/Step 4/)).toHaveAttribute('aria-pressed', 'true'));
+      expect(node(/Step 1/)).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    describe('opened by starting a run', () => {
+      function LocationProbe() {
+        const { state, search, hash } = useLocation();
+        return <span data-testid="location">{JSON.stringify({ state, search, hash })}</span>;
+      }
+
+      const currentLocation = (): unknown =>
+        JSON.parse(screen.getByTestId('location').textContent ?? '');
+
+      function renderWithState(state: unknown, search = '', hash = '') {
+        stubApi({ 'GET /api/v1/runs/r1': { status: 200, body: completedPipeline() } });
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        render(
+          <QueryClientProvider client={queryClient}>
+            <MemoryRouter
+              initialEntries={[{ pathname: '/workflows/w1/runs/r1', search, hash, state }]}
+            >
+              <Routes>
+                <Route path="/workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
+              </Routes>
+              <LocationProbe />
+            </MemoryRouter>
+          </QueryClientProvider>,
+        );
+        return queryClient;
+      }
+
+      it('clears the focus request once the run has loaded, so a reload does not move focus', async () => {
+        renderWithState({ focusHeading: true });
+
+        await screen.findByRole('heading', { name: 'Run completed' });
+        await waitFor(() => expect(currentLocation()).toMatchObject({ state: null }));
+      });
+
+      it('keeps the query string and the fragment when it clears the focus request', async () => {
+        renderWithState({ focusHeading: true }, '?from=home', '#result');
+
+        await screen.findByRole('heading', { name: 'Run completed' });
+        await waitFor(() => expect(currentLocation()).toMatchObject({ state: null }));
+        expect(currentLocation()).toMatchObject({ search: '?from=home', hash: '#result' });
+      });
+
+      it('puts focus on the heading once the run has loaded, and not again after a poll', async () => {
+        const user = userEvent.setup();
+        const queryClient = renderWithState({ focusHeading: true });
+
+        const heading = await screen.findByRole('heading', { name: 'Run completed' });
+        await waitFor(() => expect(heading).toHaveFocus());
+
+        await user.click(node(/Inspect the file/));
+        await queryClient.invalidateQueries();
+        await settled(queryClient);
+        expect(node(/Inspect the file/)).toHaveFocus();
+      });
+
+      it('leaves focus alone on a direct load', async () => {
+        renderWithState(null);
+
+        const heading = await screen.findByRole('heading', { name: 'Run completed' });
+        expect(heading).not.toHaveFocus();
+        expect(heading).toHaveAttribute('tabindex', '-1');
+      });
     });
   });
 });
