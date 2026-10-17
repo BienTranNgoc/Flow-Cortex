@@ -1,0 +1,512 @@
+.wf-list {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wf-list__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.wf-list__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.wf-list__welcome {
+  margin: 0.25rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.95rem;
+}
+
+.wf-list__header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.wf-list__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+}
+
+.wf-list__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 240px;
+  min-height: 38px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--ink-3);
+}
+
+.wf-list__search input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  font-size: 0.92rem;
+  min-height: 0;
+  padding: 0.55rem 0;
+}
+
+.wf-list__filter,
+.wf-list__scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+
+.wf-list__filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.7rem;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.wf-list__scope-btn {
+  padding: 0.3rem 0.65rem;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.wf-list__scope-btn.is-active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  border-color: color-mix(in srgb, var(--teal-glow) 30%, transparent);
+  font-weight: 600;
+}
+
+.wf-list__layout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  border: 1px solid var(--card-edge);
+  border-radius: 999px;
+  padding: 0.2rem;
+  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+}
+
+.wf-list__layout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.wf-list__layout-btn.is-active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+}
+
+.wf-list__status {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.95rem;
+}
+
+.wf-list__status--error {
+  color: var(--red);
+}
+
+.wf-list__table-wrap {
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-2) 60%, transparent);
+  overflow: hidden;
+}
+
+.wf-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.wf-list__table thead th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--paper-1) 70%, transparent);
+  border-bottom: 1px solid var(--card-edge);
+}
+
+.wf-list__table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--card-edge);
+  vertical-align: middle;
+}
+
+.wf-list__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.wf-list__table tbody tr:hover {
+  background: color-mix(in srgb, var(--teal-glow) 5%, transparent);
+}
+
+.wf-list__name {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wf-list__name div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.wf-list__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--teal-glow) 12%, transparent);
+  color: var(--teal);
+  flex-shrink: 0;
+}
+
+.wf-list__name-link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.wf-list__name-link:hover {
+  color: var(--teal-bright);
+}
+
+.wf-list__shared {
+  font-size: 0.72rem;
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.wf-list__muted {
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.wf-list__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wf-list__status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+.wf-list__status-pill--active {
+  background: color-mix(in srgb, var(--green-bright) 18%, transparent);
+  color: var(--green-bright);
+}
+
+.wf-list__status-pill--inactive {
+  background: color-mix(in srgb, var(--ink-5) 25%, transparent);
+  color: var(--ink-3);
+}
+
+.wf-list__status-pill--failed {
+  background: color-mix(in srgb, var(--red) 22%, transparent);
+  color: var(--red-light);
+}
+
+.wf-list__status-pill--attention {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+
+.wf-list__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wf-list__actions .cortex-btn {
+  min-height: 34px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.cortex-btn--icon {
+  min-width: 0;
+  min-height: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-3);
+  border: 1px solid transparent;
+  margin-right: 0;
+  transition: all 0.18s ease;
+}
+
+.cortex-btn--icon:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--teal-glow) 8%, transparent);
+  border-color: color-mix(in srgb, var(--teal-glow) 25%, transparent);
+}
+
+.wf-list__run-btn {
+  color: var(--teal);
+  border-color: color-mix(in srgb, var(--teal-glow) 25%, transparent);
+}
+
+.wf-list__run-btn:hover {
+  color: var(--teal-bright);
+  background: color-mix(in srgb, var(--teal-glow) 12%, transparent);
+  border-color: color-mix(in srgb, var(--teal-glow) 50%, transparent);
+}
+
+.wf-list__check-col {
+  width: 40px;
+  padding-left: 1rem;
+  padding-right: 0.25rem;
+}
+
+.wf-list__check {
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  accent-color: var(--teal);
+}
+
+.wf-list__actions-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.wf-list__table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
+}
+
+.wf-list__grid-card.is-selected {
+  border-color: color-mix(in srgb, var(--teal-glow) 45%, transparent);
+  background: color-mix(in srgb, var(--teal-glow) 5%, transparent);
+}
+
+.wf-list__grid-check {
+  display: inline-flex;
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.wf-list__bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--teal-glow) 30%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--teal-glow) 8%, transparent);
+}
+
+.wf-list__bulk-count {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.wf-list__bulk-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.wf-list__bulk-danger {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red-strong) 35%, transparent);
+}
+
+.wf-list__bulk-danger:hover {
+  color: var(--red-light);
+  background: color-mix(in srgb, var(--red-strong) 8%, transparent);
+  border-color: color-mix(in srgb, var(--red-strong) 55%, transparent);
+}
+
+.wf-list__bulk-clear {
+  margin-left: auto;
+  margin-right: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-height: 32px;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.wf-list__bulk-clear:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink-5) 8%, transparent);
+}
+
+.wf-list__owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.wf-list__owner-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--primary-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-5) 25%, transparent);
+}
+
+.wf-list__owner-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
+
+.wf-list__owner-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--ink-5) 20%, transparent);
+  color: var(--ink-3);
+}
+
+.wf-list__owner-tag--mine {
+  background: color-mix(in srgb, var(--teal-glow) 22%, transparent);
+  color: var(--teal-bright);
+}
+
+.wf-list__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.wf-list__grid-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+}
+
+.wf-list__grid-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+.wf-list__grid-meta dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+}
+
+.wf-list__grid-meta dd {
+  margin: 0.1rem 0 0;
+  color: var(--ink);
+}
+
+.wf-list__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-4);
+  font-size: 0.82rem;
+  padding: 0 0.4rem;
+}
+
+.wf-list__pager {
+  color: var(--ink-3);
+}

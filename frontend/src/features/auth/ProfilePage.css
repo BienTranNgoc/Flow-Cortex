@@ -224,6 +224,45 @@
   margin: 2rem 0;
 }
 
+.profile-apikey__row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.profile-apikey__value {
+  flex: 1 1 280px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink-5) 12%, transparent);
+  border: 1px solid var(--card-edge);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.profile-apikey__btn {
+  flex: 0 0 auto;
+}
+
+.profile-apikey__hint {
+  margin: 0.7rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.profile-apikey__hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: color-mix(in srgb, var(--ink-5) 12%, transparent);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+
 .profile-facts {
   margin: 0;
   display: grid;
