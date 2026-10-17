@@ -3,14 +3,15 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ApiError } from '@flow-cortex/api-client';
 import type { UserResponse } from '@flow-cortex/api-client';
+import { Link } from 'react-router-dom';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
-import { useDeleteUserMutation, useUpdateUserMutation } from './useUsers';
+import { useUpdateUserMutation } from './useUsers';
 
-/** One row of the Users table — view mode, or an inline edit form. */
+/** One row of the users table — view mode, or an inline edit form. */
 export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
-  const deleteMutation = useDeleteUserMutation();
+  const role = user.role === 'ADMIN' || user.role === 'CREATOR' ? user.role : 'MEMBER';
   const {
     register,
     handleSubmit,
@@ -20,7 +21,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
     values: {
       email: user.email ?? '',
       name: user.name ?? '',
-      role: user.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+      role,
       status: user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
     },
   });
@@ -34,19 +35,13 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
     updateMutation.mutate({ id, changes: values }, { onSuccess: () => setEditing(false) });
   });
 
-  const onDelete = () => {
-    if (window.confirm(`Delete ${user.email ?? 'this user'}?`)) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const updateError = updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
-  const deleteError = deleteMutation.error instanceof ApiError ? deleteMutation.error.problem : undefined;
+  const updateError =
+    updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
 
   if (editing) {
     return (
       <tr>
-        <td colSpan={5}>
+        <td colSpan={6}>
           <form onSubmit={onSave} noValidate aria-label={`Edit ${user.email ?? id}`}>
             <div className="field">
               <label htmlFor={`edit-email-${id}`}>Email</label>
@@ -64,6 +59,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
               <select id={`edit-role-${id}`} {...register('role')}>
                 <option value="MEMBER">Member</option>
                 <option value="ADMIN">Admin</option>
+                <option value="CREATOR">Creator</option>
               </select>
             </div>
             <div className="field">
@@ -88,18 +84,39 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
 
   return (
     <tr>
+      <td data-label="Name">
+        <span className="user-name-cell">
+          <span className="user-avatar" aria-hidden="true">
+            {user.name?.trim().charAt(0).toUpperCase() || '?'}
+          </span>
+          {user.name}
+        </span>
+      </td>
       <td data-label="Email">{user.email}</td>
-      <td data-label="Name">{user.name}</td>
-      <td data-label="Role">{user.role}</td>
-      <td data-label="Status">{user.status}</td>
+      <td data-label="Role">
+        <span className="status-badge">{user.role}</span>
+      </td>
+      <td data-label="Status">
+        <span
+          className={`status-badge ${user.status === 'ACTIVE' ? 'status-success' : 'status-warning'}`}
+        >
+          {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+        </span>
+      </td>
+      <td data-label="Joined">
+        {user.createdAt ? (
+          <time dateTime={user.createdAt}>{new Date(user.createdAt).toLocaleDateString()}</time>
+        ) : (
+          '—'
+        )}
+      </td>
       <td data-label="Actions">
+        <Link className="table-link" to={`/users/${id}`}>
+          View
+        </Link>
         <button type="button" onClick={() => setEditing(true)}>
           Edit
         </button>
-        <button type="button" onClick={onDelete} disabled={deleteMutation.isPending}>
-          Delete
-        </button>
-        {deleteError && <p role="alert">{deleteError.detail}</p>}
       </td>
     </tr>
   );
