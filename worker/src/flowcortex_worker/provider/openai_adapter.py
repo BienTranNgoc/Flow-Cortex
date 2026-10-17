@@ -294,7 +294,7 @@ class OpenAIProviderAdapter:
             ],
             "response_format": response_format,
             "temperature": temperature,
-        }).encode("utf-8")
+        }).encode()
         api_key = self.config.api_key
         base_url = self.config.base_url
         url = f"{base_url.rstrip('/')}/chat/completions"

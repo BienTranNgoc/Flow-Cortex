@@ -89,7 +89,7 @@ class VeoAdapter:
                     "resolution": "720p",
                 },
             }
-        ).encode("utf-8")
+        ).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/models/{model}:predictLongRunning",
             method="POST",

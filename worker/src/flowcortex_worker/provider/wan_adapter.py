@@ -109,7 +109,7 @@ class WanAdapter:
         }
         if request.reference_image_url:
             input_body["image"] = request.reference_image_url
-        body = json.dumps({"input": input_body}).encode("utf-8")
+        body = json.dumps({"input": input_body}).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/models/{model_path}/predictions",
             method="POST",

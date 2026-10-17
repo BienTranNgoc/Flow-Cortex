@@ -105,7 +105,7 @@ class SeedanceAdapter:
                     "generate_audio": False,
                 },
             }
-        ).encode("utf-8")
+        ).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/services/aigc/video-generation/video-synthesis",
             method="POST",
@@ -168,7 +168,7 @@ class SeedanceAdapter:
                 "generate_audio": False,
                 "watermark": False,
             }
-        ).encode("utf-8")
+        ).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/contents/generations/tasks",
             method="POST",

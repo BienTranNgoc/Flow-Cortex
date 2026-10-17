@@ -198,7 +198,7 @@ class FixtureProviderAdapter:
 
     def submit_video(self, request: VideoRequest) -> str:
         digest = hashlib.sha256(
-            f"{request.source_revision_id}|{request.prompt}".encode("utf-8")
+            f"{request.source_revision_id}|{request.prompt}".encode()
         ).hexdigest()[:16]
         return f"fixture-{digest}"
 

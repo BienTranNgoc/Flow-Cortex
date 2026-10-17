@@ -136,7 +136,7 @@ def _generate_speech(
         "idempotencyKey": _speech_idempotency_key(request, identity),
         "format": "wav",
     }
-    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
     return ProviderOutcome(
         data=data,
         files=(
@@ -206,7 +206,7 @@ def _generate_video(
         "format": "mp4",
     }
     normalized = _normalize_video(video.body, context)
-    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
     return ProviderOutcome(
         data=data,
         files=(
@@ -298,9 +298,9 @@ def _store_video_task(
             "provider": identity.provider,
             "providerTaskId": task_id,
         },
-        ensure_ascii=True,
-        sort_keys=True,
-    ).encode("utf-8")
+            ensure_ascii=True,
+            sort_keys=True,
+        ).encode()
     context.storage.put(
         f"{context.output_prefix}manifest.json",
         checkpoint,
