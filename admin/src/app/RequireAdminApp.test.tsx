@@ -120,11 +120,14 @@ describe('RequireAdminApp', () => {
     expect(await screen.findByText('No runs yet.')).toBeInTheDocument();
     expect(queryClient.getQueryCache().findAll({ queryKey: ['admin'] })).not.toHaveLength(0);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await userEvent.click(screen.getByRole('button', { name: /account menu/i }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(queryClient.getQueryCache().findAll({ queryKey: ['admin'] })).toHaveLength(0);
-    expect(queryClient.getQueryCache().findAll({ queryKey: ['me', 'admin-token-signout'] })).toHaveLength(0);
+    expect(
+      queryClient.getQueryCache().findAll({ queryKey: ['me', 'admin-token-signout'] }),
+    ).toHaveLength(0);
   });
 
   it('renders its children for an ADMIN', async () => {
