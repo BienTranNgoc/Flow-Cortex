@@ -19,7 +19,7 @@ export type MultiUploadPhase =
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_IMAGES = 1;
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 1;
 
 export interface ImageProblem {
   message: string;
@@ -27,7 +27,7 @@ export interface ImageProblem {
 
 export function imageFileProblem(file: File): ImageProblem | null {
   if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    return { message: 'Each image must be between 1 byte and 10 MB.' };
+    return { message: 'The image must be between 1 byte and 10 MB.' };
   }
   const dot = file.name.lastIndexOf('.');
   const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
@@ -38,11 +38,11 @@ export function imageFileProblem(file: File): ImageProblem | null {
 }
 
 export const EMPTY_IMAGE_LIST: ImageProblem = {
-  message: `Pick between ${MIN_IMAGES} and ${MAX_IMAGES} images.`,
+  message: 'Please select an image.',
 };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
-  message: `At most ${MAX_IMAGES} images per run.`,
+  message: 'At most 1 image per run.',
 };
 
 /** Walks `files`; returns the first ImageProblem found or null. */

@@ -14,7 +14,7 @@ import java.util.UUID;
 record ProductVideoRunRequest(
         @NotBlank @Size(max = 200) String productName,
         @NotBlank @Size(max = 4000) String description,
-        @NotBlank @Size(max = 500) String cta,
+        @Size(max = 500) String cta,
         @Size(max = 200) String price,
         @Size(max = 500) String promotion,
         @NotNull @Size(min = 1, max = 10) List<@NotNull UUID> uploadIds,
@@ -29,14 +29,14 @@ record ProductVideoRunRequest(
         return uploadIds == null || uploadIds.stream().distinct().count() == uploadIds.size();
     }
 
-    @AssertTrue(message = "price and promotion must be omitted or contain text")
+    @AssertTrue(message = "price, promotion, and cta must be omitted or contain text")
     @JsonIgnore
     boolean hasNoBlankOptionalClaims() {
-        return notBlankWhenPresent(price) && notBlankWhenPresent(promotion);
+        return notBlankWhenPresent(price) && notBlankWhenPresent(promotion) && notBlankWhenPresent(cta);
     }
 
     ProductVideoDraft draft() {
-        return new ProductVideoDraft(productName.trim(), description.trim(), cta.trim(), trimToNull(price),
+        return new ProductVideoDraft(productName.trim(), description.trim(), trimToNull(cta), trimToNull(price),
                 trimToNull(promotion), video.aspectRatio());
     }
 

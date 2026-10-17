@@ -20,9 +20,6 @@ type Failure = { kind: 'upload' } | { kind: 'alert'; message: string };
 const TEXT_FIELDS = [
   { id: 'product-name', name: 'productName', label: 'Product name', required: true, maxLength: 200 },
   { id: 'product-description', name: 'description', label: 'Description', required: true, maxLength: 4000, multiline: true },
-  { id: 'product-cta', name: 'cta', label: 'Call to action', required: true, maxLength: 500 },
-  { id: 'product-price', name: 'price', label: 'Price (optional)', required: false, maxLength: 200 },
-  { id: 'product-promotion', name: 'promotion', label: 'Promotion (optional)', required: false, maxLength: 500 },
 ] as const;
 
 type TextFieldName = (typeof TEXT_FIELDS)[number]['name'];
@@ -60,9 +57,6 @@ export function ProductVideoStartForm({
   const [text, setText] = useState<Record<TextFieldName, string>>({
     productName: '',
     description: '',
-    cta: '',
-    price: '',
-    promotion: '',
   });
   const [textError, setTextError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -82,7 +76,7 @@ export function ProductVideoStartForm({
     if (phase) {
       return;
     }
-    const picked = event.target.files ? Array.from(event.target.files) : [];
+    const picked = event.target.files && event.target.files[0] ? [event.target.files[0]] : [];
     setFiles(picked);
     setFailure(null);
     setImageError(firstImageProblem(picked)?.message ?? null);
@@ -116,9 +110,6 @@ export function ProductVideoStartForm({
       const runResponse = await startRun.mutateAsync({
         productName: text.productName.trim(),
         description: text.description.trim(),
-        cta: text.cta.trim(),
-        ...(text.price.trim() ? { price: text.price.trim() } : {}),
-        ...(text.promotion.trim() ? { promotion: text.promotion.trim() } : {}),
         uploadIds,
         video: { aspectRatio: '9:16' },
       });
@@ -192,19 +183,18 @@ export function ProductVideoStartForm({
         </div>
       )}
       <div className="field">
-        <label htmlFor="product-images">Product images (1–10, JPG/PNG/WebP, ≤ 10 MB each) *</label>
+        <label htmlFor="product-images">Product image (JPG/PNG/WebP, ≤ 10 MB) *</label>
         <input
           id="product-images"
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          multiple
           required
           onChange={onPick}
           aria-invalid={imageError ? true : undefined}
           aria-describedby={imageError ? 'product-images-problem' : undefined}
         />
         {files.length > 0 && (
-          <p className="field-hint">{files.length} image{files.length === 1 ? '' : 's'} selected</p>
+          <p className="field-hint">1 image selected: {files[0]?.name}</p>
         )}
         {imageError && (
           <div id="product-images-problem" className="field-error" role="alert">

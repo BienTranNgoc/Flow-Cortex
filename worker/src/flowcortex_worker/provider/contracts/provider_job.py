@@ -13,7 +13,7 @@ class ProductAdPayload(BaseModel):
     )
     productName: Annotated[StrictStr, Field(max_length=200, min_length=1)]
     description: Annotated[StrictStr, Field(max_length=4000, min_length=1)]
-    cta: Annotated[StrictStr, Field(max_length=500, min_length=1)]
+    cta: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
     price: Annotated[StrictStr | None, Field(max_length=200, min_length=1)] = None
     promotion: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
 

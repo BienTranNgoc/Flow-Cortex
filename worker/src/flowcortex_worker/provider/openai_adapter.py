@@ -127,8 +127,10 @@ _SYSTEM_PROMPT = (
     "3. PRICE: If a price is provided, mention it naturally and accurately.\n"
     "4. PROMOTION: If a promotion is provided, mention it naturally "
     "without exaggeration.\n"
-    "5. CTA: End with the exact call-to-action sentence provided "
-    "by the user, without modifying it.\n\n"
+    "5. CTA: If a call-to-action is provided, end with the exact call-to-action "
+    "sentence provided by the user. If no call-to-action is provided, generate a "
+    "natural, compelling Vietnamese call-to-action that fits the product and urges "
+    "the viewer to act (e.g. 'Khám phá ngay!', 'Mua ngay hôm nay!').\n\n"
 
     "STYLE GUIDELINES:\n"
     "- Write entirely in natural, conversational Vietnamese.\n"
@@ -152,7 +154,7 @@ _SYSTEM_PROMPT = (
     "- Never invent features, materials, discounts, guarantees, "
     "scarcity, customer reviews, or product performance claims.\n"
     "- Never invent a price or promotion.\n"
-    "- Never modify the provided CTA.\n"
+    "- If a CTA is provided, never modify it. If omitted, create an appropriate call-to-action.\n"
     "- Ensure the final script is coherent, persuasive, and ready "
     "for direct text-to-speech generation."
 )
@@ -360,8 +362,9 @@ class OpenAIProviderAdapter:
         parts = [
             f"productName: {payload.productName}",
             f"description: {payload.description}",
-            f"cta: {payload.cta}",
         ]
+        if payload.cta is not None:
+            parts.append(f"cta: {payload.cta}")
         if payload.price is not None:
             parts.append(f"price: {payload.price}")
         if payload.promotion is not None:

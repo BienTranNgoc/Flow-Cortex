@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Báo cáo Bài tập lớn - Flow-Cortex</title>
+<style>
+  body {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13pt;
+    line-height: 1.4;
+    color: #111;
+    max-width: 850px;
+    margin: 40px auto;
+    padding: 0 30px;
+    background-color: #fff;
+  }
+  h1 {
+    color: #0d47a1;
+    font-size: 20pt;
+    text-align: center;
+    text-transform: uppercase;
+    margin-top: 30px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #0d47a1;
+    padding-bottom: 10px;
+  }
+  h2 {
+    color: #1565c0;
+    font-size: 16pt;
+    margin-top: 25px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 6px;
+  }
+  h3 {
+    color: #283593;
+    font-size: 14pt;
+    margin-top: 18px;
+    margin-bottom: 8px;
+  }
+  p {
+    text-align: justify;
+    margin-bottom: 10px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 18px 0;
+    font-size: 11pt;
+  }
+  th, td {
+    border: 1px solid #777;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+    font-weight: bold;
+  }
+  tr:nth-child(even) {
+    background-color: #fafafa;
+  }
+  pre, code {
+    font-family: Consolas, 'Courier New', monospace;
+    background-color: #f5f5f5;
+  }
+  pre {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-left: 4px solid #1976d2;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 10.5pt;
+    line-height: 1.3;
+  }
+  code {
+    padding: 2px 5px;
+    border-radius: 3px;
+    color: #c2185b;
+  }
+  pre code {
+    color: #212121;
+    padding: 0;
+    background: none;
+  }
+  blockquote {
+    border-left: 4px solid #ff9800;
+    background-color: #fff8e1;
+    margin: 15px 0;
+    padding: 10px 18px;
+    border-radius: 0 4px 4px 0;
+  }
+  ul, ol {
+    margin-bottom: 12px;
+    padding-left: 25px;
+  }
+  li {
+    margin-bottom: 5px;
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid #ccc;
+    margin: 25px 0;
+  }
+</style>
+</head>
+<body>
+<h1>BÁO CÁO BÀI TẬP LỚN / ĐỒ ÁN KỸ THUẬT PHẦN MỀM</h1>
+<h1>ĐỀ TÀI: FLOW-CORTEX — NỀN TẢNG ĐIỀU PHỐI LUỒNG TẠO NỘI DUNG ĐA PHƯƠNG TIỆN ỨNG DỤNG AI (AI WORKFLOW ORCHESTRATION PLATFORM)</h1>
+<hr />
+<h2>MỤC LỤC TỔNG QUAN</h2>
+<ol>
+<li><a href="#1-thông-tin-chung-đề-tài--tóm-tắt">Thông tin chung đề tài &amp; Tóm tắt</a></li>
+<li><a href="#chương-1-đặt-vấn-đề-và-mục-tiêu-đề-tài">Chương 1: Đặt vấn đề và Mục tiêu đề tài</a></li>
+<li><a href="#chương-2-phân-tích-yêu-cầu-hệ-thống-srs--brs">Chương 2: Phân tích yêu cầu hệ thống (SRS &amp; BRS)</a></li>
+<li><a href="#chương-3-kiến-trúc-hệ-thống-và-thiết-kế-kỹ-thuật">Chương 3: Kiến trúc hệ thống và Thiết kế kỹ thuật</a></li>
+<li><a href="#chương-4-chi-tiết-triển-khai-tính-năng-cốt-lõi-core-implementation">Chương 4: Chi tiết triển khai tính năng cốt lõi (Core Implementation)</a></li>
+<li><a href="#chương-5-đảm-bảo-chất-lượng-kiểm-thử-và-cicd">Chương 5: Đảm bảo chất lượng, Kiểm thử và CI/CD</a></li>
+<li><a href="#chương-6-đánh-giá-thách-thức-kỹ-thuật--hướng-phát-triển">Chương 6: Đánh giá, Thách thức kỹ thuật &amp; Hướng phát triển</a></li>
+<li><a href="#phụ-lục-1-kịch-bản-demo-trực-tiếp-khi-bảo-vệ-live-demo-script">Phụ lục 1: Kịch bản Demo trực tiếp khi bảo vệ (Live Demo Script)</a></li>
+<li><a href="#phụ-lục-2-bộ-câu-hỏi--câu-trả-lời-vấn-đáp-bảo-vệ-qa-defense">Phụ lục 2: Bộ câu hỏi &amp; Câu trả lời vấn đáp bảo vệ (Q&amp;A Defense)</a></li>
+<li><a href="#phụ-lục-3-cấu-trúc-slide-thuyết-trình-presentation-deck-outline">Phụ lục 3: Cấu trúc Slide thuyết trình (Presentation Deck Outline)</a></li>
+</ol>
+<hr />
+<h2>1. THÔNG TIN CHUNG ĐỀ TÀI &amp; TÓM TẮT</h2>
+<ul>
+<li><strong>Tên đề tài:</strong> Hệ thống điều phối luồng sản xuất nội dung đa phương tiện ứng dụng Trí tuệ Nhân tạo (<strong>Flow-Cortex</strong>).</li>
+<li><strong>Loại hình:</strong> Bài tập lớn chuyên ngành Kỹ thuật Phần mềm / Đồ án Tốt nghiệp CNTT.</li>
+<li><strong>Mã nguồn dự án:</strong> <a href="https://github.com/BienTranNgoc/Flow-Cortex">Flow-Cortex GitHub Repository</a>.</li>
+<li><strong>Kiến trúc cốt lõi:</strong> Modular Monolith (Spring Modulith), Event-Driven Architecture (RabbitMQ Quorum Queues, Transactional Outbox), Multi-Worker Distributed Engine (Python AI &amp; Media Workers), Contract-First API &amp; Schema Governance, Dual Single-Page Applications (Member App &amp; Admin Console).</li>
+</ul>
+<h3>Tóm tắt nội dung (Executive Summary)</h3>
+<p><strong>Flow-Cortex</strong> giải quyết bài toán sản xuất nội dung đa phương tiện quy mô lớn bằng cách xâu chuỗi các tác vụ AI phân tán (LLM sinh kịch bản, Edge/OpenAI TTS sinh giọng đọc, Wan/Seedance/Veo sinh video từ ảnh) cùng công cụ xử lý media chuyên sâu (FFmpeg/FFprobe) vào một pipeline tự động và liền mạch. Điểm đột phá của hệ thống là tích hợp cơ chế <strong>Human-in-the-loop (Phê duyệt kịch bản qua cơ chế kiểm soát phiên bản Revision bất biến và Khóa lạc quan Optimistic Locking)</strong>, cho phép con người kiểm soát độ chính xác của thông tin trước khi kích hoạt các bước tính toán tốn kém phía sau.</p>
+<p>Hệ thống được thiết kế theo tiêu chuẩn công nghiệp cao cấp:<br />
+- <strong>Tính tin cậy và phân tán:</strong> Tách biệt hoàn toàn API điều phối và Worker xử lý tác vụ nặng; áp dụng 3 mốc kiểm soát thời gian của Temporal (<code>queue_timeout</code>, <code>lease_expired</code>, <code>run_timeout</code>), cơ chế hàng đợi Quorum Queue với Dead-lettering và Fencing token ngăn chặn duplicate/stale callback.<br />
+- <strong>Bảo mật:</strong> Media worker chạy hoàn toàn keyless và cách ly mạng nội bộ (không có Internet egress), ngăn chặn rủi ro SSRF và lộ dữ liệu.<br />
+- <strong>Tính toàn vẹn phần mềm:</strong> Contract-first với OpenAPI và JSON Schema được kiểm tra trôi lệch (drift check) tự động tại CI; Spring Modulith kiểm chứng ranh giới module tại tầng kiểm thử tĩnh.</p>
+<hr />
+<h2>2. CHƯƠNG 1: ĐẶT VẤN ĐỀ VÀ MỤC TIÊU ĐỀ TÀI</h2>
+<h3>1.1. Bối cảnh thực tế &amp; Điểm nghẽn nghiệp vụ (Pain Points)</h3>
+<p>Trong kỷ nguyên thương mại điện tử và video ngắn (TikTok, Reels, Shorts), nhu cầu tạo video quảng cáo sản phẩm và nội dung chuyển ngữ tăng vọt. Tuy nhiên, quy trình truyền thống gặp các vấn đề nghiêm trọng:<br />
+1. <strong>Phân mảnh công cụ (PAIN-01):</strong> Người sáng tạo nội dung phải copy-paste dữ liệu qua 4–6 công cụ rời rạc (ChatGPT viết kịch bản, CapCut/Canva cắt ghép, elevenlabs tạo voice, công cụ download). Tốn thời gian thao tác thủ công và dễ sai sót.<br />
+2. <strong>Lệch pha phiên bản (PAIN-02):</strong> Kịch bản sửa đổi nhưng audio voice-over hoặc hình ảnh không đồng bộ lại, dẫn đến phải render lại nhiều lần gây lãng phí chi phí API và hạ tầng.<br />
+3. <strong>Ảo tưởng AI và sai lệch thông tin sản phẩm (PAIN-04):</strong> Các mô hình AI sinh kịch bản thường tự ý "bịa" giá tiền, chương trình khuyến mãi hoặc công dụng vượt quá công bố của nhà bán hàng nếu không có cơ chế chặn lọc và kiểm duyệt trước khi sản xuất.<br />
+4. <strong>Tắc nghẽn hệ thống (PAIN-03):</strong> Các tác vụ xử lý media (render video, AI inference) tốn rất nhiều tài nguyên CPU/GPU và thời gian (vài chục giây đến vài phút). Nếu xử lý đồng bộ trong HTTP request sẽ gây nghẽn kết nối, sập server và trải nghiệm tồi tệ.</p>
+<h3>1.2. Mục tiêu nghiên cứu &amp; Sản phẩm bàn giao</h3>
+<ul>
+<li><strong>Xây dựng Nền tảng Điều phối (Orchestration Engine):</strong> Quản lý vòng đời thực thi workflow (WorkflowRun, RunStep) với trạng thái minh bạch (<code>pending</code> -&gt; <code>running</code> -&gt; <code>completed</code>/<code>error</code>), có khả năng khôi phục khi gặp sự cố mạng hoặc broker.</li>
+<li><strong>Hoàn thiện tính năng Sản xuất Video Quảng Cáo Sản phẩm (Product Video Pipeline):</strong></li>
+<li>Người dùng tải lên thông tin sản phẩm và 1–10 ảnh chất lượng cao.</li>
+<li>Tự động sinh kịch bản gồm Hook, Lợi ích và Kêu gọi hành động (CTA).</li>
+<li>Điểm dừng kiểm duyệt kịch bản (Human Checkpoint) cho phép chỉnh sửa, lưu phiên bản (Revision) và phê duyệt.</li>
+<li>Tự động chuyển đổi kịch bản thành giọng đọc chuẩn (TTS) và bảng phân cảnh trực quan (Storyboard).</li>
+<li>Tự động tạo clip AI (Image-to-Video) và ghép nối thành video dọc 9:16 chuẩn xuất bản.</li>
+<li><strong>Xây dựng Hệ thống Quản trị (Admin Console):</strong> Giám sát trạng thái hoạt động của toàn bộ hệ thống, theo dõi tiến độ các tác vụ ngầm, delivery limit, tài khoản người dùng và cảnh báo lỗi.</li>
+</ul>
+<hr />
+<h2>3. CHƯƠNG 2: PHÂN TÍCH YÊU CẦU HỆ THỐNG (SRS &amp; BRS)</h2>
+<p>Dựa trên tài liệu đặc tả <a href="file:///d:/Project/Flow-Cortex/docs/private_docs/AI_Workflow_Platform_SRS.docx">AI_Workflow_Platform_SRS.docx</a> và <a href="file:///d:/Project/Flow-Cortex/docs/private_docs/AI_Workflow_Platform_BRS.docx">AI_Workflow_Platform_BRS.docx</a>:</p>
+<h3>2.1. Tác nhân hệ thống (Actors)</h3>
+<ul>
+<li><strong>Guest / Unauthenticated User:</strong> Có thể đăng ký tài khoản, đăng nhập bằng Email/Password hoặc Google OAuth2.</li>
+<li><strong>Member (Người dùng thông thường):</strong></li>
+<li>Quản lý tài nguyên media cá nhân.</li>
+<li>Tạo run cho workflow Product Video; tải ảnh sản phẩm trực tiếp lên Object Store.</li>
+<li>Theo dõi tiến độ thời gian thực của từng bước trong workflow.</li>
+<li>Chỉnh sửa, lưu revision và phê duyệt kịch bản tại checkpoint.</li>
+<li>Xem trước (preview) và tải video thành phẩm về máy.</li>
+<li><strong>Admin (Quản trị viên hệ thống):</strong></li>
+<li>Quản lý người dùng (xem danh sách, chi tiết, khóa/mở khóa tài khoản).</li>
+<li>Giám sát toàn bộ các Workflow Runs trên toàn hệ thống.</li>
+<li>Kiểm tra chi tiết kỹ thuật của từng Media Job / Provider Job (attempt, delivery count, queue deadline, lease expiration, worker timeout markers).</li>
+<li>Kích hoạt cơ chế dừng khẩn cấp (Kill switches).</li>
+</ul>
+<h3>2.2. Yêu cầu chức năng (Functional Requirements - FR)</h3>
+<table>
+<thead>
+<tr>
+<th>Mã FR</th>
+<th>Tên yêu cầu</th>
+<th>Mô tả chi tiết</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FR-01</strong></td>
+<td>Xác thực &amp; Quản lý phiên</td>
+<td>Hỗ trợ đăng nhập kép (Local JWT &amp; Google OAuth2). Phiên làm việc quản lý qua Access Token ngắn hạn và Refresh Token trong DB; có cơ chế khóa tài khoản (lockout) khi nhập sai mật khẩu nhiều lần.</td>
+</tr>
+<tr>
+<td><strong>FR-02</strong></td>
+<td>Upload trực tiếp lên Object Storage</td>
+<td>Cấp presigned PUT URL để client upload trực tiếp ảnh (1–10 ảnh, JPG/PNG/WebP, tối đa 10MB/ảnh) lên bucket <code>flowcortex-uploads</code>. Backend kiểm tra xác thực owner, MIME, dung lượng trước khi gắn vào run.</td>
+</tr>
+<tr>
+<td><strong>FR-03</strong></td>
+<td>Điều phối Workflow Run</td>
+<td>Khởi tạo run với snapshot dữ liệu bất biến. Điều phối các bước thực thi tuần tự theo đồ thị có hướng (DAG); xử lý kết quả callback và cập nhật trạng thái bước.</td>
+</tr>
+<tr>
+<td><strong>FR-04</strong></td>
+<td>Sinh kịch bản quảng cáo AI</td>
+<td>Provider worker gọi mô hình ngôn ngữ lớn (OpenAI GPT / GitHub Models) để sinh kịch bản tiếng Việt có cấu trúc (Hook, Body, CTA) theo prompt chuẩn kỹ thuật.</td>
+</tr>
+<tr>
+<td><strong>FR-05</strong></td>
+<td>Human Checkpoint &amp; Quản lý Revision</td>
+<td>Dừng workflow tại bước kiểm duyệt kịch bản. Cho phép người dùng sửa đổi văn bản, lưu thành các phiên bản bất biến (<code>script_revision</code>), duyệt kịch bản với kiểm tra khóa lạc quan (Optimistic Concurrency Control).</td>
+</tr>
+<tr>
+<td><strong>FR-06</strong></td>
+<td>Sinh visual storyboard</td>
+<td>Từ kịch bản đã duyệt, sinh 2 prompt hình ảnh chuyên biệt (<code>scene1Prompt</code>, <code>scene2Prompt</code>) định hướng cho việc tạo video clip tương ứng.</td>
+</tr>
+<tr>
+<td><strong>FR-07</strong></td>
+<td>Tổng hợp giọng đọc (TTS)</td>
+<td>Gọi Edge TTS / OpenAI Speech chuyển kịch bản đã duyệt thành audio; chuẩn hóa sang định dạng <code>speech.wav</code> (PCM mono 24 kHz) kèm file metadata <code>manifest.json</code>.</td>
+</tr>
+<tr>
+<td><strong>FR-08</strong></td>
+<td>Tạo video clip AI (Image-to-Video)</td>
+<td>Gửi prompt phân cảnh và ảnh sản phẩm tham chiếu (Reference Image) đến các mô hình tạo video (Wan / Seedance / Veo) để sinh 2 clip dọc 5 giây.</td>
+</tr>
+<tr>
+<td><strong>FR-09</strong></td>
+<td>Dựng &amp; Xuất Video (Media Rendering)</td>
+<td>Media worker sử dụng FFmpeg ghép 2 clip video cùng audio giọng đọc thành file video MP4 dọc chuẩn 9:16, kiểm tra tính toàn vẹn bằng FFprobe trước khi xuất bản.</td>
+</tr>
+<tr>
+<td><strong>FR-10</strong></td>
+<td>Giám sát &amp; Quản trị hệ thống</td>
+<td>Bảng điều khiển riêng biệt cho Admin hiển thị thống kê hệ thống, danh sách Runs/Jobs, lỗi hạ tầng (<code>queue_timeout</code>, <code>lease_expired</code>, <code>run_timeout</code>), và danh sách người dùng.</td>
+</tr>
+</tbody>
+</table>
+<h3>2.3. Yêu cầu phi chức năng (Non-Functional Requirements - NFR)</h3>
+<ul>
+<li><strong>NFR-01 (Độ tin cậy &amp; Xử lý sự cố):</strong> Áp dụng mô hình Transactional Outbox (Spring Modulith Event Publication Registry) đảm bảo không bao giờ mất thông điệp gửi broker ngay cả khi database commit xong nhưng broker gặp sự cố.</li>
+<li><strong>NFR-02 (Xử lý thông điệp Exactly-Once tại tầng ứng dụng):</strong> Sử dụng Fencing token (<code>attempt</code>) và CAS (<code>UPDATE ... WHERE status = 'running' AND attempt = :attempt</code>) để loại bỏ hoàn toàn các kết quả trùng lặp (duplicate) hoặc kết quả đến muộn (late delivery) do cơ chế At-least-once của RabbitMQ.</li>
+<li><strong>NFR-03 (Bảo mật &amp; Phân quyền):</strong></li>
+<li>Cơ chế cô lập đa người dùng (Multi-tenant Owner Isolation): Mọi dữ liệu (Asset, Run, Review, Video) đều được phân quyền nghiêm ngặt theo <code>owner_id</code>. Người dùng không thể truy cập tài nguyên của người khác (trả về 404).</li>
+<li>Media Worker không giữ khóa bí mật API (Keyless) và không có quyền truy cập Internet ra ngoài (chỉ nối mạng nội bộ Docker).</li>
+<li>Chuẩn hóa thông báo lỗi theo chuẩn RFC 9457 <code>ProblemDetail</code>, không bao giờ làm lộ đường dẫn nội bộ, bucket name hay stack trace.</li>
+<li><strong>NFR-04 (Tính toàn vẹn kiến trúc &amp; Không trôi lệch Contract):</strong></li>
+<li>Quản lý Database Schema bằng Flyway migrations, Hibernate chỉ ở chế độ <code>validate</code>.</li>
+<li>Toàn bộ API Client và Worker Data Model được sinh tự động từ file OpenAPI Snapshot và JSON Schemas; CI sẽ tự động đánh trượt nếu phát hiện sự trôi lệch chưa được commit.</li>
+</ul>
+<hr />
+<h2>4. CHƯƠNG 3: KIẾN TRÚC HỆ THỐNG VÀ THIẾT KẾ KỸ THUẬT</h2>
+<h3>3.1. Sơ đồ Kiến trúc Tổng thể (High-Level Architecture)</h3>
+<pre><code class="language-mermaid">flowchart TD
+    subgraph Clients[&quot;TẦNG GIAO DIỆN (FRONTEND APPS)&quot;]
+        MemberApp[&quot;Member SPA (Port 5173)&lt;br/&gt;React 19 + TypeScript + Vite&lt;br/&gt;Tạo video, Upload ảnh, Review kịch bản&quot;]
+        AdminApp[&quot;Admin Console (Port 5174)&lt;br/&gt;React 19 + TypeScript + Vite&lt;br/&gt;Quản trị Users, Runs, Jobs, Logs&quot;]
+        SharedPkg[&quot;Packages dùng chung&lt;br/&gt;@flow-cortex/api-client (Orval generated)&lt;br/&gt;@flow-cortex/ui-kit&quot;]
+        MemberApp -.-&gt; SharedPkg
+        AdminApp -.-&gt; SharedPkg
+    end
+
+    subgraph API_Gateway[&quot;TẦNG ĐIỀU PHỐI (BACKEND MODULAR MONOLITH)&quot;]
+        BackendApp[&quot;Spring Boot 4.1 / Java 25 (:boot:app)&quot;]
+        ModUser[&quot;:modules:user&lt;br/&gt;Auth, JWT, OAuth2, RBAC&quot;]
+        ModWorkflow[&quot;:modules:workflow&lt;br/&gt;Engine, State Machine, ReviewTask, DAG&quot;]
+        ModMedia[&quot;:modules:media&lt;br/&gt;Asset Registry, S3 Presigned, Broker Outbox&quot;]
+        SharedWeb[&quot;:shared:web &amp; :shared:security&lt;br/&gt;RFC 9457 ProblemDetail, Security Chains&quot;]
+
+        BackendApp --&gt; ModUser
+        BackendApp --&gt; ModWorkflow
+        BackendApp --&gt; ModMedia
+        ModWorkflow --&gt; ModMedia
+        ModWorkflow -.-&gt; SharedWeb
+        ModMedia -.-&gt; SharedWeb
+    end
+
+    subgraph Storage[&quot;TẦNG LƯU TRỮ VÀ HÀNG ĐỢI&quot;]
+        Postgres[(&quot;PostgreSQL 17&lt;br/&gt;Flyway Migrations&lt;br/&gt;Hibernate Validate&quot;)]
+        RabbitMQ[[&quot;RabbitMQ 4.3 Quorum Queues&lt;br/&gt;media.jobs / media.results&lt;br/&gt;provider.jobs / provider.results&lt;br/&gt;media.dlx / media.unrouted&quot;]]
+        MinIO[(&quot;S3 Object Store (Silo / MinIO)&lt;br/&gt;flowcortex-uploads&lt;br/&gt;flowcortex-media&quot;)]
+    end
+
+    subgraph Workers[&quot;TẦNG XỬ LÝ PHÂN TÁN (WORKERS)&quot;]
+        ProviderWorker[&quot;Provider Worker (Python 3.12)&lt;br/&gt;Egress Internet Enabled&lt;br/&gt;OpenAI GPT, Edge TTS, Wan/Seedance/Veo&quot;]
+        MediaWorker[&quot;Media Worker (Python 3.12)&lt;br/&gt;Keyless, Mạng nội bộ Internal&lt;br/&gt;FFmpeg &amp; FFprobe Engine&quot;]
+    end
+
+    Clients --&gt;|HTTPS REST API| BackendApp
+    Clients --&gt;|Direct Presigned PUT/GET| MinIO
+
+    BackendApp --&gt;|JDBC / Outbox| Postgres
+    BackendApp --&gt;|AMQP Outbox &amp; Listeners| RabbitMQ
+    BackendApp --&gt;|S3 Admin / Presign| MinIO
+
+    RabbitMQ --&gt;|Consume provider.jobs| ProviderWorker
+    ProviderWorker --&gt;|Publish provider.results| RabbitMQ
+    ProviderWorker --&gt;|Read input / Write audio &amp; video| MinIO
+    ProviderWorker --&gt;|Call External APIs| ExtAI[&quot;External AI Providers&lt;br/&gt;OpenAI / Replicate / Alibaba / Google&quot;]
+
+    RabbitMQ --&gt;|Consume media.jobs| MediaWorker
+    MediaWorker --&gt;|Publish media.results| RabbitMQ
+    MediaWorker --&gt;|Read clips &amp; audio / Write final MP4| MinIO
+</code></pre>
+<h3>3.2. Thiết kế Cơ sở dữ liệu (Database Schema &amp; ERD)</h3>
+<p>Schema được quản lý nghiêm ngặt qua tập file Flyway migration (<code>backend/boot/app/src/main/resources/db/migration/</code>). </p>
+<pre><code class="language-mermaid">erDiagram
+  app_user ||--o{ workflow : &quot;owner_id&quot;
+  app_user ||--o{ workflow_run : &quot;owner_id&quot;
+  workflow ||--|{ workflow_step : &quot;workflow_id&quot;
+  workflow ||--o{ workflow_run : &quot;workflow_id&quot;
+  workflow_run ||--|{ run_step : &quot;run_id&quot;
+  workflow_run ||--o{ media_asset_binding : &quot;run_id&quot;
+  workflow_run ||--o| product_video_input : &quot;run_id&quot;
+  workflow_run ||--o{ review_task : &quot;run_id&quot;
+  run_step ||--o| review_task : &quot;run_step_id (UNIQUE)&quot;
+  review_task ||--o{ script_revision : &quot;review_task_id&quot;
+  media_asset ||--o{ media_asset_binding : &quot;asset_id&quot;
+
+  app_user {
+    uuid id PK
+    uuid owner_id
+    varchar email UK
+    varchar password_hash
+    varchar name
+    varchar role &quot;ADMIN | MEMBER&quot;
+    varchar status &quot;ACTIVE | SUSPENDED&quot;
+    timestamptz created_at
+  }
+
+  workflow_run {
+    uuid id PK
+    uuid workflow_id FK
+    uuid owner_id
+    varchar status &quot;running | completed | error&quot;
+    text input
+    text error_message
+    timestamptz started_at
+    timestamptz finished_at
+    timestamptz last_swept_at
+  }
+
+  run_step {
+    uuid id PK
+    uuid run_id FK
+    smallint step_order
+    varchar type
+    varchar status &quot;pending | running | completed | error&quot;
+    text input
+    text output
+    timestamptz queue_deadline
+    timestamptz picked_up_at
+    timestamptz lease_until
+    timestamptz run_deadline
+    smallint attempt
+    smallint delivery_count
+    varchar error_code
+    jsonb outputs
+  }
+
+  media_asset {
+    uuid id PK
+    uuid owner_id
+    varchar kind &quot;image | audio | video | binary&quot;
+    varchar bucket
+    varchar object_key UK
+    varchar mime_type
+    bigint bytes
+    varchar status &quot;ready&quot;
+    timestamptz created_at
+  }
+
+  review_task {
+    uuid id PK
+    uuid run_id FK
+    uuid run_step_id FK
+    varchar status &quot;pending | approved | rejected&quot;
+    text original_payload
+    uuid current_revision_id FK
+    uuid approved_revision_id FK
+    bigint version &quot;JPA @Version&quot;
+  }
+
+  script_revision {
+    uuid id PK
+    uuid review_task_id FK
+    integer revision_number
+    text content
+    timestamptz created_at
+  }
+
+  product_video_input {
+    uuid run_id PK
+    varchar product_name
+    varchar description
+    varchar cta
+    varchar price
+    varchar promotion
+    varchar aspect_ratio &quot;9:16&quot;
+  }
+</code></pre>
+<blockquote>
+<p>[!NOTE]<br />
+<strong>Điểm sáng kiến trúc:</strong> Cột <code>owner_id</code> ở các bảng <code>workflow</code>, <code>workflow_run</code>, <code>media_asset</code> không gắn Foreign Key vật lý tới <code>app_user</code>. Điều này đảm bảo ranh giới <strong>Spring Modulith</strong> độc lập giữa module <code>:modules:user</code> và <code>:modules:workflow</code>, giúp tách microservices sau này mà không vướng rằng buộc tầng DB (ADR-0003 &amp; ADR-0004).</p>
+</blockquote>
+<h3>3.3. Cơ chế Chịu lỗi phân tán (Temporal-Inspired Reliability Model)</h3>
+<p>Hệ thống áp dụng 3 mốc thời gian để chống treo tác vụ:<br />
+1. <strong><code>queue_deadline</code>:</strong> Giới hạn thời gian tối đa thông điệp được nằm trên hàng đợi trước khi có worker nhận. Vượt quá mốc này -&gt; Lỗi <code>queue_timeout</code>.<br />
+2. <strong><code>lease_until</code> (Heartbeat Lease):</strong> Sau khi worker nhận tác vụ, worker phải định kỳ gửi heartbeat kéo dài lease. Nếu worker chết đột ngột -&gt; Hết hạn lease -&gt; Lỗi <code>lease_expired</code>.<br />
+3. <strong><code>run_deadline</code>:</strong> Giới hạn tổng thời gian thực thi tối đa cho một tác vụ nặng. Vượt quá mốc này -&gt; Lỗi <code>run_timeout</code>.<br />
+4. <strong>Backend Lease Reaper (<code>LeaseReaper.java</code>):</strong> Background task định kỳ quét các step bị treo để chuyển trạng thái sang lỗi và giải phóng tài nguyên.</p>
+<hr />
+<h2>5. CHƯƠNG 4: CHI TIẾT TRIỂN KHAI TÍNH NĂNG CỐT LÕI (CORE IMPLEMENTATION)</h2>
+<h3>5.1. Pipeline 7 bước tạo Video Quảng Cáo Sản phẩm (Product Video Pipeline)</h3>
+<p>Quy trình thực thi thực tế trong database (<a href="file:///d:/Project/Flow-Cortex/backend/boot/app/src/main/resources/db/migration/V2026.10.17.002__product_video_visual_storyboard.sql">V2026.10.17.002__product_video_visual_storyboard.sql</a>):</p>
+<pre><code class="language-mermaid">sequenceDiagram
+    autonumber
+    actor User as Người dùng (Frontend)
+    participant API as Backend (Workflow Engine)
+    participant S3 as Object Storage (MinIO)
+    participant MQ as RabbitMQ Broker
+    participant PW as Provider Worker (AI)
+    participant MW as Media Worker (FFmpeg)
+
+    User-&gt;&gt;S3: Upload 1-10 ảnh qua Presigned PUT URL
+    User-&gt;&gt;API: POST /api/v1/product-videos/runs (Thông tin SP + Upload IDs)
+    API-&gt;&gt;API: Xác thực ảnh, tạo Snapshot và RunSteps
+
+    rect rgb(238, 242, 255)
+    Note over API,PW: BƯỚC 1: Sinh kịch bản (generate_script)
+    API-&gt;&gt;MQ: Enqueue ProviderJob (OpenAI / GitHub Models)
+    MQ-&gt;&gt;PW: Xử lý prompt sinh Hook, Benefits, CTA
+    PW-&gt;&gt;MQ: Trả kết quả kịch bản
+    MQ-&gt;&gt;API: Cập nhật RunStep hoàn thành
+    end
+
+    rect rgb(254, 243, 199)
+    Note over User,API: BƯỚC 2: Checkpoint phê duyệt (APPROVAL_CHECKPOINT)
+    API-&gt;&gt;API: Dừng workflow, tạo ReviewTask (Status: pending)
+    User-&gt;&gt;API: Xem kịch bản, chỉnh sửa văn bản -&gt; Tạo Script Revision mới
+    User-&gt;&gt;API: Phê duyệt (Approve) với revisionId + version hiện tại
+    API-&gt;&gt;API: Kiểm tra Optimistic Lock (@Version) thành công -&gt; Tiếp tục run
+    end
+
+    rect rgb(238, 242, 255)
+    Note over API,PW: BƯỚC 3: Sinh Visual Storyboard (generate_storyboard)
+    API-&gt;&gt;MQ: Enqueue ProviderJob từ bản kịch bản đã duyệt
+    PW-&gt;&gt;MQ: Trả về scene1Prompt &amp; scene2Prompt trực quan
+    end
+
+    rect rgb(238, 242, 255)
+    Note over API,PW: BƯỚC 4: Tạo giọng đọc (generate_speech)
+    API-&gt;&gt;MQ: Enqueue ProviderJob gọi Edge TTS
+    PW-&gt;&gt;S3: Lưu speech.wav (PCM mono 24kHz) + manifest.json
+    PW-&gt;&gt;MQ: Trả về kết quả Audio Asset
+    end
+
+    rect rgb(236, 253, 245)
+    Note over API,PW: BƯỚC 5 &amp; 6: Tạo 2 Clip AI 5 giây (generate_video)
+    API-&gt;&gt;MQ: Enqueue Clip 1 (scene1Prompt + Ảnh sản phẩm tham chiếu)
+    API-&gt;&gt;MQ: Enqueue Clip 2 (scene2Prompt + Ảnh sản phẩm tham chiếu)
+    PW-&gt;&gt;PW: Gọi Wan / Seedance / Veo (Image-to-Video)
+    PW-&gt;&gt;S3: Lưu clip1.mp4 và clip2.mp4
+    PW-&gt;&gt;MQ: Báo hoàn thành 2 clip
+    end
+
+    rect rgb(254, 242, 242)
+    Note over API,MW: BƯỚC 7: Dựng &amp; Xuất Video hoàn chỉnh (render_video)
+    API-&gt;&gt;MQ: Enqueue MediaJob với 3 input: speech.wav, clip1.mp4, clip2.mp4
+    MQ-&gt;&gt;MW: Tải các asset từ S3
+    MW-&gt;&gt;MW: Dùng FFmpeg ghép 2 clip + lồng tiếng -&gt; Video dọc 9:16 ~10 giây
+    MW-&gt;&gt;MW: Dùng FFprobe kiểm tra luồng video/audio hợp lệ
+    MW-&gt;&gt;S3: Lưu file video hoàn chỉnh vào bucket flowcortex-media
+    MW-&gt;&gt;MQ: Trả kết quả thành công
+    API-&gt;&gt;API: Đánh dấu WorkflowRun = completed
+    end
+
+    User-&gt;&gt;API: Yêu cầu tải video thành phẩm
+    API-&gt;&gt;User: Cấp Presigned Download URL có giới hạn thời gian
+</code></pre>
+<h3>5.2. Giải thuật Chống Xung đột Phê duyệt (Optimistic Concurrency &amp; Immutable Revision)</h3>
+<ul>
+<li><strong>Vấn đề thực tế:</strong> Khi người dùng mở 2 tab trình duyệt hoặc có 2 người cùng xem một kịch bản, nếu người thứ nhất sửa và duyệt, người thứ hai ở tab cũ nhấn duyệt sẽ vô tình ghi đè nội dung lỗi thời lên hệ thống.</li>
+<li><strong>Giải pháp triển khai trong Flow-Cortex:</strong></li>
+<li>Bảng <code>script_revision</code> được thiết kế theo cơ chế <strong>Append-only</strong> (chỉ thêm mới, không sửa đè), mang tính bất biến. Mỗi lần người dùng gõ sửa và lưu sẽ tạo một dòng mới với số hiệu tăng dần (<code>revision_number</code>).</li>
+<li>Thực thể <code>ReviewTask</code> sở hữu trường <code>@Version</code> (JPA Optimistic Locking) và con trỏ <code>current_revision_id</code>, <code>approved_revision_id</code>.</li>
+<li>Khi gửi yêu cầu duyệt, Client bắt buộc phải truyền cả <code>revisionId</code> muốn duyệt và <code>expectedVersion</code> của task.</li>
+<li>Nếu số version trong DB đã bị thay đổi do thao tác trước đó, hệ thống lập tức chặn lại và trả về lỗi <strong>HTTP 409 Conflict</strong>. Workflow chỉ tiếp tục với đúng phiên bản được xác nhận hợp lệ.</li>
+</ul>
+<h3>5.3. Kiến trúc Quản trị (Admin Console Architecture)</h3>
+<p>Ứng dụng Admin được xây dựng thành một Single Page Application độc lập trên cổng 5174:<br />
+- <strong>Ma trận quyền hạn phân tầng (<code>can(role, action)</code>):</strong> Route Guard và Sidebar kiểm soát hiển thị theo quyền người dùng.<br />
+- <strong>Giám sát thời gian thực:</strong> Quản trị viên có thể theo dõi danh sách tất cả các Runs, từng bước nhỏ (Step Order), thời gian bắt đầu, số lần thử lại (<code>delivery_count</code>), và thời điểm hết hạn hợp đồng lease (<code>lease_until</code>).</p>
+<hr />
+<h2>6. CHƯƠNG 5: ĐẢM BẢO CHẤT LƯỢNG, KIỂM THỬ VÀ CI/CD</h2>
+<h3>6.1. Chiến lược Kiểm thử Đa tầng (Testing Pyramid)</h3>
+<p>Dự án áp dụng kiểm thử nghiêm ngặt tại mọi tầng mã nguồn:</p>
+<table>
+<thead>
+<tr>
+<th>Phân vùng</th>
+<th>Công cụ &amp; Thư viện</th>
+<th>Số lượng Test &amp; Phạm vi</th>
+<th>Kết quả đạt được</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Backend Modularity</strong></td>
+<td>Spring Modulith Core</td>
+<td><code>ModularityTests.java</code> xác thực ranh giới module tĩnh</td>
+<td><strong>100% Passed</strong> — Không có circular dependency hoặc vi phạm export package</td>
+</tr>
+<tr>
+<td><strong>Backend Business Logic</strong></td>
+<td>JUnit 5, Mockito, AssertJ</td>
+<td>172 tests (<code>:modules:workflow</code>) + 110 tests (<code>:modules:media</code>)</td>
+<td><strong>282/282 tests Passed</strong></td>
+</tr>
+<tr>
+<td><strong>Backend Integration</strong></td>
+<td>Spring Boot Test, Testcontainers Postgres &amp; RabbitMQ</td>
+<td>Round-trip tests, Auth lifecycle, Fencing token, DLQ, Outbox</td>
+<td><strong>Passed</strong></td>
+</tr>
+<tr>
+<td><strong>Worker Python</strong></td>
+<td>Pytest, Ruff, Mypy</td>
+<td>37+ tests (<code>test_video_adapters.py</code>, capabilities, fake S3/AMQP)</td>
+<td><strong>Passed</strong>, Ruff lint sạch, Mypy type-safe</td>
+</tr>
+<tr>
+<td><strong>Frontend SPAs</strong></td>
+<td>Vitest, React Testing Library, ESLint</td>
+<td>116+ component tests (ProductVideoStartForm, ApprovalPanel, v.v.)</td>
+<td><strong>116/116 Passed</strong>, TypeScript check 100% sạch</td>
+</tr>
+</tbody>
+</table>
+<h3>6.2. Pipeline Tự động hóa CI/CD (GitHub Actions)</h3>
+<p>Tệp cấu hình <a href="file:///d:/Project/Flow-Cortex/.github/workflows/ci.yml">.github/workflows/ci.yml</a> thiết lập cổng kiểm soát chất lượng (Quality Gate):<br />
+- <strong>Contract Drift Gate:</strong> Chạy lệnh build backend để sinh lại <code>docs/openapi.yaml</code>, sau đó chạy Orval để sinh lại code TypeScript trong <code>packages/api-client</code>. Nếu xuất hiện bất kỳ khác biệt nào so với git commit (<code>git diff --exit-code</code>), CI sẽ đánh trượt ngay lập tức.<br />
+- <strong>Compose Smoke Gate:</strong> Khởi chạy toàn bộ hệ thống bằng Docker Compose trên runner ảo và chạy script kiểm tra tính sẵn sàng <code>smoke-probe.sh</code>.</p>
+<hr />
+<h2>7. CHƯƠNG 6: ĐÁNH GIÁ, THÁCH THỨC KỸ THUẬT &amp; HƯỚNG PHÁT TRIỂN</h2>
+<h3>7.1. Đánh giá Kết quả Đạt được</h3>
+<ol>
+<li><strong>Hoàn thành trọn vẹn luồng nghiệp vụ MVP:</strong> Người dùng có thể tạo một video quảng cáo sản phẩm hoàn chỉnh từ thông tin và ảnh tải lên, can thiệp duyệt kịch bản và tải video thành phẩm.</li>
+<li><strong>Kiến trúc bền bỉ chuẩn công nghiệp:</strong> Triển khai thành công các mẫu thiết kế cao cấp: Modular Monolith, Transactional Outbox, Quorum Queues, Dead Lettering, Idempotent Consumer, Optimistic Concurrency Control.</li>
+<li><strong>Tiêu chuẩn mã nguồn khắt khe:</strong> Tuân thủ Conventional Commits, bảo vệ nhánh <code>main</code>, 0% lỗi trôi lệch API/Client, chia tách container an toàn theo nguyên tắc bảo mật đặc quyền tối thiểu (Least Privilege).</li>
+</ol>
+<h3>7.2. Thách thức Kỹ thuật và Giải pháp đã thực hiện</h3>
+<ul>
+<li><strong>Thách thức 1 (Lệch kiểu dữ liệu giữa Java và Python qua Message Broker):</strong></li>
+<li><em>Giải pháp:</em> Đưa toàn bộ định dạng gói tin thành các file chuẩn <code>contracts/*.schema.json</code>. Cả Java và Python đều sinh code và validate dữ liệu dựa trên nguồn sự thật duy nhất này.</li>
+<li><strong>Thách thức 2 (Hiện tượng Worker trả kết quả muộn sau khi Step đã bị hủy hoặc timeout):</strong></li>
+<li><em>Giải pháp:</em> Sử dụng cơ chế Compare-And-Swap (CAS) kết hợp với Fencing token <code>attempt</code>. Nếu kết quả gửi về mang attempt cũ hoặc trạng thái bước không còn là <code>running</code>, kết quả sẽ bị hủy bỏ an toàn mà không làm hỏng dữ liệu mới.</li>
+<li><strong>Thách thức 3 (Xử lý âm thanh giọng đọc chuẩn khớp video):</strong></li>
+<li><em>Giải pháp:</em> Dùng FFmpeg chuẩn hóa toàn bộ file âm thanh từ Edge TTS về chuẩn <code>WAV PCM mono 24 kHz</code> thống nhất, giúp quá trình render video không bị lệch pha tiếng (audio desync).</li>
+</ul>
+<h3>7.3. Hướng phát triển trong tương lai</h3>
+<ul>
+<li><strong>Triển khai Pipeline Dịch Video Douyin:</strong> Bổ sung các bước tách vocal (Demucs), nhận dạng tiếng Trung (Whisper STT), dịch thuật và lồng tiếng Việt khớp khẩu hình.</li>
+<li><strong>Nâng cao chất lượng Video Quảng cáo:</strong> Bổ sung tính năng nhận diện sản phẩm trong ảnh để truyền trực tiếp vào mô hình Image-to-Video với độ ổn định nhận diện cao hơn; tự động tạo phụ đề chạy chữ (Animated Subtitles) và chèn nhạc nền bản quyền.</li>
+<li><strong>Triển khai Đám mây (Cloud Deployment):</strong> Đóng gói Helm Chart và Terraform để đưa hệ thống lên hạ tầng đám mây (Kubernetes / Oracle Cloud A1 / AWS).</li>
+</ul>
+<hr />
+<h2>PHỤ LỤC 1: KỊCH BẢN DEMO TRỰC TIẾP KHI BẢO VỆ (LIVE DEMO SCRIPT)</h2>
+<table>
+<thead>
+<tr>
+<th>Bước</th>
+<th>Thao tác trên màn hình</th>
+<th>Diễn giải thuyết minh cho Hội đồng</th>
+<th>Bằng chứng kỹ thuật dưới nền</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1. Khởi động</strong></td>
+<td>Mở trình duyệt tại <code>http://localhost:5173</code> (Member) và <code>http://localhost:5174</code> (Admin).</td>
+<td>"Kính thưa Hội đồng, hệ thống gồm 2 phân hệ độc lập: Ứng dụng thành viên để tạo nội dung và Bảng điều khiển quản trị để giám sát vận hành."</td>
+<td>2 SPA chạy trên 2 cổng độc lập; xác thực JWT và RBAC bảo vệ.</td>
+</tr>
+<tr>
+<td><strong>2. Nhập liệu &amp; Upload</strong></td>
+<td>Chọn workflow <strong>Tạo video quảng cáo sản phẩm</strong>, nhập: Tên sản phẩm, Mô tả, CTA. Kéo thả 3 ảnh sản phẩm. Nhấn <strong>Bắt đầu tạo video</strong>.</td>
+<td>"Hệ thống hỗ trợ tải từ 1 đến 10 ảnh. File ảnh được upload trực tiếp từ client lên S3 qua Presigned PUT URL có giới hạn thời gian, giảm tải hoàn toàn cho backend."</td>
+<td>Network tab hiển thị PUT tới S3; API nhận <code>uploadIds</code> và tạo snapshot vào bảng <code>product_video_input</code>.</td>
+</tr>
+<tr>
+<td><strong>3. Sinh kịch bản &amp; Checkpoint</strong></td>
+<td>Hệ thống hiển thị Step 1 <code>generate_product_script</code> chạy và hoàn thành. Chuyển sang Step 2 <code>APPROVAL_CHECKPOINT</code> với nhãn <code>Chờ phê duyệt</code>.</td>
+<td>"Backend đã dispatch tác vụ sang RabbitMQ, Provider Worker gọi OpenAI sinh kịch bản gồm Hook, Lợi ích và CTA. Hệ thống dừng lại tại điểm kiểm duyệt để con người can thiệp."</td>
+<td>Bảng <code>run_step</code> ghi nhận trạng thái; <code>review_task</code> chuyển sang <code>pending</code>.</td>
+</tr>
+<tr>
+<td><strong>4. Chỉnh sửa &amp; Kiểm tra khóa lạc quan</strong></td>
+<td>Người dùng sửa lại một câu trong Hook. Nhấn <strong>Lưu bản nháp</strong>. Mở thêm 1 tab nữa, thử nhấn Duyệt ở tab cũ.</td>
+<td>"Hệ thống áp dụng cơ chế Revision Append-only và Khóa lạc quan. Mọi chỉnh sửa đều tạo phiên bản mới. Nếu duyệt trên một tab cũ, hệ thống phát hiện xung đột và trả về lỗi 409."</td>
+<td>Bảng <code>script_revision</code> ghi nhận dòng mới; JPA <code>@Version</code> ngăn chặn xung đột dữ liệu.</td>
+</tr>
+<tr>
+<td><strong>5. Phê duyệt &amp; Chạy tự động</strong></td>
+<td>Nhấn <strong>Phê duyệt kịch bản</strong>. Xem timeline tự động chuyển động qua các bước: Sinh Storyboard -&gt; Sinh giọng đọc TTS -&gt; Sinh 2 clip AI -&gt; Render video.</td>
+<td>"Sau khi kịch bản được duyệt, quy trình tự động xâu chuỗi: sinh visual prompts, gọi Edge TTS tạo file WAV mono 24kHz, gọi mô hình video tạo 2 clip 5s, và Media Worker dùng FFmpeg ghép thành video dọc 9:16."</td>
+<td>Hàng đợi RabbitMQ điều phối nhịp nhàng giữa Media Worker và Provider Worker.</td>
+</tr>
+<tr>
+<td><strong>6. Xem kết quả &amp; Tải về</strong></td>
+<td>Màn hình hiển thị Video Player dọc 9:16. Nhấn Play để nghe giọng đọc và xem chuyển cảnh. Nhấn nút <strong>Tải video</strong>.</td>
+<td>"Video thành phẩm đạt chuẩn 9:16, âm thanh khớp khung hình. Đường dẫn tải về là Presigned GET URL ngắn hạn, chỉ cấp cho đúng chủ sở hữu của run."</td>
+<td>Kiểm tra owner-scoped trên backend; FFprobe xác nhận video đạt chuẩn codec H.264 / AAC.</td>
+</tr>
+<tr>
+<td><strong>7. Bảng điều khiển Admin</strong></td>
+<td>Chuyển sang màn hình Admin <code>localhost:5174</code>. Mở trang <strong>Workflow Runs</strong> và <strong>Media Jobs</strong>.</td>
+<td>"Trang Admin giúp kỹ sư vận hành giám sát thời gian thực mọi tác vụ: số lần retry, mốc timeout của Temporal và trạng thái các worker."</td>
+<td>Danh sách runs hiển thị đầy đủ chi tiết attempt, delivery count và audit log.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>PHỤ LỤC 2: BỘ CÂU HỎI &amp; CÂU TRẢ LỜI VẤN ĐÁP BẢO VỆ (Q&amp;A DEFENSE)</h2>
+<h3>Câu hỏi 1: Tại sao em lại chọn kiến trúc Modular Monolith thay vì Microservices ngay từ đầu?</h3>
+<blockquote>
+<p><strong>Trả lời:</strong><br />
+"Dạ thưa Thầy/Cô, việc chọn Modular Monolith bằng Spring Modulith xuất phát từ nguyên lý thực tế của kỹ thuật phần mềm (ADR-0003). Một dự án ở giai đoạn khởi đầu nếu chia nhỏ thành nhiều microservices ngay sẽ chịu chi phí vận hành rất lớn (network latency, distributed transaction, khó debug và triển khai phức tạp).<br />
+Modular Monolith cho phép em chia tách rõ ràng các ranh giới nghiệp vụ (Bounded Contexts) giữa <code>user</code>, <code>workflow</code> và <code>media</code>. Các module chỉ được giao tiếp qua package <code>api</code> được chỉ định và được kiểm tra tự động bằng <code>ModularityTests</code>. Khi lưu lượng tăng cao và cần mở rộng, việc bóc tách bất kỳ module nào thành một microservice độc lập sẽ diễn ra rất dễ dàng và an toàn vì mã nguồn đã được đóng gói chuẩn từ đầu."</p>
+</blockquote>
+<h3>Câu hỏi 2: Làm sao hệ thống đảm bảo một thông điệp không bị xử lý trùng lặp khi RabbitMQ có cơ chế At-least-once Delivery?</h3>
+<blockquote>
+<p><strong>Trả lời:</strong><br />
+"Dạ thưa Thầy/Cô, RabbitMQ cam kết gửi thông điệp ít nhất một lần (At-least-once), nghĩa là khi mạng chập chờn hoặc worker ack trễ, thông điệp có thể được gửi lại lần 2. Để đảm bảo tính Idempotency, hệ thống của em áp dụng 2 tầng phòng vệ:<br />
+1. <strong>Fencing Token (<code>attempt</code>):</strong> Mỗi lần một step được giao việc, backend gán một số hiệu attempt duy nhất.<br />
+2. <strong>Kiểm tra trạng thái nguyên tử (Atomic CAS):</strong> Khi worker gửi kết quả về qua RabbitMQ listener, backend thực hiện câu lệnh cập nhật có điều kiện: <code>UPDATE run_step SET status = 'completed', ... WHERE id = :id AND status = 'running' AND attempt = :attempt</code>.<br />
+Nếu đây là kết quả gửi lại (duplicate) hoặc kết quả của một attempt cũ đã bị timeout, câu lệnh UPDATE sẽ tác động vào 0 dòng, kết quả sẽ bị hủy bỏ an toàn mà không làm biến đổi dữ liệu của hệ thống."</p>
+</blockquote>
+<h3>Câu hỏi 3: Cơ chế chống mất mát dữ liệu giữa Database và RabbitMQ được xử lý như thế nào?</h3>
+<blockquote>
+<p><strong>Trả lời:</strong><br />
+"Dạ thưa Thầy/Cô, trong các hệ thống phân tán, nếu ta lưu DB thành công nhưng server bị sập trước khi kịp gửi tin nhắn vào RabbitMQ, thông điệp sẽ bị mất vĩnh viễn (hiện tượng Dual-Write Problem).<br />
+Để giải quyết, em áp dụng mẫu thiết kế <strong>Transactional Outbox</strong> thông qua thư viện Spring Modulith Event Publication Registry. Khi bắt đầu một step, việc ghi nhận dữ liệu vào DB và ghi nhận thông điệp gửi đi được thực hiện trong cùng một Database Transaction. Nếu DB commit thành công, thông điệp mới được đẩy lên broker. Nếu broker tạm thời mất kết nối, hệ thống có background resubmitter tự động quét bảng <code>event_publication</code> để gửi lại khi broker phục hồi."</p>
+</blockquote>
+<h3>Câu hỏi 4: Tại sao em lại chia làm 2 Worker riêng biệt (Media Worker và Provider Worker) mà không gộp chung?</h3>
+<blockquote>
+<p><strong>Trả lời:</strong><br />
+"Dạ thưa Thầy/Cô, việc tách 2 worker xuất phát từ nguyên tắc <strong>Bảo mật tối thiểu (Least Privilege)</strong> và <strong>Cô lập tài nguyên</strong>:<br />
+1. <strong>Media Worker:</strong> Chuyên chạy FFmpeg/FFprobe để xử lý cắt ghép video. Các tác vụ này nặng về CPU/RAM nội bộ. Worker này hoàn toàn <strong>Keyless</strong> (không chứa bất kỳ API key nào) và được đặt trong mạng Docker nội bộ (<code>internal</code>), không có quyền truy cập Internet ra ngoài, loại trừ nguy cơ bị tấn công SSRF từ các file media độc hại.<br />
+2. <strong>Provider Worker:</strong> Chuyên gọi các API AI bên ngoài (OpenAI, Wan, Seedance, Veo). Worker này bắt buộc phải có Internet Egress và giữ API Key bí mật.<br />
+Việc chia tách đảm bảo nếu một worker gặp sự cố hoặc quá tải thì worker kia vẫn hoạt động bình thường, đồng thời kiểm soát an ninh tối đa."</p>
+</blockquote>
+<hr />
+<h2>PHỤ LỤC 3: CẤU TRÚC SLIDE THUYẾT TRÌNH (PRESENTATION DECK OUTLINE)</h2>
+<ul>
+<li><strong>Slide 1: Trang tiêu đề:</strong> Tên đề tài Flow-Cortex, Sinh viên thực hiện, Giảng viên hướng dẫn.</li>
+<li><strong>Slide 2: Đặt vấn đề &amp; Thực trạng:</strong> Khó khăn trong sản xuất video đa phương tiện (phân mảnh tool, lệch phiên bản, ảo tưởng AI).</li>
+<li><strong>Slide 3: Mục tiêu &amp; Giải pháp:</strong> Giới thiệu nền tảng Flow-Cortex, luồng xử lý tự động khép kín kèm Human-in-the-loop.</li>
+<li><strong>Slide 4: Sơ đồ Kiến trúc Tổng thể:</strong> Minh họa mối quan hệ giữa Member/Admin SPA, Spring Modulith, RabbitMQ Quorum Queues, MinIO và Python Workers.</li>
+<li><strong>Slide 5: Mô hình Dữ liệu (ERD):</strong> Trình bày các thực thể cốt lõi (<code>workflow_run</code>, <code>run_step</code>, <code>media_asset</code>, <code>review_task</code>, <code>script_revision</code>).</li>
+<li><strong>Slide 6: Pipeline 7 bước tạo Video Quảng cáo:</strong> Đi qua từng chặng: Prompt -&gt; Script -&gt; Review -&gt; Storyboard -&gt; TTS -&gt; Image-to-Video -&gt; FFmpeg Render.</li>
+<li><strong>Slide 7: Điểm sáng kỹ thuật 1 — Human-in-the-loop &amp; Optimistic Locking:</strong> Giải thích cách thức giải quyết bài toán xung đột phiên bản bằng Revision Append-only và <code>@Version</code> 409 Conflict.</li>
+<li><strong>Slide 8: Điểm sáng kỹ thuật 2 — Chịu lỗi &amp; Bất đồng bộ (Reliability Model):</strong> 3 mốc thời gian Temporal, Fencing Token CAS, Quorum Queues, Transactional Outbox.</li>
+<li><strong>Slide 9: Bảo mật &amp; Quản trị (Security &amp; Admin Console):</strong> Phân tách mạng nội bộ cho Media worker, S3 Presigned URL ngắn hạn, giao diện Admin quản lý người dùng và giám sát runs/jobs.</li>
+<li><strong>Slide 10: Đảm bảo Chất lượng &amp; CI/CD:</strong> Thống kê 282+ tests Java, 37+ tests Python, 116+ tests React; cơ chế tự động chặn trôi lệch Contract-First.</li>
+<li><strong>Slide 11: Demo Video / Ảnh chụp Thực tế:</strong> Trình diễn các màn hình ứng dụng từ nhập liệu đến video thành phẩm.</li>
+<li><strong>Slide 12: Kết luận &amp; Hướng phát triển:</strong> Tóm tắt giá trị đạt được và kế hoạch mở rộng tính năng dịch video Douyin trong tương lai.</li>
+<li><strong>Slide 13: Lời cảm ơn &amp; Q&amp;A:</strong> Mời Hội đồng đặt câu hỏi.</li>
+</ul>
+</body>
+</html>

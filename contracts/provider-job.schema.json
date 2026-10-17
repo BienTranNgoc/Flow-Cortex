@@ -14,7 +14,7 @@
       "title": "ProductAdPayload",
       "type": "object",
       "additionalProperties": false,
-      "required": ["productName", "description", "cta"],
+      "required": ["productName", "description"],
       "properties": {
         "productName": { "type": "string", "minLength": 1, "maxLength": 200 },
         "description": { "type": "string", "minLength": 1, "maxLength": 4000 },

@@ -66,10 +66,8 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByLabelText('Product name *');
   await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
   await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
-  await user.type(screen.getByLabelText('Call to action *'), 'Đặt mua ngay');
-  await user.upload(screen.getByLabelText(/Product images/), [
+  await user.upload(screen.getByLabelText(/Product image/), [
     image('front.png'),
-    image('side.png'),
   ]);
 }
 
@@ -85,16 +83,14 @@ describe('ProductVideoStartForm', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the product input fields and a multi-image picker', async () => {
+  it('renders the product input fields and a single image picker', async () => {
     renderForm();
 
     expect(await screen.findByLabelText('Product name *')).toBeInTheDocument();
     expect(screen.getByLabelText('Description *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Call to action *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Price (optional)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Promotion (optional)')).toBeInTheDocument();
-    const picker = screen.getByLabelText(/Product images/);
-    expect(picker).toHaveAttribute('multiple');
+    expect(screen.queryByLabelText('Call to action *')).not.toBeInTheDocument();
+    const picker = screen.getByLabelText(/Product image/);
+    expect(picker).not.toHaveAttribute('multiple');
     expect(picker).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
     expect(picker).toBeRequired();
   });
@@ -103,7 +99,7 @@ describe('ProductVideoStartForm', () => {
     const user = userEvent.setup();
     const calls = renderForm();
 
-    await user.upload(await screen.findByLabelText(/Product images/), [image('front.png')]);
+    await user.upload(await screen.findByLabelText(/Product image/), [image('front.png')]);
     await user.click(screen.getByRole('button', { name: 'Start run' }));
 
     expect(await screen.findByText('Product name is required.')).toBeInTheDocument();
@@ -114,7 +110,7 @@ describe('ProductVideoStartForm', () => {
     const user = userEvent.setup();
     const calls = renderForm();
 
-    await user.upload(await screen.findByLabelText(/Product images/), [image('holiday.avi')]);
+    await user.upload(await screen.findByLabelText(/Product image/), [image('holiday.avi')]);
 
     expect(screen.getByText('Use .jpg, .jpeg, .png or .webp.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start run' }));
@@ -125,16 +121,16 @@ describe('ProductVideoStartForm', () => {
     const user = userEvent.setup();
     const calls = renderForm();
 
-    await user.upload(await screen.findByLabelText(/Product images/), [
+    await user.upload(await screen.findByLabelText(/Product image/), [
       image('huge.png', 11 * 1024 * 1024),
     ]);
 
-    expect(screen.getByText('Each image must be between 1 byte and 10 MB.')).toBeInTheDocument();
+    expect(screen.getByText('The image must be between 1 byte and 10 MB.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start run' }));
     expect(sent(calls)).toEqual([]);
   });
 
-  it('uploads each image in order, then starts the run, then opens the run page', async () => {
+  it('uploads the image, then starts the run, then opens the run page', async () => {
     const user = userEvent.setup();
     const calls = renderForm();
     await fillRequired(user);
@@ -143,12 +139,9 @@ describe('ProductVideoStartForm', () => {
 
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
     act(() => FakeXhr.instances[0]!.respond(200));
-    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
-    act(() => FakeXhr.instances[1]!.respond(200));
 
     expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
     expect(sent(calls).map((call) => call.path)).toEqual([
-      '/api/v1/uploads',
       '/api/v1/uploads',
       '/api/v1/product-videos/runs',
     ]);
@@ -156,8 +149,7 @@ describe('ProductVideoStartForm', () => {
     expect(start.body).toEqual({
       productName: 'Bình giữ nhiệt',
       description: 'Giữ nhiệt 12 tiếng',
-      cta: 'Đặt mua ngay',
-      uploadIds: ['up-1', 'up-1'],
+      uploadIds: ['up-1'],
       video: { aspectRatio: '9:16' },
     });
   });
@@ -177,11 +169,9 @@ describe('ProductVideoStartForm', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
     act(() => FakeXhr.instances[1]!.respond(200));
-    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
-    act(() => FakeXhr.instances[2]!.respond(200));
 
     expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
-    expect(sent(calls).filter((call) => call.path === '/api/v1/uploads')).toHaveLength(3);
+    expect(sent(calls).filter((call) => call.path === '/api/v1/uploads')).toHaveLength(2);
     expect(sent(calls).filter((call) => call.path === '/api/v1/product-videos/runs')).toHaveLength(1);
   });
 
@@ -198,8 +188,6 @@ describe('ProductVideoStartForm', () => {
     await user.click(await screen.findByRole('button', { name: 'Start run' }));
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
     act(() => FakeXhr.instances[0]!.respond(200));
-    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
-    act(() => FakeXhr.instances[1]!.respond(200));
 
     expect(
       await screen.findByText('Product video is currently disabled'),

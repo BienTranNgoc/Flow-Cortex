@@ -1,7 +1,10 @@
 # Keep the build context small + reproducible. The Gradle wrapper jar/scripts
 # are committed on purpose, so they are NOT ignored here.
 build/
+**/build/
 .gradle/
+**/.gradle/
 *.log
 .idea/
 .vscode/
+

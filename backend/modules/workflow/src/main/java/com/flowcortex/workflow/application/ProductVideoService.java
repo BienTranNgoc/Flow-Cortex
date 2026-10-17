@@ -104,7 +104,9 @@ public class ProductVideoService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("productName", draft.productName());
         payload.put("description", draft.description());
-        payload.put("cta", draft.cta());
+        if (draft.cta() != null) {
+            payload.put("cta", draft.cta());
+        }
         if (draft.price() != null) {
             payload.put("price", draft.price());
         }

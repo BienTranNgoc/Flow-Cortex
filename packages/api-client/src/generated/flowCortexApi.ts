@@ -198,7 +198,7 @@ export interface ProductVideoRunRequest {
    * @minLength 0
    * @maxLength 500
    */
-  cta: string;
+  cta?: string;
   /**
    * @minLength 0
    * @maxLength 200

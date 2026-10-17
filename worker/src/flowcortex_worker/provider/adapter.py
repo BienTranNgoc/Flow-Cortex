@@ -160,7 +160,10 @@ class FixtureProviderAdapter:
             parts.append(f"Giá: {payload.price}.")
         if payload.promotion:
             parts.append(f"Ưu đãi: {payload.promotion}.")
-        parts.append(payload.cta)
+        if payload.cta:
+            parts.append(payload.cta)
+        else:
+            parts.append("Mua ngay hôm nay!")
         return " ".join(parts)
 
     def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:

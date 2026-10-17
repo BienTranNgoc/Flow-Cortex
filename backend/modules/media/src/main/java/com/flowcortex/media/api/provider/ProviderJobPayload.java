@@ -19,7 +19,7 @@ public final class ProviderJobPayload {
     public record ProductAd(
             @NotBlank @Size(max = 200) String productName,
             @NotBlank @Size(max = 4000) String description,
-            @NotBlank @Size(max = 500) String cta,
+            @Size(max = 500) String cta,
             @Size(max = 200) String price,
             @Size(max = 500) String promotion) {
     }
