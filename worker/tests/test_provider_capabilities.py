@@ -22,6 +22,7 @@ from flowcortex_worker.provider.capabilities import (
 from flowcortex_worker.provider.contracts.provider_job import GenerateSpeechJob, ProviderJob
 from flowcortex_worker.provider.contracts.provider_script_result import ProviderScriptData
 from flowcortex_worker.provider.contracts.provider_speech_result import ProviderSpeechData
+from flowcortex_worker.provider.contracts.provider_storyboard_result import ProviderStoryboardData
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
@@ -105,6 +106,24 @@ def test_product_script_includes_confirmed_price_and_promotion() -> None:
 
     assert "Giá: 299.000đ" in outcome.data["script"]
     assert "Ưu đãi: Giảm 10% hôm nay" in outcome.data["script"]
+
+
+def test_storyboard_creates_two_typed_scenes_from_approved_revision() -> None:
+    outcome = execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_storyboard",
+                "product_ad_storyboard_v1",
+                {"script": "Approved script", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        FixtureProviderAdapter(),
+        _empty_context(),
+    )
+
+    ProviderStoryboardData.model_validate(outcome.data)
+    assert outcome.data["sourceRevisionId"] == REVISION_ID
+    assert outcome.data["scene1Prompt"] != outcome.data["scene2Prompt"]
 
 
 def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:

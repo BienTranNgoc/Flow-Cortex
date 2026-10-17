@@ -5,6 +5,7 @@
   "description": "A typed provider job. Product content is carried only in params.payload and must not be logged.",
   "oneOf": [
     { "$ref": "#/$defs/generateScriptJob" },
+    { "$ref": "#/$defs/generateStoryboardJob" },
     { "$ref": "#/$defs/generateSpeechJob" },
     { "$ref": "#/$defs/generateVideoJob" }
   ],
@@ -59,6 +60,26 @@
       "properties": {
         "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
         "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "storyboardPayload": {
+      "title": "StoryboardPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "sourceRevisionId"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "storyboardParams": {
+      "title": "StoryboardParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "product_ad_storyboard_v1" },
+        "payload": { "$ref": "#/$defs/storyboardPayload" }
       }
     },
     "speechParams": {
@@ -147,6 +168,28 @@
         "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
         "capability": { "const": "generate_speech" },
         "params": { "$ref": "#/$defs/speechParams" },
+        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
+        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
+        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
+        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+      }
+    },
+    "generateStoryboardJob": {
+      "title": "GenerateStoryboardJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "jobId", "runId", "correlationId", "stepOrder",
+        "capability", "params", "outputPrefix", "attempt", "maxRuntimeSeconds", "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
+        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
+        "runId": { "$ref": "#/$defs/commonProperties/runId" },
+        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
+        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "capability": { "const": "generate_storyboard" },
+        "params": { "$ref": "#/$defs/storyboardParams" },
         "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
         "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
         "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },

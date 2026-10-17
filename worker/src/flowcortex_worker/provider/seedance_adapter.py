@@ -16,6 +16,8 @@ from .adapter import (
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
+    StoryboardArtifact,
+    StoryboardRequest,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -52,6 +54,11 @@ class SeedanceAdapter:
             "Seedance script generation is not implemented",
         )
 
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "Seedance storyboard generation is not implemented"
+        )
+
     def speech_identity(self) -> SpeechIdentity:
         raise PermanentError(
             "provider_capability_unavailable",
@@ -67,7 +74,7 @@ class SeedanceAdapter:
     def video_identity(self) -> VideoIdentity:
         if self.config.resolution not in {"480p", "720p"}:
             raise PermanentError(
-                "provider_configuration_invalid",
+                "contract_violation",
                 "Seedance resolution must be 480p or 720p",
             )
         return VideoIdentity(
@@ -279,7 +286,7 @@ class SeedanceAdapter:
             raise PermanentError(
                 "provider_response_invalid", "Seedance output is not an MP4 file"
             )
-        return body
+        return bytes(body)
 
 
 def _nested_string(value: dict[str, Any], parent: str, child: str) -> str | None:

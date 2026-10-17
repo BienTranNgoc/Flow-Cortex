@@ -21,6 +21,18 @@ class SpeechArtifact:
 
 
 @dataclass(frozen=True)
+class StoryboardRequest:
+    script: str
+    source_revision_id: UUID
+
+
+@dataclass(frozen=True)
+class StoryboardArtifact:
+    scene_1_prompt: str
+    scene_2_prompt: str
+
+
+@dataclass(frozen=True)
 class SpeechRequest:
     script: str
     source_revision_id: UUID
@@ -66,6 +78,8 @@ class VideoAbort(Protocol):
 class ProviderAdapter(Protocol):
     def generate_script(self, payload: ProductAdPayload) -> str: ...
 
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
+
     def speech_identity(self) -> SpeechIdentity: ...
 
     def generate_speech(self, request: SpeechRequest) -> SpeechArtifact: ...
@@ -92,6 +106,9 @@ class CapabilityProviderAdapter:
 
     def generate_script(self, payload: ProductAdPayload) -> str:
         return self.script_adapter.generate_script(payload)
+
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        return self.script_adapter.generate_storyboard(request)
 
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
@@ -123,6 +140,14 @@ class FixtureProviderAdapter:
             parts.append(f"Ưu đãi: {payload.promotion}.")
         parts.append(payload.cta)
         return " ".join(parts)
+
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        return StoryboardArtifact(
+            "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
+            "realistic movement, clean background, no text.",
+            "Vertical 9:16 product-in-use benefit shot followed by a clean closing beauty shot, "
+            "space for CTA overlay, realistic movement, no rendered text.",
+        )
 
     def speech_identity(self) -> SpeechIdentity:
         return SpeechIdentity("fixture", "silence", "+0%", 16_000)

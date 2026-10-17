@@ -13,10 +13,18 @@ from typing import Any, Protocol
 from pydantic import ValidationError
 
 from ..errors import PermanentError
-from .adapter import ProviderAdapter, SpeechIdentity, SpeechRequest, VideoIdentity, VideoRequest
+from .adapter import (
+    ProviderAdapter,
+    SpeechIdentity,
+    SpeechRequest,
+    StoryboardRequest,
+    VideoIdentity,
+    VideoRequest,
+)
 from .contracts.provider_job import (
     GenerateScriptJob,
     GenerateSpeechJob,
+    GenerateStoryboardJob,
     GenerateVideoJob,
     ProviderJob,
 )
@@ -59,7 +67,7 @@ class ExecutionContext:
 
 Handler = Callable[
     [
-        GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+        GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
         ProviderAdapter,
         ExecutionContext,
     ],
@@ -80,7 +88,7 @@ def execute(
 
 
 def _generate_script(
-    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
     adapter: ProviderAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
@@ -93,7 +101,7 @@ def _generate_script(
 
 
 def _generate_speech(
-    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
     adapter: ProviderAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
@@ -132,8 +140,28 @@ def _generate_speech(
     )
 
 
+def _generate_storyboard(
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
+    adapter: ProviderAdapter,
+    context: ExecutionContext,
+) -> ProviderOutcome:
+    if not isinstance(job, GenerateStoryboardJob):
+        raise UnsupportedCapability("generate_storyboard received the wrong job shape")
+    payload = job.params.payload
+    storyboard = adapter.generate_storyboard(
+        StoryboardRequest(payload.script, payload.sourceRevisionId)
+    )
+    data = {
+        "profile": "product_ad_storyboard_v1",
+        "sourceRevisionId": str(payload.sourceRevisionId),
+        "scene1Prompt": storyboard.scene_1_prompt,
+        "scene2Prompt": storyboard.scene_2_prompt,
+    }
+    return ProviderOutcome(data=data)
+
+
 def _generate_video(
-    job: GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
     adapter: ProviderAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
@@ -342,12 +370,14 @@ def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> st
         identity.aspect_ratio,
         identity.resolution,
         str(identity.generate_audio).lower(),
+        hashlib.sha256(request.prompt.encode()).hexdigest(),
     ))
     return hashlib.sha256(value.encode()).hexdigest()
 
 
 _CAPABILITIES: dict[tuple[str, str], Handler] = {
     ("generate_script", "product_ad_v1"): _generate_script,
+    ("generate_storyboard", "product_ad_storyboard_v1"): _generate_storyboard,
     ("generate_speech", "vi_voice_v1"): _generate_speech,
     ("generate_video", "vertical_ad_clip_v1"): _generate_video,
 }

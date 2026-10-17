@@ -16,6 +16,8 @@ from .adapter import (
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
+    StoryboardArtifact,
+    StoryboardRequest,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -46,6 +48,11 @@ class VeoAdapter:
     def generate_script(self, payload: ProductAdPayload) -> str:
         raise PermanentError(
             "provider_capability_unavailable", "Veo script generation is not implemented"
+        )
+
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "Veo storyboard generation is not implemented"
         )
 
     def speech_identity(self) -> SpeechIdentity:
@@ -164,7 +171,7 @@ class VeoAdapter:
             raise PermanentError("provider_response_invalid", "Veo video exceeds 100 MB")
         if len(body) < 12 or body[4:8] != b"ftyp":
             raise PermanentError("provider_response_invalid", "Veo output is not an MP4 file")
-        return body
+        return bytes(body)
 
 
 def _video_uri(response: dict[str, Any]) -> str:

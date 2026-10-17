@@ -12,6 +12,7 @@ import importlib
 import io
 import json
 import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -82,9 +83,41 @@ def _valid_mp4(size: int = 4096) -> bytes:
     return header + b"\0" * max(0, size - len(header))
 
 
+def _decodable_mp4() -> bytes:
+    completed = subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=180x320:d=1",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "frag_keyframe+empty_moov",
+            "-f",
+            "mp4",
+            "pipe:1",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return completed.stdout
+
+
 class _Abort:
     def check(self) -> None:
         return
+
+    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(argv, check=False, capture_output=True)
 
 
 def _fast_config(config: Any, **overrides: Any) -> Any:
@@ -121,7 +154,7 @@ def test_seedance_submit_sends_required_parameters(monkeypatch: pytest.MonkeyPat
     assert body["model"] == seedance_adapter.SeedanceConfig.model
     params = body["parameters"]
     assert params["duration"] == 5
-    assert params["resolution"] == "720p"
+    assert params["resolution"] == "480p"
     assert params["ratio"] == "9:16"
     assert params["generate_audio"] is False
 
@@ -390,27 +423,28 @@ def _empty_context() -> ExecutionContext:
 
 
 @needs_ffmpeg
-def test_video_capability_normalises_clip_to_5s_720x1280(monkeypatch: pytest.MonkeyPatch) -> None:
-    """End-to-end: submit a Seedance clip, FFmpeg must normalise to 5s 720x1280 H.264 MP4."""
+def test_video_capability_normalises_clip_to_five_seconds() -> None:
+    """End-to-end: submit a clip and normalize it to the configured vertical output."""
 
     class _Adapter:
         def video_identity(self) -> VideoIdentity:
             return VideoIdentity(
-                "seedance", "ByteDance-Seedance-1.5-pro", 5, "9:16", "720p", False
+                "seedance", "ByteDance-Seedance-1.5-pro", 5, "9:16", "480p", False
             )
 
         def submit_video(self, request: VideoRequest) -> str:
             return "seedance-task-1"
 
         def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
-            return VideoArtifact(_valid_mp4(4096), task_id)
+            return VideoArtifact(_decodable_mp4(), task_id)
 
-    outcome = execute(_video_job(), _Adapter(), _empty_context())  # type: ignore[arg-type]
+    context = dataclasses.replace(_empty_context(), abort=_Abort())
+    outcome = execute(_video_job(), _Adapter(), context)  # type: ignore[arg-type]
     data = ProviderVideoData.model_validate(outcome.data)
     assert data.provider == "seedance"
     assert data.durationSeconds == 5
     assert data.aspectRatio == "9:16"
-    assert data.resolution == "720p"
+    assert data.resolution == "480p"
     assert data.providerTaskId == "seedance-task-1"
     clip, manifest = outcome.files
     assert clip.name == "clip.mp4"

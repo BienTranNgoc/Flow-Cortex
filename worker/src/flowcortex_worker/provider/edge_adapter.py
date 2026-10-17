@@ -25,6 +25,8 @@ from .adapter import (
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
+    StoryboardArtifact,
+    StoryboardRequest,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -54,6 +56,9 @@ class EdgeSpeechAdapter:
         # Edge is a speech provider. Keep Product Video runnable in demo mode by retaining the
         # deterministic script implementation until a separately selectable LLM adapter lands.
         return FixtureProviderAdapter().generate_script(payload)
+
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        return FixtureProviderAdapter().generate_storyboard(request)
 
     def speech_identity(self) -> SpeechIdentity:
         return SpeechIdentity(PROVIDER_EDGE, self.config.voice, self.config.rate, 24_000)

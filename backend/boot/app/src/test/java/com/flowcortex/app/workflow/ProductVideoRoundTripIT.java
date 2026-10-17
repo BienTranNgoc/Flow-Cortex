@@ -77,6 +77,15 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                 new ApprovalView(review.currentRevisionId(), review.version()), String.class);
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
 
+        JsonNode storyboardJob = receiveJob("provider.jobs", runId, "generate_storyboard");
+        assertThat(storyboardJob.path("params").path("payload").path("sourceRevisionId").asString())
+                .isEqualTo(review.currentRevisionId().toString());
+        publishResult("provider", runId, storyboardJob, null,
+                "{\"profile\":\"product_ad_storyboard_v1\","
+                        + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
+                        + "\"scene1Prompt\":\"Opening hero scene\","
+                        + "\"scene2Prompt\":\"Benefit closing scene\"}");
+
         JsonNode speechJob = receiveJob("provider.jobs", runId, "generate_speech");
         assertThat(speechJob.path("params").path("payload").path("sourceRevisionId").asString())
                 .isEqualTo(review.currentRevisionId().toString());
@@ -93,11 +102,15 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
         JsonNode firstVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        assertThat(firstVideoJob.path("params").path("payload").path("prompt").asString())
+                .isEqualTo("Opening hero scene");
         String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
         put(MEDIA_BUCKET, firstClipKey, "video/mp4", "fixture clip one");
         publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
 
         JsonNode secondVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        assertThat(secondVideoJob.path("params").path("payload").path("prompt").asString())
+                .isEqualTo("Benefit closing scene");
         String secondClipKey = outputKey(secondVideoJob, "clip.mp4");
         put(MEDIA_BUCKET, secondClipKey, "video/mp4", "fixture clip two");
         publishVideoResult(runId, secondVideoJob, secondClipKey, "c");
@@ -119,7 +132,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
 
         assertThat(pollUntil(owner.id(), runId, run -> "completed".equals(run.status()), WAIT).steps())
                 .allMatch(step -> "completed".equals(step.status()));
-        assertThat(get("/api/v1/runs/" + runId + "/steps/6/outputs/video.mp4/url", token, String.class)
+        assertThat(get("/api/v1/runs/" + runId + "/steps/7/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from typing import Annotated, Any, Literal
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
 from uuid import UUID
 
 
@@ -15,11 +15,11 @@ class ProductAdPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    productName: Annotated[str, Field(max_length=200, min_length=1)]
-    description: Annotated[str, Field(max_length=4000, min_length=1)]
-    cta: Annotated[str, Field(max_length=500, min_length=1)]
-    price: Annotated[str | None, Field(max_length=200, min_length=1)] = None
-    promotion: Annotated[str | None, Field(max_length=500, min_length=1)] = None
+    productName: Annotated[StrictStr, Field(max_length=200, min_length=1)]
+    description: Annotated[StrictStr, Field(max_length=4000, min_length=1)]
+    cta: Annotated[StrictStr, Field(max_length=500, min_length=1)]
+    price: Annotated[StrictStr | None, Field(max_length=200, min_length=1)] = None
+    promotion: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
 
 
 class ProductAdParams(BaseModel):
@@ -34,8 +34,24 @@ class SpeechPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    script: Annotated[str, Field(max_length=8000, min_length=1)]
+    script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
     sourceRevisionId: UUID
+
+
+class StoryboardPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
+    sourceRevisionId: UUID
+
+
+class StoryboardParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["product_ad_storyboard_v1"]
+    payload: StoryboardPayload
 
 
 class SpeechParams(BaseModel):
@@ -50,7 +66,7 @@ class VideoPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    prompt: Annotated[str, Field(max_length=2500, min_length=1)]
+    prompt: Annotated[StrictStr, Field(max_length=2500, min_length=1)]
     sourceRevisionId: UUID
 
 
@@ -75,18 +91,18 @@ class GenerateScriptJob(BaseModel):
             description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
         ),
     ]
-    stepOrder: Annotated[int, Field(ge=1)]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_script"]
     params: ProductAdParams
     outputPrefix: Annotated[
-        str,
+        StrictStr,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
-    attempt: Annotated[int, Field(ge=1)]
-    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
     issuedAt: AwareDatetime
 
 
@@ -103,18 +119,46 @@ class GenerateSpeechJob(BaseModel):
             description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
         ),
     ]
-    stepOrder: Annotated[int, Field(ge=1)]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_speech"]
     params: SpeechParams
     outputPrefix: Annotated[
-        str,
+        StrictStr,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
-    attempt: Annotated[int, Field(ge=1)]
-    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    issuedAt: AwareDatetime
+
+
+class GenerateStoryboardJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: Annotated[
+        UUID,
+        Field(
+            description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        ),
+    ]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    capability: Literal["generate_storyboard"]
+    params: StoryboardParams
+    outputPrefix: Annotated[
+        StrictStr,
+        Field(
+            description="The only object-key prefix under which this job may publish outputs.",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+        ),
+    ]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
     issuedAt: AwareDatetime
 
 
@@ -131,24 +175,26 @@ class GenerateVideoJob(BaseModel):
             description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
         ),
     ]
-    stepOrder: Annotated[int, Field(ge=1)]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_video"]
     params: VideoParams
     outputPrefix: Annotated[
-        str,
+        StrictStr,
         Field(
             description="The only object-key prefix under which this job may publish outputs.",
             pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
         ),
     ]
-    attempt: Annotated[int, Field(ge=1)]
-    maxRuntimeSeconds: Annotated[int, Field(ge=1)]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
     issuedAt: AwareDatetime
 
 
-class ProviderJob(RootModel[GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob]):
+class ProviderJob(
+    RootModel[GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob]
+):
     root: Annotated[
-        GenerateScriptJob | GenerateSpeechJob | GenerateVideoJob,
+        GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
         Field(
             description="A typed provider job. Product content is carried only in params.payload and must not be logged.",
             title="ProviderJob",

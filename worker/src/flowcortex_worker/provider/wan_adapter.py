@@ -16,6 +16,8 @@ from .adapter import (
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
+    StoryboardArtifact,
+    StoryboardRequest,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -51,6 +53,11 @@ class WanAdapter:
     def generate_script(self, payload: ProductAdPayload) -> str:
         raise PermanentError(
             "provider_capability_unavailable", "Wan script generation is not implemented"
+        )
+
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "Wan storyboard generation is not implemented"
         )
 
     def speech_identity(self) -> SpeechIdentity:

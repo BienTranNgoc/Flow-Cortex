@@ -22,7 +22,7 @@ import pytest
 
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import openai_adapter
-from flowcortex_worker.provider.adapter import SpeechRequest
+from flowcortex_worker.provider.adapter import SpeechRequest, StoryboardRequest
 from flowcortex_worker.provider.contracts.provider_job import ProductAdPayload
 
 SAMPLE_PAYLOAD = ProductAdPayload(
@@ -106,6 +106,66 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
     assert "Vietnamese" in messages[0]["content"]
     assert "productName: Bình giữ nhiệt" in messages[1]["content"]
     assert "cta: Đặt mua ngay" in messages[1]["content"]
+
+
+def test_generate_storyboard_returns_two_distinct_visual_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _patch_urlopen(
+        monkeypatch,
+        _http_response(
+            _ok_body(
+                json.dumps(
+                    {
+                        "scene1Prompt": "Vertical hero shot with a fast camera push-in.",
+                        "scene2Prompt": "Product-in-use shot ending on a clean beauty frame.",
+                    }
+                )
+            )
+        ),
+    )
+
+    storyboard = _adapter().generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=1))
+    )
+
+    assert storyboard.scene_1_prompt.startswith("Vertical hero")
+    assert storyboard.scene_2_prompt.startswith("Product-in-use")
+    body: dict[str, Any] = captured["body"]
+    assert body["response_format"]["json_schema"]["name"] == "product_ad_storyboard_v1"
+    assert "Approved Vietnamese script" in body["messages"][1]["content"]
+
+
+@pytest.mark.parametrize(
+    "provider_content",
+    [
+        {
+            "scene_1_prompt": "Vertical opening hero shot.",
+            "scene_2_prompt": "Vertical closing benefit shot.",
+        },
+        {
+            "scenes": [
+                {"prompt": "Vertical opening hero shot."},
+                {"visualPrompt": "Vertical closing benefit shot."},
+            ]
+        },
+    ],
+)
+def test_generate_storyboard_accepts_openai_compatible_proxy_shapes(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_content: dict[str, Any],
+) -> None:
+    _patch_urlopen(
+        monkeypatch,
+        _http_response(_ok_body(json.dumps(provider_content))),
+    )
+
+    storyboard = _adapter("https://llm-proxy.example/v1").generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=1))
+    )
+
+    assert storyboard.scene_1_prompt == "Vertical opening hero shot."
+    assert storyboard.scene_2_prompt == "Vertical closing benefit shot."
 
 
 def test_generate_script_ignores_proxy_extra_content(monkeypatch: pytest.MonkeyPatch) -> None:

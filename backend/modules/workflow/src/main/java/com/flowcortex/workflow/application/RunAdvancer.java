@@ -8,6 +8,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.media.api.ProviderScriptData;
+import com.flowcortex.media.api.ProviderStoryboardData;
 import com.flowcortex.media.api.ProviderSpeechData;
 import com.flowcortex.media.api.ProviderVideoData;
 import com.flowcortex.workflow.domain.RunStatus;
@@ -439,6 +440,7 @@ class RunAdvancer {
         try {
             Object parsed = switch (capability) {
                 case "generate_script" -> objectMapper.convertValue(data, ProviderScriptData.class);
+                case "generate_storyboard" -> objectMapper.convertValue(data, ProviderStoryboardData.class);
                 case "generate_speech" -> objectMapper.convertValue(data, ProviderSpeechData.class);
                 case "generate_video" -> objectMapper.convertValue(data, ProviderVideoData.class);
                 default -> null;
