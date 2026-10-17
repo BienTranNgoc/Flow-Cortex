@@ -132,7 +132,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
 
         assertThat(pollUntil(owner.id(), runId, run -> "completed".equals(run.status()), WAIT).steps())
                 .allMatch(step -> "completed".equals(step.status()));
-        assertThat(get("/api/v1/runs/" + runId + "/steps/7/outputs/video.mp4/url", token, String.class)
+        assertThat(get("/api/v1/runs/" + runId + "/steps/6/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 

@@ -741,8 +741,13 @@ def test_video_provider_fixture_does_not_call_internet(monkeypatch: pytest.Monke
     from flowcortex_worker.provider.adapter import FixtureProviderAdapter
 
     assert isinstance(adapter.video_adapter, FixtureProviderAdapter)
-    with pytest.raises(PermanentError, match="not implemented"):
-        adapter.video_identity()
+    identity = adapter.video_identity()
+    assert identity.provider == "fixture"
+    assert identity.aspect_ratio == "9:16"
+    assert identity.duration_seconds == 5
+    assert adapter.submit_video(
+        VideoRequest("Hook. Lợi ích. CTA.", REVISION_ID)
+    ).startswith("fixture-")
 
 
 def test_video_provider_seedance_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:

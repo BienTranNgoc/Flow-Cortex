@@ -215,7 +215,7 @@ jq -e 'all(.steps[]; .status == "completed")' <<<"$body" >/dev/null \
   || fail "Product Video run $run completed with a step not completed: $(jq -c '[.steps[] | .status]' <<<"$body")"
 pass "Product Video run $run approved, spoken and rendered: completed"
 
-url="$(api "$member" "/api/v1/runs/$run/steps/4/outputs/video.mp4/url" | jq -er .url)" \
+url="$(api "$member" "/api/v1/runs/$run/steps/7/outputs/video.mp4/url" | jq -er .url)" \
   || fail "download URL for video.mp4"
 code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
 [[ "$code" == 200 && -s "$work/video.mp4" ]] || fail "video.mp4 download answered $code"

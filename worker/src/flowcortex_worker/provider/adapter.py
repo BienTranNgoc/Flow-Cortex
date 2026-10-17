@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import subprocess
+import tempfile
 import wave
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
@@ -184,16 +187,53 @@ class FixtureProviderAdapter:
         return SpeechArtifact(output.getvalue(), duration_ms, "fixture", "silence", "+0%")
 
     def video_identity(self) -> VideoIdentity:
-        raise PermanentError(
-            "provider_capability_unavailable", "fixture video generation is not implemented"
+        return VideoIdentity(
+            "fixture",
+            "flowcortex-fixture-v1",
+            5,
+            "9:16",
+            "480p",
+            False,
         )
 
     def submit_video(self, request: VideoRequest) -> str:
-        raise PermanentError(
-            "provider_capability_unavailable", "fixture video generation is not implemented"
-        )
+        digest = hashlib.sha256(
+            f"{request.source_revision_id}|{request.prompt}".encode("utf-8")
+        ).hexdigest()[:16]
+        return f"fixture-{digest}"
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
-        raise PermanentError(
-            "provider_capability_unavailable", "fixture video generation is not implemented"
-        )
+        abort.check()
+        with tempfile.TemporaryDirectory(prefix="flowcortex-fixture-video-") as directory:
+            output = Path(directory) / "clip.mp4"
+            completed = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-nostdin",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc=duration=5:size=720x1280:rate=24",
+                    "-an",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "fast",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-movflags",
+                    "+faststart",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+            )
+            if completed.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+                raise PermanentError(
+                    "provider_response_invalid", "fixture video could not be generated"
+                )
+            return VideoArtifact(output.read_bytes(), task_id)
