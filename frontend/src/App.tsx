@@ -4,9 +4,12 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import './styles/tokens.css';
 import './app/base.css';
 import { AppShell } from './app/AppShell';
+import { DocsPage } from './app/DocsPage';
 import { HomePage } from './app/HomePage';
+import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
+import { RunsPage } from './app/RunsPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
@@ -53,7 +56,12 @@ export function App() {
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
+              <Route path="runs" element={<RunsPage />} />
               <Route path="runs/:runId" element={<RunProgressPage />} />
+              <Route path="integrations" element={<IntegrationsPage />} />
+              <Route path="docs" element={<DocsPage />} />
+              <Route path="docs/api" element={<DocsPage initialTab="api" />} />
+              <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

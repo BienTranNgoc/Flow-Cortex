@@ -1,36 +1,21 @@
-import { type WorkflowResponse, type WorkflowStepResponseMode } from '@flow-cortex/api-client';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import { FilterBar } from '../features/dashboard/FilterBar';
+import { SearchBar } from '../features/dashboard/SearchBar';
+import { useDashboardWorkflows } from '../features/dashboard/useDashboardWorkflows';
+import { WorkflowCard } from '../features/dashboard/WorkflowCard';
 import './HomePage.css';
-
-type StageTone = 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'rose';
-type IconTone = 'blue' | 'cyan' | 'amber';
-
-const TONE_BY_MODE: Record<WorkflowStepResponseMode, IconTone> = {
-  inline: 'blue',
-  remote: 'cyan',
-};
-
-const STAGE_TONE_CYCLE: readonly StageTone[] = ['blue', 'cyan', 'violet', 'amber', 'green', 'rose'];
-
-function firstStepMode(workflow: WorkflowResponse): WorkflowStepResponseMode | undefined {
-  const first = workflow.steps?.[0];
-  return first?.mode;
-}
-
-function iconFor(workflow: WorkflowResponse): string {
-  return (workflow.name ?? workflow.id ?? '?').slice(0, 2).toUpperCase();
-}
-
-function stageToneAt(index: number): StageTone {
-  return STAGE_TONE_CYCLE[index % STAGE_TONE_CYCLE.length] as StageTone;
-}
 
 export function HomePage() {
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  if (meQuery.isLoading) return <output>Loading…</output>;
+  const workflows = workflowsQuery.data ?? [];
+  const dashboard = useDashboardWorkflows(workflows);
+  const { filtered, counts, query, setQuery, category, setCategory, reset } = dashboard;
+  const hasWorkflows = workflows.length > 0;
+
+  if (meQuery.isLoading) return <output className="dashboard-loading">Loading…</output>;
   if (meQuery.isError) {
     return (
       <main className="launchpad">
@@ -44,27 +29,58 @@ export function HomePage() {
     );
   }
   if (!meQuery.data) {
-    return <output>Loading…</output>;
+    return <output className="dashboard-loading">Loading…</output>;
   }
-
-  const workflows = workflowsQuery.data ?? [];
 
   return (
     <main className="launchpad">
-      <section className="launchpad-hero">
-        <p className="eyebrow">CREATOR LAUNCHPAD · READY TO CREATE</p>
-        <h1>
-          Your AI media <span>studio</span>
+      <section className="launchpad-hero" aria-labelledby="launchpad-hero-title">
+        <div className="launchpad-hero__glow" aria-hidden="true">
+          <span className="launchpad-hero__glow-a" />
+          <span className="launchpad-hero__glow-b" />
+        </div>
+        <div className="launchpad-hero__badge">
+          <span className="launchpad-hero__pulse" aria-hidden="true" />
+          <span className="launchpad-hero__bolt" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+              <path d="M13 2L4 14h6l-1 8 9-12h-6z" />
+            </svg>
+          </span>
+          <span>CREATOR LAUNCHPAD · READY TO CREATE</span>
+        </div>
+        <h1 id="launchpad-hero-title" className="launchpad-hero__title">
+          <span className="launchpad-hero__title-strong">Your AI media</span>{' '}
+          <span className="launchpad-hero__title-accent">studio</span>
         </h1>
-        <p>
+        <p className="launchpad-hero__lede">
           One click launches a production-ready pipeline: source, process, review, export.
         </p>
       </section>
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
-        <h2 id="launchpad-cards-title" className="launchpad-section-title">
-          Pick a pipeline
-        </h2>
+        <header className="launchpad-cards__head">
+          <h2 id="launchpad-cards-title" className="launchpad-section-title">
+            Pick a pipeline
+          </h2>
+          {hasWorkflows && (
+            <Link to="/workflows" className="launchpad-cards__see-all">
+              View all workflows
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </Link>
+          )}
+        </header>
+
+        {hasWorkflows && (
+          <div className="launchpad-cards__controls">
+            <div className="launchpad-cards__search">
+              <SearchBar value={query} onChange={setQuery} />
+            </div>
+            <FilterBar value={category} onChange={setCategory} counts={counts} />
+          </div>
+        )}
+
         {workflowsQuery.isLoading && <output>Loading workflows…</output>}
         {workflowsQuery.isError && (
           <p role="alert" className="form-error">
@@ -74,45 +90,23 @@ export function HomePage() {
             </button>
           </p>
         )}
-        {!workflowsQuery.isLoading && !workflowsQuery.isError && workflows.length === 0 && (
+        {hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && filtered.length === 0 && (
+          <div className="launchpad-cards__empty" role="status">
+            <p>No workflows match your filter.</p>
+            <button type="button" onClick={reset}>
+              Clear filters
+            </button>
+          </div>
+        )}
+        {!hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && (
           <p>No workflows available yet.</p>
         )}
-        {workflows.length > 0 && (
+
+        {filtered.length > 0 && (
           <div className="workflow-grid">
-            {workflows.map((workflow) => {
-              const mode = firstStepMode(workflow);
-              const iconTone: IconTone = mode ? TONE_BY_MODE[mode] : 'amber';
-              const linkTo = workflow.id ? `/workflows/${workflow.id}` : '/workflows';
-              return (
-                <article key={workflow.id ?? workflow.name} className="workflow-card-tile">
-                  <header className="workflow-card-header">
-                    <span className={`workflow-card-icon tone-${iconTone}`} aria-hidden="true">
-                      {iconFor(workflow)}
-                    </span>
-                    <h3 className="workflow-card-title">{workflow.name ?? 'Untitled workflow'}</h3>
-                  </header>
-
-                  {workflow.steps && workflow.steps.length > 0 && (
-                    <ul className="workflow-card-stages">
-                      {workflow.steps.map((step, index) => (
-                        <li
-                          key={step.id ?? `${index}-${step.name}`}
-                          className={`workflow-card-stage tone-${stageToneAt(index)}`}
-                        >
-                          {step.name ?? `Step ${step.stepOrder ?? index + 1}`}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <footer className="workflow-card-footer">
-                    <Link className="workflow-card-launch" to={linkTo}>
-                      Launch Workflow →
-                    </Link>
-                  </footer>
-                </article>
-              );
-            })}
+            {filtered.map((workflow) => (
+              <WorkflowCard key={workflow.id ?? workflow.name} workflow={workflow} />
+            ))}
           </div>
         )}
       </section>
@@ -153,7 +147,7 @@ export function HomePage() {
 
       <section className="launchpad-footer">
         <p>
-          Welcome, {meQuery.data.name} · <Link to="/workflows">View all workflows</Link>
+          Welcome, {meQuery.data.name} · <Link to="/profile">Manage your profile</Link>
         </p>
       </section>
     </main>
