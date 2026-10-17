@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.11.002`)
+## Current schema (`V2026.09.22.001` – `V2026.10.17.004`)
 
 ```mermaid
 erDiagram

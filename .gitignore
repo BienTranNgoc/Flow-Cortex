@@ -44,3 +44,8 @@ tmp/
 
 # Local docker compose override
 docker-compose.override.yml
+.tmp-secrets.json
+
+# Local-only
+.env.bak
+rulekhoi/

@@ -151,3 +151,7 @@ This repo keeps comments **minimal**. Well-named code is the primary documentati
 - OpenSpec/task traceability in code (`Task N`, `R-xxx`, change ids) — §6 already bans these; they live in git history, never in comments.
 
 **Keep (earns its place):** a non-obvious *why* (a workaround and the constraint that forces it, a deliberate ordering, a spec/RFC citation for a rule that looks wrong but isn't), a public-`api`-port contract note that a caller genuinely needs, and a `//` explaining an intentional deviation from the obvious approach. When in doubt, cut it — a missing junk comment costs nothing; a wrong or stale one misleads.
+
+## 15. Migration version (Flyway)
+
+Migration filenames under `backend/boot/app/src/main/resources/db/migration/` MUST use a **timestamp** version — `VYYYY.MM.DD.HHMM__<description>.sql` — set to the moment the file is created (or, for a batch created together, the highest millisecond in the batch). Versions must be **strictly increasing across the whole branch lineage** — never set a version older than any migration already merged into `origin/development`. Flyway refuses to start when it sees a version older than one already applied, and the fix (rename 4–6 files plus update the docs that cite their versions) is exactly the kind of dirty, low-confidence work this rule exists to prevent. A copy-from-another-branch + forgot-to-bump is the most common cause; `scripts/check-migration-version.sh` (wired into CI) catches it before merge.

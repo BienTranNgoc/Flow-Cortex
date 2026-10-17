@@ -30,6 +30,15 @@ jobs:
       - name: Build + test
         run: ./gradlew --no-daemon build
 
+      # Block migrations whose version is older than the latest on
+      # origin/development (AGENTS.md §15). Must fetch first so the ref exists
+      # in the shallow CI checkout.
+      - name: Check migration versions
+        working-directory: .
+        run: |
+          git fetch --no-tags --depth=1 origin development
+          bash scripts/check-migration-version.sh origin/development
+
       # Contract-first drift check: the snapshot test just rewrote docs/openapi.yaml
       # from the live /v3/api-docs; an unregenerated snapshot now differs from HEAD.
       - name: Check OpenAPI snapshot is in sync
