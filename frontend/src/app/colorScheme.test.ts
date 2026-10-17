@@ -18,9 +18,19 @@ function rule(css: string, selector: string): string {
 const COLOUR_LITERAL = /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/;
 
 describe('colour scheme', () => {
-  it('declares a dark-only page', () => {
-    expect(read('../../index.html')).toMatch(/<meta name="color-scheme" content="dark" \/>/);
-    expect(rule(read('../styles/tokens.css'), ':root')).toMatch(/color-scheme:\s*dark;/);
+  it('advertises light + dark to the browser and the design tokens default to light', () => {
+    expect(read('../../index.html')).toMatch(
+      /<meta name="color-scheme" content="light dark" \/>/,
+    );
+    expect(rule(read('../styles/tokens.css'), ':root')).toMatch(/color-scheme:\s*light;/);
+    expect(read('../styles/tokens.css')).toMatch(/\[data-theme=['"]dark['"]\]/);
+  });
+
+  it('uses dedicated palette overrides for the dark theme instead of inline hex values', () => {
+    const tokens = read('../styles/tokens.css');
+    // Dark theme is an opt-in, additive override block — it must not change `:root`.
+    expect(tokens).not.toMatch(/:root\s*\{[^}]*color-scheme:\s*dark/);
+    expect(tokens).toMatch(/:root\[data-theme=['"]dark['"]\][\s\S]*color-scheme:\s*dark;/);
   });
 
   it('paints the page and button text from tokens', () => {

@@ -1,9 +1,14 @@
+import { FlowCortexLogo } from './FlowCortexLogo';
+
 export function Footer() {
   return (
     <footer className="cortex-footer">
       <div className="cortex-footer__inner">
         <div className="cortex-footer__brand">
-          <span className="cortex-footer__brand-name">FlowCortex</span>
+          <span className="cortex-footer__brand-row">
+            <FlowCortexLogo size={28} />
+            <span className="cortex-footer__brand-name">FlowCortex</span>
+          </span>
           <p className="cortex-footer__tagline">
             AI-powered media pipeline for creators who need consistent output.
           </p>
