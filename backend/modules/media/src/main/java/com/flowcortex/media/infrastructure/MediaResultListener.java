@@ -23,6 +23,15 @@ class MediaResultListener {
     // Started by MediaTopologyCheck once the topology is declared.
     @RabbitListener(id = "mediaResults", queues = MediaTopologyConfig.RESULTS, autoStartup = "false")
     void onResult(Message message) {
+        accept(message);
+    }
+
+    @RabbitListener(id = "providerResults", queues = MediaTopologyConfig.PROVIDER_RESULTS, autoStartup = "false")
+    void onProviderResult(Message message) {
+        accept(message);
+    }
+
+    private void accept(Message message) {
         MediaResult result = InboundMessages.read(message, MediaResult.class, "result");
         try {
             inbound.acceptResult(result);

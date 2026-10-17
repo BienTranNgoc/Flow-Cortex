@@ -1,21 +1,17 @@
-import { useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authHeaders,
-  getToken,
   login as loginRequest,
   me as meRequest,
   setToken,
-  subscribeToken,
+  signOut,
   unwrap,
+  useAuthToken,
 } from '@flow-cortex/api-client';
 import type { LoginRequest } from '@flow-cortex/api-client';
 import { queryClient } from '../../app/queryClient';
 
-/** Re-renders the calling component whenever the stored token changes. */
-export function useAuthToken(): string | null {
-  return useSyncExternalStore(subscribeToken, getToken);
-}
+export { useAuthToken, useSessionReady } from '@flow-cortex/api-client';
 
 /** The signed-in user's own record; disabled while signed out. */
 export function useMeQuery() {
@@ -31,16 +27,16 @@ export function useMeQuery() {
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: LoginRequest) => unwrap(loginRequest(input)),
+    mutationFn: (input: LoginRequest) => unwrap(loginRequest({ ...input, rememberMe: true })),
     onSuccess: (data) => {
-      setToken(data.token ?? null, true);
+      setToken(data.accessToken ?? null, true);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
 
-/** Signs out and forgets every cached result, so the next account starts from nothing. */
-export function logout(): void {
-  setToken(null);
+/** Signs out, then drops every cached result so the next account starts from nothing. */
+export async function logout(): Promise<void> {
+  await signOut();
   queryClient.clear();
 }

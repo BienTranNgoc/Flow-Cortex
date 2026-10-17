@@ -4,10 +4,13 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ReviewTaskService;
 import com.flowcortex.workflow.api.ReviewTaskView;
+import com.flowcortex.workflow.api.ScriptRevisionView;
 import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.domain.ScriptRevision;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
+import com.flowcortex.workflow.infrastructure.ScriptRevisionRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -16,6 +19,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     private final ReviewTaskRepository reviewTaskRepository;
     private final RunStepRepository runStepRepository;
     private final WorkflowRunRepository workflowRunRepository;
+    private final ScriptRevisionRepository scriptRevisionRepository;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -39,21 +44,25 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         ReviewTaskRepository reviewTaskRepository,
         RunStepRepository runStepRepository,
         WorkflowRunRepository workflowRunRepository,
+        ScriptRevisionRepository scriptRevisionRepository,
         ApplicationEventPublisher events
     ) {
-        this(reviewTaskRepository, runStepRepository, workflowRunRepository, events, Clock.systemUTC());
+        this(reviewTaskRepository, runStepRepository, workflowRunRepository, scriptRevisionRepository,
+                events, Clock.systemUTC());
     }
 
     ReviewTaskServiceImpl(
         ReviewTaskRepository reviewTaskRepository,
         RunStepRepository runStepRepository,
         WorkflowRunRepository workflowRunRepository,
+        ScriptRevisionRepository scriptRevisionRepository,
         ApplicationEventPublisher events,
         Clock clock
     ) {
         this.reviewTaskRepository = reviewTaskRepository;
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
+        this.scriptRevisionRepository = scriptRevisionRepository;
         this.events = events;
         this.clock = clock;
     }
@@ -71,7 +80,8 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     }
 
     @Override
-    public ReviewTaskView approveTask(UUID taskId, UUID reviewerId, String reviewedPayload) {
+    public ReviewTaskView approveTask(UUID taskId, UUID reviewerId, String reviewedPayload,
+            UUID revisionId, Long expectedVersion) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
             .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
 
@@ -79,12 +89,60 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         workflowRunRepository.findByIdAndOwnerId(task.getRunId(), reviewerId)
             .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
 
-        task.approve(reviewerId, reviewedPayload, clock.instant());
-        String payload = task.getReviewedPayload() != null && !task.getReviewedPayload().isBlank()
-                ? task.getReviewedPayload() : task.getOriginalPayload();
+        String payload;
+        if (task.getCurrentRevisionId() != null) {
+            if (revisionId == null || expectedVersion == null) {
+                throw new ConflictException("revisionId and expectedVersion are required for script approval");
+            }
+            if (reviewedPayload != null) {
+                throw new ConflictException("reviewedPayload is not accepted for script approval");
+            }
+            ScriptRevision revision = scriptRevisionRepository.findByIdAndReviewTaskId(revisionId, taskId)
+                    .orElseThrow(() -> new NotFoundException("Script revision not found: " + revisionId));
+            task.approveRevision(reviewerId, revisionId, expectedVersion, clock.instant());
+            payload = revision.getContent();
+        } else {
+            if (revisionId != null || expectedVersion != null) {
+                throw new ConflictException("revisionId and expectedVersion are not accepted for plain approval");
+            }
+            task.approve(reviewerId, reviewedPayload, clock.instant());
+            payload = task.getReviewedPayload() != null && !task.getReviewedPayload().isBlank()
+                    ? task.getReviewedPayload() : task.getOriginalPayload();
+        }
         ReviewTaskView view = toView(reviewTaskRepository.save(task));
-        events.publishEvent(new ReviewTaskApprovedEvent(task.getId(), task.getRunId(), payload));
+        events.publishEvent(new ReviewTaskApprovedEvent(
+                task.getId(), task.getRunId(), payload, task.getApprovedRevisionId()));
         return view;
+    }
+
+    @Override
+    public ScriptRevisionView saveRevision(UUID taskId, UUID reviewerId, String content, long expectedVersion) {
+        ReviewTask task = ownedTask(taskId, reviewerId);
+        if (task.getCurrentRevisionId() == null) {
+            throw new ConflictException("This review task does not use script revisions");
+        }
+        // The `@Version` guard in `attachRevision` runs inside this transaction, so a stale tab
+        // rolls the insert back; the flush turns a concurrent writer's `revision_number` clash into
+        // the same 409 rather than a 500.
+        ScriptRevision revision = new ScriptRevision(UUID.randomUUID(), task.getRunId(), taskId,
+                Math.toIntExact(scriptRevisionRepository.countByReviewTaskId(taskId) + 1),
+                content.trim(), reviewerId, clock.instant());
+        try {
+            scriptRevisionRepository.saveAndFlush(revision);
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("Another revision was saved first; reload and try again");
+        }
+        task.attachRevision(revision.getId(), expectedVersion);
+        reviewTaskRepository.saveAndFlush(task);
+        return toView(revision, task.getVersion());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ScriptRevisionView> getRevisions(UUID taskId, UUID ownerId) {
+        ownedTask(taskId, ownerId);
+        return scriptRevisionRepository.findByReviewTaskIdOrderByRevisionNumberAsc(taskId).stream()
+                .map(revision -> toView(revision, null)).toList();
     }
 
     @Override
@@ -118,7 +176,24 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
             task.getReviewedPayload(),
             task.getReviewedBy(),
             task.getReviewedAt(),
-            task.getCreatedAt()
+            task.getCreatedAt(),
+            task.getVersion(),
+            task.getCurrentRevisionId(),
+            task.getApprovedRevisionId()
         );
+    }
+
+    private ScriptRevisionView toView(ScriptRevision revision, Long reviewTaskVersion) {
+        return new ScriptRevisionView(revision.getId(), revision.getRunId(), revision.getReviewTaskId(),
+                revision.getRevisionNumber(), revision.getContent(), revision.getCreatedBy(), revision.getCreatedAt(),
+                reviewTaskVersion);
+    }
+
+    private ReviewTask ownedTask(UUID taskId, UUID ownerId) {
+        ReviewTask task = reviewTaskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
+        workflowRunRepository.findByIdAndOwnerId(task.getRunId(), ownerId)
+                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+        return task;
     }
 }

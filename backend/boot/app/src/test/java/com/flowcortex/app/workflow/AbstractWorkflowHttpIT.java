@@ -27,7 +27,7 @@ public abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
                 restTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, password),
                         TokenResponse.class);
         TokenResponse body = response.getBody();
-        return body != null ? body.token() : null;
+        return body != null ? body.accessToken() : null;
     }
 
     /** Logs in as a freshly-seeded user (via {@code newUser}) and returns its token. */
@@ -58,7 +58,7 @@ public abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
     record LoginRequest(String email, String password) {
     }
 
-    record TokenResponse(String token) {
+    record TokenResponse(String accessToken) {
     }
 
     record StartRunRequestView(String input) {

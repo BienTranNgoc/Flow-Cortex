@@ -161,7 +161,7 @@ export function AdminLayout() {
                       className="admin-account-signout"
                       onClick={() => {
                         setMenuOpen(false);
-                        logout();
+                        void logout();
                       }}
                     >
                       Sign out

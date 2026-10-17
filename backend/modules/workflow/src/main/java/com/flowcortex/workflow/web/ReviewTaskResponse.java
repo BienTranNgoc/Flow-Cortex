@@ -14,7 +14,10 @@ public record ReviewTaskResponse(
     String reviewedPayload,
     UUID reviewedBy,
     Instant reviewedAt,
-    Instant createdAt
+    Instant createdAt,
+    Long version,
+    UUID currentRevisionId,
+    UUID approvedRevisionId
 ) {
     public static ReviewTaskResponse from(ReviewTaskView view) {
         return new ReviewTaskResponse(
@@ -27,7 +30,10 @@ public record ReviewTaskResponse(
             view.reviewedPayload(),
             view.reviewedBy(),
             view.reviewedAt(),
-            view.createdAt()
+            view.createdAt(),
+            view.version(),
+            view.currentRevisionId(),
+            view.approvedRevisionId()
         );
     }
 }

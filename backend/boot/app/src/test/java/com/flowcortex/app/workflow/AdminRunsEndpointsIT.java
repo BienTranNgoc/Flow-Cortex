@@ -346,7 +346,8 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
 
         assertThat(all.items()).extracting(MediaJobItem::jobId).containsExactly(failed, waiting, pickedUp);
         assertThat(all.items()).extracting(MediaJobItem::jobId).doesNotContain(inline);
-        assertThat(all.total()).isEqualTo(count("SELECT count(*) FROM run_step WHERE type = 'probe'"));
+        assertThat(all.total()).isEqualTo(count(
+                "SELECT count(*) FROM run_step WHERE type IN ('probe', 'extract_audio', 'render_video')"));
         MediaJobItem job = all.items().get(2);
         assertThat(job.runId()).isEqualTo(runningRun);
         assertThat(job.stepOrder()).isEqualTo(1);
@@ -363,7 +364,8 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(all.items().get(0).errorCode()).isEqualTo("probe_failed");
         assertThat(running.items()).extracting(MediaJobItem::jobId).containsExactly(waiting, pickedUp);
         assertThat(running.total())
-                .isEqualTo(count("SELECT count(*) FROM run_step WHERE type = 'probe' AND status = 'running'"));
+                .isEqualTo(count("SELECT count(*) FROM run_step WHERE type IN "
+                        + "('probe', 'extract_audio', 'render_video') AND status = 'running'"));
     }
 
     private static Instant nextBase() {

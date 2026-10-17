@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -48,6 +50,9 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
      * here); the JDK client returns the 429 as is.
      */
     private TestRestTemplate registerClient;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     record ProblemView(int status, String detail) {
     }
@@ -90,7 +95,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
                 restTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, "correct-password-1"),
                         TokenResponse.class);
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String token = loginResponse.getBody().token();
+        String token = loginResponse.getBody().accessToken();
         assertThat(token).isNotBlank();
 
         ResponseEntity<MeView> meResponse = get("/api/v1/auth/me", token, MeView.class);
@@ -215,13 +220,77 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
                 new RegisterRequest(email, "register-password-1", "Self Registered"), TokenResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        String token = response.getBody().token();
+        String token = response.getBody().accessToken();
         assertThat(token).isNotBlank();
         MeView me = get("/api/v1/auth/me", token, MeView.class).getBody();
         assertThat(me.email()).isEqualTo(email);
         assertThat(me.role()).isEqualTo("MEMBER");
 
         assertThat(login(email, "register-password-1")).isNotBlank();
+    }
+
+    @Test
+    void anEmailRegisteredInMixedCaseLogsInWithTheLowerCaseSpellingAndStaysUniqueAcrossCase() {
+        String lower = uniqueEmail("case-sensitive");
+
+        ResponseEntity<String> first = register(newClientIp(),
+                new RegisterRequest(lower.toUpperCase(Locale.ROOT), "register-password-1", "Case"), String.class);
+        ResponseEntity<String> second = register(newClientIp(),
+                new RegisterRequest(lower, "register-password-1", "Case Twin"), String.class);
+
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(login(lower, "register-password-1")).isNotBlank();
+        assertThat(login(lower.toUpperCase(Locale.ROOT), "register-password-1")).isNotBlank();
+        assertThat(jdbc.queryForObject("SELECT email FROM app_user WHERE lower(email) = ?", String.class, lower))
+                .isEqualTo(lower);
+    }
+
+    @Test
+    void anOverlongEmailIsRejectedAs400OnLoginAndRegister() {
+        String overlong = "a".repeat(250) + "@x.io";
+
+        assertThat(loginRaw(overlong, "whatever-password").getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(register(newClientIp(), new RegisterRequest(overlong, "register-password-1", "Long"),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void registerAnswersTheAccessTokenOnlySetsTheRefreshCookieAndIsAuditedOnce() {
+        String email = uniqueEmail("register-shape");
+        String clientIp = newClientIp();
+
+        ResponseEntity<String> response = register(clientIp,
+                new RegisterRequest(email, "register-password-1", "Shape"), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).contains("\"accessToken\"").contains("\"expiresIn\"")
+                .doesNotContain("refreshToken");
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).anyMatch(
+                cookie -> cookie.startsWith("refresh_token=") && cookie.contains("HttpOnly")
+                        && !cookie.contains("Max-Age"));
+        assertThat(auditCount("REGISTRATION_ACCEPTED", email)).isEqualTo(1);
+        assertThat(auditCount("LOGIN_SUCCESS", email)).isZero();
+    }
+
+    @Test
+    void aRateLimitedRegistrationIsAudited() {
+        String clientIp = newClientIp();
+        for (int attempt = 1; attempt <= PER_IP_CAPACITY; attempt++) {
+            register(clientIp, new RegisterRequest(uniqueEmail("register-audit"), "register-password-1", "A"),
+                    String.class);
+        }
+
+        register(clientIp, new RegisterRequest(uniqueEmail("register-audit"), "register-password-1", "Over"),
+                String.class);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE type = ? AND ip = ?", Integer.class,
+                "REGISTRATION_REJECTED_RATE_LIMITED", clientIp)).isEqualTo(1);
+    }
+
+    private int auditCount(String type, String email) {
+        return jdbc.queryForObject("SELECT count(*) FROM auth_event e JOIN app_user u ON u.id = e.user_id"
+                + " WHERE e.type = ? AND u.email = ?", Integer.class, type, email);
     }
 
     @Test

@@ -34,14 +34,17 @@ class MediaJob(BaseModel):
         ),
     ]
     stepOrder: Annotated[StrictInt, Field(ge=1)]
-    capability: Annotated[Literal["probe", "extract_audio"], Field(title="MediaCapability")]
+    capability: Annotated[
+        Literal["probe", "extract_audio", "align_audio", "render_video"],
+        Field(title="MediaCapability"),
+    ]
     inputs: Annotated[list[MediaJobInput], Field(min_length=1)]
     params: dict[str, Any]
     outputPrefix: Annotated[
         StrictStr,
         Field(
-            description="The only key prefix the worker writes under: runs/{runId}/steps/{stepOrder}/.",
-            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/$",
+            description="The only key prefix the worker writes under. New jobs use runs/{runId}/steps/{stepOrder}/attempts/{attempt}/; the shorter legacy shape remains readable during rollout.",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/(?:attempts/[1-9][0-9]*/)?$",
         ),
     ]
     attempt: Annotated[StrictInt, Field(ge=1)]

@@ -15,7 +15,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+
+    "types": ["vitest/globals"]
   },
-  "include": ["src", "orval.config.ts"]
+  "include": ["src", "orval.config.ts", "vite.config.ts"]
 }
