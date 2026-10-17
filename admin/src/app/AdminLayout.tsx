@@ -40,6 +40,20 @@ export function AdminLayout() {
     }
   }, [accountOpen]);
 
+  useEffect(() => {
+    const dialog = accountDialogRef.current;
+    if (!dialog) {
+      return;
+    }
+    const handleBackdropClick = (event: MouseEvent) => {
+      if (event.target === dialog) {
+        dialog.close();
+      }
+    };
+    dialog.addEventListener('click', handleBackdropClick);
+    return () => dialog.removeEventListener('click', handleBackdropClick);
+  }, []);
+
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -62,12 +76,16 @@ export function AdminLayout() {
 
     event.preventDefault();
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const nextIndex =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? items.length - 1
-          : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    let nextIndex: number;
+    if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = items.length - 1;
+    } else if (event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % items.length;
+    } else {
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
+    }
     items[nextIndex]?.focus();
   };
 
@@ -107,6 +125,7 @@ export function AdminLayout() {
                   id="admin-account-dropdown"
                   className="admin-account-dropdown"
                   role="menu"
+                  tabIndex={-1}
                   aria-label="Account menu"
                   onKeyDown={onMenuKeyDown}
                   onBlur={(event) => {
@@ -118,15 +137,11 @@ export function AdminLayout() {
                     }
                   }}
                 >
-                  <div
-                    className="admin-account-summary"
-                    role="group"
-                    aria-label="Signed-in account"
-                  >
+                  <fieldset className="admin-account-summary" aria-label="Signed-in account">
                     <strong>{displayName}</strong>
                     <span>{me.email}</span>
                     <span className="status-badge">{me.role}</span>
-                  </div>
+                  </fieldset>
                   <div className="admin-account-menu-items">
                     <button type="button" role="menuitem" onClick={openAccount}>
                       Account
@@ -139,7 +154,7 @@ export function AdminLayout() {
                       <span>Language</span>
                       <small>Coming soon</small>
                     </button>
-                    <div className="admin-account-divider" role="separator" />
+                    <hr className="admin-account-divider" />
                     <button
                       type="button"
                       role="menuitem"
@@ -162,11 +177,6 @@ export function AdminLayout() {
               onClose={() => {
                 setAccountOpen(false);
                 triggerRef.current?.focus();
-              }}
-              onClick={(event) => {
-                if (event.target === event.currentTarget) {
-                  accountDialogRef.current?.close();
-                }
               }}
             >
               <div className="admin-account-dialog-heading">

@@ -178,11 +178,7 @@ export function UserDetailPage() {
             {nextStatus === 'SUSPENDED' ? 'Suspend account' : 'Reactivate account'}
           </button>
           {updateError && <p role="alert">{updateError.detail}</p>}
-          {updateMutation.isSuccess && (
-            <p className="success-note" role="status">
-              Account updated.
-            </p>
-          )}
+          {updateMutation.isSuccess && <output className="success-note">Account updated.</output>}
         </section>
       </div>
     </main>
