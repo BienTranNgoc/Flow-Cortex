@@ -8,16 +8,18 @@ import wave
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from pydantic import ValidationError
 
 from ..errors import PermanentError
 from .adapter import (
-    ProviderAdapter,
+    ScriptAdapter,
+    SpeechAdapter,
     SpeechIdentity,
     SpeechRequest,
     StoryboardRequest,
+    VideoAdapter,
     VideoIdentity,
     VideoRequest,
 )
@@ -70,7 +72,7 @@ class ExecutionContext:
 Handler = Callable[
     [
         GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
-        ProviderAdapter,
+        ScriptAdapter | SpeechAdapter | VideoAdapter,
         ExecutionContext,
     ],
     ProviderOutcome,
@@ -78,7 +80,9 @@ Handler = Callable[
 
 
 def execute(
-    job: ProviderJob, adapter: ProviderAdapter, context: ExecutionContext
+    job: ProviderJob,
+    adapter: ScriptAdapter | SpeechAdapter | VideoAdapter,
+    context: ExecutionContext,
 ) -> ProviderOutcome:
     request = job.root
     key = (request.capability, request.params.profile)
@@ -91,7 +95,7 @@ def execute(
 
 def _generate_script(
     job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
-    adapter: ProviderAdapter,
+    adapter: ScriptAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateScriptJob):
@@ -104,7 +108,7 @@ def _generate_script(
 
 def _generate_speech(
     job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
-    adapter: ProviderAdapter,
+    adapter: SpeechAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateSpeechJob):
@@ -115,7 +119,7 @@ def _generate_speech(
     reused = _reuse_existing_artifact(context, request, identity)
     if reused is not None:
         return reused
-    speech = adapter.generate_speech(request)
+    speech = adapter.generate_speech(request, context.abort)
     if (speech.provider, speech.voice, speech.speed) != (
         identity.provider,
         identity.voice,
@@ -144,7 +148,7 @@ def _generate_speech(
 
 def _generate_storyboard(
     job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
-    adapter: ProviderAdapter,
+    adapter: ScriptAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateStoryboardJob):
@@ -164,7 +168,7 @@ def _generate_storyboard(
 
 def _generate_video(
     job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
-    adapter: ProviderAdapter,
+    adapter: VideoAdapter,
     context: ExecutionContext,
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateVideoJob):
@@ -427,9 +431,12 @@ def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> st
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-_CAPABILITIES: dict[tuple[str, str], Handler] = {
-    ("generate_script", "product_ad_v1"): _generate_script,
-    ("generate_storyboard", "product_ad_storyboard_v1"): _generate_storyboard,
-    ("generate_speech", "vi_voice_v1"): _generate_speech,
-    ("generate_video", "vertical_ad_clip_v1"): _generate_video,
-}
+_CAPABILITIES: dict[tuple[str, str], Handler] = cast(
+    dict[tuple[str, str], Handler],
+    {
+        ("generate_script", "product_ad_v1"): _generate_script,
+        ("generate_storyboard", "product_ad_storyboard_v1"): _generate_storyboard,
+        ("generate_speech", "vi_voice_v1"): _generate_speech,
+        ("generate_video", "vertical_ad_clip_v1"): _generate_video,
+    },
+)

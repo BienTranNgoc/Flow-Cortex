@@ -173,14 +173,11 @@ class MediaContractSchemaTest {
         assertThat(providerSpeechSchema.validate(MAPPER.valueToTree(
                 speechData(4200)))).isEmpty();
         assertThat(VALIDATOR.validate(speechData(4200))).isEmpty();
-<<<<<<< HEAD
 
         ProviderStoryboardData storyboard = new ProviderStoryboardData(
                 "product_ad_storyboard_v1", REVISION_ID, "Opening product hook", "Benefit close");
         assertThat(providerStoryboardSchema.validate(MAPPER.valueToTree(storyboard))).isEmpty();
         assertThat(VALIDATOR.validate(storyboard)).isEmpty();
-=======
->>>>>>> development
     }
 
     /** The provider schemas bound what Bean Validation alone cannot, so the case that motivated

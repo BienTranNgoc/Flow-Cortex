@@ -440,7 +440,7 @@ def test_video_capability_normalises_clip_to_five_seconds() -> None:
             return VideoArtifact(_decodable_mp4(), task_id)
 
     context = dataclasses.replace(_empty_context(), abort=_Abort())
-    outcome = execute(_video_job(), _Adapter(), context)  # type: ignore[arg-type]
+    outcome = execute(_video_job(), _Adapter(), context)
     data = ProviderVideoData.model_validate(outcome.data)
     assert data.provider == "seedance"
     assert data.durationSeconds == 5
@@ -496,7 +496,7 @@ def test_video_capability_uses_existing_checkpoint_without_resubmit(
         abort=MagicMock(),
     )
     with pytest.raises(PermanentError):
-        execute(_video_job(), _Adapter(), context)  # type: ignore[arg-type]
+        execute(_video_job(), _Adapter(), context)
     assert submitted == []  # checkpoint was honoured; no new task was created.
 
 

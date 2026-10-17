@@ -13,6 +13,7 @@ from typing import Any, NoReturn, cast
 
 from ..errors import PermanentError, TransientError
 from .adapter import (
+    Abort,
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
@@ -65,7 +66,7 @@ class WanAdapter:
             "provider_capability_unavailable", "Wan speech generation is not implemented"
         )
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         raise PermanentError(
             "provider_capability_unavailable", "Wan speech generation is not implemented"
         )

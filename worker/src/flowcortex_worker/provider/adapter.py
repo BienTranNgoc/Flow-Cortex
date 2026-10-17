@@ -89,19 +89,25 @@ class VideoAbort(Protocol):
     def check(self) -> None: ...
 
 
-class ProviderAdapter(Protocol):
+class ScriptAdapter(Protocol):
     def generate_script(self, payload: ProductAdPayload) -> str: ...
     def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
 
+
+class SpeechAdapter(Protocol):
     def speech_identity(self) -> SpeechIdentity: ...
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact: ...
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact: ...
 
+class VideoAdapter(Protocol):
     def video_identity(self) -> VideoIdentity: ...
-
     def submit_video(self, request: VideoRequest) -> str: ...
-
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact: ...
+
+
+class ProviderAdapter(ScriptAdapter, SpeechAdapter, VideoAdapter, Protocol):
+    """A provider that handles every capability. Capability-scoped adapters implement
+    only the relevant sub-protocol and are routed by CapabilityProviderAdapter."""
 
 
 @dataclass(frozen=True)
@@ -113,9 +119,9 @@ class CapabilityProviderAdapter:
     pretending to support the other capability.
     """
 
-    script_adapter: ProviderAdapter
-    speech_adapter: ProviderAdapter
-    video_adapter: ProviderAdapter
+    script_adapter: ScriptAdapter
+    speech_adapter: SpeechAdapter
+    video_adapter: VideoAdapter
 
     def generate_script(self, payload: ProductAdPayload) -> str:
         return self.script_adapter.generate_script(payload)
@@ -126,8 +132,8 @@ class CapabilityProviderAdapter:
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
-        return self.speech_adapter.generate_speech(request)
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
+        return self.speech_adapter.generate_speech(request, abort)
 
     def video_identity(self) -> VideoIdentity:
         return self.video_adapter.video_identity()
@@ -165,7 +171,8 @@ class FixtureProviderAdapter:
     def speech_identity(self) -> SpeechIdentity:
         return SpeechIdentity("fixture", "silence", "+0%", 16_000)
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
+        abort.check()
         duration_ms = min(30_000, max(15_000, len(request.script) * 55))
         frames = duration_ms * 16
         output = io.BytesIO()

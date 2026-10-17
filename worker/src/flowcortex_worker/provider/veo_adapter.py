@@ -14,6 +14,7 @@ from typing import Any, NoReturn
 
 from ..errors import PermanentError, TransientError
 from .adapter import (
+    Abort,
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
@@ -61,7 +62,7 @@ class VeoAdapter:
             "provider_capability_unavailable", "Veo speech generation is not implemented"
         )
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         raise PermanentError(
             "provider_capability_unavailable", "Veo speech generation is not implemented"
         )

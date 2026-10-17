@@ -19,7 +19,13 @@ from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
 from flowcortex_worker.storage import Storage, client_from, remove_leftovers
 
-from .adapter import CapabilityProviderAdapter, FixtureProviderAdapter, ProviderAdapter
+from .adapter import (
+    CapabilityProviderAdapter,
+    FixtureProviderAdapter,
+    ScriptAdapter,
+    SpeechAdapter,
+    VideoAdapter,
+)
 from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
@@ -65,7 +71,7 @@ def main() -> int:
     params.blocked_connection_timeout = 300
     params.client_properties = {"connection_name": f"provider-worker {settings.worker_id}"}
     storage = Storage(client_from(settings), settings.s3_bucket, settings.s3_upload_bucket)
-    adapter: ProviderAdapter = _build_adapter()
+    adapter: CapabilityProviderAdapter = _build_adapter()
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=JOB_THREAD_PREFIX)
 
     def parse_job(body: bytes) -> Any:
@@ -183,7 +189,8 @@ def _build_adapter() -> CapabilityProviderAdapter:
         video_model = generic_video_model
 
     script_adapter = _build_script_adapter(
-        script_provider, script_api_key, script_base_url, script_model
+        script_provider, script_api_key, script_base_url, script_model,
+        explicit=bool(os.environ.get("SCRIPT_PROVIDER", "").strip()),
     )
     speech_adapter = _build_speech_adapter(
         speech_provider, speech_api_key, speech_base_url, speech_model
@@ -203,12 +210,21 @@ def _build_adapter() -> CapabilityProviderAdapter:
 
 
 def _build_script_adapter(
-    provider: str, api_key: str, base_url: str, model: str
-) -> ProviderAdapter:
+    provider: str, api_key: str, base_url: str, model: str, explicit: bool = False
+) -> ScriptAdapter:
     if provider == PROVIDER_OPENAI:
         return select_adapter(provider, api_key, base_url=base_url, model=model)
-    if provider in {PROVIDER_FIXTURE, PROVIDER_EDGE}:
-        # `edge` preserves the old PROVIDER_ADAPTER=edge behaviour for existing environments.
+    if provider == PROVIDER_FIXTURE:
+        return FixtureProviderAdapter()
+    if provider == PROVIDER_EDGE:
+        if explicit:
+            raise RuntimeError(
+                f"Unknown SCRIPT_PROVIDER '{provider}'; accepted values: "
+                f"{PROVIDER_FIXTURE}, {PROVIDER_OPENAI}"
+            )
+        log.warning(
+            "EDGE has no script generation; falling back to the fixture adapter"
+        )
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown SCRIPT_PROVIDER '{provider}'; accepted values: "
@@ -218,7 +234,7 @@ def _build_script_adapter(
 
 def _build_speech_adapter(
     provider: str, api_key: str, base_url: str, model: str
-) -> ProviderAdapter:
+) -> SpeechAdapter:
     if provider == PROVIDER_EDGE:
         return EdgeSpeechAdapter(config_from_env())
     if provider == PROVIDER_OPENAI:
@@ -234,7 +250,7 @@ def _build_speech_adapter(
 
 def _build_video_adapter(
     provider: str, api_key: str, base_url: str, model: str
-) -> ProviderAdapter:
+) -> VideoAdapter:
     if provider == PROVIDER_SEEDANCE:
         if not api_key:
             raise RuntimeError("Seedance video provider requires SEEDANCE_API_KEY")
