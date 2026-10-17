@@ -276,11 +276,20 @@ services:
       OTEL_TRACES_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
-      # Provider adapter for `generate_script`. `openai` is the only real adapter now
-      # (GitHub Models sunset, removed 2026-10-11); any other value (or unset) keeps the
-      # deterministic stub for local-only demos. The worker refuses to boot when the
-      # secret does not match the chosen adapter (see `select_adapter`).
+      # PROVIDER_ADAPTER is the backwards-compatible fallback. New deployments route each
+      # capability independently so OpenAI copy and Edge speech can run in one workflow.
       PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
+      SCRIPT_PROVIDER: ${SCRIPT_PROVIDER:-}
+      SPEECH_PROVIDER: ${SPEECH_PROVIDER:-}
+      SCRIPT_PROVIDER_API_KEY: ${SCRIPT_PROVIDER_API_KEY:-}
+      SPEECH_PROVIDER_API_KEY: ${SPEECH_PROVIDER_API_KEY:-}
+      SCRIPT_PROVIDER_BASE_URL: ${SCRIPT_PROVIDER_BASE_URL:-}
+      SCRIPT_PROVIDER_MODEL: ${SCRIPT_PROVIDER_MODEL:-}
+      SPEECH_PROVIDER_BASE_URL: ${SPEECH_PROVIDER_BASE_URL:-}
+      SPEECH_PROVIDER_MODEL: ${SPEECH_PROVIDER_MODEL:-}
+      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-HoaiMyNeural}
+      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
+      FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
       FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}

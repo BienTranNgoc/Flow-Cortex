@@ -35,6 +35,7 @@ class SpeechPayload(BaseModel):
         extra="forbid",
     )
     script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
+    sourceRevisionId: UUID
 
 
 class SpeechParams(BaseModel):

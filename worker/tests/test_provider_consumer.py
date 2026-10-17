@@ -5,12 +5,13 @@ from typing import Any
 from conftest import FakeConnection, FakeStorage, assert_valid, published, run_consumer, settled
 
 from flowcortex_worker.provider.adapter import FixtureProviderAdapter
-from flowcortex_worker.provider.capabilities import execute
+from flowcortex_worker.provider.capabilities import ExecutionContext, execute
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.runtime import ProcessRunner
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
+REVISION_ID = "a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"
 
 
 def provider_job(capability: str, profile: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -37,7 +38,17 @@ def run_provider(conn: FakeConnection, storage: FakeStorage) -> None:
 
     def execute_job(job: Any, runner: ProcessRunner) -> Any:
         runner.check()
-        return execute(ProviderJob(root=job), adapter)
+        request = job.root if hasattr(job, "root") else job
+        return execute(
+            ProviderJob(root=job),
+            adapter,
+            ExecutionContext(
+                storage=storage,
+                bucket=storage.bucket,
+                output_prefix=request.outputPrefix,
+                abort=runner,
+            ),
+        )
 
     run_consumer(
         conn,
@@ -83,7 +94,10 @@ def test_speech_job_writes_attempt_scoped_audio_output() -> None:
         provider_job(
             "generate_speech",
             "vi_voice_v1",
-            {"script": "Khám phá sản phẩm và đặt mua ngay hôm nay"},
+            {
+                "script": "Khám phá sản phẩm và đặt mua ngay hôm nay",
+                "sourceRevisionId": REVISION_ID,
+            },
         )
     )
     storage = FakeStorage()
@@ -96,4 +110,6 @@ def test_speech_job_writes_attempt_scoped_audio_output() -> None:
     assert output["objectKey"] == expected_key
     assert output["mime"] == "audio/wav"
     assert storage.puts[expected_key][1] == "audio/wav"
+    assert result["outputs"][1]["objectKey"].endswith("/manifest.json")
+    assert result["data"]["sourceRevisionId"] == REVISION_ID
     assert 15_000 <= result["data"]["durationMs"] <= 30_000

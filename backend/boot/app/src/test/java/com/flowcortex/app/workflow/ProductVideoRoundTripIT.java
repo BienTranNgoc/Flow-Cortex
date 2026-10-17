@@ -78,11 +78,19 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         JsonNode speechJob = receiveJob("provider.jobs", runId, "generate_speech");
+        assertThat(speechJob.path("params").path("payload").path("sourceRevisionId").asString())
+                .isEqualTo(review.currentRevisionId().toString());
         String speechKey = outputKey(speechJob, "speech.wav");
+        String manifestKey = outputKey(speechJob, "manifest.json");
         put(MEDIA_BUCKET, speechKey, "audio/wav", "valid fixture wav");
+        put(MEDIA_BUCKET, manifestKey, "application/json", "{}");
         publishResult("provider", runId, speechJob,
-                output("speech.wav", speechKey, "audio/wav", 17),
-                "{\"profile\":\"vi_voice_v1\",\"durationMs\":15000}");
+                output("speech.wav", speechKey, "audio/wav", 17) + ","
+                        + output("manifest.json", manifestKey, "application/json", 2),
+                "{\"profile\":\"vi_voice_v1\",\"durationMs\":15000,"
+                        + "\"provider\":\"fixture\",\"voice\":\"silence\",\"speed\":\"+0%\","
+                        + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
+                        + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
         JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
