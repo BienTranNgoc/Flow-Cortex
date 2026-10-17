@@ -52,6 +52,8 @@ class MediaContractSchemaTest {
 
     private static final UUID JOB_ID = UUID.fromString("5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11");
     private static final UUID RUN_ID = UUID.fromString("0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f");
+    private static final UUID REVISION_ID = UUID.fromString("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4");
+    private static final String IDEMPOTENCY_KEY = "a".repeat(64);
     private static final Instant AT = Instant.parse("2026-09-30T12:00:00Z");
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -127,7 +129,8 @@ class MediaContractSchemaTest {
 
     static ProviderJob generateSpeechJob() {
         return new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_speech",
-                Map.of("profile", "vi_voice_v1", "payload", Map.of("script", "Mua máy lọc nước ngay hôm nay")),
+                Map.of("profile", "vi_voice_v1", "payload", Map.of(
+                        "script", "Mua máy lọc nước ngay hôm nay", "sourceRevisionId", REVISION_ID)),
                 MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
     }
 
@@ -151,8 +154,8 @@ class MediaContractSchemaTest {
                 new ProviderScriptData("product_ad_v1", "vi", "Mua máy lọc nước ngay hôm nay"))).isEmpty();
 
         assertThat(providerSpeechSchema.validate(MAPPER.valueToTree(
-                new ProviderSpeechData("vi_voice_v1", 4200)))).isEmpty();
-        assertThat(VALIDATOR.validate(new ProviderSpeechData("vi_voice_v1", 4200))).isEmpty();
+                speechData(4200)))).isEmpty();
+        assertThat(VALIDATOR.validate(speechData(4200))).isEmpty();
     }
 
     /** The provider schemas bound what Bean Validation alone cannot, so the case that motivated
@@ -183,10 +186,15 @@ class MediaContractSchemaTest {
 
     @Test
     void providerSpeechDataWithADurationBelowOneIsRejectedBySchemaAndByBeanValidation() {
-        ProviderSpeechData zeroDuration = new ProviderSpeechData("vi_voice_v1", 0);
+        ProviderSpeechData zeroDuration = speechData(0);
 
         assertThat(providerSpeechSchema.validate(MAPPER.valueToTree(zeroDuration))).isNotEmpty();
         assertThat(VALIDATOR.validate(zeroDuration)).isNotEmpty();
+    }
+
+    private static ProviderSpeechData speechData(int durationMs) {
+        return new ProviderSpeechData("vi_voice_v1", durationMs, "edge", "vi-VN-HoaiMyNeural",
+                "+0%", REVISION_ID, IDEMPOTENCY_KEY, "wav");
     }
 
     @Test

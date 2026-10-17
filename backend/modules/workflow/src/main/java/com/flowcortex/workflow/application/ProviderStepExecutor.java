@@ -73,13 +73,10 @@ class ProviderStepExecutor implements StepExecutor {
         if (input == null || input.isBlank()) {
             throw new StepFailedException("contract_violation", "The provider step has no input");
         }
-        if ("generate_speech".equals(capability)) {
-            return Map.of("script", input);
-        }
         try {
             return objectMapper.readValue(input, OBJECT);
         } catch (JsonProcessingException e) {
-            throw new StepFailedException("contract_violation", "Product metadata is not valid JSON", e);
+            throw new StepFailedException("contract_violation", "Provider input is not valid JSON", e);
         }
     }
 

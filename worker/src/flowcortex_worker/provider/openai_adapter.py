@@ -21,7 +21,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from ..errors import PermanentError, TransientError
-from .adapter import SpeechArtifact
+from .adapter import Abort, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
@@ -120,10 +120,11 @@ _SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class OpenAIConfig:
-    """The two values needed by the urllib adapter; no provider SDK is required."""
+    """Capability-scoped OpenAI-compatible endpoint configuration."""
 
     api_key: str
     base_url: str = _OPENAI_BASE_URL
+    model: str = _OPENAI_SCRIPT_MODEL
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,13 @@ class OpenAIProviderAdapter:
             )
         return script
 
-    def generate_speech(self, script: str) -> SpeechArtifact:
+    def speech_identity(self) -> SpeechIdentity:
+        raise PermanentError(
+            "provider_capability_unavailable",
+            "OpenAI speech generation is not implemented",
+        )
+
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         raise PermanentError(
             "provider_capability_unavailable",
             "OpenAI speech generation is not implemented",
@@ -156,7 +163,7 @@ class OpenAIProviderAdapter:
 
     def _request_script(self, payload: ProductAdPayload) -> str:
         body = json.dumps({
-            "model": _OPENAI_SCRIPT_MODEL,
+            "model": self.config.model,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": self._user_message(payload)},
@@ -269,10 +276,18 @@ def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
             return None
 
 
-def select_adapter(provider: str, openai_key: str) -> OpenAIProviderAdapter:
+def select_adapter(
+    provider: str,
+    openai_key: str,
+    *,
+    base_url: str = _OPENAI_BASE_URL,
+    model: str = _OPENAI_SCRIPT_MODEL,
+) -> OpenAIProviderAdapter:
     """Builds the adapter for `provider`; `openai` requires a key, any other name raises."""
     if provider == PROVIDER_OPENAI:
         if not openai_key:
-            raise RuntimeError("PROVIDER_ADAPTER=openai requires OPENAI_API_KEY")
-        return OpenAIProviderAdapter(OpenAIConfig(api_key=openai_key, base_url=_OPENAI_BASE_URL))
+            raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
+        return OpenAIProviderAdapter(
+            OpenAIConfig(api_key=openai_key, base_url=base_url, model=model)
+        )
     raise ValueError(f"Unknown provider adapter: {provider}")

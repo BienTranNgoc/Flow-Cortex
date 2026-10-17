@@ -105,6 +105,8 @@ class Consumer:
         parse_job: Callable[[bytes], Any] | None = None,
         execute_job: Callable[[Any, ProcessRunner], Any] | None = None,
         wait: Callable[[float], Any] | None = None,
+        max_transient_redeliveries: int | None = None,
+        transient_exhausted_code: ErrorCode = "provider_request_failed",
     ) -> None:
         self._connection = connection
         self._storage = storage
@@ -120,6 +122,8 @@ class Consumer:
         self._parse_job = parse_job or MediaJob.model_validate_json
         self._execute_job = execute_job
         self._wait = wait or self._backoff_wait
+        self._max_transient_redeliveries = max_transient_redeliveries
+        self._transient_exhausted_code = transient_exhausted_code
         self._closed = threading.Event()
         self._cancelled = False
         self._in_flight: Delivery | None = None
@@ -366,7 +370,14 @@ class Consumer:
             outputs = []
             for file in outcome.files:
                 key = output_key(job, file.name)
-                size = self._storage.put(key, file.body, file.mime, runner)
+                if getattr(file, "stored", False):
+                    size = (
+                        len(file.body)
+                        if isinstance(file.body, bytes)
+                        else file.body.stat().st_size
+                    )
+                else:
+                    size = self._storage.put(key, file.body, file.mime, runner)
                 outputs.append(
                     MediaOutput(
                         name=file.name,
@@ -394,6 +405,21 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
+        except TransientError as exc:
+            if runner.killed is not None:
+                return self._killed(job, delivery, runner.killed)
+            budget = self._max_transient_redeliveries
+            if budget is None or delivery.count < budget:
+                raise
+            log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+            return self._error(
+                job.jobId,
+                job.runId,
+                job.attempt,
+                delivery.count,
+                self._transient_exhausted_code,
+                f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+            )
         except Exception:
             if runner.killed is None:
                 raise

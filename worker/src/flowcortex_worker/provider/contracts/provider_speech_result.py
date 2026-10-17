@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
+from uuid import UUID
 
 
 class ProviderSpeechData(BaseModel):
@@ -16,3 +17,9 @@ class ProviderSpeechData(BaseModel):
     )
     profile: Literal["vi_voice_v1"]
     durationMs: Annotated[StrictInt, Field(ge=1)]
+    provider: Annotated[StrictStr, Field(max_length=50, min_length=1)]
+    voice: Annotated[StrictStr, Field(max_length=100, min_length=1)]
+    speed: Annotated[StrictStr, Field(pattern="^[+-][0-9]{1,3}%$")]
+    sourceRevisionId: UUID
+    idempotencyKey: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
+    format: Literal["wav"]

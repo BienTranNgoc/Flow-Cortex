@@ -110,7 +110,8 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
                     ? task.getReviewedPayload() : task.getOriginalPayload();
         }
         ReviewTaskView view = toView(reviewTaskRepository.save(task));
-        events.publishEvent(new ReviewTaskApprovedEvent(task.getId(), task.getRunId(), payload));
+        events.publishEvent(new ReviewTaskApprovedEvent(
+                task.getId(), task.getRunId(), payload, task.getApprovedRevisionId()));
         return view;
     }
 

@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJobCompleted;
 import com.flowcortex.media.api.MediaJobProgressed;
@@ -392,7 +393,8 @@ class RunAdvancer {
                 .map(pickedUpAt -> String.valueOf(Duration.between(pickedUpAt, result.finishedAt()).toMillis()))
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {
-            String validationError = validateProviderData(capability, result.data());
+            String validationError = validateProviderData(capability, step.map(RunStep::getInput).orElse(null),
+                    result.data());
             if (validationError != null) {
                 if (transactions.fail(result.runId(), result.jobId(), attempt, "contract_violation",
                         validationError, now)) {
@@ -430,8 +432,9 @@ class RunAdvancer {
     /** Returns a validation-error message when a provider step's {@code data} payload does not match
      * its JSON Schema, otherwise {@code null}. A non-provider step (probe, extract_audio,
      * render_video, …) is left to media's {@code MediaContractSchemaTest} — the field set there is
-     * heterogeneous and its own layer owns those contracts. */
-    private String validateProviderData(String capability, Map<String, Object> data) {
+     * heterogeneous and its own layer owns those contracts. Speech must also name the revision its
+     * job input ({@code jobInput}, the step's stored input) asked for. */
+    private String validateProviderData(String capability, String jobInput, Map<String, Object> data) {
         if (data == null) {
             return "provider result has no data";
         }
@@ -452,10 +455,37 @@ class RunAdvancer {
                         .collect(Collectors.joining(", "));
                 return "Provider " + capability + " data is not valid for its schema: " + reason;
             }
+            if (parsed instanceof ProviderSpeechData speech) {
+                String reason = provenanceMismatch(speech.sourceRevisionId(), jobInput);
+                if (reason != null) {
+                    return "Provider " + capability + " data is not valid for its schema: " + reason;
+                }
+            }
             return null;
         } catch (IllegalArgumentException e) {
             String reason = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
             return "Provider " + capability + " data is not valid for its schema: " + reason;
+        }
+    }
+
+    private String provenanceMismatch(UUID got, String jobInput) {
+        UUID expected = sourceRevisionId(jobInput);
+        if (expected == null) {
+            return "sourceRevisionId " + got + " cannot be matched: the job input has no sourceRevisionId";
+        }
+        return expected.equals(got) ? null
+                : "sourceRevisionId " + got + " does not match the job's " + expected;
+    }
+
+    private UUID sourceRevisionId(String jobInput) {
+        if (jobInput == null || jobInput.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode revision = objectMapper.readTree(jobInput).path("sourceRevisionId");
+            return revision.isTextual() ? UUID.fromString(revision.textValue()) : null;
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            return null;
         }
     }
 

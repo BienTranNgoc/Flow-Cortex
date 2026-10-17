@@ -54,9 +54,10 @@
       "title": "SpeechPayload",
       "type": "object",
       "additionalProperties": false,
-      "required": ["script"],
+      "required": ["script", "sourceRevisionId"],
       "properties": {
-        "script": { "type": "string", "minLength": 1, "maxLength": 8000 }
+        "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
       }
     },
     "speechParams": {
