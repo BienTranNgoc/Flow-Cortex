@@ -8,10 +8,15 @@ const SENTENCES: Record<string, string> = {
   run_timeout: 'This file took too long to process and was stopped. Try a shorter file.',
   media_disabled: 'The media engine is switched off right now.',
   contract_violation: 'The media engine rejected this job. Try again later.',
+  APPROVAL_REJECTED: 'You rejected this content, so the run stopped.',
 };
 
 /** The reaper closes inline steps with these codes too, and those never reached the media engine. */
-const REAPED_CODES: ReadonlySet<string> = new Set(['queue_timeout', 'lease_expired', 'run_timeout']);
+const REAPED_CODES: ReadonlySet<string> = new Set([
+  'queue_timeout',
+  'lease_expired',
+  'run_timeout',
+]);
 const REAPED_INLINE = 'This step stopped before it finished. Try running again.';
 
 export const NO_MESSAGE = 'This step stopped with an error.';

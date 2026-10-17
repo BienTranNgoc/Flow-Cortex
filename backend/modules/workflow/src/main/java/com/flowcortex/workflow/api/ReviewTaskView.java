@@ -13,5 +13,8 @@ public record ReviewTaskView(
     String reviewedPayload,
     UUID reviewedBy,
     Instant reviewedAt,
-    Instant createdAt
+    Instant createdAt,
+    Long version,
+    UUID currentRevisionId,
+    UUID approvedRevisionId
 ) {}

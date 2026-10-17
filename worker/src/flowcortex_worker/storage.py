@@ -43,7 +43,7 @@ class Abort(Protocol):
 
 
 def output_key(job: MediaJob, name: str) -> str:
-    return f"runs/{job.runId}/steps/{job.stepOrder}/{name}"
+    return f"{job.outputPrefix}{name}"
 
 
 def client_from(settings: Settings) -> Any:
@@ -82,9 +82,9 @@ class Storage:
     @contextmanager
     def fetched(self, ref: MediaJobInput, max_bytes: int, abort: Abort) -> Iterator[Path]:
         """Downloads one input to a private temporary file that is removed on exit."""
-        if ref.bucket != self.upload_bucket:
+        if ref.bucket not in {self.upload_bucket, self.bucket}:
             raise PermanentError(
-                "contract_violation", f"input '{ref.key}' is not in the uploads bucket"
+                "contract_violation", f"input '{ref.key}' is not in an allowed media bucket"
             )
         size, etag = self._head(ref)
         if size > max_bytes:
@@ -100,6 +100,48 @@ class Storage:
                 extra={"bucket": ref.bucket, "objectKey": ref.objectKey, "bytes": size},
             )
             yield path
+
+    def head_object(self, bucket: str, key: str) -> dict[str, Any] | None:
+        try:
+            return dict(self._client.head_object(Bucket=bucket, Key=key))
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in _MISSING:
+                return None
+            if code in _FORBIDDEN:
+                # Silo answers 404 for a missing key this identity may read, so 403 is the store
+                # policy, not absence. AWS S3 answers 403 there unless the caller holds
+                # s3:ListBucket: moving to AWS means revisiting the provider policy first.
+                log.warning(
+                    "head forbidden; check the provider store policy",
+                    extra={"bucket": bucket, "objectKey": key, "code": code},
+                )
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+
+    def fetch_bytes(self, bucket: str, key: str, abort: Abort) -> bytes:
+        abort.check()
+        try:
+            response = self._client.get_object(Bucket=bucket, Key=key)
+        except ClientError as exc:
+            if str(exc.response.get("Error", {}).get("Code", "")) in _MISSING:
+                raise TransientError(f"{bucket}/{key} disappeared between head and fetch") from exc
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        try:
+            return bytes(response["Body"].read())
+        finally:
+            response["Body"].close()
 
     def put(self, key: str, body: bytes | Path, mime: str, abort: Abort) -> int:
         # Outputs are small in-memory reports; the check stops a killed job before it writes.

@@ -62,7 +62,7 @@ class WorkflowsController {
             @Valid @RequestBody StartRunRequest request) {
         UUID currentUserId = currentUserResolver.require(jwt);
         RunResponse body = RunResponse.from(workflowRunService.startRun(currentUserId, id, request.input(),
-                request.uploadId(), request.originalName()));
+                request.uploadId(), request.uploadIds(), request.originalName()));
         return ResponseEntity.ok(body);
     }
 }

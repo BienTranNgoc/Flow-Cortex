@@ -4,6 +4,7 @@
  * FlowCortex API
  * OpenAPI spec version: v1.0
  */
+import { customFetch } from '../customFetch';
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
@@ -43,6 +44,11 @@ export interface StartRunRequest {
    */
   input?: string;
   uploadId?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds?: string[];
   /**
    * @minLength 0
    * @maxLength 1024
@@ -130,6 +136,26 @@ export interface UploadResponse {
   maxBytes: number;
 }
 
+export interface CreateScriptRevisionRequest {
+  /**
+   * @minLength 0
+   * @maxLength 8000
+   */
+  content: string;
+  expectedVersion: number;
+}
+
+export interface ScriptRevisionResponse {
+  id?: string;
+  runId?: string;
+  reviewTaskId?: string;
+  revisionNumber?: number;
+  content?: string;
+  createdBy?: string;
+  createdAt?: string;
+  reviewTaskVersion?: number;
+}
+
 export interface ReviewTaskResponse {
   id?: string;
   runId?: string;
@@ -141,14 +167,61 @@ export interface ReviewTaskResponse {
   reviewedBy?: string;
   reviewedAt?: string;
   createdAt?: string;
+  version?: number;
+  currentRevisionId?: string;
+  approvedRevisionId?: string;
 }
 
 export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
+  revisionId?: string;
+  expectedVersion?: number;
+}
+
+export interface VideoConfig {
+  /** @pattern 9:16 */
+  aspectRatio: string;
+}
+
+export interface ProductVideoRunRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  productName: string;
+  /**
+   * @minLength 0
+   * @maxLength 4000
+   */
+  description: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  cta: string;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  price?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  promotion?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds: string[];
+  video: VideoConfig;
 }
 
 export interface RegisterRequest {
-  /** @minLength 1 */
+  /**
+   * @minLength 0
+   * @maxLength 254
+   */
   email: string;
   /**
    * @minLength 8
@@ -157,17 +230,34 @@ export interface RegisterRequest {
   password: string;
   /** @minLength 1 */
   name: string;
+  rememberMe?: boolean;
 }
 
-export interface LoginResponse {
-  token?: string;
+export interface AccessTokenResponse {
+  accessToken?: string;
+  expiresIn?: number;
+}
+
+export type ProblemDetailProperties = { [key: string]: unknown };
+
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  properties?: ProblemDetailProperties;
 }
 
 export interface LoginRequest {
-  /** @minLength 1 */
+  /**
+   * @minLength 0
+   * @maxLength 254
+   */
   email: string;
   /** @minLength 1 */
   password: string;
+  rememberMe?: boolean;
 }
 
 export type WorkflowStepResponseMode =
@@ -205,6 +295,12 @@ export interface HealthResponse {
   status?: string;
   /** Identifier of the service reporting its health. */
   service?: string;
+}
+
+export interface CapabilitiesResponse {
+  mediaEnabled?: boolean;
+  productVideoEnabled?: boolean;
+  productVideoWorkflowId?: string;
 }
 
 export interface AdminRunResponse {
@@ -249,6 +345,17 @@ export interface PageViewMediaJobResponse {
   size: number;
   total: number;
 }
+
+export type CallbackParams = {
+  code?: string;
+  state?: string;
+  error?: string;
+};
+
+export type AuthorizeParams = {
+  remember_me?: boolean;
+  return_to?: string;
+};
 
 export type ListAdminRunsParams = {
   /**
@@ -316,16 +423,14 @@ export const getGetUrl = (id: string) => {
   return `/api/v1/users/${id}`;
 };
 
-export const get = async (id: string, options?: RequestInit): Promise<getResponse> => {
-  const res = await fetch(getGetUrl(id), {
+export const get = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getResponse> => {
+  return customFetch<getResponse>(getGetUrl(id), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as getResponse;
 };
 
 export type updateResponse200 = {
@@ -345,7 +450,7 @@ export const getUpdateUrl = (id: string) => {
 export const update = async (
   id: string,
   updateUserRequest: UpdateUserRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<updateResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -366,17 +471,12 @@ export const update = async (
     }
     return headers;
   };
-  const res = await fetch(getUpdateUrl(id), {
+  return customFetch<updateResponse>(getUpdateUrl(id), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateUserRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: updateResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as updateResponse;
 };
 
 export type _deleteResponse204 = {
@@ -393,16 +493,14 @@ export const getDeleteUrl = (id: string) => {
   return `/api/v1/users/${id}`;
 };
 
-export const _delete = async (id: string, options?: RequestInit): Promise<_deleteResponse> => {
-  const res = await fetch(getDeleteUrl(id), {
+export const _delete = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<_deleteResponse> => {
+  return customFetch<_deleteResponse>(getDeleteUrl(id), {
     ...options,
     method: 'DELETE',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: _deleteResponse['data'] = body ? JSON.parse(body) : undefined;
-  return { data, status: res.status, headers: res.headers } as _deleteResponse;
 };
 
 export type updateProfileResponse200 = {
@@ -421,7 +519,7 @@ export const getUpdateProfileUrl = () => {
 
 export const updateProfile = async (
   profileUpdateRequest: ProfileUpdateRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<updateProfileResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -442,17 +540,12 @@ export const updateProfile = async (
     }
     return headers;
   };
-  const res = await fetch(getUpdateProfileUrl(), {
+  return customFetch<updateProfileResponse>(getUpdateProfileUrl(), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(profileUpdateRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: updateProfileResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as updateProfileResponse;
 };
 
 export type startRunResponse200 = {
@@ -472,7 +565,7 @@ export const getStartRunUrl = (id: string) => {
 export const startRun = async (
   id: string,
   startRunRequest: StartRunRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<startRunResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -493,17 +586,12 @@ export const startRun = async (
     }
     return headers;
   };
-  const res = await fetch(getStartRunUrl(id), {
+  return customFetch<startRunResponse>(getStartRunUrl(id), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRunRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: startRunResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as startRunResponse;
 };
 
 export type listResponse200 = {
@@ -520,16 +608,11 @@ export const getListUrl = () => {
   return `/api/v1/users`;
 };
 
-export const list = async (options?: RequestInit): Promise<listResponse> => {
-  const res = await fetch(getListUrl(), {
+export const list = async (options?: Parameters<typeof customFetch>[1]): Promise<listResponse> => {
+  return customFetch<listResponse>(getListUrl(), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as listResponse;
 };
 
 export type createResponse201 = {
@@ -548,7 +631,7 @@ export const getCreateUrl = () => {
 
 export const create = async (
   createUserRequest: CreateUserRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<createResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -569,17 +652,12 @@ export const create = async (
     }
     return headers;
   };
-  const res = await fetch(getCreateUrl(), {
+  return customFetch<createResponse>(getCreateUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createUserRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: createResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as createResponse;
 };
 
 export type requestUploadResponse201 = {
@@ -598,7 +676,7 @@ export const getRequestUploadUrl = () => {
 
 export const requestUpload = async (
   uploadRequest: UploadRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<requestUploadResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -619,17 +697,82 @@ export const requestUpload = async (
     }
     return headers;
   };
-  const res = await fetch(getRequestUploadUrl(), {
+  return customFetch<requestUploadResponse>(getRequestUploadUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
   });
+};
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+export type getRevisionsResponse200 = {
+  data: ScriptRevisionResponse[];
+  status: 200;
+};
 
-  const data: requestUploadResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as requestUploadResponse;
+export type getRevisionsResponseSuccess = getRevisionsResponse200 & {
+  headers: Headers;
+};
+export type getRevisionsResponse = getRevisionsResponseSuccess;
+
+export const getGetRevisionsUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/revisions`;
+};
+
+export const getRevisions = async (
+  taskId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRevisionsResponse> => {
+  return customFetch<getRevisionsResponse>(getGetRevisionsUrl(taskId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveRevisionResponse200 = {
+  data: ScriptRevisionResponse;
+  status: 200;
+};
+
+export type saveRevisionResponseSuccess = saveRevisionResponse200 & {
+  headers: Headers;
+};
+export type saveRevisionResponse = saveRevisionResponseSuccess;
+
+export const getSaveRevisionUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/revisions`;
+};
+
+export const saveRevision = async (
+  taskId: string,
+  createScriptRevisionRequest: CreateScriptRevisionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveRevisionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveRevisionResponse>(getSaveRevisionUrl(taskId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createScriptRevisionRequest),
+  });
 };
 
 export type rejectTaskResponse200 = {
@@ -648,17 +791,12 @@ export const getRejectTaskUrl = (taskId: string) => {
 
 export const rejectTask = async (
   taskId: string,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<rejectTaskResponse> => {
-  const res = await fetch(getRejectTaskUrl(taskId), {
+  return customFetch<rejectTaskResponse>(getRejectTaskUrl(taskId), {
     ...options,
     method: 'POST',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: rejectTaskResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as rejectTaskResponse;
 };
 
 export type approveTaskResponse200 = {
@@ -678,7 +816,7 @@ export const getApproveTaskUrl = (taskId: string) => {
 export const approveTask = async (
   taskId: string,
   approveReviewTaskRequest?: ApproveReviewTaskRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<approveTaskResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -699,25 +837,65 @@ export const approveTask = async (
     }
     return headers;
   };
-  const res = await fetch(getApproveTaskUrl(taskId), {
+  return customFetch<approveTaskResponse>(getApproveTaskUrl(taskId), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(approveReviewTaskRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: approveTaskResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as approveTaskResponse;
 };
 
-export type registerResponse200 = {
-  data: LoginResponse;
+export type startProductVideoRunResponse200 = {
+  data: RunResponse;
   status: 200;
 };
 
-export type registerResponseSuccess = registerResponse200 & {
+export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
+  headers: Headers;
+};
+export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+
+export const getStartProductVideoRunUrl = () => {
+  return `/api/v1/product-videos/runs`;
+};
+
+export const startProductVideoRun = async (
+  productVideoRunRequest: ProductVideoRunRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<startProductVideoRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<startProductVideoRunResponse>(getStartProductVideoRunUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productVideoRunRequest),
+  });
+};
+
+export type registerResponse201 = {
+  data: AccessTokenResponse;
+  status: 201;
+};
+
+export type registerResponseSuccess = registerResponse201 & {
   headers: Headers;
 };
 export type registerResponse = registerResponseSuccess;
@@ -728,7 +906,7 @@ export const getRegisterUrl = () => {
 
 export const register = async (
   registerRequest: RegisterRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<registerResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -749,21 +927,71 @@ export const register = async (
     }
     return headers;
   };
-  const res = await fetch(getRegisterUrl(), {
+  return customFetch<registerResponse>(getRegisterUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(registerRequest),
   });
+};
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+export type refreshResponse200 = {
+  data: AccessTokenResponse;
+  status: 200;
+};
 
-  const data: registerResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as registerResponse;
+export type refreshResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type refreshResponseSuccess = refreshResponse200 & {
+  headers: Headers;
+};
+export type refreshResponseError = refreshResponse401 & {
+  headers: Headers;
+};
+
+export type refreshResponse = refreshResponseSuccess | refreshResponseError;
+
+export const getRefreshUrl = () => {
+  return `/api/v1/auth/refresh`;
+};
+
+export const refresh = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<refreshResponse> => {
+  return customFetch<refreshResponse>(getRefreshUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type logoutResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type logoutResponseSuccess = logoutResponse204 & {
+  headers: Headers;
+};
+export type logoutResponse = logoutResponseSuccess;
+
+export const getLogoutUrl = () => {
+  return `/api/v1/auth/logout`;
+};
+
+export const logout = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<logoutResponse> => {
+  return customFetch<logoutResponse>(getLogoutUrl(), {
+    ...options,
+    method: 'POST',
+  });
 };
 
 export type loginResponse200 = {
-  data: LoginResponse;
+  data: AccessTokenResponse;
   status: 200;
 };
 
@@ -778,7 +1006,7 @@ export const getLoginUrl = () => {
 
 export const login = async (
   loginRequest: LoginRequest,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<loginResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
@@ -799,17 +1027,12 @@ export const login = async (
     }
     return headers;
   };
-  const res = await fetch(getLoginUrl(), {
+  return customFetch<loginResponse>(getLoginUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginRequest),
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: loginResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as loginResponse;
 };
 
 export type listWorkflowsResponse200 = {
@@ -826,16 +1049,13 @@ export const getListWorkflowsUrl = () => {
   return `/api/v1/workflows`;
 };
 
-export const listWorkflows = async (options?: RequestInit): Promise<listWorkflowsResponse> => {
-  const res = await fetch(getListWorkflowsUrl(), {
+export const listWorkflows = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowsResponse> => {
+  return customFetch<listWorkflowsResponse>(getListWorkflowsUrl(), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listWorkflowsResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as listWorkflowsResponse;
 };
 
 export type getWorkflowResponse200 = {
@@ -854,17 +1074,12 @@ export const getGetWorkflowUrl = (id: string) => {
 
 export const getWorkflow = async (
   id: string,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<getWorkflowResponse> => {
-  const res = await fetch(getGetWorkflowUrl(id), {
+  return customFetch<getWorkflowResponse>(getGetWorkflowUrl(id), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getWorkflowResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as getWorkflowResponse;
 };
 
 export type getReviewTasksResponse200 = {
@@ -883,17 +1098,12 @@ export const getGetReviewTasksUrl = (runId: string) => {
 
 export const getReviewTasks = async (
   runId: string,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<getReviewTasksResponse> => {
-  const res = await fetch(getGetReviewTasksUrl(runId), {
+  return customFetch<getReviewTasksResponse>(getGetReviewTasksUrl(runId), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getReviewTasksResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as getReviewTasksResponse;
 };
 
 export type getRunResponse200 = {
@@ -910,16 +1120,14 @@ export const getGetRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
 };
 
-export const getRun = async (id: string, options?: RequestInit): Promise<getRunResponse> => {
-  const res = await fetch(getGetRunUrl(id), {
+export const getRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunResponse> => {
+  return customFetch<getRunResponse>(getGetRunUrl(id), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getRunResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as getRunResponse;
 };
 
 export type getOutputUrlResponse200 = {
@@ -940,17 +1148,12 @@ export const getOutputUrl = async (
   id: string,
   order: number,
   name: string,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<getOutputUrlResponse> => {
-  const res = await fetch(getGetOutputUrlUrl(id, order, name), {
+  return customFetch<getOutputUrlResponse>(getGetOutputUrlUrl(id, order, name), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: getOutputUrlResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as getOutputUrlResponse;
 };
 
 export type healthResponse200 = {
@@ -967,16 +1170,115 @@ export const getHealthUrl = () => {
   return `/api/v1/health`;
 };
 
-export const health = async (options?: RequestInit): Promise<healthResponse> => {
-  const res = await fetch(getHealthUrl(), {
+export const health = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<healthResponse> => {
+  return customFetch<healthResponse>(getHealthUrl(), {
     ...options,
     method: 'GET',
   });
+};
 
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+export type capabilitiesResponse200 = {
+  data: CapabilitiesResponse;
+  status: 200;
+};
 
-  const data: healthResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as healthResponse;
+export type capabilitiesResponseSuccess = capabilitiesResponse200 & {
+  headers: Headers;
+};
+export type capabilitiesResponse = capabilitiesResponseSuccess;
+
+export const getCapabilitiesUrl = () => {
+  return `/api/v1/capabilities`;
+};
+
+export const capabilities = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<capabilitiesResponse> => {
+  return customFetch<capabilitiesResponse>(getCapabilitiesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type callbackResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type callbackResponseError = callbackResponse302 & {
+  headers: Headers;
+};
+
+export type callbackResponse = callbackResponseError;
+
+export const getCallbackUrl = (params?: CallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/auth/oauth/google/callback?${stringifiedParams}`
+    : `/api/v1/auth/oauth/google/callback`;
+};
+
+export const callback = async (
+  params?: CallbackParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<callbackResponse> => {
+  return customFetch<callbackResponse>(getCallbackUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type authorizeResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type authorizeResponse503 = {
+  data: void;
+  status: 503;
+};
+
+export type authorizeResponseError = (authorizeResponse302 | authorizeResponse503) & {
+  headers: Headers;
+};
+
+export type authorizeResponse = authorizeResponseError;
+
+export const getAuthorizeUrl = (params?: AuthorizeParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/auth/oauth/google/authorize?${stringifiedParams}`
+    : `/api/v1/auth/oauth/google/authorize`;
+};
+
+export const authorize = async (
+  params?: AuthorizeParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<authorizeResponse> => {
+  return customFetch<authorizeResponse>(getAuthorizeUrl(params), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type meResponse200 = {
@@ -993,16 +1295,11 @@ export const getMeUrl = () => {
   return `/api/v1/auth/me`;
 };
 
-export const me = async (options?: RequestInit): Promise<meResponse> => {
-  const res = await fetch(getMeUrl(), {
+export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
+  return customFetch<meResponse>(getMeUrl(), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: meResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as meResponse;
 };
 
 export type listAdminRunsResponse200 = {
@@ -1033,17 +1330,12 @@ export const getListAdminRunsUrl = (params?: ListAdminRunsParams) => {
 
 export const listAdminRuns = async (
   params?: ListAdminRunsParams,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminRunsResponse> => {
-  const res = await fetch(getListAdminRunsUrl(params), {
+  return customFetch<listAdminRunsResponse>(getListAdminRunsUrl(params), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listAdminRunsResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as listAdminRunsResponse;
 };
 
 export type listAdminMediaJobsResponse200 = {
@@ -1074,15 +1366,10 @@ export const getListAdminMediaJobsUrl = (params?: ListAdminMediaJobsParams) => {
 
 export const listAdminMediaJobs = async (
   params?: ListAdminMediaJobsParams,
-  options?: RequestInit,
+  options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
-  const res = await fetch(getListAdminMediaJobsUrl(params), {
+  return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
     ...options,
     method: 'GET',
   });
-
-  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
-
-  const data: listAdminMediaJobsResponse['data'] = body ? JSON.parse(body) : {};
-  return { data, status: res.status, headers: res.headers } as listAdminMediaJobsResponse;
 };

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-speech-result.schema.json",
+  "title": "ProviderSpeechData",
+  "description": "The completed MediaResult.data payload returned by generate_speech/vi_voice_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "durationMs",
+    "provider",
+    "voice",
+    "speed",
+    "sourceRevisionId",
+    "idempotencyKey",
+    "format"
+  ],
+  "properties": {
+    "profile": { "const": "vi_voice_v1" },
+    "durationMs": { "type": "integer", "minimum": 1 },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 50 },
+    "voice": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "speed": { "type": "string", "pattern": "^[+-][0-9]{1,3}%$" },
+    "sourceRevisionId": { "type": "string", "format": "uuid" },
+    "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "format": { "const": "wav" }
+  }
+}

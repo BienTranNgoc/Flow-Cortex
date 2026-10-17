@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Link, Navigate } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
+import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
   detailFrom,
@@ -57,7 +58,7 @@ export function RegisterPage() {
           <OAuthButton
             provider="google"
             label="Sign up with Google"
-            onSelect={(p) => window.console.info(`[ui-only] oauth: ${p}`)}
+            href={googleAuthorizeUrl(true, '/')}
           />
         </div>
 

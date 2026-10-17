@@ -1,6 +1,6 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import { mediaFileProblem, NO_FILE, type FileProblem } from './startRunSchema';
 import { createStartWithUpload, StartStageError, type StartPhase } from './startWithUpload';
 import { uploadFile } from './uploadFile';
@@ -22,8 +22,11 @@ function startButtonLabel(phase: StartPhase | null): string {
  * picked file and then starts the run, as one sequence; Start stays focusable while it runs and a
  * press during it changes nothing.
  */
-export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
-  const navigate = useNavigate();
+export function MediaStartForm({
+  workflowId,
+  disabled,
+}: Readonly<{ workflowId: string; disabled: boolean }>) {
+  const { go } = useTransitionNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);
   const start = useMemo(
@@ -82,7 +85,7 @@ export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>)
       const runId = await start(picked, setPhase);
       // `null`: this press came while a start was already running, which owns the form state.
       if (runId !== null && mounted.current) {
-        navigate(`/workflows/${workflowId}/runs/${runId}`);
+        go(`/workflows/${workflowId}/runs/${runId}`);
       }
     } catch (error) {
       setPhase(null);
@@ -146,7 +149,7 @@ export function MediaStartForm({ workflowId }: Readonly<{ workflowId: string }>)
           <p>{NEXT_ACTION}</p>
         </div>
       )}
-      <button type="submit" aria-busy={phase !== null}>
+      <button type="submit" aria-busy={phase !== null} disabled={disabled}>
         {startButtonLabel(phase)}
       </button>
     </form>

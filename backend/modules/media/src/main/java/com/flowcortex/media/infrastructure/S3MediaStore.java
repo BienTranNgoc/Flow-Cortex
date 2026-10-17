@@ -1,5 +1,6 @@
 package com.flowcortex.media.infrastructure;
 
+import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.application.MediaProperties;
 import java.net.URI;
 import java.time.Duration;
@@ -11,6 +12,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -23,6 +26,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.TaggingDirective;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
@@ -35,8 +39,10 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequ
 @Component
 public class S3MediaStore implements AutoCloseable {
 
+    private static final Logger LOG = LoggerFactory.getLogger(S3MediaStore.class);
     /** Signed, but set by the browser itself; a script may not set them. */
     private static final Set<String> SET_BY_THE_BROWSER = Set.of("host", "content-length");
+    static final String RUN_INPUT_TAG = "flowcortex-retention=run-input";
 
     private final S3Client client;
     private final S3Presigner presigner;
@@ -102,9 +108,27 @@ public class S3MediaStore implements AutoCloseable {
     public Optional<StoredObject> head(String bucket, String key) {
         try {
             HeadObjectResponse head = client.headObject(request -> request.bucket(bucket).key(key));
-            return Optional.of(new StoredObject(head.contentLength(), head.contentType()));
+            return Optional.of(new StoredObject(head.contentLength(), head.contentType(), head.checksumSHA256()));
         } catch (NoSuchKeyException e) {
             return Optional.empty();
+        }
+    }
+
+    /**
+     * A server-side copy of an upload into a run's inputs; nothing streams through this process. The
+     * copy carries only {@value #RUN_INPUT_TAG}, which the media bucket's lifecycle rule expires by.
+     * @throws UploadRejectedException on field {@code uploadIds} if the upload is gone
+     */
+    public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        try {
+            client.copyObject(request -> request
+                    .sourceBucket(sourceBucket).sourceKey(sourceKey)
+                    .destinationBucket(targetBucket).destinationKey(targetKey)
+                    .tagging(RUN_INPUT_TAG)
+                    .taggingDirective(TaggingDirective.REPLACE));
+        } catch (NoSuchKeyException e) {
+            LOG.info("Upload refused at run start: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
+            throw new UploadRejectedException("uploadIds", "Upload the file again");
         }
     }
 
@@ -151,6 +175,10 @@ public class S3MediaStore implements AutoCloseable {
         }
     }
 
-    public record StoredObject(long size, String contentType) {
+    public record StoredObject(long size, String contentType, String checksum) {
+
+        public StoredObject(long size, String contentType) {
+            this(size, contentType, null);
+        }
     }
 }

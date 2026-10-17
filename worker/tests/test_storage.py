@@ -1,4 +1,4 @@
-"""Inputs come from the uploads bucket by reference; outputs land at deterministic keys."""
+"""Inputs come from configured media buckets; outputs land at deterministic keys."""
 
 from __future__ import annotations
 
@@ -103,16 +103,24 @@ def test_unreachable_store_is_transient() -> None:
         pass
 
 
-def test_input_outside_the_uploads_bucket_is_a_contract_violation(silo: Silo) -> None:
-    ref = MediaJobInput(key="media", bucket=MEDIA_BUCKET, objectKey="runs/x/steps/1/a")
+def test_output_asset_can_be_used_as_a_later_step_input(silo: Silo) -> None:
+    key = "runs/one/steps/3/attempts/1/speech.wav"
+    silo.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"speech")
+    ref = MediaJobInput(key="speech", bucket=MEDIA_BUCKET, objectKey=key)
     storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with (
-        pytest.raises(PermanentError) as rejected,
-        storage.fetched(ref, max_bytes=10, abort=ProcessRunner()),
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner()) as path:
+        assert path.read_bytes() == b"speech"
+
+
+def test_input_outside_configured_media_buckets_is_a_contract_violation(silo: Silo) -> None:
+    ref = MediaJobInput(key="media", bucket="foreign-bucket", objectKey="runs/x/steps/1/a")
+    storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with pytest.raises(PermanentError) as rejected, storage.fetched(
+        ref, max_bytes=10, abort=ProcessRunner()
     ):
         pass
-
     assert rejected.value.code == "contract_violation"
 
 
@@ -207,6 +215,44 @@ def test_a_kill_before_the_output_upload_stops_it() -> None:
         storage.put("runs/r/steps/1/a", b"{}", "x", runner)
 
     client.put_object.assert_not_called()
+
+
+def test_reuse_head_treats_a_missing_object_as_absent() -> None:
+    client = boto3.client(
+        "s3",
+        endpoint_url="http://127.0.0.1:1",
+        region_name="us-east-1",
+        aws_access_key_id="x",
+        aws_secret_access_key="y",
+    )
+    stubber = Stubber(client)
+    stubber.add_client_error("head_object", service_error_code="404", http_status_code=404)
+
+    with stubber:
+        storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+        assert storage.head_object(MEDIA_BUCKET, "missing") is None
+
+
+def test_reuse_head_forbidden_is_transient_and_logged_for_the_operator() -> None:
+    client = boto3.client(
+        "s3",
+        endpoint_url="http://127.0.0.1:1",
+        region_name="us-east-1",
+        aws_access_key_id="x",
+        aws_secret_access_key="y",
+    )
+    stubber = Stubber(client)
+    stubber.add_client_error("head_object", service_error_code="403", http_status_code=403)
+    key = "runs/r/steps/3/attempts/1/speech.wav"
+
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+    with stubber, captured_logs() as lines, pytest.raises(TransientError):
+        storage.head_object(MEDIA_BUCKET, key)
+
+    [warning] = [line for line in lines if line["level"] == "WARNING"]
+    assert warning["bucket"] == MEDIA_BUCKET
+    assert warning["objectKey"] == key
+    assert "http" not in str(warning)
 
 
 def test_forbidden_input_is_transient_and_logged_for_the_operator() -> None:

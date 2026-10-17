@@ -3,9 +3,12 @@ package com.flowcortex.media.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.application.MediaProperties;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -15,11 +18,13 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
  * The presigned upload URL, signed offline: what it binds and where it points. Whether the store
@@ -34,11 +39,15 @@ class S3MediaStoreTest {
             Duration apiCallAttemptTimeout) {
         return new MediaProperties(true, Duration.ofMinutes(30),
                 Map.of(
-                    "probe", Duration.ofMinutes(5),
-                    "extract_audio", Duration.ofMinutes(10)),
-                Duration.ofMinutes(20), Duration.ofMinutes(15),
+                        "probe", Duration.ofMinutes(5),
+                        "extract_audio", Duration.ofMinutes(10),
+                        "align_audio", Duration.ofMinutes(10),
+                        "render_video", Duration.ofMinutes(10)),
+                Duration.ofMinutes(20),
+                Duration.ofMinutes(2), Duration.ofMinutes(5),
+                Duration.ofMinutes(15),
 
-                new MediaProperties.Upload(524_288_000L, List.of("mp4"), Duration.ofMinutes(15)),
+                new MediaProperties.Upload(524_288_000L, List.of("mp4"), List.of("jpg"), Duration.ofMinutes(15)),
                 new MediaProperties.S3(endpoint, "http://localhost:9000", "us-east-1", true,
                         "flowcortex-uploads", "flowcortex-media", "backend-key", "backend-secret-value",
                         apiCallTimeout, apiCallAttemptTimeout));
@@ -60,6 +69,72 @@ class S3MediaStoreTest {
                     .isInstanceOfAny(ApiCallTimeoutException.class, ApiCallAttemptTimeoutException.class);
 
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5));
+        }
+    }
+
+    /** A one-route stand-in for the store: answers every request with {@code status} and {@code body}. */
+    private static HttpServer fakeStore(int status, String body, Map<String, String> requestHeaders)
+            throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestHeaders().forEach((name, values) ->
+                    requestHeaders.put(name.toLowerCase(java.util.Locale.ROOT), String.join(",", values)));
+            exchange.getRequestBody().readAllBytes();
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/xml");
+            exchange.sendResponseHeaders(status, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
+    private static S3MediaStore storeAt(HttpServer server) {
+        return new S3MediaStore(properties("http://127.0.0.1:" + server.getAddress().getPort(),
+                Duration.ofSeconds(5), Duration.ofSeconds(2)));
+    }
+
+    @Test
+    void aRunInputCopyIsTaggedForRetentionInsteadOfInheritingTheUploadsTags() throws IOException {
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        HttpServer server = fakeStore(200, "<CopyObjectResult><ETag>\"etag\"</ETag>"
+                + "<LastModified>2026-10-14T10:00:00.000Z</LastModified></CopyObjectResult>", headers);
+        try (S3MediaStore local = storeAt(server)) {
+            local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media", "runs/r/inputs/image_1");
+        } finally {
+            server.stop(0);
+        }
+
+        assertThat(headers).containsEntry("x-amz-tagging", "flowcortex-retention=run-input")
+                .containsEntry("x-amz-tagging-directive", "REPLACE")
+                .containsEntry("x-amz-copy-source", "flowcortex-uploads/owner/upload");
+    }
+
+    @Test
+    void onlyASourceThatVanishedBeforeTheCopyIsRefusedAsAnUploadToRepeat() throws IOException {
+        HttpServer missing = fakeStore(404, "<Error><Code>NoSuchKey</Code>"
+                + "<Message>The specified key does not exist.</Message></Error>", new ConcurrentHashMap<>());
+        try (S3MediaStore local = storeAt(missing)) {
+            assertThatThrownBy(() -> local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media",
+                    "runs/r/inputs/image_1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadIds");
+                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                    });
+        } finally {
+            missing.stop(0);
+        }
+
+        HttpServer denied = fakeStore(403, "<Error><Code>AccessDenied</Code><Message>Access Denied.</Message></Error>",
+                new ConcurrentHashMap<>());
+        try (S3MediaStore local = storeAt(denied)) {
+            assertThatThrownBy(() -> local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media",
+                    "runs/r/inputs/image_1"))
+                    .isInstanceOf(S3Exception.class)
+                    .isNotInstanceOf(UploadRejectedException.class);
+        } finally {
+            denied.stop(0);
         }
     }
 

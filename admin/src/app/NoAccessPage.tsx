@@ -10,7 +10,7 @@ export function NoAccessPage({ email }: Readonly<{ email: string | undefined }>)
         {email ? <strong>{email}</strong> : 'This account'} does not have the ADMIN role, so it cannot
         use the admin console.
       </p>
-      <button type="button" onClick={logout}>
+      <button type="button" onClick={() => void logout()}>
         Sign out
       </button>
     </main>

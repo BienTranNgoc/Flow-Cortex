@@ -1,15 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
+import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
+import { Pipeline } from './Pipeline';
+import { ProductVideoStartForm } from './ProductVideoStartForm';
+import { stepKey } from './stepDisplay';
 import { startRunSchema, type StartRunFormValues } from './startRunSchema';
+import { useCapabilitiesQuery } from './useCapabilities';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 
 /** Start form of a workflow whose first step runs inline: an optional text input. */
-function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
-  const navigate = useNavigate();
+function InlineStartForm({
+  workflowId,
+  disabled,
+}: Readonly<{ workflowId: string; disabled: boolean }>) {
+  const { go } = useTransitionNavigate();
   const startRunMutation = useStartRunMutation(workflowId);
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
@@ -28,7 +37,7 @@ function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
     startRunMutation.mutate(trimmedInput ? { input: trimmedInput } : {}, {
       onSuccess: (run) => {
         if (run.id) {
-          navigate(`/workflows/${workflowId}/runs/${run.id}`);
+          go(`/workflows/${workflowId}/runs/${run.id}`);
         }
       },
     });
@@ -51,7 +60,7 @@ function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
           <p>Try again later, or go back to the Workflows list.</p>
         </div>
       )}
-      <button type="submit" disabled={startRunMutation.isPending}>
+      <button type="submit" disabled={startRunMutation.isPending || disabled}>
         {startRunMutation.isPending ? 'Starting…' : 'Start run'}
       </button>
     </form>
@@ -62,36 +71,63 @@ function InlineStartForm({ workflowId }: Readonly<{ workflowId: string }>) {
  * `/workflows/:id` — steps + "start run". On a successful start, navigates straight to the
  * run-progress view so watching it progress is the very next turn. The form follows the first
  * step: one that runs remotely works on an uploaded file, an inline one takes optional text.
+ *
+ * The Product Video form renders as soon as the capabilities identify it, even while the workflow
+ * fetch is in flight or has errored, disabled until the definition arrives. Any other form waits
+ * for the workflow and for the capabilities to settle; a capabilities error does not block it.
  */
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const workflowQuery = useWorkflowQuery(id ?? '');
 
   if (!id) {
     return <p role="alert">No workflow selected.</p>;
   }
-  if (workflowQuery.isLoading) {
-    return <output>Loading workflow…</output>;
-  }
-  if (workflowQuery.isError || !workflowQuery.data) {
-    return <p role="alert">Could not load this workflow.</p>;
-  }
+  return <WorkflowDetailView workflowId={id} />;
+}
 
+function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
+  const workflowQuery = useWorkflowQuery(workflowId);
+  const capabilitiesQuery = useCapabilitiesQuery();
   const workflow = workflowQuery.data;
-  const startsWithUpload = workflow.steps?.[0]?.mode === 'remote';
+  // Until the capabilities settle, no form renders: guessing would briefly show the generic form
+  // (4 steps + plain input) before switching to the 5-field product form. If they fail, the
+  // generic form is safe — the server refuses a Product Video start through the generic route.
+  const productVideoWorkflowId = capabilitiesQuery.data?.productVideoWorkflowId;
+  const isProductVideo =
+    productVideoWorkflowId !== undefined && workflowId === productVideoWorkflowId;
+  const startsWithUpload = workflow?.steps?.[0]?.mode === 'remote';
+  // A start against a definition that is loading or failed to load would 404.
+  const startDisabled = workflowQuery.isLoading || workflowQuery.isError || !workflow;
+  let startForm: ReactNode = null;
+  if (isProductVideo) {
+    startForm = <ProductVideoStartForm disabled={startDisabled} />;
+  } else if (workflow && !capabilitiesQuery.isPending) {
+    startForm = startsWithUpload ? (
+      <MediaStartForm workflowId={workflowId} disabled={startDisabled} />
+    ) : (
+      <InlineStartForm workflowId={workflowId} disabled={startDisabled} />
+    );
+  }
 
   return (
     <main>
-      <h1>{workflow.name}</h1>
-      {workflow.isShared && <p>Shared with every member.</p>}
-      {workflow.steps && workflow.steps.length > 0 && (
-        <ol className="workflow-steps">
-          {workflow.steps.map((step) => (
-            <li key={step.id}>{step.name ?? `Step ${step.stepOrder}`}</li>
-          ))}
-        </ol>
+      <h1>{workflow?.name ?? 'Workflow'}</h1>
+      {workflow?.isShared && <p>Shared with every member.</p>}
+      {workflowQuery.isError && (
+        <p role="alert">Could not load this workflow. Try again, or pick another one.</p>
       )}
-      {startsWithUpload ? <MediaStartForm workflowId={id} /> : <InlineStartForm workflowId={id} />}
+      {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
+        <output>Loading workflow…</output>
+      )}
+      {workflow?.steps && workflow.steps.length > 0 && (
+        <Pipeline
+          steps={workflow.steps.map((step) => ({
+            id: stepKey(step),
+            name: step.name ?? `Step ${step.stepOrder}`,
+          }))}
+        />
+      )}
+      {startForm}
     </main>
   );
 }

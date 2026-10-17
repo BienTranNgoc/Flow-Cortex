@@ -32,6 +32,16 @@ class MediaExternalizationConfigTest {
     }
 
     @Test
+    void aProviderJobGetsTheSameTraceableIds() {
+        MessageProperties sent = ids.postProcessMessage(job(null), null, "provider", "job")
+                .getMessageProperties();
+
+        assertThat(sent.getMessageId()).isEqualTo(jobId.toString());
+        assertThat(sent.getCorrelationId()).isEqualTo(runId.toString());
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=" + runId);
+    }
+
+    @Test
     void idsTheMessageAlreadyCarriesAreKept() {
         MessageProperties sent = ids.postProcessMessage(job("set-upstream"), null, "media", "job")
                 .getMessageProperties();
