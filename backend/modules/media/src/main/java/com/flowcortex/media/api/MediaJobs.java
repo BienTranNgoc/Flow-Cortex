@@ -1,5 +1,6 @@
 package com.flowcortex.media.api;
 
+import com.flowcortex.media.api.provider.ProviderJob;
 import java.util.UUID;
 import java.util.List;
 

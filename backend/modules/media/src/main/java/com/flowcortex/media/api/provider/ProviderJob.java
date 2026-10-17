@@ -1,4 +1,6 @@
-package com.flowcortex.media.api;
+package com.flowcortex.media.api.provider;
+
+import com.flowcortex.media.api.MediaJob;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;

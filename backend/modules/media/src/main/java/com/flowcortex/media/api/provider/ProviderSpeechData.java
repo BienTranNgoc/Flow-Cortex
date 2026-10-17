@@ -1,4 +1,4 @@
-package com.flowcortex.media.api;
+package com.flowcortex.media.api.provider;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.AssertTrue;

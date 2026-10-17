@@ -1,4 +1,4 @@
-package com.flowcortex.media.api;
+package com.flowcortex.media.api.provider;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

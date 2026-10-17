@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
-import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.provider.ProviderJob;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
