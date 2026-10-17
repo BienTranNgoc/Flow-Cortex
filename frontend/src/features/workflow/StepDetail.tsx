@@ -2,7 +2,7 @@ import type { RunStepResponse } from '@flow-cortex/api-client';
 import type { RefObject } from 'react';
 import { ApprovalPanel } from './ApprovalPanel';
 import { StepDownloads } from './StepDownloads';
-import { stepKey, stepNameId } from './stepDisplay';
+import { formatTime, stepDuration, stepKey, stepNameId } from './stepDisplay';
 import { stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { StoredOutputDownload } from './StoredOutputDownload';
@@ -56,6 +56,9 @@ export function StepDetail({
   const details = outputs.find((output) => output.mime === 'application/json');
   const artifacts = outputs.filter((output) => output.mime !== 'application/json');
   const stepOrder = step.stepOrder;
+  const duration = stepDuration(step);
+  const started = formatTime(step.startedAt);
+  const finished = formatTime(step.finishedAt);
 
   return (
     <section
@@ -64,6 +67,29 @@ export function StepDetail({
       className="step-detail"
       aria-labelledby={stepNameId(stepKey(step))}
     >
+      {(duration || started || finished) && (
+        <div className="step-timing-bar">
+          {duration && (
+            <span className="step-timing-pill" title="Thời gian thực thi">
+              <span className="timing-label">Thời gian:</span>
+              <span className="timing-val">{duration}</span>
+            </span>
+          )}
+          {started && (
+            <span className="step-timing-pill" title="Thời gian bắt đầu">
+              <span className="timing-label">Bắt đầu:</span>
+              <span className="timing-val">{started}</span>
+            </span>
+          )}
+          {finished && (
+            <span className="step-timing-pill" title="Thời gian kết thúc">
+              <span className="timing-label">Kết thúc:</span>
+              <span className="timing-val">{finished}</span>
+            </span>
+          )}
+        </div>
+      )}
+
       {awaitingApproval && (
         // Stays mounted while another step is shown, so an unsaved edit is still there on return.
         <div className="step-detail-body" hidden={!needsYou}>

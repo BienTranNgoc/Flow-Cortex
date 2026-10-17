@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -70,9 +71,17 @@ class VeoAdapter:
 
     def submit_video(self, request: VideoRequest) -> str:
         model = urllib.parse.quote(self.config.model, safe="-._")
+        instance: dict[str, Any] = {"prompt": request.prompt}
+        if request.reference_image_bytes:
+            instance["image"] = {
+                "inlineData": {
+                    "mimeType": _image_mime(request.reference_image_bytes),
+                    "data": base64.b64encode(request.reference_image_bytes).decode("ascii"),
+                }
+            }
         body = json.dumps(
             {
-                "instances": [{"prompt": request.prompt}],
+                "instances": [instance],
                 "parameters": {
                     "aspectRatio": "9:16",
                     "durationSeconds": "6",
@@ -184,6 +193,19 @@ def _video_uri(response: dict[str, Any]) -> str:
     if not isinstance(uri, str) or not uri:
         raise PermanentError("provider_response_invalid", "Veo video URI is invalid")
     return uri
+
+
+def _image_mime(body: bytes) -> str:
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if body[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    # Veo only accepts the four formats above; the capability layer already rejected unknowns.
+    raise PermanentError("provider_response_invalid", "reference image MIME is unknown")
 
 
 def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:

@@ -29,6 +29,8 @@ CHUNK_BYTES = 1024 * 1024
 _MISSING = {"404", "NoSuchKey", "NotFound"}
 _FORBIDDEN = {"403", "AccessDenied", "Forbidden"}
 _CHANGED = {"412", "PreconditionFailed"}
+# Long enough for the video provider to fetch the image; capped so a leaked URL stays short-lived.
+_PRESIGNED_GET_EXPIRY_SECONDS = 600
 
 
 class Abort(Protocol):
@@ -114,6 +116,28 @@ class Storage:
         except BotoCoreError as exc:
             raise TransientError(
                 f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+
+    def presigned_get_url(
+        self, bucket: str, key: str, *, expires_seconds: int = _PRESIGNED_GET_EXPIRY_SECONDS
+    ) -> str:
+        """A short-lived HTTPS URL the video provider can fetch to read the reference image.
+
+        The URL signs only this object; sharing it with the provider does not grant any other
+        object access. ``expires_seconds`` is clamped to the worker's maximum so a stale URL
+        cannot outlive the job that produced it.
+        """
+        try:
+            return str(
+                self._client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": bucket, "Key": key},
+                    ExpiresIn=min(expires_seconds, _PRESIGNED_GET_EXPIRY_SECONDS),
+                )
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise TransientError(
+                f"{type(exc).__name__} signing {bucket}/{key}"
             ) from exc
 
     def fetch_bytes(self, bucket: str, key: str, abort: Abort) -> bytes:

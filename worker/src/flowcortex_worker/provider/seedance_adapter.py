@@ -89,10 +89,14 @@ class SeedanceAdapter:
     def submit_video(self, request: VideoRequest) -> str:
         if self._uses_byteplus():
             return self._submit_byteplus(request)
+        image_url = request.reference_image_url
+        input_body: dict[str, Any] = {"prompt": request.prompt}
+        if image_url:
+            input_body["image_url"] = image_url
         body = json.dumps(
             {
                 "model": self.config.model,
-                "input": {"prompt": request.prompt},
+                "input": input_body,
                 "parameters": {
                     "duration": 5,
                     "resolution": self.config.resolution,
@@ -150,10 +154,13 @@ class SeedanceAdapter:
             time.sleep(min(self.config.poll_interval_seconds, remaining))
 
     def _submit_byteplus(self, request: VideoRequest) -> str:
+        content: list[dict[str, Any]] = [{"type": "text", "text": request.prompt}]
+        if request.reference_image_url:
+            content.append({"type": "image_url", "image_url": {"url": request.reference_image_url}})
         body = json.dumps(
             {
                 "model": self.config.model,
-                "content": [{"type": "text", "text": request.prompt}],
+                "content": content,
                 "duration": 5,
                 "resolution": self.config.resolution,
                 "ratio": "9:16",

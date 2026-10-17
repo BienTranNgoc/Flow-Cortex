@@ -154,7 +154,7 @@ class MediaJobsImplTest {
     private static ProviderJob providerJob(String capability, Map<String, Object> params) {
         UUID runId = UUID.randomUUID();
         return new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, capability, params,
-                "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
+                List.of(), "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
     }
 
     private static Map<String, Object> scriptParams(Map<String, Object> payload) {
@@ -211,7 +211,7 @@ class MediaJobsImplTest {
             UUID runId = UUID.randomUUID();
             ProviderJob legacy = new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, "generate_script",
                     scriptParams(Map.of("productName", "Máy lọc nước", "description", "Lọc sạch", "cta", "Mua ngay")),
-                    "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
+                    List.of(), "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
 
             assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(legacy)))
                     .isInstanceOf(ConstraintViolationException.class)

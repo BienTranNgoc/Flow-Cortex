@@ -22,6 +22,7 @@ from uuid import UUID
 
 import jsonschema
 import pytest
+from pydantic import ValidationError
 
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
@@ -529,6 +530,175 @@ def test_video_capability_idempotency_key_changes_with_provider_model() -> None:
         _video_idempotency_key(request, identity_c),
     }
     assert len(keys) == 3
+
+
+# ---------------------------------------------------------------------------
+# Reference image input (image-to-video)
+# ---------------------------------------------------------------------------
+
+
+def _png_header(payload: bytes = b"x") -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + payload
+
+
+def _make_storage_with_png(png_body: bytes | None = None) -> Any:
+    storage = MagicMock()
+    storage.fetch_bytes.return_value = png_body if png_body is not None else _png_header()
+    storage.presigned_get_url.return_value = "https://signed.example/refs/cap.png"
+    return storage
+
+
+def test_video_capability_rejects_non_image_reference() -> None:
+    """A reference whose bytes are not a recognised image format is rejected at the boundary."""
+    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
+
+    job = _video_job_dict()
+    job["inputs"] = [
+        {"key": "reference", "bucket": "flowcortex-uploads", "objectKey": "refs/cap.png"}
+    ]
+    parsed = cast(GenerateVideoJob, ProviderJob.model_validate(job).root)
+    storage = _make_storage_with_png(png_body=b"definitely not an image")
+    context = MagicMock()
+    context.bucket = BUCKET
+    context.abort = MagicMock()
+    context.storage = storage
+    with pytest.raises(PermanentError) as raised:
+        _resolve_reference_image(parsed, context)
+    assert raised.value.code == "input_rejected"
+
+
+def test_video_capability_rejects_two_reference_images() -> None:
+    """The contract pins maxItems:1; a producer that wires two images fails fast at the boundary.
+
+    Schema validation runs before the executor; we assert both layers reject the contract
+    violation so neither is silent.
+    """
+    job = _video_job_dict()
+    job["inputs"] = [
+        {"key": "first", "bucket": "flowcortex-uploads", "objectKey": "a"},
+        {"key": "second", "bucket": "flowcortex-uploads", "objectKey": "b"},
+    ]
+    with pytest.raises(ValidationError) as raised:
+        ProviderJob.model_validate(job)
+    assert "at most 1 item" in str(raised.value) or "too_long" in str(raised.value)
+
+
+def test_video_capability_resolves_reference_image_bytes_and_signed_url() -> None:
+    """The executor must give the adapter both the bytes (for Veo) and a signed URL
+    (for Seedance/Wan) so each provider can pick the form it accepts."""
+    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
+
+    png = _png_header(b"reference-bytes")
+    job = _video_job_dict()
+    job["inputs"] = [
+        {"key": "reference", "bucket": "flowcortex-uploads", "objectKey": "refs/cap.png"}
+    ]
+    parsed = cast(GenerateVideoJob, ProviderJob.model_validate(job).root)
+    storage = _make_storage_with_png(png)
+    context = MagicMock()
+    context.bucket = BUCKET
+    context.abort = MagicMock()
+    context.storage = storage
+    image_bytes, image_url = _resolve_reference_image(parsed, context)
+    assert image_bytes == png
+    assert image_url == "https://signed.example/refs/cap.png"
+    storage.fetch_bytes.assert_called_once_with("flowcortex-uploads", "refs/cap.png", context.abort)
+    storage.presigned_get_url.assert_called_once_with("flowcortex-uploads", "refs/cap.png")
+
+
+def test_video_idempotency_key_changes_with_reference_image() -> None:
+    """Two runs with the same prompt but different reference images must yield different keys."""
+    from flowcortex_worker.provider.capabilities import _video_idempotency_key
+
+    identity = VideoIdentity("seedance", "ByteDance-Seedance-1.5-pro", 5, "9:16", "480p", False)
+    no_image = _video_idempotency_key(VideoRequest("p", REVISION_ID), identity)
+    with_a = _video_idempotency_key(
+        VideoRequest("p", REVISION_ID, reference_image_bytes=_png_header(b"A")), identity
+    )
+    with_b = _video_idempotency_key(
+        VideoRequest("p", REVISION_ID, reference_image_bytes=_png_header(b"B")), identity
+    )
+    assert len({no_image, with_a, with_b}) == 3
+
+
+def test_seedance_submit_with_reference_image_sends_image_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Alibaba body must put the signed URL into ``input.image_url``."""
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"output": {"task_id": "seedance-task-with-image"}})
+
+    task_id = _seedance().submit_video(
+        VideoRequest(
+            "A cap rotating.",
+            REVISION_ID,
+            reference_image_url="https://signed.example/refs/cap.png",
+        )
+    )
+    assert task_id == "seedance-task-with-image"
+    body = captured["calls"][0]["body"]
+    assert body["input"]["image_url"] == "https://signed.example/refs/cap.png"
+    assert body["input"]["prompt"] == "A cap rotating."
+
+
+def test_seedance_submit_without_reference_image_omits_image_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"output": {"task_id": "seedance-task-no-image"}})
+    _seedance().submit_video(VideoRequest("A cap rotating.", REVISION_ID))
+    body = captured["calls"][0]["body"]
+    assert "image_url" not in body["input"]
+
+
+def test_veo_submit_with_reference_image_sends_inline_base64(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Veo accepts only inline bytes; the adapter must base64-encode them under ``inlineData``."""
+    import base64
+
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"name": "operations/veo-with-image"})
+    png = _png_header(b"veo-image")
+
+    _veo().submit_video(
+        VideoRequest("A cap rotating.", REVISION_ID, reference_image_bytes=png)
+    )
+    instance = captured["calls"][0]["body"]["instances"][0]
+    assert instance["image"]["inlineData"]["mimeType"] == "image/png"
+    assert instance["image"]["inlineData"]["data"] == base64.b64encode(png).decode("ascii")
+
+
+def test_veo_submit_without_reference_image_omits_image_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"name": "operations/veo-no-image"})
+    _veo().submit_video(VideoRequest("A cap rotating.", REVISION_ID))
+    instance = captured["calls"][0]["body"]["instances"][0]
+    assert "image" not in instance
+
+
+def test_wan_submit_with_reference_image_sends_image_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"id": "wan-task-with-image"})
+
+    adapter = wan_adapter.WanAdapter(wan_adapter.WanConfig(api_key="wan-test-key"))
+    task_id = adapter.submit_video(
+        VideoRequest(
+            "A cap rotating.",
+            REVISION_ID,
+            reference_image_url="https://signed.example/refs/cap.png",
+        )
+    )
+    assert task_id == "wan-task-with-image"
+    input_body = captured["calls"][0]["body"]["input"]
+    assert input_body["image"] == "https://signed.example/refs/cap.png"
+    assert input_body["prompt"] == "A cap rotating."
 
 
 # ---------------------------------------------------------------------------

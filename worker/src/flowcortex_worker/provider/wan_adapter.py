@@ -96,20 +96,19 @@ class WanAdapter:
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
-        body = json.dumps(
-            {
-                "input": {
-                    "prompt": request.prompt,
-                    "go_fast": True,
-                    "num_frames": self.config.num_frames,
-                    "resolution": self.config.resolution,
-                    "aspect_ratio": "9:16",
-                    "sample_shift": 12,
-                    "frames_per_second": self.config.frames_per_second,
-                    "disable_safety_checker": False,
-                }
-            }
-        ).encode("utf-8")
+        input_body: dict[str, Any] = {
+            "prompt": request.prompt,
+            "go_fast": True,
+            "num_frames": self.config.num_frames,
+            "resolution": self.config.resolution,
+            "aspect_ratio": "9:16",
+            "sample_shift": 12,
+            "frames_per_second": self.config.frames_per_second,
+            "disable_safety_checker": False,
+        }
+        if request.reference_image_url:
+            input_body["image"] = request.reference_image_url
+        body = json.dumps({"input": input_body}).encode("utf-8")
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/models/{model_path}/predictions",
             method="POST",

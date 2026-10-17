@@ -2,13 +2,9 @@
 #   filename:  provider-job.schema.json
 
 from __future__ import annotations
-from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
+from typing import Annotated, Literal
 from uuid import UUID
-
-
-class CommonProperties(RootModel[Any]):
-    root: Any
 
 
 class ProductAdPayload(BaseModel):
@@ -68,6 +64,22 @@ class VideoPayload(BaseModel):
     )
     prompt: Annotated[StrictStr, Field(max_length=2500, min_length=1)]
     sourceRevisionId: UUID
+
+
+class VideoInput(BaseModel):
+    """
+    A reference image the worker fetches from the media store and forwards to the video provider as the first frame.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        StrictStr,
+        Field(description="Logical name inside this job; e.g. 'reference'.", min_length=1),
+    ]
+    bucket: Annotated[StrictStr, Field(min_length=1)]
+    objectKey: Annotated[StrictStr, Field(min_length=1)]
 
 
 class VideoParams(BaseModel):
@@ -178,6 +190,13 @@ class GenerateVideoJob(BaseModel):
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_video"]
     params: VideoParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional reference image; the worker fetches it and forwards it to the video provider as the first frame.",
+            max_length=1,
+        ),
+    ] = None
     outputPrefix: Annotated[
         StrictStr,
         Field(

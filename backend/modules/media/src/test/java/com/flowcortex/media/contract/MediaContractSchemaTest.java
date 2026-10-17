@@ -128,21 +128,21 @@ class MediaContractSchemaTest {
 
     static ProviderJob generateScriptJob() {
         return new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_script", scriptParams(),
-                MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
+                List.of(), MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
     }
 
     static ProviderJob generateSpeechJob() {
         return new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_speech",
                 Map.of("profile", "vi_voice_v1", "payload", Map.of(
                         "script", "Mua máy lọc nước ngay hôm nay", "sourceRevisionId", REVISION_ID)),
-                MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
+                List.of(), MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
     }
 
     static ProviderJob generateStoryboardJob() {
         return new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_storyboard",
                 Map.of("profile", "product_ad_storyboard_v1", "payload", Map.of(
                         "script", "Mua máy lọc nước ngay hôm nay", "sourceRevisionId", REVISION_ID)),
-                MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
+                List.of(), MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 120, AT);
     }
 
     @Test
@@ -238,7 +238,7 @@ class MediaContractSchemaTest {
     @Test
     void providerJobWithAnOutputPrefixOutsideTheStepIsRejectedByTheSchemaAndByBeanValidation() {
         ProviderJob escaped = new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_script",
-                scriptParams(), "/etc/", 1, 120, AT);
+                scriptParams(), List.of(), "/etc/", 1, 120, AT);
 
         assertThat(providerJobSchema.validate(MAPPER.valueToTree(escaped))).isNotEmpty();
         assertThat(VALIDATOR.validate(escaped)).isNotEmpty();

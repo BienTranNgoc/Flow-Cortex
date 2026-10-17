@@ -13,5 +13,9 @@ export function saveTextFile(fileName: string, text: string): void {
   link.click();
   link.remove();
   // Revoking in the same task can cancel the download in some browsers before it has read the blob.
-  setTimeout(() => URL.revokeObjectURL(href), 1000);
+  setTimeout(() => {
+    if (typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(href);
+    }
+  }, 1000);
 }

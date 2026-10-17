@@ -286,6 +286,11 @@ class FakeStorage:
     def fetch_bytes(self, bucket: str, key: str, abort: Any) -> bytes:
         return b""
 
+    def presigned_get_url(
+        self, bucket: str, key: str, *, expires_seconds: int = 600
+    ) -> str:
+        return f"https://signed.test/{bucket}/{key}"
+
 
 def wait_for(predicate: Callable[[], bool], timeout: float = 5.0) -> None:
     deadline = time.monotonic() + timeout

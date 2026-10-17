@@ -2,14 +2,17 @@ package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.ProviderInput;
 import com.flowcortex.media.api.ProviderJob;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Dispatches provider-neutral script, speech and generated-video jobs. */
@@ -57,7 +60,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", profile(context.config()));
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params,
+                context.stepOrder(), capability, params, videoInputs(context.config()),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
         try {
@@ -67,6 +70,36 @@ class ProviderStepExecutor implements StepExecutor {
                     "The provider job breaks its contract: " + e.getMessage(), e);
         }
         return null;
+    }
+
+    /**
+     * Video steps may carry at most one reference image; the schema enforces {@code maxItems:1}.
+     * Script and speech steps have no inputs. The image reference is read from the step config's
+     * {@code referenceInput} entry (a single {@code {key, bucket, objectKey}} object) so the
+     * producer wires the reference alongside the visual-direction instructions.
+     */
+    private List<ProviderInput> videoInputs(String config) {
+        if (!"generate_video".equals(capability)) {
+            return List.of();
+        }
+        if (config == null || config.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode tree = objectMapper.readTree(config);
+            JsonNode ref = tree.get("referenceInput");
+            if (ref == null || ref.isNull()) {
+                return List.of();
+            }
+            if (!ref.isObject()) {
+                throw new StepFailedException("contract_violation",
+                        "referenceInput must be a single {key, bucket, objectKey} object");
+            }
+            return List.of(objectMapper.treeToValue(ref, ProviderInput.class));
+        } catch (JsonProcessingException e) {
+            throw new StepFailedException("contract_violation",
+                    "referenceInput is not a valid object reference", e);
+        }
     }
 
     private Map<String, Object> payload(String input) {

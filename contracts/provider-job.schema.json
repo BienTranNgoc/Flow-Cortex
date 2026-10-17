@@ -10,25 +10,6 @@
     { "$ref": "#/$defs/generateVideoJob" }
   ],
   "$defs": {
-    "commonProperties": {
-      "schemaVersion": { "const": "1" },
-      "jobId": { "type": "string", "format": "uuid" },
-      "runId": { "type": "string", "format": "uuid" },
-      "correlationId": {
-        "type": "string",
-        "format": "uuid",
-        "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
-      },
-      "stepOrder": { "type": "integer", "minimum": 1 },
-      "outputPrefix": {
-        "type": "string",
-        "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
-        "description": "The only object-key prefix under which this job may publish outputs."
-      },
-      "attempt": { "type": "integer", "minimum": 1 },
-      "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
-      "issuedAt": { "type": "string", "format": "date-time" }
-    },
     "productPayload": {
       "title": "ProductAdPayload",
       "type": "object",
@@ -102,6 +83,22 @@
         "sourceRevisionId": { "type": "string", "format": "uuid" }
       }
     },
+    "videoInput": {
+      "title": "VideoInput",
+      "description": "A reference image the worker fetches from the media store and forwards to the video provider as the first frame.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "bucket", "objectKey"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Logical name inside this job; e.g. 'reference'."
+        },
+        "bucket": { "type": "string", "minLength": 1 },
+        "objectKey": { "type": "string", "minLength": 1 }
+      }
+    },
     "videoParams": {
       "title": "VideoParams",
       "type": "object",
@@ -130,17 +127,25 @@
         "issuedAt"
       ],
       "properties": {
-        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
-        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
-        "runId": { "$ref": "#/$defs/commonProperties/runId" },
-        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
-        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
         "capability": { "const": "generate_script" },
         "params": { "$ref": "#/$defs/productAdParams" },
-        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
-        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
-        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
-        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
       }
     },
     "generateSpeechJob": {
@@ -161,17 +166,25 @@
         "issuedAt"
       ],
       "properties": {
-        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
-        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
-        "runId": { "$ref": "#/$defs/commonProperties/runId" },
-        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
-        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
         "capability": { "const": "generate_speech" },
         "params": { "$ref": "#/$defs/speechParams" },
-        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
-        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
-        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
-        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
       }
     },
     "generateStoryboardJob": {
@@ -183,17 +196,25 @@
         "capability", "params", "outputPrefix", "attempt", "maxRuntimeSeconds", "issuedAt"
       ],
       "properties": {
-        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
-        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
-        "runId": { "$ref": "#/$defs/commonProperties/runId" },
-        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
-        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
         "capability": { "const": "generate_storyboard" },
         "params": { "$ref": "#/$defs/storyboardParams" },
-        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
-        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
-        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
-        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
       }
     },
     "generateVideoJob": {
@@ -214,17 +235,31 @@
         "issuedAt"
       ],
       "properties": {
-        "schemaVersion": { "$ref": "#/$defs/commonProperties/schemaVersion" },
-        "jobId": { "$ref": "#/$defs/commonProperties/jobId" },
-        "runId": { "$ref": "#/$defs/commonProperties/runId" },
-        "correlationId": { "$ref": "#/$defs/commonProperties/correlationId" },
-        "stepOrder": { "$ref": "#/$defs/commonProperties/stepOrder" },
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
         "capability": { "const": "generate_video" },
         "params": { "$ref": "#/$defs/videoParams" },
-        "outputPrefix": { "$ref": "#/$defs/commonProperties/outputPrefix" },
-        "attempt": { "$ref": "#/$defs/commonProperties/attempt" },
-        "maxRuntimeSeconds": { "$ref": "#/$defs/commonProperties/maxRuntimeSeconds" },
-        "issuedAt": { "$ref": "#/$defs/commonProperties/issuedAt" }
+        "inputs": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/videoInput" },
+          "description": "Optional reference image; the worker fetches it and forwards it to the video provider as the first frame."
+        },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
       }
     }
   }

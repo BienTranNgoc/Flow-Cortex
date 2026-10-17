@@ -152,7 +152,7 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM event_publication WHERE event_type LIKE '%MediaJobRequested%' "
                         + "AND serialized_event LIKE ?", Long.class, "%" + run.runId() + "%")).isZero();
-        assertThat(receiveProviderJob(run.runId(), Duration.ofSeconds(2))).isNull();
+        assertThat(receiveProviderJob(run.runId(), null, Duration.ofSeconds(2))).isNull();
     }
 
     @Test
@@ -174,7 +174,15 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
         LOG.info("DIAG review_task rows = " + jdbc.queryForObject("SELECT count(*) FROM review_task WHERE run_id = ?",
                 Long.class, run.runId()));
 
-        Message speech = receiveProviderJob(run.runId(), WAIT);
+        // The visual storyboard step now sits between approval and speech (see
+        // V2026.10.17.002). Speech is not enqueued until the storyboard provider completes, so
+        // play it before the speech assertion — this test is about the speech payload, not the
+        // storyboard's content.
+        Message storyboard = receiveProviderJob(run.runId(), "generate_storyboard", WAIT);
+        assertThat(storyboard).as("the storyboard job is dispatched after approval").isNotNull();
+        publishStoryboardResult(run.runId(), messageId(storyboard), saved.id());
+
+        Message speech = receiveProviderJob(run.runId(), "generate_speech", WAIT);
         assertThat(speech).as("the speech job carries the approved revision").isNotNull();
         String body = new String(speech.getBody(), StandardCharsets.UTF_8);
         assertThat(body).contains("generate_speech")
@@ -261,6 +269,23 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
         rabbit.send("provider", "result", new Message(body.getBytes(StandardCharsets.UTF_8), properties));
     }
 
+    /** The provider's answer for the storyboard step so the orchestrator advances to speech. */
+    private void publishStoryboardResult(UUID runId, String storyboardMessageId, UUID sourceRevisionId) {
+        UUID stepId = UUID.fromString(storyboardMessageId);
+        MessageProperties properties = new MessageProperties();
+        properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        properties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+        properties.setCorrelationId(runId.toString());
+        String body = "{\"schemaVersion\":\"1\",\"jobId\":\"" + stepId + "\",\"runId\":\"" + runId + "\","
+                + "\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
+                + "\"data\":{\"profile\":\"product_ad_storyboard_v1\","
+                + "\"sourceRevisionId\":\"" + sourceRevisionId + "\","
+                + "\"scene1Prompt\":\"Mở cảnh sản phẩm\","
+                + "\"scene2Prompt\":\"Cảnh lợi ích và CTA\"},"
+                + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"test-provider\"}";
+        rabbit.send("provider", "result", new Message(body.getBytes(StandardCharsets.UTF_8), properties));
+    }
+
     /** The job's {@code jobId} is its message id, which the producer sets to the step id. */
     private String messageId(Message job) {
         assertThat(job).as("the dispatched job carries its step as message id").isNotNull();
@@ -281,14 +306,28 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
         return body.uploadId();
     }
 
-    /** The first speech job for this run, or {@code null} when none arrives inside the window. */
-    private Message receiveProviderJob(UUID runId, Duration window) {
+    /** The first job for this run and capability to reach {@code provider.jobs}, or {@code null} when
+     * none arrives inside the window. A {@code null} or blank capability matches any job, which the
+     * "no job is dispatched yet" test uses. After the visual-storyboard step was inserted at
+     * {@code step_order = 3}, a call without a capability filter would pick up that storyboard job
+     * before the speech job at {@code step_order = 4} and the speech assertion would race it. */
+    private Message receiveProviderJob(UUID runId, String capability, Duration window) {
         Instant deadline = Instant.now().plus(window);
+        String token = "\"" + capability + "\"";
+        boolean filterCapability = capability != null && !capability.isBlank();
         while (Instant.now().isBefore(deadline)) {
             Message message = rabbit.receive("provider.jobs", 200);
-            if (message != null && new String(message.getBody(), StandardCharsets.UTF_8).contains(runId.toString())) {
-                return message;
+            if (message == null) {
+                continue;
             }
+            String body = new String(message.getBody(), StandardCharsets.UTF_8);
+            if (!body.contains(runId.toString())) {
+                continue;
+            }
+            if (filterCapability && !body.contains(token)) {
+                continue;
+            }
+            return message;
         }
         return null;
     }

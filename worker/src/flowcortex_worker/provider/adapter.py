@@ -52,6 +52,8 @@ class VideoRequest:
     prompt: str
     source_revision_id: UUID
     profile: str = "vertical_ad_clip_v1"
+    reference_image_url: str | None = None
+    reference_image_bytes: bytes | None = None
 
 
 @dataclass(frozen=True)
@@ -77,7 +79,6 @@ class VideoAbort(Protocol):
 
 class ProviderAdapter(Protocol):
     def generate_script(self, payload: ProductAdPayload) -> str: ...
-
     def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
 
     def speech_identity(self) -> SpeechIdentity: ...

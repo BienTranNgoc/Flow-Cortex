@@ -56,6 +56,8 @@ class ObjectStore(Protocol):
 
     def put(self, key: str, body: bytes, mime: str, abort: Any) -> int: ...
 
+    def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = ...) -> str: ...
+
 
 @dataclass(frozen=True)
 class ExecutionContext:
@@ -168,7 +170,13 @@ def _generate_video(
     if not isinstance(job, GenerateVideoJob):
         raise UnsupportedCapability("generate_video received the wrong job shape")
     payload = job.params.payload
-    request = VideoRequest(payload.prompt, payload.sourceRevisionId)
+    image_bytes, image_url = _resolve_reference_image(job, context)
+    request = VideoRequest(
+        payload.prompt,
+        payload.sourceRevisionId,
+        reference_image_url=image_url,
+        reference_image_bytes=image_bytes,
+    )
     identity = adapter.video_identity()
     idempotency_key = _video_idempotency_key(request, identity)
     task_id = _load_video_task(context, idempotency_key, identity)
@@ -202,6 +210,44 @@ def _generate_video(
             ProviderFile("manifest.json", "application/json", manifest),
         ),
     )
+
+
+def _resolve_reference_image(
+    job: GenerateVideoJob, context: ExecutionContext
+) -> tuple[bytes | None, str | None]:
+    """Returns (bytes, url). Exactly one is populated: bytes for byte-only adapters, URL for
+    URL-based adapters. The executor decides which side to fill based on the provider."""
+    inputs = job.inputs or ()
+    if not inputs:
+        return None, None
+    if len(inputs) > 1:
+        raise PermanentError(
+            "contract_violation",
+            "generate_video/vertical_ad_clip_v1 accepts at most one reference image",
+        )
+    reference = inputs[0]
+    body = context.storage.fetch_bytes(reference.bucket, reference.objectKey, context.abort)
+    if not _looks_like_image(body):
+        raise PermanentError(
+            "input_rejected",
+            f"reference image '{reference.key}' is not a recognised image format",
+        )
+    # The URL-based providers (Seedance, Wan) cannot read our private bucket; the byte-based
+    # provider (Veo) accepts inline base64, so the URL is unused there. The URL is a short-lived
+    # presigned GET scoped to this object only.
+    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+
+
+def _looks_like_image(body: bytes) -> bool:
+    if len(body) < 12:
+        return False
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return True
+    if body[:3] == b"\xff\xd8\xff":
+        return True
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return True
+    return bool(body[:4] == b"RIFF" and body[8:12] == b"WEBP")
 
 
 def _load_video_task(
@@ -361,6 +407,11 @@ def _speech_idempotency_key(request: SpeechRequest, identity: SpeechIdentity) ->
 
 
 def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> str:
+    image_digest = (
+        hashlib.sha256(request.reference_image_bytes or b"").hexdigest()
+        if request.reference_image_bytes or request.reference_image_url
+        else ""
+    )
     value = "\0".join((
         str(request.source_revision_id),
         request.profile,
@@ -371,6 +422,7 @@ def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> st
         identity.resolution,
         str(identity.generate_audio).lower(),
         hashlib.sha256(request.prompt.encode()).hexdigest(),
+        image_digest,
     ))
     return hashlib.sha256(value.encode()).hexdigest()
 

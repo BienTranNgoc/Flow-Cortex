@@ -4,9 +4,11 @@ import {
   defaultStep,
   edgeState,
   selectedStep,
+  stepDuration,
   stepKey,
   stepLabel,
   stepState,
+  formatTime,
   type StepChoice,
 } from './stepDisplay';
 
@@ -235,5 +237,55 @@ describe('selectedStep', () => {
 
   it('uses the default with no choice', () => {
     expect(selectedStep(steps, 'running', undefined)?.id).toBe('b');
+  });
+});
+
+describe('stepDuration', () => {
+  it('calculates duration from startedAt and finishedAt', () => {
+    const s = step({
+      startedAt: '2026-10-17T10:00:00.000Z',
+      finishedAt: '2026-10-17T10:00:11.300Z',
+    });
+    expect(stepDuration(s)).toBe('11.3s');
+  });
+
+  it('formats minutes and seconds when duration exceeds 60s', () => {
+    const s = step({
+      startedAt: '2026-10-17T10:00:00.000Z',
+      finishedAt: '2026-10-17T10:01:25.000Z',
+    });
+    expect(stepDuration(s)).toBe('1m 25s');
+  });
+
+  it('falls back to durationMs in output report', () => {
+    const s = step({ output: '{"durationMs": 4200}' });
+    expect(stepDuration(s)).toBe('4.2s');
+  });
+
+  it('falls back to durationSeconds in output report', () => {
+    const s = step({ output: '{"durationSeconds": 10}' });
+    expect(stepDuration(s)).toBe('10s');
+  });
+
+  it('falls back to duration string in output report', () => {
+    const s = step({ output: '{"duration": "11.3 s"}' });
+    expect(stepDuration(s)).toBe('11.3 s');
+  });
+
+  it('returns null when no timing or duration is available', () => {
+    expect(stepDuration(step())).toBeNull();
+  });
+});
+
+describe('formatTime', () => {
+  it('formats ISO string to time string', () => {
+    const formatted = formatTime('2026-10-17T10:30:45.000Z');
+    expect(formatted).not.toBeNull();
+    expect(formatted).toMatch(/\d{1,2}:\d{2}:\d{2}/);
+  });
+
+  it('returns null for undefined or invalid input', () => {
+    expect(formatTime(undefined)).toBeNull();
+    expect(formatTime('invalid')).toBeNull();
   });
 });
