@@ -160,6 +160,48 @@ def test_transient_retry_budget_publishes_terminal_error() -> None:
     assert waits == []
 
 
+def test_transient_retry_budget_error_keeps_the_transient_reason() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body(), headers={"x-delivery-count": 3})
+
+    def fail(job: Any, runner: Any) -> Any:
+        raise TransientError("provider unavailable")
+
+    run_consumer(
+        conn, execute_job=fail, max_transient_redeliveries=3, wait=lambda s: None, until=settled
+    )
+
+    [result] = published(conn, "result")
+    message = json.loads(result.body)["error"]["message"]
+    assert message == "transient retry budget exhausted after 3 redeliveries: provider unavailable"
+
+
+def test_unconfirmed_budget_exhausted_result_is_requeued() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body(), headers={"x-delivery-count": 3})
+    waits: list[float] = []
+
+    def fail(job: Any, runner: Any) -> Any:
+        raise TransientError("provider unavailable")
+
+    def start(c: FakeConnection) -> None:
+        if len(c.channels) == 2:
+            c.publish.fail_publish_routing_keys.add("result")
+
+    conn.hooks.append(start)
+    run_consumer(
+        conn,
+        execute_job=fail,
+        max_transient_redeliveries=3,
+        wait=waits.append,
+        until=settled,
+    )
+
+    assert conn.consume.acks == []
+    assert conn.consume.rejects == [(1, True)]
+    assert waits == [backoff_seconds(3)]
+
+
 @pytest.mark.parametrize(
     ("props", "expected_wait", "expected_count"),
     [

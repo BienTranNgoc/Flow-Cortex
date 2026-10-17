@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import io
+import subprocess
 import wave
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from ..errors import PermanentError
 from .contracts.provider_job import ProductAdPayload
+
+
+class Abort(Protocol):
+    """The job's kill switch: subprocesses and transfers must stop when it fires."""
+
+    def check(self) -> None: ...
+
+    def on_kill(self, callback: Callable[[], None]) -> None: ...
+
+    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]: ...
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,10 @@
 """The generated contract models accept reference messages and reject what the schemas forbid."""
 
+import json
 from typing import Any
 
 import pytest
+from conftest import CONTRACTS
 from pydantic import ValidationError
 
 from flowcortex_worker.contracts.media_job import MediaJob
@@ -308,3 +310,11 @@ def test_job_values_outside_the_schema_fail(change: dict[str, Any]) -> None:
 
     with pytest.raises(ValidationError):
         MediaJob.model_validate(payload)
+
+
+def test_transient_budget_matches_the_broker_delivery_limit() -> None:
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    limits = json.loads((CONTRACTS / "limits.json").read_text())
+
+    assert limits["providerJobDeliveryLimit"] == provider_main.MAX_TRANSIENT_REDELIVERIES

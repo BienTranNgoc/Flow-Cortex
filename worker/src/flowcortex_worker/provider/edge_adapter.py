@@ -1,5 +1,8 @@
 """Edge Read Aloud speech adapter used by the demo provider runtime.
 
+Demo use only: Edge TTS calls Microsoft's undocumented Read Aloud endpoint, which has no SLA, has
+broken before and receives the approved script. Production speech needs a contracted provider.
+
 The upstream service returns MP3. This boundary converts it to the stable WAV contract consumed by
 media capabilities and never logs the script or generated audio.
 """
@@ -9,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import io
 import os
-import subprocess
 import tempfile
 import wave
 from dataclasses import dataclass
@@ -17,28 +19,23 @@ from pathlib import Path
 
 import edge_tts
 from aiohttp import ClientError, WSServerHandshakeError
-from edge_tts.exceptions import NoAudioReceived
+from edge_tts.exceptions import (
+    NoAudioReceived,
+    SkewAdjustmentError,
+    UnexpectedResponse,
+    UnknownResponse,
+    WebSocketError,
+)
 
 from ..errors import PermanentError, TransientError
-from .adapter import (
-    FixtureProviderAdapter,
-    SpeechArtifact,
-    SpeechIdentity,
-    SpeechRequest,
-    StoryboardArtifact,
-    StoryboardRequest,
-    VideoAbort,
-    VideoArtifact,
-    VideoIdentity,
-    VideoRequest,
-)
+from ..storage import TEMP_PREFIX
+from .adapter import Abort, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 PROVIDER_EDGE = "edge"
 DEFAULT_EDGE_VOICE = "vi-VN-HoaiMyNeural"
 DEFAULT_EDGE_RATE = "+0%"
 DEFAULT_EDGE_TIMEOUT_SECONDS = 60.0
-_FFMPEG_TIMEOUT_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -53,39 +50,57 @@ class EdgeSpeechAdapter:
     config: EdgeConfig
 
     def generate_script(self, payload: ProductAdPayload) -> str:
-        # Edge is a speech provider. Keep Product Video runnable in demo mode by retaining the
-        # deterministic script implementation until a separately selectable LLM adapter lands.
-        return FixtureProviderAdapter().generate_script(payload)
-
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
-        return FixtureProviderAdapter().generate_storyboard(request)
+        raise PermanentError(
+            "provider_capability_unavailable",
+            "Edge TTS does not generate scripts",
+        )
 
     def speech_identity(self) -> SpeechIdentity:
         return SpeechIdentity(PROVIDER_EDGE, self.config.voice, self.config.rate, 24_000)
 
-    def generate_speech(self, request: SpeechRequest) -> SpeechArtifact:
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         if not request.script.strip():
             raise PermanentError("provider_request_failed", "speech script is blank")
+        abort.check()
         try:
-            mp3 = _run_download(request.script, self.config)
+            mp3 = _run_download(request.script, self.config, abort)
+        except asyncio.CancelledError as exc:
+            # Only a kill cancels the download; check() turns it into the kill's reason.
+            abort.check()
+            raise TransientError("Edge TTS download was cancelled") from exc
         except WSServerHandshakeError as exc:
             raise TransientError(
                 f"Edge TTS handshake failed with HTTP {exc.status}"
             ) from exc
-        except (TimeoutError, ConnectionError, OSError, ClientError) as exc:
+        except (
+            WebSocketError,
+            SkewAdjustmentError,
+            TimeoutError,
+            ConnectionError,
+            OSError,
+            ClientError,
+        ) as exc:
             raise TransientError(f"Edge TTS connection failed: {type(exc).__name__}") from exc
         except NoAudioReceived as exc:
-            raise TransientError("Edge TTS returned no audio") from exc
+            raise PermanentError("provider_response_invalid", "Edge TTS returned no audio") from exc
+        except UnexpectedResponse as exc:
+            raise PermanentError(
+                "provider_response_invalid", "Edge TTS returned an unexpected response"
+            ) from exc
+        except UnknownResponse as exc:
+            raise PermanentError(
+                "provider_response_invalid", "Edge TTS returned an unknown response"
+            ) from exc
         except ValueError as exc:
             raise PermanentError(
                 "provider_request_failed", "Edge TTS rejected the request"
             ) from exc
-        except TransientError:
-            raise
         except Exception as exc:
-            raise PermanentError("provider_response_invalid", "Edge TTS returned no audio") from exc
+            # An unclassified failure keeps the retry budget instead of failing the run outright.
+            raise TransientError(f"Edge TTS failed: {type(exc).__name__}") from exc
+        abort.check()
 
-        wav = _to_wav(mp3)
+        wav = _to_wav(mp3, abort)
         duration_ms = _validate_wav(wav)
         return SpeechArtifact(
             body=wav,
@@ -95,32 +110,26 @@ class EdgeSpeechAdapter:
             speed=self.config.rate,
         )
 
-    def video_identity(self) -> VideoIdentity:
-        raise PermanentError(
-            "provider_capability_unavailable", "Edge video generation is not implemented"
-        )
 
-    def submit_video(self, request: VideoRequest) -> str:
-        raise PermanentError(
-            "provider_capability_unavailable", "Edge video generation is not implemented"
-        )
-
-    def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
-        raise PermanentError(
-            "provider_capability_unavailable", "Edge video generation is not implemented"
-        )
-
-
-def _run_download(script: str, config: EdgeConfig) -> bytes:
-    download = asyncio.wait_for(_download_mp3(script, config), config.timeout_seconds)
-    if os.name != "nt":
-        return asyncio.run(download)
+def _run_download(script: str, config: EdgeConfig, abort: Abort) -> bytes:
     # ProactorEventLoop needs named-pipe access that restricted Windows runners may deny.
-    loop = asyncio.SelectorEventLoop()
-    try:
-        return loop.run_until_complete(download)
-    finally:
-        loop.close()
+    loop_factory = asyncio.SelectorEventLoop if os.name == "nt" else None
+    with asyncio.Runner(loop_factory=loop_factory) as runner:
+        return runner.run(_cancellable_download(script, config, abort))
+
+
+async def _cancellable_download(script: str, config: EdgeConfig, abort: Abort) -> bytes:
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    assert task is not None
+
+    def cancel() -> None:
+        # The runner keeps callbacks after the download ends; a closed loop has nothing to stop.
+        if not loop.is_closed():
+            loop.call_soon_threadsafe(task.cancel)
+
+    abort.on_kill(cancel)
+    return await asyncio.wait_for(_download_mp3(script, config), config.timeout_seconds)
 
 
 async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
@@ -134,16 +143,16 @@ async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
     return bytes(chunks)
 
 
-def _to_wav(mp3: bytes) -> bytes:
+def _to_wav(mp3: bytes, abort: Abort) -> bytes:
     if not mp3:
         raise PermanentError("provider_response_invalid", "Edge TTS produced empty audio")
-    with tempfile.TemporaryDirectory(prefix="flowcortex-edge-") as directory:
+    with tempfile.TemporaryDirectory(prefix=TEMP_PREFIX) as directory:
         root = Path(directory)
         source = root / "speech.mp3"
         output = root / "speech.wav"
         source.write_bytes(mp3)
         try:
-            subprocess.run(
+            completed = abort.run(
                 [
                     "ffmpeg",
                     "-v",
@@ -159,17 +168,16 @@ def _to_wav(mp3: bytes) -> bytes:
                     "-c:a",
                     "pcm_s16le",
                     str(output),
-                ],
-                check=True,
-                capture_output=True,
-                timeout=_FFMPEG_TIMEOUT_SECONDS,
+                ]
             )
-        except subprocess.TimeoutExpired as exc:
-            raise TransientError("FFmpeg timed out while normalizing speech") from exc
-        except (subprocess.CalledProcessError, OSError) as exc:
+        except OSError as exc:
             raise PermanentError(
                 "provider_response_invalid", "Edge TTS audio could not be normalized"
             ) from exc
+        if completed.returncode != 0:
+            raise PermanentError(
+                "provider_response_invalid", "Edge TTS audio could not be normalized"
+            )
         return output.read_bytes()
 
 

@@ -431,6 +431,21 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
+        except TransientError as exc:
+            if runner.killed is not None:
+                return self._killed(job, delivery, runner.killed)
+            budget = self._max_transient_redeliveries
+            if budget is None or delivery.count < budget:
+                raise
+            log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+            return self._error(
+                job.jobId,
+                job.runId,
+                job.attempt,
+                delivery.count,
+                self._transient_exhausted_code,
+                f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+            )
         except Exception:
             if runner.killed is None:
                 raise

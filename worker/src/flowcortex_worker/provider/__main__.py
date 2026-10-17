@@ -17,7 +17,7 @@ from flowcortex_worker.config import Settings
 from flowcortex_worker.consumer import Consumer
 from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
-from flowcortex_worker.storage import Storage, client_from
+from flowcortex_worker.storage import Storage, client_from, remove_leftovers
 
 from .adapter import CapabilityProviderAdapter, FixtureProviderAdapter, ProviderAdapter
 from .capabilities import ExecutionContext, execute
@@ -38,6 +38,9 @@ log = logging.getLogger("flowcortex_provider_worker")
 PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
+# Mirrors providerJobDeliveryLimit in contracts/limits.json, the x-delivery-limit the backend
+# declares on provider.jobs. Equal values put the terminal error on the broker's last delivery;
+# a higher value lets the broker dead-letter first, so the backend never receives a result.
 MAX_TRANSIENT_REDELIVERIES = 3
 
 
@@ -104,6 +107,7 @@ def main() -> int:
             stop.wait(min(left, 1.0))
 
     log.info("provider worker starting", extra={"workerId": settings.worker_id})
+    remove_leftovers()
     liveness_file.touch()
     Supervisor(
         connect=lambda: pika.BlockingConnection(params),
