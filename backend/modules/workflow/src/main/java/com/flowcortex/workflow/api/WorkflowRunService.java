@@ -29,6 +29,13 @@ public interface WorkflowRunService {
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName);
 
+    /**
+     * {@link #startRun(UUID, UUID, String, UUID, List, String)} with {@code acknowledgeCost}: the member has
+     * confirmed the run's cost, which a {@link RunStartGuard} may require.
+     */
+    RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost);
+
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input);
 

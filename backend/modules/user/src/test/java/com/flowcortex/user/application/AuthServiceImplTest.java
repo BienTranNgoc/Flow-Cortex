@@ -27,6 +27,8 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Clock;
+import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
+import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -35,10 +37,12 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.server.ResponseStatusException;
 
 class AuthServiceImplTest {
@@ -67,7 +71,10 @@ class AuthServiceImplTest {
     private AuthServiceImpl serviceWithOwner(String ownerEmail) {
         return new AuthServiceImpl(repository, ENCODER, refreshTokenService, loginAttempts, loginRateLimiter,
                 registrationRateLimiter, googleOAuthClient, audit,
-                new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK);
+                new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
+                mock(ApplicationEventPublisher.class), mock(PlatformTransactionManager.class),
+                mock(EmailConfirmationService.class),
+                new EmailConfirmationProperties(false, Duration.ofHours(24), "no-reply@flow-cortex.dev"));
     }
 
     private static AppUser activeUser(UUID id, Role role) {
@@ -91,8 +98,8 @@ class AuthServiceImplTest {
     }
 
     private void assertRegistrationClosed(AuthServiceImpl closed) {
-        assertThatThrownBy(() -> closed.register("new@example.com", RAW_PASSWORD, "New Person", false, "127.0.0.1",
-                "ua"))
+        assertThatThrownBy(() -> closed.register("new@example.com", RAW_PASSWORD, "New", "Person", null, false,
+                "127.0.0.1", "ua"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
                     assertThat(e.getReason()).isEqualTo("Self-registration is not available");
@@ -248,8 +255,8 @@ class AuthServiceImplTest {
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
 
-        AuthSession session = service.register("new@example.com", RAW_PASSWORD, "New Person", false, "127.0.0.1",
-                "ua");
+        AuthSession session = service.register("new@example.com", RAW_PASSWORD, "New", "Person", null, false,
+                "127.0.0.1", "ua").orElseThrow();
 
         assertThat(session).isEqualTo(SESSION);
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
@@ -273,7 +280,7 @@ class AuthServiceImplTest {
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
 
-        service.register(" New@Example.COM ", RAW_PASSWORD, "New Person", false, "127.0.0.1", "ua");
+        service.register(" New@Example.COM ", RAW_PASSWORD, "New", "Person", null, false, "127.0.0.1", "ua");
 
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(repository).saveAndFlush(captor.capture());
@@ -286,7 +293,8 @@ class AuthServiceImplTest {
         doThrow(new RegistrationRateLimitedException(Duration.ofMinutes(1))).when(registrationRateLimiter)
                 .acquire("127.0.0.1", "new@example.com");
 
-        assertThatThrownBy(() -> service.register("new@example.com", RAW_PASSWORD, "New", false, "127.0.0.1", "ua"))
+        assertThatThrownBy(() -> service.register("new@example.com", RAW_PASSWORD, "New", "Person", null, false,
+                "127.0.0.1", "ua"))
                 .isInstanceOf(RegistrationRateLimitedException.class);
 
         verify(audit).write(eq(AuthEventType.REGISTRATION_REJECTED_RATE_LIMITED), isNull(), eq("127.0.0.1"),
@@ -325,7 +333,8 @@ class AuthServiceImplTest {
         when(repository.saveAndFlush(any()))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_app_user_email"));
 
-        assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken", false, "127.0.0.1", "ua"))
+        assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken", "Member", null, false,
+                "127.0.0.1", "ua"))
                 .isInstanceOf(ConflictException.class);
         verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
     }

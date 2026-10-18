@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -74,26 +75,36 @@ public record MediaProperties(
 
     /**
      * Upload limits. {@code extensions} covers audio/video (worker render); {@code productImageExtensions}
-     * covers images (product-video feature). Each entry maps to one canonical MIME type.
+     * covers images (product-video feature). Each entry maps to one canonical MIME type, whose prefix
+     * names the kind ({@code video}, {@code audio}, {@code image}) that picks the size cap.
      */
     public record Upload(
-            @Positive long maxBytes,
+            @Positive long maxVideoBytes,
+            @Positive long maxAudioBytes,
+            @Positive long maxImageBytes,
             @NotEmpty List<String> extensions,
             @NotEmpty List<String> productImageExtensions,
-            @NotNull Duration urlTtl) {
+            @NotNull Duration urlTtl,
+            @NotNull @Valid ContentCheck contentCheck) {
 
-        private static final Map<String, String> CANONICAL_MIME_TYPES = Map.ofEntries(
-                Map.entry("mp4", "video/mp4"),
-                Map.entry("mov", "video/quicktime"),
-                Map.entry("webm", "video/webm"),
-                Map.entry("mkv", "video/x-matroska"),
-                Map.entry("m4a", "audio/mp4"),
-                Map.entry("mp3", "audio/mpeg"),
-                Map.entry("wav", "audio/wav"),
-                Map.entry("jpg", "image/jpeg"),
-                Map.entry("jpeg", "image/jpeg"),
-                Map.entry("png", "image/png"),
-                Map.entry("webp", "image/webp"));
+        /** Insertion order is the order formats are listed to the member. */
+        private static final Map<String, String> CANONICAL_MIME_TYPES = canonicalMimeTypes();
+
+        private static Map<String, String> canonicalMimeTypes() {
+            Map<String, String> types = new LinkedHashMap<>();
+            types.put("mp4", "video/mp4");
+            types.put("mov", "video/quicktime");
+            types.put("webm", "video/webm");
+            types.put("mkv", "video/x-matroska");
+            types.put("mp3", "audio/mpeg");
+            types.put("wav", "audio/wav");
+            types.put("m4a", "audio/mp4");
+            types.put("jpg", "image/jpeg");
+            types.put("jpeg", "image/jpeg");
+            types.put("png", "image/png");
+            types.put("webp", "image/webp");
+            return Collections.unmodifiableMap(types);
+        }
 
         public Upload {
             extensions = normalize(extensions, "flowcortex.media.upload.extensions");
@@ -132,6 +143,35 @@ public record MediaProperties(
         /** Only the product-image extensions, in configuration order, for the product-video allowlist. */
         public List<String> productImageExtensions() {
             return List.copyOf(productImageExtensions);
+        }
+
+        /** The kind of a canonical MIME type: its prefix before {@code /}, or {@code binary}. */
+        public static String kindOf(String mimeType) {
+            int separator = mimeType == null ? -1 : mimeType.indexOf('/');
+            return separator > 0 ? mimeType.substring(0, separator) : "binary";
+        }
+
+        /** The size cap of {@code kind}, or 0 for a kind no upload may have. */
+        public long maxBytesOf(String kind) {
+            return switch (kind) {
+                case "video" -> maxVideoBytes;
+                case "audio" -> maxAudioBytes;
+                case "image" -> maxImageBytes;
+                default -> 0L;
+            };
+        }
+
+        /** The configured extensions of {@code kind}, across both lists, in the canonical listing order. */
+        public List<String> extensionsOf(String kind) {
+            Map<String, String> configured = mimeTypes();
+            return CANONICAL_MIME_TYPES.entrySet().stream()
+                    .filter(entry -> configured.containsKey(entry.getKey()) && kindOf(entry.getValue()).equals(kind))
+                    .map(Map.Entry::getKey)
+                    .toList();
+        }
+
+        /** {@code enabled}: whether an upload's first bytes must match the kind its extension claims. */
+        public record ContentCheck(@NotNull Boolean enabled) {
         }
     }
 

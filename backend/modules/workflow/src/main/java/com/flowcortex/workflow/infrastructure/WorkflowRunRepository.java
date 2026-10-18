@@ -41,6 +41,32 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     @Query(value = "UPDATE workflow_run SET last_swept_at = :now WHERE id IN (:ids)", nativeQuery = true)
     int markSwept(@Param("ids") Collection<UUID> ids, @Param("now") Instant now);
 
+    /**
+     * Takes the run's row lock for the rest of the caller's transaction. A step transition takes it
+     * before touching its step, as a stop does with its first update, so the two never interleave:
+     * otherwise each could miss the other's uncommitted change and leave the run {@code cancelling}
+     * with nothing left to settle it.
+     */
+    @Query(value = "SELECT id FROM workflow_run WHERE id = :id FOR UPDATE", nativeQuery = true)
+    List<UUID> lockById(@Param("id") UUID id);
+
+    /** {@code running}/{@code waiting_approval} -> {@code cancelling} for the owner's run; {@code 0} otherwise. */
+    @Modifying
+    @Query("UPDATE WorkflowRun r SET r.status = com.flowcortex.workflow.domain.RunStatus.CANCELLING "
+            + "WHERE r.id = :id AND r.ownerId = :ownerId AND r.status IN ("
+            + "com.flowcortex.workflow.domain.RunStatus.RUNNING, "
+            + "com.flowcortex.workflow.domain.RunStatus.WAITING_APPROVAL)")
+    int requestCancel(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
+
+    /** {@code cancelling} -> {@code cancelled} once none of the run's steps is running; {@code 0} otherwise. */
+    @Modifying
+    @Query("UPDATE WorkflowRun r SET r.status = com.flowcortex.workflow.domain.RunStatus.CANCELLED, "
+            + "r.finishedAt = :now "
+            + "WHERE r.id = :id AND r.status = com.flowcortex.workflow.domain.RunStatus.CANCELLING "
+            + "AND NOT EXISTS (SELECT 1 FROM RunStep s WHERE s.runId = r.id "
+            + "AND s.status = com.flowcortex.workflow.domain.RunStepStatus.RUNNING)")
+    int settleCancelled(@Param("id") UUID id, @Param("now") Instant now);
+
     /** Every owner's runs, newest first, with their workflow's name; {@code status} {@code null} matches all. */
     @Query(value = "SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
             + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "

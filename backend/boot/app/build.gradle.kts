@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":modules:user"))
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
+    implementation(project(":modules:credit"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -36,6 +37,8 @@ dependencies {
     testImplementation("com.networknt:json-schema-validator:${providers.gradleProperty("jsonSchemaValidatorVersion").get()}")
     // The media ITs play the worker: raw AMQP on the broker, raw S3 on the object store.
     testImplementation("org.springframework.boot:spring-boot-starter-amqp")
+    // The registration ITs replace JavaMailSender with a capturing one.
+    testImplementation("org.springframework.boot:spring-boot-starter-mail")
     testImplementation(platform("software.amazon.awssdk:bom:${providers.gradleProperty("awsSdkVersion").get()}"))
     testImplementation("software.amazon.awssdk:s3")
     // The module convention puts JPA/Flyway/security on the runtime classpath only;
@@ -54,6 +57,10 @@ dependencies {
 }
 
 tasks.withType<Test> {
+    // Every distinct @SpringBootTest property set is its own cached context; past ~20 of them the
+    // default 512 MB heap runs out. Evicting the least recently used keeps the run inside 1 GB.
+    maxHeapSize = "1g"
+    systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")
     // Absolute path to the committed OpenAPI snapshot; the repo root is backend/'s parent.

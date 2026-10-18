@@ -84,6 +84,12 @@ spring:
         processing: 30m
         resubmitted: 10m
 
+  # Outgoing mail (email confirmation links). Compose points it at the Mailpit sink; a deployment
+  # sets its SMTP relay through the same variables.
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+
 server:
   port: 8080
   # The remote address is the client's when nginx (a private-network proxy) sends X-Forwarded-For;
@@ -112,6 +118,11 @@ management:
       probes:
         enabled: true
         add-additional-paths: true
+  # A mail sink outage must not turn the app DOWN: a failed confirmation mail is logged and the
+  # member can ask for it again.
+  health:
+    mail:
+      enabled: false
   tracing:
     sampling:
       probability: 1.0
@@ -144,6 +155,9 @@ jdbc:
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
 # profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
+  # The member app's public origin; links in outgoing mail point here.
+  app:
+    public-url: ${FLOWCORTEX_APP_PUBLIC_URL:http://localhost:5173}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -176,6 +190,10 @@ flowcortex:
       remember-me-ttl: ${REFRESH_TOKEN_REMEMBER_ME_TTL:30d}
       max-active-per-user: ${REFRESH_TOKEN_MAX_ACTIVE_PER_USER:10}
   auth:
+    # On: a new registration must confirm its email before it can sign in. Off: accounts are
+    # confirmed on creation and register signs the member in. Env var + restart.
+    email-confirmation:
+      enabled: ${FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED:false}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
     # `audit-events`, and refresh-token rows that expired or were revoked, every `interval`.
     retention:
@@ -204,6 +222,26 @@ flowcortex:
     per-email:
       capacity: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY:3}
       period: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD:1h}
+  # Phone verification by one-time code (/api/v1/me/phone/**): off answers 503 there.
+  phone-verification:
+    enabled: ${FLOWCORTEX_PHONE_VERIFICATION_ENABLED:false}
+  # Run credits: off means no balance check at start, no debit or refund, no balance shown.
+  # Every registered step type needs a cost here, or startup fails.
+  credits:
+    enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
+    step-costs:
+      echo: 1
+      fail: 20
+      # Brackets make the map binder keep the key exactly as written (upper case).
+      "[APPROVAL_CHECKPOINT]": 0
+      probe: 10
+      extract_audio: 50
+      align_audio: 50
+      generate_script: 100
+      generate_speech: 100
+      generate_storyboard: 100
+      generate_video: 200
+      render_video: 200
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
@@ -212,6 +250,9 @@ flowcortex:
   # DB-backed live toggle.
   workflow:
     enabled: ${FLOWCORTEX_WORKFLOW_ENABLED:true}
+    # Member-initiated run cancellation: off answers 503 and the app hides the stop button.
+    cancel:
+      enabled: ${FLOWCORTEX_WORKFLOW_CANCEL_ENABLED:false}
     # A picked-up step must report within this window (a heartbeat every 30 s)
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
@@ -247,7 +288,14 @@ flowcortex:
     provider-video-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:15m}
     presign-ttl: 15m
     upload:
-      max-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}
+      # Per-kind size caps; the kind comes from the file's canonical MIME type.
+      max-video-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES:524288000}
+      max-audio-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES:104857600}
+      max-image-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES:10485760}
+      # On: an upload whose first bytes do not match its declared kind is refused. The caps apply
+      # either way.
+      content-check:
+        enabled: ${FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED:true}
       # Each extension must map to a canonical MIME type in MediaProperties, or startup fails.
       # `extensions` is the audio/video allowlist (the only types a media capability takes as
       # input); `product-image-extensions` is the image allowlist (product-video feature). Neither

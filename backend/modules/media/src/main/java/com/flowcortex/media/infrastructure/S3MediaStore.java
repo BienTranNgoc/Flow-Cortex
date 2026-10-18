@@ -114,6 +114,16 @@ public class S3MediaStore implements AutoCloseable {
         }
     }
 
+    /** At most the first {@code length} bytes of the object (a ranged GET), or empty if there is no object at {@code key}. */
+    public Optional<byte[]> readPrefix(String bucket, String key, int length) {
+        try {
+            return Optional.of(client.getObjectAsBytes(request -> request
+                    .bucket(bucket).key(key).range("bytes=0-" + (length - 1))).asByteArray());
+        } catch (NoSuchKeyException e) {
+            return Optional.empty();
+        }
+    }
+
     /**
      * A server-side copy of an upload into a run's inputs; nothing streams through this process. The
      * copy carries only {@value #RUN_INPUT_TAG}, which the media bucket's lifecycle rule expires by.

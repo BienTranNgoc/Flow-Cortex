@@ -23,7 +23,10 @@ class RegistrationClosedIT extends AbstractUserModuleIT {
     record ProblemView(int status, String detail) {
     }
 
-    record RegisterRequest(String email, String password, String name) {
+    record RegisterRequest(String email, String password, String firstName, String lastName) {
+        RegisterRequest(String email, String password, String firstName) {
+            this(email, password, firstName, "Member");
+        }
     }
 
     @Test

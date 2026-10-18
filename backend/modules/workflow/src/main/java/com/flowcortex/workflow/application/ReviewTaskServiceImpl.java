@@ -2,10 +2,12 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ReviewTaskService;
 import com.flowcortex.workflow.api.ReviewTaskView;
 import com.flowcortex.workflow.api.ScriptRevisionView;
 import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.ScriptRevision;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
@@ -16,21 +18,30 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * A decision is guarded twice: the task must still be pending, and the task row's {@code
  * version} must not have moved since it was read — a concurrent decision on the same task fails
- * its commit with an optimistic-lock error, which the shared handler answers as 409.
+ * its flush with an optimistic-lock error. Either way the loser gets the same 409.
  */
 @Service
 @Transactional
 class ReviewTaskServiceImpl implements ReviewTaskService {
+
+    private static final String TASK_NOT_FOUND = "Review task not found";
+    private static final String NOT_YOUR_RUN = "You can't decide on this run";
+    private static final String RUN_STOPPING = "RUN_STOPPING";
+    private static final String RUN_STOPPING_DETAIL = "This run is being stopped";
+    private static final String EMPTY_CONTENT = "Content can't be empty";
 
     private final ReviewTaskRepository reviewTaskRepository;
     private final RunStepRepository runStepRepository;
@@ -82,12 +93,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     @Override
     public ReviewTaskView approveTask(UUID taskId, UUID reviewerId, String reviewedPayload,
             UUID revisionId, Long expectedVersion) {
-        ReviewTask task = reviewTaskRepository.findById(taskId)
-            .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
-
-        // IDOR guard: check ownership of the parent run
-        workflowRunRepository.findByIdAndOwnerId(task.getRunId(), reviewerId)
-            .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+        ReviewTask task = decidableTask(taskId, reviewerId).task();
 
         String payload;
         if (task.getCurrentRevisionId() != null) {
@@ -105,11 +111,14 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
             if (revisionId != null || expectedVersion != null) {
                 throw new ConflictException("revisionId and expectedVersion are not accepted for plain approval");
             }
+            if (reviewedPayload != null && reviewedPayload.isBlank()) {
+                throw new UnprocessableEntityException(EMPTY_CONTENT, null,
+                        Map.of("reviewedPayload", EMPTY_CONTENT));
+            }
             task.approve(reviewerId, reviewedPayload, clock.instant());
-            payload = task.getReviewedPayload() != null && !task.getReviewedPayload().isBlank()
-                    ? task.getReviewedPayload() : task.getOriginalPayload();
+            payload = reviewedPayload != null ? reviewedPayload : task.getOriginalPayload();
         }
-        ReviewTaskView view = toView(reviewTaskRepository.save(task));
+        ReviewTaskView view = toView(saveDecision(task));
         events.publishEvent(new ReviewTaskApprovedEvent(
                 task.getId(), task.getRunId(), payload, task.getApprovedRevisionId()));
         return view;
@@ -147,22 +156,20 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
 
     @Override
     public ReviewTaskView rejectTask(UUID taskId, UUID reviewerId) {
-        ReviewTask task = reviewTaskRepository.findById(taskId)
-            .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
-
-        // IDOR guard: check ownership of the parent run
-        WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(task.getRunId(), reviewerId)
-            .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+        Decidable decidable = decidableTask(taskId, reviewerId);
+        ReviewTask task = decidable.task();
+        WorkflowRun run = decidable.run();
 
         Instant now = clock.instant();
         task.reject(reviewerId, now);
+        ReviewTask saved = saveDecision(task);
         if (runStepRepository.failPendingApproval(task.getRunStepId(), task.getRunId(),
                 "APPROVAL_REJECTED", "Approval rejected", now) != 1) {
-            throw new ConflictException("Approval step is no longer pending: " + task.getRunStepId());
+            throw new ConflictException(ReviewTask.NOT_WAITING_FOR_REVIEW);
         }
         run.markError("Approval rejected", now);
         workflowRunRepository.save(run);
-        return toView(reviewTaskRepository.save(task));
+        return toView(saved);
     }
 
     private ReviewTaskView toView(ReviewTask task) {
@@ -195,5 +202,43 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         workflowRunRepository.findByIdAndOwnerId(task.getRunId(), ownerId)
                 .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
         return task;
+    }
+
+    /**
+     * The task a decision may act on. Refuses, in this order, an unknown task (not found), another
+     * member's run (forbidden) and a run being stopped (unprocessable), before anything is changed.
+     */
+    private Decidable decidableTask(UUID taskId, UUID reviewerId) {
+        ReviewTask task = reviewTaskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
+        // Run row before step row, the order a cancel takes: a decision racing a stop waits for it
+        // and then sees the stopped run, instead of deadlocking or approving a cancelled run.
+        workflowRunRepository.lockById(task.getRunId());
+        WorkflowRun run = workflowRunRepository.findById(task.getRunId())
+                .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
+        if (!run.getOwnerId().equals(reviewerId)) {
+            throw new AccessDeniedException(NOT_YOUR_RUN);
+        }
+        if (run.getStatus() == RunStatus.CANCELLING || run.getStatus() == RunStatus.CANCELLED) {
+            throw new UnprocessableEntityException(RUN_STOPPING_DETAIL, RUN_STOPPING);
+        }
+        return new Decidable(task, run);
+    }
+
+    /**
+     * Flushes inside the transaction so a concurrent decision that committed first fails here, on
+     * the task's version check, and answers the same 409 as a task already decided.
+     */
+    private ReviewTask saveDecision(ReviewTask task) {
+        try {
+            ReviewTask saved = reviewTaskRepository.save(task);
+            reviewTaskRepository.flush();
+            return saved;
+        } catch (OptimisticLockingFailureException e) {
+            throw new ConflictException(ReviewTask.NOT_WAITING_FOR_REVIEW);
+        }
+    }
+
+    private record Decidable(ReviewTask task, WorkflowRun run) {
     }
 }

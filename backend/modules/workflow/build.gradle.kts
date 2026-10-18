@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":modules:user"))
     implementation(project(":modules:media"))
+    implementation(project(":modules:credit"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

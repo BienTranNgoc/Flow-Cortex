@@ -28,12 +28,21 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
 
     long countByRunIdAndStatusNot(UUID runId, RunStepStatus status);
 
+    /** {@code pending -> running}, only while the step's run is {@code running}: no step starts after a stop. */
     @Modifying
     @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.RUNNING, r.startedAt = :now, "
             + "r.queueDeadline = :queueDeadline, r.input = :input "
-            + "WHERE r.id = :id AND r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING")
+            + "WHERE r.id = :id AND r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING "
+            + "AND EXISTS (SELECT 1 FROM WorkflowRun w WHERE w.id = r.runId "
+            + "AND w.status = com.flowcortex.workflow.domain.RunStatus.RUNNING)")
     int claimPending(@Param("id") UUID id, @Param("now") Instant now, @Param("queueDeadline") Instant queueDeadline,
             @Param("input") String input);
+
+    /** Every step of the run that has not started becomes {@code skipped}; returns how many. */
+    @Modifying
+    @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.SKIPPED "
+            + "WHERE r.runId = :runId AND r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING")
+    int skipPending(@Param("runId") UUID runId);
 
     /**
      * A delivery's {@code started}: the first pickup time is kept; the run deadline restarts

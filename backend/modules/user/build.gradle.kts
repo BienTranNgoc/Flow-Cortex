@@ -18,6 +18,8 @@ dependencies {
     implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
+    // Email confirmation links go out over SMTP (Mailpit in the local stack).
+    implementation("org.springframework.boot:spring-boot-starter-mail")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")

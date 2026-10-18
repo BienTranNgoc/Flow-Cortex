@@ -1,4 +1,5 @@
 import type { UploadRequest, UploadResponse } from '@flow-cortex/api-client';
+import { extensionOf, IMAGE, sizeProblem } from './startRunSchema';
 
 export interface MultiUploadDeps {
   requestUpload: (body: UploadRequest) => Promise<UploadResponse>;
@@ -15,9 +16,6 @@ export type MultiUploadPhase =
   | { kind: 'uploading'; percent: number; index: number; total: number }
   | { kind: 'done' };
 
-/** Why a picked image cannot be checked, or `null` when it may be uploaded. */
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 10;
 
@@ -25,20 +23,17 @@ export interface ImageProblem {
   message: string;
 }
 
+/** Why a picked image cannot be checked, or `null` when it may be uploaded. */
 export function imageFileProblem(file: File): ImageProblem | null {
-  if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    return { message: 'Each image must be between 1 byte and 10 MB.' };
-  }
-  const dot = file.name.lastIndexOf('.');
-  const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(extension)) {
+  if (!IMAGE.extensions.includes(extensionOf(file.name))) {
     return { message: 'Use .jpg, .jpeg, .png or .webp.' };
   }
-  return null;
+  const tooLarge = sizeProblem(file, IMAGE);
+  return tooLarge ? { message: tooLarge } : null;
 }
 
 export const EMPTY_IMAGE_LIST: ImageProblem = {
-  message: `Pick between ${MIN_IMAGES} and ${MAX_IMAGES} images.`,
+  message: 'Add at least one product image',
 };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
