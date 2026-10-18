@@ -21,6 +21,8 @@ import java.util.UUID;
 @Table(name = "app_user")
 public class AppUser {
 
+    private static final int NAME_MAX_LENGTH = 255;
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -123,6 +125,28 @@ public class AppUser {
         return user;
     }
 
+    /**
+     * An active MEMBER created by a first Google sign-in: linked to {@code subject}, no password, named
+     * as {@link #confirmEmailDroppingUnprovenChoices} names a claimed account.
+     */
+    public static AppUser googleSignedUp(UUID id, UUID ownerId, String email, String subject, String displayName) {
+        AppUser user = new AppUser(id, ownerId, email, "", displayNameOr(displayName, email), Role.MEMBER,
+                UserStatus.ACTIVE, false);
+        user.linkGoogle(subject);
+        return user;
+    }
+
+    /** {@code displayName} trimmed, else the email's local part; capped to the column. */
+    private static String displayNameOr(String displayName, String email) {
+        String chosen = displayName == null || displayName.isBlank() ? emailLocalPart(email) : displayName.trim();
+        return chosen.length() <= NAME_MAX_LENGTH ? chosen : chosen.substring(0, NAME_MAX_LENGTH);
+    }
+
+    private static String emailLocalPart(String email) {
+        int at = email.indexOf('@');
+        return at > 0 ? email.substring(0, at) : email;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -219,12 +243,61 @@ public class AppUser {
         touch();
     }
 
-    /** Idempotent: an already-confirmed account keeps its first confirmation time. */
-    public void confirmEmail(Instant now) {
-        if (this.emailConfirmedAt == null) {
-            this.emailConfirmedAt = now;
-            touch();
+    /**
+     * Confirms the email and drops everything chosen before anyone proved they own the address: the
+     * password (with the failed-login count and lockout that guarded it), the username and the names.
+     * The display name becomes {@code displayName}, or the email's local part when that is blank.
+     * False, changing nothing, when the email was already confirmed.
+     */
+    public boolean confirmEmailDroppingUnprovenChoices(Instant now, String displayName) {
+        if (this.emailConfirmedAt != null) {
+            return false;
         }
+        this.emailConfirmedAt = now;
+        this.passwordHash = "";
+        this.hasPassword = false;
+        this.failedLoginAttempts = 0;
+        this.lockedUntil = null;
+        this.username = null;
+        this.firstName = null;
+        this.lastName = null;
+        this.name = displayNameOr(displayName, email);
+        touch();
+        return true;
+    }
+
+    /** A new registration of the same, still unconfirmed email replaces everything the earlier one chose. */
+    public void replaceUnconfirmedRegistration(String passwordHash, String firstName, String lastName,
+            String username, Instant emailConfirmedAt) {
+        if (this.emailConfirmedAt != null) {
+            throw new IllegalStateException("A confirmed account cannot be registered again");
+        }
+        this.passwordHash = passwordHash;
+        this.hasPassword = true;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.name = firstName + " " + lastName;
+        this.username = username;
+        this.emailConfirmedAt = emailConfirmedAt;
+        touch();
+    }
+
+    /**
+     * First password of an account that has none, with the names and username the member chooses
+     * alongside it ({@code username} may be {@code null}); replacing an existing password goes through
+     * no path here.
+     */
+    public void setUpFirstPassword(String passwordHash, String firstName, String lastName, String username) {
+        if (this.hasPassword) {
+            throw new IllegalStateException("The account already has a password");
+        }
+        this.passwordHash = passwordHash;
+        this.hasPassword = true;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.name = firstName + " " + lastName;
+        this.username = username;
+        touch();
     }
 
     public void changeRole(Role role) {

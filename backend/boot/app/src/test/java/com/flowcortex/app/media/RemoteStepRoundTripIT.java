@@ -138,8 +138,12 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         assertThat(properties.getContentType()).isEqualTo(MessageProperties.CONTENT_TYPE_JSON);
         JsonNode body = JSON.readTree(run.job().getBody());
         assertThat(jobSchema().validate(body)).isEmpty();
+        String copyKey = "runs/" + run.runId() + "/inputs/media";
         assertThat(body.get("inputs")).isEqualTo(JSON.readTree(
-                "[{\"key\":\"media\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + run.objectKey() + "\"}]"));
+                "[{\"key\":\"media\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"" + copyKey + "\"}]"));
+        try (S3Client store = objectStore()) {
+            assertThat(store.headObject(o -> o.bucket(MEDIA_BUCKET).key(copyKey)).contentLength()).isPositive();
+        }
 
         publish("progress", "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.stepId() + "\",\"runId\":\"" + run.runId()
                 + "\",\"attempt\":1,\"deliveryCount\":0,\"kind\":\"started\",\"at\":\"" + Instant.now() + "\"}", run);
@@ -159,7 +163,8 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
                 "SELECT status FROM workflow_run WHERE id = ?", String.class, run.runId())).isEqualTo("completed"));
 
         ResponseEntity<String> read = get("/api/v1/runs/" + run.runId(), run.token(), String.class);
-        assertThat(read.getBody()).contains("\"input\":\"clip.mp4\"").doesNotContain(UPLOAD_BUCKET, run.objectKey());
+        assertThat(read.getBody()).contains("\"input\":\"clip.mp4\"")
+                .doesNotContain(UPLOAD_BUCKET, run.objectKey(), copyKey);
     }
 
     @Test

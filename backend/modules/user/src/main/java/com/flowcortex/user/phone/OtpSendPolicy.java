@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Whether one more code may be sent to a number, from the times codes were already sent to it.
+ * Whether a member may send one more code to a number, from the times they already sent to it.
  * Precedence: the 24-hour cap, then the hourly cap, then the cooldown after the previous send
  * within the hour (60 s before the second, 120 s before the third, 300 s before every later one).
  */
@@ -61,11 +61,12 @@ final class OtpSendPolicy {
     }
 
     /** Sends strictly after {@code windowStart}, oldest first. */
-    private static List<Instant> within(List<Instant> sends, Instant windowStart) {
+    static List<Instant> within(List<Instant> sends, Instant windowStart) {
         return sends.stream().filter(sent -> sent.isAfter(windowStart)).sorted().toList();
     }
 
-    private static long secondsUntil(Instant then, Instant now) {
+    /** Whole seconds from {@code now} to {@code then}, rounded up, at least 1. */
+    static long secondsUntil(Instant then, Instant now) {
         long millis = Duration.between(now, then).toMillis();
         return Math.max(1, (millis + 999) / 1000);
     }

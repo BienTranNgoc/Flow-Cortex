@@ -33,7 +33,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ReviewTaskServiceImplTest {
@@ -133,16 +132,16 @@ class ReviewTaskServiceImplTest {
     }
 
     @Test
-    void aDecisionByAnotherMemberIsForbiddenAndLeavesTheTaskPending() {
+    void aDecisionByAnotherMemberIsNotFoundAndLeavesTheTaskPending() {
         givenOwnedTask();
         UUID otherMember = UUID.randomUUID();
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), otherMember, null, null, null))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("You can't decide on this run");
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Review task not found");
         assertThatThrownBy(() -> service.rejectTask(task.getId(), otherMember))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("You can't decide on this run");
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Review task not found");
         assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
         verify(reviewTaskRepository, never()).save(any());
         verify(events, never()).publishEvent(any());

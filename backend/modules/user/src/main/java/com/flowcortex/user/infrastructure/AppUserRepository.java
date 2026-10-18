@@ -27,12 +27,17 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     @Query("SELECT u FROM AppUser u WHERE lower(u.email) = lower(:email)")
     Optional<AppUser> findByEmail(@Param("email") String email);
 
+    /**
+     * The id alone, so the entity is first loaded by {@link #findByIdForUpdate}: an entity already in
+     * the persistence context would keep the state it was read with, not the locked row's.
+     */
+    @Query("SELECT u.id FROM AppUser u WHERE lower(u.email) = lower(:email)")
+    Optional<UUID> findIdByEmail(@Param("email") String email);
+
     /** Row-locked read, so concurrent failed logins each see the counter the previous one wrote. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM AppUser u WHERE u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);
-
-    boolean existsByEmailIgnoreCase(String email);
 
     Optional<AppUser> findByGoogleSubject(String googleSubject);
 

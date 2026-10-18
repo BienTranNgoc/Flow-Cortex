@@ -15,6 +15,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.phone.PhoneVerificationService.SentCode;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
@@ -39,11 +41,19 @@ class PhoneVerificationServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-16T08:00:00Z");
     private static final String PHONE = "+84912345678";
+    private static final PhoneNumberHasher HASHER =
+            new PhoneNumberHasher(new PhoneHashProperties("phone-hash-secret-for-unit-tests-0123456789"), true);
+    private static final String PHONE_HASH = HASHER.hash(PHONE);
+    private static final String IP = "203.0.113.7";
+    private static final String LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
     private static final Pattern BODY = Pattern.compile("^Your Flow-Cortex code is (\\d{6})\\. It expires in 5 minutes\\.$");
+    private static final PhoneSendLimits LIMITS = new PhoneSendLimits(List.of("84"), 10, 3,
+            new PhoneSendLimits.IpLimit(30, Duration.ofHours(1)), 20, 2000);
 
     private final PhoneChallengeRepository challenges = mock(PhoneChallengeRepository.class);
     private final UserPhoneRepository phones = mock(UserPhoneRepository.class);
     private final SmsSender smsSender = mock(SmsSender.class);
+    private final PhoneSendAttemptStore attempts = mock(PhoneSendAttemptStore.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private final UUID userId = UUID.randomUUID();
@@ -52,7 +62,7 @@ class PhoneVerificationServiceTest {
     void aSendStoresOnlyAHashOfTheCodeAndLogsNeitherTheCodeNorTheFullNumber(CapturedOutput output) {
         when(challenges.findSendTimesSince(eq(PHONE), any())).thenReturn(List.of());
 
-        SentCode sent = service(NOW).sendCode(userId, "0912345678");
+        SentCode sent = service(NOW).sendCode(userId, "0912345678", IP);
 
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
         verify(smsSender).send(eq(PHONE), body.capture());
@@ -61,9 +71,10 @@ class PhoneVerificationServiceTest {
         String code = matcher.group(1);
 
         ArgumentCaptor<PhoneChallenge> saved = ArgumentCaptor.forClass(PhoneChallenge.class);
-        InOrder order = inOrder(jdbc, challenges);
-        order.verify(jdbc).query(eq("SELECT pg_advisory_xact_lock(hashtext(?))"), any(RowCallbackHandler.class),
-                eq(PHONE));
+        InOrder order = inOrder(jdbc, challenges, attempts);
+        order.verify(jdbc).query(eq(LOCK), any(RowCallbackHandler.class), eq("phone-send-user:" + userId));
+        order.verify(jdbc).query(eq(LOCK), any(RowCallbackHandler.class), eq(PHONE));
+        order.verify(attempts).record(userId, PHONE_HASH, IP, "sent", NOW);
         order.verify(challenges).invalidateOpen(userId, NOW);
         order.verify(challenges).save(saved.capture());
         assertThat(saved.getValue().getCodeHash()).isNotEqualTo(code);
@@ -77,28 +88,72 @@ class PhoneVerificationServiceTest {
     }
 
     @Test
-    void aNumberVerifiedOnAnotherAccountIsAConflictAndNothingIsSent() {
+    void aNumberVerifiedOnAnotherAccountIsAConflictRecordedAgainstTheQuotaAndNothingIsSent() {
         when(phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(PHONE, userId)).thenReturn(true);
 
-        assertThatThrownBy(() -> service(NOW).sendCode(userId, "+84912345678"))
+        assertThatThrownBy(() -> service(NOW).sendCode(userId, "+84912345678", IP))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("This number is already verified on another account");
+        verify(attempts).record(userId, PHONE_HASH, IP, "number_taken", NOW);
         verify(smsSender, never()).send(anyString(), anyString());
     }
 
     @Test
-    void aCooldownRefusalNamesItsCodeAndWhenToRetry() {
-        when(challenges.findSendTimesSince(eq(PHONE), any())).thenReturn(List.of(NOW.minusSeconds(59)));
+    void aCooldownRefusalNamesItsCodeAndWhenToRetryAndIsRecorded() {
+        when(challenges.findSendTimesByUserSince(eq(userId), eq(PHONE), any())).thenReturn(List.of(NOW.minusSeconds(59)));
 
-        assertThatThrownBy(() -> service(NOW).sendCode(userId, "0912345678"))
+        assertThatThrownBy(() -> service(NOW).sendCode(userId, "0912345678", IP))
                 .isInstanceOfSatisfying(OtpRateLimitedException.class, refused -> {
                     assertThat(refused.getBody().getProperties())
                             .containsEntry("code", "OTP_COOLDOWN")
                             .containsEntry("retryAfterSeconds", 1L);
                     assertThat(refused.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("1");
                 });
+        verify(attempts).record(userId, PHONE_HASH, IP, "cooldown", NOW);
         verify(challenges, never()).save(any());
         verify(smsSender, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    void anotherMembersRecentSendToTheNumberDoesNotHoldThisMemberBack() {
+        when(challenges.findSendTimesSince(eq(PHONE), any())).thenReturn(List.of(NOW.minusSeconds(5)));
+
+        SentCode sent = service(NOW).sendCode(userId, "0912345678", IP);
+
+        assertThat(sent.resendAfterSeconds()).isEqualTo(60);
+        verify(smsSender).send(eq(PHONE), anyString());
+    }
+
+    @Test
+    void aFourthNumberInADayIsRefusedEvenWhenItIsVerifiedElsewhere() {
+        when(attempts.countedByUserSince(eq(userId), any())).thenReturn(List.of(
+                new SendFacts.CountedAttempt("a", NOW.minusSeconds(3600)),
+                new SendFacts.CountedAttempt("b", NOW.minusSeconds(1800)),
+                new SendFacts.CountedAttempt("c", NOW.minusSeconds(600))));
+        when(phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(PHONE, userId)).thenReturn(true);
+
+        assertThatThrownBy(() -> service(NOW).sendCode(userId, "0912345678", IP))
+                .isInstanceOfSatisfying(OtpRateLimitedException.class, refused -> {
+                    assertThat(refused.getBody().getProperties())
+                            .containsEntry("code", "OTP_USER_NUMBER_LIMIT")
+                            .containsEntry("retryAfterSeconds", 23L * 3600);
+                    assertThat(refused.getBody().getDetail())
+                            .isEqualTo("You've tried too many different numbers today. Try again in 23 hours.");
+                });
+        verify(attempts).record(userId, PHONE_HASH, IP, "user_number_limit", NOW);
+        verify(smsSender, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    void startupFailsWhenTheFeatureIsOnAndNoSmsSenderIsConfigured() {
+        assertThatThrownBy(() -> service(NOW, null, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("flowcortex.sms.sender");
+    }
+
+    @Test
+    void withTheFeatureOffNoSmsSenderIsNeeded() {
+        assertThat(service(NOW, null, false)).isNotNull();
     }
 
     @Test
@@ -165,8 +220,16 @@ class PhoneVerificationServiceTest {
     }
 
     private PhoneVerificationService service(Instant now) {
-        return new PhoneVerificationService(challenges, phones, smsSender, encoder, jdbc,
-                mock(PlatformTransactionManager.class), Clock.fixed(now, ZoneOffset.UTC));
+        return service(now, smsSender, true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private PhoneVerificationService service(Instant now, SmsSender sender, boolean enabled) {
+        ObjectProvider<SmsSender> senders = mock(ObjectProvider.class);
+        when(senders.getIfAvailable()).thenReturn(sender);
+        return new PhoneVerificationService(challenges, phones, senders, enabled, attempts, HASHER,
+                new PhoneSendIpLimiter(LIMITS), LIMITS, encoder, jdbc, mock(PlatformTransactionManager.class),
+                Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private PhoneChallenge challenge(String code, Instant sentAt) {

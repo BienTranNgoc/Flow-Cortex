@@ -74,8 +74,13 @@ public class WorkflowRun {
         return status;
     }
 
-    public void markWaitingApproval() {
+    /** Pauses a {@code RUNNING} run for review; any other run is left as it is and {@code false} returned. */
+    public boolean markWaitingApproval() {
+        if (status != RunStatus.RUNNING) {
+            return false;
+        }
         this.status = RunStatus.WAITING_APPROVAL;
+        return true;
     }
 
     public void resume() {

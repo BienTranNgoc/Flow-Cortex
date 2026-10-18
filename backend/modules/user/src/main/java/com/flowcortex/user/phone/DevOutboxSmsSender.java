@@ -5,10 +5,15 @@ import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** The only {@link SmsSender}: nothing reaches a carrier, every SMS lands in {@code sms_outbox}. */
+/**
+ * Development {@link SmsSender}, present only with {@code flowcortex.sms.sender=outbox}: nothing
+ * reaches a carrier, every SMS lands in {@code sms_outbox}.
+ */
 @Component
+@ConditionalOnProperty(name = "flowcortex.sms.sender", havingValue = "outbox")
 class DevOutboxSmsSender implements SmsSender {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevOutboxSmsSender.class);

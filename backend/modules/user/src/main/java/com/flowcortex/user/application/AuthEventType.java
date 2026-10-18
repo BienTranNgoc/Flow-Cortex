@@ -16,9 +16,12 @@ public enum AuthEventType {
     LOGIN_FAILED_ACCOUNT_SUSPENDED,
     REGISTRATION_ACCEPTED,
     REGISTRATION_REJECTED_RATE_LIMITED,
+    PASSWORD_SET,
 
     OAUTH_LOGIN_SUCCESS,
     OAUTH_LOGIN_FAILED,
+    /** A Google sign-in took over an account whose email had not been confirmed. */
+    OAUTH_UNCONFIRMED_ACCOUNT_CLAIMED,
 
     REFRESH_TOKEN_ROTATED,
     REFRESH_TOKEN_REUSE_DETECTED,

@@ -176,9 +176,8 @@ class MediaJobsImpl implements MediaJobs {
 
     @Override
     @Transactional
-    public MediaJobInput resolveUpload(UUID ownerId, UUID uploadId) {
-        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null)
-                .input();
+    public MediaAssetInput resolveUpload(UUID ownerId, UUID uploadId) {
+        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null);
     }
 
     @Override
@@ -198,25 +197,56 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs) {
+        requireBindable(inputs);
+        List<MediaAssetInput> copies = new java.util.ArrayList<>();
+        for (MediaAssetInput input : inputs) {
+            MediaJobInput source = input.input();
+            String targetKey = runInputKey(runId, source.key());
+            try {
+                store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
+            } catch (UploadRejectedException e) {
+                if (UPLOAD_INPUT_KEY.equals(source.key())) {
+                    throw new UploadRejectedException("uploadId", e.getMessage());
+                }
+                throw e;
+            }
+            if (properties.upload().contentCheck().enabled()) {
+                checkContent(input.assetId(), properties.s3().bucket(), targetKey);
+            }
+            copies.add(new MediaAssetInput(input.assetId(),
+                    new MediaJobInput(source.key(), properties.s3().bucket(), targetKey)));
+        }
+        return List.copyOf(copies);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public List<MediaAssetInput> bindRunInputs(UUID runId, List<MediaAssetInput> inputs) {
+    public void bindRunInputs(UUID runId, List<MediaAssetInput> copies) {
+        requireBindable(copies);
+        Instant now = Instant.now();
+        List<MediaAssetBinding> rows = new java.util.ArrayList<>();
+        for (int index = 0; index < copies.size(); index++) {
+            MediaAssetInput copy = copies.get(index);
+            MediaJobInput input = copy.input();
+            if (!properties.s3().bucket().equals(input.bucket())
+                    || !runInputKey(runId, input.key()).equals(input.objectKey())) {
+                throw new IllegalArgumentException("Only a copy under the run's inputs can be bound: " + input.key());
+            }
+            rows.add(new MediaAssetBinding(runId, input.key(), copy.assetId(), (short) index, now));
+        }
+        bindings.saveAll(rows);
+    }
+
+    private static void requireBindable(List<MediaAssetInput> inputs) {
         if (inputs == null || inputs.isEmpty() || inputs.size() > 10) {
             throw new IllegalArgumentException("A run must bind between 1 and 10 assets");
         }
-        Instant now = Instant.now();
-        List<MediaAssetBinding> rows = new java.util.ArrayList<>();
-        List<MediaAssetInput> bound = new java.util.ArrayList<>();
-        for (int index = 0; index < inputs.size(); index++) {
-            MediaAssetInput input = inputs.get(index);
-            MediaJobInput source = input.input();
-            String targetKey = "runs/" + runId + "/inputs/" + source.key();
-            store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
-            rows.add(new MediaAssetBinding(runId, source.key(), input.assetId(), (short) index, now));
-            bound.add(new MediaAssetInput(input.assetId(),
-                    new MediaJobInput(source.key(), properties.s3().bucket(), targetKey)));
-        }
-        bindings.saveAll(rows);
-        return List.copyOf(bound);
+    }
+
+    private static String runInputKey(UUID runId, String bindingKey) {
+        return "runs/" + runId + "/inputs/" + bindingKey;
     }
 
     @Override
@@ -266,19 +296,28 @@ class MediaJobsImpl implements MediaJobs {
         if (!withinLimit(kind, stored.size())) {
             throw refused(bucket, key, stored.size() + " bytes", sizeSentence(kind));
         }
-        if (properties.upload().contentCheck().enabled()) {
-            byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
-                    .orElseThrow(() -> refused(bucket, key, "gone before the content check", "Upload the file again"));
-            if (!ContentSniffer.matches(kind, prefix)) {
-                throw refused(bucket, key, "content is not " + kind, "This file isn't a valid " + kind
-                        + " file. Accepted: " + formats(kind) + ".");
-            }
-        }
         MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, kind, bucket, key,
                 stored.contentType(), stored.size(), stored.checksum(), Instant.now()));
         asset.refresh(stored.contentType(), stored.size(), stored.checksum());
         assets.save(asset);
         return new MediaAssetInput(asset.getId(), new MediaJobInput(inputKey, bucket, key));
+    }
+
+    /**
+     * Sniffs the run's copy rather than the upload: the upload's presigned URL stays valid after the run
+     * starts, while the copy is out of the member's reach. A refused copy stays under the run prefix until
+     * the media bucket's run-input lifecycle rule expires it; the backend may not delete there.
+     */
+    private void checkContent(UUID assetId, String bucket, String key) {
+        String kind = assets.findById(assetId)
+                .orElseThrow(() -> new IllegalStateException("Bound asset is not registered: " + assetId))
+                .getKind();
+        byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
+                .orElseThrow(() -> refused(bucket, key, "gone before the content check", "Upload the file again"));
+        if (!ContentSniffer.matches(kind, prefix)) {
+            throw refused(bucket, key, "content is not " + kind, "This file isn't a valid " + kind
+                    + " file. Accepted: " + formats(kind) + ".");
+        }
     }
 
     @Override

@@ -29,7 +29,7 @@ class CreditsControllerTest {
         when(creditAccounts.enabled()).thenReturn(true);
         when(jwt.getSubject()).thenReturn(userId.toString());
         when(userDirectory.findById(userId)).thenReturn(Optional.of(
-                new CurrentUser(userId, userId, "member@example.com", "Member", "MEMBER", "active")));
+                new CurrentUser(userId, userId, "member@example.com", "Member", "MEMBER", "active", true, false)));
         when(creditAccounts.balance(userId)).thenReturn(989L);
 
         assertThat(controller.balance(jwt).getBody().balance()).isEqualTo(989);

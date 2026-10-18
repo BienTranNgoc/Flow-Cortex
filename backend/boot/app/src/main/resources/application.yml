@@ -84,11 +84,19 @@ spring:
         processing: 30m
         resubmitted: 10m
 
-  # Outgoing mail (email confirmation links). Compose points it at the Mailpit sink; a deployment
-  # sets its SMTP relay through the same variables.
+  # Outgoing mail (confirmation and set-password links). Compose points it at the Mailpit
+  # sink; a deployment sets its SMTP relay through the same variables. No default host: with email
+  # confirmation on, startup fails until one is set (the dev profile uses localhost). Mailpit takes
+  # no login; a public relay needs one, sent only after the session has switched to TLS.
   mail:
-    host: ${SPRING_MAIL_HOST:localhost}
+    host: ${SPRING_MAIL_HOST:}
     port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SPRING_MAIL_SMTP_AUTH:false}
+      "[mail.smtp.starttls.enable]": ${SPRING_MAIL_SMTP_STARTTLS:false}
+      "[mail.smtp.starttls.required]": ${SPRING_MAIL_SMTP_STARTTLS:false}
 
 server:
   port: 8080
@@ -155,9 +163,10 @@ jdbc:
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
 # profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
-  # The member app's public origin; links in outgoing mail point here.
+  # The member app's public origin; links in outgoing mail point here. No default: with email
+  # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:
-    public-url: ${FLOWCORTEX_APP_PUBLIC_URL:http://localhost:5173}
+    public-url: ${FLOWCORTEX_APP_PUBLIC_URL:}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -190,10 +199,13 @@ flowcortex:
       remember-me-ttl: ${REFRESH_TOKEN_REMEMBER_ME_TTL:30d}
       max-active-per-user: ${REFRESH_TOKEN_MAX_ACTIVE_PER_USER:10}
   auth:
-    # On: a new registration must confirm its email before it can sign in. Off: accounts are
-    # confirmed on creation and register signs the member in. Env var + restart.
+    # On: a new registration must confirm its email before it can sign in; needs app.public-url and
+    # spring.mail.host, or startup fails. Off: accounts are confirmed on creation and register signs
+    # the member in. Env var + restart. Unconfirmed accounts older than the retention, with no live
+    # link, are deleted every retention interval (below).
     email-confirmation:
       enabled: ${FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED:false}
+      unconfirmed-account-retention: ${FLOWCORTEX_AUTH_UNCONFIRMED_ACCOUNT_RETENTION:72h}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
     # `audit-events`, and refresh-token rows that expired or were revoked, every `interval`.
     retention:
@@ -222,9 +234,34 @@ flowcortex:
     per-email:
       capacity: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY:3}
       period: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD:1h}
-  # Phone verification by one-time code (/api/v1/me/phone/**): off answers 503 there.
+  # Phone verification by one-time code (/api/v1/me/phone/**): off answers 503 there. On needs an
+  # SMS sender (flowcortex.sms.sender below), or startup fails.
   phone-verification:
     enabled: ${FLOWCORTEX_PHONE_VERIFICATION_ENABLED:false}
+    # Send-code quotas, over the last 24 h unless noted; each refusal answers 429 with Retry-After.
+    # A member's sends and distinct numbers count "number already verified" answers too. The
+    # per-IP bucket is per backend instance; the rest are read from the database.
+    limits:
+      allowed-country-codes: ${FLOWCORTEX_PHONE_ALLOWED_COUNTRY_CODES:84}
+      user-sends-per-day: ${FLOWCORTEX_PHONE_USER_SENDS_PER_DAY:10}
+      user-numbers-per-day: ${FLOWCORTEX_PHONE_USER_NUMBERS_PER_DAY:3}
+      per-ip:
+        capacity: ${FLOWCORTEX_PHONE_PER_IP_CAPACITY:30}
+        period: ${FLOWCORTEX_PHONE_PER_IP_PERIOD:1h}
+      number-sends-per-day: ${FLOWCORTEX_PHONE_NUMBER_SENDS_PER_DAY:20}
+      global-sends-per-day: ${FLOWCORTEX_PHONE_GLOBAL_SENDS_PER_DAY:2000}
+    # A scheduled job deletes send attempts (they hold IPs) and outbox messages older than these.
+    retention:
+      interval: ${FLOWCORTEX_PHONE_RETENTION_INTERVAL:1h}
+      send-attempts: ${FLOWCORTEX_PHONE_SEND_ATTEMPT_RETENTION:30d}
+      sms-outbox: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:7d}
+  # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
+  phone:
+    hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}
+  # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
+  # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
+  sms:
+    sender: ${FLOWCORTEX_SMS_SENDER:}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
   # Every registered step type needs a cost here, or startup fails.
   credits:
@@ -288,8 +325,9 @@ flowcortex:
     provider-video-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:15m}
     presign-ttl: 15m
     upload:
-      # Per-kind size caps; the kind comes from the file's canonical MIME type.
-      max-video-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES:524288000}
+      # Per-kind size caps; the kind comes from the file's canonical MIME type. The video cap
+      # still honours FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES, its name before per-kind caps.
+      max-video-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES:${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}}
       max-audio-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES:104857600}
       max-image-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES:10485760}
       # On: an upload whose first bytes do not match its declared kind is refused. The caps apply
@@ -317,3 +355,6 @@ flowcortex:
     # accepts the connection and never answers cannot hold a request or a health check.
       api-call-timeout: 5s
       api-call-attempt-timeout: 2s
+      # Except a run-input copy: server-side, but it grows with the file (up to max-video-bytes),
+      # so it has its own bound for the call and each attempt. It runs before any run transaction.
+      copy-timeout: 2m
