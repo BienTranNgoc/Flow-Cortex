@@ -28,7 +28,7 @@ function initialsFor(name: string | undefined, email: string | undefined): strin
 function paletteFor(seed: string): readonly [string, string] {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    hash = (hash * 31 + (seed.codePointAt(i) ?? 0)) >>> 0;
   }
   const hue = hash % 360;
   return [`hsl(${hue} 70% 55%)`, `hsl(${(hue + 40) % 360} 70% 45%)`];

@@ -319,11 +319,6 @@
   color: var(--accent);
 }
 
-.runs-page__pill--running {
-  background: color-mix(in srgb, var(--teal) 22%, transparent);
-  color: var(--teal-bright);
-}
-
 .runs-page__empty {
   margin: 1rem 0 0;
   color: var(--ink-3);

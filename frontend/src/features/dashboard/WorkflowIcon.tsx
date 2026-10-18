@@ -105,5 +105,5 @@ const Icons = {
 
 export function WorkflowIcon({ icon, ...rest }: Readonly<{ icon: WorkflowIconKey } & IconProps>) {
   const Component = Icons[icon];
-  return <>{Component(rest)}</>;
+  return Component(rest);
 }

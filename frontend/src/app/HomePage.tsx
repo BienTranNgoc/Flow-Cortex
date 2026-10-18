@@ -91,8 +91,8 @@ export function HomePage() {
           </p>
         )}
         {hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && filtered.length === 0 && (
-          <div className="launchpad-cards__empty" role="status">
-            <p>No workflows match your filter.</p>
+          <div className="launchpad-cards__empty">
+            <p role="status">No workflows match your filter.</p>
             <button type="button" onClick={reset}>
               Clear filters
             </button>

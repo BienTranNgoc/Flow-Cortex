@@ -1,10 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Copy, Trash2 } from 'lucide-react';
 import { PageHeading } from '../../app/PageHeading';
-import { StatusPill } from '../../app/StatusPill';
+import { StatusPill, type StatusTone } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
-import { fetchSmsOutbox } from '../../app/mockAdminApi';
+import { fetchSmsOutbox, type SmsOutboxEntry } from '../../app/mockAdminApi';
+
+const SMS_TONE: Record<SmsOutboxEntry['status'], StatusTone> = {
+  SENT: 'success',
+  PENDING: 'info',
+  EXPIRED: 'warning',
+  FAILED: 'error',
+};
 
 export function SmsOutboxPage() {
   usePageTitle('SMS Outbox');
@@ -66,18 +73,7 @@ export function SmsOutboxPage() {
                     </strong>
                   </td>
                   <td data-label="Status">
-                    <StatusPill
-                      tone={
-                        s.status === 'SENT'
-                          ? 'success'
-                          : s.status === 'PENDING'
-                            ? 'info'
-                            : s.status === 'EXPIRED'
-                              ? 'warning'
-                              : 'error'
-                      }
-                      label={s.status}
-                    />
+                    <StatusPill tone={SMS_TONE[s.status]} label={s.status} />
                   </td>
                   <td data-label="Attempts">
                     {s.attempts} / 5

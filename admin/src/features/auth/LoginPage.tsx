@@ -55,16 +55,13 @@ export function LoginPage() {
             </p>
             <ul className="auth-shell__pitch-list">
               <li>
-                <span className="auth-shell__pitch-dot" />
-                Real-time run audit and approval queue
+                <span className="auth-shell__pitch-dot" /> Real-time run audit and approval queue
               </li>
               <li>
-                <span className="auth-shell__pitch-dot" />
-                Member roles, wallets, and SMS outbox
+                <span className="auth-shell__pitch-dot" /> Member roles, wallets, and SMS outbox
               </li>
               <li>
-                <span className="auth-shell__pitch-dot" />
-                Feature switches and provider model rotation
+                <span className="auth-shell__pitch-dot" /> Feature switches and provider model rotation
               </li>
             </ul>
           </div>

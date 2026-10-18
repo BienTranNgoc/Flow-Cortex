@@ -16,6 +16,16 @@ const RUN_STATES = [
   { label: 'Failed', status: ListAdminRunsStatus.error, tone: 'error' as const },
 ];
 
+const RUN_FILL_CLASS = {
+  info: 'running',
+  success: 'completed',
+  error: 'failed',
+} as const;
+
+function fillClass(tone: keyof typeof RUN_FILL_CLASS): string {
+  return `cortex-admin-status-fill--${RUN_FILL_CLASS[tone]}`;
+}
+
 export function DashboardPage() {
   usePageTitle('Dashboard');
   const usersQuery = useUsersQuery();
@@ -130,7 +140,7 @@ export function DashboardPage() {
                     }
                   >
                     <span
-                      className={`cortex-admin-status-fill cortex-admin-status-fill--${state.tone === 'success' ? 'completed' : state.tone === 'error' ? 'failed' : 'running'}`}
+                      className={`cortex-admin-status-fill ${fillClass(state.tone)}`}
                       style={{ width: `${percent}%` }}
                     />
                   </div>

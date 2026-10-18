@@ -81,8 +81,8 @@ export function DocsPage({ initialTab }: Readonly<DocsPageProps>) {
         <section className="docs-page__section">
           <h2>API Reference</h2>
           <p>
-            The HTTP API is the same surface the Member and Admin apps use. Tokens come from
-            <code> POST /api/v1/auth/login</code> and are sent as <code>Authorization: Bearer …</code> on
+            The HTTP API is the same surface the Member and Admin apps use. Tokens come from{' '}
+            <code>POST /api/v1/auth/login</code> and are sent as <code>Authorization: Bearer …</code> on
             every request.
           </p>
 
@@ -118,8 +118,8 @@ Content-Type: application/json
               send the input and watch the run update step by step.
             </li>
             <li>
-              <strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays
-              <em> Waiting for review</em> on the <Link to="/runs">Runs</Link> page until you act.
+              <strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays{' '}
+              <em>Waiting for review</em> on the <Link to="/runs">Runs</Link> page until you act.
             </li>
             <li>
               <strong>Bring your own AI provider.</strong> Add a key on the{' '}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type StatusTone = 'success' | 'warning' | 'error' | 'info' | 'muted';
+export type StatusTone = 'success' | 'warning' | 'error' | 'info' | 'muted';
 
 interface StatusPillProps {
   readonly tone?: StatusTone;

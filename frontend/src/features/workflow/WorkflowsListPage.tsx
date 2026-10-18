@@ -372,7 +372,7 @@ export function WorkflowsListPage() {
                           {steps.length} {steps.length === 1 ? 'step' : 'steps'}
                         </td>
                         <td>
-                          <div className="wf-list__actions" role="group" aria-label="Row actions">
+                          <div className="wf-list__actions" aria-label="Row actions">
                             <button
                               type="button"
                               className="cortex-btn cortex-btn--icon wf-list__run-btn"

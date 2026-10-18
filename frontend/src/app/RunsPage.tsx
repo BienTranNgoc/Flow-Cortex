@@ -178,9 +178,9 @@ export function RunsPage() {
                 </dl>
 
                 {run.errorMessage && (
-                  <p className="runs-page__row-error" role="status">
+                  <output className="runs-page__row-error">
                     {run.errorMessage}
-                  </p>
+                  </output>
                 )}
 
                 <div className="runs-page__row-actions">
