@@ -57,6 +57,23 @@ class ProviderStepExecutorTest {
     }
 
     @Test
+    void storyboardJobCarriesTheFirstSnapshottedProductImage() {
+        ProviderStepExecutor executor = executor("generate_storyboard", "product_ad_storyboard_v1");
+        StepContext context = context("""
+                {"script":"Kịch bản đã duyệt","sourceRevisionId":"00000000-0000-0000-0000-000000000001"}
+                """, """
+                [{"key":"image_1","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_1"}]
+                """, "{\"profile\":\"product_ad_storyboard_v1\"}");
+
+        executor.execute(context);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).containsExactly(
+                new ProviderInput("image_1", "flowcortex-media", "runs/r/inputs/image_1"));
+    }
+
+    @Test
     void speechJobWrapsApprovedScript() {
         ProviderStepExecutor executor = executor("generate_speech", "vi_voice_v1");
         UUID revisionId = UUID.randomUUID();
@@ -89,6 +106,25 @@ class ProviderStepExecutorTest {
                 .contains("Visual direction: Opening product hero shot");
         assertThat(castPayload(sent.getValue()))
                 .containsEntry("sourceRevisionId", revisionId.toString());
+    }
+
+    @Test
+    void videoJobBindsStoredInputForVideo2() {
+        ProviderStepExecutor executor = executor("generate_video", "vertical_ad_clip_v1");
+        UUID revisionId = UUID.randomUUID();
+        executor.execute(context("""
+                {"scene2Prompt":"Lifestyle on road","sourceRevisionId":"%s"}
+                """.formatted(revisionId), """
+                [{"key":"image_1","bucket":"flowcortex-uploads","objectKey":"image.jpg"}]
+                """, """
+                {"profile":"vertical_ad_clip_v1",
+                 "payloadFields":{"prompt":"scene2Prompt","sourceRevisionId":"sourceRevisionId"}}
+                """));
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).hasSize(1);
+        assertThat(sent.getValue().inputs().getFirst().key()).isEqualTo("image_1");
     }
 
     @SuppressWarnings("unchecked")

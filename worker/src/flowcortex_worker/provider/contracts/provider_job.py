@@ -169,6 +169,13 @@ class GenerateStoryboardJob(BaseModel):
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_storyboard"]
     params: StoryboardParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional product image the worker forwards to the multimodal storyboard provider.",
+            max_length=1,
+        ),
+    ] = None
     outputPrefix: Annotated[
         StrictStr,
         Field(

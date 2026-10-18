@@ -96,7 +96,9 @@ class ScriptAdapter(Protocol):
     def generate_script(
         self, payload: ProductAdPayload, reference_image: bytes | None = None
     ) -> str: ...
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact: ...
 
 
 class SpeechAdapter(Protocol):
@@ -133,8 +135,10 @@ class CapabilityProviderAdapter:
     ) -> str:
         return self.script_adapter.generate_script(payload, reference_image)
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
-        return self.script_adapter.generate_storyboard(request)
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
+        return self.script_adapter.generate_storyboard(request, reference_image)
 
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
@@ -172,7 +176,9 @@ class FixtureProviderAdapter:
             parts.append("Mua ngay hôm nay!")
         return " ".join(parts)
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
         return StoryboardArtifact(
             "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
             "realistic movement, clean background, no text.",

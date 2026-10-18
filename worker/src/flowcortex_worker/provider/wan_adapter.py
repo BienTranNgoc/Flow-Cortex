@@ -59,7 +59,9 @@ class WanAdapter:
             "provider_capability_unavailable", "Wan script generation is not implemented"
         )
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
         raise PermanentError(
             "provider_capability_unavailable", "Wan storyboard generation is not implemented"
         )
@@ -106,7 +108,7 @@ class WanAdapter:
             "num_frames": self.config.num_frames,
             "resolution": self.config.resolution,
             "aspect_ratio": "9:16",
-            "sample_shift": 12,
+            "sample_shift": 8,
             "frames_per_second": self.config.frames_per_second,
             "disable_safety_checker": False,
         }
@@ -232,8 +234,13 @@ class WanAdapter:
 
     def _download_once(self, url: str) -> bytes:
         try:
+            req = urllib.request.Request(
+                url,
+                method="GET",
+                headers={"User-Agent": "FlowCortexWorker/1.0 (compatible; Mozilla/5.0)"},
+            )
             with urllib.request.urlopen(
-                urllib.request.Request(url, method="GET"),
+                req,
                 timeout=self.config.request_timeout_seconds,
             ) as response:
                 return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))

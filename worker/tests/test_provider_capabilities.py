@@ -151,6 +151,33 @@ def test_storyboard_creates_two_typed_scenes_from_approved_revision() -> None:
     assert outcome.data["scene1Prompt"] != outcome.data["scene2Prompt"]
 
 
+def test_storyboard_fetches_and_passes_reference_image() -> None:
+    request = job(
+        "generate_storyboard",
+        "product_ad_storyboard_v1",
+        {"script": "Approved script", "sourceRevisionId": REVISION_ID},
+    )
+    request["inputs"] = [
+        {"key": "image_1", "bucket": "flowcortex-media", "objectKey": "runs/r/inputs/image_1"}
+    ]
+    storage = MagicMock()
+    image = b"\x89PNG\r\n\x1a\nproduct"
+    storage.fetch_bytes.return_value = image
+    adapter = MagicMock()
+    adapter.generate_storyboard.return_value = MagicMock(
+        scene_1_prompt="Scene 1", scene_2_prompt="Scene 2"
+    )
+
+    execute(
+        ProviderJob.model_validate(request),
+        adapter,
+        ExecutionContext(storage, BUCKET, f"runs/{RUN_ID}/steps/3/attempts/1/", MagicMock()),
+    )
+
+    adapter.generate_storyboard.assert_called_once()
+    assert adapter.generate_storyboard.call_args.kwargs.get("reference_image") == image
+
+
 def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
     outcome = execute(
         ProviderJob.model_validate(

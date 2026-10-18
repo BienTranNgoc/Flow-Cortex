@@ -45,7 +45,9 @@ class ProviderStepExecutor implements StepExecutor {
 
     @Override
     public boolean bindsRunInputs() {
-        return "generate_script".equals(capability) || "generate_video".equals(capability);
+        return "generate_script".equals(capability)
+                || "generate_storyboard".equals(capability)
+                || "generate_video".equals(capability);
     }
 
     @Override

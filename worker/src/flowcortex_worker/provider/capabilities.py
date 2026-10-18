@@ -156,8 +156,10 @@ def _generate_storyboard(
     if not isinstance(job, GenerateStoryboardJob):
         raise UnsupportedCapability("generate_storyboard received the wrong job shape")
     payload = job.params.payload
+    reference_image = _fetch_reference_image(job, context)
     storyboard = adapter.generate_storyboard(
-        StoryboardRequest(payload.script, payload.sourceRevisionId)
+        StoryboardRequest(payload.script, payload.sourceRevisionId),
+        reference_image=reference_image,
     )
     data = {
         "profile": "product_ad_storyboard_v1",
@@ -233,7 +235,7 @@ def _resolve_reference_image(
 
 
 def _fetch_reference_image(
-    job: GenerateScriptJob | GenerateVideoJob, context: ExecutionContext
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateVideoJob, context: ExecutionContext
 ) -> bytes | None:
     inputs = job.inputs or ()
     if not inputs:
@@ -241,7 +243,7 @@ def _fetch_reference_image(
     if len(inputs) > 1:
         raise PermanentError(
             "contract_violation",
-            "generate_video/vertical_ad_clip_v1 accepts at most one reference image",
+            f"{job.capability} accepts at most one reference image",
         )
     reference = inputs[0]
     body = context.storage.fetch_bytes(reference.bucket, reference.objectKey, context.abort)
