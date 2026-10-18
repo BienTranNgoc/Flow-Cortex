@@ -366,26 +366,6 @@
   pointer-events: none;
 }
 
-.auth-terms {
-  margin: 0.85rem 0 0;
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: var(--ink-3);
-  text-align: center;
-}
-
-.auth-terms a {
-  color: var(--ink-2);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-thickness: 1px;
-  transition: color 0.15s ease;
-}
-
-.auth-terms a:hover {
-  color: var(--teal);
-}
-
 /* Password field with inline reveal toggle.
    Wrapper is the only child of `.field` between label and error.
    Input is full width; button is absolutely positioned on top of it.

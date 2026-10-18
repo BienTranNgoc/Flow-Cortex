@@ -6,7 +6,7 @@ import { Footer } from './Footer';
 export function Layout() {
   return (
     <div className="app-shell cortex-ambient">
-      <Header email={undefined} />
+      <Header />
       <div className="app-content">
         <Outlet />
       </div>

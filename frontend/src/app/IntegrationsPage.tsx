@@ -153,11 +153,11 @@ export function IntegrationsPage() {
         </p>
       </header>
 
-      <div className="integrations-page__tabs" role="tablist" aria-label="Integration categories">
+      <fieldset className="integrations-page__tabs">
+        <legend className="visually-hidden">Integration categories</legend>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === 'models'}
+          aria-pressed={tab === 'models'}
           className={`integrations-page__tab${tab === 'models' ? ' is-active' : ''}`}
           onClick={() => setTab('models')}
         >
@@ -165,14 +165,13 @@ export function IntegrationsPage() {
         </button>
         <button
           type="button"
-          role="tab"
-          aria-selected={tab === 'social'}
+          aria-pressed={tab === 'social'}
           className={`integrations-page__tab${tab === 'social' ? ' is-active' : ''}`}
           onClick={() => setTab('social')}
         >
           Social accounts
         </button>
-      </div>
+      </fieldset>
 
       {tab === 'models' ? (
         (['text', 'media', 'audio'] as const).map((category) => (

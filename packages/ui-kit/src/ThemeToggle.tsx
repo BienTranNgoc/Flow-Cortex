@@ -1,12 +1,15 @@
-import { useTheme, type Theme } from './useTheme';
+import type { ReactElement } from 'react';
+import type { Theme } from './createUseTheme';
 
-interface ThemeToggleProps {
+export interface ThemeToggleProps {
+  readonly theme: Theme;
+  readonly onToggle: () => void;
   readonly compact?: boolean;
 }
 
-const ICONS: Record<Theme, { label: string; svg: JSX.Element }> = {
+// Keyed by the theme a click switches TO, so the icon previews the destination.
+const ICONS: Record<Theme, { label: string; svg: ReactElement }> = {
   light: {
-    // Shown when the user is in dark mode and would click to go light.
     label: 'Switch to light theme',
     svg: (
       <>
@@ -16,21 +19,20 @@ const ICONS: Record<Theme, { label: string; svg: JSX.Element }> = {
     ),
   },
   dark: {
-    // Shown when the user is in light mode and would click to go dark.
     label: 'Switch to dark theme',
     svg: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
   },
 };
 
-export function ThemeToggle({ compact = false }: ThemeToggleProps) {
-  const { theme, toggle } = useTheme();
+/** Light/dark switch; each app passes the state from its own `useTheme` so storage keys stay per app. */
+export function ThemeToggle({ theme, onToggle, compact = false }: ThemeToggleProps) {
   const next: Theme = theme === 'dark' ? 'light' : 'dark';
   const meta = ICONS[next];
   return (
     <button
       type="button"
       className={`cortex-theme-toggle${compact ? ' cortex-theme-toggle--compact' : ''}`}
-      onClick={toggle}
+      onClick={onToggle}
       aria-label={meta.label}
       title={meta.label}
     >

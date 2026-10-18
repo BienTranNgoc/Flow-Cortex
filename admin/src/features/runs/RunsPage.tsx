@@ -40,41 +40,36 @@ export function RunsPage() {
           onPageChange={setPage}
         >
           {(runs) => (
-            <div className="cortex-admin-table-wrapper">
-              <table className="cortex-admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Workflow</th>
-                    <th scope="col">Owner</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Started</th>
-                    <th scope="col">Finished</th>
-                    <th scope="col">Error</th>
+            <table className="cortex-admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Workflow</th>
+                  <th scope="col">Owner</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Started</th>
+                  <th scope="col">Finished</th>
+                  <th scope="col">Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((run) => (
+                  <tr key={run.id}>
+                    <td data-label="Workflow">{run.workflowName}</td>
+                    <td data-label="Owner">{run.ownerEmail ?? '(deleted user)'}</td>
+                    <td data-label="Status">
+                      <StatusPill tone={STATUS_TONE[run.status] ?? 'info'} label={run.status} />
+                    </td>
+                    <td data-label="Started">
+                      <Timestamp value={run.startedAt} />
+                    </td>
+                    <td data-label="Finished">
+                      <Timestamp value={run.finishedAt} />
+                    </td>
+                    <td data-label="Error">{run.errorMessage ?? '—'}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => (
-                    <tr key={run.id}>
-                      <td data-label="Workflow">{run.workflowName}</td>
-                      <td data-label="Owner">{run.ownerEmail ?? '(deleted user)'}</td>
-                      <td data-label="Status">
-                        <StatusPill
-                          tone={STATUS_TONE[run.status] ?? 'info'}
-                          label={run.status}
-                        />
-                      </td>
-                      <td data-label="Started">
-                        <Timestamp value={run.startedAt} />
-                      </td>
-                      <td data-label="Finished">
-                        <Timestamp value={run.finishedAt} />
-                      </td>
-                      <td data-label="Error">{run.errorMessage ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           )}
         </AdminList>
       </div>

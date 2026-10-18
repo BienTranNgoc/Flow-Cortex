@@ -26,6 +26,17 @@ describe('colour scheme', () => {
     expect(read('../styles/tokens.css')).toMatch(/\[data-theme=['"]dark['"]\]/);
   });
 
+  it('applies the stored theme before the app bundle loads, with the key the app writes', () => {
+    const html = read('../../index.html');
+    const initAt = html.indexOf('<script src="/theme-init.js"></script>');
+    expect(initAt).toBeGreaterThan(-1);
+    expect(initAt).toBeLessThan(html.indexOf('<script type="module"'));
+
+    const storageKey = /storageKey:\s*'([^']+)'/.exec(read('./useTheme.ts'))?.[1];
+    expect(storageKey).toBeDefined();
+    expect(read('../../public/theme-init.js')).toContain(`localStorage.getItem('${storageKey}')`);
+  });
+
   it('uses dedicated palette overrides for the dark theme instead of inline hex values', () => {
     const tokens = read('../styles/tokens.css');
     // Dark theme is an opt-in, additive override block — it must not change `:root`.

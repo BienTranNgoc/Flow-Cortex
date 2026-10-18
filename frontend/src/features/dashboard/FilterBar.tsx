@@ -20,7 +20,8 @@ const LABELS: Record<CategoryFilter, string> = {
 
 export function FilterBar({ value, onChange, counts }: Readonly<FilterBarProps>) {
   return (
-    <div className="dashboard-filter" role="tablist" aria-label="Filter workflows by category">
+    <fieldset className="dashboard-filter">
+      <legend className="visually-hidden">Filter workflows by category</legend>
       {ORDER.map((key) => {
         const isActive = value === key;
         const count = counts[key] ?? 0;
@@ -29,8 +30,7 @@ export function FilterBar({ value, onChange, counts }: Readonly<FilterBarProps>)
           <button
             key={key}
             type="button"
-            role="tab"
-            aria-selected={isActive}
+            aria-pressed={isActive}
             disabled={isEmpty}
             className={`dashboard-filter__chip${isActive ? ' is-active' : ''}${isEmpty ? ' is-empty' : ''}`}
             onClick={() => onChange(key)}
@@ -43,6 +43,6 @@ export function FilterBar({ value, onChange, counts }: Readonly<FilterBarProps>)
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }

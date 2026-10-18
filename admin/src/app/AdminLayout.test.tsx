@@ -125,12 +125,10 @@ describe('AdminLayout', () => {
     const trigger = await screen.findByRole('button', { name: /account menu/i });
     await userEvent.click(trigger);
     const account = screen.getByRole('menuitem', { name: 'Account details' });
-    const help = screen.getByRole('menuitem', { name: 'Help & docs' });
     const signOut = screen.getByRole('menuitem', { name: 'Sign out' });
+    expect(screen.queryByRole('menuitem', { name: 'Help & docs' })).not.toBeInTheDocument();
     expect(account).toHaveFocus();
 
-    await userEvent.keyboard('{ArrowDown}');
-    expect(help).toHaveFocus();
     await userEvent.keyboard('{ArrowDown}');
     expect(signOut).toHaveFocus();
     await userEvent.keyboard('{Escape}');
@@ -149,13 +147,15 @@ describe('AdminLayout', () => {
     await userEvent.click(trigger);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Account details' }));
 
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { name: 'Account' });
     expect(dialog).toHaveTextContent(ADMIN_ME.email);
     expect(dialog).toHaveTextContent(ADMIN_ME.role);
-    expect(dialog).toHaveTextContent('Two-factor authentication');
-    expect(dialog).toHaveTextContent('Active sessions');
+    expect(dialog).not.toHaveTextContent('Two-factor authentication');
+    expect(dialog).not.toHaveTextContent('Session timeout');
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Close account dialog' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });

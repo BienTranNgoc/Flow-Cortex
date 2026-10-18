@@ -75,15 +75,13 @@ function descriptionFor(name: string | undefined): string {
   return DEFAULT_DESCRIPTION;
 }
 
-function statusFor(name: string | undefined, steps: readonly WorkflowStepResponse[]): {
+/** Status comes from the steps alone; the name only drives cosmetic fields (ETA, category, description). */
+function statusFor(steps: readonly WorkflowStepResponse[]): {
   label: string;
   tone: StatusTone;
 } {
-  if (name && /fail|deliberate/i.test(name)) {
+  if (steps.some((step) => step.type === FAILING_TYPE)) {
     return { label: 'Demo: failure', tone: 'attention' };
-  }
-  if (name && /echo|product\s*video|product-video/i.test(name)) {
-    return { label: 'Ready', tone: 'ready' };
   }
   if (steps.some((step) => step.type === APPROVAL)) {
     return { label: 'Review required', tone: 'experimental' };
@@ -92,7 +90,7 @@ function statusFor(name: string | undefined, steps: readonly WorkflowStepRespons
 }
 
 export function metaFor(workflow: WorkflowResponse): WorkflowMeta {
-  const { label, tone } = statusFor(workflow.name, workflow.steps ?? []);
+  const { label, tone } = statusFor(workflow.steps ?? []);
   return {
     statusLabel: label,
     statusTone: tone,

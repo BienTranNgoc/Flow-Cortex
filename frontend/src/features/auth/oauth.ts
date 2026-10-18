@@ -4,12 +4,6 @@ export function googleAuthorizeUrl(rememberMe: boolean, returnTo: string): strin
   return `/api/v1/auth/oauth/google/authorize?${params}`;
 }
 
-/** Mirror of {@link googleAuthorizeUrl} for the GitHub OAuth start endpoint. */
-export function githubAuthorizeUrl(rememberMe: boolean, returnTo: string): string {
-  const params = new URLSearchParams({ remember_me: String(rememberMe), return_to: returnTo });
-  return `/api/v1/auth/oauth/github/authorize?${params}`;
-}
-
 const FAILED = 'Google sign-in failed. Please try again.';
 
 const OAUTH_ERROR_MESSAGES = new Map([

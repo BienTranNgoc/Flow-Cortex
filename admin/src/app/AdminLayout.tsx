@@ -1,24 +1,20 @@
-import { ErrorBoundary, FlowCortexLogo } from '@flow-cortex/ui-kit';
+import { ErrorBoundary, FlowCortexLogo, ThemeToggle } from '@flow-cortex/ui-kit';
 import {
   ChevronDown,
   Copy,
-  HelpCircle,
-  KeyRound,
   LogOut,
   Mail,
   PanelLeft,
   PanelRight,
   ShieldCheck,
   Trash2,
-  UserCog,
   UserCircle2,
-  Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
 import { Sidebar } from './Sidebar';
-import { ThemeToggle } from './ThemeToggle';
+import { useTheme } from './useTheme';
 
 const SIDEBAR_COLLAPSED_KEY = 'flow-cortex:admin:sidebar:collapsed';
 
@@ -37,6 +33,7 @@ function readCollapsed(): boolean {
 export function AdminLayout() {
   const me = useMeQuery().data;
   const { pathname } = useLocation();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() =>
     typeof window === 'undefined' ? false : readCollapsed(),
@@ -143,7 +140,7 @@ export function AdminLayout() {
             <span className="cortex-admin-header__title">Admin console</span>
           </a>
           <div className="cortex-admin-header__actions">
-            <ThemeToggle compact />
+            <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
             {me && (
               <div className="cortex-admin-user-menu">
                 <button
@@ -215,18 +212,6 @@ export function AdminLayout() {
                       <UserCircle2 aria-hidden="true" size={16} />
                       <span>Account details</span>
                     </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="cortex-admin-user-menu__item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        window.open('https://docs.flow-cortex.local', '_blank', 'noopener');
-                      }}
-                    >
-                      <HelpCircle aria-hidden="true" size={16} />
-                      <span>Help &amp; docs</span>
-                    </button>
 
                     <div className="cortex-admin-user-menu__divider" aria-hidden="true" />
 
@@ -259,7 +244,7 @@ export function AdminLayout() {
         <dialog
           ref={accountDialogRef}
           className="cortex-admin-account-dialog"
-          aria-labelledby="cortex-admin-account-dialog-title"
+          aria-label="Account"
           onClose={() => {
             triggerRef.current?.focus();
           }}
@@ -306,64 +291,6 @@ export function AdminLayout() {
               ✕
             </button>
           </header>
-
-          <section className="cortex-admin-account-dialog__section" aria-labelledby="cortex-admin-account-dialog-actions">
-            <h3 id="cortex-admin-account-dialog-actions">Account actions</h3>
-            <div className="cortex-admin-account-dialog__actions">
-              <button
-                type="button"
-                className="cortex-admin-account-dialog__action"
-                onClick={() => accountDialogRef.current?.close()}
-              >
-                <UserCog aria-hidden="true" size={16} />
-                <span>Edit profile</span>
-                <span className="cortex-admin-account-dialog__action-meta">Name · initials</span>
-              </button>
-              <button
-                type="button"
-                className="cortex-admin-account-dialog__action"
-                onClick={() => accountDialogRef.current?.close()}
-              >
-                <KeyRound aria-hidden="true" size={16} />
-                <span>Change password</span>
-                <span className="cortex-admin-account-dialog__action-meta">Last set 42 days ago</span>
-              </button>
-              <button
-                type="button"
-                className="cortex-admin-account-dialog__action"
-                onClick={() => accountDialogRef.current?.close()}
-              >
-                <Users aria-hidden="true" size={16} />
-                <span>Active sessions</span>
-                <span className="cortex-admin-account-dialog__action-meta">2 devices · this browser</span>
-              </button>
-            </div>
-          </section>
-
-          <section className="cortex-admin-account-dialog__section" aria-labelledby="cortex-admin-account-dialog-security">
-            <h3 id="cortex-admin-account-dialog-security">Security</h3>
-            <div className="cortex-admin-account-dialog__security">
-              <div className="cortex-admin-account-dialog__security-row">
-                <div>
-                  <strong>Two-factor authentication</strong>
-                  <p>Require a TOTP code on every admin sign-in.</p>
-                </div>
-                <label className="cortex-admin-toggle" aria-label="Toggle two-factor authentication">
-                  <input type="checkbox" defaultChecked={false} />
-                  <span className="cortex-admin-toggle__track" aria-hidden="true">
-                    <span className="cortex-admin-toggle__thumb" />
-                  </span>
-                </label>
-              </div>
-              <div className="cortex-admin-account-dialog__security-row">
-                <div>
-                  <strong>Session timeout</strong>
-                  <p>Automatically sign out after inactivity.</p>
-                </div>
-                <span className="cortex-admin-account-dialog__chip">30 minutes</span>
-              </div>
-            </div>
-          </section>
 
           <section className="cortex-admin-account-dialog__section cortex-admin-account-dialog__section--danger" aria-labelledby="cortex-admin-account-dialog-danger">
             <h3 id="cortex-admin-account-dialog-danger">Danger zone</h3>

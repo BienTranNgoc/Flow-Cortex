@@ -122,18 +122,6 @@ export function RegisterPage() {
           </button>
         </form>
 
-        <p className="auth-terms">
-          By creating an account, you agree to our{' '}
-          <a href="/legal/terms" target="_blank" rel="noopener noreferrer">
-            Terms of Service
-          </a>{' '}
-          and{' '}
-          <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">
-            Privacy Policy
-          </a>
-          .
-        </p>
-
         <p className="auth-footer">
           Already have an account? <Link to="/login">Sign in to workspace</Link>
         </p>

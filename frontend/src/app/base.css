@@ -262,9 +262,6 @@ a {
   max-width: 1180px;
   margin: 0 auto;
   padding: 3rem 1.5rem 2.5rem;
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 3rem;
 }
 
 .cortex-footer__brand {
@@ -323,41 +320,6 @@ a {
   border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
   transform: translateY(-2px);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--teal) 12%, transparent);
-}
-
-.cortex-footer__links {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-}
-
-.cortex-footer__col h4 {
-  margin: 0 0 0.85rem;
-  color: var(--ink);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.cortex-footer__col ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.cortex-footer__col a {
-  color: var(--ink-3);
-  text-decoration: none;
-  font-size: 0.88rem;
-  transition: color 0.15s ease;
-}
-
-.cortex-footer__col a:hover {
-  color: var(--teal);
 }
 
 .cortex-footer__bottom {
@@ -449,14 +411,6 @@ a {
     display: none;
   }
 
-  .cortex-footer__inner {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-
-  .cortex-footer__links {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 480px) {
@@ -467,10 +421,6 @@ a {
 
   .cortex-gpu-pill span {
     display: none;
-  }
-
-  .cortex-footer__links {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -707,8 +657,7 @@ a:focus-visible {
   .cortex-header__nav a,
   .cortex-btn,
   .cortex-gpu-pill,
-  .cortex-footer__social-link,
-  .cortex-footer__col a {
+  .cortex-footer__social-link {
     animation: none !important;
     transition: none !important;
   }

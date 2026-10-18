@@ -1,3 +1,5 @@
+import { demoPagesEnabled } from './featureFlags';
+
 /** Primary navigation items rendered in the member app header. */
 export interface PrimaryNavItem {
   readonly to: string;
@@ -5,12 +7,20 @@ export interface PrimaryNavItem {
   readonly end?: boolean;
 }
 
-export const PRIMARY_NAV_ITEMS: readonly PrimaryNavItem[] = [
+const CORE_NAV_ITEMS: readonly PrimaryNavItem[] = [
   { to: '/', label: 'Home', end: true },
   { to: '/workflows', label: 'Workflows' },
+];
+
+const DEMO_NAV_ITEMS: readonly PrimaryNavItem[] = [
   { to: '/runs', label: 'Runs' },
   { to: '/integrations', label: 'Integrations' },
-] as const;
+];
+
+/** Header items; the demo pages join only while their flag is on, read on every call like the flag itself. */
+export function primaryNavItems(): readonly PrimaryNavItem[] {
+  return demoPagesEnabled() ? [...CORE_NAV_ITEMS, ...DEMO_NAV_ITEMS] : CORE_NAV_ITEMS;
+}
 
 export interface SubNavItem {
   readonly to: string;

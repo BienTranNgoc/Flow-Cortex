@@ -23,4 +23,15 @@ describe('colour scheme', () => {
     expect(rule(css, '.cortex-admin-btn')).toMatch(/background:\s*var\(--admin-btn-bg\)/);
     expect(rule(css, '.cortex-admin-btn')).toMatch(/color:\s*var\(--admin-ink\)/);
   });
+
+  it('applies the saved theme from a first-party script that loads before the bundle', () => {
+    const html = read('../../index.html');
+    const init = read('../../public/theme-init.js');
+
+    expect(html).toMatch(/<meta name="color-scheme" content="light dark" \/>/);
+    expect(html.indexOf('src="/theme-init.js"')).toBeGreaterThan(-1);
+    expect(html.indexOf('src="/theme-init.js"')).toBeLessThan(html.indexOf('src="/src/main.tsx"'));
+    expect(init).toContain("'flow-cortex:admin:theme'");
+    expect(read('./useTheme.ts')).toContain("storageKey: 'flow-cortex:admin:theme'");
+  });
 });

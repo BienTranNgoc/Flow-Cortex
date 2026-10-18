@@ -6,7 +6,7 @@ import { BrandPanel } from '../../app/BrandPanel';
 import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { githubAuthorizeUrl, googleAuthorizeUrl, oauthErrorMessage } from './oauth';
+import { googleAuthorizeUrl, oauthErrorMessage } from './oauth';
 import {
   clearRememberedEmail,
   detailFrom,
@@ -77,11 +77,6 @@ export function LoginPage() {
             provider="google"
             label="Continue with Google"
             href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
-          />
-          <OAuthButton
-            provider="github"
-            label="Continue with GitHub"
-            href={githubAuthorizeUrl(watch('rememberMe'), returnTo)}
           />
         </div>
 

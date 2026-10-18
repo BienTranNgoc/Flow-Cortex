@@ -4,6 +4,9 @@
 export const accountStatsEnabled = (): boolean =>
   import.meta.env.VITE_ACCOUNT_STATS_ENABLED === 'true';
 
+/** Demo only: the runs list and integrations pages show placeholder data until their APIs exist — never enable in production. */
+export const demoPagesEnabled = (): boolean => import.meta.env.VITE_DEMO_PAGES_ENABLED === 'true';
+
 /** "Continue with Google" entry; needs the backend OAuth flow configured. */
 export const oauthEnabled = (): boolean => import.meta.env.VITE_OAUTH_ENABLED === 'true';
 

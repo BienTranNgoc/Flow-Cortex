@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { DOCS_SUB_ITEMS } from './navItems';
 import './DocsMenu.css';
@@ -11,7 +11,11 @@ interface DocsMenuProps {
 export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const isActive = pathname.startsWith('/docs');  useEffect(() => {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelId = useId();
+  const isActive = pathname.startsWith('/docs');
+
+  useEffect(() => {
     if (!open) return;
     const onClick = (event: MouseEvent) => {
       const target = event.target as Node | null;
@@ -19,7 +23,9 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
       setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
@@ -37,10 +43,11 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
   return (
     <div ref={rootRef} className="cortex-docs-menu">
       <button
+        ref={triggerRef}
         type="button"
         className={`cortex-header__nav-link cortex-docs-menu__trigger${isActive ? ' is-active' : ''}`}
-        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((prev) => !prev)}
       >
         Docs
@@ -60,7 +67,7 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
         </svg>
       </button>
       {open && (
-        <div className="cortex-docs-menu__panel" role="menu">
+        <div id={panelId} className="cortex-docs-menu__panel">
           {DOCS_SUB_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -69,7 +76,6 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
               className={({ isActive: active }) =>
                 `cortex-docs-menu__item${active ? ' is-active' : ''}`
               }
-              role="menuitem"
               onClick={() => setOpen(false)}
             >
               {item.label}

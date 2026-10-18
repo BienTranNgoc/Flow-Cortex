@@ -107,20 +107,20 @@ export function RunsPage() {
           onChange={(event) => setQuery(event.target.value)}
           aria-label="Search runs"
         />
-        <div className="runs-page__filters" role="tablist" aria-label="Filter by status">
+        <fieldset className="runs-page__filters">
+          <legend className="visually-hidden">Filter by status</legend>
           {FILTERS.map((value) => (
             <button
               key={value}
               type="button"
-              role="tab"
-              aria-selected={filter === value}
+              aria-pressed={filter === value}
               className={`runs-page__filter${filter === value ? ' is-active' : ''}`}
               onClick={() => setFilter(value)}
             >
               {STATUS_LABEL[value]}
             </button>
           ))}
-        </div>
+        </fieldset>
       </div>
 
       {visible.length === 0 ? (

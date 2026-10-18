@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { demoPagesEnabled } from './featureFlags';
 import './DocsPage.css';
 
 type Tab = 'overview' | 'api' | 'guides';
@@ -24,6 +25,7 @@ export function DocsPage({ initialTab }: Readonly<DocsPageProps>) {
   const urlTab = (searchParams.get('tab') as Tab | null) ?? null;
   const [local, setLocal] = useState<Tab | null>(initialTab ? TAB_FROM_INITIAL[initialTab] : null);
   const active: Tab = urlTab ?? local ?? 'overview';
+  const showDemoPages = demoPagesEnabled();
 
   const onSelect = (next: Tab) => {
     setLocal(null);
@@ -119,13 +121,22 @@ Content-Type: application/json
             </li>
             <li>
               <strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays{' '}
-              <em>Waiting for review</em> on the <Link to="/runs">Runs</Link> page until you act.
+              <em>Waiting for review</em>
+              {showDemoPages ? (
+                <>
+                  {' '}on the <Link to="/runs">Runs</Link> page until you act.
+                </>
+              ) : (
+                ' on the run page until you act.'
+              )}
             </li>
-            <li>
-              <strong>Bring your own AI provider.</strong> Add a key on the{' '}
-              <Link to="/integrations">Integrations</Link> page; any workflow that needs that model will
-              pick it up automatically.
-            </li>
+            {showDemoPages && (
+              <li>
+                <strong>Bring your own AI provider.</strong> Add a key on the{' '}
+                <Link to="/integrations">Integrations</Link> page; any workflow that needs that model will
+                pick it up automatically.
+              </li>
+            )}
           </ul>
         </section>
       )}

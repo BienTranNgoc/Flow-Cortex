@@ -6,7 +6,6 @@ export const ACTIONS = [
   'approvals.view',
   'credits.view',
   'providers.view',
-  'sms.view',
   'features.toggle',
   'audit.view',
   'voice.view',

@@ -24,13 +24,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/runs');
     expect(screen.getByRole('link', { name: /Media Jobs/i })).toHaveAttribute('href', '/media-jobs');
     expect(screen.getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/users');
-    expect(screen.getByRole('link', { name: /Workflows/ })).toHaveAttribute('href', '/workflows');
-    expect(screen.getByRole('link', { name: /Approval Queue/ })).toHaveAttribute('href', '/approvals');
-    expect(screen.getByRole('link', { name: /Credits & Wallets/ })).toHaveAttribute('href', '/credits');
-    expect(screen.getByRole('link', { name: /Model Providers/ })).toHaveAttribute('href', '/providers');
-    expect(screen.getByRole('link', { name: /SMS Outbox/ })).toHaveAttribute('href', '/sms-outbox');
-    expect(screen.getByRole('link', { name: /Feature Switches/ })).toHaveAttribute('href', '/features');
-    expect(screen.getByRole('link', { name: /Audit Log/ })).toHaveAttribute('href', '/audit');
+    expect(screen.queryByText('SMS Outbox')).not.toBeInTheDocument();
 
     const voice = screen.getByText('Voice Quota').closest('[aria-disabled]');
     expect(voice).toHaveAttribute('aria-disabled', 'true');
@@ -42,7 +36,16 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /Voice Quota/ })).not.toBeInTheDocument();
   });
 
-  it.each(['Voice Quota', 'Health'])(
+  it.each([
+    'Workflows & Templates',
+    'Approval Queue',
+    'Credits & Wallets',
+    'Model Providers',
+    'Feature Switches',
+    'Audit Log',
+    'Voice Quota',
+    'Health',
+  ])(
     'shows %s as a disabled "Coming soon" entry, never a link',
     (label) => {
       render(

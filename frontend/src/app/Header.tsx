@@ -1,24 +1,22 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
-import { FlowCortexLogo } from '@flow-cortex/ui-kit';
-import { ThemeToggle } from './ThemeToggle';
+import { FlowCortexLogo, ThemeToggle } from '@flow-cortex/ui-kit';
+import { useTheme } from './useTheme';
 import { accountStatsEnabled } from './featureFlags';
 import { DocsMenu } from './DocsMenu';
-import { PRIMARY_NAV_ITEMS } from './navItems';
+import { primaryNavItems } from './navItems';
 import { UserMenu } from './UserMenu';
-
-type HeaderProps = {
-  readonly email: string | undefined;
-};
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? 'cortex-header__nav-link is-active' : 'cortex-header__nav-link';
 
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
-export function Header({ email }: HeaderProps) {
+export function Header() {
   const meQuery = useMeQuery();
   const displayName = meQuery.data?.name;
+  const email = meQuery.data?.email;
   const location = useLocation();
+  const { theme, toggle } = useTheme();
   return (
     <header className="cortex-header">
       <div className="cortex-header__inner">
@@ -28,7 +26,7 @@ export function Header({ email }: HeaderProps) {
         </Link>
 
         <nav className="cortex-header__nav" aria-label="Main navigation">
-          {PRIMARY_NAV_ITEMS.map((item) => (
+          {primaryNavItems().map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -57,7 +55,7 @@ export function Header({ email }: HeaderProps) {
               <span>18 GPU Credits</span>
             </span>
           )}
-          <ThemeToggle compact />
+          <ThemeToggle theme={theme} onToggle={toggle} compact />
           <UserMenu name={displayName} email={email} />
         </div>
       </div>

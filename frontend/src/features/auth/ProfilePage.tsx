@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
@@ -194,10 +193,6 @@ export function ProfilePage() {
             </div>
           </dl>
 
-          <hr className="profile-card__divider" />
-
-          <ApiKeySection email={me.email} />
-
           {showAccountStats && (
             <>
               <hr className="profile-card__divider" />
@@ -216,52 +211,5 @@ export function ProfilePage() {
         </section>
       </div>
     </main>
-  );
-}
-
-function ApiKeySection({ email }: { readonly email: string | undefined }) {
-  const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const seed = (email ?? 'user').replace(/[^a-z0-9]/gi, '').toLowerCase();
-  const visibleTail = seed.slice(-4).padStart(4, '0');
-  const fullKey = `fc_live_${seed.slice(0, 6)}${'x'.repeat(20)}${visibleTail}`;
-  const masked = `fc_live_${'*'.repeat(20)}${visibleTail}`;
-  const display = revealed ? fullKey : masked;
-  return (
-    <section className="profile-apikey" aria-label="API key">
-      <h2 className="profile-card__title">API key</h2>
-      <p className="profile-card__hint">
-        Use this key to call FlowCortex workflows from curl, Postman, or any HTTP client.
-        Keep it private — anyone with the key can run on your behalf.
-      </p>
-      <div className="profile-apikey__row">
-        <code className="profile-apikey__value" aria-label="API key value">
-          {display}
-        </code>
-        <button
-          type="button"
-          className="cortex-btn cortex-btn--ghost profile-apikey__btn"
-          onClick={() => setRevealed((value) => !value)}
-          aria-pressed={revealed}
-        >
-          {revealed ? 'Hide' : 'Reveal'}
-        </button>
-        <button
-          type="button"
-          className="cortex-btn cortex-btn--ghost profile-apikey__btn"
-          onClick={() => {
-            void navigator.clipboard.writeText(fullKey).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1500);
-            });
-          }}
-        >
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
-      <p className="profile-apikey__hint">
-        Authorization header: <code>Authorization: Bearer &lt;your-key&gt;</code>
-      </p>
-    </section>
   );
 }

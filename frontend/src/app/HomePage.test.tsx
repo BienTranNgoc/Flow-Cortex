@@ -150,7 +150,8 @@ describe('HomePage — launchpad cards', () => {
 
     expect(await screen.findByText(/CREATOR LAUNCHPAD · READY TO CREATE/)).toBeInTheDocument();
     expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: /filter workflows/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /filter workflows/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.getByText('studio')).toBeInTheDocument();
   });
 
@@ -194,8 +195,10 @@ describe('HomePage — launchpad cards', () => {
 
     renderHome();
 
-    const demos = await screen.findByRole('tab', { name: /Demos/ });
+    const demos = await screen.findByRole('button', { name: /Demos/ });
+    expect(demos).toHaveAttribute('aria-pressed', 'false');
     await user.click(demos);
+    expect(demos).toHaveAttribute('aria-pressed', 'true');
     expect(
       screen.getByRole('heading', { name: 'Echo Demo (all steps succeed)' }),
     ).toBeInTheDocument();

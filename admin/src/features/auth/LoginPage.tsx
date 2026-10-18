@@ -48,20 +48,20 @@ export function LoginPage() {
             </div>
           </div>
           <div className="auth-shell__pitch">
-            <h2>Operate every workflow from one place.</h2>
+            <h2>Operate the platform from one place.</h2>
             <p>
-              Audit runs, manage members, control credits and feature switches — built for
-              Flow-Cortex operators.
+              Audit workflow runs, watch the media job queue and manage member accounts — built
+              for Flow-Cortex operators.
             </p>
             <ul className="auth-shell__pitch-list">
               <li>
-                <span className="auth-shell__pitch-dot" /> Real-time run audit and approval queue
+                <span className="auth-shell__pitch-dot" /> Run audit across every workflow
               </li>
               <li>
-                <span className="auth-shell__pitch-dot" /> Member roles, wallets, and SMS outbox
+                <span className="auth-shell__pitch-dot" /> Media job status, retries and deadlines
               </li>
               <li>
-                <span className="auth-shell__pitch-dot" /> Feature switches and provider model rotation
+                <span className="auth-shell__pitch-dot" /> Member accounts and roles
               </li>
             </ul>
           </div>

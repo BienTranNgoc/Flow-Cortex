@@ -17,6 +17,12 @@ function renderMenu() {
   );
 }
 
+function panelOf(trigger: HTMLElement): HTMLElement {
+  const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+  if (!panel) throw new Error('the trigger controls no rendered panel');
+  return panel;
+}
+
 describe('UserMenu', () => {
   beforeEach(() => setToken('t', true));
   afterEach(() => {
@@ -32,20 +38,45 @@ describe('UserMenu', () => {
     expect(trigger).not.toHaveTextContent('Member One');
   });
 
-  it('opens the dropdown on click and closes on Escape', async () => {
+  it('opens a disclosure panel on click; Escape closes it and returns focus to the trigger', async () => {
     const user = userEvent.setup();
     renderMenu();
     const trigger = screen.getByRole('button', { name: /open account menu/i });
     await user.click(trigger);
-    const menu = await screen.findByRole('menu');
+    const panel = panelOf(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(within(menu).getByText('member1@flowcortex.dev')).toBeInTheDocument();
-    expect(within(menu).getByText('Member One')).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: 'Account settings' })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(within(panel).getByText('member1@flowcortex.dev')).toBeInTheDocument();
+    expect(within(panel).getByText('Member One')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'Account settings' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+
+    await user.tab();
+    expect(within(panel).getByRole('link', { name: 'Account settings' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('link', { name: 'Account settings' })).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  it('hides Connected services while the demo pages are off and shows it when on', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderMenu();
+    await user.click(screen.getByRole('button', { name: /open account menu/i }));
+    expect(screen.queryByRole('link', { name: 'Connected services' })).not.toBeInTheDocument();
+    unmount();
+
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+    try {
+      renderMenu();
+      await user.click(screen.getByRole('button', { name: /open account menu/i }));
+      expect(screen.getByRole('link', { name: 'Connected services' })).toHaveAttribute(
+        'href',
+        '/integrations',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('shows the GPU and token quota when the account-stats flag is on', async () => {
@@ -53,8 +84,9 @@ describe('UserMenu', () => {
     vi.stubEnv('VITE_ACCOUNT_STATS_ENABLED', 'true');
     try {
       renderMenu();
-      await user.click(screen.getByRole('button', { name: /open account menu/i }));
-      const menu = await screen.findByRole('menu');
+      const trigger = screen.getByRole('button', { name: /open account menu/i });
+      await user.click(trigger);
+      const menu = panelOf(trigger);
       expect(within(menu).getByText('GPU minutes')).toBeInTheDocument();
       expect(within(menu).getByText('Token balance')).toBeInTheDocument();
     } finally {
@@ -67,7 +99,7 @@ describe('UserMenu', () => {
     stubApi({ 'POST /api/v1/auth/logout': { status: 204, body: null } });
     renderMenu();
     await user.click(screen.getByRole('button', { name: /open account menu/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
     expect(getToken()).toBeNull();
   });
 });

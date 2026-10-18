@@ -2,24 +2,10 @@ import type { WorkflowResponse } from '@flow-cortex/api-client';
 
 interface OwnerCellProps {
   readonly workflow: WorkflowResponse;
-  readonly currentUserEmail?: string | undefined;
 }
 
-function ownerEmailOf(workflow: WorkflowResponse): string | undefined {
-  const candidate = (workflow as unknown as { ownerEmail?: unknown }).ownerEmail;
-  return typeof candidate === 'string' ? candidate : undefined;
-}
-
-function ownerNameOf(workflow: WorkflowResponse): string | undefined {
-  const candidate = (workflow as unknown as { ownerName?: unknown }).ownerName;
-  return typeof candidate === 'string' ? candidate : undefined;
-}
-
-function initialsFor(name: string | undefined, email: string | undefined): string {
-  const source = (name ?? '').trim() || email || '';
-  if (!source) return '?';
-  const cleaned = source.replace(/[^A-Za-z0-9]+/g, ' ').trim();
-  const parts = cleaned.split(/\s+/).filter(Boolean);
+function initialsFor(name: string): string {
+  const parts = name.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
@@ -34,30 +20,11 @@ function paletteFor(seed: string): readonly [string, string] {
   return [`hsl(${hue} 70% 55%)`, `hsl(${(hue + 40) % 360} 70% 45%)`];
 }
 
-function isMine(
-  workflow: WorkflowResponse,
-  currentUserEmail: string | undefined,
-): boolean {
-  if (!workflow.isShared) return true;
-  const ownerEmail = ownerEmailOf(workflow);
-  if (!currentUserEmail || !ownerEmail) return false;
-  return ownerEmail.toLowerCase() === currentUserEmail.toLowerCase();
-}
-
-/**
- * Avatar + tên người tạo. Workflow không có `ownerEmail` thì hiển thị "Shared"
- * (workflow của team) — phân biệt với Mine (workflow cá nhân, isShared=false).
- */
-export function OwnerCell({ workflow, currentUserEmail }: Readonly<OwnerCellProps>) {
-  const ownerEmail = ownerEmailOf(workflow);
-  const ownerName = ownerNameOf(workflow);
-  const mine = isMine(workflow, currentUserEmail);
-  const displayName = mine
-    ? 'You'
-    : (ownerName ?? ownerEmail ?? 'Shared team');
-  const seed = ownerEmail ?? workflow.id ?? workflow.name ?? 'wf';
-  const [from, to] = paletteFor(seed);
-  const initials = initialsFor(displayName, ownerEmail);
+/** The API reports only whether a workflow is shared, not who owns it: a personal workflow is "You", a shared one "Shared team". */
+export function OwnerCell({ workflow }: Readonly<OwnerCellProps>) {
+  const mine = !workflow.isShared;
+  const displayName = mine ? 'You' : 'Shared team';
+  const [from, to] = paletteFor(workflow.id ?? workflow.name ?? 'wf');
 
   return (
     <div className="wf-list__owner">
@@ -66,7 +33,7 @@ export function OwnerCell({ workflow, currentUserEmail }: Readonly<OwnerCellProp
         style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
         aria-hidden="true"
       >
-        {initials}
+        {initialsFor(displayName)}
       </span>
       <span className="wf-list__owner-name">
         {displayName}

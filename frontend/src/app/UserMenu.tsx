@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { setToken, signOut } from '@flow-cortex/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { accountStatsEnabled } from './featureFlags';
+import { accountStatsEnabled, demoPagesEnabled } from './featureFlags';
 import './UserMenu.css';
 
 interface UserMenuProps {
@@ -23,6 +23,8 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelId = useId();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -36,7 +38,9 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
       setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
@@ -64,10 +68,11 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
   return (
     <div ref={rootRef} className="cortex-user-menu">
       <button
+        ref={triggerRef}
         type="button"
         className="cortex-user-menu__trigger"
-        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         aria-label={email ? `Open account menu for ${email}` : 'Open account menu'}
         onClick={() => setOpen((prev) => !prev)}
       >
@@ -77,7 +82,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
       </button>
 
       {open && (
-        <div className="cortex-user-menu__panel" role="menu">
+        <div id={panelId} className="cortex-user-menu__panel">
           <div className="cortex-user-menu__identity">
             <span className="cortex-user-menu__avatar cortex-user-menu__avatar--lg" aria-hidden="true">
               {initials}
@@ -103,28 +108,19 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
             </div>
           )}
 
-          <Link
-            to="/profile"
-            className="cortex-user-menu__item"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-          >
+          <Link to="/profile" className="cortex-user-menu__item" onClick={() => setOpen(false)}>
             <span>Account settings</span>
           </Link>
-          <Link
-            to="/integrations"
-            className="cortex-user-menu__item"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-          >
-            <span>Connected services</span>
-          </Link>
-          <Link
-            to="/docs"
-            className="cortex-user-menu__item"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-          >
+          {demoPagesEnabled() && (
+            <Link
+              to="/integrations"
+              className="cortex-user-menu__item"
+              onClick={() => setOpen(false)}
+            >
+              <span>Connected services</span>
+            </Link>
+          )}
+          <Link to="/docs" className="cortex-user-menu__item" onClick={() => setOpen(false)}>
             <span>Help &amp; docs</span>
           </Link>
 
@@ -133,7 +129,6 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
           <button
             type="button"
             className="cortex-user-menu__item cortex-user-menu__item--danger"
-            role="menuitem"
             onClick={onSignOut}
             disabled={signingOut}
           >

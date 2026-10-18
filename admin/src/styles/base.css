@@ -1238,6 +1238,16 @@ a {
   border-radius: var(--radius-sm);
 }
 
+.cortex-admin-table-job-marker {
+  color: var(--admin-red);
+}
+
+.cortex-admin-table-job-message {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--admin-ink-3);
+}
+
 /* ===== STATUS PILLS ===================================================== */
 
 .cortex-admin-pill {
@@ -1499,116 +1509,6 @@ a {
   font-size: 1.25rem;
 }
 
-/* ===== STACK (inline group of buttons) ================================== */
-
-.cortex-admin-stack {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.cortex-admin-stack-list {
-  display: grid;
-  gap: 1rem;
-}
-
-/* ===== SEARCH INPUT WITH ICON ========================================== */
-
-.cortex-admin-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.cortex-admin-search > svg {
-  position: absolute;
-  left: 0.65rem;
-  color: var(--admin-ink-3);
-  pointer-events: none;
-}
-
-.cortex-admin-search > input {
-  padding-left: 2.25rem;
-}
-
-/* ===== TOGGLE SWITCH ==================================================== */
-
-.cortex-admin-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--admin-ink-3);
-}
-
-.cortex-admin-toggle input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.cortex-admin-toggle__track {
-  position: relative;
-  width: 2.5rem;
-  height: 1.4rem;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--admin-ink-5) 30%, transparent);
-  transition: background var(--dur-quick) var(--ease-standard);
-}
-
-.cortex-admin-toggle__thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 50%;
-  background: var(--admin-card-surface);
-  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
-  transition: transform var(--dur-quick) var(--ease-standard);
-}
-
-.cortex-admin-toggle input:checked + .cortex-admin-toggle__track {
-  background: var(--admin-teal);
-}
-
-.cortex-admin-toggle input:checked + .cortex-admin-toggle__track .cortex-admin-toggle__thumb {
-  transform: translateX(1.1rem);
-}
-
-.cortex-admin-toggle input:focus-visible + .cortex-admin-toggle__track {
-  outline: 2px solid var(--admin-primary);
-  outline-offset: 2px;
-}
-
-.cortex-admin-toggle__label {
-  min-width: 2ch;
-}
-
-/* ===== SCRIPT PREVIEW =================================================== */
-
-.cortex-admin-script-preview {
-  margin: 0.5rem 0 0;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--admin-card-edge);
-  border-radius: var(--radius-md);
-  background: var(--admin-card-surface-2);
-  color: var(--admin-ink-2);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-x: auto;
-}
-
 /* ===== ACCOUNT DIALOG (premium — gradient cover, sections, actions) ===== */
 
 .cortex-admin-account-dialog {
@@ -1829,11 +1729,6 @@ a {
   text-transform: uppercase;
 }
 
-.cortex-admin-account-dialog__actions {
-  display: grid;
-  gap: 0.4rem;
-}
-
 .cortex-admin-account-dialog__action {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -1883,54 +1778,6 @@ a {
   text-overflow: ellipsis;
   max-width: 11rem;
   text-align: right;
-}
-
-.cortex-admin-account-dialog__security {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.cortex-admin-account-dialog__security-row {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--admin-card-edge);
-  border-radius: var(--radius-md);
-  background: var(--admin-card-surface-2);
-}
-
-.cortex-admin-account-dialog__security-row > div {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.cortex-admin-account-dialog__security-row strong {
-  display: block;
-  color: var(--admin-ink);
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.cortex-admin-account-dialog__security-row p {
-  margin: 0.15rem 0 0;
-  color: var(--admin-ink-3);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.cortex-admin-account-dialog__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--admin-card-edge-strong);
-  border-radius: var(--radius-full);
-  background: var(--admin-card-surface);
-  color: var(--admin-ink-2);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
 }
 
 .cortex-admin-account-dialog__section--danger {

@@ -1,5 +1,6 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
 import { WorkflowsListPage } from './WorkflowsListPage';
 
@@ -107,7 +108,7 @@ describe('WorkflowsListPage', () => {
     expect(screen.getByText('Check a video file')).toBeInTheDocument();
   });
 
-  it('renders a table with status pills, last-run, step count, and run / edit / more actions', async () => {
+  it('renders a table with status pills, owner, step count, and run actions', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
       'GET /api/v1/workflows': { status: 200, body: [DOUYIN, ECHO, FAIL, PRODUCT_VIDEO] },
@@ -116,24 +117,109 @@ describe('WorkflowsListPage', () => {
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
 
     expect(await screen.findByRole('heading', { name: 'Workflows' })).toBeInTheDocument();
-    expect(await screen.findByText(/Welcome back/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /\+ Create Workflow/ })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Search workflows/i)).toBeInTheDocument();
 
     // Table header columns from the spec.
     const table = await screen.findByRole('region', { name: /workflows table/i });
     expect(withinTable(table, 'Name')).toBeInTheDocument();
     expect(withinTable(table, 'Status')).toBeInTheDocument();
-    expect(withinTable(table, 'Last run')).toBeInTheDocument();
+    expect(withinTable(table, 'Owner')).toBeInTheDocument();
     expect(withinTable(table, 'Steps')).toBeInTheDocument();
     expect(withinTable(table, 'Actions')).toBeInTheDocument();
+    expect(screen.queryByText('Last run')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Shared team')).toHaveLength(2);
+    expect(screen.getAllByText('You')).toHaveLength(2);
 
-    // Status pills match the data.
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Failed')).toBeInTheDocument();
+    // Status pills come from the steps: a definition has no active/failed run state.
     expect(screen.getByText('Review required')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getByText('Demo: failure')).toBeInTheDocument();
+    expect(screen.getAllByText('Ready')).toHaveLength(2);
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+    expect(screen.queryByText('Inactive')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+  });
+
+  it('keeps only the workflows whose name matches the search', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [DOUYIN, ECHO, FAIL] },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    expect(await screen.findByText('Echo Demo (all steps succeed)')).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText('Search workflows...'), 'douyin');
+
+    expect(screen.getByText('Douyin Video Repurpose')).toBeInTheDocument();
+    expect(screen.queryByText('Echo Demo (all steps succeed)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failing Demo (deliberate)')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 3 workflows')).toBeInTheDocument();
+  });
+
+  it('greets the member by name and offers no control the API cannot back', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [DOUYIN, ECHO] },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    expect(await screen.findByText('Echo Demo (all steps succeed)')).toBeInTheDocument();
+    const welcome = screen.getByText(/Welcome back/);
+    await waitFor(() => expect(within(welcome).getByText('Member')).toBeInTheDocument());
+    expect(welcome).not.toHaveTextContent('Demo');
+
+    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Create Workflow/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Filter:')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Page 1 of 1/)).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 2 of 2 workflows')).toBeInTheDocument();
+  });
+
+  it('runs a workflow by opening its start page, in both layouts', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [ECHO] },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    const run = await screen.findByRole('link', { name: 'Run Echo Demo (all steps succeed)' });
+    expect(run).toHaveAttribute('href', '/workflows/echo');
+
+    await user.click(screen.getByRole('button', { name: 'Grid layout' }));
+
+    expect(screen.getByRole('link', { name: 'Run Echo Demo (all steps succeed)' })).toHaveAttribute(
+      'href',
+      '/workflows/echo',
+    );
+  });
+
+  it('scopes the list with pressed toggle buttons instead of tabs', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [DOUYIN, ECHO] },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    expect(await screen.findByText('Echo Demo (all steps succeed)')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    const scope = screen.getByRole('group', { name: 'Scope' });
+    const mine = within(scope).getByRole('button', { name: 'Mine' });
+    expect(mine).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(mine);
+
+    expect(mine).toHaveAttribute('aria-pressed', 'true');
+    expect(within(scope).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText('Douyin Video Repurpose')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'List layout' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
