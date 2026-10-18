@@ -45,8 +45,10 @@ class AdminRunsController {
     ResponseEntity<PageView<AdminRunResponse>> listRuns(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) int size,
-            @Parameter(schema = @Schema(allowableValues = {"running", "completed", "error"}))
-            @RequestParam(required = false) @Pattern(regexp = "running|completed|error") String status) {
+            @Parameter(schema = @Schema(allowableValues = {"running", "waiting_approval", "completed", "error",
+                    "cancelling", "cancelled"}))
+            @RequestParam(required = false)
+            @Pattern(regexp = "running|waiting_approval|completed|error|cancelling|cancelled") String status) {
         currentUserResolver.requireAdmin(jwt);
         return ResponseEntity.ok(workflowRunService.listAllRuns(page, size, status).map(AdminRunResponse::from));
     }

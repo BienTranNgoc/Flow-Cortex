@@ -156,6 +156,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+  /api/v1/runs/{id}/cancel:
+    post:
+      tags:
+      - runs-controller
+      operationId: cancelRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
   /api/v1/review-tasks/{taskId}/revisions:
     get:
       tags:
@@ -262,6 +281,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/me/phone/verify:
+    post:
+      tags:
+      - phone-controller
+      operationId: verify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+  /api/v1/me/phone/send-code:
+    post:
+      tags:
+      - phone-controller
+      operationId: sendCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/auth/resend-confirmation:
+    post:
+      tags:
+      - auth-controller
+      operationId: resendConfirmation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendConfirmationRequest"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmationSentResponse"
+      security: []
   /api/v1/auth/register:
     post:
       tags:
@@ -280,6 +354,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessTokenResponse"
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmationSentResponse"
       security: []
   /api/v1/auth/refresh:
     post:
@@ -327,6 +407,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessTokenResponse"
+      security: []
+  /api/v1/auth/confirm-email:
+    post:
+      tags:
+      - auth-controller
+      operationId: confirmEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEmailRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessTokenResponse"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/workflows:
     get:
@@ -431,6 +536,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutputUrlResponse"
+  /api/v1/me/phone:
+    get:
+      tags:
+      - phone-controller
+      operationId: current
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
   /api/v1/health:
     get:
       tags:
@@ -443,6 +560,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/v1/features:
+    get:
+      tags:
+      - features-controller
+      operationId: features
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeaturesResponse"
+      security: []
+  /api/v1/credits/balance:
+    get:
+      tags:
+      - credits-controller
+      operationId: balance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
   /api/v1/capabilities:
     get:
       tags:
@@ -516,6 +658,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/sms-outbox:
+    get:
+      tags:
+      - admin-sms-outbox-controller
+      operationId: listAdminSmsOutbox
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SmsOutboxEntryResponse"
   /api/v1/admin/runs:
     get:
       tags:
@@ -547,9 +713,12 @@ paths:
           type: string
           enum:
           - running
+          - waiting_approval
           - completed
           - error
-          pattern: running|completed|error
+          - cancelling
+          - cancelled
+          pattern: running|waiting_approval|completed|error|cancelling|cancelled
       responses:
         "200":
           description: OK
@@ -678,6 +847,8 @@ components:
           type: string
           maxLength: 1024
           minLength: 0
+        acknowledgeCost:
+          type: boolean
     RunResponse:
       type: object
       properties:
@@ -703,6 +874,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunStepResponse"
+        chargedCredits:
+          type: integer
+          format: int64
     RunStepOutputResponse:
       type: object
       properties:
@@ -953,6 +1127,8 @@ components:
           minItems: 1
         video:
           $ref: "#/components/schemas/VideoConfig"
+        acknowledgeCost:
+          type: boolean
       required:
       - description
       - productName
@@ -966,9 +1142,84 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    VerifyCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: "^\\d{6}$"
+      required:
+      - code
+    PhoneResponse:
+      type: object
+      properties:
+        phone:
+          type: string
+          description: "Verified number in E.164, or null"
+        verified:
+          type: boolean
+        maskedPhone:
+          type: string
+          description: The verified number as shown to the member (carrier digit and
+            last three digits)
+      required:
+      - verified
+    SendCodeRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: "0912345678"
+          pattern: "^(0|\\+84)([35789]\\d{8})$"
+      required:
+      - phone
+    SendCodeResponse:
+      type: object
+      properties:
+        maskedPhone:
+          type: string
+        resendAfterSeconds:
+          type: integer
+          format: int64
+          description: Seconds before a resend is accepted
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - maskedPhone
+      - resendAfterSeconds
+    ResendConfirmationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          minLength: 0
+      required:
+      - email
+    ConfirmationSentResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
     RegisterRequest:
       type: object
       properties:
+        firstName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        lastName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        username:
+          type: string
+          pattern: "^[a-z0-9_]{3,20}$"
         email:
           type: string
           format: email
@@ -978,14 +1229,12 @@ components:
           type: string
           maxLength: 72
           minLength: 8
-        name:
-          type: string
-          minLength: 1
         rememberMe:
           type: boolean
       required:
       - email
-      - name
+      - firstName
+      - lastName
       - password
     AccessTokenResponse:
       type: object
@@ -1029,6 +1278,15 @@ components:
       required:
       - email
       - password
+    ConfirmEmailRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - token
     WorkflowResponse:
       type: object
       properties:
@@ -1049,6 +1307,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowStepResponse"
+        estimatedCredits:
+          type: integer
+          format: int64
     WorkflowStepResponse:
       type: object
       properties:
@@ -1091,6 +1352,31 @@ components:
           type: string
           description: Identifier of the service reporting its health.
           example: flow-cortex
+    FeaturesResponse:
+      type: object
+      properties:
+        emailConfirmation:
+          type: boolean
+        phoneVerification:
+          type: boolean
+        uploadContentCheck:
+          type: boolean
+        runCancellation:
+          type: boolean
+        credits:
+          type: boolean
+      required:
+      - credits
+      - emailConfirmation
+      - phoneVerification
+      - runCancellation
+      - uploadContentCheck
+    BalanceResponse:
+      type: object
+      properties:
+        balance:
+          type: integer
+          format: int64
     CapabilitiesResponse:
       type: object
       properties:
@@ -1101,6 +1387,25 @@ components:
         productVideoWorkflowId:
           type: string
           format: uuid
+    SmsOutboxEntryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+          description: Recipient in E.164
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - body
+      - createdAt
+      - id
+      - phone
     AdminRunResponse:
       type: object
       properties:

@@ -9,13 +9,29 @@ import java.util.UUID;
 public interface AuthService {
 
     /**
-     * Creates an active member account owned by the configured registration
-     * owner and returns its first {@link AuthSession}.
-     * @throws com.flowcortex.shared.web.ConflictException if the email is already taken
+     * Creates an active member account owned by the configured registration owner; its display name
+     * is "first last" and {@code username} may be {@code null}. With email confirmation on, the account
+     * is created unconfirmed, a confirmation link is mailed after commit and the result is empty;
+     * otherwise the account is confirmed and its first {@link AuthSession} is returned.
+     * @throws com.flowcortex.shared.web.ConflictException if the email or the username is already taken
      * @throws org.springframework.web.server.ResponseStatusException 403 if no active ADMIN owner is configured
      */
-    AuthSession register(String email, String rawPassword, String name, boolean rememberMe, String ip,
-            String userAgent);
+    Optional<AuthSession> register(String email, String rawPassword, String firstName, String lastName,
+            String username, boolean rememberMe, String ip, String userAgent);
+
+    /**
+     * Spends an emailed confirmation link, confirms its account and signs it in, as {@link #login} would.
+     * @throws com.flowcortex.shared.web.UnprocessableEntityException code {@code CONFIRMATION_LINK_INVALID}
+     *         when the link is unknown, used, superseded or expired
+     * @throws org.springframework.security.access.AccessDeniedException if the account is suspended
+     */
+    AuthSession confirmEmail(String rawToken, String ip, String userAgent);
+
+    /**
+     * Mails a new confirmation link and retires the earlier ones when the email belongs to an
+     * unconfirmed account; answers the same whether or not it does. Shares the registration limits.
+     */
+    void resendConfirmation(String email, String ip, String userAgent);
 
     /**
      * Verifies the email/password pair and returns an {@link AuthSession}. The password is checked
@@ -26,6 +42,8 @@ public interface AuthService {
      * @throws org.springframework.security.access.AccessDeniedException if the password is right but the account
      *         is {@code SUSPENDED} — no token is minted
      * @throws com.flowcortex.shared.web.AccountLockedException if the password is right but the account is locked
+     * @throws com.flowcortex.user.emailconfirm.EmailNotConfirmedException (403 {@code EMAIL_NOT_CONFIRMED})
+     *         if the password is right but the account has not confirmed its email
      */
     AuthSession login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
 

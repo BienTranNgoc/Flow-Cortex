@@ -43,7 +43,6 @@ class MediaJobsImpl implements MediaJobs {
 
     private static final Logger LOG = LoggerFactory.getLogger(MediaJobsImpl.class);
     private static final long MEGABYTE = 1024L * 1024;
-    private static final long MAX_IMAGE_BYTES = 10L * MEGABYTE;
     /** The key of the one input a job built from an upload carries. */
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
@@ -140,25 +139,31 @@ class MediaJobsImpl implements MediaJobs {
     public MediaLimits limitsFor(String capability) {
         MediaCapability known = MediaCapability.fromValue(capability);
         return new MediaLimits(properties.queueTimeout(), properties.maxRuntime().get(known.value()),
-                properties.upload().maxBytes());
+                largestMediaInputBytes());
     }
 
     @Override
     public MediaLimits providerLimits(String capability) {
         if ("generate_video".equals(capability)) {
             return new MediaLimits(properties.providerVideoQueueTimeout(), properties.providerVideoMaxRuntime(),
-                    properties.upload().maxBytes());
+                    largestMediaInputBytes());
         }
         return new MediaLimits(properties.providerQueueTimeout(), properties.providerMaxRuntime(),
-                properties.upload().maxBytes());
+                largestMediaInputBytes());
+    }
+
+    /** A capability's input is an audio or video upload, so its bound is the larger of those two caps. */
+    private long largestMediaInputBytes() {
+        return Math.max(properties.upload().maxVideoBytes(), properties.upload().maxAudioBytes());
     }
 
     @Override
     public UploadGrant prepareUpload(UUID ownerId, String fileName, long size) {
         String contentType = allowedType(fileName)
                 .orElseThrow(() -> new UploadRejectedException("fileName", typeSentence()));
-        if (!withinLimit(size)) {
-            throw new UploadRejectedException("size", sizeSentence());
+        String kind = MediaProperties.Upload.kindOf(contentType);
+        if (!withinLimit(kind, size)) {
+            throw new UploadRejectedException("size", sizeSentence(kind));
         }
         UUID uploadId = UUID.randomUUID();
         String bucket = properties.s3().uploadBucket();
@@ -166,14 +171,14 @@ class MediaJobsImpl implements MediaJobs {
         S3MediaStore.PresignedPut put = store.presignPut(bucket, key, contentType, size, properties.upload().urlTtl());
         LOG.info("Upload grant issued: bucket={} key={} size={} expiresAt={}", bucket, key, size, put.expiresAt());
         return new UploadGrant(uploadId, put.url(), "PUT", put.headers(), put.expiresAt(),
-                properties.upload().maxBytes());
+                properties.upload().maxBytesOf(kind));
     }
 
     @Override
     @Transactional
     public MediaJobInput resolveUpload(UUID ownerId, UUID uploadId) {
-        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null,
-                properties.upload().maxBytes()).input();
+        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null)
+                .input();
     }
 
     @Override
@@ -187,7 +192,7 @@ class MediaJobsImpl implements MediaJobs {
         List<String> anyAllowed = List.copyOf(properties.upload().mimeTypes().keySet());
         for (int index = 0; index < uploadIds.size(); index++) {
             resolved.add(resolveAndRegister(ownerId, uploadIds.get(index), "image_" + (index + 1), anyAllowed,
-                    "image/", MAX_IMAGE_BYTES));
+                    "image/"));
         }
         return List.copyOf(resolved);
     }
@@ -233,14 +238,14 @@ class MediaJobsImpl implements MediaJobs {
                             || legacyPrefix != null && MediaJob.isBelow(legacyPrefix, output.objectKey()))) {
                 throw new IllegalArgumentException("Worker output is outside the current run prefix");
             }
-            return new MediaAsset(UUID.randomUUID(), ownerId, mediaKind(output.mime()), output.bucket(),
+            return new MediaAsset(UUID.randomUUID(), ownerId, MediaProperties.Upload.kindOf(output.mime()), output.bucket(),
                     output.objectKey(), output.mime(), output.bytes(), null, runStepId, attempt, now);
         }).toList();
         assets.saveAll(registered);
     }
 
     private MediaAssetInput resolveAndRegister(UUID ownerId, UUID uploadId, String inputKey,
-            List<String> allowedExtensions, String requiredMimePrefix, long maxBytes) {
+            List<String> allowedExtensions, String requiredMimePrefix) {
         Optional<MediaAsset> existing = assets.findById(uploadId);
         if (existing.isPresent() && !existing.orElseThrow().getOwnerId().equals(ownerId)) {
             throw refused(properties.s3().uploadBucket(), objectKey(ownerId, uploadId), "another owner",
@@ -250,9 +255,6 @@ class MediaJobsImpl implements MediaJobs {
         String key = objectKey(ownerId, uploadId);
         S3MediaStore.StoredObject stored = store.head(bucket, key)
                 .orElseThrow(() -> refused(bucket, key, "no object", "Upload the file again"));
-        if (!withinLimit(stored.size())) {
-            throw refused(bucket, key, stored.size() + " bytes", sizeSentence());
-        }
         Map<String, String> mimeTypes = properties.upload().mimeTypes();
         if (allowedExtensions.stream().map(mimeTypes::get).noneMatch(type -> type.equals(stored.contentType()))) {
             throw refused(bucket, key, "type " + stored.contentType(), typeSentence(allowedExtensions));
@@ -260,19 +262,23 @@ class MediaJobsImpl implements MediaJobs {
         if (requiredMimePrefix != null && !stored.contentType().startsWith(requiredMimePrefix)) {
             throw new UploadRejectedException("uploadIds", "Every product asset must be an image");
         }
-        if (stored.size() > maxBytes) {
-            throw new UploadRejectedException("uploadIds", "Each product image must be no larger than 10 MB");
+        String kind = MediaProperties.Upload.kindOf(stored.contentType());
+        if (!withinLimit(kind, stored.size())) {
+            throw refused(bucket, key, stored.size() + " bytes", sizeSentence(kind));
         }
-        MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, mediaKind(stored.contentType()), bucket, key,
+        if (properties.upload().contentCheck().enabled()) {
+            byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
+                    .orElseThrow(() -> refused(bucket, key, "gone before the content check", "Upload the file again"));
+            if (!ContentSniffer.matches(kind, prefix)) {
+                throw refused(bucket, key, "content is not " + kind, "This file isn't a valid " + kind
+                        + " file. Accepted: " + formats(kind) + ".");
+            }
+        }
+        MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, kind, bucket, key,
                 stored.contentType(), stored.size(), stored.checksum(), Instant.now()));
         asset.refresh(stored.contentType(), stored.size(), stored.checksum());
         assets.save(asset);
         return new MediaAssetInput(asset.getId(), new MediaJobInput(inputKey, bucket, key));
-    }
-
-    private static String mediaKind(String mimeType) {
-        int separator = mimeType.indexOf('/');
-        return separator > 0 ? mimeType.substring(0, separator) : "binary";
     }
 
     @Override
@@ -308,14 +314,18 @@ class MediaJobsImpl implements MediaJobs {
         return Optional.ofNullable(properties.upload().mimeTypes().get(extension));
     }
 
-    private boolean withinLimit(long size) {
-        return size >= 1 && size <= properties.upload().maxBytes();
+    private boolean withinLimit(String kind, long size) {
+        return size >= 1 && size <= properties.upload().maxBytesOf(kind);
     }
 
-    private String sizeSentence() {
-        long max = properties.upload().maxBytes();
+    private String sizeSentence(String kind) {
+        long max = properties.upload().maxBytesOf(kind);
         String limit = max % MEGABYTE == 0 ? max / MEGABYTE + " MB" : max + " bytes";
-        return "Files must be between 1 byte and " + limit + ".";
+        return "Files of this type must be at most " + limit + ". Accepted: " + formats(kind) + ".";
+    }
+
+    private String formats(String kind) {
+        return String.join(", ", properties.upload().extensionsOf(kind).stream().map(e -> "." + e).toList());
     }
 
     private String typeSentence() {

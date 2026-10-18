@@ -2,9 +2,12 @@ package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
+import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
+import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -20,6 +23,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -62,10 +66,18 @@ class RunStepClaimConcurrencyIT {
     @Autowired
     private RunStepTransactions runStepTransactions;
 
+    @Autowired
+    private WorkflowRunRepository workflowRunRepository;
+
+    @MockitoBean
+    private CreditAccounts creditAccounts;
+
     @Test
     void exactlyOneOfTwoConcurrentClaimsSucceeds() throws Exception {
+        WorkflowRun run = workflowRunRepository.saveAndFlush(
+                new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), null, Instant.now()));
         RunStep step = runStepRepository
-                .saveAndFlush(new RunStep(UUID.randomUUID(), UUID.randomUUID(), (short) 1, "echo"));
+                .saveAndFlush(new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo"));
 
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch go = new CountDownLatch(1);

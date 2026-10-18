@@ -54,6 +54,7 @@ export interface StartRunRequest {
    * @maxLength 1024
    */
   originalName?: string;
+  acknowledgeCost?: boolean;
 }
 
 export interface RunStepOutputResponse {
@@ -97,6 +98,7 @@ export interface RunResponse {
   startedAt?: string;
   finishedAt?: string;
   steps?: RunStepResponse[];
+  chargedCredits?: number;
 }
 
 export interface CreateUserRequest {
@@ -215,9 +217,59 @@ export interface ProductVideoRunRequest {
    */
   uploadIds: string[];
   video: VideoConfig;
+  acknowledgeCost?: boolean;
+}
+
+export interface VerifyCodeRequest {
+  /** @pattern ^\d{6}$ */
+  code: string;
+}
+
+export interface PhoneResponse {
+  /** Verified number in E.164, or null */
+  phone?: string;
+  verified: boolean;
+  /** The verified number as shown to the member (carrier digit and last three digits) */
+  maskedPhone?: string;
+}
+
+export interface SendCodeRequest {
+  /** @pattern ^(0|\+84)([35789]\d{8})$ */
+  phone: string;
+}
+
+export interface SendCodeResponse {
+  maskedPhone: string;
+  /** Seconds before a resend is accepted */
+  resendAfterSeconds: number;
+  expiresAt: string;
+}
+
+export interface ResendConfirmationRequest {
+  /**
+   * @minLength 0
+   * @maxLength 254
+   */
+  email: string;
+}
+
+export interface ConfirmationSentResponse {
+  status: string;
 }
 
 export interface RegisterRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  firstName: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  lastName: string;
+  /** @pattern ^[a-z0-9_]{3,20}$ */
+  username?: string;
   /**
    * @minLength 0
    * @maxLength 254
@@ -228,8 +280,6 @@ export interface RegisterRequest {
    * @maxLength 72
    */
   password: string;
-  /** @minLength 1 */
-  name: string;
   rememberMe?: boolean;
 }
 
@@ -260,6 +310,14 @@ export interface LoginRequest {
   rememberMe?: boolean;
 }
 
+export interface ConfirmEmailRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  token: string;
+}
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -283,6 +341,7 @@ export interface WorkflowResponse {
   createdAt?: string;
   updatedAt?: string;
   steps?: WorkflowStepResponse[];
+  estimatedCredits?: number;
 }
 
 export interface OutputUrlResponse {
@@ -297,10 +356,30 @@ export interface HealthResponse {
   service?: string;
 }
 
+export interface FeaturesResponse {
+  emailConfirmation: boolean;
+  phoneVerification: boolean;
+  uploadContentCheck: boolean;
+  runCancellation: boolean;
+  credits: boolean;
+}
+
+export interface BalanceResponse {
+  balance?: number;
+}
+
 export interface CapabilitiesResponse {
   mediaEnabled?: boolean;
   productVideoEnabled?: boolean;
   productVideoWorkflowId?: string;
+}
+
+export interface SmsOutboxEntryResponse {
+  id: string;
+  /** Recipient in E.164 */
+  phone: string;
+  body: string;
+  createdAt: string;
 }
 
 export interface AdminRunResponse {
@@ -357,6 +436,14 @@ export type AuthorizeParams = {
   return_to?: string;
 };
 
+export type ListAdminSmsOutboxParams = {
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
+};
+
 export type ListAdminRunsParams = {
   /**
    * @minimum 0
@@ -369,7 +456,7 @@ export type ListAdminRunsParams = {
    */
   size?: number;
   /**
-   * @pattern running|completed|error
+   * @pattern running|waiting_approval|completed|error|cancelling|cancelled
    */
   status?: ListAdminRunsStatus;
 };
@@ -378,8 +465,11 @@ export type ListAdminRunsStatus = (typeof ListAdminRunsStatus)[keyof typeof List
 
 export const ListAdminRunsStatus = {
   running: 'running',
+  waiting_approval: 'waiting_approval',
   completed: 'completed',
   error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
 } as const;
 
 export type ListAdminMediaJobsParams = {
@@ -705,6 +795,30 @@ export const requestUpload = async (
   });
 };
 
+export type cancelRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type cancelRunResponseSuccess = cancelRunResponse200 & {
+  headers: Headers;
+};
+export type cancelRunResponse = cancelRunResponseSuccess;
+
+export const getCancelRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}/cancel`;
+};
+
+export const cancelRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelRunResponse> => {
+  return customFetch<cancelRunResponse>(getCancelRunUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type getRevisionsResponse200 = {
   data: ScriptRevisionResponse[];
   status: 200;
@@ -890,12 +1004,152 @@ export const startProductVideoRun = async (
   });
 };
 
+export type verifyResponse200 = {
+  data: PhoneResponse;
+  status: 200;
+};
+
+export type verifyResponseSuccess = verifyResponse200 & {
+  headers: Headers;
+};
+export type verifyResponse = verifyResponseSuccess;
+
+export const getVerifyUrl = () => {
+  return `/api/v1/me/phone/verify`;
+};
+
+export const verify = async (
+  verifyCodeRequest: VerifyCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<verifyResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<verifyResponse>(getVerifyUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifyCodeRequest),
+  });
+};
+
+export type sendCodeResponse200 = {
+  data: SendCodeResponse;
+  status: 200;
+};
+
+export type sendCodeResponseSuccess = sendCodeResponse200 & {
+  headers: Headers;
+};
+export type sendCodeResponse = sendCodeResponseSuccess;
+
+export const getSendCodeUrl = () => {
+  return `/api/v1/me/phone/send-code`;
+};
+
+export const sendCode = async (
+  sendCodeRequest: SendCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sendCodeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<sendCodeResponse>(getSendCodeUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type resendConfirmationResponse202 = {
+  data: ConfirmationSentResponse;
+  status: 202;
+};
+
+export type resendConfirmationResponseSuccess = resendConfirmationResponse202 & {
+  headers: Headers;
+};
+export type resendConfirmationResponse = resendConfirmationResponseSuccess;
+
+export const getResendConfirmationUrl = () => {
+  return `/api/v1/auth/resend-confirmation`;
+};
+
+export const resendConfirmation = async (
+  resendConfirmationRequest: ResendConfirmationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resendConfirmationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<resendConfirmationResponse>(getResendConfirmationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(resendConfirmationRequest),
+  });
+};
+
 export type registerResponse201 = {
   data: AccessTokenResponse;
   status: 201;
 };
 
-export type registerResponseSuccess = registerResponse201 & {
+export type registerResponse202 = {
+  data: ConfirmationSentResponse;
+  status: 202;
+};
+
+export type registerResponseSuccess = (registerResponse201 | registerResponse202) & {
   headers: Headers;
 };
 export type registerResponse = registerResponseSuccess;
@@ -1035,6 +1289,60 @@ export const login = async (
   });
 };
 
+export type confirmEmailResponse200 = {
+  data: AccessTokenResponse;
+  status: 200;
+};
+
+export type confirmEmailResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type confirmEmailResponseSuccess = confirmEmailResponse200 & {
+  headers: Headers;
+};
+export type confirmEmailResponseError = confirmEmailResponse422 & {
+  headers: Headers;
+};
+
+export type confirmEmailResponse = confirmEmailResponseSuccess | confirmEmailResponseError;
+
+export const getConfirmEmailUrl = () => {
+  return `/api/v1/auth/confirm-email`;
+};
+
+export const confirmEmail = async (
+  confirmEmailRequest: ConfirmEmailRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<confirmEmailResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<confirmEmailResponse>(getConfirmEmailUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmEmailRequest),
+  });
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -1156,6 +1464,29 @@ export const getOutputUrl = async (
   });
 };
 
+export type currentResponse200 = {
+  data: PhoneResponse;
+  status: 200;
+};
+
+export type currentResponseSuccess = currentResponse200 & {
+  headers: Headers;
+};
+export type currentResponse = currentResponseSuccess;
+
+export const getCurrentUrl = () => {
+  return `/api/v1/me/phone`;
+};
+
+export const current = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<currentResponse> => {
+  return customFetch<currentResponse>(getCurrentUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -1174,6 +1505,52 @@ export const health = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<healthResponse> => {
   return customFetch<healthResponse>(getHealthUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type featuresResponse200 = {
+  data: FeaturesResponse;
+  status: 200;
+};
+
+export type featuresResponseSuccess = featuresResponse200 & {
+  headers: Headers;
+};
+export type featuresResponse = featuresResponseSuccess;
+
+export const getFeaturesUrl = () => {
+  return `/api/v1/features`;
+};
+
+export const features = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<featuresResponse> => {
+  return customFetch<featuresResponse>(getFeaturesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type balanceResponse200 = {
+  data: BalanceResponse;
+  status: 200;
+};
+
+export type balanceResponseSuccess = balanceResponse200 & {
+  headers: Headers;
+};
+export type balanceResponse = balanceResponseSuccess;
+
+export const getBalanceUrl = () => {
+  return `/api/v1/credits/balance`;
+};
+
+export const balance = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<balanceResponse> => {
+  return customFetch<balanceResponse>(getBalanceUrl(), {
     ...options,
     method: 'GET',
   });
@@ -1297,6 +1674,42 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminSmsOutboxResponse200 = {
+  data: SmsOutboxEntryResponse[];
+  status: 200;
+};
+
+export type listAdminSmsOutboxResponseSuccess = listAdminSmsOutboxResponse200 & {
+  headers: Headers;
+};
+export type listAdminSmsOutboxResponse = listAdminSmsOutboxResponseSuccess;
+
+export const getListAdminSmsOutboxUrl = (params?: ListAdminSmsOutboxParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/sms-outbox?${stringifiedParams}`
+    : `/api/v1/admin/sms-outbox`;
+};
+
+export const listAdminSmsOutbox = async (
+  params?: ListAdminSmsOutboxParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSmsOutboxResponse> => {
+  return customFetch<listAdminSmsOutboxResponse>(getListAdminSmsOutboxUrl(params), {
     ...options,
     method: 'GET',
   });

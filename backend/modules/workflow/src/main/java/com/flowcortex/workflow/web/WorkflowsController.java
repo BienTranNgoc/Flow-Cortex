@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
 import jakarta.validation.Valid;
@@ -30,19 +31,21 @@ class WorkflowsController {
     private final WorkflowService workflowService;
     private final WorkflowRunService workflowRunService;
     private final CurrentUserResolver currentUserResolver;
+    private final CreditAccounts creditAccounts;
 
     WorkflowsController(WorkflowService workflowService, WorkflowRunService workflowRunService,
-            CurrentUserResolver currentUserResolver) {
+            CurrentUserResolver currentUserResolver, CreditAccounts creditAccounts) {
         this.workflowService = workflowService;
         this.workflowRunService = workflowRunService;
         this.currentUserResolver = currentUserResolver;
+        this.creditAccounts = creditAccounts;
     }
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<List<WorkflowResponse>> listWorkflows(@AuthenticationPrincipal Jwt jwt) {
         UUID currentUserId = currentUserResolver.require(jwt);
         List<WorkflowResponse> body = workflowService.listVisibleWorkflows(currentUserId).stream()
-                .map(WorkflowResponse::from)
+                .map(view -> WorkflowResponse.from(view, creditAccounts))
                 .toList();
         return ResponseEntity.ok(body);
     }
@@ -50,7 +53,8 @@ class WorkflowsController {
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<WorkflowResponse> getWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID currentUserId = currentUserResolver.require(jwt);
-        return ResponseEntity.ok(WorkflowResponse.from(workflowService.getVisibleWorkflow(currentUserId, id)));
+        return ResponseEntity.ok(WorkflowResponse.from(workflowService.getVisibleWorkflow(currentUserId, id),
+                creditAccounts));
     }
 
     // @ResponseStatus documents 200 for springdoc/orval explicitly, rather than relying on
@@ -62,7 +66,8 @@ class WorkflowsController {
             @Valid @RequestBody StartRunRequest request) {
         UUID currentUserId = currentUserResolver.require(jwt);
         RunResponse body = RunResponse.from(workflowRunService.startRun(currentUserId, id, request.input(),
-                request.uploadId(), request.uploadIds(), request.originalName()));
+                request.uploadId(), request.uploadIds(), request.originalName(),
+                Boolean.TRUE.equals(request.acknowledgeCost())), creditAccounts);
         return ResponseEntity.ok(body);
     }
 }

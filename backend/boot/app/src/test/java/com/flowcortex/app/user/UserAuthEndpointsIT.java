@@ -2,9 +2,13 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.user.api.UserCreatedEvent;
 import com.flowcortex.user.api.UserView;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +19,7 @@ import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -22,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -36,6 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT,
         properties = "flowcortex.registration.owner-email=" + UserAuthEndpointsIT.OWNER_EMAIL)
 @AutoConfigureTestRestTemplate
+@Import(UserAuthEndpointsIT.UserCreatedEvents.class)
 class UserAuthEndpointsIT extends AbstractUserModuleIT {
 
     static final String OWNER_EMAIL = "registration-owner@example.com";
@@ -53,6 +60,9 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private UserCreatedEvents createdEvents;
 
     record ProblemView(int status, String detail) {
     }
@@ -359,6 +369,19 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     }
 
     @Test
+    void registeringAndAdminCreatingAnAccountEachPublishOneUserCreatedEventInTheirTransaction() {
+        ResponseEntity<TokenResponse> response = register(newClientIp(),
+                new RegisterRequest(uniqueEmail("register-event"), "register-password-1", "Event"),
+                TokenResponse.class);
+        UUID registered = get("/api/v1/auth/me", response.getBody().accessToken(), MeView.class).getBody().id();
+        UUID adminCreated = userService.createInitialAdmin(uniqueEmail("admin-event"), "admin-password-1",
+                "Event Admin").id();
+
+        assertThat(createdEvents.received()).filteredOn(event -> event.userId().equals(registered)).hasSize(1);
+        assertThat(createdEvents.received()).filteredOn(event -> event.userId().equals(adminCreated)).hasSize(1);
+    }
+
+    @Test
     void registerDuplicateEmailReturns409() {
         String email = uniqueEmail("register-duplicate");
         String clientIp = newClientIp();
@@ -388,6 +411,28 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     record ProfileUpdateRequest(String name) {
     }
 
-    record RegisterRequest(String email, String password, String name) {
+    record RegisterRequest(String email, String password, String firstName, String lastName) {
+        RegisterRequest(String email, String password, String firstName) {
+            this(email, password, firstName, "Member");
+        }
+    }
+
+    /**
+     * An after-commit listener only fires for an event published inside a transaction that then
+     * committed, so a recorded event proves both. Registration answers on a server thread, which
+     * {@code @RecordApplicationEvents} does not see.
+     */
+    static class UserCreatedEvents {
+
+        private final List<UserCreatedEvent> received = new CopyOnWriteArrayList<>();
+
+        @TransactionalEventListener
+        void on(UserCreatedEvent event) {
+            received.add(event);
+        }
+
+        List<UserCreatedEvent> received() {
+            return received;
+        }
     }
 }

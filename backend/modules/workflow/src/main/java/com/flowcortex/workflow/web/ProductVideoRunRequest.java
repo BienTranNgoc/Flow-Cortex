@@ -18,7 +18,8 @@ record ProductVideoRunRequest(
         @Size(max = 200) String price,
         @Size(max = 500) String promotion,
         @NotNull @Size(min = 1, max = 10) List<@NotNull UUID> uploadIds,
-        @NotNull @Valid VideoConfig video) {
+        @NotNull @Valid VideoConfig video,
+        Boolean acknowledgeCost) {
 
     record VideoConfig(@NotNull @Pattern(regexp = "9:16") String aspectRatio) {
     }

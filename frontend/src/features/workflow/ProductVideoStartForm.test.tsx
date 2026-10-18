@@ -95,6 +95,20 @@ describe('ProductVideoStartForm', () => {
     expect(picker).toBeRequired();
   });
 
+  it('asks for at least one product image when Start is pressed without one', async () => {
+    const user = userEvent.setup();
+    const calls = renderForm();
+
+    await screen.findByLabelText('Product name *');
+    await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
+    await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
+    await user.type(screen.getByLabelText('Call to action *'), 'Đặt mua ngay');
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    expect(await screen.findByText('Add at least one product image')).toBeInTheDocument();
+    expect(sent(calls)).toEqual([]);
+  });
+
   it('refuses Start when a required text field is blank', async () => {
     const user = userEvent.setup();
     const calls = renderForm();
@@ -125,7 +139,9 @@ describe('ProductVideoStartForm', () => {
       image('huge.png', 11 * 1024 * 1024),
     ]);
 
-    expect(screen.getByText('The image must be between 1 byte and 10 MB.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Files of this type must be at most 10 MB. Accepted: .jpg, .jpeg, .png, .webp.'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start run' }));
     expect(sent(calls)).toEqual([]);
   });

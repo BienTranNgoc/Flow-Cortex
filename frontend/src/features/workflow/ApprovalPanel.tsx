@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ApiError } from '@flow-cortex/api-client';
 import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
 import {
   useApproveTaskMutation,
@@ -20,15 +21,23 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
   const scripted = Boolean(task.currentRevisionId);
   const [draft, setDraft] = useState(original);
   const [scriptApprovalBlocked, setScriptApprovalBlocked] = useState(scripted);
+  const [blankDraft, setBlankDraft] = useState(false);
   const approve = useApproveTaskMutation(runId, task.id ?? '');
   const reject = useRejectTaskMutation(runId, task.id ?? '');
   const busy = approve.isPending || reject.isPending;
   const approveBlocked = busy || scriptApprovalBlocked;
+  const serverFieldError = scripted ? undefined : payloadFieldError(approve.error);
+  const contentError = blankDraft ? "Content can't be empty" : serverFieldError;
 
   // Busy rather than disabled, so focus stays on the button while the decision is sent.
   const onApprove = () => {
     if (approveBlocked) return;
     reject.reset();
+    if (!scripted && draft !== original && draft.trim() === '') {
+      approve.reset();
+      setBlankDraft(true);
+      return;
+    }
     approve.mutate(
       scripted
         ? { revisionId: task.currentRevisionId, expectedVersion: task.version }
@@ -56,8 +65,19 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
             id="approval-payload"
             rows={6}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setBlankDraft(false);
+              if (serverFieldError) approve.reset();
+            }}
+            aria-invalid={contentError ? true : undefined}
+            aria-describedby={contentError ? 'approval-payload-problem' : undefined}
           />
+          {contentError && (
+            <div id="approval-payload-problem" className="field-error" role="alert">
+              <p className="form-error">{contentError}</p>
+            </div>
+          )}
         </div>
       )}
       <div className="approval-actions">
@@ -73,14 +93,14 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
           {reject.isPending ? 'Rejecting…' : 'Reject'}
         </button>
       </div>
-      {approve.isError && (
+      {approve.isError && !serverFieldError && (
         <p role="alert" className="approval-error">
           {approveError(approve.error, scripted)}
         </p>
       )}
       {reject.isError && (
         <p role="alert" className="approval-error">
-          Could not reject this step
+          {refusalReason(reject.error) ?? 'Could not reject this step'}
         </p>
       )}
     </section>
@@ -88,17 +108,27 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
 }
 
 /**
- * A 409 on a script checkpoint means the revision moved on; the same status on a plain checkpoint
- * means the decision was already taken. Either way the reviewer has to reload — retrying the same
- * click can only lose again.
+ * A 409 on a script checkpoint means the revision moved on, so the reviewer is told to reload
+ * rather than shown the server's generic conflict sentence.
  */
 function approveError(error: unknown, scripted: boolean): string {
-  if (!isLostRace(error)) {
-    return 'Could not approve this step';
+  if (scripted && isLostRace(error)) {
+    return 'This script moved on in another tab. Reload the page to see the latest revision.';
   }
-  return scripted
-    ? 'This script moved on in another tab. Reload the page to see the latest revision.'
-    : 'This step was already decided elsewhere.';
+  return refusalReason(error) ?? 'Could not approve this step';
+}
+
+/**
+ * A refused decision (403, 409, 422…) carries a sentence written for the member; a 5xx detail
+ * does not, so the caller falls back to its own wording.
+ */
+function refusalReason(error: unknown): string | undefined {
+  if (!(error instanceof ApiError) || error.status >= 500) return undefined;
+  return error.problem?.detail;
+}
+
+function payloadFieldError(error: unknown): string | undefined {
+  return error instanceof ApiError ? error.problem?.errors?.reviewedPayload : undefined;
 }
 
 /**

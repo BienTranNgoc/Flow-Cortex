@@ -4,6 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { accountStatsEnabled } from '../../app/featureFlags';
+import { useFeatures } from '../../app/useFeatures';
+import { formatCredits } from '../credits/formatCredits';
+import { useBalance } from '../credits/useBalance';
+import { PhoneVerification } from './PhoneVerification';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { useMeQuery } from './useAuth';
 import './ProfilePage.css';
@@ -19,6 +23,8 @@ function initialsFrom(name: string | null | undefined, email: string | null | un
 /** Fix my own display name; email/role/status are not self-service. */
 export function ProfilePage() {
   const meQuery = useMeQuery();
+  const { phoneVerification } = useFeatures();
+  const credits = useBalance();
   const queryClient = useQueryClient();
   const {
     register,
@@ -97,24 +103,30 @@ export function ProfilePage() {
             <span className="profile-role-pill">{me.role}</span>
           </div>
 
-          {showAccountStats && (
+          {(showAccountStats || credits !== undefined) && (
             <ul className="profile-stats" aria-label="Account statistics">
-              <li>
-                <span className="profile-stats__value">1,248</span>
-                <span className="profile-stats__label">XP</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">14d</span>
-                <span className="profile-stats__label">Streak</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">#42</span>
-                <span className="profile-stats__label">Rank</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">18</span>
-                <span className="profile-stats__label">Credits</span>
-              </li>
+              {showAccountStats && (
+                <>
+                  <li>
+                    <span className="profile-stats__value">1,248</span>
+                    <span className="profile-stats__label">XP</span>
+                  </li>
+                  <li>
+                    <span className="profile-stats__value">14d</span>
+                    <span className="profile-stats__label">Streak</span>
+                  </li>
+                  <li>
+                    <span className="profile-stats__value">#42</span>
+                    <span className="profile-stats__label">Rank</span>
+                  </li>
+                </>
+              )}
+              {credits !== undefined && (
+                <li>
+                  <span className="profile-stats__value">{formatCredits(credits)}</span>
+                  <span className="profile-stats__label">Credits</span>
+                </li>
+              )}
             </ul>
           )}
         </aside>
@@ -192,6 +204,13 @@ export function ProfilePage() {
               </dd>
             </div>
           </dl>
+
+          {phoneVerification && (
+            <>
+              <hr className="profile-card__divider" />
+              <PhoneVerification />
+            </>
+          )}
 
           {showAccountStats && (
             <>

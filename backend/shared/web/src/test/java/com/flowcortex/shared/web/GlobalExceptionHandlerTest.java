@@ -42,6 +42,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void unprocessableReturns422WithItsCodeAndFieldErrors() throws Exception {
+        mockMvc.perform(get("/test/unprocessable"))
+                .andExpect(status().is(422))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.detail").value("thing is incomplete"))
+                .andExpect(jsonPath("$.code").value("THING_INCOMPLETE"))
+                .andExpect(jsonPath("$.errors['steps[1].config']").value("is missing"));
+    }
+
+    @Test
     void aLostOptimisticLockReturns409() throws Exception {
         mockMvc.perform(get("/test/optimistic-lock"))
                 .andExpect(status().isConflict())

@@ -37,6 +37,19 @@ public class AppUser {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "first_name")
+    private String firstName;
+
+    @Column(name = "last_name")
+    private String lastName;
+
+    @Column(name = "username")
+    private String username;
+
+    /** {@code null} only for a self-registered account that has not opened its confirmation link yet. */
+    @Column(name = "email_confirmed_at")
+    private Instant emailConfirmedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private Role role;
@@ -75,7 +88,10 @@ public class AppUser {
         this(id, ownerId, email, passwordHash, name, role, status, true);
     }
 
-    /** Constructor that exposes {@code hasPassword} — used by the OAuth-only path. */
+    /**
+     * Constructor that exposes {@code hasPassword} — used by the OAuth-only path. The account is
+     * created with its email confirmed: only {@link #selfRegistered} can create an unconfirmed one.
+     */
     public AppUser(UUID id, UUID ownerId, String email, String passwordHash, String name, Role role,
             UserStatus status, boolean hasPassword) {
         this.id = id;
@@ -89,6 +105,22 @@ public class AppUser {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+        this.emailConfirmedAt = now;
+    }
+
+    /**
+     * An active MEMBER created by self-registration; {@code name} becomes "first last". A {@code
+     * null} {@code emailConfirmedAt} leaves the account unable to sign in until {@link #confirmEmail}.
+     */
+    public static AppUser selfRegistered(UUID id, UUID ownerId, String email, String passwordHash, String firstName,
+            String lastName, String username, Instant emailConfirmedAt) {
+        AppUser user = new AppUser(id, ownerId, email, passwordHash, firstName + " " + lastName, Role.MEMBER,
+                UserStatus.ACTIVE);
+        user.firstName = firstName;
+        user.lastName = lastName;
+        user.username = username;
+        user.emailConfirmedAt = emailConfirmedAt;
+        return user;
     }
 
     public UUID getId() {
@@ -109,6 +141,26 @@ public class AppUser {
 
     public String getName() {
         return name;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public Instant getEmailConfirmedAt() {
+        return emailConfirmedAt;
+    }
+
+    public boolean isEmailConfirmed() {
+        return emailConfirmedAt != null;
     }
 
     public Role getRole() {
@@ -165,6 +217,14 @@ public class AppUser {
     public void changeName(String name) {
         this.name = name;
         touch();
+    }
+
+    /** Idempotent: an already-confirmed account keeps its first confirmation time. */
+    public void confirmEmail(Instant now) {
+        if (this.emailConfirmedAt == null) {
+            this.emailConfirmedAt = now;
+            touch();
+        }
     }
 
     public void changeRole(Role role) {

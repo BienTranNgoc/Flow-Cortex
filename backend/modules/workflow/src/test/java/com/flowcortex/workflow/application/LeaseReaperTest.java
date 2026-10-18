@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
@@ -45,7 +46,7 @@ class LeaseReaperTest {
     private final RunAdvancer advancer = mock(RunAdvancer.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final LeaseReaper reaper = new LeaseReaper(runStepRepository, workflowRunRepository,
-            new RunStepTransactions(runStepRepository, workflowRunRepository),
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class)),
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), advancer, meters,
             Clock.fixed(NOW, ZoneOffset.UTC));
 

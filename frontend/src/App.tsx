@@ -7,6 +7,7 @@ import { AppShell } from './app/AppShell';
 import { HomePage } from './app/HomePage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
+import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
@@ -39,6 +40,7 @@ export function App() {
           >
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/confirm-email" element={<ConfirmEmailPage />} />
           </Route>
           <Route
             element={
