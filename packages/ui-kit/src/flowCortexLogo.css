@@ -1,0 +1,68 @@
+/* Flow-Cortex mark — brain + circuit half. The mark ships as a React
+   component, this stylesheet drives the halo + node-pulse motion. Consumer
+   apps must define these tokens (light + dark variants):
+     --logo-stroke-violet, --logo-stroke-teal,
+     --logo-fill-violet, --logo-fill-teal,
+     --logo-glow-1, --logo-glow-2. */
+
+.cortex-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  position: relative;
+  isolation: isolate;
+}
+
+.cortex-logo::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--logo-glow-1) 0%,
+    var(--logo-glow-2) 35%,
+    transparent 70%
+  );
+  filter: blur(8px);
+  z-index: -1;
+  opacity: 0.85;
+  animation: cortex-logo-halo 5.4s ease-in-out infinite;
+}
+
+.cortex-logo__svg {
+  display: block;
+}
+
+.cortex-logo__pulse circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cortex-logo-pulse 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px var(--logo-glow-1));
+}
+
+@keyframes cortex-logo-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px var(--logo-glow-1));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 8px var(--logo-glow-1));
+  }
+}
+
+@keyframes cortex-logo-halo {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cortex-logo::before,
+  .cortex-logo__pulse circle {
+    animation: none;
+  }
+  .cortex-logo__pulse circle {
+    filter: drop-shadow(0 0 3px var(--logo-glow-1));
+  }
+}

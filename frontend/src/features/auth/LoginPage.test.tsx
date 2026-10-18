@@ -205,6 +205,13 @@ describe('LoginPage', () => {
       return { path: url.pathname, params: Object.fromEntries(url.searchParams) };
     }
 
+    it('offers Google as the only provider, the one the backend implements', () => {
+      renderLogin({});
+
+      expect(screen.getByRole('link', { name: 'Continue with Google' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /GitHub/ })).not.toBeInTheDocument();
+    });
+
     it('starts the authorize flow with the checkbox state and the page login returns to', async () => {
       const user = userEvent.setup();
       renderLogin({ from: '/profile' });

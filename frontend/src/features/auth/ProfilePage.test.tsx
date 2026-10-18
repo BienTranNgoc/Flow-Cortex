@@ -34,6 +34,16 @@ describe('ProfilePage', () => {
     expect(screen.queryByRole('button', { name: 'Request deletion' })).not.toBeInTheDocument();
   });
 
+  it('offers no API key, since the backend issues none', async () => {
+    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ME } });
+
+    renderProfile();
+
+    expect(await screen.findByRole('heading', { name: 'Identity' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'API key' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Authorization: Bearer/)).not.toBeInTheDocument();
+  });
+
   it('shows a dash when /me has no status', async () => {
     const { status: _status, ...withoutStatus } = ME;
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: withoutStatus } });

@@ -1,0 +1,81 @@
+.cortex-docs-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.cortex-docs-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  min-height: 0;
+  margin: 0;
+  padding: 0.4rem 0.85rem;
+}
+
+.cortex-docs-menu__chevron {
+  color: var(--ink-4);
+  transition: transform var(--dur-quick) var(--ease-standard);
+}
+
+.cortex-docs-menu__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.cortex-docs-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 220px;
+  padding: 0.4rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-2) 95%, transparent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--shadow-color) 45%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  z-index: 110;
+}
+
+.cortex-docs-menu__item {
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-size: 0.88rem;
+  text-decoration: none;
+  min-height: 36px;
+}
+
+.cortex-docs-menu__item:hover,
+.cortex-docs-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--teal-glow) 10%, transparent);
+  color: var(--ink);
+}
+
+.cortex-docs-menu__item.is-active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  font-weight: 600;
+}
+
+.cortex-docs-menu__hint {
+  margin-top: 0.3rem;
+  padding: 0.45rem 0.65rem;
+  color: var(--ink-4);
+  font-size: 0.78rem;
+  text-decoration: none;
+  border-top: 1px solid var(--card-edge);
+}
+
+.cortex-docs-menu__hint:hover {
+  color: var(--ink);
+}

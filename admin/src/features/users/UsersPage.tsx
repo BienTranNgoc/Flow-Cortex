@@ -2,10 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ApiError } from '@flow-cortex/api-client';
+import { Plus, RefreshCw } from 'lucide-react';
 import { UserRow } from './UserRow';
-import './UsersPage.css';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { usePageTitle } from '../../app/usePageTitle';
+import { PageHeading } from '../../app/PageHeading';
+import { MetricCard } from '../../app/MetricCard';
+import { EmptyState } from '../../app/EmptyState';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
 
 const EMPTY_USERS: NonNullable<ReturnType<typeof useUsersQuery>['data']> = [];
@@ -60,55 +63,73 @@ export function UsersPage() {
   ).length;
 
   return (
-    <main className="users-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Administration</p>
-          <h1>Users</h1>
-          <p className="page-description">
-            Manage account access and roles. Account history is preserved when access is suspended.
-          </p>
-        </div>
-        <button
-          className="button-primary"
-          type="button"
-          onClick={() => setShowCreateForm((open) => !open)}
-        >
-          {showCreateForm ? 'Cancel' : 'Add user'}
-        </button>
-      </div>
+    <div className="cortex-admin-users">
+      <PageHeading
+        eyebrow="Administration"
+        title="Users"
+        description="Manage account access and roles. Account history is preserved when access is suspended."
+        actions={
+          <>
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--ghost"
+              onClick={() => usersQuery.refetch()}
+              disabled={usersQuery.isFetching}
+            >
+              <RefreshCw size={16} aria-hidden="true" />
+              <span>{usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}</span>
+            </button>
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--primary"
+              onClick={() => setShowCreateForm((open) => !open)}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span>{showCreateForm ? 'Cancel' : 'Add user'}</span>
+            </button>
+          </>
+        }
+      />
 
       {usersQuery.data && (
-        <section className="metric-grid" aria-label="User statistics">
-          <article className="metric-card">
-            <span>Total users</span>
-            <strong>{users.length}</strong>
-          </article>
-          <article className="metric-card">
-            <span>Active</span>
-            <strong>{users.filter((user) => user.status === 'ACTIVE').length}</strong>
-          </article>
-          <article className="metric-card">
-            <span>Suspended</span>
-            <strong>{users.filter((user) => user.status === 'SUSPENDED').length}</strong>
-          </article>
-          <article className="metric-card">
-            <span>New in 7 days</span>
-            <strong>{newThisWeek}</strong>
-          </article>
+        <section className="cortex-admin-metric-grid" aria-label="User statistics">
+          <MetricCard label="Total users" value={users.length} />
+          <MetricCard
+            label="Active"
+            value={users.filter((user) => user.status === 'ACTIVE').length}
+          />
+          <MetricCard
+            label="Suspended"
+            value={users.filter((user) => user.status === 'SUSPENDED').length}
+          />
+          <MetricCard label="New in 7 days" value={newThisWeek} />
         </section>
       )}
 
       {showCreateForm && (
-        <form className="create-user-panel" onSubmit={onCreate} noValidate aria-label="Add user">
-          <h2>Create user</h2>
-          <div className="field">
+        <form
+          className="cortex-admin-panel"
+          onSubmit={onCreate}
+          noValidate
+          aria-label="Add user"
+        >
+          <header className="cortex-admin-section-heading">
+            <div>
+              <h2>Create user</h2>
+              <p>Sets the initial password and role. The user can change both later.</p>
+            </div>
+          </header>
+          <div className="cortex-admin-field">
             <label htmlFor="new-user-email">Email</label>
             <input id="new-user-email" type="email" autoComplete="off" {...register('email')} />
-            {errors.email && <p role="alert">{errors.email.message}</p>}
-            {createError?.errors?.email && <p role="alert">{createError.errors.email}</p>}
+            {errors.email && (
+              <p className="cortex-admin-form-error" role="alert">{errors.email.message}</p>
+            )}
+            {createError?.errors?.email && (
+              <p className="cortex-admin-form-error" role="alert">{createError.errors.email}</p>
+            )}
           </div>
-          <div className="field">
+          <div className="cortex-admin-field">
             <label htmlFor="new-user-password">Password</label>
             <input
               id="new-user-password"
@@ -116,47 +137,50 @@ export function UsersPage() {
               autoComplete="new-password"
               {...register('password')}
             />
-            {errors.password && <p role="alert">{errors.password.message}</p>}
+            {errors.password && (
+              <p className="cortex-admin-form-error" role="alert">{errors.password.message}</p>
+            )}
           </div>
-          <div className="field">
+          <div className="cortex-admin-field">
             <label htmlFor="new-user-name">Name</label>
             <input id="new-user-name" {...register('name')} />
-            {errors.name && <p role="alert">{errors.name.message}</p>}
+            {errors.name && (
+              <p className="cortex-admin-form-error" role="alert">{errors.name.message}</p>
+            )}
           </div>
-          <div className="field">
+          <div className="cortex-admin-field">
             <label htmlFor="new-user-role">Role</label>
             <select id="new-user-role" {...register('role')}>
               <option value="MEMBER">Member</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>
-          {createError && !createError.errors && <p role="alert">{createError.detail}</p>}
-          <button type="submit" disabled={createMutation.isPending}>
+          {createError && !createError.errors && (
+            <p className="cortex-admin-form-error" role="alert">{createError.detail}</p>
+          )}
+          <button
+            type="submit"
+            className="cortex-admin-btn cortex-admin-btn--primary"
+            disabled={createMutation.isPending}
+          >
             {createMutation.isPending ? 'Creating…' : 'Create user'}
           </button>
         </form>
       )}
 
-      <section className="users-list-panel" aria-label="User directory">
-        <div className="section-heading">
+      <section className="cortex-admin-panel" aria-label="User directory">
+        <header className="cortex-admin-section-heading">
           <div>
             <h2>All users</h2>
             {usersQuery.data && (
               <p>
-                {visibleUsers.length} of {users.length} accounts
+                Showing {visibleUsers.length} of {users.length} accounts
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => usersQuery.refetch()}
-            disabled={usersQuery.isFetching}
-          >
-            {usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-        <div className="user-filters">
-          <div className="field">
+        </header>
+        <div className="cortex-admin-filters">
+          <div className="cortex-admin-field">
             <label htmlFor="users-search">Search</label>
             <input
               id="users-search"
@@ -166,7 +190,7 @@ export function UsersPage() {
               placeholder="Name or email"
             />
           </div>
-          <div className="field">
+          <div className="cortex-admin-field">
             <label htmlFor="users-status">Status</label>
             <select
               id="users-status"
@@ -178,7 +202,7 @@ export function UsersPage() {
               <option value="SUSPENDED">Suspended</option>
             </select>
           </div>
-          <div className="field">
+          <div className="cortex-admin-field">
             <label htmlFor="users-role">Role</label>
             <select
               id="users-role"
@@ -192,24 +216,46 @@ export function UsersPage() {
             </select>
           </div>
         </div>
-        {usersQuery.isLoading && <output>Loading users…</output>}
+        {usersQuery.isLoading && <output className="cortex-admin-loading">Loading users…</output>}
         {usersQuery.isError && (
-          <>
-            <p role="alert">Could not load users.</p>
-            <button type="button" onClick={() => usersQuery.refetch()}>
+          <div className="cortex-admin-error" role="alert">
+            <p>Could not load users.</p>
+            <button
+              type="button"
+              className="cortex-admin-btn"
+              onClick={() => usersQuery.refetch()}
+            >
               Retry
             </button>
-          </>
+          </div>
         )}
         {usersQuery.data?.length === 0 && (
-          <p className="list-empty">No users yet — add one above.</p>
+          <EmptyState
+            title="No users yet."
+            description="Add the first admin or member above."
+          />
         )}
         {usersQuery.data && users.length > 0 && visibleUsers.length === 0 && (
-          <p className="list-empty">No users match these filters.</p>
+          <EmptyState
+            title="No users match these filters."
+            action={
+              <button
+                type="button"
+                className="cortex-admin-btn cortex-admin-btn--ghost"
+                onClick={() => {
+                  setSearch('');
+                  setStatusFilter('');
+                  setRoleFilter('');
+                }}
+              >
+                Clear filters
+              </button>
+            }
+          />
         )}
         {visibleUsers.length > 0 && (
-          <div className="users-table-wrapper">
-            <table className="users-table">
+          <div className="cortex-admin-table-wrapper">
+            <table className="cortex-admin-table">
               <thead>
                 <tr>
                   <th scope="col">Name</th>
@@ -229,6 +275,6 @@ export function UsersPage() {
           </div>
         )}
       </section>
-    </main>
+    </div>
   );
 }

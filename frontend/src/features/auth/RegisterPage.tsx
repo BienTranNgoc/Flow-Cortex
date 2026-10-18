@@ -147,9 +147,8 @@ export function RegisterPage() {
     <div className="auth-page">
       <BrandPanel />
 
-      <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1 className="auth-card__title">Create your free creator account</h1>
+      <section className="auth-card auth-card--surface">
+        <h1 className="auth-card__title">Create your account</h1>
         <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
 
         <div className="oauth-row">
@@ -158,10 +157,6 @@ export function RegisterPage() {
             label="Sign up with Google"
             href={googleAuthorizeUrl(true, '/')}
           />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>or sign up with email</span>
         </div>
 
         <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">

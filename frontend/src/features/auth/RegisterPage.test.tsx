@@ -220,4 +220,11 @@ describe('RegisterPage', () => {
     expect(url.pathname).toBe('/api/v1/auth/oauth/google/authorize');
     expect(Object.fromEntries(url.searchParams)).toEqual({ remember_me: 'true', return_to: '/' });
   });
+
+  it('links to no legal page the app does not serve', () => {
+    renderRoute('/register', '/register', <RegisterPage />);
+
+    expect(screen.queryByRole('link', { name: 'Terms of Service' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Privacy Policy' })).not.toBeInTheDocument();
+  });
 });

@@ -1,0 +1,62 @@
+/* BrandPanel — the left column of the auth pages. Logo, headline, lead,
+   three feature bullets with checkmark icons, and a soft neural-network
+   backdrop that gives the panel depth without competing with the form. */
+
+.brand-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.brand-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.28;
+  transform: translateZ(0);
+}
+
+.brand-panel__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 0.25rem;
+}
+
+.brand-panel__logo-name {
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, var(--teal), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.brand-panel__bullets li {
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.brand-panel__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--teal-glow) 14%, transparent);
+  color: var(--teal-deep);
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--teal-glow) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-panel__backdrop {
+    opacity: 0.6;
+  }
+}
