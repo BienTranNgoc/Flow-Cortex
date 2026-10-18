@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
 from flowcortex_worker.provider.adapter import (
+    FixtureProviderAdapter,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -564,8 +565,9 @@ def test_video_capability_rejects_non_image_reference() -> None:
     context.abort = MagicMock()
     context.storage = storage
     with pytest.raises(PermanentError) as raised:
-        _resolve_reference_image(parsed, context)
+        _resolve_reference_image(parsed, context, by_url=True)
     assert raised.value.code == "input_rejected"
+    storage.presigned_get_url.assert_not_called()
 
 
 def test_video_capability_rejects_two_reference_images() -> None:
@@ -584,9 +586,9 @@ def test_video_capability_rejects_two_reference_images() -> None:
     assert "at most 1 item" in str(raised.value) or "too_long" in str(raised.value)
 
 
-def test_video_capability_resolves_reference_image_bytes_and_signed_url() -> None:
-    """The executor must give the adapter both the bytes (for Veo) and a signed URL
-    (for Seedance/Wan) so each provider can pick the form it accepts."""
+@pytest.mark.parametrize("by_url", [True, False])
+def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: bool) -> None:
+    """The bytes are always read (image check, idempotency); a URL is signed only on request."""
     from flowcortex_worker.provider.capabilities import _resolve_reference_image
     from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
 
@@ -601,11 +603,60 @@ def test_video_capability_resolves_reference_image_bytes_and_signed_url() -> Non
     context.bucket = BUCKET
     context.abort = MagicMock()
     context.storage = storage
-    image_bytes, image_url = _resolve_reference_image(parsed, context)
+    image_bytes, image_url = _resolve_reference_image(parsed, context, by_url=by_url)
     assert image_bytes == png
-    assert image_url == "https://signed.example/refs/cap.png"
     storage.fetch_bytes.assert_called_once_with("flowcortex-uploads", "refs/cap.png", context.abort)
-    storage.presigned_get_url.assert_called_once_with("flowcortex-uploads", "refs/cap.png")
+    if by_url:
+        assert image_url == "https://signed.example/refs/cap.png"
+        storage.presigned_get_url.assert_called_once_with("flowcortex-uploads", "refs/cap.png")
+    else:
+        assert image_url is None
+        storage.presigned_get_url.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("provider", "sends_url"), [("veo", False), ("seedance", True), ("wan", False)]
+)
+def test_video_job_with_a_product_image_sends_bytes_to_veo_and_wan_and_a_url_to_seedance(
+    monkeypatch: pytest.MonkeyPatch, provider: str, sends_url: bool
+) -> None:
+    from flowcortex_worker.provider import capabilities as capabilities_module
+
+    monkeypatch.setattr(capabilities_module, "_normalize_video", lambda body, context: body)
+    png = _png_header(b"product")
+    image_key = f"runs/{RUN_ID}/inputs/image_1"
+    storage = _make_storage_with_png(png)
+    storage.head_object.return_value = None
+    submitted: list[VideoRequest] = []
+
+    class _Adapter:
+        def video_identity(self) -> VideoIdentity:
+            return VideoIdentity(provider, "model", 5, "9:16", "480p", False)
+
+        def submit_video(self, request: VideoRequest) -> str:
+            submitted.append(request)
+            return "task-1"
+
+        def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+            return VideoArtifact(b"clip", task_id)
+
+    job = _video_job_dict()
+    job["inputs"] = [{"key": "image_1", "bucket": BUCKET, "objectKey": image_key}]
+    context = ExecutionContext(
+        storage=storage, bucket=BUCKET, output_prefix=job["outputPrefix"], abort=MagicMock()
+    )
+
+    execute(ProviderJob.model_validate(job), _Adapter(), context)
+
+    (request,) = submitted
+    assert request.reference_image_bytes == png
+    storage.fetch_bytes.assert_any_call(BUCKET, image_key, context.abort)
+    if sends_url:
+        assert request.reference_image_url == "https://signed.example/refs/cap.png"
+        storage.presigned_get_url.assert_called_once_with(BUCKET, image_key)
+    else:
+        assert request.reference_image_url is None
+        storage.presigned_get_url.assert_not_called()
 
 
 def test_video_idempotency_key_changes_with_reference_image() -> None:
@@ -722,8 +773,6 @@ def test_wan_submit_with_reference_image_bytes_sends_data_uri(
     input_body = captured["calls"][0]["body"]["input"]
     assert input_body["image"].startswith("data:image/png;base64,")
     assert input_body["prompt"] == "A cap rotating."
-
-
 # ---------------------------------------------------------------------------
 # Adapter wiring (VIDEO_PROVIDER env)
 # ---------------------------------------------------------------------------
@@ -796,7 +845,7 @@ def test_video_provider_seedance_uses_capability_scoped_credentials(
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
-    adapter = provider_main._build_adapter()
+    adapter = provider_main._build_adapter("https://media.example.com")
 
     assert isinstance(adapter.video_adapter, seedance_adapter.SeedanceAdapter)
     assert adapter.video_adapter.config.api_key == "sk-capability-key"
@@ -804,6 +853,93 @@ def test_video_provider_seedance_uses_capability_scoped_credentials(
     assert adapter.video_adapter.config.model == "vendor/seedance-pro"
 
 
+@pytest.mark.parametrize(
+    ("provider", "credentials"),
+    [
+        ("seedance", {"SEEDANCE_API_KEY": "key", "SEEDANCE_BASE_URL": "https://ark.example.com"}),
+    ],
+)
+@pytest.mark.parametrize("public_endpoint", ["", "http://localhost:9000", "https://"])
+def test_a_url_video_provider_refuses_to_start_without_a_public_https_store(
+    monkeypatch: pytest.MonkeyPatch,
+    provider: str,
+    credentials: dict[str, str],
+    public_endpoint: str,
+) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.delenv("WAN_API_KEY", raising=False)
+    monkeypatch.setenv("VIDEO_PROVIDER", provider)
+    for name, value in credentials.items():
+        monkeypatch.setenv(name, value)
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    with pytest.raises(RuntimeError) as refused:
+        provider_main._build_adapter(public_endpoint)
+    assert str(refused.value) == (
+        "Seedance/Wan read the product image from a public HTTPS URL: set S3_PUBLIC_ENDPOINT "
+        "to the public object-store URL (https://media.<domain>)"
+    )
+
+
+@pytest.mark.parametrize("provider", ["fixture", "veo"])
+def test_a_bytes_video_provider_starts_without_a_public_store(
+    monkeypatch: pytest.MonkeyPatch, provider: str
+) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", provider)
+    monkeypatch.setenv("VEO_API_KEY", "veo-key")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    assert provider_main._build_adapter("").video_identity().provider == provider
+
+
+def test_video_provider_wan_starts_with_a_public_https_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "key")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter("https://media.example.com")
+    assert isinstance(adapter.video_adapter, wan_adapter.WanAdapter)
+
+
+def test_video_provider_wan_starts_without_a_public_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "key")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter("")
+    assert isinstance(adapter.video_adapter, wan_adapter.WanAdapter)
+
+
+def test_non_video_worker_does_not_initialize_configured_video_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter("", video_enabled=False)
+    assert isinstance(adapter.video_adapter, FixtureProviderAdapter)
 def test_video_provider_veo_uses_default_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_env(monkeypatch)
     monkeypatch.setenv("VIDEO_PROVIDER", "veo")

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Provider job envelope consumed from {@code provider.jobs}. */
+/** Provider job envelope consumed from {@code provider.jobs}, or {@code provider.video.jobs} for video clips. */
 public record ProviderJob(
         @NotNull @Pattern(regexp = "1") String schemaVersion,
         @NotNull UUID jobId,
@@ -24,7 +24,7 @@ public record ProviderJob(
         @NotNull @Min(1) Integer stepOrder,
         @NotBlank String capability,
         @NotNull Map<String, Object> params,
-        // Script and video jobs may carry one product-image reference.
+        // Script, storyboard and video jobs may carry product-image references.
         @JsonInclude(JsonInclude.Include.NON_EMPTY) @Size(max = 1) List<@NotNull ProviderInput> inputs,
         @NotNull @Pattern(regexp = ProviderJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,

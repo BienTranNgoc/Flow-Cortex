@@ -318,3 +318,25 @@ def test_transient_budget_matches_the_broker_delivery_limit() -> None:
     limits = json.loads((CONTRACTS / "limits.json").read_text())
 
     assert limits["providerJobDeliveryLimit"] == provider_main.MAX_TRANSIENT_REDELIVERIES
+
+
+def test_render_target_matches_the_shared_video_duration() -> None:
+    from flowcortex_worker.handlers import render_video
+
+    limits = json.loads((CONTRACTS / "limits.json").read_text())
+
+    assert limits["productVideoDurationSeconds"] == render_video.TARGET_DURATION_SECONDS
+
+
+def test_fixture_speech_fits_the_video_for_the_longest_script() -> None:
+    from unittest.mock import MagicMock
+    from uuid import uuid4
+
+    from flowcortex_worker.provider.adapter import FixtureProviderAdapter, SpeechRequest
+
+    limits = json.loads((CONTRACTS / "limits.json").read_text())
+    speech = FixtureProviderAdapter().generate_speech(
+        SpeechRequest("a" * 8000, uuid4()), MagicMock()
+    )
+
+    assert speech.duration_ms <= limits["productVideoDurationSeconds"] * 1000

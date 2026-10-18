@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJob;
+import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.provider.ProviderInput;
 import com.flowcortex.media.api.provider.ProviderJob;
@@ -19,6 +20,7 @@ import java.util.Map;
 class ProviderStepExecutor implements StepExecutor {
 
     private static final TypeReference<Map<String, Object>> OBJECT = new TypeReference<>() { };
+    private static final TypeReference<List<MediaJobInput>> INPUTS = new TypeReference<>() { };
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String capability;
@@ -52,12 +54,12 @@ class ProviderStepExecutor implements StepExecutor {
 
     @Override
     public Duration maxRuntime() {
-        return mediaJobs.providerLimits().maxRuntime();
+        return mediaJobs.providerLimits(capability).maxRuntime();
     }
 
     @Override
     public Duration queueTimeout(Duration lease) {
-        return mediaJobs.providerLimits().queueTimeout();
+        return mediaJobs.providerLimits(capability).queueTimeout();
     }
 
     @Override
@@ -67,7 +69,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", profile(context.config()));
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params, providerInputs(context.storedInput(), context.config()),
+                context.stepOrder(), capability, params, providerInputs(context),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
         try {
@@ -79,40 +81,66 @@ class ProviderStepExecutor implements StepExecutor {
         return null;
     }
 
-    /** Script and video use the first immutable product image; config remains a legacy fallback. */
-    private List<ProviderInput> providerInputs(String storedInput, String config) {
+    /**
+     * Resolves product image input. If the step config defines referenceImage, only that named
+     * image from the run's inputs is sent. Otherwise, for capabilities binding run inputs (script,
+     * storyboard), the first snapshotted product image is sent as visual ground truth.
+     */
+    private List<ProviderInput> providerInputs(StepContext context) {
         if (!bindsRunInputs()) {
             return List.of();
         }
-        if (storedInput != null && !storedInput.isBlank()) {
+        if (context.config() != null && !context.config().isBlank()) {
+            JsonNode reference;
             try {
-                List<ProviderInput> inputs = objectMapper.readValue(storedInput, new TypeReference<>() { });
-                return inputs.isEmpty() ? List.of() : List.of(inputs.getFirst());
+                reference = objectMapper.readTree(context.config()).get("referenceImage");
+            } catch (JsonProcessingException e) {
+                throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
+            }
+            if (reference != null && !reference.isNull()) {
+                if (!reference.isTextual() || reference.textValue().isBlank()) {
+                    throw new StepFailedException("contract_violation", "referenceImage must name a run input");
+                }
+                String key = reference.textValue();
+                String runInputs = "runs/" + context.runId() + "/inputs/";
+                return storedInputs(context.storedInput(), key).stream()
+                        .filter(input -> key.equals(input.key()) && input.bucket() != null && !input.bucket().isBlank()
+                                && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
+                        .findFirst()
+                        .map(input -> List.of(new ProviderInput(input.key(), input.bucket(), input.objectKey())))
+                        .orElseThrow(() -> missingImage(key, null));
+            }
+        }
+        if (context.storedInput() != null && !context.storedInput().isBlank()) {
+            try {
+                List<MediaJobInput> inputs = objectMapper.readValue(context.storedInput(), INPUTS);
+                if (!inputs.isEmpty()) {
+                    MediaJobInput first = inputs.getFirst();
+                    return List.of(new ProviderInput(first.key(), first.bucket(), first.objectKey()));
+                }
             } catch (JsonProcessingException e) {
                 throw new StepFailedException("contract_violation",
                         "Provider image input is not a valid ordered list", e);
             }
         }
-        if (config == null || config.isBlank()) {
-            return List.of();
+        return List.of();
+    }
+
+    private List<MediaJobInput> storedInputs(String storedInput, String key) {
+        if (storedInput == null || storedInput.isBlank()) {
+            throw missingImage(key, null);
         }
         try {
-            JsonNode tree = objectMapper.readTree(config);
-            JsonNode ref = tree.get("referenceInput");
-            if (ref == null || ref.isNull()) {
-                return List.of();
-            }
-            if (!ref.isObject()) {
-                throw new StepFailedException("contract_violation",
-                        "referenceInput must be a single {key, bucket, objectKey} object");
-            }
-            return List.of(objectMapper.treeToValue(ref, ProviderInput.class));
+            return objectMapper.readValue(storedInput, INPUTS);
         } catch (JsonProcessingException e) {
-            throw new StepFailedException("contract_violation",
-                    "referenceInput is not a valid object reference", e);
+            throw missingImage(key, e);
         }
     }
 
+    private static StepFailedException missingImage(String key, Throwable cause) {
+        return new StepFailedException("contract_violation",
+                "Product image " + key + " is missing from the run inputs", cause);
+    }
     private Map<String, Object> payload(String input) {
         if (input == null || input.isBlank()) {
             throw new StepFailedException("contract_violation", "The provider step has no input");

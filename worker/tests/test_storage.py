@@ -318,3 +318,48 @@ def test_leftover_job_directories_are_removed_at_startup(tmp_path: Path) -> None
 
     assert not stale.exists()
     assert unrelated.exists()
+
+
+def _settings(public_endpoint: str) -> Any:
+    from flowcortex_worker.config import Settings
+
+    return Settings(
+        amqp_url="amqp://user:pass@rabbitmq:5672/%2F",
+        s3_endpoint="http://minio:9000",
+        s3_public_endpoint=public_endpoint,
+        s3_path_style=True,
+        s3_upload_bucket=UPLOAD_BUCKET,
+        s3_bucket=MEDIA_BUCKET,
+        s3_access_key="provider",
+        s3_secret_key="secret",
+    )
+
+
+def test_a_url_for_a_provider_is_signed_for_the_public_store_never_the_internal_one() -> None:
+    from urllib.parse import urlparse
+
+    from flowcortex_worker.storage import client_from
+
+    settings = _settings("https://media.example.com")
+    storage = Storage(
+        client_from(settings),
+        MEDIA_BUCKET,
+        UPLOAD_BUCKET,
+        presign_client=client_from(settings, settings.s3_public_endpoint),
+    )
+
+    url = urlparse(storage.presigned_get_url(MEDIA_BUCKET, "runs/r/inputs/image_1"))
+
+    assert (url.scheme, url.netloc) == ("https", "media.example.com")
+    assert url.path == f"/{MEDIA_BUCKET}/runs/r/inputs/image_1"
+    assert "X-Amz-Expires=600" in url.query
+
+
+def test_a_worker_without_a_public_store_signs_no_url() -> None:
+    from flowcortex_worker.storage import client_from
+
+    storage = Storage(client_from(_settings("")), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with pytest.raises(PermanentError) as refused:
+        storage.presigned_get_url(MEDIA_BUCKET, "runs/r/inputs/image_1")
+    assert refused.value.code == "provider_capability_unavailable"

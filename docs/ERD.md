@@ -66,6 +66,8 @@ erDiagram
     uuid run_id FK
     smallint step_order "UNIQUE (run_id, step_order)"
     varchar type
+    jsonb config "copied from workflow_step when the run starts; dispatch reads only this copy"
+    varchar input_ref "copied from workflow_step when the run starts"
     varchar status "pending | running | completed | error — claim = UPDATE ... WHERE status = 'pending'"
     text input "resolved input"
     text output
@@ -79,7 +81,7 @@ erDiagram
     smallint progress_percent "CHECK 0–100"
     smallint attempt "DEFAULT 1; API-owned fencing token every result CAS checks, constant 1 here"
     smallint delivery_count "DEFAULT 0; broker redeliveries, display only"
-    varchar error_code "queue_timeout | lease_expired | run_timeout | media_disabled | input_rejected | probe_failed | contract_violation"
+    varchar error_code "queue_timeout | lease_expired | run_timeout | media_disabled | input_rejected | probe_failed | contract_violation | speech_too_long | workflow_changed"
     jsonb outputs "MediaOutput[] {name, bucket, objectKey, mime, bytes, meta} — object keys runs/{runId}/steps/{order}/{name}"
   }
   media_asset {

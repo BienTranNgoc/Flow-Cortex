@@ -124,7 +124,6 @@ def test_generate_script_sends_product_image_as_multimodal_input(
     assert content[1]["type"] == "image_url"
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
-
 def test_generate_storyboard_returns_two_distinct_visual_prompts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -182,7 +181,6 @@ def test_generate_storyboard_sends_product_image_as_multimodal_input(
     assert "visual ground truth" in content[0]["text"].lower()
     assert content[1]["type"] == "image_url"
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
-
 
 @pytest.mark.parametrize(
     "provider_content",

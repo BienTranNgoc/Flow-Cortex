@@ -41,6 +41,11 @@ services:
     environment:
       S3_PUBLIC_ENDPOINT: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
 
+  # Seedance and Wan read the product photo through a presigned URL on this host.
+  provider-video-worker:
+    environment:
+      S3_PUBLIC_ENDPOINT: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
+
 volumes:
   # Certificates and the ACME account: losing them re-requests every certificate.
   caddy_data:

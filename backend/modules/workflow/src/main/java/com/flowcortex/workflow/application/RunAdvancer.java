@@ -12,14 +12,13 @@ import com.flowcortex.media.api.provider.ProviderScriptData;
 import com.flowcortex.media.api.provider.ProviderSpeechData;
 import com.flowcortex.media.api.provider.ProviderStoryboardData;
 import com.flowcortex.media.api.provider.ProviderVideoData;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
-import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
-import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
@@ -83,7 +82,6 @@ class RunAdvancer {
     private final StoredWithOutputsResolver storedWithOutputsResolver = new StoredWithOutputsResolver();
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
-    private final WorkflowStepRepository workflowStepRepository;
     private final RunStepTransactions transactions;
     private final InputResolver inputResolver;
     private final StepExecutorRegistry registry;
@@ -101,37 +99,34 @@ class RunAdvancer {
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
             ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator) {
-        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
                 Clock.systemUTC(), checkpointTransactions, mediaJobs, validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
-            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, Validator validator) {
-        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            Validator validator) {
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
                 validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
-            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs,
-            Validator validator) {
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            MediaJobs mediaJobs, Validator validator) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
-        this.workflowStepRepository = workflowStepRepository;
         this.transactions = transactions;
         this.inputResolver = inputResolver;
         this.registry = registry;
@@ -246,36 +241,34 @@ class RunAdvancer {
 
     private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
             Map<Integer, String> assetOutputsByOrder) {
-        int order = step.getStepOrder();
-        WorkflowStep definition = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(run.getWorkflowId())
-                .stream()
-                .collect(Collectors.toMap(s -> (int) s.getStepOrder(), s -> s))
-                .get(order);
         Optional<StepExecutor> executor = registry.find(step.getType());
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), remote, step.getAttempt(), null)) {
-            dispatch(run, step, definition, executor, outputsByOrder, assetOutputsByOrder);
+            dispatch(run, step, executor, outputsByOrder, assetOutputsByOrder);
         }
     }
 
-    private void dispatch(WorkflowRun run, RunStep step, WorkflowStep definition, Optional<StepExecutor> executor,
+    /**
+     * Reads config and input reference only from the run step's own snapshot, never from the
+     * current workflow definition: a run in flight must not change shape when the workflow does.
+     */
+    private void dispatch(WorkflowRun run, RunStep step, Optional<StepExecutor> executor,
             Map<Integer, String> outputsByOrder, Map<Integer, String> assetOutputsByOrder) {
         int order = step.getStepOrder();
         String resolvedInput = null;
         Runnable inClaim;
         try {
-            String stepConfig = definition == null ? null : definition.getConfig();
+            String stepConfig = step.getConfig();
             StepExecutor.InputPolicy inputPolicy = executor.map(value -> value.inputPolicy(stepConfig))
                     .orElse(StepExecutor.InputPolicy.RESOLVED);
             resolvedInput = switch (inputPolicy) {
                 case STORED -> step.getInput();
                 case STORED_WITH_OUTPUTS -> storedWithOutputsResolver.resolve(step.getInput(),
                         stepConfig, assetOutputsByOrder, run.getId(), order);
-                case RESOLVED -> inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
-                        run.getInput(), outputsByOrder);
+                case RESOLVED -> inputResolver.resolve(order, step.getInputRef(), run.getInput(), outputsByOrder);
             };
             StepContext context = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
-                    resolvedInput, step.getInput(), definition == null ? null : definition.getConfig());
+                    resolvedInput, stepConfig, step.getInput());
             if (executor.isEmpty()) {
                 inClaim = () -> {
                     throw new StepFailedException(null, "Unsupported step type: " + step.getType());
@@ -305,17 +298,16 @@ class RunAdvancer {
                     LOG.info("Job dispatched: runId={} jobId={} stepOrder={} capability={} attempt={}", run.getId(),
                             step.getId(), order, step.getType(), step.getAttempt());
                 } else {
-                    submitInline(run.getId(), step, claimed, resolvedInput, definition);
+                    submitInline(run.getId(), step, claimed, resolvedInput);
                 }
             }
             default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
         }
     }
 
-    private void submitInline(UUID runId, RunStep step, StepExecutor executor, String resolvedInput,
-            WorkflowStep definition) {
+    private void submitInline(UUID runId, RunStep step, StepExecutor executor, String resolvedInput) {
         StepContext context = new StepContext(runId, step.getId(), step.getStepOrder(), step.getType(),
-                step.getAttempt(), resolvedInput, step.getInput(), definition == null ? null : definition.getConfig());
+                step.getAttempt(), resolvedInput, step.getConfig(), step.getInput());
         try {
             taskExecutor.execute(() -> inRun(runId, () -> {
                 try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),
@@ -395,14 +387,14 @@ class RunAdvancer {
                 .map(pickedUpAt -> String.valueOf(Duration.between(pickedUpAt, result.finishedAt()).toMillis()))
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {
-            String validationError = validateProviderData(capability, step.map(RunStep::getInput).orElse(null),
+            Rejection rejection = rejectProviderData(capability, step.map(RunStep::getInput).orElse(null),
                     result.data());
-            if (validationError != null) {
-                if (transactions.fail(result.runId(), result.jobId(), attempt, "contract_violation",
-                        validationError, now)) {
+            if (rejection != null) {
+                if (transactions.fail(result.runId(), result.jobId(), attempt, rejection.code(),
+                        rejection.message(), now)) {
                     LOG.warn("Provider result rejected at trust boundary: runId={} jobId={} capability={} "
-                            + "attempt={} reason={}", result.runId(), result.jobId(), capability, attempt,
-                            validationError);
+                            + "attempt={} code={} reason={}", result.runId(), result.jobId(), capability, attempt,
+                            rejection.code(), rejection.message());
                 } else {
                     discardLate(result.jobId(), attempt, result.status().value());
                 }
@@ -429,6 +421,32 @@ class RunAdvancer {
         // A redelivered result may be the only event left for a run whose first delivery completed
         // the step but died before advancing; advancing is idempotent.
         advance(result.runId());
+    }
+
+    /** Why a completed provider result fails its step: the step error code and its message. */
+    private record Rejection(String code, String message) {
+    }
+
+    /** Returns the rejection of a completed provider step's {@code data} payload, or {@code null}
+     * when the step may complete. A payload that does not match its JSON Schema is a
+     * {@code contract_violation}; speech longer than the Product Video would be cut off by the
+     * renderer, so it is {@code speech_too_long}. */
+    private Rejection rejectProviderData(String capability, String jobInput, Map<String, Object> data) {
+        String validationError = validateProviderData(capability, jobInput, data);
+        if (validationError != null) {
+            return new Rejection("contract_violation", validationError);
+        }
+        if ("generate_speech".equals(capability)) {
+            int durationMs = objectMapper.convertValue(data, ProviderSpeechData.class).durationMs();
+            if (durationMs > ProductVideoWorkflow.VIDEO_DURATION_SECONDS * 1000) {
+                // Rounded up so a speech just over the limit never reads as exactly the video length.
+                return new Rejection("speech_too_long", String.format(Locale.ROOT,
+                        "The approved script reads for %.1f s, longer than the %d s video. "
+                                + "Start a new run with a shorter script.",
+                        Math.ceil(durationMs / 100.0) / 10, ProductVideoWorkflow.VIDEO_DURATION_SECONDS));
+            }
+        }
+        return null;
     }
 
     /** Returns a validation-error message when a provider step's {@code data} payload does not match

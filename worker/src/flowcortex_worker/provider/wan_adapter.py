@@ -274,4 +274,3 @@ def _image_mime(body: bytes) -> str:
     if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
         return "image/webp"
     raise PermanentError("input_rejected", "product image format is not supported")
-

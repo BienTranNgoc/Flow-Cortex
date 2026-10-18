@@ -70,20 +70,20 @@ export function StepDetail({
       {(duration || started || finished) && (
         <div className="step-timing-bar">
           {duration && (
-            <span className="step-timing-pill" title="Thời gian thực thi">
-              <span className="timing-label">Thời gian:</span>
+            <span className="step-timing-pill" title="Time taken">
+              <span className="timing-label">Duration:</span>
               <span className="timing-val">{duration}</span>
             </span>
           )}
           {started && (
-            <span className="step-timing-pill" title="Thời gian bắt đầu">
-              <span className="timing-label">Bắt đầu:</span>
+            <span className="step-timing-pill" title="Start time">
+              <span className="timing-label">Started:</span>
               <span className="timing-val">{started}</span>
             </span>
           )}
           {finished && (
-            <span className="step-timing-pill" title="Thời gian kết thúc">
-              <span className="timing-label">Kết thúc:</span>
+            <span className="step-timing-pill" title="Finish time">
+              <span className="timing-label">Finished:</span>
               <span className="timing-val">{finished}</span>
             </span>
           )}

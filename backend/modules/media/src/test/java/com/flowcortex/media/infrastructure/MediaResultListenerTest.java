@@ -48,6 +48,7 @@ class MediaResultListenerTest {
                 "render_video", Duration.ofMinutes(10)),
             Duration.ofMinutes(20),
             Duration.ofMinutes(2), Duration.ofMinutes(5),
+            Duration.ofMinutes(10), Duration.ofMinutes(15),
             Duration.ofMinutes(15),
             new MediaProperties.Upload(524_288_000L, List.of("mp4"), List.of("jpg"), Duration.ofMinutes(15)),
             new MediaProperties.S3("http://minio:9000", "http://localhost:9000", "us-east-1", true,

@@ -25,10 +25,11 @@ public interface MediaJobs {
     MediaLimits limitsFor(String capability);
 
     /**
-     * The same two bounds for the provider runtime (script and speech), which is not a media
-     * capability and so has no entry in {@link #limitsFor(String)}.
+     * The same two bounds for a provider-runtime {@code capability}, which is not a media
+     * capability and so has no entry in {@link #limitsFor(String)}: {@code generate_video} runs on
+     * its own queue with its own bounds, every other provider capability shares one pair.
      */
-    MediaLimits providerLimits();
+    MediaLimits providerLimits(String capability);
 
     /**
      * Signs an upload of {@code size} bytes to a key derived from {@code ownerId} and a new upload id.

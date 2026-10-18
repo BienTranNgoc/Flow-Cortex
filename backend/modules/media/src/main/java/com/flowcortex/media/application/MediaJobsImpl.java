@@ -144,7 +144,11 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
-    public MediaLimits providerLimits() {
+    public MediaLimits providerLimits(String capability) {
+        if ("generate_video".equals(capability)) {
+            return new MediaLimits(properties.providerVideoQueueTimeout(), properties.providerVideoMaxRuntime(),
+                    properties.upload().maxBytes());
+        }
         return new MediaLimits(properties.providerQueueTimeout(), properties.providerMaxRuntime(),
                 properties.upload().maxBytes());
     }

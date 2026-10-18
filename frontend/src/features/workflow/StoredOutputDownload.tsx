@@ -1,5 +1,5 @@
 import type { RunStepOutputResponse } from '@flow-cortex/api-client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { openInCurrentTab } from './browser';
 import { useOutputUrlMutation } from './useWorkflows';
 
@@ -24,40 +24,63 @@ export function StoredOutputDownload({
   const outputUrl = useOutputUrlMutation(runId, stepOrder, output.name);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
+  const [videoRetried, setVideoRetried] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   const isVideo = output.mime?.startsWith('video/') || output.name.endsWith('.mp4');
 
+  // Links are presigned for a limited time, so every download and every opening of the player
+  // asks for a new one rather than reusing a link that may have expired since.
   const download = () => {
-    if (videoUrl) {
-      openInCurrentTab(videoUrl);
-      return;
-    }
     if (outputUrl.isPending) {
       return;
     }
     outputUrl.mutate(undefined, {
+      onSuccess: ({ url }) => openInCurrentTab(url),
+    });
+  };
+
+  // Hiding the player starts a new opening, so a link that arrives for an earlier one is dropped
+  // instead of reopening the player the member just closed.
+  const opening = useRef(0);
+
+  const loadVideo = () => {
+    const current = opening.current;
+    outputUrl.mutate(undefined, {
       onSuccess: ({ url }) => {
+        if (opening.current !== current) {
+          return;
+        }
         setVideoUrl(url);
-        openInCurrentTab(url);
+        setShowVideo(true);
       },
     });
   };
 
   const toggleVideo = () => {
     if (showVideo) {
+      opening.current += 1;
       setShowVideo(false);
+      setVideoUrl(null);
       return;
     }
-    if (videoUrl) {
-      setShowVideo(true);
+    if (outputUrl.isPending) {
       return;
     }
-    outputUrl.mutate(undefined, {
-      onSuccess: ({ url }) => {
-        setVideoUrl(url);
-        setShowVideo(true);
-      },
-    });
+    setVideoRetried(false);
+    setVideoFailed(false);
+    loadVideo();
+  };
+
+  // A link that expired while the player was open fails to load; one fresh link recovers it,
+  // and a second failure is not a stale link, so it is reported instead of retried.
+  const retryVideo = () => {
+    if (videoRetried || outputUrl.isPending) {
+      setVideoFailed(true);
+      return;
+    }
+    setVideoRetried(true);
+    loadVideo();
   };
 
   if (isVideo) {
@@ -86,7 +109,7 @@ export function StoredOutputDownload({
               <line x1="17" y1="17" x2="22" y2="17" />
               <line x1="17" y1="7" x2="22" y2="7" />
             </svg>
-            <span>Video quảng cáo ({output.name})</span>
+            <span>Ad video ({output.name})</span>
           </div>
         </div>
 
@@ -98,10 +121,16 @@ export function StoredOutputDownload({
               autoPlay
               playsInline
               src={videoUrl}
+              onError={retryVideo}
             >
-              Trình duyệt của bạn không hỗ trợ thẻ video.
+              Your browser cannot play this video.
             </video>
           </div>
+        )}
+        {showVideo && videoFailed && (
+          <p role="alert" className="run-step-download-error">
+            Could not play the video. Download it instead.
+          </p>
         )}
 
         <div className="video-artifact-actions run-step-downloads">
@@ -125,7 +154,13 @@ export function StoredOutputDownload({
                 <polygon points="5 3 19 12 5 21 5 3" />
               )}
             </svg>
-            <span>{showVideo ? 'Ẩn video' : outputUrl.isPending ? 'Đang tải video…' : 'Xem video'}</span>
+            <span>
+              {showVideo
+                ? 'Hide video'
+                : outputUrl.isPending
+                  ? 'Loading the video…'
+                  : 'Watch video'}
+            </span>
           </button>
 
           <button
