@@ -32,10 +32,9 @@ from .contracts.provider_job import (
 )
 from .contracts.provider_speech_result import ProviderSpeechData
 from .seedance_adapter import PROVIDER_SEEDANCE
-from .wan_adapter import PROVIDER_WAN
 
 # Providers that fetch the reference image themselves from a URL instead of taking its bytes.
-_URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE, PROVIDER_WAN})
+_URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE})
 
 
 class UnsupportedCapability(ValueError):
@@ -105,7 +104,9 @@ def _generate_script(
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateScriptJob):
         raise UnsupportedCapability("generate_script received the wrong job shape")
-    script = adapter.generate_script(job.params.payload)
+    script = adapter.generate_script(
+        job.params.payload, _fetch_reference_image(job, context)
+    )
     return ProviderOutcome(
         data={"profile": "product_ad_v1", "language": "vi", "script": script}
     )
@@ -159,8 +160,10 @@ def _generate_storyboard(
     if not isinstance(job, GenerateStoryboardJob):
         raise UnsupportedCapability("generate_storyboard received the wrong job shape")
     payload = job.params.payload
+    reference_image = _fetch_reference_image(job, context)
     storyboard = adapter.generate_storyboard(
-        StoryboardRequest(payload.script, payload.sourceRevisionId)
+        StoryboardRequest(payload.script, payload.sourceRevisionId),
+        reference_image=reference_image,
     )
     data = {
         "profile": "product_ad_storyboard_v1",
@@ -229,15 +232,29 @@ def _resolve_reference_image(
     """Returns (bytes, url) of the job's reference image, or (None, None) without one.
 
     The bytes are always read: they are checked to be an image and key the job's idempotency.
-    The URL is signed only when the provider reads the image ``by_url`` (Seedance, Wan); Veo
-    takes the bytes inline, so no URL to our store leaves the worker for it."""
+    The URL is signed only when the provider reads the image ``by_url`` (Seedance). Veo and Wan
+    take the bytes inline, so no URL to our store leaves the worker for them."""
+    body = _fetch_reference_image(job, context)
+    if body is None:
+        return None, None
+    if not by_url:
+        return body, None
+    if not job.inputs:
+        return body, None
+    reference = job.inputs[0]
+    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+
+
+def _fetch_reference_image(
+    job: GenerateScriptJob | GenerateStoryboardJob | GenerateVideoJob, context: ExecutionContext
+) -> bytes | None:
     inputs = job.inputs or ()
     if not inputs:
-        return None, None
+        return None
     if len(inputs) > 1:
         raise PermanentError(
             "contract_violation",
-            "generate_video/vertical_ad_clip_v1 accepts at most one reference image",
+            f"{job.capability} accepts at most one reference image",
         )
     reference = inputs[0]
     body = context.storage.fetch_bytes(reference.bucket, reference.objectKey, context.abort)
@@ -246,10 +263,7 @@ def _resolve_reference_image(
             "input_rejected",
             f"reference image '{reference.key}' is not a recognised image format",
         )
-    if not by_url:
-        return body, None
-    # A short-lived presigned GET for this one object, signed for the public store endpoint.
-    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+    return body
 
 
 def _looks_like_image(body: bytes) -> bool:

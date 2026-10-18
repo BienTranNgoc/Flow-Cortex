@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -51,12 +52,16 @@ class WanConfig:
 class WanAdapter:
     config: WanConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         raise PermanentError(
             "provider_capability_unavailable", "Wan script generation is not implemented"
         )
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
         raise PermanentError(
             "provider_capability_unavailable", "Wan storyboard generation is not implemented"
         )
@@ -103,11 +108,15 @@ class WanAdapter:
             "num_frames": self.config.num_frames,
             "resolution": self.config.resolution,
             "aspect_ratio": "9:16",
-            "sample_shift": 12,
+            "sample_shift": 8,
             "frames_per_second": self.config.frames_per_second,
             "disable_safety_checker": False,
         }
-        if request.reference_image_url:
+        if request.reference_image_bytes:
+            mime = _image_mime(request.reference_image_bytes)
+            encoded = base64.b64encode(request.reference_image_bytes).decode("ascii")
+            input_body["image"] = f"data:{mime};base64,{encoded}"
+        elif request.reference_image_url:
             input_body["image"] = request.reference_image_url
         body = json.dumps({"input": input_body}).encode()
         response = self._json_request(
@@ -138,6 +147,8 @@ class WanAdapter:
                     )
                 return VideoArtifact(self._download_video(video_url), task_id)
             if status in _TERMINAL_FAILURES:
+                # Replicate's `error` is free text with no machine code; it can echo paths,
+                # prompts or tokens, so only the fixed status reaches logs and members.
                 log.warning("Wan prediction failed", extra={"taskStatus": status})
                 raise PermanentError(
                     "provider_request_failed", f"Wan prediction ended with status {status}"
@@ -218,8 +229,13 @@ class WanAdapter:
 
     def _download_once(self, url: str) -> bytes:
         try:
+            req = urllib.request.Request(
+                url,
+                method="GET",
+                headers={"User-Agent": "FlowCortexWorker/1.0 (compatible; Mozilla/5.0)"},
+            )
             with urllib.request.urlopen(
-                urllib.request.Request(url, method="GET"),
+                req,
                 timeout=self.config.request_timeout_seconds,
             ) as response:
                 return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))
@@ -241,3 +257,15 @@ def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
     raise PermanentError(
         "provider_request_failed", f"Wan rejected the request with HTTP {exc.code}"
     ) from exc
+
+
+def _image_mime(body: bytes) -> str:
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if body[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    raise PermanentError("input_rejected", "product image format is not supported")

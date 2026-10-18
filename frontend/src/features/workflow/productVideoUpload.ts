@@ -17,7 +17,7 @@ export type MultiUploadPhase =
   | { kind: 'done' };
 
 const MIN_IMAGES = 1;
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 1;
 
 export type ImageProblem = FileProblem;
 
@@ -33,7 +33,6 @@ export const EMPTY_IMAGE_LIST: ImageProblem = { messageKey: 'workflow.validation
 
 export const TOO_MANY_IMAGES: ImageProblem = {
   messageKey: 'workflow.validation.tooManyImages',
-  values: { max: MAX_IMAGES },
 };
 
 /** Walks `files`; returns the first ImageProblem found or null. */

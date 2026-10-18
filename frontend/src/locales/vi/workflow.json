@@ -135,15 +135,11 @@
     "uploading": "Đang tải lên {{index}} / {{total}}…",
     "field": {
       "productName": "Tên sản phẩm",
-      "description": "Mô tả",
-      "cta": "Lời kêu gọi hành động",
-      "price": "Giá (không bắt buộc)",
-      "promotion": "Khuyến mãi (không bắt buộc)"
+      "description": "Mô tả"
     },
     "required": "{{field}} là bắt buộc.",
-    "images": "Ảnh sản phẩm (1–10 ảnh, JPG/PNG/WebP, tối đa 10 MB mỗi ảnh) *",
-    "imageSelected": "Đã chọn {{n}} ảnh",
-    "imagesSelected": "Đã chọn {{n}} ảnh",
+    "image": "Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *",
+    "imageSelected": "Đã chọn 1 ảnh: {{name}}",
     "uploadingImage": "Đang tải lên ảnh {{index}}",
     "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại."
   },
@@ -153,7 +149,7 @@
     "fileType": "Chưa kiểm tra được loại tệp này. Hãy dùng .mp4, .mov, .webm, .mkv, .m4a, .mp3 hoặc .wav.",
     "imageType": "Hãy dùng .jpg, .jpeg, .png hoặc .webp.",
     "noImage": "Hãy thêm ít nhất một ảnh sản phẩm",
-    "tooManyImages": "Tối đa {{max}} ảnh cho mỗi lượt chạy.",
+    "tooManyImages": "Tối đa 1 ảnh cho mỗi lượt chạy.",
     "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ"
   },
   "stop": {

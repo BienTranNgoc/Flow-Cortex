@@ -102,7 +102,7 @@ public class ProductVideoService {
             mediaJobs.bindRunInputs(run.getId(), copies);
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
-                String storedInput = registry.usesStoredInput(definition.getType())
+                String storedInput = registry.snapshotsRunInputs(definition.getType())
                         || namesReferenceImage(definition.getConfig()) ? assetJson : null;
                 steps.add(new RunStep(UUID.randomUUID(), run.getId(), definition.getStepOrder(),
                         definition.getType(), storedInput, definition.getConfig(), definition.getInputRef()));
@@ -117,7 +117,9 @@ public class ProductVideoService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("productName", draft.productName());
         payload.put("description", draft.description());
-        payload.put("cta", draft.cta());
+        if (draft.cta() != null) {
+            payload.put("cta", draft.cta());
+        }
         if (draft.price() != null) {
             payload.put("price", draft.price());
         }

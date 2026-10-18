@@ -33,7 +33,7 @@ from .adapter import Abort, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
 PROVIDER_EDGE = "edge"
-DEFAULT_EDGE_VOICE = "vi-VN-HoaiMyNeural"
+DEFAULT_EDGE_VOICE = "vi-VN-NamMinhNeural"
 DEFAULT_EDGE_RATE = "+0%"
 DEFAULT_EDGE_TIMEOUT_SECONDS = 60.0
 
@@ -49,7 +49,9 @@ class EdgeConfig:
 class EdgeSpeechAdapter:
     config: EdgeConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         raise PermanentError(
             "provider_capability_unavailable",
             "Edge TTS does not generate scripts",
@@ -82,7 +84,7 @@ class EdgeSpeechAdapter:
         ) as exc:
             raise TransientError(f"Edge TTS connection failed: {type(exc).__name__}") from exc
         except NoAudioReceived as exc:
-            raise PermanentError("provider_response_invalid", "Edge TTS returned no audio") from exc
+            raise TransientError("Edge TTS returned no audio") from exc
         except UnexpectedResponse as exc:
             raise PermanentError(
                 "provider_response_invalid", "Edge TTS returned an unexpected response"

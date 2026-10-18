@@ -67,6 +67,8 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         UUID runId = started.getBody().id();
 
         JsonNode scriptJob = receiveJob("provider.jobs", runId, "generate_script");
+        assertThat(scriptJob.path("inputs").get(0).path("key").asString()).isEqualTo("image_1");
+        String productImageKey = scriptJob.path("inputs").get(0).path("objectKey").asString();
         publishResult("provider", runId, scriptJob, null,
                 "{\"profile\":\"product_ad_v1\",\"language\":\"vi\",\"script\":\"Đặt mua ngay\"}");
         pollUntil(owner.id(), runId, run -> "waiting_approval".equals(run.status()), WAIT);

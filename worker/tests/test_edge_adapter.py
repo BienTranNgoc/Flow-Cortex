@@ -180,11 +180,6 @@ def test_transport_and_unknown_failures_are_transient_and_omit_the_script(
     ("error", "code", "message"),
     [
         (
-            edge_errors.NoAudioReceived("x"),
-            "provider_response_invalid",
-            "Edge TTS returned no audio",
-        ),
-        (
             edge_errors.UnexpectedResponse("x"),
             "provider_response_invalid",
             "Edge TTS returned an unexpected response",
@@ -196,7 +191,7 @@ def test_transport_and_unknown_failures_are_transient_and_omit_the_script(
         ),
         (ValueError("x"), "provider_request_failed", "Edge TTS rejected the request"),
     ],
-    ids=["no-audio", "unexpected-response", "unknown-response", "rejected-request"],
+    ids=["unexpected-response", "unknown-response", "rejected-request"],
 )
 def test_response_failures_are_permanent_with_their_own_message(
     monkeypatch: pytest.MonkeyPatch, error: Exception, code: str, message: str
@@ -213,7 +208,7 @@ def test_response_failures_are_permanent_with_their_own_message(
     assert raised.value.message == message
 
 
-def test_stream_without_audio_chunks_is_permanent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stream_without_audio_chunks_is_transient(monkeypatch: pytest.MonkeyPatch) -> None:
     class SilentCommunicate:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
@@ -223,10 +218,10 @@ def test_stream_without_audio_chunks_is_permanent(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("edge_tts.Communicate", SilentCommunicate)
 
-    with pytest.raises(PermanentError) as raised:
+    with pytest.raises(TransientError) as raised:
         _speak()
 
-    assert raised.value.message == "Edge TTS returned no audio"
+    assert str(raised.value) == "Edge TTS returned no audio"
 
 
 def test_kill_during_download_stops_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:

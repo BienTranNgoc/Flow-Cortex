@@ -34,6 +34,11 @@ interface StepExecutor {
         return inputPolicy();
     }
 
+    /** Whether uploaded assets must be snapshotted on this step in addition to its resolved input. */
+    default boolean bindsRunInputs() {
+        return inputPolicy() != InputPolicy.RESOLVED;
+    }
+
     /** How long one run of this step may take once picked up; bounds its run deadline. */
     Duration maxRuntime();
 

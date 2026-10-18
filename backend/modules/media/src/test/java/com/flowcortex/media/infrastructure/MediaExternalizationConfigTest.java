@@ -2,7 +2,7 @@ package com.flowcortex.media.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.application.ProviderJobRequested;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;

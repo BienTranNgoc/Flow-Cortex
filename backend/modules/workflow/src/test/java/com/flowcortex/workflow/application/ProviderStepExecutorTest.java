@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
-import com.flowcortex.media.api.ProviderInput;
-import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.provider.ProviderInput;
+import com.flowcortex.media.api.provider.ProviderJob;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,6 +39,41 @@ class ProviderStepExecutorTest {
         assertThat(sent.getValue().capability()).isEqualTo("generate_script");
         assertThat(sent.getValue().params()).containsEntry("profile", "product_ad_v1");
         assertThat(castPayload(sent.getValue())).containsOnlyKeys("productName", "description", "cta");
+    }
+
+    @Test
+    void scriptJobCarriesTheFirstSnapshottedProductImage() {
+        ProviderStepExecutor executor = executor("generate_script", "product_ad_v1");
+        StepContext context = context("""
+                {"productName":"Bình giữ nhiệt","description":"Giữ đồ uống"}
+                """, """
+                [{"key":"image_1","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_1"},
+                 {"key":"image_2","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_2"}]
+                """, "{\"profile\":\"product_ad_v1\"}");
+
+        executor.execute(context);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).containsExactly(
+                new ProviderInput("image_1", "flowcortex-media", "runs/r/inputs/image_1"));
+    }
+
+    @Test
+    void storyboardJobCarriesTheFirstSnapshottedProductImage() {
+        ProviderStepExecutor executor = executor("generate_storyboard", "product_ad_storyboard_v1");
+        StepContext context = context("""
+                {"script":"Kịch bản đã duyệt","sourceRevisionId":"00000000-0000-0000-0000-000000000001"}
+                """, """
+                [{"key":"image_1","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_1"}]
+                """, "{\"profile\":\"product_ad_storyboard_v1\"}");
+
+        executor.execute(context);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).containsExactly(
+                new ProviderInput("image_1", "flowcortex-media", "runs/r/inputs/image_1"));
     }
 
     @Test
@@ -74,6 +109,25 @@ class ProviderStepExecutorTest {
                 .contains("Visual direction: Opening product hero shot");
         assertThat(castPayload(sent.getValue()))
                 .containsEntry("sourceRevisionId", revisionId.toString());
+    }
+
+    @Test
+    void videoJobBindsStoredInputForVideo2() {
+        ProviderStepExecutor executor = executor("generate_video", "vertical_ad_clip_v1");
+        UUID revisionId = UUID.randomUUID();
+        executor.execute(context("""
+                {"scene2Prompt":"Lifestyle on road","sourceRevisionId":"%s"}
+                """.formatted(revisionId), """
+                [{"key":"image_1","bucket":"flowcortex-uploads","objectKey":"image.jpg"}]
+                """, """
+                {"profile":"vertical_ad_clip_v1",
+                 "payloadFields":{"prompt":"scene2Prompt","sourceRevisionId":"sourceRevisionId"}}
+                """));
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).hasSize(1);
+        assertThat(sent.getValue().inputs().getFirst().key()).isEqualTo("image_1");
     }
 
     @SuppressWarnings("unchecked")
@@ -161,7 +215,11 @@ class ProviderStepExecutorTest {
     }
 
     private static StepContext context(String input, String config) {
+        return context(input, null, config);
+    }
+
+    private static StepContext context(String input, String storedInput, String config) {
         UUID runId = UUID.randomUUID();
-        return new StepContext(runId, UUID.randomUUID(), 1, "provider", (short) 1, input, config, null);
+        return new StepContext(runId, UUID.randomUUID(), 1, "provider", (short) 1, input, config, storedInput);
     }
 }

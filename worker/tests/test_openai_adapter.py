@@ -108,6 +108,22 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
     assert "cta: Đặt mua ngay" in messages[1]["content"]
 
 
+def test_generate_script_sends_product_image_as_multimodal_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _patch_urlopen(
+        monkeypatch,
+        _http_response(_ok_body(json.dumps({"script": "Đúng sản phẩm. Đặt mua ngay"}))),
+    )
+
+    _adapter().generate_script(SAMPLE_PAYLOAD, b"\x89PNG\r\n\x1a\nproduct")
+
+    content = captured["body"]["messages"][1]["content"]
+    assert content[0]["type"] == "text"
+    assert "visual ground truth" in content[0]["text"]
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
 def test_generate_storyboard_returns_two_distinct_visual_prompts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -135,6 +151,36 @@ def test_generate_storyboard_returns_two_distinct_visual_prompts(
     assert body["response_format"]["json_schema"]["name"] == "product_ad_storyboard_v1"
     assert "Approved Vietnamese script" in body["messages"][1]["content"]
 
+
+def test_generate_storyboard_sends_product_image_as_multimodal_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _patch_urlopen(
+        monkeypatch,
+        _http_response(
+            _ok_body(
+                json.dumps(
+                    {
+                        "scene1Prompt": "Vertical hero shot with a fast camera push-in.",
+                        "scene2Prompt": "Product-in-use shot ending on a clean beauty frame.",
+                    }
+                )
+            )
+        ),
+    )
+
+    png = b"\x89PNG\r\n\x1a\nproduct"
+    storyboard = _adapter().generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=1)),
+        reference_image=png,
+    )
+
+    assert storyboard.scene_1_prompt.startswith("Vertical hero")
+    content = captured["body"]["messages"][1]["content"]
+    assert content[0]["type"] == "text"
+    assert "visual ground truth" in content[0]["text"].lower()
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
 @pytest.mark.parametrize(
     "provider_content",

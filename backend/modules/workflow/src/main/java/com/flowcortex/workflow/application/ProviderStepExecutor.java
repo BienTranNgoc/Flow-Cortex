@@ -7,8 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
-import com.flowcortex.media.api.ProviderInput;
-import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.provider.ProviderInput;
+import com.flowcortex.media.api.provider.ProviderJob;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Clock;
 import java.time.Duration;
@@ -46,6 +46,13 @@ class ProviderStepExecutor implements StepExecutor {
     }
 
     @Override
+    public boolean bindsRunInputs() {
+        return "generate_script".equals(capability)
+                || "generate_storyboard".equals(capability)
+                || "generate_video".equals(capability);
+    }
+
+    @Override
     public Duration maxRuntime() {
         return mediaJobs.providerLimits(capability).maxRuntime();
     }
@@ -62,7 +69,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", profile(context.config()));
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params, videoInputs(context),
+                context.stepOrder(), capability, params, providerInputs(context),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
         try {
@@ -75,34 +82,48 @@ class ProviderStepExecutor implements StepExecutor {
     }
 
     /**
-     * A video step sends at most one product image (the schema enforces {@code maxItems:1}): the
-     * run input named by its config's {@code referenceImage}, taken from the inputs the step stored
-     * when the run started. Only an object under this run's own inputs is ever sent.
+     * Resolves product image input. If the step config defines referenceImage, only that named
+     * image from the run's inputs is sent. Otherwise, for capabilities binding run inputs (script,
+     * storyboard), the first snapshotted product image is sent as visual ground truth.
      */
-    private List<ProviderInput> videoInputs(StepContext context) {
-        if (!"generate_video".equals(capability) || context.config() == null || context.config().isBlank()) {
+    private List<ProviderInput> providerInputs(StepContext context) {
+        if (!bindsRunInputs()) {
             return List.of();
         }
-        JsonNode reference;
-        try {
-            reference = objectMapper.readTree(context.config()).get("referenceImage");
-        } catch (JsonProcessingException e) {
-            throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
+        if (context.config() != null && !context.config().isBlank()) {
+            JsonNode reference;
+            try {
+                reference = objectMapper.readTree(context.config()).get("referenceImage");
+            } catch (JsonProcessingException e) {
+                throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
+            }
+            if (reference != null && !reference.isNull()) {
+                if (!reference.isTextual() || reference.textValue().isBlank()) {
+                    throw new StepFailedException("contract_violation", "referenceImage must name a run input");
+                }
+                String key = reference.textValue();
+                String runInputs = "runs/" + context.runId() + "/inputs/";
+                return storedInputs(context.storedInput(), key).stream()
+                        .filter(input -> key.equals(input.key()) && input.bucket() != null && !input.bucket().isBlank()
+                                && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
+                        .findFirst()
+                        .map(input -> List.of(new ProviderInput(input.key(), input.bucket(), input.objectKey())))
+                        .orElseThrow(() -> missingImage(key, null));
+            }
         }
-        if (reference == null || reference.isNull()) {
-            return List.of();
+        if (context.storedInput() != null && !context.storedInput().isBlank()) {
+            try {
+                List<MediaJobInput> inputs = objectMapper.readValue(context.storedInput(), INPUTS);
+                if (!inputs.isEmpty()) {
+                    MediaJobInput first = inputs.getFirst();
+                    return List.of(new ProviderInput(first.key(), first.bucket(), first.objectKey()));
+                }
+            } catch (JsonProcessingException e) {
+                throw new StepFailedException("contract_violation",
+                        "Provider image input is not a valid ordered list", e);
+            }
         }
-        if (!reference.isTextual() || reference.textValue().isBlank()) {
-            throw new StepFailedException("contract_violation", "referenceImage must name a run input");
-        }
-        String key = reference.textValue();
-        String runInputs = "runs/" + context.runId() + "/inputs/";
-        return storedInputs(context.storedInput(), key).stream()
-                .filter(input -> key.equals(input.key()) && input.bucket() != null && !input.bucket().isBlank()
-                        && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
-                .findFirst()
-                .map(input -> List.of(new ProviderInput(input.key(), input.bucket(), input.objectKey())))
-                .orElseThrow(() -> missingImage(key, null));
+        return List.of();
     }
 
     private List<MediaJobInput> storedInputs(String storedInput, String key) {

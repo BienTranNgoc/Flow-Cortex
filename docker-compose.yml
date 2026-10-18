@@ -56,6 +56,8 @@ x-provider-worker-env: &provider-worker-env
 services:
   postgres:
     image: postgres:17
+    ports:
+      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_DB: flowcortex
       POSTGRES_USER: flowcortex
@@ -63,7 +65,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flowcortex -d flowcortex"]
+      test: ['CMD-SHELL', 'pg_isready -U flowcortex -d flowcortex']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -83,11 +85,11 @@ services:
     networks: [default, internal]
     # AMQP + management UI on loopback only; the metrics port 15692 is never published.
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - '127.0.0.1:5672:5672'
+      - '127.0.0.1:15672:15672'
     healthcheck:
       # Healthy only once the AMQP listener accepts connections, not merely when the node runs.
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -99,7 +101,7 @@ services:
   # command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
-    entrypoint: ["/bin/sh", "/init/init.sh"]
+    entrypoint: ['/bin/sh', '/init/init.sh']
     environment:
       RABBITMQ_NODENAME: rabbit@rabbitmq
       PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
@@ -110,11 +112,11 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
 
   minio:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
-    command: ["server", "/data", "--console-address", ":9001"]
+    command: ['server', '/data', '--console-address', ':9001']
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
@@ -125,10 +127,10 @@ services:
       - minio_data:/data
     networks: [default, internal]
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -139,7 +141,7 @@ services:
   # Root credentials exist only here and in `minio`. Idempotent; never restarted.
   minio-init:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
-    entrypoint: ["/bin/sh", "/init/init.sh"]
+    entrypoint: ['/bin/sh', '/init/init.sh']
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
@@ -156,7 +158,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    restart: "no"
+    restart: 'no'
 
   # Mail sink for the email-confirmation demo: the backend sends SMTP to 1025 and every
   # message shows up in the web UI at http://localhost:8025. Nothing leaves the machine.
@@ -174,9 +176,9 @@ services:
     # The API on loopback only. Health and metrics answer on 8081 inside the
     # service network and are never published.
     ports:
-      - "127.0.0.1:8080:8080"
+      - '127.0.0.1:8080:8080'
     expose:
-      - "8081"
+      - '8081'
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
@@ -197,7 +199,7 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
-      S3_PATH_STYLE: "true"
+      S3_PATH_STYLE: 'true'
       S3_UPLOAD_BUCKET: flowcortex-uploads
       S3_BUCKET: flowcortex-media
       S3_ACCESS_KEY: ${BACKEND_S3_ACCESS_KEY:?Set BACKEND_S3_ACCESS_KEY (see .env.example)}
@@ -289,7 +291,7 @@ services:
     # The probe Docker uses to gate the frontend below. On 8080, not 8081: the
     # management port can answer while the API port is broken.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/readyz"]
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:8080/readyz']
       interval: 15s
       timeout: 3s
       retries: 5
@@ -312,7 +314,7 @@ services:
       AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
-      S3_PATH_STYLE: "true"
+      S3_PATH_STYLE: 'true'
       S3_UPLOAD_BUCKET: flowcortex-uploads
       S3_BUCKET: flowcortex-media
       S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
@@ -333,7 +335,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
+      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
       interval: 15s
       timeout: 5s
       retries: 3
@@ -355,13 +357,33 @@ services:
       PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
       SCRIPT_PROVIDER: ${SCRIPT_PROVIDER:-}
       SPEECH_PROVIDER: ${SPEECH_PROVIDER:-}
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-fixture}
       SCRIPT_PROVIDER_API_KEY: ${SCRIPT_PROVIDER_API_KEY:-}
       SPEECH_PROVIDER_API_KEY: ${SPEECH_PROVIDER_API_KEY:-}
+      VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
       SCRIPT_PROVIDER_BASE_URL: ${SCRIPT_PROVIDER_BASE_URL:-}
       SCRIPT_PROVIDER_MODEL: ${SCRIPT_PROVIDER_MODEL:-}
       SPEECH_PROVIDER_BASE_URL: ${SPEECH_PROVIDER_BASE_URL:-}
       SPEECH_PROVIDER_MODEL: ${SPEECH_PROVIDER_MODEL:-}
-      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-HoaiMyNeural}
+      VIDEO_PROVIDER_BASE_URL: ${VIDEO_PROVIDER_BASE_URL:-}
+      VIDEO_PROVIDER_MODEL: ${VIDEO_PROVIDER_MODEL:-}
+      SEEDANCE_API_KEY: ${SEEDANCE_API_KEY:-}
+      SEEDANCE_BASE_URL: ${SEEDANCE_BASE_URL:-}
+      SEEDANCE_MODEL: ${SEEDANCE_MODEL:-}
+      SEEDANCE_RESOLUTION: ${SEEDANCE_RESOLUTION:-480p}
+      VEO_API_KEY: ${VEO_API_KEY:-}
+      VEO_BASE_URL: ${VEO_BASE_URL:-}
+      VEO_MODEL: ${VEO_MODEL:-}
+      WAN_API_KEY: ${WAN_API_KEY:-}
+      WAN_BASE_URL: ${WAN_BASE_URL:-https://api.replicate.com/v1}
+      WAN_MODEL: ${WAN_MODEL:-wan-video/wan-2.2-5b-fast}
+      WAN_RESOLUTION: ${WAN_RESOLUTION:-480p}
+      WAN_FRAMES_PER_SECOND: ${WAN_FRAMES_PER_SECOND:-24}
+      WAN_NUM_FRAMES: ${WAN_NUM_FRAMES:-121}
+      VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
+      VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
+      VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
+      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-NamMinhNeural}
       EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
       FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -398,8 +420,8 @@ services:
       VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
       VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
       VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
-      # Seedance and Wan fetch the product photo themselves, so its URL is signed for the store's
-      # public HTTPS address; they refuse to start without one. Fixture and Veo do not need it.
+      # Seedance fetches the product photo itself, so its URL is signed for the store's public
+      # HTTPS address. Wan and Veo receive the image inline and work with a local object store.
       S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
     deploy:
       replicas: ${PROVIDER_VIDEO_WORKERS:-2}
@@ -410,9 +432,9 @@ services:
       dockerfile: frontend/Dockerfile
     image: flow-cortex-frontend:local
     ports:
-      - "127.0.0.1:5173:8080"
+      - '127.0.0.1:5173:8080'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1']
       interval: 15s
       timeout: 3s
       retries: 5
@@ -427,9 +449,9 @@ services:
       dockerfile: admin/Dockerfile
     image: flow-cortex-admin:local
     ports:
-      - "127.0.0.1:5174:8080"
+      - '127.0.0.1:5174:8080'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1']
       interval: 15s
       timeout: 3s
       retries: 5

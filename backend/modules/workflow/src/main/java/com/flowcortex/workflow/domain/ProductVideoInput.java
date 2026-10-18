@@ -22,7 +22,7 @@ public class ProductVideoInput {
     @Column(name = "description", nullable = false, updatable = false)
     private String description;
 
-    @Column(name = "cta", nullable = false, updatable = false)
+    @Column(name = "cta", updatable = false)
     private String cta;
 
     @Column(name = "price", updatable = false)

@@ -135,15 +135,11 @@
     "uploading": "Uploading {{index}} / {{total}}…",
     "field": {
       "productName": "Product name",
-      "description": "Description",
-      "cta": "Call to action",
-      "price": "Price (optional)",
-      "promotion": "Promotion (optional)"
+      "description": "Description"
     },
     "required": "{{field}} is required.",
-    "images": "Product images (1–10, JPG/PNG/WebP, ≤ 10 MB each) *",
-    "imageSelected": "{{n}} image selected",
-    "imagesSelected": "{{n}} images selected",
+    "image": "Product image (JPG/PNG/WebP, ≤ 10 MB) *",
+    "imageSelected": "1 image selected: {{name}}",
     "uploadingImage": "Uploading image {{index}}",
     "uploadsUnfinished": "One of the uploads didn't finish. Try again."
   },
@@ -153,7 +149,7 @@
     "fileType": "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
     "imageType": "Use .jpg, .jpeg, .png or .webp.",
     "noImage": "Add at least one product image",
-    "tooManyImages": "At most {{max}} images per run.",
+    "tooManyImages": "At most 1 image per run.",
     "creatorLink": "Paste a valid TikTok or Douyin link"
   },
   "stop": {

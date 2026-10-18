@@ -93,10 +93,12 @@ class VideoAbort(Protocol):
 
 
 class ScriptAdapter(Protocol):
-    def generate_script(self, payload: ProductAdPayload) -> str: ...
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
-
-
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str: ...
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact: ...
 class SpeechAdapter(Protocol):
     def speech_identity(self) -> SpeechIdentity: ...
     def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact: ...
@@ -126,11 +128,15 @@ class CapabilityProviderAdapter:
     speech_adapter: SpeechAdapter
     video_adapter: VideoAdapter
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
-        return self.script_adapter.generate_script(payload)
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
+        return self.script_adapter.generate_script(payload, reference_image)
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
-        return self.script_adapter.generate_storyboard(request)
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
+        return self.script_adapter.generate_storyboard(request, reference_image)
 
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
@@ -151,7 +157,9 @@ class CapabilityProviderAdapter:
 class FixtureProviderAdapter:
     """Deterministic local adapter for development and contract tests."""
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         parts = [
             f"Khám phá {payload.productName}.",
             payload.description,
@@ -160,10 +168,15 @@ class FixtureProviderAdapter:
             parts.append(f"Giá: {payload.price}.")
         if payload.promotion:
             parts.append(f"Ưu đãi: {payload.promotion}.")
-        parts.append(payload.cta)
+        if payload.cta:
+            parts.append(payload.cta)
+        else:
+            parts.append("Mua ngay hôm nay!")
         return " ".join(parts)
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
         return StoryboardArtifact(
             "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
             "realistic movement, clean background, no text.",

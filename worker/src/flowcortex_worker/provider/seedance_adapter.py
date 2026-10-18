@@ -49,13 +49,17 @@ class SeedanceConfig:
 class SeedanceAdapter:
     config: SeedanceConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         raise PermanentError(
             "provider_capability_unavailable",
             "Seedance script generation is not implemented",
         )
 
-    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+    def generate_storyboard(
+        self, request: StoryboardRequest, reference_image: bytes | None = None
+    ) -> StoryboardArtifact:
         raise PermanentError(
             "provider_capability_unavailable", "Seedance storyboard generation is not implemented"
         )

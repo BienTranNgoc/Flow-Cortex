@@ -1,4 +1,6 @@
-package com.flowcortex.media.api;
+package com.flowcortex.media.api.provider;
+
+import com.flowcortex.media.api.MediaJob;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -22,8 +24,7 @@ public record ProviderJob(
         @NotNull @Min(1) Integer stepOrder,
         @NotBlank String capability,
         @NotNull Map<String, Object> params,
-        // Only {@code generateVideoJob} declares {@code inputs} in the schema; omitting the
-        // field for other capabilities keeps their JSON minimal and schema-valid.
+        // Script, storyboard and video jobs may carry product-image references.
         @JsonInclude(JsonInclude.Include.NON_EMPTY) @Size(max = 1) List<@NotNull ProviderInput> inputs,
         @NotNull @Pattern(regexp = ProviderJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,

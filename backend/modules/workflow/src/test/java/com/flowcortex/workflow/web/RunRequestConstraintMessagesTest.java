@@ -50,7 +50,7 @@ class RunRequestConstraintMessagesTest {
 
         assertThat(englishErrors(request))
                 .containsEntry("distinctUploads", "uploadIds must not contain duplicates")
-                .containsEntry("noBlankOptionalClaims", "price and promotion must be omitted or contain text");
+                .containsEntry("noBlankOptionalClaims", "price, promotion, and cta must be omitted or contain text");
     }
 
     /** Binds under the object name Spring MVC gives a {@code @RequestBody} of the same type. */
