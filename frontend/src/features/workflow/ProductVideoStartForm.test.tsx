@@ -102,7 +102,6 @@ describe('ProductVideoStartForm', () => {
     await screen.findByLabelText('Product name *');
     await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
     await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
-    await user.type(screen.getByLabelText('Call to action *'), 'Đặt mua ngay');
     await user.click(screen.getByRole('button', { name: 'Start run' }));
 
     expect(await screen.findByText('Add at least one product image')).toBeInTheDocument();

@@ -154,9 +154,6 @@ export function ProductVideoStartForm({
     await submitRun({
       productName: text.productName.trim(),
       description: text.description.trim(),
-      cta: text.cta.trim(),
-      ...(text.price.trim() ? { price: text.price.trim() } : {}),
-      ...(text.promotion.trim() ? { promotion: text.promotion.trim() } : {}),
       uploadIds,
       video: { aspectRatio: '9:16' },
     });
