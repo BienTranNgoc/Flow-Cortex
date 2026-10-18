@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -44,6 +45,12 @@ class ThrowawayTestController {
     @GetMapping("/test/conflict")
     String triggerConflict() {
         throw new ConflictException(new LocalizedMessage(GlobalExceptionHandlerTest.THING_CONFLICTS));
+    }
+
+    @GetMapping("/test/unprocessable")
+    String triggerUnprocessable() {
+        throw new UnprocessableEntityException(new LocalizedMessage(GlobalExceptionHandlerTest.THING_INCOMPLETE),
+                "THING_INCOMPLETE", Map.of("steps[1].config", new LocalizedMessage(GlobalExceptionHandlerTest.THING_MISSING)));
     }
 
     @GetMapping("/test/optimistic-lock")

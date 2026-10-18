@@ -9,6 +9,7 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.ProductVideoInput;
 import com.flowcortex.workflow.domain.RunStep;
@@ -45,6 +46,7 @@ public class ProductVideoService {
     private final StepExecutorRegistry registry;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate transactions;
+    private final RunStartGuards runStartGuards;
     private final boolean enabled;
     private final boolean workflowEnabled;
     private final ObjectMapper json = new ObjectMapper();
@@ -52,7 +54,7 @@ public class ProductVideoService {
     ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
-            TransactionTemplate transactions,
+            TransactionTemplate transactions, RunStartGuards runStartGuards,
             @Value("${flowcortex.product-video.enabled:false}") boolean enabled,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
         this.workflows = workflows;
@@ -64,11 +66,16 @@ public class ProductVideoService {
         this.registry = registry;
         this.events = events;
         this.transactions = transactions;
+        this.runStartGuards = runStartGuards;
         this.enabled = enabled;
         this.workflowEnabled = workflowEnabled;
     }
 
     public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds) {
+        return start(ownerId, draft, uploadIds, false);
+    }
+
+    public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost) {
         if (!enabled || !workflowEnabled) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     new LocalizedMessage("workflow.productVideo.disabled"));
@@ -79,6 +86,7 @@ public class ProductVideoService {
         Workflow workflow = workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
+        runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
         String productJson = productJson(draft);
         Instant now = Instant.now();

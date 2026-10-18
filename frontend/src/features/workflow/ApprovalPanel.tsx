@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { ApiError } from '@flow-cortex/api-client';
 import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
 import {
   useApproveTaskMutation,
@@ -22,15 +24,23 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
   const scripted = Boolean(task.currentRevisionId);
   const [draft, setDraft] = useState(original);
   const [scriptApprovalBlocked, setScriptApprovalBlocked] = useState(scripted);
+  const [blankDraft, setBlankDraft] = useState(false);
   const approve = useApproveTaskMutation(runId, task.id ?? '');
   const reject = useRejectTaskMutation(runId, task.id ?? '');
   const busy = approve.isPending || reject.isPending;
   const approveBlocked = busy || scriptApprovalBlocked;
+  const serverFieldError = scripted ? undefined : payloadFieldError(approve.error);
+  const contentError = blankDraft ? t('workflow.approval.contentEmpty') : serverFieldError;
 
   // Busy rather than disabled, so focus stays on the button while the decision is sent.
   const onApprove = () => {
     if (approveBlocked) return;
     reject.reset();
+    if (!scripted && draft !== original && draft.trim() === '') {
+      approve.reset();
+      setBlankDraft(true);
+      return;
+    }
     approve.mutate(
       scripted
         ? { revisionId: task.currentRevisionId, expectedVersion: task.version }
@@ -58,8 +68,19 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
             id="approval-payload"
             rows={6}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setBlankDraft(false);
+              if (serverFieldError) approve.reset();
+            }}
+            aria-invalid={contentError ? true : undefined}
+            aria-describedby={contentError ? 'approval-payload-problem' : undefined}
           />
+          {contentError && (
+            <div id="approval-payload-problem" className="field-error" role="alert">
+              <p className="form-error">{contentError}</p>
+            </div>
+          )}
         </div>
       )}
       <div className="approval-actions">
@@ -75,14 +96,14 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
           {reject.isPending ? t('workflow.approval.rejecting') : t('workflow.approval.reject')}
         </button>
       </div>
-      {approve.isError && (
+      {approve.isError && !serverFieldError && (
         <p role="alert" className="approval-error">
-          {t(approveErrorKey(approve.error, scripted))}
+          {approveError(approve.error, scripted, t)}
         </p>
       )}
       {reject.isError && (
         <p role="alert" className="approval-error">
-          {t('workflow.approval.rejectFailed')}
+          {refusalReason(reject.error) ?? t('workflow.approval.rejectFailed')}
         </p>
       )}
     </section>
@@ -90,15 +111,27 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
 }
 
 /**
- * A 409 on a script checkpoint means the revision moved on; the same status on a plain checkpoint
- * means the decision was already taken. Either way the reviewer has to reload — retrying the same
- * click can only lose again.
+ * A 409 on a script checkpoint means the revision moved on, so the reviewer is told to reload
+ * rather than shown the server's generic conflict sentence.
  */
-function approveErrorKey(error: unknown, scripted: boolean): string {
-  if (!isLostRace(error)) {
-    return 'workflow.approval.approveFailed';
+function approveError(error: unknown, scripted: boolean, t: TFunction): string {
+  if (scripted && isLostRace(error)) {
+    return t('workflow.approval.scriptMovedOn');
   }
-  return scripted ? 'workflow.approval.scriptMovedOn' : 'workflow.approval.alreadyDecided';
+  return refusalReason(error) ?? t('workflow.approval.approveFailed');
+}
+
+/**
+ * A refused decision (403, 409, 422…) carries a sentence written for the member; a 5xx detail
+ * does not, so the caller falls back to its own wording.
+ */
+function refusalReason(error: unknown): string | undefined {
+  if (!(error instanceof ApiError) || error.status >= 500) return undefined;
+  return error.problem?.detail;
+}
+
+function payloadFieldError(error: unknown): string | undefined {
+  return error instanceof ApiError ? error.problem?.errors?.reviewedPayload : undefined;
 }
 
 /**

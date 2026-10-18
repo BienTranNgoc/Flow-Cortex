@@ -19,6 +19,7 @@
       "running": "Đang chạy",
       "completed": "Hoàn tất",
       "error": "Lỗi",
+      "skipped": "Đã bỏ qua",
       "needsYou": "Cần bạn xử lý"
     },
     "label": {
@@ -51,7 +52,8 @@
   "pipeline": {
     "region": "Các bước",
     "hint": "Chọn một bước để xem kết quả.",
-    "retried": "Đã thử lại {{n}} lần"
+    "retried": "Đã thử lại {{n}} lần",
+    "notConfigured": "Chưa cấu hình"
   },
   "run": {
     "heading": {
@@ -59,7 +61,9 @@
       "running": "Lượt chạy đang diễn ra",
       "waitingApproval": "Đang chờ bạn duyệt",
       "completed": "Lượt chạy đã hoàn tất",
-      "error": "Lượt chạy bị lỗi"
+      "error": "Lượt chạy bị lỗi",
+      "cancelling": "Đang dừng…",
+      "cancelled": "Lượt chạy đã bị hủy"
     },
     "headingOther": "Lượt chạy: {{status}}",
     "back": "Quay lại quy trình",
@@ -92,7 +96,7 @@
     "approveFailed": "Không duyệt được bước này",
     "rejectFailed": "Không từ chối được bước này",
     "scriptMovedOn": "Kịch bản này đã thay đổi ở một tab khác. Hãy tải lại trang để xem bản sửa mới nhất.",
-    "alreadyDecided": "Bước này đã được quyết định ở nơi khác.",
+    "contentEmpty": "Nội dung không được để trống",
     "loadingScript": "Đang tải kịch bản…",
     "scriptLoadError": "Không tải được các bản sửa của kịch bản.",
     "loadingTask": "Đang tải bước cần duyệt…",
@@ -145,14 +149,27 @@
   },
   "validation": {
     "noFile": "Hãy chọn một tệp video hoặc âm thanh để tải lên",
-    "fileSize": "Tệp phải có dung lượng từ 1 byte đến 500 MB.",
-    "fileSizeNext": "Hãy chọn một tệp nhỏ hơn.",
+    "kindSize": "Tệp loại này tối đa {{max}} MB. Định dạng được chấp nhận: {{formats}}.",
     "fileType": "Chưa kiểm tra được loại tệp này. Hãy dùng .mp4, .mov, .webm, .mkv, .m4a, .mp3 hoặc .wav.",
-    "imageSize": "Mỗi ảnh phải có dung lượng từ 1 byte đến 10 MB.",
     "imageType": "Hãy dùng .jpg, .jpeg, .png hoặc .webp.",
-    "imageCount": "Hãy chọn từ {{min}} đến {{max}} ảnh.",
+    "noImage": "Hãy thêm ít nhất một ảnh sản phẩm",
     "tooManyImages": "Tối đa {{max}} ảnh cho mỗi lượt chạy.",
     "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ"
+  },
+  "stop": {
+    "open": "Dừng quy trình",
+    "title": "Dừng quy trình này?",
+    "text": "Bước hiện tại sẽ chạy xong, sau đó lượt chạy dừng lại. Các bước còn lại sẽ không chạy và không bị tính phí. Kết quả của các bước đã xong vẫn được giữ lại.",
+    "keep": "Tiếp tục chạy",
+    "confirm": "Dừng",
+    "stopping": "Đang dừng…",
+    "failed": "Không dừng được lượt chạy. Hãy thử lại."
+  },
+  "incomplete": {
+    "summary": "Quy trình này chưa chạy được.",
+    "summaryStep": "Quy trình này chưa chạy được: bước {{order}} chưa được cấu hình đầy đủ.",
+    "line": "Bước {{order}}: {{reason}}",
+    "lineNamed": "Bước {{order}} · {{name}}: {{reason}}"
   },
   "detail": {
     "noWorkflow": "Chưa chọn quy trình.",

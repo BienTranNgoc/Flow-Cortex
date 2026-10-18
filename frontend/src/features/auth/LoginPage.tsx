@@ -6,14 +6,17 @@ import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
+import { ResendConfirmation } from './ConfirmEmailPage';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { googleAuthorizeUrl, oauthErrorKey } from './oauth';
 import { activeLocale } from '../../lib/i18n';
 import {
   accountLockedMessage,
   clearRememberedEmail,
+  EMAIL_NOT_CONFIRMED,
   failureMessage,
   getRememberedEmail,
+  problemCodeFrom,
   setRememberedEmail,
   submitState,
   useAuthToken,
@@ -56,10 +59,12 @@ export function LoginPage() {
   });
 
   const oauthError = searchParams.get('oauth_error');
-  const serverError =
-    accountLockedMessage(loginMutation.error, t, activeLocale()) ??
-    failureMessage(loginMutation, t) ??
-    (oauthError ? t(oauthErrorKey(oauthError)) : undefined);
+  const notConfirmed = problemCodeFrom(loginMutation.error) === EMAIL_NOT_CONFIRMED;
+  const serverError = notConfirmed
+    ? t('auth.login.emailNotConfirmed')
+    : (accountLockedMessage(loginMutation.error, t, activeLocale()) ??
+      failureMessage(loginMutation, t) ??
+      (oauthError ? t(oauthErrorKey(oauthError)) : undefined));
   const isPending = loginMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
@@ -119,11 +124,7 @@ export function LoginPage() {
           </div>
           <div className="login-meta-row">
             <label className="remember-row" htmlFor="login-remember">
-              <input
-                id="login-remember"
-                type="checkbox"
-                {...register('rememberMe')}
-              />
+              <input id="login-remember" type="checkbox" {...register('rememberMe')} />
               <span>{t('auth.login.rememberMe')}</span>
             </label>
             {passwordResetEnabled() && (
@@ -146,6 +147,10 @@ export function LoginPage() {
             {buttonLabel}
           </button>
         </form>
+
+        {notConfirmed && loginMutation.variables && (
+          <ResendConfirmation email={loginMutation.variables.email} />
+        )}
 
         <p className="auth-footer">
           {t('auth.login.newHere')} <Link to="/register">{t('auth.login.createAccount')}</Link>

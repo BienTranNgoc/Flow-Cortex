@@ -28,7 +28,7 @@
     "profile": "Hồ sơ",
     "docs": "Tài liệu",
     "api": "API",
-    "gpuCredits": "18 Credit GPU",
+    "credits": "{{amount}} Credit",
     "signOut": "Đăng xuất"
   },
   "shell": {

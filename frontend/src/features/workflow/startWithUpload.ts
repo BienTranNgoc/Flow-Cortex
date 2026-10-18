@@ -24,12 +24,15 @@ export type StartStage = 'request' | 'upload' | 'start';
 export class StartStageError extends Error {
   readonly stage: StartStage;
   override readonly cause: unknown;
+  /** The run start that was refused (stage `start` only), so it can be resent without re-uploading. */
+  readonly request: StartRunRequest | undefined;
 
-  constructor(stage: StartStage, cause: unknown) {
+  constructor(stage: StartStage, cause: unknown, request?: StartRunRequest) {
     super(`Start failed at stage ${stage}`);
     this.name = 'StartStageError';
     this.stage = stage;
     this.cause = cause;
+    this.request = request;
   }
 }
 
@@ -45,14 +48,41 @@ async function stage<T>(name: StartStage, work: () => Promise<T>): Promise<T> {
  * One press of Start: `POST /uploads`, the PUT, then `POST …/runs` only once the PUT succeeded,
  * so no run is ever started with an upload id whose object is missing. A call made while one is
  * in flight sends nothing and resolves `null`; a call after a failure starts again from `/uploads`.
+ * `resend` repeats only the run start of a refused press, sharing the same in-flight guard.
  */
 export function createStartWithUpload(deps: StartWithUploadDeps) {
   let inFlight = false;
 
-  return async function start(
-    file: File,
+  async function startRun(request: StartRunRequest): Promise<string> {
+    let run: RunResponse;
+    try {
+      run = await deps.startRun(request);
+    } catch (error) {
+      throw new StartStageError('start', error, request);
+    }
+    if (!run.id) {
+      throw new StartStageError('start', new Error('The run start answered without a run id'));
+    }
+    return run.id;
+  }
+
+  async function resend(
+    request: StartRunRequest,
     onPhase: (phase: StartPhase) => void,
   ): Promise<string | null> {
+    if (inFlight) {
+      return null;
+    }
+    inFlight = true;
+    try {
+      onPhase({ kind: 'starting' });
+      return await startRun(request);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  async function start(file: File, onPhase: (phase: StartPhase) => void): Promise<string | null> {
     if (inFlight) {
       return null;
     }
@@ -68,15 +98,11 @@ export function createStartWithUpload(deps: StartWithUploadDeps) {
         ),
       );
       onPhase({ kind: 'starting' });
-      const run = await stage('start', () =>
-        deps.startRun({ uploadId: grant.uploadId, originalName: file.name }),
-      );
-      if (!run.id) {
-        throw new StartStageError('start', new Error('The run start answered without a run id'));
-      }
-      return run.id;
+      return await startRun({ uploadId: grant.uploadId, originalName: file.name });
     } finally {
       inFlight = false;
     }
-  };
+  }
+
+  return Object.assign(start, { resend });
 }

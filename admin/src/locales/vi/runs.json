@@ -14,6 +14,8 @@
     "running": "Đang chạy",
     "waiting_approval": "Chờ duyệt",
     "completed": "Hoàn tất",
-    "error": "Lỗi"
+    "error": "Lỗi",
+    "cancelling": "Đang dừng",
+    "cancelled": "Đã hủy"
   }
 }

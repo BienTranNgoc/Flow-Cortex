@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 import { logout } from '../features/auth/useAuth';
+import { useBalance } from '../features/credits/useBalance';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
-import { accountStatsEnabled } from './featureFlags';
+import { formatNumber } from '../lib/format';
+import { activeLocale } from '../lib/i18n';
 
 type HeaderProps = {
   readonly email: string | undefined;
@@ -13,6 +15,7 @@ const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' :
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
 export function Header({ email }: HeaderProps) {
   const { t } = useTranslation();
+  const credits = useBalance();
   return (
     <header className="cortex-header">
       <div className="cortex-header__inner">
@@ -83,9 +86,9 @@ export function Header({ email }: HeaderProps) {
           <a href="#api">{t('common.nav.api')}</a>
         </nav>
 
-        {/* Right: GPU Pill + Auth */}
+        {/* Right: credits pill + Auth */}
         <div className="cortex-header__actions">
-          {accountStatsEnabled() && (
+          {credits !== undefined && (
             <span className="cortex-gpu-pill">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -97,7 +100,9 @@ export function Header({ email }: HeaderProps) {
               >
                 <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
               </svg>
-              <span>{t('common.nav.gpuCredits')}</span>
+              <span>
+                {t('common.nav.credits', { amount: formatNumber(credits, activeLocale()) })}
+              </span>
             </span>
           )}
           <AppLanguageToggle />

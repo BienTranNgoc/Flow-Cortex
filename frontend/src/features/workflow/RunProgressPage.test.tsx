@@ -779,14 +779,17 @@ describe('RunProgressPage', () => {
     it('says the step was already decided when the approval loses the race', async () => {
       const user = userEvent.setup();
       renderWaiting({
-        [APPROVE]: { status: 409, body: { status: 409, detail: 'Review task is not pending' } },
+        [APPROVE]: {
+          status: 409,
+          body: { status: 409, detail: 'This step is no longer waiting for review' },
+        },
       });
 
       await screen.findByLabelText('Content to approve');
       await user.click(screen.getByRole('button', { name: 'Approve' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        'This step was already decided elsewhere.',
+        'This step is no longer waiting for review',
       );
     });
 
@@ -1516,6 +1519,302 @@ describe('RunProgressPage', () => {
       await user.click(screen.getByRole('button', { name: /Bước 2/ }));
 
       expect(screen.getByRole('alert').textContent).toBe(unknownMessage);
+    });
+  });
+
+  describe('stopping a run', () => {
+    const CANCEL = 'POST /api/v1/runs/r1/cancel';
+    const FEATURES_ON = {
+      emailConfirmation: false,
+      phoneVerification: false,
+      uploadContentCheck: false,
+      runCancellation: true,
+      credits: false,
+    };
+    const stopButton = () => screen.findByRole('button', { name: 'Stop workflow' });
+    const cancelCalls = (calls: { method: string; path: string }[]) =>
+      calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/runs/r1/cancel');
+
+    /** jsdom has no `showModal`/`close`; Escape fires `cancel` the way a browser does. */
+    function stubModalDialog() {
+      const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
+      Object.defineProperties(proto, {
+        showModal: {
+          configurable: true,
+          value(this: HTMLDialogElement) {
+            this.setAttribute('open', '');
+          },
+        },
+        close: {
+          configurable: true,
+          value(this: HTMLDialogElement) {
+            if (!this.hasAttribute('open')) return;
+            this.removeAttribute('open');
+            this.dispatchEvent(new Event('close'));
+          },
+        },
+      });
+      const onEscape = (event: KeyboardEvent) => {
+        const open = document.querySelector('dialog[open]');
+        if (event.key === 'Escape' && open instanceof HTMLDialogElement) {
+          if (open.dispatchEvent(new Event('cancel', { cancelable: true }))) open.close();
+        }
+      };
+      document.addEventListener('keydown', onEscape);
+      return () => {
+        document.removeEventListener('keydown', onEscape);
+        delete proto.showModal;
+        delete proto.close;
+      };
+    }
+
+    function threeSteps(first: Partial<RunStepResponse>, later: string): RunStepResponse[] {
+      return [
+        step({ type: 'echo', mode: 'inline', ...first }),
+        step({ id: 's2', stepOrder: 2, type: 'echo', mode: 'inline', status: later }),
+        step({ id: 's3', stepOrder: 3, type: 'echo', mode: 'inline', status: later }),
+      ];
+    }
+
+    const runningRun = (overrides: Partial<RunResponse> = {}) =>
+      run(threeSteps({ status: 'running', pickedUpAt: '2026-10-01T10:00:01Z' }, 'pending'), {
+        input: 'hello',
+        ...overrides,
+      });
+    const cancellingRun = () =>
+      run(threeSteps({ status: 'running', pickedUpAt: '2026-10-01T10:00:01Z' }, 'skipped'), {
+        status: 'cancelling',
+        input: 'hello',
+      });
+
+    /** Serves `before` until a cancel succeeds, then `after`. */
+    function renderStoppable(
+      before: RunResponse,
+      cancel: Handler,
+      after: RunResponse = before,
+      features = FEATURES_ON,
+    ) {
+      let stopped = false;
+      const calls = stubApi({
+        'GET /api/v1/features': { status: 200, body: features },
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: stopped ? after : before }),
+        [CANCEL]: async () => {
+          const reply = typeof cancel === 'function' ? await cancel() : cancel;
+          stopped = reply.status < 400;
+          return reply;
+        },
+      });
+      const { queryClient } = renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+      return { calls, queryClient };
+    }
+
+    let restoreDialog: () => void;
+    beforeEach(() => {
+      restoreDialog = stubModalDialog();
+    });
+    afterEach(() => {
+      restoreDialog();
+    });
+
+    it.each(['running', 'waiting_approval'])(
+      'offers "Stop workflow" on a %s run',
+      async (status) => {
+        renderStoppable(runningRun({ status }), { status: 200, body: cancellingRun() });
+
+        expect(await stopButton()).toBeEnabled();
+      },
+    );
+
+    it.each(['completed', 'error', 'cancelling', 'cancelled'])(
+      'offers no "Stop workflow" on a %s run',
+      async (status) => {
+        const { queryClient } = renderStoppable(runningRun({ status }), { status: 409 });
+
+        await screen.findByRole('heading', { level: 1 });
+        await settled(queryClient);
+        expect(screen.queryByRole('button', { name: 'Stop workflow' })).not.toBeInTheDocument();
+      },
+    );
+
+    it('offers no "Stop workflow" while stopping runs is switched off', async () => {
+      const { queryClient } = renderStoppable(runningRun(), { status: 503 }, runningRun(), {
+        ...FEATURES_ON,
+        runCancellation: false,
+      });
+
+      await screen.findByRole('heading', { name: 'Run in progress' });
+      await settled(queryClient);
+      expect(screen.queryByRole('button', { name: 'Stop workflow' })).not.toBeInTheDocument();
+    });
+
+    it('asks first, and "Keep running" or Escape closes the question without stopping', async () => {
+      const user = userEvent.setup();
+      const { calls } = renderStoppable(runningRun(), { status: 200, body: cancellingRun() });
+
+      await user.click(await stopButton());
+      expect(await screen.findByRole('dialog', { name: 'Stop this workflow?' })).toHaveTextContent(
+        "The current step will finish, then the run stops. Remaining steps won't run and won't be charged. Results of finished steps are kept.",
+      );
+      expect(screen.getByRole('button', { name: 'Keep running' })).toHaveFocus();
+      await user.click(screen.getByRole('button', { name: 'Keep running' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Stop workflow' })).toHaveFocus();
+
+      await user.click(screen.getByRole('button', { name: 'Stop workflow' }));
+      await screen.findByRole('dialog', { name: 'Stop this workflow?' });
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Stop workflow' })).toHaveFocus();
+      expect(cancelCalls(calls)).toHaveLength(0);
+      expect(screen.getByRole('heading', { name: 'Run in progress' })).toBeInTheDocument();
+    });
+
+    it('shows what the run has been charged so far when the amount is known', async () => {
+      const user = userEvent.setup();
+      renderStoppable(runningRun({ chargedCredits: 60 }), { status: 200, body: cancellingRun() });
+
+      await user.click(await stopButton());
+
+      expect(await screen.findByRole('dialog')).toHaveTextContent(
+        'Charged for this run so far: 60 credits',
+      );
+    });
+
+    it('shows no charged line when the amount is unknown', async () => {
+      const user = userEvent.setup();
+      const unknownCharge = { ...runningRun(), chargedCredits: null } as unknown as RunResponse;
+      renderStoppable(unknownCharge, { status: 200, body: cancellingRun() });
+
+      await user.click(await stopButton());
+
+      expect(await screen.findByRole('dialog')).not.toHaveTextContent(/Charged for this run/);
+    });
+
+    it('sends one stop for a double press, then reads "Stopping…" with the later steps skipped and keeps polling', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      onTestFinished(() => {
+        vi.useRealTimers();
+      });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+      const { calls } = renderStoppable(
+        runningRun(),
+        { status: 200, body: cancellingRun() },
+        cancellingRun(),
+      );
+
+      await user.click(await stopButton());
+      await screen.findByRole('dialog', { name: 'Stop this workflow?' });
+      await user.dblClick(screen.getByRole('button', { name: 'Stop' }));
+
+      const heading = await screen.findByRole('heading', { name: 'Stopping…' });
+      expect(cancelCalls(calls)).toHaveLength(1);
+      await waitFor(() => expect(heading).toHaveFocus());
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Stop workflow' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Step 2/ })).toHaveTextContent('Skipped');
+      expect(screen.getByRole('button', { name: /Step 3/ })).toHaveTextContent('Skipped');
+
+      const reads = calls.filter((call) => call.path === '/api/v1/runs/r1').length;
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(calls.filter((call) => call.path === '/api/v1/runs/r1').length).toBeGreaterThan(reads);
+      expect(cancelCalls(calls)).toHaveLength(1);
+    });
+
+    it('says the stop failed when the server cannot take it, and lets the member try again', async () => {
+      const user = userEvent.setup();
+      const { calls } = renderStoppable(runningRun(), {
+        status: 503,
+        body: { status: 503, detail: 'This feature is turned off' },
+      });
+
+      await user.click(await stopButton());
+      await user.click(await screen.findByRole('button', { name: 'Stop' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        "Couldn't stop the run. Try again.",
+      );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Run in progress' })).toBeInTheDocument();
+      const again = screen.getByRole('button', { name: 'Stop workflow' });
+      expect(again).toHaveFocus();
+      await user.click(again);
+      expect(
+        await screen.findByRole('dialog', { name: 'Stop this workflow?' }),
+      ).toBeInTheDocument();
+      expect(cancelCalls(calls)).toHaveLength(1);
+    });
+
+    it('says the stop failed when the request never reaches the server', async () => {
+      const user = userEvent.setup();
+      renderStoppable(runningRun(), () => Promise.reject(new TypeError('Failed to fetch')));
+
+      await user.click(await stopButton());
+      await user.click(await screen.findByRole('button', { name: 'Stop' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        "Couldn't stop the run. Try again.",
+      );
+      expect(screen.getByRole('button', { name: 'Stop workflow' })).toBeInTheDocument();
+    });
+
+    it('stops a run waiting for approval at once and removes the review', async () => {
+      const user = userEvent.setup();
+      const waiting = run(
+        [
+          step({ type: 'echo', mode: 'inline', status: 'completed', output: 'Draft caption' }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'APPROVAL_CHECKPOINT',
+            mode: 'inline',
+            status: 'pending',
+          }),
+          step({ id: 's3', stepOrder: 3, type: 'echo', mode: 'inline', status: 'pending' }),
+        ],
+        { status: 'waiting_approval', input: 'Draft caption' },
+      );
+      const cancelled: RunResponse = {
+        ...waiting,
+        status: 'cancelled',
+        steps: (waiting.steps ?? []).map((each) =>
+          each.status === 'pending' ? { ...each, status: 'skipped' } : each,
+        ),
+      };
+      renderStoppable(waiting, { status: 200, body: cancelled }, cancelled);
+
+      await user.click(await stopButton());
+      await user.click(await screen.findByRole('button', { name: 'Stop' }));
+
+      expect(await screen.findByRole('heading', { name: 'Run cancelled' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Review/ })).toHaveTextContent('Skipped');
+      expect(screen.getByRole('button', { name: /Step 3/ })).toHaveTextContent('Skipped');
+      expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the download of a step that finished before the run was cancelled', async () => {
+      const finished = completedPipeline();
+      const [first, second] = finished.steps ?? [];
+      const skipped = step({
+        id: 's3',
+        stepOrder: 3,
+        type: 'echo',
+        mode: 'inline',
+        status: 'skipped',
+      });
+      const cancelled = run([first!, second!, skipped], { status: 'cancelled' });
+      renderStoppable(cancelled, { status: 200, body: cancelled });
+
+      expect(await screen.findByRole('heading', { name: 'Run cancelled' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: 'Download extracted audio (WAV)' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Step 3/ })).toHaveTextContent('Skipped');
     });
   });
 });

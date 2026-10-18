@@ -214,6 +214,94 @@
   white-space: nowrap;
 }
 
+.run-stop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.run-stop button {
+  margin-right: 0;
+}
+
+.run-stop-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.stop-run-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.stop-run-dialog[open] {
+  animation: stop-run-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.stop-run-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.stop-run-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.stop-run-dialog p {
+  margin: 0 0 0.75rem;
+}
+
+.stop-run-charged {
+  font-weight: 600;
+}
+
+.stop-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.stop-run-actions button {
+  margin-right: 0;
+}
+
+.stop-run-confirm {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.stop-run-actions button[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.stop-run-actions button[aria-busy='true'] {
+  cursor: progress;
+}
+
+@keyframes stop-run-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stop-run-dialog[open] {
+    animation: none;
+  }
+}
+
 @media (max-width: 480px) {
   .output-fields {
     grid-template-columns: 1fr;
@@ -225,12 +313,14 @@
   }
 
   .run-step-downloads,
-  .approval-actions {
+  .approval-actions,
+  .stop-run-actions {
     flex-direction: column;
   }
 
   .run-step-downloads button,
   .approval-actions button,
+  .stop-run-actions button,
   .media-start-form button {
     width: 100%;
   }

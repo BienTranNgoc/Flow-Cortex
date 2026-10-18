@@ -32,7 +32,8 @@ class MediaTopologyConfigTest {
                 Duration.ofMinutes(10),
                 Duration.ofMinutes(15),
                 Duration.ofMinutes(15),
-                new MediaProperties.Upload(10_000_000, List.of("jpg"), List.of("jpg"), Duration.ofMinutes(15)),
+                new MediaProperties.Upload(10_000_000, 10_000_000, 10_000_000, List.of("jpg"), List.of("jpg"),
+                        Duration.ofMinutes(15), new MediaProperties.Upload.ContentCheck(true)),
                 new MediaProperties.S3(
                         null,
                         null,

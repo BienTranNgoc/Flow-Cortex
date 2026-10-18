@@ -1,15 +1,22 @@
-import { ApiError } from '@flow-cortex/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { StartRunRequest } from '@flow-cortex/api-client';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
+import { activeLocale } from '../../lib/i18n';
+import { CreditsRefusal } from '../credits/CreditsRefusal';
+import { invalidateBalance } from '../credits/useBalance';
+import { startProblem, type IncompleteWorkflow } from './startProblem';
 import { mediaFileProblem, NO_FILE, type FileProblem } from './startRunSchema';
 import { createStartWithUpload, StartStageError, type StartPhase } from './startWithUpload';
 import { uploadFile } from './uploadFile';
 import { useCreateUploadMutation, useStartRunMutation } from './useWorkflows';
 
-/** `detail` is the server's own sentence, shown as received; without one the form's fallback is shown. */
-type Failure = { kind: 'upload' } | { kind: 'alert'; detail: string | undefined };
+type Failure =
+  | { kind: 'upload' }
+  | { kind: 'alert'; message: string }
+  | { kind: 'credits'; message: string; resend: StartRunRequest | null };
 
 /** A check made here (translated at render) or a field message the server wrote (shown as received). */
 type FieldProblem = { kind: 'check'; problem: FileProblem } | { kind: 'server'; message: string };
@@ -27,14 +34,21 @@ function startButtonLabel(phase: StartPhase | null, t: TFunction): string {
 /**
  * Start form of a workflow whose first step works on an uploaded file. Pressing Start uploads the
  * picked file and then starts the run, as one sequence; Start stays focusable while it runs and a
- * press during it changes nothing.
+ * press during it changes nothing. A refusal because a step is not configured goes to
+ * `onIncomplete`, which the page shows next to the pipeline; every new start clears it.
  */
 export function MediaStartForm({
   workflowId,
   disabled,
-}: Readonly<{ workflowId: string; disabled: boolean }>) {
+  onIncomplete,
+}: Readonly<{
+  workflowId: string;
+  disabled: boolean;
+  onIncomplete: (problem: IncompleteWorkflow | null) => void;
+}>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
+  const queryClient = useQueryClient();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);
   const start = useMemo(
@@ -75,30 +89,54 @@ export function MediaStartForm({
       setFailure({ kind: 'upload' });
       return;
     }
-    const cause = error instanceof StartStageError ? error.cause : error;
-    const problem = cause instanceof ApiError ? cause.problem : undefined;
-    const fieldMessage =
-      problem?.errors?.uploadId ?? problem?.errors?.size ?? problem?.errors?.fileName;
-    if (fieldMessage) {
-      setFieldProblem({ kind: 'server', message: fieldMessage });
-      return;
+    const stageError = error instanceof StartStageError ? error : null;
+    const problem = startProblem(stageError ? stageError.cause : error, undefined, t, activeLocale());
+    if (problem.kind === 'field') {
+      setFieldProblem({ kind: 'server', message: problem.message });
+    } else if (problem.kind === 'incomplete') {
+      onIncomplete(problem);
+    } else if (problem.kind === 'credits') {
+      const refused = problem.canRunAnyway ? stageError?.request : undefined;
+      setFailure({
+        kind: 'credits',
+        message: problem.message,
+        resend: refused ? { ...refused, acknowledgeCost: true } : null,
+      });
+    } else {
+      setFailure({ kind: 'alert', message: problem.message });
     }
-    setFailure({ kind: 'alert', detail: problem?.detail });
   };
 
-  const run = async (picked: File) => {
-    setFailure(null);
-    setFieldProblem(null);
+  const settle = async (started: Promise<string | null>) => {
     try {
-      const runId = await start(picked, setPhase);
+      const runId = await started;
       // `null`: this press came while a start was already running, which owns the form state.
-      if (runId !== null && mounted.current) {
-        go(`/workflows/${workflowId}/runs/${runId}`);
+      if (runId !== null) {
+        void invalidateBalance(queryClient);
+        if (mounted.current) {
+          go(`/workflows/${workflowId}/runs/${runId}`);
+        }
       }
     } catch (error) {
       setPhase(null);
       showFailure(error);
     }
+  };
+
+  const clearProblems = () => {
+    setFailure(null);
+    setFieldProblem(null);
+    onIncomplete(null);
+  };
+
+  const run = (picked: File) => {
+    clearProblems();
+    return settle(start(picked, setPhase));
+  };
+
+  const runAnyway = (request: StartRunRequest) => {
+    clearProblems();
+    return settle(start.resend(request, setPhase));
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -115,6 +153,8 @@ export function MediaStartForm({
     }
     void run(file);
   };
+
+  const resend = failure?.kind === 'credits' ? failure.resend : null;
 
   return (
     <form
@@ -135,16 +175,11 @@ export function MediaStartForm({
         />
         {fieldProblem && (
           <div id="run-file-problem" className="field-error" role="alert">
-            {fieldProblem.kind === 'server' ? (
-              <p>{fieldProblem.message}</p>
-            ) : (
-              <>
-                <p>{t(fieldProblem.problem.messageKey)}</p>
-                {fieldProblem.problem.nextActionKey && (
-                  <p>{t(fieldProblem.problem.nextActionKey)}</p>
-                )}
-              </>
-            )}
+            <p>
+              {fieldProblem.kind === 'server'
+                ? fieldProblem.message
+                : t(fieldProblem.problem.messageKey, fieldProblem.problem.values ?? {})}
+            </p>
           </div>
         )}
       </div>
@@ -166,9 +201,16 @@ export function MediaStartForm({
       )}
       {failure?.kind === 'alert' && (
         <div role="alert">
-          <p>{failure.detail ?? t('workflow.start.failed')}</p>
+          <p>{failure.message}</p>
           <p>{t('workflow.start.nextActionLater')}</p>
         </div>
+      )}
+      {failure?.kind === 'credits' && (
+        <CreditsRefusal
+          message={failure.message}
+          busy={phase !== null}
+          onRunAnyway={resend ? () => void runAnyway(resend) : undefined}
+        />
       )}
       <button type="submit" aria-busy={phase !== null} disabled={disabled}>
         {startButtonLabel(phase, t)}

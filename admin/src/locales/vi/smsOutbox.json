@@ -1,0 +1,11 @@
+{
+  "title": "Hộp thư đi SMS",
+  "loading": "Đang tải tin nhắn SMS…",
+  "loadError": "Không tải được tin nhắn SMS.",
+  "empty": "Chưa có tin nhắn SMS nào.",
+  "columns": {
+    "number": "Số điện thoại",
+    "text": "Nội dung",
+    "sent": "Gửi lúc"
+  }
+}

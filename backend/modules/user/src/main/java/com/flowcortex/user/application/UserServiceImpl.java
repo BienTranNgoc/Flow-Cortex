@@ -3,6 +3,7 @@ package com.flowcortex.user.application;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.api.UserCreatedEvent;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
@@ -11,6 +12,7 @@ import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,12 +31,14 @@ class UserServiceImpl implements UserService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final ApplicationEventPublisher events;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService) {
+            RefreshTokenService refreshTokenService, ApplicationEventPublisher events) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.events = events;
     }
 
     @Override
@@ -54,7 +58,9 @@ class UserServiceImpl implements UserService {
     private UserView createRow(UUID id, UUID ownerId, String email, String rawPassword, String name, Role role) {
         AppUser user = new AppUser(id, ownerId, email, passwordEncoder.encode(rawPassword), name, role,
                 UserStatus.ACTIVE);
-        return save(user, email);
+        UserView created = save(user, email);
+        events.publishEvent(new UserCreatedEvent(id));
+        return created;
     }
 
     @Override

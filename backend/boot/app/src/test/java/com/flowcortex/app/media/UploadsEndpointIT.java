@@ -50,7 +50,8 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
     @Autowired
     private JdbcTemplate jdbc;
 
-    private static final String SIZE_SENTENCE = "Files must be between 1 byte and 500 MB.";
+    private static final String SIZE_SENTENCE =
+            "Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.";
     private static final String TYPE_SENTENCE =
             "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3, .wav, .jpg, .jpeg, .png or .webp.";
     private static final byte[] CLIP = "sixteen bytes!!!".getBytes();
@@ -116,7 +117,7 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         String expected = new MessageFormat(vietnameseBundle().getProperty("upload.sizeMegabytes"),
-                Locale.forLanguageTag("vi")).format(new Object[] {500L});
+                Locale.forLanguageTag("vi")).format(new Object[] {500L, ".mp4, .mov, .webm, .mkv"});
         assertThat(new String(response.getBody(), StandardCharsets.UTF_8))
                 .contains("\"size\":\"" + expected + "\"");
     }

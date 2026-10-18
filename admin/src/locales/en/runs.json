@@ -14,6 +14,8 @@
     "running": "running",
     "waiting_approval": "waiting_approval",
     "completed": "completed",
-    "error": "error"
+    "error": "error",
+    "cancelling": "cancelling",
+    "cancelled": "cancelled"
   }
 }

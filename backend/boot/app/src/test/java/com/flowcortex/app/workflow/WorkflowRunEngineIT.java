@@ -13,6 +13,7 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.RunStepOutputView;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowView;
@@ -284,22 +285,16 @@ class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
     }
 
     @Test
-    void danglingInputRefHaltsTheRunWithErrorOnThatStepAndDownstreamStaysPending() {
+    void danglingInputRefIsRefusedBeforeAnyRunIsCreated() {
         UserView user = newUser("dangling-ref-user");
         WorkflowView workflow = newWorkflow(user.id(), false,
                 new NewWorkflowStep("first", "echo", null),
                 new NewWorkflowStep("dangling", "echo", "{step:9.field}"),
                 new NewWorkflowStep("never-reached", "echo", null));
 
-        RunView started = workflowRunService.startRun(user.id(), workflow.id(), "hello");
-        RunView finished = awaitTerminal(user.id(), started.id());
-
-        assertThat(finished.status()).isEqualTo("error");
-        List<RunStepView> steps = finished.steps();
-        assertThat(steps.get(0).status()).isEqualTo("completed");
-        assertThat(steps.get(1).status()).isEqualTo("error");
-        assertThat(steps.get(1).errorMessage()).contains("references step 9");
-        assertThat(steps.get(2).status()).isEqualTo("pending");
+        assertThatThrownBy(() -> workflowRunService.startRun(user.id(), workflow.id(), "hello"))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        refused -> assertThat(refused.getCode()).isEqualTo("WORKFLOW_INCOMPLETE"));
     }
 
     @Test

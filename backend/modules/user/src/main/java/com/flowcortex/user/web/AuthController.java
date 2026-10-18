@@ -15,6 +15,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -33,9 +35,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/auth}: password login, rate-limited self-registration,
- * Google OAuth callback (authorize lives in {@link OAuthController}), refresh,
- * logout, the caller's own profile ({@code me}), and self-service name update
+ * {@code /api/v1/auth}: password login, rate-limited self-registration with its email
+ * confirmation ({@code confirm-email}, {@code resend-confirmation}), Google OAuth callback
+ * (authorize lives in {@link OAuthController}), refresh, logout, the caller's own profile
+ * ({@code me}), and self-service name update
  * ({@code profile}). Email/role/status are admin-mediated only.
  *
  * <p>Responses carry the access token only; the refresh token lives in an HttpOnly cookie that
@@ -67,16 +70,50 @@ class AuthController {
         return ResponseEntity.ok(session.toResponse());
     }
 
+    /** 202 without a session while email confirmation is on; 201 with the first session when it is off. */
     @SecurityRequirements
-    @ApiResponse(responseCode = "201")
+    @ApiResponse(responseCode = "201", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = AccessTokenResponse.class)))
+    @ApiResponse(responseCode = "202", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = ConfirmationSentResponse.class)))
     @PostMapping(value = "/register", produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<AccessTokenResponse> register(@Valid @RequestBody RegisterRequest request,
+    ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request,
             HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        AuthSession session = authService.register(request.email(), request.password(), request.name(),
+        Optional<AuthSession> session = authService.register(request.email(), request.password(),
+                request.firstName(), request.lastName(), request.username(),
                 Boolean.TRUE.equals(request.rememberMe()), servletRequest.getRemoteAddr(),
                 servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        if (session.isEmpty()) {
+            return ResponseEntity.accepted().body(ConfirmationSentResponse.SENT);
+        }
+        cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session.get());
+        return ResponseEntity.status(HttpStatus.CREATED).body(session.get().toResponse());
+    }
+
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping(value = "/confirm-email", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<AccessTokenResponse> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request,
+            HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        AuthSession session = authService.confirmEmail(request.token(), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
         cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
-        return ResponseEntity.status(HttpStatus.CREATED).body(session.toResponse());
+        return ResponseEntity.ok(session.toResponse());
+    }
+
+    /** Always 202, whether or not the email belongs to an account that needs confirming. */
+    @SecurityRequirements
+    @ApiResponse(responseCode = "202")
+    @PostMapping(value = "/resend-confirmation", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<ConfirmationSentResponse> resendConfirmation(@Valid @RequestBody ResendConfirmationRequest request,
+            HttpServletRequest servletRequest) {
+        authService.resendConfirmation(request.email(), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.accepted().body(ConfirmationSentResponse.SENT);
     }
 
     @SecurityRequirements
@@ -131,10 +168,24 @@ class AuthController {
             @NotBlank String password, Boolean rememberMe) {
     }
 
-    record RegisterRequest(@NotBlank @jakarta.validation.constraints.Email
-            @jakarta.validation.constraints.Size(max = 254) String email,
-            @NotBlank @jakarta.validation.constraints.Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password,
-            @NotBlank String name, Boolean rememberMe) {
+    /** {@code @NotBlank} refuses whitespace-only names; the service stores them trimmed. */
+    record RegisterRequest(
+            @NotBlank(message = "First name is required") @Size(max = 100) String firstName,
+            @NotBlank(message = "Last name is required") @Size(max = 100) String lastName,
+            @Pattern(regexp = "^[a-z0-9_]{3,20}$", message = "Use 3–20 lowercase letters, digits or _") String username,
+            @NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email,
+            @NotBlank @Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password,
+            Boolean rememberMe) {
+    }
+
+    record ConfirmEmailRequest(@NotBlank @Size(max = 128) String token) {
+    }
+
+    record ResendConfirmationRequest(@NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email) {
+    }
+
+    record ConfirmationSentResponse(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status) {
+        static final ConfirmationSentResponse SENT = new ConfirmationSentResponse("confirmation_sent");
     }
 
     record ProfileUpdateRequest(@NotBlank String name) {

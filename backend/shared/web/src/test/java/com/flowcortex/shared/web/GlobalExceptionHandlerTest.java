@@ -39,6 +39,8 @@ class GlobalExceptionHandlerTest {
 
     static final String THING_NOT_FOUND = "test.thingNotFound";
     static final String THING_CONFLICTS = "test.thingConflicts";
+    static final String THING_INCOMPLETE = "test.thingIncomplete";
+    static final String THING_MISSING = "test.thingMissing";
 
     @Autowired
     private MockMvc mockMvc;
@@ -59,6 +61,8 @@ class GlobalExceptionHandlerTest {
                         StaticMessageSource parent = new StaticMessageSource();
                         parent.addMessage(THING_NOT_FOUND, Locale.ENGLISH, "thing not found");
                         parent.addMessage(THING_CONFLICTS, Locale.ENGLISH, "thing conflicts");
+                        parent.addMessage(THING_INCOMPLETE, Locale.ENGLISH, "thing is incomplete");
+                        parent.addMessage(THING_MISSING, Locale.ENGLISH, "is missing");
                         source.setParentMessageSource(parent);
                     }
                     return bean;
@@ -84,6 +88,17 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.detail").value("thing conflicts"));
+    }
+
+    @Test
+    void unprocessableReturns422WithItsCodeAndFieldErrors() throws Exception {
+        mockMvc.perform(get("/test/unprocessable"))
+                .andExpect(status().is(422))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.detail").value("thing is incomplete"))
+                .andExpect(jsonPath("$.code").value("THING_INCOMPLETE"))
+                .andExpect(jsonPath("$.errors['steps[1].config']").value("is missing"));
     }
 
     @Test

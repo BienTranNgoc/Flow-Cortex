@@ -1,7 +1,14 @@
 import { registerSchema } from './registerSchema';
 
 function form(password: string) {
-  return { name: 'New Person', email: 'new@example.com', password, confirmPassword: password };
+  return {
+    firstName: 'New',
+    lastName: 'Person',
+    email: 'new@example.com',
+    username: '',
+    password,
+    confirmPassword: password,
+  };
 }
 
 describe('registerSchema', () => {

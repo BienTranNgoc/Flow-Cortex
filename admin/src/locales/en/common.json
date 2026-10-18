@@ -49,6 +49,7 @@
         "providers": "Providers",
         "usage": "Usage",
         "users": "Users",
+        "smsOutbox": "SMS outbox",
         "settings": "Settings",
         "auditLog": "Audit log"
       }

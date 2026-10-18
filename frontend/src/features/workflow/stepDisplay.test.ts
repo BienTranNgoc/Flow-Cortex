@@ -81,6 +81,13 @@ describe('stepState', () => {
     ['completed', step({ status: 'completed' }), 'completed', 'completed'],
     ['error', step({ status: 'error' }), 'error', 'error'],
     ['pending checkpoint of a run that is not waiting', checkpoint(), 'running', 'pending'],
+    ['skipped by a stop', step({ status: 'skipped' }), 'cancelled', 'skipped'],
+    [
+      'skipped checkpoint of a stopping run',
+      checkpoint({ status: 'skipped' }),
+      'cancelling',
+      'skipped',
+    ],
   ])('%s reads %s -> %s', (_name, subject, runStatus, expected) => {
     expect(stepState(subject, running, runStatus)).toBe(expected);
   });

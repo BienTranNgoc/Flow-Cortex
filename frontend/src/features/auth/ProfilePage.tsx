@@ -5,9 +5,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { accountStatsEnabled } from '../../app/featureFlags';
+import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { useBalance } from '../credits/useBalance';
 import { roleLabel, statusLabel } from './enumLabels';
+import { PhoneVerification } from './PhoneVerification';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
 import { failureMessage, useMeQuery } from './useAuth';
 import './ProfilePage.css';
@@ -24,6 +27,8 @@ function initialsFrom(name: string | null | undefined, email: string | null | un
 export function ProfilePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
+  const { phoneVerification } = useFeatures();
+  const credits = useBalance();
   const queryClient = useQueryClient();
   const {
     register,
@@ -102,26 +107,36 @@ export function ProfilePage() {
             <span className="profile-role-pill">{roleLabel(t, me.role)}</span>
           </div>
 
-          {showAccountStats && (
+          {(showAccountStats || credits !== undefined) && (
             <ul className="profile-stats" aria-label={t('auth.profile.statsLabel')}>
-              <li>
-                <span className="profile-stats__value">{formatNumber(1248, activeLocale())}</span>
-                <span className="profile-stats__label">{t('auth.profile.stats.xp')}</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">
-                  {t('auth.profile.stats.streakValue', { days: 14 })}
-                </span>
-                <span className="profile-stats__label">{t('auth.profile.stats.streak')}</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">#42</span>
-                <span className="profile-stats__label">{t('auth.profile.stats.rank')}</span>
-              </li>
-              <li>
-                <span className="profile-stats__value">18</span>
-                <span className="profile-stats__label">{t('auth.profile.stats.credits')}</span>
-              </li>
+              {showAccountStats && (
+                <>
+                  <li>
+                    <span className="profile-stats__value">
+                      {formatNumber(1248, activeLocale())}
+                    </span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.xp')}</span>
+                  </li>
+                  <li>
+                    <span className="profile-stats__value">
+                      {t('auth.profile.stats.streakValue', { days: 14 })}
+                    </span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.streak')}</span>
+                  </li>
+                  <li>
+                    <span className="profile-stats__value">#42</span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.rank')}</span>
+                  </li>
+                </>
+              )}
+              {credits !== undefined && (
+                <li>
+                  <span className="profile-stats__value">
+                    {formatNumber(credits, activeLocale())}
+                  </span>
+                  <span className="profile-stats__label">{t('auth.profile.stats.credits')}</span>
+                </li>
+              )}
             </ul>
           )}
         </aside>
@@ -200,6 +215,13 @@ export function ProfilePage() {
               </dd>
             </div>
           </dl>
+
+          {phoneVerification && (
+            <>
+              <hr className="profile-card__divider" />
+              <PhoneVerification />
+            </>
+          )}
 
           {showAccountStats && (
             <>

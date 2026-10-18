@@ -1,4 +1,5 @@
 import type { UploadRequest, UploadResponse } from '@flow-cortex/api-client';
+import { extensionOf, IMAGE, sizeProblem, type FileProblem } from './startRunSchema';
 
 export interface MultiUploadDeps {
   requestUpload: (body: UploadRequest) => Promise<UploadResponse>;
@@ -15,34 +16,20 @@ export type MultiUploadPhase =
   | { kind: 'uploading'; percent: number; index: number; total: number }
   | { kind: 'done' };
 
-/** Why a picked image cannot be checked, or `null` when it may be uploaded. */
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 10;
 
-/** A translation key with its values, so a problem already on screen follows a language switch. */
-export interface ImageProblem {
-  messageKey: string;
-  values?: Record<string, number>;
-}
+export type ImageProblem = FileProblem;
 
+/** Why a picked image cannot be checked, or `null` when it may be uploaded. */
 export function imageFileProblem(file: File): ImageProblem | null {
-  if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    return { messageKey: 'workflow.validation.imageSize' };
-  }
-  const dot = file.name.lastIndexOf('.');
-  const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(extension)) {
+  if (!IMAGE.extensions.includes(extensionOf(file.name))) {
     return { messageKey: 'workflow.validation.imageType' };
   }
-  return null;
+  return sizeProblem(file, IMAGE);
 }
 
-export const EMPTY_IMAGE_LIST: ImageProblem = {
-  messageKey: 'workflow.validation.imageCount',
-  values: { min: MIN_IMAGES, max: MAX_IMAGES },
-};
+export const EMPTY_IMAGE_LIST: ImageProblem = { messageKey: 'workflow.validation.noImage' };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
   messageKey: 'workflow.validation.tooManyImages',

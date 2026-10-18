@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
@@ -32,7 +33,8 @@ class UserServiceImplTest {
     private final AppUserRepository repository = mock(AppUserRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService,
+                    mock(ApplicationEventPublisher.class));
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
@@ -30,7 +31,7 @@ class RunStepTransactionsTest {
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final RunStepTransactions transactions =
-            new RunStepTransactions(runStepRepository, workflowRunRepository);
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class));
 
     private final UUID runId = UUID.randomUUID();
     private final UUID stepId = UUID.randomUUID();

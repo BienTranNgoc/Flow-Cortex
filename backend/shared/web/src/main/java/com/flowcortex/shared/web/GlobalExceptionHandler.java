@@ -80,6 +80,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, "conflict", detail(ex.getDetail(), request));
     }
 
+    @ExceptionHandler(UnprocessableEntityException.class)
+    public ProblemDetail handleUnprocessable(UnprocessableEntityException ex, HttpServletRequest request) {
+        Locale locale = locale(request);
+        ProblemDetail detail = problem(HttpStatus.UNPROCESSABLE_CONTENT, "unprocessable",
+                messages.getMessage(ex.getDetail(), locale));
+        if (ex.getCode() != null) {
+            detail.setProperty("code", ex.getCode());
+        }
+        if (!ex.getErrors().isEmpty()) {
+            Map<String, String> errors = new LinkedHashMap<>();
+            ex.getErrors().forEach((field, reason) -> errors.put(field, messages.getMessage(reason, locale)));
+            detail.setProperty("errors", errors);
+        }
+        return detail;
+    }
+
     /**
      * Two requests changed the same versioned row at once and this one lost; Spring's {@link
      * OptimisticLockingFailureException} covers a lost {@code @Version} check at commit.

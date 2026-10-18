@@ -36,7 +36,32 @@ const GRANT = {
   maxBytes: 524288000,
 };
 
-const SIZE_SENTENCE = 'Files must be between 1 byte and 500 MB.';
+const INCOMPLETE: WorkflowResponse = {
+  id: 'w1',
+  name: 'Incomplete Demo (step 2 not configured)',
+  isShared: true,
+  steps: [
+    { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
+    { id: 'ws2', stepOrder: 2, name: 'Echo step 2', type: 'echo', mode: 'inline' },
+  ],
+};
+
+const INCOMPLETE_DETAIL = "This workflow can't run yet: step 2 is not fully configured.";
+const STEP_2_REASON = 'Reads from step 5, which is not an earlier step';
+const INCOMPLETE_REPLY: FakeReply = {
+  status: 422,
+  body: {
+    status: 422,
+    code: 'WORKFLOW_INCOMPLETE',
+    detail: INCOMPLETE_DETAIL,
+    errors: { step2: STEP_2_REASON },
+  },
+};
+
+const SIZE_SENTENCE =
+  'Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.';
+const AUDIO_SIZE_SENTENCE =
+  'Files of this type must be at most 100 MB. Accepted: .mp3, .wav, .m4a.';
 const TYPE_SENTENCE =
   "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.";
 
@@ -229,9 +254,52 @@ describe('WorkflowDetailPage', () => {
       await user.upload(await screen.findByLabelText('Media file'), file('long.mp4', 600_000_000));
 
       expect(screen.getByText(SIZE_SENTENCE)).toBeInTheDocument();
-      expect(screen.getByText('Choose a smaller file.')).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Start run' }));
       expect(sent(calls)).toEqual([]);
+    });
+
+    it('refuses a .wav one byte over 100 MB on pick with the audio cap and formats', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(CHECK);
+
+      await user.upload(await screen.findByLabelText('Media file'), file('voice.wav', 104_857_601));
+
+      expect(screen.getByText(AUDIO_SIZE_SENTENCE)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Start run' }));
+      expect(sent(calls)).toEqual([]);
+    });
+
+    it('accepts a .wav of exactly 100 MB', async () => {
+      const user = userEvent.setup();
+      renderForm(CHECK);
+
+      await user.upload(await screen.findByLabelText('Media file'), file('voice.wav', 104_857_600));
+
+      expect(screen.queryByText(AUDIO_SIZE_SENTENCE)).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('names the incompletely configured step after the upload and marks it in the pipeline', async () => {
+      const user = userEvent.setup();
+      renderForm(
+        {
+          ...INCOMPLETE,
+          steps: (INCOMPLETE.steps ?? []).map((step) => ({ ...step, mode: 'remote' as const })),
+        },
+        { 'POST /api/v1/workflows/w1/runs': INCOMPLETE_REPLY },
+      );
+
+      await user.upload(await screen.findByLabelText('Media file'), file('holiday clip.mp4'));
+      await user.click(screen.getByRole('button', { name: 'Start run' }));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+      act(() => FakeXhr.instances[0]!.respond(200));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(INCOMPLETE_DETAIL);
+      const [, second] = within(screen.getByRole('region', { name: 'Steps' })).getAllByRole(
+        'listitem',
+      );
+      expect(second).toHaveTextContent('Not configured');
+      expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
     });
 
     it('accepts an upper-case extension such as IMG_0412.MOV', async () => {
@@ -476,6 +544,168 @@ describe('WorkflowDetailPage', () => {
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('Runs are paused for maintenance');
       expect(alert).toHaveTextContent('Try again later, or go back to the Workflows list.');
+    });
+  });
+
+  describe('a workflow with an incompletely configured step', () => {
+    it('starting "Incomplete Demo" says which step is not configured, lists why, and marks step 2', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(INCOMPLETE, { 'POST /api/v1/workflows/w1/runs': INCOMPLETE_REPLY });
+      await settled(calls.queryClient);
+      const pipeline = screen.getByRole('region', { name: 'Steps' });
+      expect(within(pipeline).queryByText('Not configured')).not.toBeInTheDocument();
+
+      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(INCOMPLETE_DETAIL);
+      expect(within(alert).getByRole('listitem')).toHaveTextContent(
+        `Step 2 · Echo step 2: ${STEP_2_REASON}`,
+      );
+      const [first, second] = within(pipeline).getAllByRole('listitem');
+      expect(second).toHaveTextContent('Not configured');
+      expect(first).not.toHaveTextContent('Not configured');
+      expect(screen.queryByText('Run page r1')).not.toBeInTheDocument();
+    });
+
+    it('drops the refusal and the mark when the next start fails for another reason', async () => {
+      const user = userEvent.setup();
+      let reply: FakeReply = INCOMPLETE_REPLY;
+      const calls = renderForm(INCOMPLETE, { 'POST /api/v1/workflows/w1/runs': () => reply });
+      await settled(calls.queryClient);
+
+      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(INCOMPLETE_DETAIL);
+
+      reply = { status: 503, body: { status: 503, detail: 'Runs are paused for maintenance' } };
+      await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+      expect(await screen.findByText('Runs are paused for maintenance')).toBeInTheDocument();
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(screen.queryByText(INCOMPLETE_DETAIL)).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: 'Steps' })).queryByText('Not configured'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('credits', () => {
+    const SHORT_SENTENCE = 'Not enough credits: you have 30, this run needs 60 (short 30).';
+
+    function notEnough(balance: number): FakeReply {
+      return {
+        status: 402,
+        body: {
+          status: 402,
+          code: 'INSUFFICIENT_CREDITS',
+          detail: 'Not enough credits',
+          balance,
+          required: 60,
+          shortfall: 60 - balance,
+        },
+      };
+    }
+
+    /** The first start is refused with `first`; every later one starts run r1. */
+    function refusedOnce(first: FakeReply): () => FakeReply {
+      let count = 0;
+      return () => {
+        count += 1;
+        return count === 1 ? first : { status: 200, body: { id: 'r1', status: 'running' } };
+      };
+    }
+
+    it('shows the estimate next to the start button', async () => {
+      renderForm({ ...ECHO, estimatedCredits: 60 });
+
+      const form = await screen.findByRole('form', { name: 'Start run' });
+      expect(form.parentElement).toHaveTextContent('Estimated cost: 60 credits');
+    });
+
+    it('shows no estimate when the workflow carries none', async () => {
+      const calls = renderForm(ECHO);
+      await settled(calls.queryClient);
+
+      expect(await screen.findByRole('button', { name: 'Start run' })).toBeInTheDocument();
+      expect(screen.queryByText(/Estimated cost/)).not.toBeInTheDocument();
+    });
+
+    it('says the run needs more credits, and "Run anyway" resends the start with the acknowledgement', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(ECHO, {
+        'POST /api/v1/workflows/w1/runs': refusedOnce(notEnough(30)),
+      });
+      await settled(calls.queryClient);
+
+      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(SHORT_SENTENCE);
+      await user.click(within(alert).getByRole('button', { name: 'Run anyway' }));
+
+      expect(await screen.findByText('Run page r1')).toBeInTheDocument();
+      expect(sent(calls).map((call) => call.body)).toEqual([{}, { acknowledgeCost: true }]);
+    });
+
+    it('offers no "Run anyway" when the balance is 0', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(ECHO, { 'POST /api/v1/workflows/w1/runs': notEnough(0) });
+      await settled(calls.queryClient);
+
+      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Not enough credits: you have 0, this run needs 60 (short 60).',
+      );
+      expect(screen.queryByRole('button', { name: 'Run anyway' })).not.toBeInTheDocument();
+    });
+
+    it('"Run anyway" on the media form starts with the same upload, without uploading again', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(CHECK, {
+        'POST /api/v1/workflows/w1/runs': refusedOnce(notEnough(30)),
+      });
+
+      await user.upload(await screen.findByLabelText('Media file'), file('holiday clip.mp4'));
+      await user.click(screen.getByRole('button', { name: 'Start run' }));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+      act(() => FakeXhr.instances[0]!.respond(200));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(SHORT_SENTENCE);
+      await user.click(within(alert).getByRole('button', { name: 'Run anyway' }));
+
+      expect(await screen.findByText('Run page r1')).toBeInTheDocument();
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(sent(calls)).toEqual([
+        {
+          method: 'POST',
+          path: '/api/v1/uploads',
+          body: { fileName: 'holiday clip.mp4', size: 10 },
+        },
+        {
+          method: 'POST',
+          path: '/api/v1/workflows/w1/runs',
+          body: { uploadId: 'up-1', originalName: 'holiday clip.mp4' },
+        },
+        {
+          method: 'POST',
+          path: '/api/v1/workflows/w1/runs',
+          body: { uploadId: 'up-1', originalName: 'holiday clip.mp4', acknowledgeCost: true },
+        },
+      ]);
+    });
+
+    it('marks the balance stale once a run starts', async () => {
+      const user = userEvent.setup();
+      const calls = renderForm(ECHO);
+      await settled(calls.queryClient);
+      calls.queryClient.setQueryData(['credits', 'balance'], { balance: 1000 });
+
+      await user.click(await screen.findByRole('button', { name: 'Start run' }));
+
+      expect(await screen.findByText('Run page r1')).toBeInTheDocument();
+      expect(calls.queryClient.getQueryState(['credits', 'balance'])?.isInvalidated).toBe(true);
     });
   });
 });

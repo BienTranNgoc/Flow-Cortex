@@ -12,6 +12,8 @@ export interface PipelineStep {
   name: string;
   /** The saved run step; a step without one is drawn as a plain list item. */
   run?: RunStepResponse;
+  /** The step's own order in its workflow, when known; display position otherwise. */
+  order?: number | undefined;
 }
 
 interface PipelineProps {
@@ -21,6 +23,8 @@ interface PipelineProps {
   /** Present on a run: nodes become buttons that report the step to open. */
   onSelect?: (id: string) => void;
   panelId?: string;
+  /** Order (1-based) of the step a refused start names as not fully configured. */
+  problemOrder?: number | undefined;
 }
 
 const CURRENT_STATES: ReadonlySet<StepState> = new Set(['waiting', 'running', 'needs-you']);
@@ -43,9 +47,10 @@ interface NodeProps {
   selected: boolean;
   panelId: string | undefined;
   onSelect: ((id: string) => void) | undefined;
+  problem: boolean;
 }
 
-function Node({ step, order, state, selected, panelId, onSelect }: Readonly<NodeProps>) {
+function Node({ step, order, state, selected, panelId, onSelect, problem }: Readonly<NodeProps>) {
   const { t } = useTranslation();
   const duration = step.run ? stepDuration(step.run, t, activeLocale()) : null;
   const content = (
@@ -61,6 +66,12 @@ function Node({ step, order, state, selected, panelId, onSelect }: Readonly<Node
         <span className="run-step-status" data-state={state}>
           <StatusGlyph state={state} />
           {stateWord(state, t)}
+        </span>
+      )}
+      {problem && (
+        <span className="run-step-status" data-state="error">
+          <StatusGlyph state="error" />
+          {t('workflow.pipeline.notConfigured')}
         </span>
       )}
       {duration && (
@@ -89,7 +100,12 @@ function Node({ step, order, state, selected, panelId, onSelect }: Readonly<Node
 
   if (!onSelect || !state) {
     return (
-      <div className="pipeline-node" data-state={state}>
+      <div
+        className="pipeline-node"
+        data-state={state}
+        data-problem={problem ? 'true' : undefined}
+        aria-current={problem ? 'step' : undefined}
+      >
         {content}
       </div>
     );
@@ -123,7 +139,8 @@ function Connector({
 
 /**
  * The steps of a workflow or run as nodes joined by connectors. With `onSelect` the nodes are
- * buttons and carry the run's status; without it they are plain list items.
+ * buttons and carry the run's status; without it they are plain list items, and `problemOrder`
+ * marks the one a refused start named as not fully configured.
  */
 export function Pipeline({
   steps,
@@ -131,6 +148,7 @@ export function Pipeline({
   selectedId,
   onSelect,
   panelId,
+  problemOrder,
 }: Readonly<PipelineProps>) {
   const { t } = useTranslation();
   const runSteps = steps.flatMap((step) => (step.run ? [step.run] : []));
@@ -150,6 +168,7 @@ export function Pipeline({
                 selected={step.id === selectedId}
                 panelId={panelId}
                 onSelect={onSelect}
+                problem={!onSelect && (step.order ?? index + 1) === problemOrder}
               />
               {next && <Connector from={step.run} to={next.run} />}
             </li>

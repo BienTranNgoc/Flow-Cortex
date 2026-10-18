@@ -61,6 +61,12 @@ export const NAV: NavGroup[] = [
     items: [
       { label: 'common.shell.nav.items.users', path: '/users', icon: '●', action: 'users.manage' },
       {
+        label: 'common.shell.nav.items.smsOutbox',
+        path: '/sms-outbox',
+        icon: '✉',
+        action: 'users.manage',
+      },
+      {
         label: 'common.shell.nav.items.settings',
         path: '/settings',
         icon: '⚙',

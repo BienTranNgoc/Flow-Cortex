@@ -1,8 +1,12 @@
-import { ApiError } from '@flow-cortex/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ProductVideoRunRequest, RunResponse } from '@flow-cortex/api-client';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
+import { activeLocale } from '../../lib/i18n';
+import { CreditsRefusal } from '../credits/CreditsRefusal';
+import { invalidateBalance } from '../credits/useBalance';
 import {
   createMultiUpload,
   firstImageProblem,
@@ -10,14 +14,17 @@ import {
   type ImageProblem,
   type MultiUploadPhase,
 } from './productVideoUpload';
+import { startProblem, type IncompleteWorkflow } from './startProblem';
 import { uploadFile } from './uploadFile';
 import {
   useCreateUploadMutation,
   useStartProductVideoRunMutation,
 } from './useWorkflows';
 
-/** `detail` is the server's own sentence, shown as received; without one the form's fallback is shown. */
-type Failure = { kind: 'upload' } | { kind: 'alert'; detail: string | undefined };
+type Failure =
+  | { kind: 'upload' }
+  | { kind: 'alert'; message: string }
+  | { kind: 'credits'; message: string; resend: ProductVideoRunRequest | null };
 
 /** A check made here (translated at render) or a field message the server wrote (shown as received). */
 type ImageError = { kind: 'check'; problem: ImageProblem } | { kind: 'server'; message: string };
@@ -48,13 +55,16 @@ function startButtonLabel(phase: MultiUploadPhase | null, t: TFunction): string 
 /**
  * Start form for the Product Video workflow. Image picker is the only way to surface a multi-file
  * need; text fields stay plain inputs (1.5.0 rule: every value crossing the trust boundary is
- * validated, the schema is the API's, the form just refuses obvious blanks).
+ * validated, the schema is the API's, the form just refuses obvious blanks). A refusal because a
+ * step is not configured goes to `onIncomplete`; every new start clears it.
  */
 export function ProductVideoStartForm({
   disabled,
-}: Readonly<{ disabled: boolean }>) {
+  onIncomplete,
+}: Readonly<{ disabled: boolean; onIncomplete: (problem: IncompleteWorkflow | null) => void }>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
+  const queryClient = useQueryClient();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartProductVideoRunMutation();
   const uploadAll = useMemo(
@@ -102,47 +112,87 @@ export function ProductVideoStartForm({
       setFailure({ kind: 'upload' });
       return;
     }
-    const cause = error instanceof MultiUploadError ? error.cause : error;
-    const problem = cause instanceof ApiError ? cause.problem : undefined;
-    const fieldMessage =
-      problem?.errors?.uploadIds ?? problem?.errors?.uploadId ?? problem?.errors?.size;
-    if (fieldMessage) {
-      setImageError({ kind: 'server', message: fieldMessage });
-      return;
+    const problem = startProblem(
+      error instanceof MultiUploadError ? error.cause : error,
+      undefined,
+      t,
+      activeLocale(),
+    );
+    if (problem.kind === 'field') {
+      setImageError({ kind: 'server', message: problem.message });
+    } else if (problem.kind === 'incomplete') {
+      onIncomplete(problem);
+    } else {
+      setFailure({ kind: 'alert', message: problem.message });
     }
-    setFailure({ kind: 'alert', detail: problem?.detail });
   };
 
-  const run = async () => {
+  const clearProblems = () => {
     setFailure(null);
     setBlankFieldKey(null);
     setImageError(null);
+    onIncomplete(null);
+  };
+
+  const submitRun = async (body: ProductVideoRunRequest) => {
+    let runResponse: RunResponse;
     try {
-      const uploadIds = await uploadAll(files, setPhase);
-      if (uploadIds === null) {
-        return;
+      runResponse = await startRun.mutateAsync(body);
+    } catch (error) {
+      setPhase(null);
+      const problem = startProblem(error, undefined, t, activeLocale());
+      if (problem.kind === 'credits') {
+        setFailure({
+          kind: 'credits',
+          message: problem.message,
+          resend: problem.canRunAnyway ? { ...body, acknowledgeCost: true } : null,
+        });
+      } else {
+        showFailure(error);
       }
-      const runResponse = await startRun.mutateAsync({
-        productName: text.productName.trim(),
-        description: text.description.trim(),
-        cta: text.cta.trim(),
-        ...(text.price.trim() ? { price: text.price.trim() } : {}),
-        ...(text.promotion.trim() ? { promotion: text.promotion.trim() } : {}),
-        uploadIds,
-        video: { aspectRatio: '9:16' },
-      });
-      if (runResponse.id && mounted.current) {
-        go(`/runs/${runResponse.id}`);
-      }
+      return;
+    }
+    void invalidateBalance(queryClient);
+    if (runResponse.id && mounted.current) {
+      go(`/runs/${runResponse.id}`);
+    }
+  };
+
+  const run = async () => {
+    clearProblems();
+    let uploadIds: string[] | null;
+    try {
+      uploadIds = await uploadAll(files, setPhase);
     } catch (error) {
       setPhase(null);
       showFailure(error);
+      return;
     }
+    if (uploadIds === null) {
+      return;
+    }
+    await submitRun({
+      productName: text.productName.trim(),
+      description: text.description.trim(),
+      cta: text.cta.trim(),
+      ...(text.price.trim() ? { price: text.price.trim() } : {}),
+      ...(text.promotion.trim() ? { promotion: text.promotion.trim() } : {}),
+      uploadIds,
+      video: { aspectRatio: '9:16' },
+    });
+  };
+
+  const runAnyway = (body: ProductVideoRunRequest) => {
+    if (startRun.isPending) {
+      return;
+    }
+    clearProblems();
+    void submitRun(body);
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (phase) {
+    if (phase || startRun.isPending) {
       return;
     }
     const blank = TEXT_FIELDS.find((field) => field.required && text[field.name].trim() === '');
@@ -162,6 +212,7 @@ export function ProductVideoStartForm({
   };
 
   const uploadPercent = phase?.kind === 'uploading' ? phase.percent : null;
+  const resend = failure?.kind === 'credits' ? failure.resend : null;
 
   return (
     <form onSubmit={onSubmit} noValidate aria-label={t('workflow.productVideo.formLabel')} className="media-start-form">
@@ -252,11 +303,18 @@ export function ProductVideoStartForm({
       )}
       {failure?.kind === 'alert' && (
         <div role="alert">
-          <p>{failure.detail ?? t('workflow.start.failed')}</p>
+          <p>{failure.message}</p>
           <p>{t('workflow.start.nextAction')}</p>
         </div>
       )}
-      <button type="submit" aria-busy={phase !== null} disabled={disabled}>
+      {failure?.kind === 'credits' && (
+        <CreditsRefusal
+          message={failure.message}
+          busy={startRun.isPending}
+          onRunAnyway={resend ? () => runAnyway(resend) : undefined}
+        />
+      )}
+      <button type="submit" aria-busy={phase !== null || startRun.isPending} disabled={disabled}>
         {startButtonLabel(phase, t)}
       </button>
     </form>

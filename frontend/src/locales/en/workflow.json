@@ -19,6 +19,7 @@
       "running": "Running",
       "completed": "Completed",
       "error": "Error",
+      "skipped": "Skipped",
       "needsYou": "Needs you"
     },
     "label": {
@@ -51,7 +52,8 @@
   "pipeline": {
     "region": "Steps",
     "hint": "Select a step to see its result.",
-    "retried": "Retried {{n}}×"
+    "retried": "Retried {{n}}×",
+    "notConfigured": "Not configured"
   },
   "run": {
     "heading": {
@@ -59,7 +61,9 @@
       "running": "Run in progress",
       "waitingApproval": "Waiting for your approval",
       "completed": "Run completed",
-      "error": "Run error"
+      "error": "Run error",
+      "cancelling": "Stopping…",
+      "cancelled": "Run cancelled"
     },
     "headingOther": "Run {{status}}",
     "back": "Back to workflow",
@@ -92,7 +96,7 @@
     "approveFailed": "Could not approve this step",
     "rejectFailed": "Could not reject this step",
     "scriptMovedOn": "This script moved on in another tab. Reload the page to see the latest revision.",
-    "alreadyDecided": "This step was already decided elsewhere.",
+    "contentEmpty": "Content can't be empty",
     "loadingScript": "Loading the script…",
     "scriptLoadError": "Could not load the script revisions.",
     "loadingTask": "Loading the step to review…",
@@ -145,14 +149,27 @@
   },
   "validation": {
     "noFile": "Choose a video or audio file to upload",
-    "fileSize": "Files must be between 1 byte and 500 MB.",
-    "fileSizeNext": "Choose a smaller file.",
+    "kindSize": "Files of this type must be at most {{max}} MB. Accepted: {{formats}}.",
     "fileType": "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
-    "imageSize": "Each image must be between 1 byte and 10 MB.",
     "imageType": "Use .jpg, .jpeg, .png or .webp.",
-    "imageCount": "Pick between {{min}} and {{max}} images.",
+    "noImage": "Add at least one product image",
     "tooManyImages": "At most {{max}} images per run.",
     "creatorLink": "Paste a valid TikTok or Douyin link"
+  },
+  "stop": {
+    "open": "Stop workflow",
+    "title": "Stop this workflow?",
+    "text": "The current step will finish, then the run stops. Remaining steps won't run and won't be charged. Results of finished steps are kept.",
+    "keep": "Keep running",
+    "confirm": "Stop",
+    "stopping": "Stopping…",
+    "failed": "Couldn't stop the run. Try again."
+  },
+  "incomplete": {
+    "summary": "This workflow can't run yet.",
+    "summaryStep": "This workflow can't run yet: step {{order}} is not fully configured.",
+    "line": "Step {{order}}: {{reason}}",
+    "lineNamed": "Step {{order}} · {{name}}: {{reason}}"
   },
   "detail": {
     "noWorkflow": "No workflow selected.",

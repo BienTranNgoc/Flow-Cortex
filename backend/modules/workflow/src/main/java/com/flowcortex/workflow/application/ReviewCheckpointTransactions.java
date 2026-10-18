@@ -89,6 +89,7 @@ class ReviewCheckpointTransactions {
         if (task == null || task.getStatus() != ReviewTaskStatus.APPROVED) {
             return false;
         }
+        workflowRunRepository.lockById(task.getRunId());
         WorkflowRun run = workflowRunRepository.findById(task.getRunId()).orElse(null);
         if (run == null || run.getStatus() != RunStatus.WAITING_APPROVAL) {
             return false;

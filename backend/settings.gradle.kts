@@ -8,6 +8,7 @@ include(
     ":modules:user",
     ":modules:workflow",
     ":modules:media",
+    ":modules:credit",
     ":shared:web",
     ":shared:security",
 )

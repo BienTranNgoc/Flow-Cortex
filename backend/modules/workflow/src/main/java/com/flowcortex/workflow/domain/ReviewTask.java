@@ -14,6 +14,9 @@ import java.util.UUID;
 @Table(name = "review_task")
 public class ReviewTask {
 
+    /** The refusal every losing or late decision on a task answers with. */
+    public static final LocalizedMessage NOT_WAITING_FOR_REVIEW = new LocalizedMessage("reviewTask.notWaitingForReview");
+
     @Id
     private UUID id;
 
@@ -162,9 +165,7 @@ public class ReviewTask {
 
     private void requirePending() {
         if (this.status != ReviewTaskStatus.PENDING) {
-            throw new ConflictException(this.status == ReviewTaskStatus.APPROVED
-                    ? new LocalizedMessage("reviewTask.alreadyApproved", this.id)
-                    : new LocalizedMessage("reviewTask.alreadyRejected", this.id));
+            throw new ConflictException(NOT_WAITING_FOR_REVIEW);
         }
     }
 

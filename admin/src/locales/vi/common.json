@@ -49,6 +49,7 @@
         "providers": "Nhà cung cấp",
         "usage": "Mức sử dụng",
         "users": "Người dùng",
+        "smsOutbox": "Hộp thư đi SMS",
         "settings": "Cài đặt",
         "auditLog": "Nhật ký kiểm toán"
       }

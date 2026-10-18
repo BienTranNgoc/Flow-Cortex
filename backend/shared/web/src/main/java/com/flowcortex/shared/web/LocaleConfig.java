@@ -30,6 +30,11 @@ public class LocaleConfig implements WebMvcConfigurer {
         return new AcceptLanguageHeaderResolver();
     }
 
+    @Bean
+    RequestLocale requestLocale(LocaleResolver localeResolver) {
+        return new RequestLocale(localeResolver);
+    }
+
     @Bean(name = "messageSource")
     MessageSource messageSource() {
         ResourceBundleMessageSource source = new ResourceBundleMessageSource();

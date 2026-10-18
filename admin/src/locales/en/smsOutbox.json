@@ -1,0 +1,11 @@
+{
+  "title": "SMS outbox",
+  "loading": "Loading SMS messages…",
+  "loadError": "Could not load SMS messages.",
+  "empty": "No SMS messages yet.",
+  "columns": {
+    "number": "Number",
+    "text": "Text",
+    "sent": "Sent"
+  }
+}

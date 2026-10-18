@@ -10,34 +10,61 @@ export const startRunSchema = z.object({
 
 export type StartRunFormValues = z.infer<typeof startRunSchema>;
 
-/**
- * The server's defaults for uploads (`flowcortex.media.upload`). Checked on pick only so a member
- * hears about a wrong file before uploading it; `/uploads` and the run start decide.
- */
-const MEDIA_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'mkv', 'm4a', 'mp3', 'wav']);
-// Mirrors FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES (default 524288000); when it changes, the server decides.
-const MAX_MEDIA_BYTES = 500 * 1024 * 1024;
+const MEGABYTE = 1024 * 1024;
 
-/** Translation keys, so a problem already on screen follows a language switch. */
+/**
+ * The server's default formats and caps per kind (`flowcortex.media.upload`), extensions in the
+ * order the server lists them. Checked on pick only so a member hears about a wrong file before
+ * uploading it; `/uploads` and the run start decide when an operator changed a cap.
+ */
+export interface UploadKind {
+  extensions: readonly string[];
+  maxBytes: number;
+}
+
+const VIDEO: UploadKind = { extensions: ['mp4', 'mov', 'webm', 'mkv'], maxBytes: 500 * MEGABYTE };
+const AUDIO: UploadKind = { extensions: ['mp3', 'wav', 'm4a'], maxBytes: 100 * MEGABYTE };
+export const IMAGE: UploadKind = {
+  extensions: ['jpg', 'jpeg', 'png', 'webp'],
+  maxBytes: 10 * MEGABYTE,
+};
+const MEDIA_KINDS: readonly UploadKind[] = [VIDEO, AUDIO];
+
+/** A translation key with its values, so a problem already on screen follows a language switch. */
 export interface FileProblem {
   messageKey: string;
-  nextActionKey?: string;
+  values?: Record<string, string | number>;
+}
+
+/** Lower-case extension of `fileName` without the dot, or `''` when it has none. */
+export function extensionOf(fileName: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return dot < 0 ? '' : fileName.slice(dot + 1).toLowerCase();
+}
+
+/**
+ * The server's `errors.size` sentence for `kind` (word for word in English) when `file` is empty
+ * or over the kind's cap; exactly the cap is accepted.
+ */
+export function sizeProblem(file: File, kind: UploadKind): FileProblem | null {
+  if (file.size >= 1 && file.size <= kind.maxBytes) {
+    return null;
+  }
+  const formats = kind.extensions.map((extension) => `.${extension}`).join(', ');
+  return {
+    messageKey: 'workflow.validation.kindSize',
+    values: { max: kind.maxBytes / MEGABYTE, formats },
+  };
 }
 
 export const NO_FILE: FileProblem = { messageKey: 'workflow.validation.noFile' };
 
 /** Why a picked file cannot be checked, or `null` when it may be uploaded. */
 export function mediaFileProblem(file: File): FileProblem | null {
-  if (file.size < 1 || file.size > MAX_MEDIA_BYTES) {
-    return {
-      messageKey: 'workflow.validation.fileSize',
-      nextActionKey: 'workflow.validation.fileSizeNext',
-    };
-  }
-  const dot = file.name.lastIndexOf('.');
-  const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
-  if (!MEDIA_EXTENSIONS.has(extension)) {
+  const extension = extensionOf(file.name);
+  const kind = MEDIA_KINDS.find((candidate) => candidate.extensions.includes(extension));
+  if (!kind) {
     return { messageKey: 'workflow.validation.fileType' };
   }
-  return null;
+  return sizeProblem(file, kind);
 }

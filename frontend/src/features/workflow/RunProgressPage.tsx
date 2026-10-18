@@ -1,11 +1,13 @@
-import type { RunResponse } from '@flow-cortex/api-client';
+import { ApiError, type RunResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
 import { StepDetail } from './StepDetail';
+import { StopRunDialog } from './StopRunDialog';
 import {
   choiceTakenBack,
   needsYouStep,
@@ -17,7 +19,7 @@ import {
   type StepChoice,
 } from './stepDisplay';
 import { NO_MESSAGE } from './stepErrorMessages';
-import { useRunQuery } from './useWorkflows';
+import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
 const RUN_HEADING_KEYS: Record<string, string> = {
   pending: 'workflow.run.heading.pending',
@@ -25,11 +27,83 @@ const RUN_HEADING_KEYS: Record<string, string> = {
   waiting_approval: 'workflow.run.heading.waitingApproval',
   completed: 'workflow.run.heading.completed',
   error: 'workflow.run.heading.error',
+  cancelling: 'workflow.run.heading.cancelling',
+  cancelled: 'workflow.run.heading.cancelled',
 };
 
 function runHeading(status: string | undefined, t: TFunction): string {
   const key = RUN_HEADING_KEYS[status ?? ''];
   return key ? t(key) : t('workflow.run.headingOther', { status });
+}
+
+const STOPPABLE: ReadonlySet<string> = new Set(['running', 'waiting_approval']);
+
+/** A refusal keeps the server's own sentence; a broken request or a server fault gets ours. */
+function stopProblem(error: unknown, t: TFunction): string {
+  const refusal =
+    error instanceof ApiError && error.status < 500 ? error.problem?.detail : undefined;
+  return refusal ?? t('workflow.stop.failed');
+}
+
+interface StopControlProps {
+  runId: string;
+  chargedCredits: number | null | undefined;
+  onStopped: () => void;
+}
+
+/** "Stop workflow", its confirmation, and what a failed stop says. Mounted only on a stoppable run. */
+function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlProps>) {
+  const { t } = useTranslation();
+  const { runCancellation } = useFeatures();
+  const cancel = useCancelRunMutation(runId);
+  const [open, setOpen] = useState(false);
+  const [creditsAtOpen, setCreditsAtOpen] = useState<number | null | undefined>();
+  // `isPending` lands a render later than a second press of a double click.
+  const sending = useRef(false);
+
+  if (!runCancellation) {
+    return null;
+  }
+
+  const onOpen = () => {
+    cancel.reset();
+    setCreditsAtOpen(chargedCredits);
+    setOpen(true);
+  };
+  const onStop = async () => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await cancel.mutateAsync();
+      setOpen(false);
+      onStopped();
+    } catch {
+      // The mutation holds the error, which the alert below reads.
+      setOpen(false);
+    } finally {
+      sending.current = false;
+    }
+  };
+
+  return (
+    <div className="run-stop">
+      <button type="button" className="run-stop-button" aria-haspopup="dialog" onClick={onOpen}>
+        {t('workflow.stop.open')}
+      </button>
+      {cancel.isError && (
+        <p role="alert" className="run-stop-error">
+          {stopProblem(cancel.error, t)}
+        </p>
+      )}
+      <StopRunDialog
+        open={open}
+        chargedCredits={creditsAtOpen}
+        stopping={cancel.isPending}
+        onKeep={() => setOpen(false)}
+        onStop={() => void onStop()}
+      />
+    </div>
+  );
 }
 
 /**
@@ -83,6 +157,12 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       });
     }
   }, [asksForFocus, location.pathname, location.search, location.hash, navigate]);
+  // "Stop workflow" leaves with the status it was offered under, so focus moves to the heading.
+  const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    if (stopped) headingRef.current?.focus();
+  }, [stopped]);
+
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
     selected && selectedState ? `${stepLabel(selected, t)}, ${stateWord(selectedState, t)}` : '';
@@ -122,6 +202,13 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       <h1 ref={headingRef} tabIndex={-1}>
         {runHeading(run.status, t)}
       </h1>
+      {STOPPABLE.has(run.status ?? '') && (
+        <StopControl
+          runId={runId}
+          chargedCredits={run.chargedCredits}
+          onStopped={() => setStopped(true)}
+        />
+      )}
       <div role="status" className="visually-hidden">
         {announced}
       </div>

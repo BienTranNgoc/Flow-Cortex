@@ -1,18 +1,23 @@
 package com.flowcortex.user.application;
 
 import com.flowcortex.shared.web.AccountLockedException;
-import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OAuthFailure;
 import com.flowcortex.user.api.OAuthLoginException;
+import com.flowcortex.user.api.UserCreatedEvent;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
+import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
+import com.flowcortex.user.emailconfirm.EmailConfirmationService;
+import com.flowcortex.user.emailconfirm.EmailNotConfirmedException;
+import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -23,13 +28,17 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -45,6 +54,10 @@ class AuthServiceImpl implements AuthService {
 
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
 
+    private static final String CONFIRMATION_LINK_INVALID_CODE = "CONFIRMATION_LINK_INVALID";
+
+    private static final String USERNAME_UNIQUE_INDEX = "uq_app_user_username";
+
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
@@ -55,12 +68,17 @@ class AuthServiceImpl implements AuthService {
     private final AuditEventWriter audit;
     private final RegistrationProperties registration;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
+    private final TransactionTemplate accountInsert;
+    private final EmailConfirmationService emailConfirmation;
+    private final EmailConfirmationProperties emailConfirmationProperties;
 
     AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokenService, LoginAttemptRecorder loginAttempts,
             LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
             GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, RegistrationProperties registration,
-            Clock clock) {
+            Clock clock, ApplicationEventPublisher events, PlatformTransactionManager transactionManager,
+            EmailConfirmationService emailConfirmation, EmailConfirmationProperties emailConfirmationProperties) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -71,11 +89,15 @@ class AuthServiceImpl implements AuthService {
         this.audit = audit;
         this.registration = registration;
         this.clock = clock;
+        this.events = events;
+        this.accountInsert = new TransactionTemplate(transactionManager);
+        this.emailConfirmation = emailConfirmation;
+        this.emailConfirmationProperties = emailConfirmationProperties;
     }
 
     @Override
-    public AuthSession register(String rawEmail, String rawPassword, String name, boolean rememberMe, String ip,
-            String userAgent) {
+    public Optional<AuthSession> register(String rawEmail, String rawPassword, String firstName, String lastName,
+            String username, boolean rememberMe, String ip, String userAgent) {
         String email = normalizeEmail(rawEmail);
         String agent = truncate(userAgent);
         try {
@@ -85,17 +107,48 @@ class AuthServiceImpl implements AuthService {
             throw ex;
         }
         AppUser owner = requireRegistrationOwner();
-        AppUser user = new AppUser(UUID.randomUUID(), owner.getId(), email, passwordEncoder.encode(rawPassword), name,
-                Role.MEMBER, UserStatus.ACTIVE);
+        boolean confirmationRequired = emailConfirmationProperties.enabled();
+        AppUser user = AppUser.selfRegistered(UUID.randomUUID(), owner.getId(), email,
+                passwordEncoder.encode(rawPassword), firstName.trim(), lastName.trim(), username,
+                confirmationRequired ? null : Instant.now(clock));
         try {
-            userRepository.saveAndFlush(user);
+            insertAccount(user, confirmationRequired);
         } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException(new LocalizedMessage("user.emailTaken", email));
+            throw isUsernameTaken(ex) ? RegistrationConflictException.usernameTaken()
+                    : RegistrationConflictException.emailTaken();
         }
-        AuthSession session = refreshTokenService.issueFor(user, ip, agent, rememberMe);
         audit.write(AuthEventType.REGISTRATION_ACCEPTED, user.getId(), ip, agent,
                 AuthEventType.userMetadata(user.getId()));
+        if (confirmationRequired) {
+            LOG.info("Registration accepted: outcome=confirmation_sent userId={}", user.getId());
+            return Optional.empty();
+        }
+        return Optional.of(refreshTokenService.issueFor(user, ip, agent, rememberMe));
+    }
+
+    @Override
+    public AuthSession confirmEmail(String rawToken, String ip, String userAgent) {
+        String agent = truncate(userAgent);
+        AppUser user = emailConfirmation.confirm(rawToken)
+                .orElseThrow(() -> new UnprocessableEntityException(
+                        new LocalizedMessage("auth.confirmationLinkInvalid"), CONFIRMATION_LINK_INVALID_CODE));
+        requireNotLocked(user, ip, agent);
+        requireActive(user, ip, agent);
+        AuthSession session = refreshTokenService.issueFor(user, ip, agent, false);
+        audit.write(AuthEventType.LOGIN_SUCCESS, user.getId(), ip, agent, AuthEventType.userMetadata(user.getId()));
         return session;
+    }
+
+    @Override
+    public void resendConfirmation(String rawEmail, String ip, String userAgent) {
+        String email = normalizeEmail(rawEmail);
+        try {
+            registrationRateLimiter.acquire(ip, email);
+        } catch (RegistrationRateLimitedException ex) {
+            LOG.info("email_confirmation outcome=resend_rate_limited");
+            throw ex;
+        }
+        emailConfirmation.resend(email);
     }
 
     @Override
@@ -117,6 +170,10 @@ class AuthServiceImpl implements AuthService {
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
         requireActive(user, ip, agent);
+        if (!user.isEmailConfirmed()) {
+            LOG.info("Login refused: outcome=email_not_confirmed userId={}", user.getId());
+            throw new EmailNotConfirmedException();
+        }
         if (user.getFailedLoginAttempts() > 0 || user.getLockedUntil() != null) {
             loginAttempts.recordSuccess(user.getId());
         }
@@ -245,13 +302,29 @@ class AuthServiceImpl implements AuthService {
                 UserStatus.ACTIVE, false);
         fresh.linkGoogle(subject);
         try {
-            userRepository.saveAndFlush(fresh);
+            insertAccount(fresh, false);
         } catch (DataIntegrityViolationException ex) {
             throw refuse(OAuthFailure.LINK_REQUIRED, null, ip, agent, emailMetadata);
         }
         audit.write(AuthEventType.REGISTRATION_ACCEPTED, fresh.getId(), ip, agent,
                 AuthEventType.userMetadata(fresh.getId()));
         return fresh;
+    }
+
+    /** The insert and its event commit together, so no committed account lacks its event. */
+    private void insertAccount(AppUser user, boolean mailConfirmationLink) {
+        accountInsert.executeWithoutResult(status -> {
+            userRepository.saveAndFlush(user);
+            events.publishEvent(new UserCreatedEvent(user.getId()));
+            if (mailConfirmationLink) {
+                emailConfirmation.issue(user.getId(), user.getEmail());
+            }
+        });
+    }
+
+    private static boolean isUsernameTaken(DataIntegrityViolationException ex) {
+        String message = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
+        return message != null && message.contains(USERNAME_UNIQUE_INDEX);
     }
 
     private OAuthLoginException refuse(OAuthFailure failure, UUID userId, String ip, String agent,

@@ -3,9 +3,11 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
+import enCredits from '../locales/en/credits.json';
 import enWorkflow from '../locales/en/workflow.json';
 import viAuth from '../locales/vi/auth.json';
 import viCommon from '../locales/vi/common.json';
+import viCredits from '../locales/vi/credits.json';
 import viWorkflow from '../locales/vi/workflow.json';
 
 export const SUPPORTED_LOCALES = ['vi', 'en'] as const;
@@ -42,8 +44,12 @@ void i18n
   .use(initReactI18next)
   .init({
     resources: {
-      vi: { translation: { common: viCommon, auth: viAuth, workflow: viWorkflow } },
-      en: { translation: { common: enCommon, auth: enAuth, workflow: enWorkflow } },
+      vi: {
+        translation: { common: viCommon, auth: viAuth, workflow: viWorkflow, credits: viCredits },
+      },
+      en: {
+        translation: { common: enCommon, auth: enAuth, workflow: enWorkflow, credits: enCredits },
+      },
     },
     supportedLngs: SUPPORTED_LOCALES,
     fallbackLng: 'vi',

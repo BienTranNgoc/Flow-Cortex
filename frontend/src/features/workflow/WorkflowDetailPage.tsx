@@ -1,15 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import { ApiError } from '@flow-cortex/api-client';
+import { ApiError, type StartRunRequest, type WorkflowStepResponse } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
+import { activeLocale } from '../../lib/i18n';
+import { CreditsRefusal } from '../credits/CreditsRefusal';
+import { formatCredits } from '../credits/formatCredits';
+import { invalidateBalance } from '../credits/useBalance';
 import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
 import { Pipeline } from './Pipeline';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
 import { stepKey } from './stepDisplay';
+import { startProblem, type IncompleteStep, type IncompleteWorkflow } from './startProblem';
 import { startRunSchema, type StartRunFormValues } from './startRunSchema';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
@@ -18,31 +25,63 @@ import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 function InlineStartForm({
   workflowId,
   disabled,
-}: Readonly<{ workflowId: string; disabled: boolean }>) {
+  onIncomplete,
+}: Readonly<{
+  workflowId: string;
+  disabled: boolean;
+  onIncomplete: (problem: IncompleteWorkflow | null) => void;
+}>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
+  const queryClient = useQueryClient();
   const startRunMutation = useStartRunMutation(workflowId);
+  // The refused start, so "Run anyway" resends exactly what the member submitted.
+  const lastBody = useRef<StartRunRequest>({});
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
     defaultValues: { input: '' },
   });
 
-  const startError =
-    startRunMutation.error instanceof ApiError ? startRunMutation.error.problem : undefined;
   // Execution-disabled (kill switch off) is a 503 — show the reason plus a concrete next action
   // rather than a bare error or a spinner that never resolves.
   const isExecutionDisabled =
     startRunMutation.error instanceof ApiError && startRunMutation.error.status === 503;
+  const problem = startRunMutation.error
+    ? startProblem(
+        startRunMutation.error,
+        isExecutionDisabled ? t('workflow.start.executionDisabled') : undefined,
+        t,
+        activeLocale(),
+      )
+    : null;
+  const alertMessage =
+    problem?.kind === 'field' || problem?.kind === 'alert' ? problem.message : null;
 
-  const onStart = handleSubmit((values) => {
-    const trimmedInput = values.input?.trim();
-    startRunMutation.mutate(trimmedInput ? { input: trimmedInput } : {}, {
+  const start = (body: StartRunRequest) => {
+    if (startRunMutation.isPending) {
+      return;
+    }
+    onIncomplete(null);
+    lastBody.current = body;
+    startRunMutation.mutate(body, {
       onSuccess: (run) => {
+        void invalidateBalance(queryClient);
         if (run.id) {
           go(`/workflows/${workflowId}/runs/${run.id}`);
         }
       },
+      onError: (error) => {
+        const refused = startProblem(error, undefined, t, activeLocale());
+        if (refused.kind === 'incomplete') {
+          onIncomplete(refused);
+        }
+      },
     });
+  };
+
+  const onStart = handleSubmit((values) => {
+    const trimmedInput = values.input?.trim();
+    start(trimmedInput ? { input: trimmedInput } : {});
   });
 
   return (
@@ -51,16 +90,22 @@ function InlineStartForm({
         <label htmlFor="run-input">{t('workflow.start.inputLabel')}</label>
         <input id="run-input" {...register('input')} />
       </div>
-      {startError && (
+      {alertMessage && (
         <div role="alert">
-          <p>
-            {startError.detail ??
-              (isExecutionDisabled
-                ? t('workflow.start.executionDisabled')
-                : t('workflow.start.failed'))}
-          </p>
+          <p>{alertMessage}</p>
           <p>{t('workflow.start.nextActionLater')}</p>
         </div>
+      )}
+      {problem?.kind === 'credits' && (
+        <CreditsRefusal
+          message={problem.message}
+          busy={startRunMutation.isPending}
+          onRunAnyway={
+            problem.canRunAnyway
+              ? () => start({ ...lastBody.current, acknowledgeCost: true })
+              : undefined
+          }
+        />
       )}
       <button type="submit" disabled={startRunMutation.isPending || disabled}>
         {startRunMutation.isPending ? t('workflow.start.starting') : t('workflow.start.button')}
@@ -85,7 +130,19 @@ export function WorkflowDetailPage() {
   if (!id) {
     return <p role="alert">{t('workflow.detail.noWorkflow')}</p>;
   }
-  return <WorkflowDetailView workflowId={id} />;
+  return <WorkflowDetailView key={id} workflowId={id} />;
+}
+
+/** "Step 2 · Echo step 2: reason", or "Step 2: reason" when the workflow has no such named step. */
+function incompleteLine(
+  step: IncompleteStep,
+  steps: readonly WorkflowStepResponse[] | undefined,
+  t: TFunction,
+): string {
+  const name = steps?.find((candidate) => candidate.stepOrder === step.order)?.name;
+  return name
+    ? t('workflow.incomplete.lineNamed', { order: step.order, name, reason: step.reason })
+    : t('workflow.incomplete.line', { order: step.order, reason: step.reason });
 }
 
 function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
@@ -93,6 +150,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   const workflowQuery = useWorkflowQuery(workflowId);
   const capabilitiesQuery = useCapabilitiesQuery();
   const workflow = workflowQuery.data;
+  const [incomplete, setIncomplete] = useState<IncompleteWorkflow | null>(null);
   // Until the capabilities settle, no form renders: guessing would briefly show the generic form
   // (4 steps + plain input) before switching to the 5-field product form. If they fail, the
   // generic form is safe — the server refuses a Product Video start through the generic route.
@@ -104,12 +162,20 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   const startDisabled = workflowQuery.isLoading || workflowQuery.isError || !workflow;
   let startForm: ReactNode = null;
   if (isProductVideo) {
-    startForm = <ProductVideoStartForm disabled={startDisabled} />;
+    startForm = <ProductVideoStartForm disabled={startDisabled} onIncomplete={setIncomplete} />;
   } else if (workflow && !capabilitiesQuery.isPending) {
     startForm = startsWithUpload ? (
-      <MediaStartForm workflowId={workflowId} disabled={startDisabled} />
+      <MediaStartForm
+        workflowId={workflowId}
+        disabled={startDisabled}
+        onIncomplete={setIncomplete}
+      />
     ) : (
-      <InlineStartForm workflowId={workflowId} disabled={startDisabled} />
+      <InlineStartForm
+        workflowId={workflowId}
+        disabled={startDisabled}
+        onIncomplete={setIncomplete}
+      />
     );
   }
 
@@ -126,10 +192,31 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           steps={workflow.steps.map((step) => ({
             id: stepKey(step),
             name: step.name ?? t('workflow.step.fallback', { order: step.stepOrder }),
+            order: step.stepOrder,
           }))}
+          problemOrder={incomplete?.firstOrder ?? undefined}
         />
       )}
+      {incomplete && (
+        <div role="alert" className="form-error">
+          <p>{incomplete.summary}</p>
+          {incomplete.steps.length > 0 && (
+            <ul>
+              {incomplete.steps.map((step) => (
+                <li key={step.order}>{incompleteLine(step, workflow?.steps, t)}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {startForm}
+      {startForm && typeof workflow?.estimatedCredits === 'number' && (
+        <p className="field-hint">
+          {t('credits.estimatedCost', {
+            amount: formatCredits(workflow.estimatedCredits, activeLocale()),
+          })}
+        </p>
+      )}
     </main>
   );
 }

@@ -450,8 +450,9 @@ a {
     padding-inline: 1rem;
   }
 
-  .cortex-gpu-pill span {
-    display: none;
+  .cortex-gpu-pill {
+    padding-inline: 0.5rem;
+    white-space: nowrap;
   }
 
   .cortex-footer__links {

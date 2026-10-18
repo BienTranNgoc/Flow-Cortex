@@ -12,6 +12,7 @@ import { useMeQuery } from './features/auth/useAuth';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { RunsPage } from './features/runs/RunsPage';
+import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
 
@@ -20,6 +21,7 @@ const PAGES: Record<string, ReactElement> = {
   '/runs': <RunsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/users': <UsersPage />,
+  '/sms-outbox': <SmsOutboxPage />,
 };
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */

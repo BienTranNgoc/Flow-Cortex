@@ -3,7 +3,8 @@ import type { TFunction } from 'i18next';
 import { formatDateTime, formatNumber } from '../../lib/format';
 import type { Locale } from '../../lib/i18n';
 
-export type StepState = 'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'needs-you';
+export type StepState =
+  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'skipped' | 'needs-you';
 export type EdgeState = 'done' | 'active' | 'broken' | 'pending';
 
 /** The member's own pick, with the run status and the step waiting for approval at that moment. */
@@ -24,6 +25,7 @@ const STATE_WORD_KEYS: Record<StepState, string> = {
   running: 'workflow.step.state.running',
   completed: 'workflow.step.state.completed',
   error: 'workflow.step.state.error',
+  skipped: 'workflow.step.state.skipped',
   'needs-you': 'workflow.step.state.needsYou',
 };
 
@@ -72,6 +74,7 @@ export function stepState(
       return step.pickedUpAt ? 'running' : 'waiting';
     case 'completed':
     case 'error':
+    case 'skipped':
       return step.status;
     default:
       return 'pending';

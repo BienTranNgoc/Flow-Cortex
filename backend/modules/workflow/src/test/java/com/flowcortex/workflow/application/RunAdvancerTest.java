@@ -23,6 +23,7 @@ import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
@@ -87,7 +88,8 @@ class RunAdvancerTest {
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
-    private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
+    private final RunStepTransactions transactions =
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class));
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 

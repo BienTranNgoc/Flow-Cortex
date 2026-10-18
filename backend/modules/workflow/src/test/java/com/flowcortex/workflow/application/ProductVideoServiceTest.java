@@ -14,6 +14,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.domain.ProductVideoInput;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
@@ -25,6 +26,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +51,7 @@ class ProductVideoServiceTest {
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                transactions, enabled, true);
+                transactions, new RunStartGuards(List.of()), enabled, true);
     }
 
     @Test
@@ -59,6 +61,30 @@ class ProductVideoServiceTest {
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
                         .isEqualTo(503));
 
+        verify(media, never()).resolveImageUploads(any(), any());
+        verify(runs, never()).save(any());
+    }
+
+    @Test
+    void aRefusingStartGuardStopsTheRunBeforeUploadsAreResolved() {
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(ProductVideoWorkflow.ID, UUID.randomUUID(), "Product Video", true);
+        when(media.isEnabled()).thenReturn(true);
+        when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
+                .thenReturn(List.of(step(1, "generate_script")));
+        List<Boolean> acknowledged = new ArrayList<>();
+        RunStartGuard refusing = (owner, workflowId, steps, context) -> {
+            acknowledged.add(context.acknowledgeCost());
+            throw new IllegalStateException("refused");
+        };
+        ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
+                registry, events, transactions, new RunStartGuards(List.of(refusing)), true, true);
+
+        assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
+                .hasMessage("refused");
+
+        assertThat(acknowledged).containsExactly(true);
         verify(media, never()).resolveImageUploads(any(), any());
         verify(runs, never()).save(any());
     }

@@ -60,7 +60,7 @@ class WorkflowRunServiceImplTest {
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
                 runStepRepository, events, registry, mediaJobs, mock(UserDirectory.class),
-                new TransactionTemplate(transactions), workflowEnabled);
+                new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {

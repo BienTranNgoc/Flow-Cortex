@@ -250,8 +250,11 @@ describe('RunsPage', () => {
       const options = within(screen.getByRole('combobox')).getAllByRole('option').slice(1);
       expect(options.map((option) => [option.getAttribute('value'), option.textContent])).toEqual([
         ['running', viRuns.status.running],
+        ['waiting_approval', viRuns.status.waiting_approval],
         ['completed', viRuns.status.completed],
         ['error', viRuns.status.error],
+        ['cancelling', 'Đang dừng'],
+        ['cancelled', 'Đã hủy'],
       ]);
     });
   });

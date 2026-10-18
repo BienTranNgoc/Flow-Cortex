@@ -28,7 +28,7 @@
     "profile": "Profile",
     "docs": "Docs",
     "api": "API",
-    "gpuCredits": "18 GPU Credits",
+    "credits": "{{amount}} credits",
     "signOut": "Sign out"
   },
   "shell": {
