@@ -21,28 +21,32 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 10;
 
+/** A translation key with its values, so a problem already on screen follows a language switch. */
 export interface ImageProblem {
-  message: string;
+  messageKey: string;
+  values?: Record<string, number>;
 }
 
 export function imageFileProblem(file: File): ImageProblem | null {
   if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    return { message: 'Each image must be between 1 byte and 10 MB.' };
+    return { messageKey: 'workflow.validation.imageSize' };
   }
   const dot = file.name.lastIndexOf('.');
   const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
   if (!IMAGE_EXTENSIONS.has(extension)) {
-    return { message: 'Use .jpg, .jpeg, .png or .webp.' };
+    return { messageKey: 'workflow.validation.imageType' };
   }
   return null;
 }
 
 export const EMPTY_IMAGE_LIST: ImageProblem = {
-  message: `Pick between ${MIN_IMAGES} and ${MAX_IMAGES} images.`,
+  messageKey: 'workflow.validation.imageCount',
+  values: { min: MIN_IMAGES, max: MAX_IMAGES },
 };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
-  message: `At most ${MAX_IMAGES} images per run.`,
+  messageKey: 'workflow.validation.tooManyImages',
+  values: { max: MAX_IMAGES },
 };
 
 /** Walks `files`; returns the first ImageProblem found or null. */

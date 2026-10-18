@@ -1,0 +1,98 @@
+{
+  "errorView": {
+    "title": "Đã xảy ra lỗi",
+    "message": "Không thể hiển thị trang này. Hãy tải lại để thử lần nữa.",
+    "reload": "Tải lại"
+  },
+  "errors": {
+    "requestFailed": "Không thực hiện được yêu cầu. Hãy thử lại."
+  },
+  "units": {
+    "milliseconds": "{{value}} ms",
+    "secondsShort": "{{value}} giây",
+    "seconds": "{{value}} giây",
+    "minutes": "{{value}} phút",
+    "minutesSeconds": "{{minutes}} phút {{seconds}} giây",
+    "megabytes": "{{value}} MB"
+  },
+  "language": {
+    "groupLabel": "Ngôn ngữ",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "nav": {
+    "homeLink": "Trang chủ FlowCortex",
+    "label": "Điều hướng chính",
+    "home": "Trang chủ",
+    "workflows": "Quy trình",
+    "profile": "Hồ sơ",
+    "docs": "Tài liệu",
+    "api": "API",
+    "gpuCredits": "18 Credit GPU",
+    "signOut": "Đăng xuất"
+  },
+  "shell": {
+    "brandPanel": {
+      "headline": "<highlight>Studio</highlight> media AI của bạn cho các quy trình chuẩn sản xuất.",
+      "lede": "Lấy nguồn, xử lý, duyệt và xuất media chỉ với một cú nhấp — dành cho nhà sáng tạo cần đầu ra ổn định, chứ không phải một công cụ cho vui.",
+      "pipelines": "Ba quy trình sản xuất dùng được ngay",
+      "reviewGates": "Bước duyệt thủ công có sẵn trong mọi lượt chạy nhiều bước",
+      "retention": "Mặc định lưu giữ đầu ra và cấp liên kết tải xuống có chữ ký"
+    },
+    "footer": {
+      "tagline": "Quy trình media dùng AI cho nhà sáng tạo cần đầu ra ổn định.",
+      "social": "FlowCortex trên {{network}}",
+      "product": "Sản phẩm",
+      "features": "Tính năng",
+      "pricing": "Bảng giá",
+      "changelog": "Nhật ký thay đổi",
+      "roadmap": "Lộ trình",
+      "resources": "Tài nguyên",
+      "documentation": "Tài liệu",
+      "apiReference": "Tài liệu tham khảo API",
+      "guides": "Hướng dẫn",
+      "systemStatus": "Trạng thái hệ thống",
+      "legal": "Pháp lý",
+      "privacy": "Chính sách quyền riêng tư",
+      "terms": "Điều khoản dịch vụ",
+      "cookies": "Chính sách cookie",
+      "copyright": "© {{year}} FlowCortex. Bảo lưu mọi quyền."
+    }
+  },
+  "home": {
+    "loading": "Đang tải…",
+    "loadProfileError": "Không tải được hồ sơ của bạn.",
+    "retry": "Thử lại",
+    "eyebrow": "KHÔNG GIAN SÁNG TẠO · SẴN SÀNG BẮT ĐẦU",
+    "headline": "<highlight>Studio</highlight> media AI của bạn",
+    "lede": "Một cú nhấp khởi chạy quy trình sẵn sàng cho sản xuất: lấy nguồn, xử lý, duyệt, xuất.",
+    "pickTitle": "Chọn một quy trình",
+    "loadingWorkflows": "Đang tải quy trình…",
+    "loadWorkflowsError": "Không tải được danh sách quy trình.",
+    "empty": "Chưa có quy trình nào.",
+    "untitled": "Quy trình chưa đặt tên",
+    "stepFallback": "Bước {{order}}",
+    "launch": "Khởi chạy quy trình →",
+    "stagesTitle": "Cách Flow-Cortex xử lý các lượt chạy video của bạn",
+    "stages": {
+      "source": {
+        "title": "Nguồn",
+        "body": "Gửi liên kết hoặc tải lên tệp media. Các trường bắt buộc và giới hạn được kiểm tra ngay từ đầu."
+      },
+      "process": {
+        "title": "Xử lý",
+        "body": "Hệ thống chạy từng bước theo thứ tự. Trạng thái, số lần thử và lỗi được lưu ở mọi nút."
+      },
+      "review": {
+        "title": "Duyệt",
+        "body": "Tạm dừng ở các bước duyệt bạn đã cấu hình. Chỉnh sửa nội dung, rồi duyệt để tiếp tục."
+      },
+      "export": {
+        "title": "Xuất",
+        "body": "Tải xuống kết quả hoàn chỉnh khi nó vẫn còn trong thời hạn lưu giữ tệp."
+      }
+    },
+    "welcome": "Chào mừng, {{name}}",
+    "viewAll": "Xem tất cả quy trình"
+  }
+}

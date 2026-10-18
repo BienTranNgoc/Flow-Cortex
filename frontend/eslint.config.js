@@ -4,6 +4,8 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import prettier from 'eslint-config-prettier';
+import i18next from 'eslint-plugin-i18next';
+import i18nextDefaults from 'eslint-plugin-i18next/lib/options/defaults.js';
 
 export default tseslint.config(
   {
@@ -42,6 +44,30 @@ export default tseslint.config(
       globals: {
         ...globals.node,
       },
+    },
+  },
+  {
+    ...i18next.configs['flat/recommended'],
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.{test,spec}.{ts,tsx}', 'src/test/**'],
+    rules: {
+      'i18next/no-literal-string': [
+        'error',
+        {
+          mode: 'jsx-only',
+          'jsx-attributes': { include: ['aria-label', 'placeholder', 'title', 'alt'] },
+          // The rule replaces an option's default list rather than extending it.
+          words: {
+            exclude: [
+              ...i18nextDefaults.words.exclude,
+              'FlowCortex',
+              'FLOWCORTEX AI 2\\.5',
+            ],
+          },
+          // react-hook-form field names
+          callees: { exclude: [...i18nextDefaults.callees.exclude, 'register'] },
+        },
+      ],
     },
   },
   prettier,

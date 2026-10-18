@@ -1,0 +1,31 @@
+{
+  "title": "Media jobs",
+  "noun": "media jobs",
+  "columns": {
+    "jobId": "Job id",
+    "run": "Run",
+    "step": "Step",
+    "capability": "Capability",
+    "status": "Status",
+    "detail": "Detail",
+    "attempt": "Attempt",
+    "deliveryCount": "Delivery count",
+    "pickedUp": "Picked up",
+    "queueDeadline": "Queue deadline",
+    "leaseUntil": "Lease until",
+    "runDeadline": "Run deadline"
+  },
+  "detail": {
+    "queueTimeoutPending": "queue timeout pending",
+    "waiting": "waiting",
+    "runTimeoutPending": "run timeout pending",
+    "leaseExpired": "lease expired",
+    "running": "running"
+  },
+  "status": {
+    "pending": "pending",
+    "running": "running",
+    "completed": "completed",
+    "error": "error"
+  }
+}

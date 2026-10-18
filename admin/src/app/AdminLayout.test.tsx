@@ -109,7 +109,8 @@ describe('AdminLayout', () => {
     );
     expect(screen.getByRole('menuitem', { name: 'Account' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Settings.*Coming soon/ })).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: /Language.*Coming soon/ })).toBeDisabled();
+    expect(screen.queryByRole('menuitem', { name: /Language/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Page action' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();

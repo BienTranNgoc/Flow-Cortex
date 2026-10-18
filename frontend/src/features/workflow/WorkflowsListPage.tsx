@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../auth/useAuth';
 import './WorkflowPages.css';
@@ -7,6 +8,7 @@ import { useCapabilitiesQuery } from './useCapabilities';
 /** `/workflows` — list = owner OR shared. Hides the Product Video entry when its feature flag is
  * off, since the start endpoint would 503 the request otherwise. */
 export function WorkflowsListPage() {
+  const { t } = useTranslation();
   const workflowsQuery = useWorkflowsQuery();
   const meQuery = useMeQuery();
   const capabilitiesQuery = useCapabilitiesQuery();
@@ -26,27 +28,31 @@ export function WorkflowsListPage() {
 
   return (
     <main className="workflows">
-      <h1 className="visually-hidden">Workflows</h1>
+      <h1 className="visually-hidden">{t('workflow.list.heading')}</h1>
       <section className="workflows-list-section" aria-labelledby="workflows-list-title">
-        <h2 id="workflows-list-title">Your workflows</h2>
+        <h2 id="workflows-list-title">{t('workflow.list.yours')}</h2>
         {(workflowsQuery.isLoading || (capabilitiesQuery.isPending && !workflowsQuery.isError)) && (
-          <output>Loading workflows…</output>
+          <output>{t('workflow.list.loading')}</output>
         )}
-        {workflowsQuery.isError && <p role="alert">Could not load workflows.</p>}
-        {visible?.length === 0 && <p>No workflows yet.</p>}
+        {workflowsQuery.isError && <p role="alert">{t('workflow.list.loadError')}</p>}
+        {visible?.length === 0 && <p>{t('workflow.list.empty')}</p>}
         {visible && visible.length > 0 && (
           <ul className="workflow-list">
             {visible.map((workflow) => (
               <li key={workflow.id} className="workflow-card">
                 <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
-                {workflow.isShared && <span className="workflow-badge">Shared</span>}
+                {workflow.isShared && (
+                  <span className="workflow-badge">{t('workflow.list.shared')}</span>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {meQuery.data?.name && <p className="workflows-footer">Welcome, {meQuery.data.name}</p>}
+      {meQuery.data?.name && (
+        <p className="workflows-footer">{t('workflow.list.welcome', { name: meQuery.data.name })}</p>
+      )}
     </main>
   );
 }

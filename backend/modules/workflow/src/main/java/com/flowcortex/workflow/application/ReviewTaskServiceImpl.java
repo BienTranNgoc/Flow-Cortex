@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ReviewTaskService;
 import com.flowcortex.workflow.api.ReviewTaskView;
@@ -72,7 +73,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     public List<ReviewTaskView> getTasksByRunId(UUID runId, UUID ownerId) {
         // IDOR guard: ensure the run exists and belongs to the caller
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, ownerId)
-            .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+            .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
 
         return reviewTaskRepository.findByRunId(run.getId()).stream()
             .map(this::toView)
@@ -83,27 +84,27 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     public ReviewTaskView approveTask(UUID taskId, UUID reviewerId, String reviewedPayload,
             UUID revisionId, Long expectedVersion) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
-            .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
+            .orElseThrow(() -> new NotFoundException(new LocalizedMessage("reviewTask.notFound", taskId)));
 
         // IDOR guard: check ownership of the parent run
         workflowRunRepository.findByIdAndOwnerId(task.getRunId(), reviewerId)
-            .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+            .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", task.getRunId())));
 
         String payload;
         if (task.getCurrentRevisionId() != null) {
             if (revisionId == null || expectedVersion == null) {
-                throw new ConflictException("revisionId and expectedVersion are required for script approval");
+                throw new ConflictException(new LocalizedMessage("reviewTask.scriptApprovalNeedsRevision"));
             }
             if (reviewedPayload != null) {
-                throw new ConflictException("reviewedPayload is not accepted for script approval");
+                throw new ConflictException(new LocalizedMessage("reviewTask.scriptApprovalTakesNoPayload"));
             }
             ScriptRevision revision = scriptRevisionRepository.findByIdAndReviewTaskId(revisionId, taskId)
-                    .orElseThrow(() -> new NotFoundException("Script revision not found: " + revisionId));
+                    .orElseThrow(() -> new NotFoundException(new LocalizedMessage("reviewTask.revisionNotFound", revisionId)));
             task.approveRevision(reviewerId, revisionId, expectedVersion, clock.instant());
             payload = revision.getContent();
         } else {
             if (revisionId != null || expectedVersion != null) {
-                throw new ConflictException("revisionId and expectedVersion are not accepted for plain approval");
+                throw new ConflictException(new LocalizedMessage("reviewTask.plainApprovalTakesNoRevision"));
             }
             task.approve(reviewerId, reviewedPayload, clock.instant());
             payload = task.getReviewedPayload() != null && !task.getReviewedPayload().isBlank()
@@ -119,7 +120,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     public ScriptRevisionView saveRevision(UUID taskId, UUID reviewerId, String content, long expectedVersion) {
         ReviewTask task = ownedTask(taskId, reviewerId);
         if (task.getCurrentRevisionId() == null) {
-            throw new ConflictException("This review task does not use script revisions");
+            throw new ConflictException(new LocalizedMessage("reviewTask.noScriptRevisions"));
         }
         // The `@Version` guard in `attachRevision` runs inside this transaction, so a stale tab
         // rolls the insert back; the flush turns a concurrent writer's `revision_number` clash into
@@ -130,7 +131,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         try {
             scriptRevisionRepository.saveAndFlush(revision);
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("Another revision was saved first; reload and try again");
+            throw new ConflictException(new LocalizedMessage("reviewTask.revisionSavedFirst"));
         }
         task.attachRevision(revision.getId(), expectedVersion);
         reviewTaskRepository.saveAndFlush(task);
@@ -148,17 +149,17 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     @Override
     public ReviewTaskView rejectTask(UUID taskId, UUID reviewerId) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
-            .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
+            .orElseThrow(() -> new NotFoundException(new LocalizedMessage("reviewTask.notFound", taskId)));
 
         // IDOR guard: check ownership of the parent run
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(task.getRunId(), reviewerId)
-            .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+            .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", task.getRunId())));
 
         Instant now = clock.instant();
         task.reject(reviewerId, now);
         if (runStepRepository.failPendingApproval(task.getRunStepId(), task.getRunId(),
                 "APPROVAL_REJECTED", "Approval rejected", now) != 1) {
-            throw new ConflictException("Approval step is no longer pending: " + task.getRunStepId());
+            throw new ConflictException(new LocalizedMessage("reviewTask.approvalNotPending", task.getRunStepId()));
         }
         run.markError("Approval rejected", now);
         workflowRunRepository.save(run);
@@ -191,9 +192,9 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
 
     private ReviewTask ownedTask(UUID taskId, UUID ownerId) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
-                .orElseThrow(() -> new NotFoundException("ReviewTask not found: " + taskId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("reviewTask.notFound", taskId)));
         workflowRunRepository.findByIdAndOwnerId(task.getRunId(), ownerId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + task.getRunId()));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", task.getRunId())));
         return task;
     }
 }

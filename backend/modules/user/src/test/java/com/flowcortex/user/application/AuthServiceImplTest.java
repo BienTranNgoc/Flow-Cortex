@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocaleConfig;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.CurrentUser;
@@ -30,11 +31,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -95,7 +98,11 @@ class AuthServiceImplTest {
                 "ua"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-                    assertThat(e.getReason()).isEqualTo("Self-registration is not available");
+                    try (AnnotationConfigApplicationContext messages =
+                            new AnnotationConfigApplicationContext(LocaleConfig.class)) {
+                        assertThat(messages.getMessage(e.getDetailMessageCode(), e.getDetailMessageArguments(),
+                                Locale.ENGLISH)).isEqualTo("Self-registration is not available");
+                    }
                 });
         verify(repository, never()).saveAndFlush(any());
         verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));

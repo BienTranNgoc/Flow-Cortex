@@ -2,6 +2,7 @@ package com.flowcortex.media.infrastructure;
 
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.application.MediaProperties;
+import com.flowcortex.shared.web.LocalizedMessage;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -128,7 +129,7 @@ public class S3MediaStore implements AutoCloseable {
                     .taggingDirective(TaggingDirective.REPLACE));
         } catch (NoSuchKeyException e) {
             LOG.info("Upload refused at run start: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
-            throw new UploadRejectedException("uploadIds", "Upload the file again");
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
         }
     }
 

@@ -8,6 +8,8 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
@@ -46,7 +48,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Implementation of {@link WorkflowRunService}. {@link #startRun} is tx#1 of the async
@@ -118,20 +119,20 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Workflow execution is currently disabled");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    new LocalizedMessage("workflow.disabled"));
         }
         if (ProductVideoWorkflow.ID.equals(workflowId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Start Product Video through /api/v1/product-videos/runs");
+            throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
+                    new LocalizedMessage("workflow.productVideo.startElsewhere"));
         }
 
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
-                .orElseThrow(() -> new NotFoundException("Workflow not found: " + workflowId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
         List<WorkflowStep> stepDefs = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId());
         // Refused up front: a run whose remote step would only fail media_disabled later.
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
@@ -145,7 +146,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             } else if (uploadId != null) {
                 singleUploadStepInput = json(mediaJobs.resolveUpload(currentUserId, uploadId));
             } else {
-                throw new UploadRejectedException("uploadId", "Choose a video or audio file to upload");
+                throw new UploadRejectedException("uploadId", new LocalizedMessage("upload.mediaRequired"));
             }
             runInput = displayName(originalName);
         } else {
@@ -207,7 +208,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Transactional(readOnly = true)
     public RunView getRun(UUID currentUserId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
         return WorkflowMapper.toRunView(run, steps, registry::isRemote);
     }
@@ -216,19 +217,19 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Transactional(readOnly = true)
     public RunOutputUrlView getOutputUrl(UUID currentUserId, UUID runId, int stepOrder, String name) {
         workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         RunStep step = runStepRepository.findByRunIdOrderByStepOrderAsc(runId).stream()
                 .filter(candidate -> candidate.getStepOrder() == stepOrder)
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Step " + stepOrder + " not found in run " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.step.notFound", stepOrder, runId)));
         StoredOutput output = storedOutputs(step).stream()
                 .filter(candidate -> candidate.name().equals(name))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Step " + stepOrder + " has no output named " + name));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name)));
         if (!MediaJob.isBelow(MediaJob.outputPrefix(runId, stepOrder), output.objectKey())) {
             LOG.warn("Stored output not signed, it lies outside its step: runId={} stepOrder={} name={} bucket={} key={}",
                     runId, stepOrder, name, output.bucket(), output.objectKey());
-            throw new NotFoundException("Step " + stepOrder + " has no output named " + name);
+            throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
         }
         MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());
         return new RunOutputUrlView(download.url(), download.expiresAt());

@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import static com.flowcortex.workflow.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -14,6 +15,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.RunView;
@@ -86,7 +88,7 @@ class WorkflowRunServiceImplTest {
                 .satisfies(e -> {
                     ResponseStatusException status = (ResponseStatusException) e;
                     assertThat(status.getStatusCode().value()).isEqualTo(503);
-                    assertThat(status.getReason()).isEqualTo("Media engine is currently disabled");
+                    assertThat(english(status)).isEqualTo("Media engine is currently disabled");
                 });
 
         verify(workflowRunRepository, never()).save(any());
@@ -160,7 +162,7 @@ class WorkflowRunServiceImplTest {
         assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), null, null, "clip.mp4"))
                 .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                     assertThat(e.field()).isEqualTo("uploadId");
-                    assertThat(e.getMessage()).isEqualTo("Choose a video or audio file to upload");
+                    assertThat(english(e.detail())).isEqualTo("Choose a video or audio file to upload");
                 });
 
         verify(workflowRunRepository, never()).save(any());
@@ -175,11 +177,11 @@ class WorkflowRunServiceImplTest {
         Workflow workflow = givenWorkflow(ownerId, "probe");
         when(mediaJobs.isEnabled()).thenReturn(true);
         when(mediaJobs.resolveUpload(ownerId, uploadId))
-                .thenThrow(new UploadRejectedException("uploadId", "Upload the file again"));
+                .thenThrow(new UploadRejectedException("uploadId", new LocalizedMessage("upload.again")));
 
         assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4"))
                 .isInstanceOfSatisfying(UploadRejectedException.class,
-                        e -> assertThat(e.getMessage()).isEqualTo("Upload the file again"));
+                        e -> assertThat(english(e.detail())).isEqualTo("Upload the file again"));
 
         verify(workflowRunRepository, never()).save(any());
         verify(runStepRepository, never()).saveAll(any());

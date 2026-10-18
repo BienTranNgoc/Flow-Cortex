@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -149,6 +150,6 @@ class RunStepTransactions {
 
     private WorkflowRun requireRun(UUID runId) {
         return workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
     }
 }

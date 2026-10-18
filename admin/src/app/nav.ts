@@ -1,5 +1,6 @@
 import { can, type Action } from './permissions';
 
+/** `label` is an i18n key; the sidebar translates it. */
 export interface NavItem {
   label: string;
   path: string;
@@ -9,30 +10,70 @@ export interface NavItem {
 }
 
 export interface NavGroup {
+  id: string;
   label: string;
   items: NavItem[];
 }
 
 export const NAV: NavGroup[] = [
   {
-    label: 'Overview',
-    items: [{ label: 'Dashboard', path: '/dashboard', icon: '▦', action: 'runs.view' }],
-  },
-  {
-    label: 'Operations',
+    id: 'overview',
+    label: 'common.shell.nav.groups.overview',
     items: [
-      { label: 'Runs', path: '/runs', icon: '▶', action: 'runs.view' },
-      { label: 'Media jobs', path: '/media-jobs', icon: '◆', action: 'mediaJobs.view' },
-      { label: 'Providers', path: '/providers', icon: '◇', action: 'runs.view', disabled: true },
-      { label: 'Usage', path: '/usage', icon: '▤', action: 'runs.view', disabled: true },
+      {
+        label: 'common.shell.nav.items.dashboard',
+        path: '/dashboard',
+        icon: '▦',
+        action: 'runs.view',
+      },
     ],
   },
   {
-    label: 'Administration',
+    id: 'operations',
+    label: 'common.shell.nav.groups.operations',
     items: [
-      { label: 'Users', path: '/users', icon: '●', action: 'users.manage' },
-      { label: 'Settings', path: '/settings', icon: '⚙', action: 'users.manage', disabled: true },
-      { label: 'Audit log', path: '/audit', icon: '☰', action: 'users.manage', disabled: true },
+      { label: 'common.shell.nav.items.runs', path: '/runs', icon: '▶', action: 'runs.view' },
+      {
+        label: 'common.shell.nav.items.mediaJobs',
+        path: '/media-jobs',
+        icon: '◆',
+        action: 'mediaJobs.view',
+      },
+      {
+        label: 'common.shell.nav.items.providers',
+        path: '/providers',
+        icon: '◇',
+        action: 'runs.view',
+        disabled: true,
+      },
+      {
+        label: 'common.shell.nav.items.usage',
+        path: '/usage',
+        icon: '▤',
+        action: 'runs.view',
+        disabled: true,
+      },
+    ],
+  },
+  {
+    id: 'administration',
+    label: 'common.shell.nav.groups.administration',
+    items: [
+      { label: 'common.shell.nav.items.users', path: '/users', icon: '●', action: 'users.manage' },
+      {
+        label: 'common.shell.nav.items.settings',
+        path: '/settings',
+        icon: '⚙',
+        action: 'users.manage',
+        disabled: true,
+      },
+      {
+        label: 'common.shell.nav.items.auditLog',
+        path: '/audit',
+        icon: '☰',
+        action: 'users.manage',
+        disabled: true,
+      },
     ],
   },
 ];

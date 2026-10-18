@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthToken, useMeQuery, useSessionReady } from '../features/auth/useAuth';
 import { NoAccessPage } from './NoAccessPage';
@@ -13,22 +14,23 @@ export function RequireAdminApp({ children }: Readonly<{ children: ReactNode }>)
   const sessionReady = useSessionReady();
   const location = useLocation();
   const meQuery = useMeQuery();
+  const { t } = useTranslation();
 
   if (!sessionReady) {
-    return <output>Checking your session…</output>;
+    return <output>{t('common.shell.session.checkingSession')}</output>;
   }
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   if (meQuery.isPending) {
-    return <output>Checking your account…</output>;
+    return <output>{t('common.shell.session.checkingAccount')}</output>;
   }
   if (meQuery.isError) {
     return (
       <main className="auth-page">
-        <p role="alert">Could not check your account.</p>
+        <p role="alert">{t('common.shell.session.accountError')}</p>
         <button type="button" onClick={() => meQuery.refetch()}>
-          Retry
+          {t('common.shell.session.retry')}
         </button>
       </main>
     );

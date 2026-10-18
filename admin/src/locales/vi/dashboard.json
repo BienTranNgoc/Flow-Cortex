@@ -1,0 +1,41 @@
+{
+  "title": "Tổng quan",
+  "eyebrow": "Vận hành Flow-Cortex",
+  "description": "Ảnh chụp trực tiếp về tài khoản và hoạt động quy trình.",
+  "refresh": "Làm mới",
+  "refreshing": "Đang làm mới…",
+  "loadError": "Không tải được một số dữ liệu tổng quan.",
+  "retry": "Thử lại",
+  "metrics": {
+    "label": "Thống kê tài khoản",
+    "totalUsers": "Tổng số người dùng",
+    "totalUsersHint": "Tính trên mọi trạng thái tài khoản",
+    "activeUsers": "Người dùng đang hoạt động",
+    "activeUsersHint": "Các tài khoản đang được bật",
+    "newUsers": "Mới trong 7 ngày",
+    "newUsersHint": "Theo ngày đăng ký tài khoản",
+    "totalRuns": "Tổng số lượt chạy quy trình",
+    "totalRunsHint": "Mọi quy trình, từ trước đến nay"
+  },
+  "runStatus": {
+    "title": "Trạng thái lượt chạy",
+    "description": "Tổng số theo bộ lọc lượt chạy của trang quản trị; các lượt chạy đang chờ duyệt không được tính ở đây.",
+    "viewRuns": "Xem lượt chạy",
+    "running": "Đang chạy",
+    "completed": "Hoàn tất",
+    "failed": "Thất bại",
+    "share": "{{label}}: {{percent}}% trên tổng số lượt chạy quy trình",
+    "unavailable": "{{label}}: chưa có số lượt chạy",
+    "countsUnavailable": "Số lượt chạy theo trạng thái tạm thời không khả dụng."
+  },
+  "failures": {
+    "title": "Lỗi gần đây",
+    "description": "Các lượt chạy gần nhất báo lỗi",
+    "allRuns": "Tất cả lượt chạy",
+    "loading": "Đang tải các lượt chạy thất bại…",
+    "loadError": "Không tải được các lỗi gần đây.",
+    "retry": "Thử lại",
+    "empty": "Không có lượt chạy thất bại nào.",
+    "note": "Lượt chạy thất bại; mở danh sách lượt chạy để xem chi tiết."
+  }
+}

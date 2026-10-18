@@ -1,0 +1,110 @@
+{
+  "title": "Users",
+  "eyebrow": "Administration",
+  "description": "Manage account access and roles. Account history is preserved when access is suspended.",
+  "addUser": "Add user",
+  "cancel": "Cancel",
+  "roleOptions": {
+    "MEMBER": "Member",
+    "ADMIN": "Admin",
+    "CREATOR": "Creator"
+  },
+  "role": {
+    "MEMBER": "MEMBER",
+    "ADMIN": "ADMIN",
+    "CREATOR": "CREATOR"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended"
+  },
+  "stats": {
+    "label": "User statistics",
+    "total": "Total users",
+    "active": "Active",
+    "suspended": "Suspended",
+    "newThisWeek": "New in 7 days"
+  },
+  "create": {
+    "form": "Add user",
+    "title": "Create user",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "role": "Role",
+    "submit": "Create user",
+    "submitting": "Creating…"
+  },
+  "directory": {
+    "label": "User directory",
+    "title": "All users",
+    "count": "{{visible}} of {{total}} accounts",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "search": "Search",
+    "searchPlaceholder": "Name or email",
+    "status": "Status",
+    "allStatuses": "All statuses",
+    "role": "Role",
+    "allRoles": "All roles",
+    "loading": "Loading users…",
+    "loadError": "Could not load users.",
+    "retry": "Retry",
+    "empty": "No users yet — add one above.",
+    "noMatch": "No users match these filters."
+  },
+  "columns": {
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "joined": "Joined",
+    "actions": "Actions"
+  },
+  "row": {
+    "editForm": "Edit {{target}}",
+    "email": "Email",
+    "name": "Name",
+    "role": "Role",
+    "status": "Status",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "view": "View",
+    "edit": "Edit"
+  },
+  "detail": {
+    "title": "User details",
+    "notFound": "User not found",
+    "invalidId": "The user ID is not valid.",
+    "backToUsers": "Back to users",
+    "loading": "Loading user…",
+    "loadError": "Could not load this user.",
+    "retry": "Retry",
+    "allUsers": "← All users",
+    "eyebrow": "User account",
+    "accountInfo": "Account information",
+    "accountInfoHint": "Identity and access details",
+    "userId": "User ID",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "registered": "Registered",
+    "lastUpdated": "Last updated",
+    "access": "Access management",
+    "accessHint": "Changes are recorded without deleting account history.",
+    "saveRole": "Save role",
+    "saving": "Saving…",
+    "suspend": "Suspend account",
+    "reactivate": "Reactivate account",
+    "updated": "Account updated.",
+    "invalidRole": "Select a valid role."
+  },
+  "validation": {
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email",
+    "passwordMin": "Password must be at least 8 characters",
+    "passwordMax": "Password must be at most 72 characters",
+    "nameRequired": "Name is required"
+  }
+}

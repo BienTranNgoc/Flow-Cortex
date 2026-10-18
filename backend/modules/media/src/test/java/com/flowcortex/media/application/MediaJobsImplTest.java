@@ -1,5 +1,6 @@
 package com.flowcortex.media.application;
 
+import static com.flowcortex.media.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -635,7 +636,7 @@ class MediaJobsImplTest {
                 assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "clip.mp4", size))
                         .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                             assertThat(e.field()).isEqualTo("size");
-                            assertThat(e.getMessage()).isEqualTo(SIZE_SENTENCE);
+                            assertThat(english(e.detail())).isEqualTo(SIZE_SENTENCE);
                         });
             }
             verify(context.getBean(S3MediaStore.class), never()).presignPut(any(), any(), any(), anyLong(), any());
@@ -650,7 +651,7 @@ class MediaJobsImplTest {
                 assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), fileName, 16L))
                         .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                             assertThat(e.field()).isEqualTo("fileName");
-                            assertThat(e.getMessage()).isEqualTo(TYPE_SENTENCE);
+                            assertThat(english(e.detail())).isEqualTo(TYPE_SENTENCE);
                         });
             }
         });
@@ -710,7 +711,7 @@ class MediaJobsImplTest {
                     .resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID())))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadIds");
-                        assertThat(e.getMessage()).isEqualTo("Each product image must be no larger than 10 MB");
+                        assertThat(english(e.detail())).isEqualTo("Each product image must be no larger than 10 MB");
                     });
             verify(context.getBean(MediaAssetRepository.class), never()).save(any());
         });
@@ -724,7 +725,7 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
         });
     }
@@ -742,7 +743,7 @@ class MediaJobsImplTest {
                     .resolveImageUploads(UUID.randomUUID(), List.of(uploadId)))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
             verify(context.getBean(S3MediaStore.class), never()).head(anyString(), anyString());
         });
@@ -760,12 +761,12 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(SIZE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(SIZE_SENTENCE);
                     });
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(MEDIA_TYPE_SENTENCE);
                     });
             verify(store, org.mockito.Mockito.times(2)).head(eq("flowcortex-uploads"), anyString());
         });
@@ -783,7 +784,7 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(MEDIA_TYPE_SENTENCE);
                     });
             assertThat(jobs.resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID()))).hasSize(1);
             verify(context.getBean(MediaAssetRepository.class), org.mockito.Mockito.times(1)).save(any());

@@ -8,11 +8,18 @@ import java.time.Instant;
  */
 public class AccountLockedException extends RuntimeException {
 
+    private final LocalizedMessage detail;
     private final Instant lockedUntil;
 
-    public AccountLockedException(String message, Instant lockedUntil) {
-        super(message);
+    public AccountLockedException(LocalizedMessage detail, Instant lockedUntil) {
+        super(detail.toString());
+        this.detail = detail;
         this.lockedUntil = lockedUntil;
+    }
+
+    /** The bundle key for the problem detail. */
+    public LocalizedMessage getDetail() {
+        return detail;
     }
 
     public Instant getLockedUntil() {

@@ -1,0 +1,98 @@
+{
+  "errorView": {
+    "title": "Something went wrong",
+    "message": "This page could not be shown. Reload it to try again.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "requestFailed": "Something went wrong. Try again."
+  },
+  "units": {
+    "milliseconds": "{{value}}ms",
+    "secondsShort": "{{value}}s",
+    "seconds": "{{value}} s",
+    "minutes": "{{value}}m",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s",
+    "megabytes": "{{value}} MB"
+  },
+  "language": {
+    "groupLabel": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "nav": {
+    "homeLink": "FlowCortex home",
+    "label": "Main navigation",
+    "home": "Home",
+    "workflows": "Workflows",
+    "profile": "Profile",
+    "docs": "Docs",
+    "api": "API",
+    "gpuCredits": "18 GPU Credits",
+    "signOut": "Sign out"
+  },
+  "shell": {
+    "brandPanel": {
+      "headline": "Your AI media <highlight>studio</highlight> for production-grade pipelines.",
+      "lede": "Source, process, review and export media in one click — built for creators who need consistent output, not another toy.",
+      "pipelines": "Three production pipelines ready out of the box",
+      "reviewGates": "Human review gates built into every multi-step run",
+      "retention": "Output retention and signed download links by default"
+    },
+    "footer": {
+      "tagline": "AI-powered media pipeline for creators who need consistent output.",
+      "social": "FlowCortex on {{network}}",
+      "product": "Product",
+      "features": "Features",
+      "pricing": "Pricing",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap",
+      "resources": "Resources",
+      "documentation": "Documentation",
+      "apiReference": "API Reference",
+      "guides": "Guides",
+      "systemStatus": "System Status",
+      "legal": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "cookies": "Cookie Policy",
+      "copyright": "© {{year}} FlowCortex. All rights reserved."
+    }
+  },
+  "home": {
+    "loading": "Loading…",
+    "loadProfileError": "Could not load your profile.",
+    "retry": "Retry",
+    "eyebrow": "CREATOR LAUNCHPAD · READY TO CREATE",
+    "headline": "Your AI media <highlight>studio</highlight>",
+    "lede": "One click launches a production-ready pipeline: source, process, review, export.",
+    "pickTitle": "Pick a pipeline",
+    "loadingWorkflows": "Loading workflows…",
+    "loadWorkflowsError": "Could not load workflows.",
+    "empty": "No workflows available yet.",
+    "untitled": "Untitled workflow",
+    "stepFallback": "Step {{order}}",
+    "launch": "Launch Workflow →",
+    "stagesTitle": "How Flow-Cortex Handles Your Video Runs",
+    "stages": {
+      "source": {
+        "title": "Source",
+        "body": "Submit a link or upload a media file. Required fields and limits are checked up front."
+      },
+      "process": {
+        "title": "Process",
+        "body": "Workers run each step in order. Status, attempts and errors are saved on every node."
+      },
+      "review": {
+        "title": "Review",
+        "body": "Pauses at the review gates you configured. Edit content, then approve to continue."
+      },
+      "export": {
+        "title": "Export",
+        "body": "Download the finished output while it is still within the asset retention window."
+      }
+    },
+    "welcome": "Welcome, {{name}}",
+    "viewAll": "View all workflows"
+  }
+}

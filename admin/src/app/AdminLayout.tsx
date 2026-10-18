@@ -1,7 +1,10 @@
 import { ErrorBoundary } from '@flow-cortex/ui-kit';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
+import { roleLabel } from '../features/users/enumLabels';
+import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { Sidebar } from './Sidebar';
 
 /** Console shell. The page area is keyed by path so navigating away from a failed page clears it. */
@@ -13,7 +16,8 @@ export function AdminLayout() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const accountDialogRef = useRef<HTMLDialogElement>(null);
-  const displayName = me?.name?.trim() || me?.email || 'Account';
+  const { t } = useTranslation();
+  const displayName = me?.name?.trim() || me?.email || t('common.account.fallbackName');
   const avatarInitial = displayName.trim().charAt(0).toLocaleUpperCase();
 
   useEffect(() => {
@@ -97,7 +101,10 @@ export function AdminLayout() {
   return (
     <div className="admin-shell">
       <header className="admin-header">
-        <span className="admin-title">Flow-Cortex Admin</span>
+        <span className="admin-title">{t('common.header.title')}</span>
+        <div className="admin-header-language">
+          <AppLanguageToggle />
+        </div>
         {me && (
           <div className="admin-user">
             <div className="admin-account-menu">
@@ -105,7 +112,7 @@ export function AdminLayout() {
                 ref={triggerRef}
                 type="button"
                 className="admin-account-trigger"
-                aria-label={`${displayName}, account menu`}
+                aria-label={t('common.account.trigger', { name: displayName })}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 aria-controls="admin-account-dropdown"
@@ -126,7 +133,7 @@ export function AdminLayout() {
                   className="admin-account-dropdown"
                   role="menu"
                   tabIndex={-1}
-                  aria-label="Account menu"
+                  aria-label={t('common.account.menu')}
                   onKeyDown={onMenuKeyDown}
                   onBlur={(event) => {
                     if (
@@ -137,22 +144,21 @@ export function AdminLayout() {
                     }
                   }}
                 >
-                  <fieldset className="admin-account-summary" aria-label="Signed-in account">
+                  <fieldset
+                    className="admin-account-summary"
+                    aria-label={t('common.account.summary')}
+                  >
                     <strong>{displayName}</strong>
                     <span>{me.email}</span>
-                    <span className="status-badge">{me.role}</span>
+                    <span className="status-badge">{roleLabel(t, me.role)}</span>
                   </fieldset>
                   <div className="admin-account-menu-items">
                     <button type="button" role="menuitem" onClick={openAccount}>
-                      Account
+                      {t('common.account.account')}
                     </button>
                     <button type="button" role="menuitem" disabled aria-disabled="true">
-                      <span>Settings</span>
-                      <small>Coming soon</small>
-                    </button>
-                    <button type="button" role="menuitem" disabled aria-disabled="true">
-                      <span>Language</span>
-                      <small>Coming soon</small>
+                      <span>{t('common.account.settings')}</span>
+                      <small>{t('common.account.comingSoon')}</small>
                     </button>
                     <hr className="admin-account-divider" />
                     <button
@@ -164,7 +170,7 @@ export function AdminLayout() {
                         void logout();
                       }}
                     >
-                      Sign out
+                      {t('common.account.signOut')}
                     </button>
                   </div>
                 </div>
@@ -180,10 +186,10 @@ export function AdminLayout() {
               }}
             >
               <div className="admin-account-dialog-heading">
-                <h2 id="admin-account-dialog-title">Account</h2>
+                <h2 id="admin-account-dialog-title">{t('common.account.dialogTitle')}</h2>
                 <button
                   type="button"
-                  aria-label="Close account details"
+                  aria-label={t('common.account.close')}
                   onClick={() => accountDialogRef.current?.close()}
                 >
                   ×
@@ -191,16 +197,16 @@ export function AdminLayout() {
               </div>
               <dl className="admin-account-details">
                 <div>
-                  <dt>Name</dt>
+                  <dt>{t('common.account.name')}</dt>
                   <dd>{me.name || '—'}</dd>
                 </div>
                 <div>
-                  <dt>Email</dt>
+                  <dt>{t('common.account.email')}</dt>
                   <dd>{me.email}</dd>
                 </div>
                 <div>
-                  <dt>Role</dt>
-                  <dd>{me.role}</dd>
+                  <dt>{t('common.account.role')}</dt>
+                  <dd>{roleLabel(t, me.role)}</dd>
                 </div>
               </dl>
             </dialog>
@@ -209,7 +215,14 @@ export function AdminLayout() {
       </header>
       <Sidebar role={me?.role} />
       <div className="admin-content">
-        <ErrorBoundary key={pathname}>
+        <ErrorBoundary
+          key={pathname}
+          labels={{
+            title: t('common.errorView.title'),
+            message: t('common.errorView.message'),
+            reload: t('common.errorView.reload'),
+          }}
+        >
           <Outlet />
         </ErrorBoundary>
       </div>

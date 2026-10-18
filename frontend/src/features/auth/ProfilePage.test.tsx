@@ -1,6 +1,8 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { ProfilePage } from './ProfilePage';
 
@@ -104,5 +106,52 @@ describe('ProfilePage', () => {
 
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Profile' })).toBeInTheDocument();
+  });
+
+  it('shows a role or status code it does not know as sent', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: { ...ME, role: 'AUDITOR', status: 'PENDING' } },
+    });
+
+    renderProfile();
+
+    expect(await screen.findByText('PENDING')).toBeInTheDocument();
+    expect(screen.getAllByText('AUDITOR')).toHaveLength(2);
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the role and status in Vietnamese', async () => {
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: { ...ME, status: 'SUSPENDED' } } });
+
+      renderProfile();
+
+      expect(await screen.findByText(viAuth.profile.status.SUSPENDED)).toBeInTheDocument();
+      expect(screen.queryByText('SUSPENDED')).not.toBeInTheDocument();
+      expect(screen.getAllByText(viAuth.profile.role.MEMBER)).toHaveLength(2);
+    });
+
+    it('shows the generic retry message in Vietnamese when saving never reaches the server', async () => {
+      stubApi({
+        'GET /api/v1/auth/me': { status: 200, body: ME },
+        'PUT /api/v1/auth/profile': () => {
+          throw new TypeError('Failed to fetch');
+        },
+      });
+      const user = userEvent.setup();
+      renderProfile();
+
+      await user.click(await screen.findByRole('button', { name: viAuth.profile.save }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Không thực hiện được yêu cầu. Hãy thử lại.',
+      );
+    });
   });
 });

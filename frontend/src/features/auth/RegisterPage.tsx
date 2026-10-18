@@ -1,19 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
 import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
-  detailFrom,
+  failureMessage,
   submitState,
   useAuthToken,
   useRegisterMutation,
 } from './useAuth';
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const token = useAuthToken();
   const registerMutation = useRegisterMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
@@ -35,14 +37,14 @@ export function RegisterPage() {
     });
   });
 
-  const serverError = detailFrom(registerMutation);
+  const serverError = failureMessage(registerMutation, t);
   const isPending = registerMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
   const buttonLabel = (() => {
-    if (submitSucceeded) return '✓ Account created';
-    if (isPending) return 'Creating account…';
-    return 'Get started free →';
+    if (submitSucceeded) return t('auth.register.succeeded');
+    if (isPending) return t('auth.register.submitting');
+    return t('auth.register.submit');
   })();
 
   return (
@@ -50,35 +52,40 @@ export function RegisterPage() {
       <BrandPanel />
 
       <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1 className="auth-card__title">Create your free creator account</h1>
-        <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
+        <p className="eyebrow">{t('auth.register.eyebrow')}</p>
+        <h1 className="auth-card__title">{t('auth.register.title')}</h1>
+        <p className="auth-subtitle">{t('auth.register.subtitle')}</p>
 
         <div className="oauth-row">
           <OAuthButton
             provider="google"
-            label="Sign up with Google"
+            label={t('auth.register.google')}
             href={googleAuthorizeUrl(true, '/')}
           />
         </div>
 
         <div className="auth-divider" aria-hidden="true">
-          <span>or sign up with email</span>
+          <span>{t('auth.register.divider')}</span>
         </div>
 
-        <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          aria-label={t('auth.register.formLabel')}
+          className="auth-form"
+        >
           <div className="field" style={{ '--i': 0 } as React.CSSProperties}>
-            <label htmlFor="register-name">Full name</label>
+            <label htmlFor="register-name">{t('auth.register.nameLabel')}</label>
             <input
               id="register-name"
               autoComplete="name"
               aria-invalid={errors.name ? 'true' : 'false'}
               {...register('name')}
             />
-            {errors.name && <p role="alert">{errors.name.message}</p>}
+            {errors.name?.message && <p role="alert">{t(errors.name.message)}</p>}
           </div>
           <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
-            <label htmlFor="register-email">Work or personal email</label>
+            <label htmlFor="register-email">{t('auth.register.emailLabel')}</label>
             <input
               id="register-email"
               type="email"
@@ -86,10 +93,10 @@ export function RegisterPage() {
               aria-invalid={errors.email ? 'true' : 'false'}
               {...register('email')}
             />
-            {errors.email && <p role="alert">{errors.email.message}</p>}
+            {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
           </div>
           <div className="field" style={{ '--i': 2 } as React.CSSProperties}>
-            <label htmlFor="register-password">Password</label>
+            <label htmlFor="register-password">{t('auth.register.passwordLabel')}</label>
             <input
               id="register-password"
               type="password"
@@ -97,10 +104,12 @@ export function RegisterPage() {
               aria-invalid={errors.password ? 'true' : 'false'}
               {...register('password')}
             />
-            {errors.password && <p role="alert">{errors.password.message}</p>}
+            {errors.password?.message && <p role="alert">{t(errors.password.message)}</p>}
           </div>
           <div className="field" style={{ '--i': 3 } as React.CSSProperties}>
-            <label htmlFor="register-confirm-password">Confirm password</label>
+            <label htmlFor="register-confirm-password">
+              {t('auth.register.confirmPasswordLabel')}
+            </label>
             <input
               id="register-confirm-password"
               type="password"
@@ -108,8 +117,8 @@ export function RegisterPage() {
               aria-invalid={errors.confirmPassword ? 'true' : 'false'}
               {...register('confirmPassword')}
             />
-            {errors.confirmPassword && (
-              <p role="alert">{errors.confirmPassword.message}</p>
+            {errors.confirmPassword?.message && (
+              <p role="alert">{t(errors.confirmPassword.message)}</p>
             )}
           </div>
           {serverError && (
@@ -128,7 +137,7 @@ export function RegisterPage() {
         </form>
 
         <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in to workspace</Link>
+          {t('auth.register.haveAccount')} <Link to="/login">{t('auth.register.signIn')}</Link>
         </p>
       </section>
     </div>

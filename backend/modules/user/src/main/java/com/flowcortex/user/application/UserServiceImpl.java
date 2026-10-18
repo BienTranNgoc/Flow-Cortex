@@ -1,6 +1,7 @@
 package com.flowcortex.user.application;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
@@ -109,7 +110,7 @@ class UserServiceImpl implements UserService {
         // ADMIN row is self-owned (ownerId == id) — deleting it would orphan every MEMBER whose
         // owner_id points at it, making them unreachable through the API.
         if (id.equals(ownerId)) {
-            throw new ConflictException("Cannot delete your own account");
+            throw new ConflictException(new LocalizedMessage("user.cannotDeleteSelf"));
         }
         userRepository.delete(requireOwned(ownerId, id));
     }
@@ -122,7 +123,7 @@ class UserServiceImpl implements UserService {
      */
     private void requireActiveCaller(UUID ownerId) {
         AppUser caller = userRepository.findById(ownerId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + ownerId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", ownerId)));
         AccountStatusGuard.requireActive(caller);
     }
 
@@ -134,7 +135,7 @@ class UserServiceImpl implements UserService {
         boolean suspendsSelf = status != null && !status.isBlank() && parseStatus(status) == UserStatus.SUSPENDED;
         boolean downgradesSelf = role != null && !role.isBlank() && parseRole(role) != Role.ADMIN;
         if (suspendsSelf || downgradesSelf) {
-            throw new ConflictException("Cannot suspend or downgrade your own admin account");
+            throw new ConflictException(new LocalizedMessage("user.cannotDemoteSelf"));
         }
     }
 
@@ -142,13 +143,13 @@ class UserServiceImpl implements UserService {
         try {
             return AppUserMapper.toUserView(userRepository.saveAndFlush(user));
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("A user with email '" + email + "' already exists");
+            throw new ConflictException(new LocalizedMessage("user.emailTaken", email));
         }
     }
 
     private AppUser requireOwned(UUID ownerId, UUID id) {
         return userRepository.findByOwnerIdAndId(ownerId, id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
     }
 
     /**

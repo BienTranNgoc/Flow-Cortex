@@ -1,32 +1,35 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
+import { roleLabel, statusLabel } from './enumLabels';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
 const userRoleSchema = z.enum(['ADMIN', 'MEMBER', 'CREATOR']);
 
 export function UserDetailPage() {
-  usePageTitle('User details');
+  const { t } = useTranslation();
+  usePageTitle(t('users.detail.title'));
   const { userId = '' } = useParams();
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
   const updateMutation = useUpdateUserMutation();
   const [role, setRole] = useState('');
-  const [roleError, setRoleError] = useState('');
+  const [roleErrorKey, setRoleErrorKey] = useState('');
 
   if (!parsedId.success) {
     return (
       <main>
-        <h1>User not found</h1>
+        <h1>{t('users.detail.notFound')}</h1>
         <p className="list-error" role="alert">
-          The user ID is not valid.
+          {t('users.detail.invalidId')}
         </p>
         <Link className="table-link" to="/users">
-          Back to users
+          {t('users.detail.backToUsers')}
         </Link>
       </main>
     );
@@ -35,8 +38,8 @@ export function UserDetailPage() {
   if (userQuery.isLoading) {
     return (
       <main>
-        <h1>User details</h1>
-        <output>Loading user…</output>
+        <h1>{t('users.detail.title')}</h1>
+        <output>{t('users.detail.loading')}</output>
       </main>
     );
   }
@@ -44,14 +47,14 @@ export function UserDetailPage() {
   if (userQuery.isError || !userQuery.data) {
     return (
       <main>
-        <h1>User details</h1>
+        <h1>{t('users.detail.title')}</h1>
         <div className="list-error">
-          <p role="alert">Could not load this user.</p>
+          <p role="alert">{t('users.detail.loadError')}</p>
           <button type="button" onClick={() => userQuery.refetch()}>
-            Retry
+            {t('users.detail.retry')}
           </button>
           <Link className="table-link" to="/users">
-            Back to users
+            {t('users.detail.backToUsers')}
           </Link>
         </div>
       </main>
@@ -65,17 +68,17 @@ export function UserDetailPage() {
   const saveRole = () => {
     const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
-      setRoleError('Select a valid role.');
+      setRoleErrorKey('users.detail.invalidRole');
       return;
     }
-    setRoleError('');
+    setRoleErrorKey('');
     updateMutation.mutate({ id: parsedId.data, changes: { role: parsedRole.data } });
   };
 
   return (
     <main className="user-detail-page">
       <Link className="back-link" to="/users">
-        ← All users
+        {t('users.detail.allUsers')}
       </Link>
       <div className="page-heading">
         <div className="user-profile-heading">
@@ -83,7 +86,7 @@ export function UserDetailPage() {
             {user.name?.trim().charAt(0).toUpperCase() || '?'}
           </span>
           <div>
-            <p className="eyebrow">User account</p>
+            <p className="eyebrow">{t('users.detail.eyebrow')}</p>
             <h1>{user.name || user.email}</h1>
             <p className="page-description">{user.email}</p>
           </div>
@@ -91,7 +94,7 @@ export function UserDetailPage() {
         <span
           className={`status-badge ${user.status === 'ACTIVE' ? 'status-success' : 'status-warning'}`}
         >
-          {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+          {statusLabel(t, user.status)}
         </span>
       </div>
 
@@ -99,37 +102,37 @@ export function UserDetailPage() {
         <section className="detail-panel">
           <div className="section-heading">
             <div>
-              <h2>Account information</h2>
-              <p>Identity and access details</p>
+              <h2>{t('users.detail.accountInfo')}</h2>
+              <p>{t('users.detail.accountInfoHint')}</p>
             </div>
           </div>
           <dl className="user-meta-list">
             <div>
-              <dt>User ID</dt>
+              <dt>{t('users.detail.userId')}</dt>
               <dd>
                 <code>{user.id}</code>
               </dd>
             </div>
             <div>
-              <dt>Email</dt>
+              <dt>{t('users.detail.email')}</dt>
               <dd>{user.email}</dd>
             </div>
             <div>
-              <dt>Role</dt>
-              <dd>{user.role}</dd>
+              <dt>{t('users.detail.role')}</dt>
+              <dd>{roleLabel(t, user.role)}</dd>
             </div>
             <div>
-              <dt>Status</dt>
-              <dd>{user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}</dd>
+              <dt>{t('users.detail.status')}</dt>
+              <dd>{statusLabel(t, user.status)}</dd>
             </div>
             <div>
-              <dt>Registered</dt>
+              <dt>{t('users.detail.registered')}</dt>
               <dd>
                 <Timestamp value={user.createdAt} />
               </dd>
             </div>
             <div>
-              <dt>Last updated</dt>
+              <dt>{t('users.detail.lastUpdated')}</dt>
               <dd>
                 <Timestamp value={user.updatedAt} />
               </dd>
@@ -140,23 +143,23 @@ export function UserDetailPage() {
         <section className="detail-panel">
           <div className="section-heading">
             <div>
-              <h2>Access management</h2>
-              <p>Changes are recorded without deleting account history.</p>
+              <h2>{t('users.detail.access')}</h2>
+              <p>{t('users.detail.accessHint')}</p>
             </div>
           </div>
           <div className="field">
-            <label htmlFor="user-role">Role</label>
+            <label htmlFor="user-role">{t('users.detail.role')}</label>
             <select
               id="user-role"
               value={role || user.role || 'MEMBER'}
               onChange={(event) => {
                 setRole(event.target.value);
-                setRoleError('');
+                setRoleErrorKey('');
               }}
             >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
-              <option value="CREATOR">Creator</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
             </select>
           </div>
           <button
@@ -164,9 +167,9 @@ export function UserDetailPage() {
             onClick={saveRole}
             disabled={updateMutation.isPending || (role || user.role) === user.role}
           >
-            {updateMutation.isPending ? 'Saving…' : 'Save role'}
+            {updateMutation.isPending ? t('users.detail.saving') : t('users.detail.saveRole')}
           </button>
-          {roleError && <p role="alert">{roleError}</p>}
+          {roleErrorKey && <p role="alert">{t(roleErrorKey)}</p>}
           <button
             className={nextStatus === 'SUSPENDED' ? 'button-danger' : ''}
             type="button"
@@ -175,10 +178,12 @@ export function UserDetailPage() {
             }
             disabled={updateMutation.isPending}
           >
-            {nextStatus === 'SUSPENDED' ? 'Suspend account' : 'Reactivate account'}
+            {nextStatus === 'SUSPENDED' ? t('users.detail.suspend') : t('users.detail.reactivate')}
           </button>
           {updateError && <p role="alert">{updateError.detail}</p>}
-          {updateMutation.isSuccess && <output className="success-note">Account updated.</output>}
+          {updateMutation.isSuccess && (
+            <output className="success-note">{t('users.detail.updated')}</output>
+          )}
         </section>
       </div>
     </main>

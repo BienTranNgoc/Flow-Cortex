@@ -18,28 +18,26 @@ const MEDIA_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'mkv', 'm4a', 'mp3', 'wa
 // Mirrors FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES (default 524288000); when it changes, the server decides.
 const MAX_MEDIA_BYTES = 500 * 1024 * 1024;
 
+/** Translation keys, so a problem already on screen follows a language switch. */
 export interface FileProblem {
-  message: string;
-  nextAction?: string;
+  messageKey: string;
+  nextActionKey?: string;
 }
 
-export const NO_FILE: FileProblem = { message: 'Choose a video or audio file to upload' };
+export const NO_FILE: FileProblem = { messageKey: 'workflow.validation.noFile' };
 
 /** Why a picked file cannot be checked, or `null` when it may be uploaded. */
 export function mediaFileProblem(file: File): FileProblem | null {
   if (file.size < 1 || file.size > MAX_MEDIA_BYTES) {
     return {
-      message: 'Files must be between 1 byte and 500 MB.',
-      nextAction: 'Choose a smaller file.',
+      messageKey: 'workflow.validation.fileSize',
+      nextActionKey: 'workflow.validation.fileSizeNext',
     };
   }
   const dot = file.name.lastIndexOf('.');
   const extension = dot < 0 ? '' : file.name.slice(dot + 1).toLowerCase();
   if (!MEDIA_EXTENSIONS.has(extension)) {
-    return {
-      message:
-        "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
-    };
+    return { messageKey: 'workflow.validation.fileType' };
   }
   return null;
 }

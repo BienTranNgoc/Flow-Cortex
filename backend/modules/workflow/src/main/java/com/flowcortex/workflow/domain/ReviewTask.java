@@ -1,13 +1,13 @@
 package com.flowcortex.workflow.domain;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -137,7 +137,7 @@ public class ReviewTask {
         requirePending();
         requireVersion(expectedVersion);
         if (currentRevisionId == null || !currentRevisionId.equals(revisionId)) {
-            throw new ConflictException("Only the current script revision can be approved");
+            throw new ConflictException(new LocalizedMessage("reviewTask.notCurrentRevision"));
         }
         this.status = ReviewTaskStatus.APPROVED;
         this.reviewedBy = reviewerId;
@@ -162,16 +162,16 @@ public class ReviewTask {
 
     private void requirePending() {
         if (this.status != ReviewTaskStatus.PENDING) {
-            throw new ConflictException("ReviewTask " + this.id + " is already "
-                    + this.status.name().toLowerCase(Locale.ROOT));
+            throw new ConflictException(this.status == ReviewTaskStatus.APPROVED
+                    ? new LocalizedMessage("reviewTask.alreadyApproved", this.id)
+                    : new LocalizedMessage("reviewTask.alreadyRejected", this.id));
         }
     }
 
     private void requireVersion(long expectedVersion) {
         long actual = version == null ? 0L : version;
         if (actual != expectedVersion) {
-            throw new ConflictException("ReviewTask " + id + " changed; expected version "
-                    + expectedVersion + " but was " + actual);
+            throw new ConflictException(new LocalizedMessage("reviewTask.versionChanged", id, expectedVersion, actual));
         }
     }
 }

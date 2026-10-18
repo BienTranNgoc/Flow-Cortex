@@ -1,5 +1,6 @@
 package com.flowcortex.media.infrastructure;
 
+import static com.flowcortex.media.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -121,7 +122,7 @@ class S3MediaStoreTest {
                     "runs/r/inputs/image_1"))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadIds");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
         } finally {
             missing.stop(0);

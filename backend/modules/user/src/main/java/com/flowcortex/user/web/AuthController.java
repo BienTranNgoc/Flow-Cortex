@@ -1,5 +1,6 @@
 package com.flowcortex.user.web;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AccessTokenResponse;
 import com.flowcortex.user.api.AuthService;
@@ -110,7 +111,7 @@ class AuthController {
     ResponseEntity<MeResponse> me(@AuthenticationPrincipal Jwt jwt) {
         UUID id = subjectId(jwt);
         CurrentUser user = userDirectory.findById(id)
-                .orElseThrow(() -> new NotFoundException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
         return ResponseEntity.ok(MeResponse.from(user));
     }
 

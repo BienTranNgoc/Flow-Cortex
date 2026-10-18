@@ -1,6 +1,9 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { TFunction } from 'i18next';
+import i18n from '../../lib/i18n';
+import viWorkflow from '../../locales/vi/workflow.json';
 import { Pipeline, type PipelineStep } from './Pipeline';
 import { stepLabel } from './stepDisplay';
 
@@ -18,8 +21,8 @@ function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
   };
 }
 
-const asNodes = (steps: RunStepResponse[]): PipelineStep[] =>
-  steps.map((run) => ({ id: run.id ?? '', name: stepLabel(run), run }));
+const asNodes = (steps: RunStepResponse[], t: TFunction = i18n.getFixedT('en')): PipelineStep[] =>
+  steps.map((run) => ({ id: run.id ?? '', name: stepLabel(run, t), run }));
 
 const numbered = (count: number) =>
   Array.from({ length: count }, (_, index) =>
@@ -144,6 +147,39 @@ describe('Pipeline in run mode', () => {
 
     render(<Pipeline steps={asNodes(numbered(1))} runStatus="completed" onSelect={vi.fn()} />);
     expect(screen.queryByText('Select a step to see its result.')).not.toBeInTheDocument();
+  });
+});
+
+describe('Pipeline in Vietnamese', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('vi');
+  });
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('names a finished probe and extract_audio run in Vietnamese, with no "probe" anywhere', () => {
+    const run = [
+      step({ status: 'completed', type: 'probe' }),
+      step({ id: 's2', stepOrder: 2, type: 'extract_audio', status: 'completed' }),
+    ];
+    render(
+      <Pipeline
+        steps={asNodes(run, i18n.getFixedT('vi'))}
+        runStatus="completed"
+        selectedId="s2"
+        panelId="panel"
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const [probe, extract] = screen.getAllByRole('button');
+    expect(probe).toHaveAccessibleName(new RegExp(viWorkflow.step.label.probe));
+    expect(probe).toHaveTextContent(viWorkflow.step.state.completed);
+    expect(extract).toHaveAccessibleName(new RegExp(viWorkflow.step.label.extract_audio));
+    expect(screen.getByRole('region', { name: viWorkflow.pipeline.region })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/probe/i);
+    expect(document.body.textContent).not.toMatch(/Inspect the file|Completed/);
   });
 });
 

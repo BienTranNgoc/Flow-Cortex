@@ -1,0 +1,110 @@
+{
+  "title": "Người dùng",
+  "eyebrow": "Quản trị",
+  "description": "Quản lý quyền truy cập và vai trò của tài khoản. Lịch sử tài khoản được giữ lại khi quyền truy cập bị tạm ngưng.",
+  "addUser": "Thêm người dùng",
+  "cancel": "Hủy",
+  "roleOptions": {
+    "MEMBER": "Thành viên",
+    "ADMIN": "Quản trị viên",
+    "CREATOR": "Nhà sáng tạo"
+  },
+  "role": {
+    "MEMBER": "Thành viên",
+    "ADMIN": "Quản trị viên",
+    "CREATOR": "Nhà sáng tạo"
+  },
+  "status": {
+    "ACTIVE": "Đang hoạt động",
+    "SUSPENDED": "Đã tạm ngưng"
+  },
+  "stats": {
+    "label": "Thống kê người dùng",
+    "total": "Tổng số người dùng",
+    "active": "Đang hoạt động",
+    "suspended": "Đã tạm ngưng",
+    "newThisWeek": "Mới trong 7 ngày"
+  },
+  "create": {
+    "form": "Thêm người dùng",
+    "title": "Tạo người dùng",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "name": "Tên",
+    "role": "Vai trò",
+    "submit": "Tạo người dùng",
+    "submitting": "Đang tạo…"
+  },
+  "directory": {
+    "label": "Danh sách người dùng",
+    "title": "Tất cả người dùng",
+    "count": "{{visible}} trên {{total}} tài khoản",
+    "refresh": "Làm mới",
+    "refreshing": "Đang làm mới…",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Tên hoặc email",
+    "status": "Trạng thái",
+    "allStatuses": "Tất cả trạng thái",
+    "role": "Vai trò",
+    "allRoles": "Tất cả vai trò",
+    "loading": "Đang tải người dùng…",
+    "loadError": "Không tải được danh sách người dùng.",
+    "retry": "Thử lại",
+    "empty": "Chưa có người dùng nào — hãy thêm ở phía trên.",
+    "noMatch": "Không có người dùng nào khớp với bộ lọc này."
+  },
+  "columns": {
+    "name": "Tên",
+    "email": "Email",
+    "role": "Vai trò",
+    "status": "Trạng thái",
+    "joined": "Ngày tham gia",
+    "actions": "Thao tác"
+  },
+  "row": {
+    "editForm": "Sửa {{target}}",
+    "email": "Email",
+    "name": "Tên",
+    "role": "Vai trò",
+    "status": "Trạng thái",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Hủy",
+    "view": "Xem",
+    "edit": "Sửa"
+  },
+  "detail": {
+    "title": "Chi tiết người dùng",
+    "notFound": "Không tìm thấy người dùng",
+    "invalidId": "ID người dùng không hợp lệ.",
+    "backToUsers": "Quay lại danh sách người dùng",
+    "loading": "Đang tải người dùng…",
+    "loadError": "Không tải được người dùng này.",
+    "retry": "Thử lại",
+    "allUsers": "← Tất cả người dùng",
+    "eyebrow": "Tài khoản người dùng",
+    "accountInfo": "Thông tin tài khoản",
+    "accountInfoHint": "Thông tin định danh và quyền truy cập",
+    "userId": "ID người dùng",
+    "email": "Email",
+    "role": "Vai trò",
+    "status": "Trạng thái",
+    "registered": "Ngày đăng ký",
+    "lastUpdated": "Cập nhật lần cuối",
+    "access": "Quản lý quyền truy cập",
+    "accessHint": "Các thay đổi được ghi lại mà không xóa lịch sử tài khoản.",
+    "saveRole": "Lưu vai trò",
+    "saving": "Đang lưu…",
+    "suspend": "Tạm ngưng tài khoản",
+    "reactivate": "Kích hoạt lại tài khoản",
+    "updated": "Đã cập nhật tài khoản.",
+    "invalidRole": "Hãy chọn một vai trò hợp lệ."
+  },
+  "validation": {
+    "emailRequired": "Hãy nhập email",
+    "emailInvalid": "Hãy nhập địa chỉ email hợp lệ",
+    "passwordMin": "Mật khẩu phải có ít nhất 8 ký tự",
+    "passwordMax": "Mật khẩu chỉ được tối đa 72 ký tự",
+    "nameRequired": "Hãy nhập tên"
+  }
+}

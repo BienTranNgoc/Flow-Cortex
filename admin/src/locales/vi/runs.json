@@ -1,0 +1,19 @@
+{
+  "title": "Lượt chạy",
+  "noun": "lượt chạy",
+  "deletedUser": "(người dùng đã bị xóa)",
+  "columns": {
+    "workflow": "Quy trình",
+    "owner": "Chủ sở hữu",
+    "status": "Trạng thái",
+    "started": "Bắt đầu",
+    "finished": "Kết thúc",
+    "error": "Lỗi"
+  },
+  "status": {
+    "running": "Đang chạy",
+    "waiting_approval": "Chờ duyệt",
+    "completed": "Hoàn tất",
+    "error": "Lỗi"
+  }
+}

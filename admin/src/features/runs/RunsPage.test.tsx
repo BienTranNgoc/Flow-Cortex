@@ -2,6 +2,8 @@ import { setToken } from '@flow-cortex/api-client';
 import type { AdminRunResponse } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viRuns from '../../locales/vi/runs.json';
 import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { RunsPage } from './RunsPage';
 
@@ -195,5 +197,62 @@ describe('RunsPage', () => {
     expect(await screen.findByText('Admin console is disabled')).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.getByText('Showing the results loaded before this error.')).toBeInTheDocument();
+  });
+
+  it('shows status codes as sent in English, an unknown one included', async () => {
+    stubApi({
+      [RUNS_PATH]: page([
+        run({ id: 'run-2', status: 'running' }),
+        run({ id: 'run-1', status: 'paused' }),
+      ]),
+    });
+    renderRoute('/runs', '/runs', <RunsPage />);
+    const rows = within(await screen.findByRole('table'))
+      .getAllByRole('row')
+      .slice(1);
+
+    expect(within(rows[0] as HTMLElement).getByText('running')).toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText('paused')).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels a running run in Vietnamese and leaves an unknown status as sent', async () => {
+      stubApi({
+        [RUNS_PATH]: page([
+          run({ id: 'run-2', status: 'running' }),
+          run({ id: 'run-1', status: 'paused' }),
+          run({ id: 'run-0', status: 'waiting_approval' }),
+        ]),
+      });
+      renderRoute('/runs', '/runs', <RunsPage />);
+      const rows = within(await screen.findByRole('table'))
+        .getAllByRole('row')
+        .slice(1);
+
+      expect(within(rows[0] as HTMLElement).getByText(viRuns.status.running)).toBeInTheDocument();
+      expect(within(rows[0] as HTMLElement).getByText('Đang chạy')).toBeInTheDocument();
+      expect(within(rows[1] as HTMLElement).getByText('paused')).toBeInTheDocument();
+      expect(within(rows[2] as HTMLElement).getByText(viRuns.status.waiting_approval)).toBeInTheDocument();
+    });
+
+    it('labels the status filter options in Vietnamese and keeps their values', async () => {
+      stubApi({ [RUNS_PATH]: page([run()]) });
+      renderRoute('/runs', '/runs', <RunsPage />);
+      await screen.findByRole('table');
+
+      const options = within(screen.getByRole('combobox')).getAllByRole('option').slice(1);
+      expect(options.map((option) => [option.getAttribute('value'), option.textContent])).toEqual([
+        ['running', viRuns.status.running],
+        ['completed', viRuns.status.completed],
+        ['error', viRuns.status.error],
+      ]);
+    });
   });
 });

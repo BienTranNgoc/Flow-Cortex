@@ -1,14 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import type { UserResponse } from '@flow-cortex/api-client';
 import { Link } from 'react-router-dom';
+import { formatDateTime } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
+import { roleLabel, statusLabel } from './enumLabels';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
 import { useUpdateUserMutation } from './useUsers';
 
 /** One row of the users table — view mode, or an inline edit form. */
 export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
   const role = user.role === 'ADMIN' || user.role === 'CREATOR' ? user.role : 'MEMBER';
@@ -42,39 +47,43 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
     return (
       <tr>
         <td colSpan={6}>
-          <form onSubmit={onSave} noValidate aria-label={`Edit ${user.email ?? id}`}>
+          <form
+            onSubmit={onSave}
+            noValidate
+            aria-label={t('users.row.editForm', { target: user.email ?? id })}
+          >
             <div className="field">
-              <label htmlFor={`edit-email-${id}`}>Email</label>
+              <label htmlFor={`edit-email-${id}`}>{t('users.row.email')}</label>
               <input id={`edit-email-${id}`} type="email" {...register('email')} />
-              {errors.email && <p role="alert">{errors.email.message}</p>}
+              {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
               {updateError?.errors?.email && <p role="alert">{updateError.errors.email}</p>}
             </div>
             <div className="field">
-              <label htmlFor={`edit-name-${id}`}>Name</label>
+              <label htmlFor={`edit-name-${id}`}>{t('users.row.name')}</label>
               <input id={`edit-name-${id}`} {...register('name')} />
-              {errors.name && <p role="alert">{errors.name.message}</p>}
+              {errors.name?.message && <p role="alert">{t(errors.name.message)}</p>}
             </div>
             <div className="field">
-              <label htmlFor={`edit-role-${id}`}>Role</label>
+              <label htmlFor={`edit-role-${id}`}>{t('users.row.role')}</label>
               <select id={`edit-role-${id}`} {...register('role')}>
-                <option value="MEMBER">Member</option>
-                <option value="ADMIN">Admin</option>
-                <option value="CREATOR">Creator</option>
+                <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+                <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+                <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
               </select>
             </div>
             <div className="field">
-              <label htmlFor={`edit-status-${id}`}>Status</label>
+              <label htmlFor={`edit-status-${id}`}>{t('users.row.status')}</label>
               <select id={`edit-status-${id}`} {...register('status')}>
-                <option value="ACTIVE">Active</option>
-                <option value="SUSPENDED">Suspended</option>
+                <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
+                <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
               </select>
             </div>
             {updateError && !updateError.errors && <p role="alert">{updateError.detail}</p>}
             <button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Saving…' : 'Save'}
+              {updateMutation.isPending ? t('users.row.saving') : t('users.row.save')}
             </button>
             <button type="button" onClick={() => setEditing(false)}>
-              Cancel
+              {t('users.row.cancel')}
             </button>
           </form>
         </td>
@@ -84,7 +93,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
 
   return (
     <tr>
-      <td data-label="Name">
+      <td data-label={t('users.columns.name')}>
         <span className="user-name-cell">
           <span className="user-avatar" aria-hidden="true">
             {user.name?.trim().charAt(0).toUpperCase() || '?'}
@@ -92,30 +101,30 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
           {user.name}
         </span>
       </td>
-      <td data-label="Email">{user.email}</td>
-      <td data-label="Role">
-        <span className="status-badge">{user.role}</span>
+      <td data-label={t('users.columns.email')}>{user.email}</td>
+      <td data-label={t('users.columns.role')}>
+        <span className="status-badge">{roleLabel(t, user.role)}</span>
       </td>
-      <td data-label="Status">
+      <td data-label={t('users.columns.status')}>
         <span
           className={`status-badge ${user.status === 'ACTIVE' ? 'status-success' : 'status-warning'}`}
         >
-          {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+          {statusLabel(t, user.status)}
         </span>
       </td>
-      <td data-label="Joined">
+      <td data-label={t('users.columns.joined')}>
         {user.createdAt ? (
-          <time dateTime={user.createdAt}>{new Date(user.createdAt).toLocaleDateString()}</time>
+          <time dateTime={user.createdAt}>{formatDateTime(user.createdAt, activeLocale())}</time>
         ) : (
           '—'
         )}
       </td>
-      <td data-label="Actions">
+      <td data-label={t('users.columns.actions')}>
         <Link className="table-link" to={`/users/${id}`}>
-          View
+          {t('users.row.view')}
         </Link>
         <button type="button" onClick={() => setEditing(true)}>
-          Edit
+          {t('users.row.edit')}
         </button>
       </td>
     </tr>

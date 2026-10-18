@@ -1,5 +1,7 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
 import type { RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
+import { activeLocale } from '../../lib/i18n';
 import { ApprovalPanel } from './ApprovalPanel';
 import { StepDownloads } from './StepDownloads';
 import { formatTime, stepDuration, stepKey, stepNameId } from './stepDisplay';
@@ -8,11 +10,12 @@ import { StepOutput } from './StepOutput';
 import { StoredOutputDownload } from './StoredOutputDownload';
 
 function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
+  const { t } = useTranslation();
   if (step.status !== 'running') {
     return null;
   }
   if (!step.pickedUpAt) {
-    return <p className="run-step-waiting">Waiting to start…</p>;
+    return <p className="run-step-waiting">{t('workflow.step.waitingToStart')}</p>;
   }
   if (step.progressPercent === undefined || step.progressPercent === null) {
     return null;
@@ -22,7 +25,7 @@ function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
       <progress
         max={100}
         value={step.progressPercent}
-        aria-label={`Step ${step.stepOrder} progress`}
+        aria-label={t('workflow.step.progress', { order: step.stepOrder })}
       />
       <span>{step.progressPercent} %</span>
     </p>
@@ -51,14 +54,16 @@ export function StepDetail({
   needsYou,
   fileName,
 }: Readonly<StepDetailProps>) {
+  const { t } = useTranslation();
+  const locale = activeLocale();
   const status = step.status ?? 'pending';
   const outputs = step.outputs ?? [];
   const details = outputs.find((output) => output.mime === 'application/json');
   const artifacts = outputs.filter((output) => output.mime !== 'application/json');
   const stepOrder = step.stepOrder;
-  const duration = stepDuration(step);
-  const started = formatTime(step.startedAt);
-  const finished = formatTime(step.finishedAt);
+  const duration = stepDuration(step, t, locale);
+  const started = formatTime(step.startedAt, locale);
+  const finished = formatTime(step.finishedAt, locale);
 
   return (
     <section
@@ -70,20 +75,20 @@ export function StepDetail({
       {(duration || started || finished) && (
         <div className="step-timing-bar">
           {duration && (
-            <span className="step-timing-pill" title="Time taken">
-              <span className="timing-label">Duration:</span>
+            <span className="step-timing-pill" title={t('workflow.step.timing.timeTaken')}>
+              <span className="timing-label">{t('workflow.step.timing.duration')}</span>
               <span className="timing-val">{duration}</span>
             </span>
           )}
           {started && (
-            <span className="step-timing-pill" title="Start time">
-              <span className="timing-label">Started:</span>
+            <span className="step-timing-pill" title={t('workflow.step.timing.startTime')}>
+              <span className="timing-label">{t('workflow.step.timing.started')}</span>
               <span className="timing-val">{started}</span>
             </span>
           )}
           {finished && (
-            <span className="step-timing-pill" title="Finish time">
-              <span className="timing-label">Finished:</span>
+            <span className="step-timing-pill" title={t('workflow.step.timing.finishTime')}>
+              <span className="timing-label">{t('workflow.step.timing.finished')}</span>
               <span className="timing-val">{finished}</span>
             </span>
           )}
@@ -121,7 +126,13 @@ export function StepDetail({
         {status === 'error' && (
           <div className="run-step-failure">
             <p role="alert" className="run-step-error">
-              {stepErrorSentence(step.errorCode, step.errorMessage, step.mode === 'remote')}
+              {stepErrorSentence(
+                step.errorCode,
+                step.errorMessage,
+                step.mode === 'remote',
+                t,
+                locale,
+              )}
             </p>
             {step.errorCode && <small className="run-step-code">{step.errorCode}</small>}
           </div>

@@ -7,6 +7,12 @@ function Explodes(): never {
   throw new TypeError('Cannot read properties of undefined (reading "durationMs")');
 }
 
+const LABELS = {
+  title: 'Something went wrong',
+  message: 'This page could not be shown. Reload it to try again.',
+  reload: 'Reload',
+};
+
 type ConsoleSpy = MockInstance<Parameters<Console['error']>, void>;
 
 function clientEvents(spy: ConsoleSpy) {
@@ -26,7 +32,7 @@ describe('ErrorBoundary', () => {
 
   it('renders its children when nothing throws', () => {
     render(
-      <ErrorBoundary>
+      <ErrorBoundary labels={LABELS}>
         <p>Run page</p>
       </ErrorBoundary>,
     );
@@ -38,7 +44,7 @@ describe('ErrorBoundary', () => {
     render(
       <div>
         <nav>Workflows</nav>
-        <ErrorBoundary>
+        <ErrorBoundary labels={LABELS}>
           <Explodes />
         </ErrorBoundary>
       </div>,
@@ -50,9 +56,30 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/^This page could not be shown\. Reload it to try again\.$/);
   });
 
+  it('shows the heading, message and reload action it is given', () => {
+    render(
+      <ErrorBoundary
+        labels={{
+          title: 'Đã xảy ra lỗi',
+          message: 'Không thể hiển thị trang này. Hãy tải lại để thử lần nữa.',
+          reload: 'Tải lại',
+        }}
+      >
+        <Explodes />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Đã xảy ra lỗi' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /^Không thể hiển thị trang này\. Hãy tải lại để thử lần nữa\.$/,
+    );
+    expect(screen.getByRole('button', { name: 'Tải lại' })).toBeInTheDocument();
+    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+  });
+
   it('reports the failure once as a structured event with the route and the error name', () => {
     render(
-      <ErrorBoundary>
+      <ErrorBoundary labels={LABELS}>
         <Explodes />
       </ErrorBoundary>,
     );
@@ -68,7 +95,7 @@ describe('ErrorBoundary', () => {
   it('reloads the page from the Reload action', () => {
     const reload = vi.fn();
     render(
-      <ErrorBoundary onReload={reload}>
+      <ErrorBoundary labels={LABELS} onReload={reload}>
         <Explodes />
       </ErrorBoundary>,
     );

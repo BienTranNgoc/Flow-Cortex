@@ -2,6 +2,8 @@ import { setToken } from '@flow-cortex/api-client';
 import type { MediaJobResponse } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viMediaJobs from '../../locales/vi/mediaJobs.json';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
 import { MediaJobsPage } from './MediaJobsPage';
 
@@ -207,5 +209,54 @@ describe('MediaJobsPage', () => {
     expect(await screen.findByText('Admin console is disabled')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('shows status codes as sent in English and leaves the capability raw', async () => {
+    stubApi({ [JOBS_PATH]: page([job('job-1', { status: 'pending' })]) });
+    renderRoute('/media-jobs', '/media-jobs', <MediaJobsPage />);
+    const row = (await screen.findByText('job-1')).closest('tr') as HTMLElement;
+
+    expect(within(row).getByText('pending')).toBeInTheDocument();
+    expect(within(row).getByText('video.transcode')).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels a queued job in Vietnamese, leaving an unknown status and the capability as sent', async () => {
+      stubApi({
+        [JOBS_PATH]: page([
+          job('job-queued', { status: 'pending' }),
+          job('job-odd', { status: 'paused' }),
+        ]),
+      });
+      renderRoute('/media-jobs', '/media-jobs', <MediaJobsPage />);
+      const queued = (await screen.findByText('job-queued')).closest('tr') as HTMLElement;
+      const odd = screen.getByText('job-odd').closest('tr') as HTMLElement;
+
+      expect(within(queued).getByText(viMediaJobs.status.pending)).toBeInTheDocument();
+      expect(within(queued).getByText('Chờ xử lý')).toBeInTheDocument();
+      expect(within(queued).getByText('video.transcode')).toBeInTheDocument();
+      expect(within(odd).getByText('paused')).toBeInTheDocument();
+    });
+
+    it('labels the status filter options in Vietnamese and keeps their values', async () => {
+      stubApi({ [JOBS_PATH]: page([job('job-1')]) });
+      renderRoute('/media-jobs', '/media-jobs', <MediaJobsPage />);
+      await screen.findByRole('table');
+
+      const options = within(screen.getByRole('combobox')).getAllByRole('option').slice(1);
+      expect(options.map((option) => [option.getAttribute('value'), option.textContent])).toEqual([
+        ['pending', viMediaJobs.status.pending],
+        ['running', viMediaJobs.status.running],
+        ['completed', viMediaJobs.status.completed],
+        ['error', viMediaJobs.status.error],
+      ]);
+    });
   });
 });

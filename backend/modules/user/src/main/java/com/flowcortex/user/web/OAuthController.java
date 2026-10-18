@@ -1,5 +1,7 @@
 package com.flowcortex.user.web;
 
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.OAuthFailure;
@@ -27,7 +29,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Google OAuth 2.0 authorization-code flow with PKCE.
@@ -75,7 +76,8 @@ class OAuthController {
     void authorize(@RequestParam(name = "remember_me", defaultValue = "false") boolean rememberMe,
             @RequestParam(name = "return_to", required = false) String returnTo, HttpServletResponse response) {
         if (!googleClient.isConfigured()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google sign-in is not configured");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    new LocalizedMessage("auth.google.notConfigured"));
         }
         OAuthFlowState flow = OAuthFlowState.begin(SafeReturnTo.of(returnTo), rememberMe, properties.stateTtl(),
                 clock);

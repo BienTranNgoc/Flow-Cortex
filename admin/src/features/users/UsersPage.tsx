@@ -1,17 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import { UserRow } from './UserRow';
 import './UsersPage.css';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { usePageTitle } from '../../app/usePageTitle';
+import { formatNumber } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
 
 const EMPTY_USERS: NonNullable<ReturnType<typeof useUsersQuery>['data']> = [];
 
 export function UsersPage() {
-  usePageTitle('Users');
+  const { t } = useTranslation();
+  const locale = activeLocale();
+  usePageTitle(t('users.title'));
   const usersQuery = useUsersQuery();
   const createMutation = useCreateUserMutation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -63,87 +68,97 @@ export function UsersPage() {
     <main className="users-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Administration</p>
-          <h1>Users</h1>
-          <p className="page-description">
-            Manage account access and roles. Account history is preserved when access is suspended.
-          </p>
+          <p className="eyebrow">{t('users.eyebrow')}</p>
+          <h1>{t('users.title')}</h1>
+          <p className="page-description">{t('users.description')}</p>
         </div>
         <button
           className="button-primary"
           type="button"
           onClick={() => setShowCreateForm((open) => !open)}
         >
-          {showCreateForm ? 'Cancel' : 'Add user'}
+          {showCreateForm ? t('users.cancel') : t('users.addUser')}
         </button>
       </div>
 
       {usersQuery.data && (
-        <section className="metric-grid" aria-label="User statistics">
+        <section className="metric-grid" aria-label={t('users.stats.label')}>
           <article className="metric-card">
-            <span>Total users</span>
-            <strong>{users.length}</strong>
+            <span>{t('users.stats.total')}</span>
+            <strong>{formatNumber(users.length, locale)}</strong>
           </article>
           <article className="metric-card">
-            <span>Active</span>
-            <strong>{users.filter((user) => user.status === 'ACTIVE').length}</strong>
+            <span>{t('users.stats.active')}</span>
+            <strong>
+              {formatNumber(users.filter((user) => user.status === 'ACTIVE').length, locale)}
+            </strong>
           </article>
           <article className="metric-card">
-            <span>Suspended</span>
-            <strong>{users.filter((user) => user.status === 'SUSPENDED').length}</strong>
+            <span>{t('users.stats.suspended')}</span>
+            <strong>
+              {formatNumber(users.filter((user) => user.status === 'SUSPENDED').length, locale)}
+            </strong>
           </article>
           <article className="metric-card">
-            <span>New in 7 days</span>
-            <strong>{newThisWeek}</strong>
+            <span>{t('users.stats.newThisWeek')}</span>
+            <strong>{formatNumber(newThisWeek, locale)}</strong>
           </article>
         </section>
       )}
 
       {showCreateForm && (
-        <form className="create-user-panel" onSubmit={onCreate} noValidate aria-label="Add user">
-          <h2>Create user</h2>
+        <form
+          className="create-user-panel"
+          onSubmit={onCreate}
+          noValidate
+          aria-label={t('users.create.form')}
+        >
+          <h2>{t('users.create.title')}</h2>
           <div className="field">
-            <label htmlFor="new-user-email">Email</label>
+            <label htmlFor="new-user-email">{t('users.create.email')}</label>
             <input id="new-user-email" type="email" autoComplete="off" {...register('email')} />
-            {errors.email && <p role="alert">{errors.email.message}</p>}
+            {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
             {createError?.errors?.email && <p role="alert">{createError.errors.email}</p>}
           </div>
           <div className="field">
-            <label htmlFor="new-user-password">Password</label>
+            <label htmlFor="new-user-password">{t('users.create.password')}</label>
             <input
               id="new-user-password"
               type="password"
               autoComplete="new-password"
               {...register('password')}
             />
-            {errors.password && <p role="alert">{errors.password.message}</p>}
+            {errors.password?.message && <p role="alert">{t(errors.password.message)}</p>}
           </div>
           <div className="field">
-            <label htmlFor="new-user-name">Name</label>
+            <label htmlFor="new-user-name">{t('users.create.name')}</label>
             <input id="new-user-name" {...register('name')} />
-            {errors.name && <p role="alert">{errors.name.message}</p>}
+            {errors.name?.message && <p role="alert">{t(errors.name.message)}</p>}
           </div>
           <div className="field">
-            <label htmlFor="new-user-role">Role</label>
+            <label htmlFor="new-user-role">{t('users.create.role')}</label>
             <select id="new-user-role" {...register('role')}>
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
             </select>
           </div>
           {createError && !createError.errors && <p role="alert">{createError.detail}</p>}
           <button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? 'Creating…' : 'Create user'}
+            {createMutation.isPending ? t('users.create.submitting') : t('users.create.submit')}
           </button>
         </form>
       )}
 
-      <section className="users-list-panel" aria-label="User directory">
+      <section className="users-list-panel" aria-label={t('users.directory.label')}>
         <div className="section-heading">
           <div>
-            <h2>All users</h2>
+            <h2>{t('users.directory.title')}</h2>
             {usersQuery.data && (
               <p>
-                {visibleUsers.length} of {users.length} accounts
+                {t('users.directory.count', {
+                  visible: formatNumber(visibleUsers.length, locale),
+                  total: formatNumber(users.length, locale),
+                })}
               </p>
             )}
           </div>
@@ -152,72 +167,72 @@ export function UsersPage() {
             onClick={() => usersQuery.refetch()}
             disabled={usersQuery.isFetching}
           >
-            {usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+            {usersQuery.isFetching ? t('users.directory.refreshing') : t('users.directory.refresh')}
           </button>
         </div>
         <div className="user-filters">
           <div className="field">
-            <label htmlFor="users-search">Search</label>
+            <label htmlFor="users-search">{t('users.directory.search')}</label>
             <input
               id="users-search"
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name or email"
+              placeholder={t('users.directory.searchPlaceholder')}
             />
           </div>
           <div className="field">
-            <label htmlFor="users-status">Status</label>
+            <label htmlFor="users-status">{t('users.directory.status')}</label>
             <select
               id="users-status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="">{t('users.directory.allStatuses')}</option>
+              <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
+              <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
             </select>
           </div>
           <div className="field">
-            <label htmlFor="users-role">Role</label>
+            <label htmlFor="users-role">{t('users.directory.role')}</label>
             <select
               id="users-role"
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value)}
             >
-              <option value="">All roles</option>
-              <option value="ADMIN">Admin</option>
-              <option value="MEMBER">Member</option>
-              <option value="CREATOR">Creator</option>
+              <option value="">{t('users.directory.allRoles')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
             </select>
           </div>
         </div>
-        {usersQuery.isLoading && <output>Loading users…</output>}
+        {usersQuery.isLoading && <output>{t('users.directory.loading')}</output>}
         {usersQuery.isError && (
           <>
-            <p role="alert">Could not load users.</p>
+            <p role="alert">{t('users.directory.loadError')}</p>
             <button type="button" onClick={() => usersQuery.refetch()}>
-              Retry
+              {t('users.directory.retry')}
             </button>
           </>
         )}
         {usersQuery.data?.length === 0 && (
-          <p className="list-empty">No users yet — add one above.</p>
+          <p className="list-empty">{t('users.directory.empty')}</p>
         )}
         {usersQuery.data && users.length > 0 && visibleUsers.length === 0 && (
-          <p className="list-empty">No users match these filters.</p>
+          <p className="list-empty">{t('users.directory.noMatch')}</p>
         )}
         {visibleUsers.length > 0 && (
           <div className="users-table-wrapper">
             <table className="users-table">
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Joined</th>
-                  <th scope="col">Actions</th>
+                  <th scope="col">{t('users.columns.name')}</th>
+                  <th scope="col">{t('users.columns.email')}</th>
+                  <th scope="col">{t('users.columns.role')}</th>
+                  <th scope="col">{t('users.columns.status')}</th>
+                  <th scope="col">{t('users.columns.joined')}</th>
+                  <th scope="col">{t('users.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>

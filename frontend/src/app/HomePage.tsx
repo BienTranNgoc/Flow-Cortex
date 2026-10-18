@@ -1,4 +1,5 @@
 import { type WorkflowResponse, type WorkflowStepResponseMode } from '@flow-cortex/api-client';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
@@ -11,6 +12,8 @@ const TONE_BY_MODE: Record<WorkflowStepResponseMode, IconTone> = {
   inline: 'blue',
   remote: 'cyan',
 };
+const DEFAULT_TONE: IconTone = 'amber';
+const WORKFLOWS_PATH = '/workflows';
 
 const STAGE_TONE_CYCLE: readonly StageTone[] = ['blue', 'cyan', 'violet', 'amber', 'green', 'rose'];
 
@@ -27,24 +30,32 @@ function stageToneAt(index: number): StageTone {
   return STAGE_TONE_CYCLE[index % STAGE_TONE_CYCLE.length] as StageTone;
 }
 
+const STAGES = [
+  { order: 1, title: 'common.home.stages.source.title', body: 'common.home.stages.source.body' },
+  { order: 2, title: 'common.home.stages.process.title', body: 'common.home.stages.process.body' },
+  { order: 3, title: 'common.home.stages.review.title', body: 'common.home.stages.review.body' },
+  { order: 4, title: 'common.home.stages.export.title', body: 'common.home.stages.export.body' },
+] as const;
+
 export function HomePage() {
+  const { t } = useTranslation();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  if (meQuery.isLoading) return <output>Loading…</output>;
+  if (meQuery.isLoading) return <output>{t('common.home.loading')}</output>;
   if (meQuery.isError) {
     return (
       <main className="launchpad">
         <p role="alert" className="form-error">
-          Could not load your profile.{' '}
+          {t('common.home.loadProfileError')}{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
-            Retry
+            {t('common.home.retry')}
           </button>
         </p>
       </main>
     );
   }
   if (!meQuery.data) {
-    return <output>Loading…</output>;
+    return <output>{t('common.home.loading')}</output>;
   }
 
   const workflows = workflowsQuery.data ?? [];
@@ -52,44 +63,44 @@ export function HomePage() {
   return (
     <main className="launchpad">
       <section className="launchpad-hero">
-        <p className="eyebrow">CREATOR LAUNCHPAD · READY TO CREATE</p>
+        <p className="eyebrow">{t('common.home.eyebrow')}</p>
         <h1>
-          Your AI media <span>studio</span>
+          <Trans i18nKey="common.home.headline" components={{ highlight: <span /> }} />
         </h1>
-        <p>
-          One click launches a production-ready pipeline: source, process, review, export.
-        </p>
+        <p>{t('common.home.lede')}</p>
       </section>
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
         <h2 id="launchpad-cards-title" className="launchpad-section-title">
-          Pick a pipeline
+          {t('common.home.pickTitle')}
         </h2>
-        {workflowsQuery.isLoading && <output>Loading workflows…</output>}
+        {workflowsQuery.isLoading && <output>{t('common.home.loadingWorkflows')}</output>}
         {workflowsQuery.isError && (
           <p role="alert" className="form-error">
-            Could not load workflows.{' '}
+            {t('common.home.loadWorkflowsError')}{' '}
             <button type="button" onClick={() => void workflowsQuery.refetch()}>
-              Retry
+              {t('common.home.retry')}
             </button>
           </p>
         )}
         {!workflowsQuery.isLoading && !workflowsQuery.isError && workflows.length === 0 && (
-          <p>No workflows available yet.</p>
+          <p>{t('common.home.empty')}</p>
         )}
         {workflows.length > 0 && (
           <div className="workflow-grid">
             {workflows.map((workflow) => {
               const mode = firstStepMode(workflow);
-              const iconTone: IconTone = mode ? TONE_BY_MODE[mode] : 'amber';
-              const linkTo = workflow.id ? `/workflows/${workflow.id}` : '/workflows';
+              const iconTone: IconTone = mode ? TONE_BY_MODE[mode] : DEFAULT_TONE;
+              const linkTo = workflow.id ? `${WORKFLOWS_PATH}/${workflow.id}` : WORKFLOWS_PATH;
               return (
                 <article key={workflow.id ?? workflow.name} className="workflow-card-tile">
                   <header className="workflow-card-header">
                     <span className={`workflow-card-icon tone-${iconTone}`} aria-hidden="true">
                       {iconFor(workflow)}
                     </span>
-                    <h3 className="workflow-card-title">{workflow.name ?? 'Untitled workflow'}</h3>
+                    <h3 className="workflow-card-title">
+                      {workflow.name ?? t('common.home.untitled')}
+                    </h3>
                   </header>
 
                   {workflow.steps && workflow.steps.length > 0 && (
@@ -99,7 +110,8 @@ export function HomePage() {
                           key={step.id ?? `${index}-${step.name}`}
                           className={`workflow-card-stage tone-${stageToneAt(index)}`}
                         >
-                          {step.name ?? `Step ${step.stepOrder ?? index + 1}`}
+                          {step.name ??
+                            t('common.home.stepFallback', { order: step.stepOrder ?? index + 1 })}
                         </li>
                       ))}
                     </ul>
@@ -107,7 +119,7 @@ export function HomePage() {
 
                   <footer className="workflow-card-footer">
                     <Link className="workflow-card-launch" to={linkTo}>
-                      Launch Workflow →
+                      {t('common.home.launch')}
                     </Link>
                   </footer>
                 </article>
@@ -118,42 +130,24 @@ export function HomePage() {
       </section>
 
       <section className="launchpad-stages" aria-labelledby="launchpad-stages-title">
-        <h2 id="launchpad-stages-title">How Flow-Cortex Handles Your Video Runs</h2>
+        <h2 id="launchpad-stages-title">{t('common.home.stagesTitle')}</h2>
         <ol className="launchpad-stages-list">
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              1
-            </span>
-            <h3>Source</h3>
-            <p>Submit a link or upload a media file. Required fields and limits are checked up front.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              2
-            </span>
-            <h3>Process</h3>
-            <p>Workers run each step in order. Status, attempts and errors are saved on every node.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              3
-            </span>
-            <h3>Review</h3>
-            <p>Pauses at the review gates you configured. Edit content, then approve to continue.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              4
-            </span>
-            <h3>Export</h3>
-            <p>Download the finished output while it is still within the asset retention window.</p>
-          </li>
+          {STAGES.map(({ order, title, body }) => (
+            <li key={order} className="launchpad-stage">
+              <span className="launchpad-stage-order" aria-hidden="true">
+                {order}
+              </span>
+              <h3>{t(title)}</h3>
+              <p>{t(body)}</p>
+            </li>
+          ))}
         </ol>
       </section>
 
       <section className="launchpad-footer">
         <p>
-          Welcome, {meQuery.data.name} · <Link to="/workflows">View all workflows</Link>
+          {t('common.home.welcome', { name: meQuery.data.name })} ·{' '}
+          <Link to="/workflows">{t('common.home.viewAll')}</Link>
         </p>
       </section>
     </main>

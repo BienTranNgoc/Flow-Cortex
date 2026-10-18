@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { googleAuthorizeUrl, oauthErrorMessage } from './oauth';
+import { googleAuthorizeUrl, oauthErrorKey } from './oauth';
+import { activeLocale } from '../../lib/i18n';
 import {
+  accountLockedMessage,
   clearRememberedEmail,
-  detailFrom,
+  failureMessage,
   getRememberedEmail,
   setRememberedEmail,
   submitState,
@@ -18,6 +21,7 @@ import {
 } from './useAuth';
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const token = useAuthToken();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -53,14 +57,16 @@ export function LoginPage() {
 
   const oauthError = searchParams.get('oauth_error');
   const serverError =
-    detailFrom(loginMutation) ?? (oauthError ? oauthErrorMessage(oauthError) : undefined);
+    accountLockedMessage(loginMutation.error, t, activeLocale()) ??
+    failureMessage(loginMutation, t) ??
+    (oauthError ? t(oauthErrorKey(oauthError)) : undefined);
   const isPending = loginMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
   const buttonLabel = (() => {
-    if (submitSucceeded) return '✓ Signed in';
-    if (isPending) return 'Signing in…';
-    return 'Sign in to Studio →';
+    if (submitSucceeded) return t('auth.login.succeeded');
+    if (isPending) return t('auth.login.submitting');
+    return t('auth.login.submit');
   })();
 
   return (
@@ -68,24 +74,29 @@ export function LoginPage() {
       <BrandPanel />
 
       <section className="auth-card">
-        <h1 className="auth-card__title">Sign in</h1>
-        <p className="auth-subtitle">Access your creator workspace and run media pipelines.</p>
+        <h1 className="auth-card__title">{t('auth.login.title')}</h1>
+        <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
 
         <div className="oauth-row">
           <OAuthButton
             provider="google"
-            label="Continue with Google"
+            label={t('auth.login.google')}
             href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
           />
         </div>
 
         <div className="auth-divider" aria-hidden="true">
-          <span>or sign in with email</span>
+          <span>{t('auth.login.divider')}</span>
         </div>
 
-        <form onSubmit={onSubmit} noValidate aria-label="Sign in" className="auth-form">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          aria-label={t('auth.login.formLabel')}
+          className="auth-form"
+        >
           <div className="field" style={{ '--i': 0 } as React.CSSProperties}>
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t('auth.login.emailLabel')}</label>
             <input
               id="login-email"
               type="email"
@@ -93,10 +104,10 @@ export function LoginPage() {
               aria-invalid={errors.email ? 'true' : 'false'}
               {...register('email')}
             />
-            {errors.email && <p role="alert">{errors.email.message}</p>}
+            {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
           </div>
           <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t('auth.login.passwordLabel')}</label>
             <input
               id="login-password"
               type="password"
@@ -104,7 +115,7 @@ export function LoginPage() {
               aria-invalid={errors.password ? 'true' : 'false'}
               {...register('password')}
             />
-            {errors.password && <p role="alert">{errors.password.message}</p>}
+            {errors.password?.message && <p role="alert">{t(errors.password.message)}</p>}
           </div>
           <div className="login-meta-row">
             <label className="remember-row" htmlFor="login-remember">
@@ -113,11 +124,11 @@ export function LoginPage() {
                 type="checkbox"
                 {...register('rememberMe')}
               />
-              <span>Remember me</span>
+              <span>{t('auth.login.rememberMe')}</span>
             </label>
             {passwordResetEnabled() && (
               <Link to="/forgot-password" className="forgot-password-link">
-                Forgot password?
+                {t('auth.login.forgotPassword')}
               </Link>
             )}
           </div>
@@ -137,7 +148,7 @@ export function LoginPage() {
         </form>
 
         <p className="auth-footer">
-          New to Flow-Cortex? <Link to="/register">Create a free account</Link>
+          {t('auth.login.newHere')} <Link to="/register">{t('auth.login.createAccount')}</Link>
         </p>
       </section>
     </div>

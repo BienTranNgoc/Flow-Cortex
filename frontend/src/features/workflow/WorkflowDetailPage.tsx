@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
@@ -18,6 +19,7 @@ function InlineStartForm({
   workflowId,
   disabled,
 }: Readonly<{ workflowId: string; disabled: boolean }>) {
+  const { t } = useTranslation();
   const { go } = useTransitionNavigate();
   const startRunMutation = useStartRunMutation(workflowId);
   const { register, handleSubmit } = useForm<StartRunFormValues>({
@@ -44,9 +46,9 @@ function InlineStartForm({
   });
 
   return (
-    <form onSubmit={onStart} noValidate aria-label="Start run">
+    <form onSubmit={onStart} noValidate aria-label={t('workflow.start.formLabel')}>
       <div className="field">
-        <label htmlFor="run-input">Input (optional)</label>
+        <label htmlFor="run-input">{t('workflow.start.inputLabel')}</label>
         <input id="run-input" {...register('input')} />
       </div>
       {startError && (
@@ -54,14 +56,14 @@ function InlineStartForm({
           <p>
             {startError.detail ??
               (isExecutionDisabled
-                ? 'Workflow execution is currently disabled.'
-                : 'Could not start the run.')}
+                ? t('workflow.start.executionDisabled')
+                : t('workflow.start.failed'))}
           </p>
-          <p>Try again later, or go back to the Workflows list.</p>
+          <p>{t('workflow.start.nextActionLater')}</p>
         </div>
       )}
       <button type="submit" disabled={startRunMutation.isPending || disabled}>
-        {startRunMutation.isPending ? 'Starting…' : 'Start run'}
+        {startRunMutation.isPending ? t('workflow.start.starting') : t('workflow.start.button')}
       </button>
     </form>
   );
@@ -78,14 +80,16 @@ function InlineStartForm({
  */
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
 
   if (!id) {
-    return <p role="alert">No workflow selected.</p>;
+    return <p role="alert">{t('workflow.detail.noWorkflow')}</p>;
   }
   return <WorkflowDetailView workflowId={id} />;
 }
 
 function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
+  const { t } = useTranslation();
   const workflowQuery = useWorkflowQuery(workflowId);
   const capabilitiesQuery = useCapabilitiesQuery();
   const workflow = workflowQuery.data;
@@ -111,19 +115,17 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
 
   return (
     <main>
-      <h1>{workflow?.name ?? 'Workflow'}</h1>
-      {workflow?.isShared && <p>Shared with every member.</p>}
-      {workflowQuery.isError && (
-        <p role="alert">Could not load this workflow. Try again, or pick another one.</p>
-      )}
+      <h1>{workflow?.name ?? t('workflow.detail.heading')}</h1>
+      {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
+      {workflowQuery.isError && <p role="alert">{t('workflow.detail.loadError')}</p>}
       {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
-        <output>Loading workflow…</output>
+        <output>{t('workflow.detail.loading')}</output>
       )}
       {workflow?.steps && workflow.steps.length > 0 && (
         <Pipeline
           steps={workflow.steps.map((step) => ({
             id: stepKey(step),
-            name: step.name ?? `Step ${step.stepOrder}`,
+            name: step.name ?? t('workflow.step.fallback', { order: step.stepOrder }),
           }))}
         />
       )}

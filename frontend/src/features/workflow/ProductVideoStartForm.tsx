@@ -1,10 +1,13 @@
 import { ApiError } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import {
   createMultiUpload,
   firstImageProblem,
   MultiUploadError,
+  type ImageProblem,
   type MultiUploadPhase,
 } from './productVideoUpload';
 import { uploadFile } from './uploadFile';
@@ -13,28 +16,33 @@ import {
   useStartProductVideoRunMutation,
 } from './useWorkflows';
 
-const NEXT_ACTION = 'Try again, or go back to the Workflows list.';
+/** `detail` is the server's own sentence, shown as received; without one the form's fallback is shown. */
+type Failure = { kind: 'upload' } | { kind: 'alert'; detail: string | undefined };
 
-type Failure = { kind: 'upload' } | { kind: 'alert'; message: string };
+/** A check made here (translated at render) or a field message the server wrote (shown as received). */
+type ImageError = { kind: 'check'; problem: ImageProblem } | { kind: 'server'; message: string };
+
+const asCheck = (problem: ImageProblem | null): ImageError | null =>
+  problem ? { kind: 'check', problem } : null;
 
 const TEXT_FIELDS = [
-  { id: 'product-name', name: 'productName', label: 'Product name', required: true, maxLength: 200 },
-  { id: 'product-description', name: 'description', label: 'Description', required: true, maxLength: 4000, multiline: true },
-  { id: 'product-cta', name: 'cta', label: 'Call to action', required: true, maxLength: 500 },
-  { id: 'product-price', name: 'price', label: 'Price (optional)', required: false, maxLength: 200 },
-  { id: 'product-promotion', name: 'promotion', label: 'Promotion (optional)', required: false, maxLength: 500 },
+  { id: 'product-name', name: 'productName', labelKey: 'workflow.productVideo.field.productName', required: true, maxLength: 200 },
+  { id: 'product-description', name: 'description', labelKey: 'workflow.productVideo.field.description', required: true, maxLength: 4000, multiline: true },
+  { id: 'product-cta', name: 'cta', labelKey: 'workflow.productVideo.field.cta', required: true, maxLength: 500 },
+  { id: 'product-price', name: 'price', labelKey: 'workflow.productVideo.field.price', required: false, maxLength: 200 },
+  { id: 'product-promotion', name: 'promotion', labelKey: 'workflow.productVideo.field.promotion', required: false, maxLength: 500 },
 ] as const;
 
 type TextFieldName = (typeof TEXT_FIELDS)[number]['name'];
 
-function startButtonLabel(phase: MultiUploadPhase | null): string {
+function startButtonLabel(phase: MultiUploadPhase | null, t: TFunction): string {
   if (phase?.kind === 'requesting') {
-    return 'Preparing…';
+    return t('workflow.productVideo.preparing');
   }
   if (phase?.kind === 'uploading') {
-    return `Uploading ${phase.index + 1} / ${phase.total}…`;
+    return t('workflow.productVideo.uploading', { index: phase.index + 1, total: phase.total });
   }
-  return 'Start run';
+  return t('workflow.start.button');
 }
 
 /**
@@ -45,6 +53,7 @@ function startButtonLabel(phase: MultiUploadPhase | null): string {
 export function ProductVideoStartForm({
   disabled,
 }: Readonly<{ disabled: boolean }>) {
+  const { t } = useTranslation();
   const { go } = useTransitionNavigate();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartProductVideoRunMutation();
@@ -64,9 +73,9 @@ export function ProductVideoStartForm({
     price: '',
     promotion: '',
   });
-  const [textError, setTextError] = useState<string | null>(null);
+  const [blankFieldKey, setBlankFieldKey] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<ImageError | null>(null);
   const [phase, setPhase] = useState<MultiUploadPhase | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
 
@@ -85,7 +94,7 @@ export function ProductVideoStartForm({
     const picked = event.target.files ? Array.from(event.target.files) : [];
     setFiles(picked);
     setFailure(null);
-    setImageError(firstImageProblem(picked)?.message ?? null);
+    setImageError(asCheck(firstImageProblem(picked)));
   };
 
   const showFailure = (error: unknown) => {
@@ -98,15 +107,15 @@ export function ProductVideoStartForm({
     const fieldMessage =
       problem?.errors?.uploadIds ?? problem?.errors?.uploadId ?? problem?.errors?.size;
     if (fieldMessage) {
-      setImageError(fieldMessage);
+      setImageError({ kind: 'server', message: fieldMessage });
       return;
     }
-    setFailure({ kind: 'alert', message: problem?.detail ?? 'Could not start the run.' });
+    setFailure({ kind: 'alert', detail: problem?.detail });
   };
 
   const run = async () => {
     setFailure(null);
-    setTextError(null);
+    setBlankFieldKey(null);
     setImageError(null);
     try {
       const uploadIds = await uploadAll(files, setPhase);
@@ -138,15 +147,15 @@ export function ProductVideoStartForm({
     }
     const blank = TEXT_FIELDS.find((field) => field.required && text[field.name].trim() === '');
     if (blank) {
-      setTextError(`${blank.label} is required.`);
+      setBlankFieldKey(blank.labelKey);
       return;
     }
-    if (textError) {
+    if (blankFieldKey) {
       return;
     }
     const listProblem = firstImageProblem(files);
     if (listProblem) {
-      setImageError(listProblem.message);
+      setImageError(asCheck(listProblem));
       return;
     }
     void run();
@@ -155,11 +164,11 @@ export function ProductVideoStartForm({
   const uploadPercent = phase?.kind === 'uploading' ? phase.percent : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Start a product video run" className="media-start-form">
+    <form onSubmit={onSubmit} noValidate aria-label={t('workflow.productVideo.formLabel')} className="media-start-form">
       {TEXT_FIELDS.map((field) => (
         <div className="field" key={field.id}>
           <label htmlFor={field.id}>
-            {field.label}
+            {t(field.labelKey)}
             {field.required ? ' *' : ''}
           </label>
           {('multiline' in field && field.multiline) ? (
@@ -186,13 +195,13 @@ export function ProductVideoStartForm({
           )}
         </div>
       ))}
-      {textError && (
+      {blankFieldKey && (
         <div className="field-error" role="alert">
-          <p>{textError}</p>
+          <p>{t('workflow.productVideo.required', { field: t(blankFieldKey) })}</p>
         </div>
       )}
       <div className="field">
-        <label htmlFor="product-images">Product images (1–10, JPG/PNG/WebP, ≤ 10 MB each) *</label>
+        <label htmlFor="product-images">{t('workflow.productVideo.images')}</label>
         <input
           id="product-images"
           type="file"
@@ -204,11 +213,22 @@ export function ProductVideoStartForm({
           aria-describedby={imageError ? 'product-images-problem' : undefined}
         />
         {files.length > 0 && (
-          <p className="field-hint">{files.length} image{files.length === 1 ? '' : 's'} selected</p>
+          <p className="field-hint">
+            {t(
+              files.length === 1
+                ? 'workflow.productVideo.imageSelected'
+                : 'workflow.productVideo.imagesSelected',
+              { n: files.length },
+            )}
+          </p>
         )}
         {imageError && (
           <div id="product-images-problem" className="field-error" role="alert">
-            <p>{imageError}</p>
+            <p>
+              {imageError.kind === 'server'
+                ? imageError.message
+                : t(imageError.problem.messageKey, imageError.problem.values ?? {})}
+            </p>
           </div>
         )}
       </div>
@@ -217,25 +237,27 @@ export function ProductVideoStartForm({
           className="upload-progress"
           max={100}
           value={uploadPercent}
-          aria-label={`Uploading image ${(phase as { index: number }).index + 1}`}
+          aria-label={t('workflow.productVideo.uploadingImage', {
+            index: (phase as { index: number }).index + 1,
+          })}
         />
       )}
       {failure?.kind === 'upload' && (
         <div role="alert">
-          <p>One of the uploads didn&apos;t finish. Try again.</p>
+          <p>{t('workflow.productVideo.uploadsUnfinished')}</p>
           <button type="button" onClick={() => void run()}>
-            Retry
+            {t('workflow.start.retry')}
           </button>
         </div>
       )}
       {failure?.kind === 'alert' && (
         <div role="alert">
-          <p>{failure.message}</p>
-          <p>{NEXT_ACTION}</p>
+          <p>{failure.detail ?? t('workflow.start.failed')}</p>
+          <p>{t('workflow.start.nextAction')}</p>
         </div>
       )}
       <button type="submit" aria-busy={phase !== null} disabled={disabled}>
-        {startButtonLabel(phase)}
+        {startButtonLabel(phase, t)}
       </button>
     </form>
   );

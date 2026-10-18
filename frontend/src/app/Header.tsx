@@ -1,5 +1,7 @@
+import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 import { logout } from '../features/auth/useAuth';
+import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { accountStatsEnabled } from './featureFlags';
 
 type HeaderProps = {
@@ -10,11 +12,12 @@ const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' :
 
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
 export function Header({ email }: HeaderProps) {
+  const { t } = useTranslation();
   return (
     <header className="cortex-header">
       <div className="cortex-header__inner">
         {/* Left: Logo + Brand */}
-        <Link to="/" className="cortex-header__brand" aria-label="FlowCortex home">
+        <Link to="/" className="cortex-header__brand" aria-label={t('common.nav.homeLink')}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 500 500"
@@ -66,18 +69,18 @@ export function Header({ email }: HeaderProps) {
         </Link>
 
         {/* Center: Navigation */}
-        <nav className="cortex-header__nav" aria-label="Main navigation">
+        <nav className="cortex-header__nav" aria-label={t('common.nav.label')}>
           <NavLink to="/" end className={navClass}>
-            Home
+            {t('common.nav.home')}
           </NavLink>
           <NavLink to="/workflows" className={navClass}>
-            Workflows
+            {t('common.nav.workflows')}
           </NavLink>
           <NavLink to="/profile" className={navClass}>
-            Profile
+            {t('common.nav.profile')}
           </NavLink>
-          <a href="#docs">Docs</a>
-          <a href="#api">API</a>
+          <a href="#docs">{t('common.nav.docs')}</a>
+          <a href="#api">{t('common.nav.api')}</a>
         </nav>
 
         {/* Right: GPU Pill + Auth */}
@@ -94,13 +97,14 @@ export function Header({ email }: HeaderProps) {
               >
                 <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
               </svg>
-              <span>18 GPU Credits</span>
+              <span>{t('common.nav.gpuCredits')}</span>
             </span>
           )}
+          <AppLanguageToggle />
           <div className="cortex-header__user">
             {email && <span className="cortex-header__email">{email}</span>}
             <button type="button" className="cortex-btn cortex-btn--ghost" onClick={() => void logout()}>
-              Sign out
+              {t('common.nav.signOut')}
             </button>
           </div>
         </div>

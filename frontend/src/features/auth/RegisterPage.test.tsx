@@ -1,4 +1,8 @@
 import { fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AppShell } from '../../app/AppShell';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
 import { RegisterPage } from './RegisterPage';
 
@@ -63,5 +67,61 @@ describe('RegisterPage', () => {
     const url = new URL(href ?? '', 'http://localhost');
     expect(url.pathname).toBe('/api/v1/auth/oauth/google/authorize');
     expect(Object.fromEntries(url.searchParams)).toEqual({ remember_me: 'true', return_to: '/' });
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+      window.localStorage.clear();
+    });
+
+    it('switches to English without losing the typed name and remembers the choice', async () => {
+      const user = userEvent.setup();
+      renderRoute(
+        '/register',
+        '/register',
+        <AppShell>
+          <RegisterPage />
+        </AppShell>,
+      );
+
+      await user.type(screen.getByLabelText(viAuth.register.nameLabel), 'An');
+      await user.click(screen.getByRole('button', { name: 'EN English' }));
+
+      expect(screen.getByLabelText('Full name')).toHaveValue('An');
+      expect(screen.getByLabelText('Work or personal email')).toBeInTheDocument();
+      expect(screen.getByRole('form', { name: 'Create account' })).toBeInTheDocument();
+      expect(window.localStorage.getItem('flow-cortex.locale')).toBe('en');
+    });
+
+    it('shows the generic retry message in Vietnamese when the request never reaches the server', async () => {
+      stubApi({
+        'POST /api/v1/auth/register': () => {
+          throw new TypeError('Failed to fetch');
+        },
+      });
+      renderRoute('/register', '/register', <RegisterPage />);
+
+      fireEvent.change(screen.getByLabelText(viAuth.register.nameLabel), {
+        target: { value: 'New Creator' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.emailLabel), {
+        target: { value: 'new.creator@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.passwordLabel), {
+        target: { value: 'register-password-1' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.confirmPasswordLabel), {
+        target: { value: 'register-password-1' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: viAuth.register.submit }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Không thực hiện được yêu cầu. Hãy thử lại.',
+      );
+    });
   });
 });

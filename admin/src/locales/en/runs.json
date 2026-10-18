@@ -1,0 +1,19 @@
+{
+  "title": "Runs",
+  "noun": "runs",
+  "deletedUser": "(deleted user)",
+  "columns": {
+    "workflow": "Workflow",
+    "owner": "Owner",
+    "status": "Status",
+    "started": "Started",
+    "finished": "Finished",
+    "error": "Error"
+  },
+  "status": {
+    "running": "running",
+    "waiting_approval": "waiting_approval",
+    "completed": "completed",
+    "error": "error"
+  }
+}

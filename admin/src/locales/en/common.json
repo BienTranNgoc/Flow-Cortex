@@ -1,0 +1,87 @@
+{
+  "errorView": {
+    "title": "Something went wrong",
+    "message": "This page could not be shown. Reload it to try again.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "requestFailed": "Something went wrong. Try again."
+  },
+  "language": {
+    "groupLabel": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "header": {
+    "title": "Flow-Cortex Admin"
+  },
+  "account": {
+    "fallbackName": "Account",
+    "trigger": "{{name}}, account menu",
+    "menu": "Account menu",
+    "summary": "Signed-in account",
+    "account": "Account",
+    "settings": "Settings",
+    "comingSoon": "Coming soon",
+    "signOut": "Sign out",
+    "dialogTitle": "Account",
+    "close": "Close account details",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role"
+  },
+  "shell": {
+    "noPage": "No page is available to this account.",
+    "nav": {
+      "label": "Admin navigation",
+      "menu": "Menu",
+      "comingSoon": "(Coming soon)",
+      "unavailable": "unavailable",
+      "groups": {
+        "overview": "Overview",
+        "operations": "Operations",
+        "administration": "Administration"
+      },
+      "items": {
+        "dashboard": "Dashboard",
+        "runs": "Runs",
+        "mediaJobs": "Media jobs",
+        "providers": "Providers",
+        "usage": "Usage",
+        "users": "Users",
+        "settings": "Settings",
+        "auditLog": "Audit log"
+      }
+    },
+    "noAccess": {
+      "title": "No access",
+      "messageWithEmail": "<account>{{email}}</account> does not have the ADMIN role, so it cannot use the admin console.",
+      "message": "This account does not have the ADMIN role, so it cannot use the admin console.",
+      "signOut": "Sign out"
+    },
+    "session": {
+      "checkingSession": "Checking your session…",
+      "checkingAccount": "Checking your account…",
+      "accountError": "Could not check your account.",
+      "retry": "Retry"
+    },
+    "list": {
+      "emptyPage": "No {{noun}} on this page.",
+      "backToFirstPage": "Back to first page",
+      "noMatch": "No {{noun}} match this filter",
+      "clearFilter": "Clear filter",
+      "empty": "No {{noun}} yet.",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "refresh": "Refresh",
+      "disabled": "Admin console is disabled",
+      "loadError": "Could not load {{noun}}.",
+      "retry": "Retry",
+      "loading": "Loading {{noun}}…",
+      "stale": "Showing the results loaded before this error.",
+      "previousPage": "Previous page",
+      "pager": "Page {{page}} of {{pages}} · {{total}} {{noun}}",
+      "nextPage": "Next page"
+    }
+  }
+}

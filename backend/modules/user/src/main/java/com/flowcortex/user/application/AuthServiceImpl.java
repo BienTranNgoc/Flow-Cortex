@@ -2,6 +2,8 @@ package com.flowcortex.user.application;
 
 import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
@@ -40,8 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
 class AuthServiceImpl implements AuthService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
-
-    private static final String REGISTRATION_CLOSED = "Self-registration is not available";
 
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
 
@@ -90,7 +90,7 @@ class AuthServiceImpl implements AuthService {
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException("A user with email '" + email + "' already exists");
+            throw new ConflictException(new LocalizedMessage("user.emailTaken", email));
         }
         AuthSession session = refreshTokenService.issueFor(user, ip, agent, rememberMe);
         audit.write(AuthEventType.REGISTRATION_ACCEPTED, user.getId(), ip, agent,
@@ -158,7 +158,7 @@ class AuthServiceImpl implements AuthService {
     @Transactional
     public CurrentUser updateOwnProfile(UUID userId, String name) {
         AppUser user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", userId)));
         AccountStatusGuard.requireActive(user);
         user.changeName(name);
         return AppUserMapper.toCurrentUser(user);
@@ -267,7 +267,7 @@ class AuthServiceImpl implements AuthService {
         String ownerEmail = registration.ownerEmail() == null ? "" : registration.ownerEmail().trim();
         if (ownerEmail.isEmpty()) {
             LOG.info("Registration refused: reason=owner_not_configured");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+            throw registrationClosed();
         }
         AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
         String unusable = owner == null ? "owner_not_found"
@@ -276,9 +276,13 @@ class AuthServiceImpl implements AuthService {
                 : null;
         if (unusable != null) {
             LOG.warn("Registration refused: reason={} (check flowcortex.registration.owner-email)", unusable);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+            throw registrationClosed();
         }
         return owner;
+    }
+
+    private static LocalizedStatusException registrationClosed() {
+        return new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("auth.registrationClosed"));
     }
 
     private static String truncate(String value) {

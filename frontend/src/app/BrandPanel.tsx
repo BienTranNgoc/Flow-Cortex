@@ -1,28 +1,28 @@
+import { Trans, useTranslation } from 'react-i18next';
+
+const BULLET_KEYS = [
+  'common.shell.brandPanel.pipelines',
+  'common.shell.brandPanel.reviewGates',
+  'common.shell.brandPanel.retention',
+] as const;
+
 export function BrandPanel() {
+  const { t } = useTranslation();
   return (
     <aside className="brand-panel" aria-hidden="false">
       <div className="brand-panel__inner">
         <p className="eyebrow">FLOWCORTEX AI 2.5</p>
         <h2 className="brand-panel__headline">
-          Your AI media <span>studio</span> for production-grade pipelines.
+          <Trans i18nKey="common.shell.brandPanel.headline" components={{ highlight: <span /> }} />
         </h2>
-        <p className="brand-panel__lede">
-          Source, process, review and export media in one click — built for creators
-          who need consistent output, not another toy.
-        </p>
+        <p className="brand-panel__lede">{t('common.shell.brandPanel.lede')}</p>
         <ul className="brand-panel__bullets">
-          <li>
-            <span className="brand-panel__bullet-dot" aria-hidden="true" />
-            <span>Three production pipelines ready out of the box</span>
-          </li>
-          <li>
-            <span className="brand-panel__bullet-dot" aria-hidden="true" />
-            <span>Human review gates built into every multi-step run</span>
-          </li>
-          <li>
-            <span className="brand-panel__bullet-dot" aria-hidden="true" />
-            <span>Output retention and signed download links by default</span>
-          </li>
+          {BULLET_KEYS.map((key) => (
+            <li key={key}>
+              <span className="brand-panel__bullet-dot" aria-hidden="true" />
+              <span>{t(key)}</span>
+            </li>
+          ))}
         </ul>
       </div>
     </aside>

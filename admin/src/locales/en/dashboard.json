@@ -1,0 +1,41 @@
+{
+  "title": "Dashboard",
+  "eyebrow": "Flow-Cortex operations",
+  "description": "A live snapshot of accounts and workflow activity.",
+  "refresh": "Refresh",
+  "refreshing": "Refreshing…",
+  "loadError": "Some dashboard data could not be loaded.",
+  "retry": "Retry",
+  "metrics": {
+    "label": "Account statistics",
+    "totalUsers": "Total users",
+    "totalUsersHint": "Across all account statuses",
+    "activeUsers": "Active users",
+    "activeUsersHint": "Accounts currently enabled",
+    "newUsers": "New in 7 days",
+    "newUsersHint": "Based on account registration date",
+    "totalRuns": "Total workflow runs",
+    "totalRunsHint": "All workflows, all time"
+  },
+  "runStatus": {
+    "title": "Run status",
+    "description": "Totals reported by the admin run filters; approval-waiting runs are not included here.",
+    "viewRuns": "View runs",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "share": "{{label}}: {{percent}}% of all workflow runs",
+    "unavailable": "{{label}} run count unavailable",
+    "countsUnavailable": "Run status counts are temporarily unavailable."
+  },
+  "failures": {
+    "title": "Recent failures",
+    "description": "Most recent runs reported with an error",
+    "allRuns": "All runs",
+    "loading": "Loading failed runs…",
+    "loadError": "Could not load recent failures.",
+    "retry": "Retry",
+    "empty": "No failed runs.",
+    "note": "Run failed; open the runs list for details."
+  }
+}

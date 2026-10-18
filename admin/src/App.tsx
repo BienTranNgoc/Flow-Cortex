@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './app/base.css';
 import { AdminLayout } from './app/AdminLayout';
@@ -23,6 +24,7 @@ const PAGES: Record<string, ReactElement> = {
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */
 function AdminRoutes() {
+  const { t } = useTranslation();
   const items = reachableItems(useMeQuery().data?.role);
   const home = items[0]?.path;
 
@@ -37,9 +39,7 @@ function AdminRoutes() {
         )}
         <Route
           path="*"
-          element={
-            home ? <Navigate to={home} replace /> : <p>No page is available to this account.</p>
-          }
+          element={home ? <Navigate to={home} replace /> : <p>{t('common.shell.noPage')}</p>}
         />
       </Route>
     </Routes>

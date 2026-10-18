@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import static com.flowcortex.workflow.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -158,7 +160,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.saveRevision(task.getId(), ownerId, "Kịch bản ba", 99L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("expected version 99");
+                .satisfies(detailContaining("expected version 99"));
     }
 
     @Test
@@ -167,7 +169,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.saveRevision(task.getId(), ownerId, "Kịch bản", 0L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("does not use script revisions");
+                .satisfies(detailContaining("does not use script revisions"));
     }
 
     @Test
@@ -176,7 +178,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "nội dung", null, null))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("revisionId and expectedVersion are required");
+                .satisfies(detailContaining("revisionId and expectedVersion are required"));
     }
 
     @Test
@@ -186,7 +188,7 @@ class ReviewTaskServiceImplTest {
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "changed inline",
                 revision.getId(), taskVersion()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("reviewedPayload is not accepted");
+                .satisfies(detailContaining("reviewedPayload is not accepted"));
     }
 
     @Test
@@ -195,7 +197,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, UUID.randomUUID(), 0L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("not accepted for plain approval");
+                .satisfies(detailContaining("not accepted for plain approval"));
     }
 
     @Test
@@ -210,7 +212,7 @@ class ReviewTaskServiceImplTest {
         assertThat(second.revisionNumber()).isEqualTo(2);
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, first.getId(), 1L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("Only the current script revision can be approved");
+                .satisfies(detailContaining("Only the current script revision can be approved"));
     }
 
     @Test
@@ -231,5 +233,9 @@ class ReviewTaskServiceImplTest {
         when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getRevisions(task.getId(), ownerId)).isInstanceOf(NotFoundException.class);
+    }
+
+    private static ThrowingConsumer<Throwable> detailContaining(String text) {
+        return e -> assertThat(english(((ConflictException) e).getDetail())).contains(text);
     }
 }

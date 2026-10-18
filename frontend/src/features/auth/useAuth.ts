@@ -10,6 +10,9 @@ import {
   useAuthToken,
 } from '@flow-cortex/api-client';
 import type { LoginRequest, RegisterRequest } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
+import { formatDateTime } from '../../lib/format';
+import type { Locale } from '../../lib/i18n';
 
 export { signOut as logout, useAuthToken, useSessionReady } from '@flow-cortex/api-client';
 
@@ -79,8 +82,38 @@ export function clearRememberedEmail(): void {
   }
 }
 
-export function detailFrom(mutation: { readonly error: unknown }): string | undefined {
-  return mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
+/** The server's `detail` for a failed request, else the generic retry message; nothing before a failure. */
+export function failureMessage(
+  mutation: { readonly error: unknown },
+  t: TFunction,
+): string | undefined {
+  if (!mutation.error) return undefined;
+  const detail = mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
+  return detail || t('common.errors.requestFailed');
+}
+
+const LOCK_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' };
+
+/**
+ * In Vietnamese, the account-locked sentence with the lock end in vi-VN form;
+ * otherwise nothing, so English keeps the server `detail`.
+ */
+export function accountLockedMessage(
+  error: unknown,
+  t: TFunction,
+  locale: Locale,
+): string | undefined {
+  if (locale !== 'vi' || !(error instanceof ApiError)) return undefined;
+  const problem = error.problem ?? {};
+  if (typeof problem.type !== 'string' || !problem.type.endsWith('account-locked')) {
+    return undefined;
+  }
+  if (typeof problem.lockedUntil !== 'string') return undefined;
+  const lockedUntil = new Date(problem.lockedUntil);
+  if (Number.isNaN(lockedUntil.getTime())) return undefined;
+  return t('auth.login.accountLocked', {
+    time: formatDateTime(lockedUntil, 'vi', LOCK_TIME_FORMAT),
+  });
 }
 
 export type SubmitDataState = 'idle' | 'pending' | 'success';
