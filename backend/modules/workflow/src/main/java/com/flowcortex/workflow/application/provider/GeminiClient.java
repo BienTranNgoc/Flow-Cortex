@@ -178,12 +178,13 @@ public class GeminiClient {
                             break attempts;
                         }
                     }
-                    case SERVER_ERROR, UNREACHABLE -> { }
                     case REFUSED -> {
                         refused = true;
                         break attempts;
                     }
                     case INTERRUPTED -> throw interrupted(model, null);
+                    // SERVER_ERROR and UNREACHABLE: tried again after the wait.
+                    default -> { }
                 }
                 if (attempt < attempts) {
                     pause(config.retryWaits().get(attempt - 1), model);
