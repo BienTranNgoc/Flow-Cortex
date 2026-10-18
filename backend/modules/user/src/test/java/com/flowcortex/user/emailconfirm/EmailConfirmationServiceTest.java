@@ -20,10 +20,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -38,11 +42,12 @@ class EmailConfirmationServiceTest {
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final JavaMailSender mailSender = mock(JavaMailSender.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    private TaskExecutor mailExecutor = Runnable::run;
 
     private EmailConfirmationService service(boolean enabled, String publicUrl, String mailHost) {
-        return new EmailConfirmationService(tokens, users, mailSender,
+        return new EmailConfirmationService(tokens, users, mailSender, mailExecutor,
                 new EmailConfirmationProperties(enabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
-                        Duration.ofHours(72), Duration.ofMinutes(30)),
+                        Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 Clock.fixed(NOW, ZoneOffset.UTC), publicUrl, mailHost, meters);
     }
 
@@ -75,6 +80,34 @@ class EmailConfirmationServiceTest {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+
+        assertThat(meters.get("email.confirmation.send_failed").counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void mailIsHandedToTheExecutorOnlyAfterCommitAndAFullQueueIsCountedWithoutFailingTheCaller() {
+        List<Runnable> queued = new ArrayList<>();
+        mailExecutor = queued::add;
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.issue(UUID.randomUUID(), "an@example.com");
+            assertThat(queued).as("nothing leaves before the commit").isEmpty();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        assertThat(queued).hasSize(1);
+        queued.getFirst().run();
+        verify(mailSender).send(any(SimpleMailMessage.class));
+
+        mailExecutor = task -> {
+            throw new TaskRejectedException("queue full");
+        };
+        runCommitting(() -> service(true, "https://app.example.com", "mailpit")
+                .issue(UUID.randomUUID(), "an@example.com"));
 
         assertThat(meters.get("email.confirmation.send_failed").counter().count()).isEqualTo(1.0);
     }

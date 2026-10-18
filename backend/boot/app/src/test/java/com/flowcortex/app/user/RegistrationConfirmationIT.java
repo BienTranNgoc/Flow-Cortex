@@ -2,7 +2,9 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.emailconfirm.UnconfirmedAccountPurgeJob;
+import com.flowcortex.user.infrastructure.AppUserRepository;
 import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -21,6 +23,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -29,6 +34,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -49,6 +55,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -60,6 +67,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.registration.owner-email=" + RegistrationConfirmationIT.OWNER_EMAIL,
+        "flowcortex.auth.email-confirmation.purge-batch-size=2",
         "flowcortex.security.oauth.google.client-id=test-client.apps.googleusercontent.com",
         "flowcortex.security.oauth.google.client-secret=test-secret",
         "flowcortex.security.oauth.google.redirect-uri=http://localhost:5173/api/v1/auth/oauth/google/callback"})
@@ -573,6 +581,48 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     }
 
     @Test
+    void aResendAnswersBeforeItsMailIsSentAndAKnownAddressAnswersLikeAnUnknownOne() {
+        String email = uniqueEmail("resend-async");
+        registerAndReadToken(email);
+        String unknown = uniqueEmail("resend-async-unknown");
+
+        mail.hold();
+        try {
+            ResponseEntity<String> known = postFrom("/api/v1/auth/resend-confirmation", new ResendRequest(email),
+                    String.class);
+            ResponseEntity<String> stranger = postFrom("/api/v1/auth/resend-confirmation",
+                    new ResendRequest(unknown), String.class);
+
+            assertThat(List.of(known, stranger)).allSatisfy(response -> {
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+                assertThat(response.getBody()).isEqualTo(known.getBody());
+            });
+            assertThat(mail.sentSoFar(email)).as("the request answered while its mail was still on the way")
+                    .hasSize(1);
+        } finally {
+            mail.release();
+        }
+        assertThat(mail.sentTo(email)).hasSize(2);
+        assertThat(mail.sentTo(unknown)).isEmpty();
+    }
+
+    @Test
+    void thePurgeWorksThroughMoreAccountsThanOneBatchInOneRun() {
+        List<String> abandoned = List.of(uniqueEmail("batch-1"), uniqueEmail("batch-2"), uniqueEmail("batch-3"),
+                uniqueEmail("batch-4"), uniqueEmail("batch-5"));
+        abandoned.forEach(this::registerAndReadToken);
+
+        clock.advance(Duration.ofHours(73));
+        try {
+            purgeJob.purge();
+        } finally {
+            clock.reset();
+        }
+
+        assertThat(abandoned).allSatisfy(email -> assertThat(accountsWith(email)).as(email).isZero());
+    }
+
+    @Test
     void aSuspendedAccountConfirmingItsEmailGetsNoGrantUntilAnAdminReactivatesIt() throws InterruptedException {
         String email = uniqueEmail("grant-suspended");
         String token = registerAndReadToken(email);
@@ -664,6 +714,9 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
         @Autowired
         private JdbcTemplate nestedJdbc;
 
+        @Autowired
+        private AppUserRepository nestedUsers;
+
         @Test
         void registerAnswers201WithASessionAndTheAccountIsConfirmed() {
             String email = uniqueEmail("confirmation-off");
@@ -683,18 +736,68 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
             assertThat(nestedRestTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, PASSWORD),
                     String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         }
+
+        @Test
+        void registeringOverASuspendedUnconfirmedAccountIsRefusedWithoutASessionOrAGrant()
+                throws InterruptedException {
+            String email = uniqueEmail("off-suspended");
+            UUID ownerId = nestedJdbc.queryForObject("SELECT id FROM app_user WHERE email = ?", UUID.class,
+                    OWNER_EMAIL);
+            UUID userId = UUID.randomUUID();
+            nestedUsers.saveAndFlush(AppUser.selfRegistered(userId, ownerId, email, "earlier-hash", "An", "Tran",
+                    null, null));
+            nestedJdbc.update("UPDATE app_user SET status = 'SUSPENDED' WHERE id = ?", userId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Forwarded-For", nextIp());
+
+            ResponseEntity<String> response = nestedRestTemplate.exchange("/api/v1/auth/register", HttpMethod.POST,
+                    new HttpEntity<>(valid(email), headers), String.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNull();
+            assertThat(response.getBody()).doesNotContain("accessToken");
+            assertThat(nestedJdbc.queryForObject("SELECT count(*) FROM refresh_token WHERE user_id = ?",
+                    Integer.class, userId)).isZero();
+            Thread.sleep(2000);
+            assertThat(nestedJdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ?"
+                    + " AND kind = 'grant'", Long.class, userId)).as("no grant while suspended").isZero();
+        }
     }
 
     record CapturedMail(List<String> to, String subject, String body) {
     }
 
-    /** Records every message instead of opening an SMTP connection. */
+    /**
+     * Records every message instead of opening an SMTP connection. While held, a send blocks until
+     * released or for five seconds, whichever comes first.
+     */
     static class CapturingMailSender extends JavaMailSenderImpl {
 
         private final List<CapturedMail> sent = new CopyOnWriteArrayList<>();
 
+        private final ObjectProvider<ThreadPoolTaskExecutor> executor;
+
+        private volatile CountDownLatch held = new CountDownLatch(0);
+
+        CapturingMailSender(ObjectProvider<ThreadPoolTaskExecutor> executor) {
+            this.executor = executor;
+        }
+
+        void hold() {
+            held = new CountDownLatch(1);
+        }
+
+        void release() {
+            held.countDown();
+        }
+
         @Override
         protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) throws MailException {
+            try {
+                held.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
             for (MimeMessage message : mimeMessages) {
                 try {
                     Address[] recipients = message.getAllRecipients();
@@ -706,8 +809,30 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
             }
         }
 
+        /** Every mail to the address once the app's task executor, which sends account mail, has drained. */
         List<CapturedMail> sentTo(String address) {
+            awaitQueuedSends();
+            return sentSoFar(address);
+        }
+
+        List<CapturedMail> sentSoFar(String address) {
             return sent.stream().filter(message -> message.to().contains(address)).toList();
+        }
+
+        /** Two idle polls in a row: a worker between taking a task and starting it reads as idle once. */
+        private void awaitQueuedSends() {
+            ThreadPoolExecutor pool = executor.getObject().getThreadPoolExecutor();
+            Instant deadline = Instant.now().plusSeconds(10);
+            int idlePolls = 0;
+            while (idlePolls < 2 && Instant.now().isBefore(deadline)) {
+                idlePolls = pool.getActiveCount() == 0 && pool.getQueue().isEmpty() ? idlePolls + 1 : 0;
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
 
         String lastTokenFor(String address) {
@@ -750,8 +875,8 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     static class MailAndClock {
 
         @Bean
-        CapturingMailSender capturingMailSender() {
-            return new CapturingMailSender();
+        CapturingMailSender capturingMailSender(ObjectProvider<ThreadPoolTaskExecutor> executor) {
+            return new CapturingMailSender(executor);
         }
 
         @Bean

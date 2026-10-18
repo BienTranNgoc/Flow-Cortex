@@ -180,6 +180,36 @@ describe('SetPasswordPage', () => {
     expect(calls.filter((call) => call.method === 'PUT')).toEqual([]);
   });
 
+  it('lets a member held at a required password without a setup token sign out instead', async () => {
+    setToken('jwt-session', false);
+    const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME_REQUIRED },
+      'POST /api/v1/auth/logout': { status: 204 },
+    });
+    const user = userEvent.setup();
+    renderSetPassword('/set-password');
+
+    await user.click(await screen.findByRole('link', { name: 'Sign out' }));
+
+    expect(await screen.findByText('Login page')).toBeInTheDocument();
+    expect(getToken()).toBeNull();
+    expect(calls.filter((call) => call.path === '/api/v1/auth/logout')).toHaveLength(1);
+  });
+
+  it('offers no sign-out to a signed-in member whose password is not required', async () => {
+    setToken('jwt-session', false);
+    stubApi({
+      'GET /api/v1/auth/me': {
+        status: 200,
+        body: { ...ME_REQUIRED, hasPassword: true, passwordSetupRequired: false },
+      },
+    });
+    renderSetPassword('/set-password');
+
+    expect(await screen.findByRole('link', { name: 'Go to your workspace' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign out' })).not.toBeInTheDocument();
+  });
+
   it('opens an emailed link signed out, then asks for the password with the token it handed out', async () => {
     const calls = stubApi({
       'POST /api/v1/auth/password-link': {

@@ -18,7 +18,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -32,10 +35,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * links, set-password links and password-setup tokens. A token carries 32 random bytes; only their
  * SHA-256 hex is stored, and neither the token nor a link is ever logged.
  *
- * <p>Mail leaves after the surrounding transaction commits, so a rolled-back request sends nothing,
- * and a send failure is logged and counted without failing the request — the member can ask for a
- * new link. A transaction synchronization is used rather than an after-commit event listener
- * because the event publication registry would persist the event, raw token included.
+ * <p>Mail is handed to the app's task executor after the surrounding transaction commits, so a
+ * rolled-back request sends nothing and no request waits on SMTP — an address with an account answers
+ * as fast as one without. A send failure or a full queue is logged and counted without failing the
+ * request; the member can ask for a new link. A transaction synchronization is used rather than an
+ * after-commit event listener because the event publication registry would persist the event, raw
+ * token included.
  */
 @Service
 public class EmailConfirmationService {
@@ -55,6 +60,7 @@ public class EmailConfirmationService {
     private final EmailConfirmationTokenRepository tokens;
     private final AppUserRepository users;
     private final JavaMailSender mailSender;
+    private final TaskExecutor mailExecutor;
     private final EmailConfirmationProperties properties;
     private final Clock clock;
     private final String publicUrl;
@@ -62,7 +68,8 @@ public class EmailConfirmationService {
 
     /** Fails startup when confirmation is on and a link could not be built or mailed. */
     EmailConfirmationService(EmailConfirmationTokenRepository tokens, AppUserRepository users,
-            JavaMailSender mailSender, EmailConfirmationProperties properties, Clock clock,
+            JavaMailSender mailSender, @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor,
+            EmailConfirmationProperties properties, Clock clock,
             @Value("${flowcortex.app.public-url:}") String publicUrl, @Value("${spring.mail.host:}") String mailHost,
             MeterRegistry meters) {
         if (properties.enabled()) {
@@ -73,12 +80,13 @@ public class EmailConfirmationService {
         this.tokens = tokens;
         this.users = users;
         this.mailSender = mailSender;
+        this.mailExecutor = mailExecutor;
         this.properties = properties;
         this.clock = clock;
         this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
         this.sendFailures = Counter.builder("email.confirmation.send_failed")
                 .description("Account mails (confirmation, set-password link, password notice) the SMTP server"
-                        + " did not accept")
+                        + " did not accept, or the send queue had no room for")
                 .register(meters);
     }
 
@@ -243,7 +251,12 @@ public class EmailConfirmationService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                send(userId, email, subject, body, sentOutcome);
+                try {
+                    mailExecutor.execute(() -> send(userId, email, subject, body, sentOutcome));
+                } catch (TaskRejectedException ex) {
+                    sendFailures.increment();
+                    LOG.warn("email_confirmation outcome=send_rejected userId={} reason=queue_full", userId);
+                }
             }
         });
     }

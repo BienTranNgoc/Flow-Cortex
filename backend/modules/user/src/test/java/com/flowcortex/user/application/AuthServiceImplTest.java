@@ -89,7 +89,7 @@ class AuthServiceImplTest {
                 new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
                 new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
-                        Duration.ofHours(72), Duration.ofMinutes(30)));
+                        Duration.ofHours(72), Duration.ofMinutes(30), 500));
     }
 
     private AppUser unconfirmedMember(String email) {

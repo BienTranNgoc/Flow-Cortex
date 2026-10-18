@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
@@ -10,6 +10,7 @@ import {
   PASSWORD_SETUP_TOKEN_INVALID,
   detailFrom,
   fieldErrorsFrom,
+  logout,
   problemCodeFrom,
   useAuthToken,
   useMeQuery,
@@ -228,9 +229,16 @@ interface EmailMeALinkProps {
 /** No usable setup token here: a new set-password link goes to the account's address. */
 function EmailMeALink({ notice, signedIn }: EmailMeALinkProps) {
   const me = useMeQuery();
+  const navigate = useNavigate();
   // Signed in, the link goes to the account's own address; the page waits until it is known.
   const waitingForMe = signedIn && me.isPending;
   const canSkip = signedIn && me.data?.passwordSetupRequired === false;
+
+  // The login page sends a signed-in visitor away, so it opens only once the session is gone.
+  const onSignOut = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    void logout().then(() => navigate('/login', { replace: true }));
+  };
 
   return (
     <>
@@ -254,7 +262,15 @@ function EmailMeALink({ notice, signedIn }: EmailMeALinkProps) {
       )}
       <p className="auth-footer">
         {signedIn ? (
-          canSkip && <Link to="/">Go to your workspace</Link>
+          canSkip ? (
+            <Link to="/">Go to your workspace</Link>
+          ) : (
+            !waitingForMe && (
+              <Link to="/login" onClick={onSignOut}>
+                Sign out
+              </Link>
+            )
+          )
         ) : (
           <Link to="/login">Back to sign in</Link>
         )}
