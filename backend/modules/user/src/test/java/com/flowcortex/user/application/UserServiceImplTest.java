@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,8 +30,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
+    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder());
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -95,6 +97,36 @@ class UserServiceImplTest {
         assertThat(updated.email()).isEqualTo("person@example.com");
         assertThat(updated.name()).isEqualTo("Original Name");
         assertThat(updated.role()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void suspendingAUserRevokesEveryRefreshSessionOfThatUser() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser existing = new AppUser(id, ownerId, "person@example.com", "$2a$hash", "Person", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(existing));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateUser(ownerId, id, null, null, null, "SUSPENDED");
+
+        verify(refreshTokenService).revokeAllFor(id);
+    }
+
+    @Test
+    void anUpdateThatDoesNotSuspendKeepsTheRefreshSessions() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser existing = new AppUser(id, ownerId, "person@example.com", "$2a$hash", "Person", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(existing));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
+
+        verify(refreshTokenService, never()).revokeAllFor(any());
     }
 
     @Test

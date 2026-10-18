@@ -2,33 +2,44 @@ package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.media.api.MediaJob;
+import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
-import com.flowcortex.workflow.api.RunOptions;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /** The step types the engine knows, and how each one runs. */
 class StepExecutorRegistryTest {
 
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
+
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
 
+    StepExecutorRegistryTest() {
+        when(mediaJobs.providerLimits(anyString()))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+    }
+
     private static StepContext context(String input) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null,
-                RunOptions.DEFAULTS, null, new java.util.ArrayList<>());
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null, null);
     }
 
     @Test
     void theDemoTypesAndEveryMediaCapabilityAreKnown() {
-        assertThat(registry.knownTypes()).containsExactlyInAnyOrder("echo", "fail", "probe", "extract_audio",
-                "transcribe", "separate_audio", "compose_dub");
+        assertThat(registry.knownTypes())
+                .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_storyboard",
+                        "generate_speech", "generate_video", "probe", "extract_audio", "align_audio",
+                        "render_video", "transcribe", "separate_audio", "compose_dub");
     }
 
     @Test
@@ -49,10 +60,20 @@ class StepExecutorRegistryTest {
                 .get()
                 .extracting(StepExecutor::mode)
                 .isEqualTo(StepExecutor.Mode.REMOTE);
+        assertThat(registry.find("generate_script"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.REMOTE);
+        assertThat(registry.find("generate_storyboard"))
+                .get()
+                .extracting(StepExecutor::mode)
+                .isEqualTo(StepExecutor.Mode.REMOTE);
 
         assertThat(registry.isRemote("probe")).isTrue();
         assertThat(registry.isRemote("extract_audio")).isTrue();
         assertThat(registry.isRemote("echo")).isFalse();
+        assertThat(registry.usesStoredInput("render_video")).isTrue();
+        assertThat(registry.usesStoredInput("generate_script")).isFalse();
     }
 
     @Test
@@ -86,6 +107,14 @@ class StepExecutorRegistryTest {
     }
 
     @Test
+    void aProviderStepsBoundsComeFromTheProviderLimitsNotAMediaCapability() {
+        StepExecutor script = registry.find("generate_script").orElseThrow();
+
+        assertThat(script.maxRuntime()).isEqualTo(Duration.ofMinutes(2));
+        assertThat(script.queueTimeout(Duration.ofSeconds(120))).isEqualTo(Duration.ofMinutes(5));
+    }
+
+    @Test
     void aRemoteStepsBoundsComeFromTheMediaLimitsOfItsCapability() {
         when(mediaJobs.limitsFor("probe"))
                 .thenReturn(new MediaLimits(Duration.ofMinutes(30), Duration.ofMinutes(5), 1000L));
@@ -93,6 +122,24 @@ class StepExecutorRegistryTest {
 
         assertThat(probe.maxRuntime()).isEqualTo(Duration.ofMinutes(5));
         assertThat(probe.queueTimeout(Duration.ofSeconds(120))).isEqualTo(Duration.ofMinutes(30));
+    }
+
+    @Test
+    void aRemoteStepPreservesAnOrderedInputArray() {
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        when(mediaJobs.limitsFor("render_video"))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(30), Duration.ofMinutes(10), 1000L));
+        StepExecutor render = registry.find("render_video").orElseThrow();
+        String inputs = "[{\"key\":\"image_1\",\"bucket\":\"uploads\",\"objectKey\":\"a\"},"
+                + "{\"key\":\"image_2\",\"bucket\":\"uploads\",\"objectKey\":\"b\"}]";
+
+        render.execute(context(inputs));
+
+        ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+        verify(mediaJobs).enqueue(job.capture());
+        assertThat(job.getValue().inputs()).containsExactly(
+                new MediaJobInput("image_1", "uploads", "a"),
+                new MediaJobInput("image_2", "uploads", "b"));
     }
 
     @Test

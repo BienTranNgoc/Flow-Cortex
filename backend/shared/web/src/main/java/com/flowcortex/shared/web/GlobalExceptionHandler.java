@@ -76,6 +76,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "You do not have permission to perform this action");
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ProblemDetail handleAccountLocked(AccountLockedException ex) {
+        ProblemDetail detail = problem(HttpStatus.LOCKED, "account-locked", ex.getMessage());
+        detail.setProperty("lockedUntil", ex.getLockedUntil());
+        return detail;
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
         ProblemDetail detail = problem(HttpStatus.BAD_REQUEST, "validation-failed", "Request validation failed");

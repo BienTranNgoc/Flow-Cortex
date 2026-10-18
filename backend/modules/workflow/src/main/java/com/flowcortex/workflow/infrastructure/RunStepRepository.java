@@ -27,10 +27,14 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
 
     List<RunStep> findByRunIdOrderByStepOrderAsc(UUID runId);
 
-    /** A step's type and pickup time. */
+    /** A step's type, order, stored input and pickup time. */
     interface Timing {
 
         String getType();
+
+        short getStepOrder();
+
+        String getInput();
 
         Instant getPickedUpAt();
     }
@@ -39,7 +43,8 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
      * Columns, not the entity: a caller that transitions the step in another transaction and then
      * reads the run's steps in its own would otherwise get this step back as it was before.
      */
-    @Query("SELECT r.type AS type, r.pickedUpAt AS pickedUpAt FROM RunStep r WHERE r.id = :id")
+    @Query("SELECT r.type AS type, r.stepOrder AS stepOrder, r.input AS input, r.pickedUpAt AS pickedUpAt "
+            + "FROM RunStep r WHERE r.id = :id")
     Optional<Timing> findTimingById(@Param("id") UUID id);
 
     long countByRunIdAndStatusNot(UUID runId, RunStepStatus status);

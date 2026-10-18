@@ -174,8 +174,12 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         WorkflowView workflow = newWorkflow(user.id(), false,
                 new NewWorkflowStep("Inspect the file", "probe", null),
                 new NewWorkflowStep("Voice it", StoringStepTestConfig.TYPE, null),
-                new NewWorkflowStep("Compose", "extract_audio", null, "{\"inputs\":{\"media\":\"upload\","
-                        + "\"details\":\"step:1/video-details.json\",\"voice\":\"step:2/*\"},\"label\":\"x\"}"));
+                new NewWorkflowStep("Compose", "extract_audio", null, "{\"label\":\"x\",\"outputInputs\":["
+                        + "{\"stepOrder\":1,\"outputName\":\"video-details.json\",\"inputKey\":\"details\"},"
+                        + "{\"stepOrder\":2,\"outputName\":\"" + StoringStepTestConfig.OBJECT_NAME
+                        + "\",\"inputKey\":\"voice\"},"
+                        + "{\"stepOrder\":1,\"outputName\":\"accompaniment.wav\",\"inputKey\":\"music\","
+                        + "\"optional\":true}]}"));
         UUID uploadId = UUID.randomUUID();
         String objectKey = user.id() + "/" + uploadId;
         putClip(objectKey);
@@ -191,15 +195,12 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         JsonNode body = JSON.readTree(compose.getBody());
         assertThat(jobSchema().validate(body)).isEmpty();
         String voiceKey = "runs/" + probe.runId() + "/steps/2/" + StoringStepTestConfig.OBJECT_NAME;
-        // jsonb keeps object keys in its own order, so the declared order does not survive storage.
-        assertThat(body.get("inputs").values()).containsExactlyInAnyOrder(
-                JSON.readTree("{\"key\":\"media\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + objectKey
-                        + "\"}"),
-                JSON.readTree("{\"key\":\"details\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/"
-                        + probe.runId() + "/steps/1/video-details.json\"}"),
-                JSON.readTree("{\"key\":\"voice.wav\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + voiceKey
-                        + "\"}"));
-        assertThat(body.get("params")).isEqualTo(JSON.readTree("{\"label\":\"x\"}"));
+        assertThat(body.get("inputs")).isEqualTo(JSON.readTree("["
+                + "{\"key\":\"media\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + objectKey + "\"},"
+                + "{\"key\":\"details\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/" + probe.runId()
+                + "/steps/1/attempts/1/video-details.json\"},"
+                + "{\"key\":\"voice\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + voiceKey + "\"}]"));
+        assertThat(body.get("params").get("label").asString()).isEqualTo("x");
         try (S3Client store = objectStore()) {
             assertThat(store.headObject(o -> o.bucket(UPLOAD_BUCKET).key(voiceKey)).contentLength()).isEqualTo(4L);
         }
@@ -353,7 +354,7 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         return "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.stepId() + "\",\"runId\":\"" + run.runId() + "\","
                 + "\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\",\"outputs\":[{\"name\":"
                 + "\"video-details.json\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/" + run.runId()
-                + "/steps/1/video-details.json\",\"mime\":\"application/json\",\"bytes\":42}],"
+                + "/steps/1/attempts/1/video-details.json\",\"mime\":\"application/json\",\"bytes\":42}],"
                 + "\"data\":{\"durationMs\":1000},\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"test-worker\"}";
     }
 

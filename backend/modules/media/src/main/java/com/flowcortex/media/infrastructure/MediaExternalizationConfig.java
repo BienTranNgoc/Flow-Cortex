@@ -1,6 +1,7 @@
 package com.flowcortex.media.infrastructure;
 
 import com.flowcortex.media.application.MediaJobRequested;
+import com.flowcortex.media.application.ProviderJobRequested;
 import org.springframework.amqp.core.Correlation;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -25,6 +26,10 @@ class MediaExternalizationConfig {
         return EventExternalizationConfiguration.externalizing()
                 .select(EventExternalizationConfiguration.annotatedAsExternalized())
                 .mapping(MediaJobRequested.class, MediaJobRequested::job)
+                .mapping(ProviderJobRequested.class, ProviderJobRequested::job)
+                // Keeps the annotation's exchange; only the key changes, per capability.
+                .routeKey(ProviderJobRequested.class,
+                        event -> MediaTopologyConfig.providerJobKey(event.job().capability()))
                 .build();
     }
 
@@ -54,7 +59,12 @@ class MediaExternalizationConfig {
         public Message postProcessMessage(Message message, Correlation correlation, String exchange,
                 String routingKey) {
             MessageProperties properties = message.getMessageProperties();
-            if (!MediaTopologyConfig.EXCHANGE.equals(exchange) || !MediaTopologyConfig.JOB_KEY.equals(routingKey)) {
+            boolean mediaJob = MediaTopologyConfig.EXCHANGE.equals(exchange)
+                    && MediaTopologyConfig.JOB_KEY.equals(routingKey);
+            boolean providerJob = MediaTopologyConfig.PROVIDER_EXCHANGE.equals(exchange)
+                    && (MediaTopologyConfig.JOB_KEY.equals(routingKey)
+                            || MediaTopologyConfig.VIDEO_JOB_KEY.equals(routingKey));
+            if (!mediaJob && !providerJob) {
                 return message;
             }
             JsonNode job = JSON.readTree(message.getBody());

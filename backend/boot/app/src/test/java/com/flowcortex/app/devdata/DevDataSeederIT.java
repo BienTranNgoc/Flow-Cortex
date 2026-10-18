@@ -68,7 +68,7 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
     private WorkflowRunService workflowRunService;
 
     private UUID subjectOf(String email, String password) {
-        String token = authService.login(email, password);
+        String token = authService.login(email, password, false, "127.0.0.1", "devdata").accessToken();
         Jwt jwt = jwtDecoder.decode(token);
         return UUID.fromString(jwt.getSubject());
     }

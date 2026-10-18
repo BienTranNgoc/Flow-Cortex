@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.01.002`)
+## Current schema (`V2026.09.22.001` – `V2026.10.11.002`)
 
 ```mermaid
 erDiagram
@@ -15,6 +15,12 @@ erDiagram
   workflow ||--|{ workflow_step : "workflow_id"
   workflow ||--o{ workflow_run : "workflow_id"
   workflow_run ||--|{ run_step : "run_id"
+  workflow_run ||--o{ media_asset_binding : "run_id"
+  workflow_run ||--o| product_video_input : "run_id"
+  workflow_run ||--o{ review_task : "run_id"
+  run_step ||--o| review_task : "run_step_id, UNIQUE — one checkpoint per step"
+  review_task ||--o{ script_revision : "review_task_id"
+  media_asset ||--o{ media_asset_binding : "asset_id"
 
   app_user {
     uuid id PK
@@ -40,7 +46,7 @@ erDiagram
     uuid workflow_id FK
     smallint step_order "UNIQUE (workflow_id, step_order), contiguous from 1"
     varchar name
-    varchar type "capability key: echo | fail (inline) | probe (remote, first step only)"
+    varchar type "inline, provider remote, media remote, or APPROVAL_CHECKPOINT"
     jsonb config
     varchar input_ref "{step:K.field}; NULL = previous step's output"
   }
@@ -60,6 +66,8 @@ erDiagram
     uuid run_id FK
     smallint step_order "UNIQUE (run_id, step_order)"
     varchar type
+    jsonb config "copied from workflow_step when the run starts; dispatch reads only this copy"
+    varchar input_ref "copied from workflow_step when the run starts"
     varchar status "pending | running | completed | error — claim = UPDATE ... WHERE status = 'pending'"
     text input "resolved input"
     text output
@@ -73,8 +81,64 @@ erDiagram
     smallint progress_percent "CHECK 0–100"
     smallint attempt "DEFAULT 1; API-owned fencing token every result CAS checks, constant 1 here"
     smallint delivery_count "DEFAULT 0; broker redeliveries, display only"
-    varchar error_code "queue_timeout | lease_expired | run_timeout | media_disabled | input_rejected | probe_failed | contract_violation"
+    varchar error_code "queue_timeout | lease_expired | run_timeout | media_disabled | input_rejected | probe_failed | contract_violation | speech_too_long | workflow_changed"
     jsonb outputs "MediaOutput[] {name, bucket, objectKey, mime, bytes, meta} — object keys runs/{runId}/steps/{order}/{name}"
+  }
+  media_asset {
+    uuid id PK "upload id for uploaded inputs"
+    uuid owner_id "application-enforced owner scope"
+    varchar kind "image | audio | video | binary"
+    varchar bucket
+    varchar object_key UK
+    varchar mime_type
+    bigint bytes
+    varchar checksum "object-store SHA-256 when available"
+    varchar status "ready"
+    timestamptz expires_at "NULL until a retention policy is assigned"
+    uuid source_run_step_id "output provenance; NULL for uploads"
+    smallint source_attempt "attempt fence; NULL for uploads"
+    timestamptz created_at
+  }
+  media_asset_binding {
+    uuid run_id PK,FK
+    varchar binding_key PK "image_1 .. image_10"
+    uuid asset_id FK
+    smallint position "UNIQUE (run_id, position), preserves request order"
+    timestamptz created_at
+  }
+  product_video_input {
+    uuid run_id PK,FK
+    varchar product_name
+    varchar description
+    varchar cta
+    varchar price "optional confirmed claim"
+    varchar promotion "optional confirmed claim"
+    varchar aspect_ratio "9:16 in MVP"
+    timestamptz created_at
+  }
+  review_task {
+    uuid id PK
+    uuid run_id FK "ON DELETE CASCADE"
+    uuid run_step_id FK,UK "ON DELETE CASCADE — a step pauses at most once"
+    varchar review_type "APPROVAL_CHECKPOINT"
+    varchar status "pending | approved | rejected"
+    text original_payload "the checkpoint's input, unwrapped from the provider result"
+    text reviewed_payload "plain checkpoints only; a script task approves a revision instead"
+    uuid reviewed_by
+    timestamptz reviewed_at
+    timestamptz created_at
+    bigint version "JPA @Version — the decision's optimistic lock"
+    uuid current_revision_id FK "the revision on screen; NULL = task keeps no revisions"
+    uuid approved_revision_id FK "the revision that was approved; NULL until a decision"
+  }
+  script_revision {
+    uuid id PK
+    uuid run_id FK "ON DELETE CASCADE"
+    uuid review_task_id FK "ON DELETE CASCADE"
+    integer revision_number "UNIQUE (review_task_id, revision_number), CHECK > 0"
+    text content "CHECK length(btrim(content)) > 0 — revisions are never blank"
+    uuid created_by "NULL for revision 1, which the provider wrote"
+    timestamptz created_at
   }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
@@ -92,7 +156,8 @@ erDiagram
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
-the reaper scan), `idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
+the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
+`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is
@@ -103,14 +168,17 @@ no upload table either — an upload is an object at a server-derived key. `inpu
 object was missing or over size when the worker checked it. Objects never live in the database: uploads in
 the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex-media`.
 
+`script_revision` is append-only: an edit inserts a row and moves `review_task.current_revision_id`
+forward, never overwrites one. Approval names a revision id and the task `version` it read, so a browser
+tab holding older text loses the approval with a 409 instead of approving something it never showed. The
+payload `generate_speech` consumes is the approved revision's content, not whatever sits in the task.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
 |---|---|---|
 | `provider` | provider catalogue + fallback order per capability | Providers page / first real capability |
-| `media_asset` | first-class assets (sha256, size, expiry) for retention and dedup | first download/demucs capability |
 | `usage_event` | per-step provider units and cost | first paid provider |
 | `audit_log` | admin actions with before/after | first admin write beyond Users |
 | `app_setting`, `settings_audit` | DB-backed runtime settings (override > env > default) | Settings page |
 | `channel_account` | publish targets with encrypted tokens | Publish step |
-| `run_step.status += awaiting_review` (+ `reviewed_by`, `reviewed_at`) | manual approval checkpoint — a ladder change, not a new table | Review checkpoint change |

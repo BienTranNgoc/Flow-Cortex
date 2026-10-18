@@ -26,13 +26,14 @@ describe('a partial grant', () => {
     const calls = stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
+      'GET /api/v1/users': { status: 200, body: [] },
     });
-    setToken('admin-token-partial');
+    setToken('admin-token-partial', true);
     window.history.pushState({}, '', '/media-jobs');
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/runs');
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/dashboard');
     expect(screen.queryByRole('link', { name: /Media jobs/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Runs/ })).toBeInTheDocument();
     expect(calls.some((call) => call.path === '/api/v1/admin/media/jobs')).toBe(false);

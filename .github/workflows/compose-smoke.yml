@@ -2,7 +2,9 @@ name: compose-smoke
 
 # Builds every image, starts the whole compose stack and runs
 # scripts/smoke-probe.sh: upload a clip, check it on the worker, download the
-# report, see the run in the admin list, and fail a text file with probe_failed.
+# report, see the run in the admin list, fail a text file with probe_failed, and
+# carry a Product Video run through the fixture provider worker, a script
+# approval and the media worker's render to a downloadable video.
 on:
   workflow_call:
   workflow_dispatch:
@@ -14,6 +16,10 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Read by `docker compose` over the .env value (off by default) and by the probe,
+    # which runs its Product Video section only when this is true.
+    env:
+      FLOWCORTEX_PRODUCT_VIDEO_ENABLED: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -22,8 +28,9 @@ jobs:
         # store credentials are placed in URLs.
         run: |
           cp .env.example .env
-          for key in JWT_SECRET POSTGRES_PASSWORD RABBITMQ_DEFAULT_PASS MINIO_ROOT_PASSWORD \
-                     BACKEND_S3_SECRET_KEY WORKER_S3_SECRET_KEY \
+          for key in JWT_SECRET POSTGRES_PASSWORD RABBITMQ_DEFAULT_PASS \
+                     PROVIDER_RABBITMQ_PASS MINIO_ROOT_PASSWORD \
+                     BACKEND_S3_SECRET_KEY WORKER_S3_SECRET_KEY PROVIDER_S3_SECRET_KEY \
                      GF_SECURITY_ADMIN_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
             sed -i "s|^$key=.*|$key=$(openssl rand -hex 24)|" .env
           done
@@ -58,6 +65,8 @@ jobs:
         run: curl -fsS localhost:8080/readyz
 
       - name: Smoke
+        env:
+          POLL_SECONDS: "300"
         run: scripts/smoke-probe.sh
 
       - name: Collect diagnostics

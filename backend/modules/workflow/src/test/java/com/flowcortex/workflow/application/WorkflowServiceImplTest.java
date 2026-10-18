@@ -29,8 +29,9 @@ class WorkflowServiceImplTest {
 
     private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
     private final WorkflowStepRepository workflowStepRepository = mock(WorkflowStepRepository.class);
+    private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final StepExecutorRegistry registry =
-            new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+            new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
             registry, Validation.buildDefaultValidatorFactory().getValidator());
 
@@ -100,10 +101,14 @@ class WorkflowServiceImplTest {
                 .satisfies(e -> assertThat(((ConstraintViolationException) e).getConstraintViolations())
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
-                                "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, echo, "
-                                        + "extract_audio, fail, probe",
-                                "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, echo, "
-                                        + "extract_audio, fail, probe"));
+                                "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
+                                        + "compose_dub, echo, extract_audio, fail, generate_script, generate_speech, "
+                                        + "generate_storyboard, generate_video, probe, render_video, separate_audio, "
+                                        + "transcribe",
+                                "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
+                                        + "align_audio, compose_dub, echo, extract_audio, fail, generate_script, "
+                                        + "generate_speech, generate_storyboard, generate_video, probe, render_video, "
+                                        + "separate_audio, transcribe"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
@@ -167,16 +172,17 @@ class WorkflowServiceImplTest {
     }
 
     @Test
-    void createWorkflowKeepsTheInputsAStepDeclaresFromTheUploadAndEarlierSteps() {
+    void createWorkflowKeepsTheOutputInputsAStepDeclaresOnEarlierSteps() {
         when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        String config = "{\"inputs\":{\"media\":\"upload\",\"details\":\"step:1/video-details.json\","
-                + "\"audio\":\"step:2/*\"},\"label\":\"x\"}";
+        String config = "{\"label\":\"x\",\"outputInputs\":["
+                + "{\"stepOrder\":2,\"outputName\":\"source-audio.wav\",\"inputKey\":\"audio\"},"
+                + "{\"stepOrder\":1,\"outputName\":\"voice.wav\",\"inputKey\":\"voice\",\"optional\":true}]}";
 
         service.createWorkflow(UUID.randomUUID(), "Declared inputs", false, List.of(
                 new NewWorkflowStep("probe", "probe", null),
                 new NewWorkflowStep("extract", "extract_audio", null),
-                new NewWorkflowStep("again", "extract_audio", null, config)));
+                new NewWorkflowStep("compose", "compose_dub", null, config)));
 
         org.mockito.ArgumentCaptor<List<WorkflowStep>> saved = org.mockito.ArgumentCaptor.captor();
         verify(workflowStepRepository).saveAll(saved.capture());
@@ -184,43 +190,91 @@ class WorkflowServiceImplTest {
     }
 
     @Test
-    void createWorkflowRefusesAnInputSourceThatIsNotAnEarlierStepOrNotWellFormedAtThatStepsConfig() {
+    void createWorkflowRefusesAnOutputInputsEntryThatIsNotAnEarlierStepOrNotWellFormedAtThatStepsConfig() {
         List<NewWorkflowStep> steps = List.of(
                 new NewWorkflowStep("probe", "probe", null),
-                new NewWorkflowStep("self", "extract_audio", null, "{\"inputs\":{\"x\":\"step:2/a.wav\"}}"),
-                new NewWorkflowStep("forward", "extract_audio", null, "{\"inputs\":{\"x\":\"step:5/x.wav\"}}"),
-                new NewWorkflowStep("malformed", "extract_audio", null, "{\"inputs\":{\"x\":\"media\"}}"),
-                new NewWorkflowStep("no slash", "extract_audio", null, "{\"inputs\":{\"x\":\"step:1\"}}"),
-                new NewWorkflowStep("not text", "extract_audio", null, "{\"inputs\":{\"x\":1}}"),
-                new NewWorkflowStep("not a map", "extract_audio", null, "{\"inputs\":[\"upload\"]}"),
-                new NewWorkflowStep("not json", "extract_audio", null, "{inputs"));
+                remote("self", "[" + entry("2", "\"a.wav\"", "\"a\"") + "]"),
+                remote("forward", "[" + entry("5", "\"x.wav\"", "\"x\"") + "]"),
+                remote("order zero", "[" + entry("0", "\"x.wav\"", "\"x\"") + "]"),
+                remote("order text", "[" + entry("\"1\"", "\"x.wav\"", "\"x\"") + "]"),
+                remote("no name", "[{\"stepOrder\":1,\"inputKey\":\"x\"}]"),
+                remote("blank key", "[" + entry("1", "\"x.wav\"", "\" \"") + "]"),
+                remote("not an entry", "[\"step:1/x.wav\"]"),
+                remote("not a list", "{\"stepOrder\":1}"),
+                remote("empty", "[]"),
+                remote("optional text", "[{\"stepOrder\":1,\"outputName\":\"x.wav\",\"inputKey\":\"x\","
+                        + "\"optional\":\"yes\"}]"),
+                new NewWorkflowStep("not json", "extract_audio", null, "{outputInputs"));
 
         assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Bad inputs", false, steps))
                 .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
                         .extracting(violation -> violation.getPropertyPath().toString())
                         .containsExactlyInAnyOrder("steps[1].config", "steps[2].config", "steps[3].config",
-                                "steps[4].config", "steps[5].config", "steps[6].config", "steps[7].config"));
+                                "steps[4].config", "steps[5].config", "steps[6].config", "steps[7].config",
+                                "steps[8].config", "steps[9].config", "steps[10].config", "steps[11].config"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
     }
 
     @Test
-    void createWorkflowRefusesInputsOnAStepThatDoesNotRunRemotelyAtThatStepsConfig() {
+    void createWorkflowRefusesAStepWhoseOutputInputsPointForwardNamingThatStep() {
         List<NewWorkflowStep> steps = List.of(
                 new NewWorkflowStep("probe", "probe", null),
-                new NewWorkflowStep("echo", "echo", null, "{\"inputs\":{\"media\":\"upload\"}}"),
-                new NewWorkflowStep("review", "APPROVAL_CHECKPOINT", null, "{\"inputs\":{\"d\":\"step:1/*\"}}"),
+                new NewWorkflowStep("extract", "extract_audio", null),
+                remote("transcribe", "[" + entry("5", "\"source-audio.wav\"", "\"audio\"") + "]"));
+
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Forward", false, steps))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .containsExactly("steps[2].config outputInputs reads step 5, which does not run before "
+                                + "step 3"));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void createWorkflowRefusesTwoOutputInputsEntriesWithOneInputKeyAtThatStepsConfig() {
+        List<NewWorkflowStep> steps = List.of(
+                new NewWorkflowStep("probe", "probe", null),
+                new NewWorkflowStep("extract", "extract_audio", null),
+                remote("compose", "[" + entry("1", "\"a.wav\"", "\"music\"") + ","
+                        + entry("2", "\"b.wav\"", "\"music\"") + "]"));
+
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Duplicate", false, steps))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .containsExactly("steps[2].config outputInputs gives input key 'music' twice"));
+
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkflowRefusesOutputInputsOnAStepThatDoesNotRunRemotelyAtThatStepsConfig() {
+        String config = "{\"outputInputs\":[" + entry("1", "\"a.wav\"", "\"a\"") + "]}";
+        List<NewWorkflowStep> steps = List.of(
+                new NewWorkflowStep("probe", "probe", null),
+                new NewWorkflowStep("echo", "echo", null, config),
+                new NewWorkflowStep("review", "APPROVAL_CHECKPOINT", null, config),
                 new NewWorkflowStep("no inputs", "echo", null, "{\"label\":\"x\"}"));
 
         assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Inline inputs", false, steps))
                 .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
-                                "steps[1].config only a remote step reads declared inputs; 'echo' runs inline",
-                                "steps[2].config only a remote step reads declared inputs; 'APPROVAL_CHECKPOINT' "
+                                "steps[1].config only a remote step reads outputInputs; 'echo' runs inline",
+                                "steps[2].config only a remote step reads outputInputs; 'APPROVAL_CHECKPOINT' "
                                         + "runs inline"));
 
         verify(workflowRepository, never()).save(any());
+    }
+
+    private static NewWorkflowStep remote(String name, String outputInputs) {
+        return new NewWorkflowStep(name, "extract_audio", null, "{\"outputInputs\":" + outputInputs + "}");
+    }
+
+    private static String entry(String stepOrder, String outputName, String inputKey) {
+        return "{\"stepOrder\":" + stepOrder + ",\"outputName\":" + outputName + ",\"inputKey\":" + inputKey + "}";
     }
 }

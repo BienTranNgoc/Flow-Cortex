@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-job.schema.json",
+  "title": "ProviderJob",
+  "description": "A typed provider job. Product content is carried only in params.payload and must not be logged.",
+  "oneOf": [
+    { "$ref": "#/$defs/generateScriptJob" },
+    { "$ref": "#/$defs/generateStoryboardJob" },
+    { "$ref": "#/$defs/generateSpeechJob" },
+    { "$ref": "#/$defs/generateVideoJob" }
+  ],
+  "$defs": {
+    "productPayload": {
+      "title": "ProductAdPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productName", "description", "cta"],
+      "properties": {
+        "productName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "cta": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "price": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "promotion": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "productAdParams": {
+      "title": "ProductAdParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "product_ad_v1" },
+        "payload": { "$ref": "#/$defs/productPayload" }
+      }
+    },
+    "speechPayload": {
+      "title": "SpeechPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "sourceRevisionId"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "storyboardPayload": {
+      "title": "StoryboardPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "sourceRevisionId"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "storyboardParams": {
+      "title": "StoryboardParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "product_ad_storyboard_v1" },
+        "payload": { "$ref": "#/$defs/storyboardPayload" }
+      }
+    },
+    "speechParams": {
+      "title": "SpeechParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "vi_voice_v1" },
+        "payload": { "$ref": "#/$defs/speechPayload" }
+      }
+    },
+    "videoPayload": {
+      "title": "VideoPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "sourceRevisionId"],
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 2500 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "videoInput": {
+      "title": "VideoInput",
+      "description": "A reference image the worker fetches from the media store and forwards to the video provider as the first frame.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "bucket", "objectKey"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Logical name inside this job; e.g. 'reference'."
+        },
+        "bucket": { "type": "string", "minLength": 1 },
+        "objectKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "videoParams": {
+      "title": "VideoParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "vertical_ad_clip_v1" },
+        "payload": { "$ref": "#/$defs/videoPayload" }
+      }
+    },
+    "generateScriptJob": {
+      "title": "GenerateScriptJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "correlationId",
+        "stepOrder",
+        "capability",
+        "params",
+        "outputPrefix",
+        "attempt",
+        "maxRuntimeSeconds",
+        "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "generate_script" },
+        "params": { "$ref": "#/$defs/productAdParams" },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "generateSpeechJob": {
+      "title": "GenerateSpeechJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "correlationId",
+        "stepOrder",
+        "capability",
+        "params",
+        "outputPrefix",
+        "attempt",
+        "maxRuntimeSeconds",
+        "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "generate_speech" },
+        "params": { "$ref": "#/$defs/speechParams" },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "generateStoryboardJob": {
+      "title": "GenerateStoryboardJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "jobId", "runId", "correlationId", "stepOrder",
+        "capability", "params", "outputPrefix", "attempt", "maxRuntimeSeconds", "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "generate_storyboard" },
+        "params": { "$ref": "#/$defs/storyboardParams" },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "generateVideoJob": {
+      "title": "GenerateVideoJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "runId",
+        "correlationId",
+        "stepOrder",
+        "capability",
+        "params",
+        "outputPrefix",
+        "attempt",
+        "maxRuntimeSeconds",
+        "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "generate_video" },
+        "params": { "$ref": "#/$defs/videoParams" },
+        "inputs": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/videoInput" },
+          "description": "Optional reference image; the worker fetches it and forwards it to the video provider as the first frame."
+        },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+          "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

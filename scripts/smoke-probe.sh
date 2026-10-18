@@ -14,19 +14,25 @@
 #   - its technical details download answers 200 as an attachment named
 #     video-details.json;
 #   - the admin Runs list shows that run;
-#   - a text file uploaded as .mp4 ends with the step error `probe_failed`.
+#   - a text file uploaded as .mp4 ends with the step error `probe_failed`;
+#   - only with FLOWCORTEX_PRODUCT_VIDEO_ENABLED=true (set it for the stack too):
+#     two PNGs generated in the worker image start a Product Video run, the script
+#     the provider worker writes is approved like a reviewer would, the media worker
+#     renders, the run ends `completed` and its video.mp4 downloads as 9:16 h264
+#     with an audio track.
 # Needs no internet. Exits non-zero on the first miss.
 #
 # The upload URL is signed for the host the browser reaches (localhost:9000),
 # so the PUT and the download run here, not inside a container.
 # `docker compose` honours COMPOSE_FILE, COMPOSE_ENV_FILES and COMPOSE_PROJECT_NAME
-# as usual. Env: API_URL (default http://localhost:8080), POLL_SECONDS (default 120).
-# Needs bash, curl, jq and docker.
+# as usual. Env: API_URL (default http://localhost:8080), POLL_SECONDS (default 120),
+# FLOWCORTEX_PRODUCT_VIDEO_ENABLED (default false). Needs bash, curl, jq and docker.
 
 set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8080}"
 POLL_SECONDS="${POLL_SECONDS:-120}"
+PRODUCT_VIDEO="${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}"
 WORKFLOW_NAME="Check a video file"
 
 cd "$(dirname "$0")/.."
@@ -40,7 +46,7 @@ login() {
   local email=$1 password=$2
   curl -sS --fail-with-body -H 'Content-Type: application/json' \
     -d "$(jq -n --arg e "$email" --arg p "$password" '{email: $e, password: $p}')" \
-    "$API_URL/api/v1/auth/login" | jq -er .token
+    "$API_URL/api/v1/auth/login" | jq -er .accessToken
 }
 
 # GET or POST (with a JSON body) as the given token; prints the response body.
@@ -62,8 +68,8 @@ grant() {
 
 # PUTs a file to a grant's URL; prints the HTTP status.
 put() {
-  local file=$1 url=$2
-  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$file" -H "Content-Type: video/mp4" "$url"
+  local file=$1 url=$2 mime=${3:-video/mp4}
+  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$file" -H "Content-Type: $mime" "$url"
 }
 
 # Uploads a file and starts the workflow on it; prints the run id.
@@ -77,16 +83,20 @@ start_run() {
     | jq -er .id
 }
 
-# Polls a run every 2 s until it leaves `running`; prints the run.
+# Polls a run every 2 s until its status is none of the given ones (default
+# `running`); prints the run.
 await_run() {
-  local run=$1 deadline=$((SECONDS + POLL_SECONDS)) body
+  local run=$1 deadline=$((SECONDS + POLL_SECONDS)) body status
+  shift
+  local waiting=("${@:-running}")
   while :; do
     body="$(api "$member" "/api/v1/runs/$run")" || fail "GET run $run"
-    if [[ "$(jq -r .status <<<"$body")" != running ]]; then
+    status="$(jq -r .status <<<"$body")"
+    if [[ " ${waiting[*]} " != *" $status "* ]]; then
       echo "$body"
       return
     fi
-    ((SECONDS < deadline)) || fail "run $run still running after ${POLL_SECONDS} s: $(jq -c '.steps[0] | {status, pickedUpAt, errorCode}' <<<"$body")"
+    ((SECONDS < deadline)) || fail "run $run still $status after ${POLL_SECONDS} s: $(jq -c '[.steps[] | {status, pickedUpAt, errorCode}]' <<<"$body")"
     sleep 2
   done
 }
@@ -163,5 +173,58 @@ audio_status="$(jq -r '.steps[1].status' <<<"$body")"
 [[ "$(jq -r .status <<<"$body")" == error && "$error_code" == probe_failed && "$audio_status" == pending ]] \
   || fail "text-file run $run ended $(jq -c '{status, step1: .steps[0] | {status, errorCode}, step2: .steps[1] | {status}}' <<<"$body"), expected error/probe_failed and pending step 2"
 pass "text-file run $run ended with probe_failed"
+
+if [[ "$PRODUCT_VIDEO" != true ]]; then
+  echo "SKIP  Product Video (FLOWCORTEX_PRODUCT_VIDEO_ENABLED is not true)"
+  echo "smoke-probe: all checks passed"
+  exit 0
+fi
+
+uploads=()
+for i in 1 2; do
+  docker compose exec -T worker ffmpeg -y -v error -f lavfi -i "testsrc=size=360x640" \
+    -frames:v 1 "/tmp/product-$i.png" || fail "image $i generation in the worker container"
+  docker compose cp "worker:/tmp/product-$i.png" "$work/product-$i.png" >"$work/cp.log" 2>&1 \
+    || { cat "$work/cp.log" >&2; fail "copy image $i out of the worker"; }
+  g="$(grant "product-$i.png" "$(stat -c %s "$work/product-$i.png")")" || fail "upload grant for image $i"
+  code="$(put "$work/product-$i.png" "$(jq -er .url <<<"$g")" image/png)"
+  [[ "$code" == 200 ]] || fail "PUT image $i answered $code: $(cat "$work/put-body")"
+  uploads+=("$(jq -er .uploadId <<<"$g")")
+done
+pass "two product images generated in the worker image and uploaded"
+
+run="$(api "$member" /api/v1/product-videos/runs "$(jq -n '{
+    productName: "Smoke bottle", description: "Keeps drinks cold all day.", cta: "Order today",
+    uploadIds: $ARGS.positional, video: {aspectRatio: "9:16"}}' --args "${uploads[@]}")" \
+  | jq -er .id)" || fail "start a Product Video run"
+body="$(await_run "$run")"
+[[ "$(jq -r .status <<<"$body")" == waiting_approval ]] \
+  || fail "Product Video run $run did not stop for script review: $(jq -c '{status, errorMessage, steps: [.steps[] | {status, errorCode}]}' <<<"$body")"
+pass "Product Video run $run: the provider worker wrote a script, waiting for review"
+
+review="$(api "$member" "/api/v1/runs/$run/review-tasks" | jq -ec '.[0]')" || fail "review task of run $run"
+api "$member" "/api/v1/review-tasks/$(jq -r .id <<<"$review")/approve" \
+  "$(jq -c '{revisionId: .currentRevisionId, expectedVersion: .version}' <<<"$review")" >/dev/null \
+  || fail "approve the script of run $run"
+# The approval resumes the run after its own commit, so the run can still read
+# waiting_approval for a moment.
+body="$(await_run "$run" running waiting_approval)"
+[[ "$(jq -r .status <<<"$body")" == completed ]] \
+  || fail "Product Video run $run did not complete: $(jq -c '{status, errorMessage, steps: [.steps[] | {status, errorCode}]}' <<<"$body")"
+jq -e 'all(.steps[]; .status == "completed")' <<<"$body" >/dev/null \
+  || fail "Product Video run $run completed with a step not completed: $(jq -c '[.steps[] | .status]' <<<"$body")"
+pass "Product Video run $run approved, spoken and rendered: completed"
+
+url="$(api "$member" "/api/v1/runs/$run/steps/7/outputs/video.mp4/url" | jq -er .url)" \
+  || fail "download URL for video.mp4"
+code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
+[[ "$code" == 200 && -s "$work/video.mp4" ]] || fail "video.mp4 download answered $code"
+docker compose cp "$work/video.mp4" worker:/tmp/product-video.mp4 >/dev/null
+video="$(docker compose exec -T worker ffprobe -v error \
+  -show_entries stream=codec_type,codec_name,width,height -of json /tmp/product-video.mp4)"
+jq -e 'any(.streams[]; .codec_type == "video" and .codec_name == "h264" and .width * 16 == .height * 9)
+  and any(.streams[]; .codec_type == "audio")' <<<"$video" >/dev/null \
+  || fail "video.mp4 is not a 9:16 h264 video with audio: $(jq -c . <<<"$video")"
+pass "Product Video video.mp4 downloaded and verified"
 
 echo "smoke-probe: all checks passed"

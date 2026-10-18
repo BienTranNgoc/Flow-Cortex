@@ -1,7 +1,10 @@
 package com.flowcortex.workflow.web;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -15,6 +18,19 @@ import java.util.UUID;
  *
  * <p>{@code options} travel with the run to its steps; omitted, the run gets the defaults.
  */
-record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId, @Size(max = 1024) String originalName,
+record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId,
+        @Size(min = 1, max = 10) List<UUID> uploadIds, @Size(max = 1024) String originalName,
         @Valid RunOptionsRequest options) {
+
+    @AssertTrue(message = "Use uploadId or uploadIds, not both")
+    @JsonIgnore
+    boolean isUploadSelectionUnambiguous() {
+        return uploadId == null || uploadIds == null;
+    }
+
+    @AssertTrue(message = "uploadIds must not contain duplicates")
+    @JsonIgnore
+    boolean isUploadOrderDistinct() {
+        return uploadIds == null || uploadIds.stream().distinct().count() == uploadIds.size();
+    }
 }

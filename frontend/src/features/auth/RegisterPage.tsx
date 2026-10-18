@@ -1,14 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { ApiError } from '@flow-cortex/api-client';
+import { Link, Navigate } from 'react-router-dom';
+import { BrandPanel } from '../../app/BrandPanel';
+import { OAuthButton } from '../../app/OAuthButton';
+import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
-import { useAuthToken, useRegisterMutation } from './useAuth';
+import {
+  detailFrom,
+  submitState,
+  useAuthToken,
+  useRegisterMutation,
+} from './useAuth';
 
 export function RegisterPage() {
   const token = useAuthToken();
-  const navigate = useNavigate();
   const registerMutation = useRegisterMutation();
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const {
     register,
     handleSubmit,
@@ -21,62 +29,108 @@ export function RegisterPage() {
 
   const onSubmit = handleSubmit(({ confirmPassword: _confirmPassword, ...values }) => {
     registerMutation.mutate(values, {
-      onSuccess: () => navigate('/', { replace: true }),
+      onSuccess: () => {
+        setSubmitSucceeded(true);
+      },
     });
   });
-  const serverError =
-    registerMutation.error instanceof ApiError ? registerMutation.error.problem?.detail : undefined;
+
+  const serverError = detailFrom(registerMutation);
+  const isPending = registerMutation.isPending;
+  const dataState = submitState(submitSucceeded, isPending);
+
+  const buttonLabel = (() => {
+    if (submitSucceeded) return '✓ Account created';
+    if (isPending) return 'Creating account…';
+    return 'Get started free →';
+  })();
 
   return (
-    <main className="auth-page">
+    <div className="auth-page">
+      <BrandPanel />
+
       <section className="auth-card">
-        <p className="eyebrow">FLOW-CORTEX · CREATOR ACCESS</p>
-        <h1>Create your free creator account</h1>
+        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
+        <h1 className="auth-card__title">Create your free creator account</h1>
         <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
-        <form onSubmit={onSubmit} noValidate aria-label="Create account">
-          <div className="field">
+
+        <div className="oauth-row">
+          <OAuthButton
+            provider="google"
+            label="Sign up with Google"
+            href={googleAuthorizeUrl(true, '/')}
+          />
+        </div>
+
+        <div className="auth-divider" aria-hidden="true">
+          <span>or sign up with email</span>
+        </div>
+
+        <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">
+          <div className="field" style={{ '--i': 0 } as React.CSSProperties}>
             <label htmlFor="register-name">Full name</label>
-            <input id="register-name" autoComplete="name" {...register('name')} />
+            <input
+              id="register-name"
+              autoComplete="name"
+              aria-invalid={errors.name ? 'true' : 'false'}
+              {...register('name')}
+            />
             {errors.name && <p role="alert">{errors.name.message}</p>}
           </div>
-          <div className="field">
+          <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
             <label htmlFor="register-email">Work or personal email</label>
-            <input id="register-email" type="email" autoComplete="email" {...register('email')} />
+            <input
+              id="register-email"
+              type="email"
+              autoComplete="email"
+              aria-invalid={errors.email ? 'true' : 'false'}
+              {...register('email')}
+            />
             {errors.email && <p role="alert">{errors.email.message}</p>}
           </div>
-          <div className="field">
+          <div className="field" style={{ '--i': 2 } as React.CSSProperties}>
             <label htmlFor="register-password">Password</label>
             <input
               id="register-password"
               type="password"
               autoComplete="new-password"
+              aria-invalid={errors.password ? 'true' : 'false'}
               {...register('password')}
             />
             {errors.password && <p role="alert">{errors.password.message}</p>}
           </div>
-          <div className="field">
+          <div className="field" style={{ '--i': 3 } as React.CSSProperties}>
             <label htmlFor="register-confirm-password">Confirm password</label>
             <input
               id="register-confirm-password"
               type="password"
               autoComplete="new-password"
+              aria-invalid={errors.confirmPassword ? 'true' : 'false'}
               {...register('confirmPassword')}
             />
-            {errors.confirmPassword && <p role="alert">{errors.confirmPassword.message}</p>}
+            {errors.confirmPassword && (
+              <p role="alert">{errors.confirmPassword.message}</p>
+            )}
           </div>
           {serverError && (
             <p role="alert" className="form-error">
               {serverError}
             </p>
           )}
-          <button className="primary-button" type="submit" disabled={registerMutation.isPending}>
-            {registerMutation.isPending ? 'Creating account…' : 'Get started free →'}
+          <button
+            className="primary-button"
+            type="submit"
+            data-state={dataState}
+            disabled={isPending}
+          >
+            {buttonLabel}
           </button>
         </form>
+
         <p className="auth-footer">
           Already have an account? <Link to="/login">Sign in to workspace</Link>
         </p>
       </section>
-    </main>
+    </div>
   );
 }

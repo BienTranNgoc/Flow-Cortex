@@ -79,7 +79,7 @@ curl http://localhost:8080/readyz
 curl -s -XPOST http://localhost:8080/api/v1/auth/login \
   -H 'content-type: application/json' \
   -d '{"email":"admin1@flowcortex.dev","password":"AdminPass123!"}'
-# -> { "token": "..." }
+# -> { "accessToken": "...", "expiresIn": 900 }  (the refresh token arrives as an HttpOnly cookie)
 ```
 
 The `dev` profile seeds two admins, `admin1@flowcortex.dev` and
@@ -151,17 +151,20 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows seven services `healthy` and `minio-init`
-`Exited (0)`:
+`docker compose ps -a` then shows eight services `healthy` and `rabbitmq-init` and
+`minio-init` `Exited (0)`:
 
 | Service | What it is | Address (all bound to 127.0.0.1) |
 |---|---|---|
 | `postgres` | the database | not published |
-| `rabbitmq` | the broker: queue `media.jobs` and the result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
+| `rabbitmq` | the broker: `media.*` and `provider.*` job/result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
-| `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle and one least-privilege user per service, then exits | — |
+| `rabbitmq-init` | one-shot: creates the provider workers' restricted broker user (`PROVIDER_RABBITMQ_*`), then exits | — |
+| `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
 | `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
 | `worker` | the Python media worker | none — and no internet access |
+| `provider-worker` | the Python provider worker, on `provider.jobs`: script, storyboard and speech — `SCRIPT_PROVIDER` (fixture or openai) and `SPEECH_PROVIDER` (fixture or edge). Edge TTS is demo-only — it calls Microsoft's undocumented Edge Read Aloud endpoint (no SLA, it has broken before) and sends the approved script there; keep the pinned `edge-tts` current and move production speech to a contracted provider | none |
+| `provider-video-worker` | the same image on `provider.video.jobs`: the video clips — `VIDEO_PROVIDER` (fixture, seedance, veo or wan). `PROVIDER_VIDEO_WORKERS` replicas (default 2), one clip each, so a clip that runs for minutes never delays another run's script or speech. Seedance, Veo and Wan receive the storyboard scene prompts and the run's first product image | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
 | `admin` | the admin console (same) | <http://localhost:5174> |
 
@@ -188,8 +191,11 @@ docker compose cp worker:/tmp/clip.mp4 /tmp/clip.mp4
 
 `scripts/smoke-probe.sh` runs the same flow from the command line against the
 running stack (a clip, a wrong-size upload, a text file posing as `.mp4`, the
-download and the admin list) and exits non-zero on any miss. CI runs it on every
-PR that touches the stack (`.github/workflows/compose-smoke.yml`).
+download and the admin list) and exits non-zero on any miss. With
+`FLOWCORTEX_PRODUCT_VIDEO_ENABLED=true` set for both the stack and the script it
+also takes a Product Video run through the provider worker, a script approval and
+the media worker's render to a downloaded `video.mp4`. CI runs it, Product Video
+included, on every PR that touches the stack (`.github/workflows/compose-smoke.yml`).
 
 What to know about the media path:
 
@@ -205,6 +211,9 @@ What to know about the media path:
 - **Upload limits.** `FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES` (500 MB) and
   `FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS` (`mp4,mov,webm,mkv,m4a,mp3,wav`). An upload
   URL is valid for 15 minutes, and uploaded files are deleted after **1 day**.
+  A run keeps its own copy of each input image (`runs/<run>/inputs/` in the media
+  bucket), tagged so the store deletes it after `RUN_INPUT_RETENTION_DAYS` (30);
+  keep that at least as long as a run may wait for its script review.
 - **Browser origins.** `MINIO_API_CORS_ALLOW_ORIGIN` lists the origins allowed to
   upload: `http://localhost:5173,http://127.0.0.1:5173`. Add the production origin
   later; never `*`.
@@ -214,9 +223,11 @@ What to know about the media path:
   internal compose network with the broker and the store.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
   management port 8081 and the broker's metrics port 15692 are not published.
-- **Store keys.** The backend and the worker each have their own store user
-  (`BACKEND_S3_*`, `WORKER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
-  `minio` and `minio-init`. The backend and the worker share the broker account.
+- **Store keys.** The backend, media worker and provider worker each have their own store user
+  (`BACKEND_S3_*`, `WORKER_S3_*`, `PROVIDER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
+  `minio` and `minio-init`. The backend and the media worker share the broker account
+  (`RABBITMQ_DEFAULT_*`); the provider workers share their own (`PROVIDER_RABBITMQ_*`), which
+  can only consume `provider.jobs` and `provider.video.jobs` and publish to the `provider` exchange.
 
 **Kill switches (rollout notes).** Each is an env var in `.env`, read at startup;
 apply a change with `docker compose up -d backend`.
@@ -238,8 +249,19 @@ fix named in each case, when:
 - **Queue settings changed.** Queue arguments are fixed once a queue exists, so
   changing `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` (or the delivery limit in code) on an
   existing broker makes the backend stay not-ready and log one ERROR naming the
-  queue and the differing argument. Delete that queue in the management UI
-  (<http://localhost:15672>, Queues) and restart the backend, or `down -v`.
+  queue and the differing argument. Delete **every** job queue — `media.jobs`,
+  `provider.jobs` and `provider.video.jobs` — and restart the backend, or `down -v`:
+
+  ```bash
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue provider.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue provider.video.jobs
+  docker compose up -d backend
+  ```
+
+  Deleting a queue drops the messages still waiting in it, so stop the workers first
+  (`docker compose stop worker provider-worker provider-video-worker`) if any run is in flight. The queues
+  are recreated by the backend at startup with the new argument.
 - **A store key was rotated.** `minio-init` creates a user for the new
   `BACKEND_S3_ACCESS_KEY` / `WORKER_S3_ACCESS_KEY` but leaves the old one in place.
   Remove it (`<old access key>` is the previous value):
@@ -251,6 +273,99 @@ fix named in each case, when:
 - **Runs from before the media engine.** A database from an earlier checkout can
   hold runs whose input is raw JSON text; they display as such. `down -v` clears
   them.
+
+**Upgrading an existing deployment** (a host with its own `.env` and volumes, such
+as the demo server). Compare the host's `.env` with `.env.example` before pulling a
+new release: compose refuses to start **any** service while a required variable is
+missing, and names it. For the Product Video release:
+
+1. Add to `.env`:
+   - **required:** `PROVIDER_RABBITMQ_USER` and `PROVIDER_RABBITMQ_PASS` — the provider
+     worker's own broker user (letters, digits and `. _ ~ -` only; it goes in a URL);
+   - optional, defaults shown in `.env.example`: `RUN_INPUT_RETENTION_DAYS`,
+     `FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME`, `FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT`.
+2. Re-run both one-shot init services, so the broker user, the store policies and
+   the run-input expiry exist (each is idempotent), then bring the rest up:
+
+   ```bash
+   docker compose up -d --force-recreate rabbitmq-init minio-init
+   docker compose up -d
+   ```
+
+3. If `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` changed, delete the job queues as in
+   **Queue settings changed** above; otherwise the backend stays not-ready.
+
+**Upgrading to the video worker pool.** Video clips now go to their own queue,
+`provider.video.jobs`, which the backend declares at startup, and run on
+`provider-video-worker`; `provider-worker` keeps script, storyboard and speech.
+The `VIDEO_*`, `SEEDANCE_*`, `VEO_*` and `WAN_*` settings in `.env` now reach only
+the video worker. New optional settings, defaults in `.env.example`:
+`PROVIDER_VIDEO_WORKERS` (2), `FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME` (10m) and
+`FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT` (15m); `FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME`
+is back to 2m, since it no longer covers clips. Upgrade with `provider.jobs` empty
+(`rabbitmqctl list_queues name messages`): `provider-worker` answers a clip job the old
+backend left there with `contract_violation` instead of running it, so that run fails and
+has to be started again. Rolling the backend back to a build without `provider.video.jobs`
+leaves any clip jobs waiting on that queue unconsumed, so drain it first. The provider
+broker user needs read access to the new queue, which `rabbitmq-init` grants, so re-run it
+before the video worker starts:
+
+```bash
+docker compose up -d --force-recreate rabbitmq-init
+docker compose up -d --build
+```
+
+A video worker started before that re-run fails to consume (`ACCESS_REFUSED`) and keeps
+reconnecting with backoff until the permission exists.
+
+**Upgrading to clips made from the product photo.** Both clip steps now send the run's
+first product photo (`image_1`) to the video provider: Veo receives the bytes, Seedance
+and Wan a 10-minute presigned URL. The provider store user may now read
+`runs/*/inputs/image_1` and no other run input, and writes only below a step attempt
+(`runs/*/steps/*/attempts/*`), so it cannot replace a run input it sends to a vendor.
+Re-run `minio-init` so the store applies that policy, or clip jobs fail reading the photo:
+
+```bash
+docker compose up -d --force-recreate minio-init
+```
+
+With `VIDEO_PROVIDER=seedance` or `wan`, set `S3_PUBLIC_ENDPOINT` in `.env` to the
+store's public HTTPS address (`https://media.<domain>`; `compose.aws.yaml` sets it from
+`DOMAIN`). The vendor downloads the photo from there, so `http://localhost:9000` cannot
+work, and `provider-video-worker` refuses to start until the value is an `https://` URL.
+Runs started before the upgrade finish without the photo.
+
+**Upgrading across the speech contract change** (the Edge TTS release). Speech jobs
+and results now carry the approved script revision and its provenance, and neither
+side accepts the old shape, so an old message must not meet a new service:
+
+1. **Before pulling or building the release**, so the old images are still the ones
+   compose starts: stop new Product Video work by setting
+   `FLOWCORTEX_PRODUCT_VIDEO_ENABLED=false` and running `docker compose up -d backend`,
+   and hold off script approvals for the window.
+2. Keep the **old** backend and provider worker running until both provider queues
+   show `0`. The old backend is what consumes `provider.results`, so stopping it
+   first leaves old results behind for the new one to reject:
+
+   ```bash
+   docker compose exec rabbitmq rabbitmqctl list_queues name messages
+   ```
+
+3. Stop both, pull the release, then start the backend and the provider worker together,
+   re-running `minio-init` so the narrowed provider store policy is applied:
+
+   ```bash
+   docker compose stop backend provider-worker
+   docker compose up -d --build --force-recreate minio-init backend provider-worker
+   ```
+
+   Then set `FLOWCORTEX_PRODUCT_VIDEO_ENABLED` back and apply it with
+   `docker compose up -d backend`.
+
+The migration `V2026.10.14.004__product_video_speech_input_backfill.sql` gives runs
+whose script was approved before the upgrade the revision the new speech step needs.
+A run that reached the speech step on the old contract and was not backfilled fails
+with `contract_violation`; start it again.
 
 **Port 5173 already taken** (another local project, say). Publish the member app
 on another port with an override file kept outside the checkout, and list the new

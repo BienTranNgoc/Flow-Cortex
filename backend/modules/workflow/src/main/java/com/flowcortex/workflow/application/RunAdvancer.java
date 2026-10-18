@@ -1,27 +1,33 @@
 package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJobCompleted;
-import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobProgressed;
+import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.media.api.ProviderScriptData;
+import com.flowcortex.media.api.ProviderStoryboardData;
+import com.flowcortex.media.api.ProviderSpeechData;
+import com.flowcortex.media.api.ProviderVideoData;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
-import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
-import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.BaggageInScope;
 import io.micrometer.tracing.Tracer;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
@@ -74,9 +81,9 @@ class RunAdvancer {
     private static final short INLINE_DELIVERY = 0;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final StoredWithOutputsResolver storedWithOutputsResolver = new StoredWithOutputsResolver();
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
-    private final WorkflowStepRepository workflowStepRepository;
     private final RunStepTransactions transactions;
     private final InputResolver inputResolver;
     private final StepExecutorRegistry registry;
@@ -89,29 +96,39 @@ class RunAdvancer {
     private final Duration lease;
     private final Clock clock;
     private final ReviewCheckpointTransactions checkpointTransactions;
+    private final MediaJobs mediaJobs;
+    private final Validator validator;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
             @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
-            ReviewCheckpointTransactions checkpointTransactions) {
-        this(workflowRunRepository, runStepRepository, workflowStepRepository, transactions, inputResolver, registry,
+            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator) {
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), checkpointTransactions);
+                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            WorkflowStepRepository workflowStepRepository, RunStepTransactions transactions,
-            InputResolver inputResolver, StepExecutorRegistry registry, TaskExecutor taskExecutor,
-            TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations, MeterRegistry meters,
-            Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions) {
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            Validator validator) {
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
+                taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
+                validator);
+    }
+
+    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            MediaJobs mediaJobs, Validator validator) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
-        this.workflowStepRepository = workflowStepRepository;
         this.transactions = transactions;
         this.inputResolver = inputResolver;
         this.registry = registry;
@@ -128,11 +145,13 @@ class RunAdvancer {
         this.lease = lease;
         this.clock = clock;
         this.checkpointTransactions = checkpointTransactions;
+        this.mediaJobs = mediaJobs;
+        this.validator = validator;
     }
 
     @ApplicationModuleListener
     void on(WorkflowRunStartedEvent event) {
-        inRun(event.runId(), () -> advanceInRun(event.runId(), true));
+        inRun(event.runId(), () -> advance(event.runId(), true));
     }
 
     @ApplicationModuleListener
@@ -164,9 +183,21 @@ class RunAdvancer {
         }
     }
 
-    /** Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight. */
+/**
+     * Claims and hands on the run's next pending step; a no-op when the run is finished or a step is in flight.
+     *
+     * <p>Runs inside {@link RunStepTransactions#inNewTransaction}: a step transition is a bulk
+     * {@code UPDATE} on its own transaction, so a {@link RunStep} loaded earlier in the caller's
+     * transaction still carries its pre-transition status. Reading the ladder from that context
+     * would report a closed step as still running and stall the run between steps, and the caller
+     * here is this class itself, so the proxy a {@code @Transactional} here would need is skipped.
+     */
     void advance(UUID runId) {
-        inRun(runId, () -> advanceInRun(runId, false));
+        advance(runId, false);
+    }
+
+    private void advance(UUID runId, boolean starting) {
+        transactions.inNewTransaction(() -> inRun(runId, () -> advanceInRun(runId, starting)));
     }
 
     private void advanceInRun(UUID runId, boolean starting) {
@@ -184,7 +215,7 @@ class RunAdvancer {
             LOG.info("Workflow run started: runId={} steps={}", runId, runSteps.size());
         }
         Map<Integer, String> outputsByOrder = new LinkedHashMap<>();
-        Map<Integer, String> objectsByOrder = new LinkedHashMap<>();
+        Map<Integer, String> assetOutputsByOrder = new LinkedHashMap<>();
         RunStep next = null;
         for (RunStep runStep : runSteps) {
             if (runStep.getStatus() != RunStepStatus.COMPLETED) {
@@ -192,7 +223,7 @@ class RunAdvancer {
                 break;
             }
             outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
-            objectsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
+            assetOutputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
         }
         if (next == null) {
             transactions.completeRunIfDone(runId, clock.instant());
@@ -207,43 +238,41 @@ class RunAdvancer {
             checkpointTransactions.pause(run, next, payload, clock.instant());
             return;
         }
-        dispatch(run, next, outputsByOrder, objectsByOrder);
+        dispatch(run, next, outputsByOrder, assetOutputsByOrder);
     }
 
     private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
-            Map<Integer, String> objectsByOrder) {
-        int order = step.getStepOrder();
-        WorkflowStep definition = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(run.getWorkflowId())
-                .stream()
-                .collect(Collectors.toMap(s -> (int) s.getStepOrder(), s -> s))
-                .get(order);
+            Map<Integer, String> assetOutputsByOrder) {
         Optional<StepExecutor> executor = registry.find(step.getType());
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), remote, step.getAttempt(), null)) {
-            dispatch(run, step, definition, executor, outputsByOrder, objectsByOrder);
+            dispatch(run, step, executor, outputsByOrder, assetOutputsByOrder);
         }
     }
 
-    private void dispatch(WorkflowRun run, RunStep step, WorkflowStep definition, Optional<StepExecutor> executor,
-            Map<Integer, String> outputsByOrder, Map<Integer, String> objectsByOrder) {
+    /**
+     * Reads config and input reference only from the run step's own snapshot, never from the
+     * current workflow definition: a run in flight must not change shape when the workflow does.
+     */
+    private void dispatch(WorkflowRun run, RunStep step, Optional<StepExecutor> executor,
+            Map<Integer, String> outputsByOrder, Map<Integer, String> assetOutputsByOrder) {
         int order = step.getStepOrder();
-        String config = definition == null ? null : definition.getConfig();
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         String resolvedInput = null;
         StepContext context = null;
         Runnable inClaim;
         try {
-            // A remote step's stored input stays the run's upload reference, whatever it declares,
-            // so the claim's rewrite of the stored input never loses it for a later dispatch.
-            resolvedInput = remote
-                    ? step.getInput()
-                    : inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
-                            run.getInput(), outputsByOrder);
-            List<MediaJobInput> jobInputs = remote
-                    ? DeclaredInputs.resolve(order, config, step.getInput(), objectsByOrder)
-                    : null;
+            String stepConfig = step.getConfig();
+            StepExecutor.InputPolicy inputPolicy = executor.map(value -> value.inputPolicy(stepConfig))
+                    .orElse(StepExecutor.InputPolicy.RESOLVED);
+            resolvedInput = switch (inputPolicy) {
+                case STORED -> step.getInput();
+                case STORED_WITH_OUTPUTS -> storedWithOutputsResolver.resolve(step.getInput(),
+                        stepConfig, assetOutputsByOrder, run.getId(), order);
+                case RESOLVED -> inputResolver.resolve(order, step.getInputRef(), run.getInput(), outputsByOrder);
+            };
             StepContext built = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
-                    resolvedInput, config, options(run), jobInputs, new ArrayList<>());
+                    resolvedInput, stepConfig, step.getInput(), options(run), new ArrayList<>());
             context = built;
             if (executor.isEmpty()) {
                 inClaim = () -> {
@@ -386,8 +415,23 @@ class RunAdvancer {
                 .map(pickedUpAt -> String.valueOf(Duration.between(pickedUpAt, result.finishedAt()).toMillis()))
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {
+            Rejection rejection = rejectProviderData(capability,
+                    step.map(RunStepRepository.Timing::getInput).orElse(null), result.data());
+            if (rejection != null) {
+                if (transactions.fail(result.runId(), result.jobId(), attempt, rejection.code(),
+                        rejection.message(), now)) {
+                    LOG.warn("Provider result rejected at trust boundary: runId={} jobId={} capability={} "
+                            + "attempt={} code={} reason={}", result.runId(), result.jobId(), capability, attempt,
+                            rejection.code(), rejection.message());
+                } else {
+                    discardLate(result.jobId(), attempt, result.status().value());
+                }
+                advance(result.runId());
+                return;
+            }
             if (transactions.complete(result.runId(), result.jobId(), attempt, json(result.data()),
-                    json(result.outputs()), now)) {
+                    json(result.outputs()), now,
+                    () -> registerOutputs(result, step.orElseThrow().getStepOrder(), attempt))) {
                 LOG.info("Job result applied: runId={} jobId={} capability={} attempt={} deliveryCount={} "
                         + "outcome=completed durationMs={} worker={}", result.runId(), result.jobId(), capability,
                         attempt, result.deliveryCount(), durationMs, result.workerId());
@@ -405,6 +449,104 @@ class RunAdvancer {
         // A redelivered result may be the only event left for a run whose first delivery completed
         // the step but died before advancing; advancing is idempotent.
         advance(result.runId());
+    }
+
+    /** Why a completed provider result fails its step: the step error code and its message. */
+    private record Rejection(String code, String message) {
+    }
+
+    /** Returns the rejection of a completed provider step's {@code data} payload, or {@code null}
+     * when the step may complete. A payload that does not match its JSON Schema is a
+     * {@code contract_violation}; speech longer than the Product Video would be cut off by the
+     * renderer, so it is {@code speech_too_long}. */
+    private Rejection rejectProviderData(String capability, String jobInput, Map<String, Object> data) {
+        String validationError = validateProviderData(capability, jobInput, data);
+        if (validationError != null) {
+            return new Rejection("contract_violation", validationError);
+        }
+        if ("generate_speech".equals(capability)) {
+            int durationMs = objectMapper.convertValue(data, ProviderSpeechData.class).durationMs();
+            if (durationMs > ProductVideoWorkflow.VIDEO_DURATION_SECONDS * 1000) {
+                // Rounded up so a speech just over the limit never reads as exactly the video length.
+                return new Rejection("speech_too_long", String.format(Locale.ROOT,
+                        "The approved script reads for %.1f s, longer than the %d s video. "
+                                + "Start a new run with a shorter script.",
+                        Math.ceil(durationMs / 100.0) / 10, ProductVideoWorkflow.VIDEO_DURATION_SECONDS));
+            }
+        }
+        return null;
+    }
+
+    /** Returns a validation-error message when a provider step's {@code data} payload does not match
+     * its JSON Schema, otherwise {@code null}. A non-provider step (probe, extract_audio,
+     * render_video, …) is left to media's {@code MediaContractSchemaTest} — the field set there is
+     * heterogeneous and its own layer owns those contracts. Speech must also name the revision its
+     * job input ({@code jobInput}, the step's stored input) asked for. */
+    private String validateProviderData(String capability, String jobInput, Map<String, Object> data) {
+        if (data == null) {
+            return "provider result has no data";
+        }
+        try {
+            Object parsed = switch (capability) {
+                case "generate_script" -> objectMapper.convertValue(data, ProviderScriptData.class);
+                case "generate_storyboard" -> objectMapper.convertValue(data, ProviderStoryboardData.class);
+                case "generate_speech" -> objectMapper.convertValue(data, ProviderSpeechData.class);
+                case "generate_video" -> objectMapper.convertValue(data, ProviderVideoData.class);
+                default -> null;
+            };
+            if (parsed == null) {
+                return null;
+            }
+            Set<ConstraintViolation<Object>> violations = validator.validate(parsed);
+            if (!violations.isEmpty()) {
+                String reason = violations.stream()
+                        .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .sorted()
+                        .collect(Collectors.joining(", "));
+                return "Provider " + capability + " data is not valid for its schema: " + reason;
+            }
+            if (parsed instanceof ProviderSpeechData speech) {
+                String reason = provenanceMismatch(speech.sourceRevisionId(), jobInput);
+                if (reason != null) {
+                    return "Provider " + capability + " data is not valid for its schema: " + reason;
+                }
+            }
+            return null;
+        } catch (IllegalArgumentException e) {
+            String reason = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            return "Provider " + capability + " data is not valid for its schema: " + reason;
+        }
+    }
+
+    private String provenanceMismatch(UUID got, String jobInput) {
+        UUID expected = sourceRevisionId(jobInput);
+        if (expected == null) {
+            return "sourceRevisionId " + got + " cannot be matched: the job input has no sourceRevisionId";
+        }
+        return expected.equals(got) ? null
+                : "sourceRevisionId " + got + " does not match the job's " + expected;
+    }
+
+    private UUID sourceRevisionId(String jobInput) {
+        if (jobInput == null || jobInput.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode revision = objectMapper.readTree(jobInput).path("sourceRevisionId");
+            return revision.isTextual() ? UUID.fromString(revision.textValue()) : null;
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private void registerOutputs(MediaResult result, int stepOrder, short attempt) {
+        if (mediaJobs == null || result.outputs() == null || result.outputs().isEmpty()) {
+            return;
+        }
+        WorkflowRun run = workflowRunRepository.findById(result.runId())
+                .orElseThrow(() -> new IllegalStateException("Workflow run disappeared: " + result.runId()));
+        mediaJobs.registerOutputs(run.getOwnerId(), result.runId(), result.jobId(), stepOrder, attempt,
+                result.outputs());
     }
 
     private void applyProgress(MediaProgress progress) {

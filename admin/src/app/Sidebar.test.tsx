@@ -13,13 +13,14 @@ afterEach(() => {
 });
 
 describe('Sidebar', () => {
-  it('links every permitted entry and shows a disabled one as inert "Coming soon" text', () => {
+  it('links dashboard and permitted entries, and shows disabled items as inert text', () => {
     render(
       <MemoryRouter>
         <Sidebar role="ADMIN" />
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole('link', { name: /Dashboard/ })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/runs');
     expect(screen.getByRole('link', { name: /Media jobs/ })).toHaveAttribute('href', '/media-jobs');
     expect(screen.getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/users');
@@ -62,12 +63,13 @@ describe('Sidebar', () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
+      'GET /api/v1/users': { status: 200, body: [] },
     });
-    setToken('admin-token-providers');
+    setToken('admin-token-providers', true);
     window.history.pushState({}, '', '/providers');
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/runs');
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/dashboard');
   });
 });

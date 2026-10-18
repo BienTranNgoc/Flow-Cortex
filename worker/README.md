@@ -1,12 +1,20 @@
 # flowcortex-worker
 
-Consumes media jobs from RabbitMQ (`media.jobs`), reads the uploaded object from the store,
-runs the capability (`probe` = ffprobe) and publishes progress and the result back through
-exchange `media`. Message shapes live in `../contracts/*.schema.json`.
+One Python codebase serves two isolated runtimes:
 
-**Run** — `docker compose up worker` from the repo root (env in `.env`, see `.env.example`), or
-locally with the variables of `src/flowcortex_worker/config.py` set: `uv run python -m flowcortex_worker`.
-The API declares the broker topology; the worker only consumes and publishes.
+- the media worker consumes `media.jobs`, reads assets, runs FFmpeg/FFprobe capabilities and
+  publishes through exchange `media`;
+- the provider worker consumes the queue `PROVIDER_QUEUE` names — `provider.jobs` (script,
+  storyboard, speech; the default) or `provider.video.jobs` (video clips, compose service
+  `provider-video-worker`) — runs provider capabilities and publishes through
+  exchange `provider`. Its deterministic fixture adapter is for development until OpenAI is wired.
+
+Message shapes live in `../contracts/*.schema.json`.
+
+**Run** — `docker compose up worker provider-worker provider-video-worker` from the repo root (env in `.env`, see
+`.env.example`). Local entrypoints are `uv run python -m flowcortex_worker` and
+`uv run python -m flowcortex_worker.provider`. The API declares both broker topologies; workers
+only consume and publish.
 
 **Test** — `uv sync && uv run ruff check . && uv run mypy && uv run pytest`. Needs Docker
 (Testcontainers starts `rabbitmq:4.3.6-management` and the pinned Silo image) and `ffmpeg` /

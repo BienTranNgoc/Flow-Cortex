@@ -10,7 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * One ordered step in a {@link Workflow} definition. {@code inputRef}, when set, is the raw
- * {@code {step:K.field}} reference resolved at run time; {@code null} defaults to the previous
+ * {@code {step:K}} or {@code {step:K.field}} reference resolved at run time; {@code null} defaults to the previous
  * step's output (or, for step 1, the run's input). {@code config} is the step type's settings as
  * JSON, {@code null} when it needs none; a remote step's config may declare its job inputs.
  */

@@ -27,3 +27,6 @@ coverage
 
 # TS build info
 *.tsbuildinfo
+
+# Local design reference for AI-assisted UI work.
+DESIGN.md

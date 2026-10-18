@@ -58,8 +58,8 @@ jobs:
       - name: Check the committed models are in sync
         working-directory: .
         run: |
-          git diff --exit-code worker/src/flowcortex_worker/contracts
-          drift=$(git status --porcelain worker/src/flowcortex_worker/contracts)
+          git diff --exit-code worker/src/flowcortex_worker/contracts worker/src/flowcortex_worker/provider/contracts
+          drift=$(git status --porcelain worker/src/flowcortex_worker/contracts worker/src/flowcortex_worker/provider/contracts)
           if [ -n "$drift" ]; then
             echo "$drift"
             exit 1

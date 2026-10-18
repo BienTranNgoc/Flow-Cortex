@@ -2,14 +2,21 @@ package com.flowcortex.media.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.application.ProviderJobRequested;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.modulith.events.EventExternalizationConfiguration;
+import org.springframework.modulith.events.RoutingTarget;
 
-/** The ids a job message leaves with. */
+/** Where a job message goes and the ids it leaves with. */
 class MediaExternalizationConfigTest {
 
     private final MessagePostProcessor ids = new MediaExternalizationConfig.JobMessageIds();
@@ -29,6 +36,47 @@ class MediaExternalizationConfigTest {
 
         assertThat(sent.getMessageId()).isEqualTo(jobId.toString());
         assertThat(sent.getCorrelationId()).isEqualTo(runId.toString());
+    }
+
+    @Test
+    void aProviderJobGetsTheSameTraceableIds() {
+        MessageProperties sent = ids.postProcessMessage(job(null), null, "provider", "job")
+                .getMessageProperties();
+
+        assertThat(sent.getMessageId()).isEqualTo(jobId.toString());
+        assertThat(sent.getCorrelationId()).isEqualTo(runId.toString());
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=" + runId);
+    }
+
+    @Test
+    void aVideoJobGetsTheSameTraceableIds() {
+        MessageProperties sent = ids.postProcessMessage(job(null), null, "provider", "video.job")
+                .getMessageProperties();
+
+        assertThat(sent.getMessageId()).isEqualTo(jobId.toString());
+        assertThat(sent.getCorrelationId()).isEqualTo(runId.toString());
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=" + runId);
+    }
+
+    @Test
+    void videoClipsLeaveOnTheVideoKeyAndOtherProviderJobsOnTheJobKey() {
+        EventExternalizationConfiguration configuration = new MediaExternalizationConfig().mediaExternalization();
+
+        for (String capability : List.of("generate_video", "generate_script", "generate_storyboard",
+                "generate_speech")) {
+            ProviderJob job = providerJob(capability);
+            RoutingTarget target = configuration.determineTarget(new ProviderJobRequested(job));
+
+            assertThat(target.getTarget()).as(capability).isEqualTo("provider");
+            assertThat(target.getKey()).as(capability)
+                    .isEqualTo("generate_video".equals(capability) ? "video.job" : "job");
+            assertThat(configuration.map(new ProviderJobRequested(job))).as(capability).isSameAs(job);
+        }
+    }
+
+    private ProviderJob providerJob(String capability) {
+        return new ProviderJob("1", jobId, runId, runId, 1, capability, Map.of(), List.of(),
+                "runs/" + runId + "/steps/1/attempts/1/", 1, 60, Instant.now());
     }
 
     @Test

@@ -30,6 +30,8 @@ CHUNK_BYTES = 1024 * 1024
 _MISSING = {"404", "NoSuchKey", "NotFound"}
 _FORBIDDEN = {"403", "AccessDenied", "Forbidden"}
 _CHANGED = {"412", "PreconditionFailed"}
+# Long enough for the video provider to fetch the image; capped so a leaked URL stays short-lived.
+_PRESIGNED_GET_EXPIRY_SECONDS = 600
 
 
 class Abort(Protocol):
@@ -44,7 +46,7 @@ class Abort(Protocol):
 
 
 def output_key(job: MediaJob, name: str) -> str:
-    return f"runs/{job.runId}/steps/{job.stepOrder}/{name}"
+    return f"{job.outputPrefix}{name}"
 
 
 def _is_below(prefix: str, key: str) -> bool:
@@ -54,14 +56,17 @@ def _is_below(prefix: str, key: str) -> bool:
     return all(segment not in {"", ".", ".."} for segment in key[len(prefix) :].split("/"))
 
 
-def client_from(settings: Settings) -> Any:
+def client_from(settings: Settings, endpoint: str | None = None) -> Any:
+    """A store client for ``endpoint``, by default the internal ``S3_ENDPOINT``."""
     return boto3.client(
         "s3",
-        endpoint_url=settings.s3_endpoint,
+        endpoint_url=endpoint or settings.s3_endpoint,
         region_name=settings.s3_region,
         aws_access_key_id=settings.s3_access_key.get_secret_value(),
         aws_secret_access_key=settings.s3_secret_key.get_secret_value(),
         config=Config(
+            # Requests are SigV4 already; without this, presigned URLs fall back to legacy SigV2.
+            signature_version="s3v4",
             s3={"addressing_style": "path" if settings.s3_path_style else "virtual"},
             retries={"max_attempts": 3, "mode": "standard"},
             connect_timeout=5,
@@ -82,8 +87,12 @@ def remove_leftovers(directory: Path | None = None) -> int:
 
 
 class Storage:
-    def __init__(self, client: Any, bucket: str, upload_bucket: str) -> None:
+    def __init__(
+        self, client: Any, bucket: str, upload_bucket: str, *, presign_client: Any = None
+    ) -> None:
         self._client = client
+        # Signs URLs for outside readers; its endpoint is the public one, never the internal store.
+        self._presign_client = presign_client
         self.bucket = bucket
         self.upload_bucket = upload_bucket
 
@@ -121,6 +130,75 @@ class Storage:
                 extra={"bucket": ref.bucket, "objectKey": ref.objectKey, "bytes": size},
             )
             yield path
+
+    def head_object(self, bucket: str, key: str) -> dict[str, Any] | None:
+        try:
+            return dict(self._client.head_object(Bucket=bucket, Key=key))
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in _MISSING:
+                return None
+            if code in _FORBIDDEN:
+                # Silo answers 404 for a missing key this identity may read, so 403 is the store
+                # policy, not absence. AWS S3 answers 403 there unless the caller holds
+                # s3:ListBucket: moving to AWS means revisiting the provider policy first.
+                log.warning(
+                    "head forbidden; check the provider store policy",
+                    extra={"bucket": bucket, "objectKey": key, "code": code},
+                )
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} heading {bucket}/{key}"
+            ) from exc
+
+    def presigned_get_url(
+        self, bucket: str, key: str, *, expires_seconds: int = _PRESIGNED_GET_EXPIRY_SECONDS
+    ) -> str:
+        """A short-lived HTTPS URL the video provider can fetch to read the reference image.
+
+        The URL signs only this object, for the public store endpoint (``S3_PUBLIC_ENDPOINT``);
+        sharing it with the provider does not grant any other object access. ``expires_seconds``
+        is clamped to the worker's maximum so a stale URL cannot outlive the job that produced it.
+        """
+        if self._presign_client is None:
+            raise PermanentError(
+                "provider_capability_unavailable",
+                "this worker has no public store endpoint (S3_PUBLIC_ENDPOINT) to sign URLs for",
+            )
+        try:
+            return str(
+                self._presign_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": bucket, "Key": key},
+                    ExpiresIn=min(expires_seconds, _PRESIGNED_GET_EXPIRY_SECONDS),
+                )
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise TransientError(
+                f"{type(exc).__name__} signing {bucket}/{key}"
+            ) from exc
+
+    def fetch_bytes(self, bucket: str, key: str, abort: Abort) -> bytes:
+        abort.check()
+        try:
+            response = self._client.get_object(Bucket=bucket, Key=key)
+        except ClientError as exc:
+            if str(exc.response.get("Error", {}).get("Code", "")) in _MISSING:
+                raise TransientError(f"{bucket}/{key} disappeared between head and fetch") from exc
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        except BotoCoreError as exc:
+            raise TransientError(
+                f"{type(exc).__name__} fetching {bucket}/{key}"
+            ) from exc
+        try:
+            return bytes(response["Body"].read())
+        finally:
+            response["Body"].close()
 
     def put(self, key: str, body: bytes | Path, mime: str, abort: Abort) -> int:
         # Outputs are small in-memory reports; the check stops a killed job before it writes.

@@ -29,7 +29,7 @@ final class DubFixtures {
     }
 
     static StepContext context(String type, int order, String input, String voice) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), order, type, (short) 1, input, null,
-                new RunOptions(voice), null, new ArrayList<>());
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), order, type, (short) 1, input, null, null,
+                new RunOptions(voice), new ArrayList<>());
     }
 }

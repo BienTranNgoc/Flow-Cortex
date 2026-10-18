@@ -1,0 +1,123 @@
+/* Member SPA design tokens: the only file that holds colour values. */
+
+:root {
+  color-scheme: dark;
+
+  /* Surface */
+  --paper: #080c13;
+  --paper-2: #0d131c;
+  --paper-3: #101721;
+  --btn-bg: #141d28;
+  --btn-bg-hover: #141e2a;
+  --input-bg: #0b1119;
+  --card-from: #101a24;
+  --card-to: #0c111a;
+  --glow: #152b38;
+  --header-bg: #0f0f1e;
+  --footer-bg: #080812;
+  --aurora-top: #0d1828;
+  --aurora-mid: #060a12;
+  --aurora-bottom: #04060c;
+  --disabled-from: #1a3540;
+  --disabled-to: #2a3a55;
+
+  /* Text */
+  --ink: #e8f1f2;
+  --ink-2: #c8d4dc;
+  --ink-3: #9eacb6;
+  --ink-4: #81919e;
+  --ink-5: #5a6b78;
+  --nav-ink: #8a9ab5;
+  --ink-disabled: #a8b6c2;
+
+  /* Border */
+  --line: #26313d;
+  --line-2: #334352;
+  --line-3: #2e3b49;
+  --line-soft: #1c2935;
+  --line-subtle: #233443;
+  --card-border: #253746;
+  --control-border: #2a3a4a;
+  --input-border: #62727f;
+  --input-border-hover: #3a4a5b;
+  --edge: var(--input-border);
+
+  /* Brand */
+  --primary: #35e5e0;
+  --primary-foreground: #061016;
+  --cta-from: #1be0d1;
+  --cta-to: #5174ff;
+  --accent: #5f9cff;
+  --accent-soft: #1b2440;
+  --primary-soft: #0b2a2c;
+  --teal: #00e5db;
+  --teal-bright: #5ef0e0;
+  --teal-glow: #5eead4;
+  --teal-deep: #00d4ce;
+  --violet: #b3a4ff;
+  --indigo: #120074;
+  --aurora-teal: #0fb5a8;
+  --aurora-indigo: #4338ca;
+  --aurora-cyan: #06b6d4;
+
+  /* Brand: workflow category tones (text on bg, line edge; icon gradients) */
+  --tone-blue-text: #9fc4ff;
+  --tone-blue-bg: #0a1a2c;
+  --tone-blue-line: #1d3a66;
+  --tone-cyan-text: #7fe1f5;
+  --tone-cyan-bg: #062028;
+  --tone-cyan-line: #175663;
+  --tone-cyan-from: #5cd0ff;
+  --tone-cyan-to: #7a5bff;
+  --tone-violet-text: #c0b0ff;
+  --tone-violet-bg: #16102a;
+  --tone-violet-line: #382c6a;
+  --tone-amber-text: #ffcd6b;
+  --tone-amber-bg: #2a200a;
+  --tone-amber-line: #5a4416;
+  --tone-amber-from: #ffb46b;
+  --tone-amber-to: #ff7a59;
+  --tone-amber-on: #2a1106;
+  --tone-green-bg: #0a2618;
+  --tone-green-line: #1f4d34;
+  --tone-rose-text: #ff9bb0;
+  --tone-rose-bg: #2a0e16;
+  --tone-rose-line: #6a2536;
+
+  /* Status */
+  --red: #ff9a9a;
+  --red-soft: #3b1518;
+  --red-strong: #ff7a7a;
+  --red-light: #ffb8b8;
+  --warning: #ffd766;
+  --warning-soft: #3a2f0b;
+  --green: #7ee2a8;
+  --green-soft: #0f3320;
+  --green-bright: #69f0a8;
+  --green-vivid: #4ade80;
+
+  /* Form controls */
+  --input-text: var(--ink);
+  --input-placeholder: var(--ink-3);
+
+  /* Gradients and shadows */
+  --gradient-cta: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  --gradient-card: linear-gradient(145deg, var(--card-from), var(--card-to));
+  --gradient-page-glow: radial-gradient(circle at 80% 20%, var(--glow) 0, transparent 35%);
+  --shadow-lg: 0 24px 70px #0008;
+  --shadow: 0 20px 60px #0005;
+  --shadow-color: #000000;
+
+  /* Shape and size */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --target-min: 44px;
+
+  /* Motion */
+  --dur-quick: 120ms;
+  --dur-standard: 220ms;
+  --dur-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}

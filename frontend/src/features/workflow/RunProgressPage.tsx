@@ -1,23 +1,25 @@
-import type { RunStepResponse } from '@flow-cortex/api-client';
-import { Link, useParams } from 'react-router-dom';
+import type { RunResponse } from '@flow-cortex/api-client';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import './WorkflowPages.css';
-import { StepDownloads } from './StepDownloads';
-import { NO_MESSAGE, stepErrorSentence } from './stepErrorMessages';
-import { StepOutput } from './StepOutput';
+import { Pipeline } from './Pipeline';
+import { StepDetail } from './StepDetail';
+import {
+  choiceTakenBack,
+  needsYouStep,
+  selectedStep,
+  STATE_WORDS,
+  stepKey,
+  stepLabel,
+  stepState,
+  type StepChoice,
+} from './stepDisplay';
+import { NO_MESSAGE } from './stepErrorMessages';
 import { useRunQuery } from './useWorkflows';
-import { StoredOutputDownload } from './StoredOutputDownload';
-import { ApprovalPanel } from './ApprovalPanel';
 
 const RUN_HEADINGS: Record<string, string> = {
   running: 'Run in progress',
   waiting_approval: 'Waiting for your approval',
-};
-
-const STEP_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  running: 'Running',
-  completed: 'Completed',
-  error: 'Error',
 };
 
 /**
@@ -33,25 +35,121 @@ function looksLikeJson(value: string): boolean {
   }
 }
 
-function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
-  if (step.status !== 'running') {
-    return null;
-  }
-  if (!step.pickedUpAt) {
-    return <p className="run-step-waiting">Waiting to start…</p>;
-  }
-  if (step.progressPercent === undefined || step.progressPercent === null) {
-    return null;
-  }
+/** The state `useTransitionNavigate` attaches when a member has just started this run. */
+function isFocusRequest(state: unknown): boolean {
   return (
-    <p className="run-step-progress">
-      <progress
-        max={100}
-        value={step.progressPercent}
-        aria-label={`Step ${step.stepOrder} progress`}
-      />
-      <span>{step.progressPercent} %</span>
-    </p>
+    typeof state === 'object' && state !== null && 'focusHeading' in state && !!state.focusHeading
+  );
+}
+
+interface RunViewProps {
+  run: RunResponse;
+  runId: string;
+  workflowId: string | undefined;
+}
+
+function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
+  const panelId = useId();
+  const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [choice, setChoice] = useState<StepChoice>();
+  const steps = run.steps ?? [];
+  if (choice && choiceTakenBack(steps, run.status, choice)) {
+    setChoice(undefined);
+  }
+  const selected = selectedStep(steps, run.status, choice);
+
+  const asksForFocus = isFocusRequest(location.state);
+  useEffect(() => {
+    if (asksForFocus) {
+      headingRef.current?.focus();
+      // The request lives in the history entry, so a reload would repeat it.
+      navigate(location.pathname + location.search + location.hash, {
+        replace: true,
+        state: null,
+      });
+    }
+  }, [asksForFocus, location.pathname, location.search, location.hash, navigate]);
+  const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
+  const announcement =
+    selected && selectedState ? `${stepLabel(selected)}, ${STATE_WORDS[selectedState]}` : '';
+
+  const selectedKey = selected && stepKey(selected);
+  const [announced, setAnnounced] = useState('');
+  const previousKey = useRef(selectedKey);
+  useEffect(() => {
+    if (previousKey.current !== selectedKey) {
+      previousKey.current = selectedKey;
+      setAnnounced(announcement);
+    }
+  }, [selectedKey, announcement]);
+
+  const startsWithUpload = steps[0]?.mode === 'remote';
+  const fileName =
+    startsWithUpload && run.input && !looksLikeJson(run.input) ? run.input : undefined;
+  const failedWithoutStep =
+    run.status === 'error' && !steps.some((step) => step.status === 'error');
+  const backTo = workflowId ?? run.workflowId;
+
+  const onSelect = (stepId: string) => {
+    const waitingOn = needsYouStep(steps, run.status);
+    setChoice({
+      stepId,
+      runStatus: run.status,
+      needsYouId: waitingOn && stepKey(waitingOn),
+    });
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    panelRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+  };
+
+  return (
+    <main>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {RUN_HEADINGS[run.status ?? ''] ?? `Run ${run.status}`}
+      </h1>
+      <div role="status" className="visually-hidden">
+        {announced}
+      </div>
+      {failedWithoutStep && (
+        <p role="alert" className="run-step-error">
+          {NO_MESSAGE}
+        </p>
+      )}
+      {fileName && <p className="run-file">File: {fileName}</p>}
+      {selected && (
+        <div className="run-layout">
+          <div className="run-layout-pipeline">
+            <Pipeline
+              steps={steps.map((step) => ({ id: stepKey(step), name: stepLabel(step), run: step }))}
+              runStatus={run.status}
+              selectedId={stepKey(selected)}
+              onSelect={onSelect}
+              panelId={panelId}
+            />
+          </div>
+          <div className="run-layout-detail">
+            <StepDetail
+              id={panelId}
+              panelRef={panelRef}
+              runId={runId}
+              step={selected}
+              awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+              needsYou={selectedState === 'needs-you'}
+              fileName={fileName}
+            />
+          </div>
+        </div>
+      )}
+      {backTo && (
+        <Link className="run-back-link action-link" to={`/workflows/${backTo}`}>
+          Back to workflow
+        </Link>
+      )}
+    </main>
   );
 }
 
@@ -73,82 +171,5 @@ export function RunProgressPage() {
   if (runQuery.isError || !runQuery.data) {
     return <p role="alert">Could not load this run.</p>;
   }
-
-  const run = runQuery.data;
-  const startsWithUpload = run.steps?.[0]?.mode === 'remote';
-  const fileName =
-    startsWithUpload && run.input && !looksLikeJson(run.input) ? run.input : undefined;
-  const failedWithoutStep =
-    run.status === 'error' && !(run.steps ?? []).some((step) => step.status === 'error');
-
-  return (
-    <main>
-      <h1>{RUN_HEADINGS[run.status ?? ''] ?? `Run ${run.status}`}</h1>
-      {failedWithoutStep && (
-        <p role="alert" className="run-step-error">
-          {NO_MESSAGE}
-        </p>
-      )}
-      {fileName && <p className="run-file">File: {fileName}</p>}
-      {run.status === 'waiting_approval' && <ApprovalPanel runId={runId} />}
-      <ol className="run-steps">
-        {(run.steps ?? []).map((step) => {
-          const status = step.status ?? 'pending';
-          const waiting = status === 'running' && !step.pickedUpAt;
-          const deliveries = step.deliveryCount ?? 0;
-          // const details = (step.outputs ?? []).find((output) => output.mime === 'application/json');
-          const outputs = step.outputs ?? [];
-          const details = outputs.find((output) => output.mime === 'application/json');
-          const artifacts = outputs.filter((output) => output.mime !== 'application/json');
-          const stepOrder = step.stepOrder;
-          return (
-            <li key={step.id} className={`run-step run-step-${status}`}>
-              <div className="run-step-head">
-                <span className="run-step-order">Step {step.stepOrder}</span>
-                <span className="run-step-status">
-                  {waiting ? 'Waiting' : (STEP_LABELS[status] ?? status)}
-                </span>
-                {deliveries >= 1 && <span className="run-step-retried">Retried {deliveries}×</span>}
-              </div>
-              <StepProgress step={step} />
-              {status === 'completed' && step.output && <StepOutput output={step.output} />}
-              {status === 'completed' && details && stepOrder !== undefined && (
-                <StepDownloads
-                  runId={runId}
-                  stepOrder={stepOrder}
-                  output={step.output}
-                  details={details}
-                  fileName={fileName}
-                />
-              )}
-
-              {status === 'completed' &&
-                stepOrder !== undefined &&
-                artifacts.map((artifact) => (
-                  <StoredOutputDownload
-                    key={artifact.name}
-                    runId={runId}
-                    stepOrder={stepOrder}
-                    output={artifact}
-                  />
-                ))}
-              {status === 'error' && (
-                <div className="run-step-failure">
-                  <p role="alert" className="run-step-error">
-                    {stepErrorSentence(step.errorCode, step.errorMessage, step.mode === 'remote')}
-                  </p>
-                  {step.errorCode && <small className="run-step-code">{step.errorCode}</small>}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-      {workflowId && (
-        <Link className="run-back-link action-link" to={`/workflows/${workflowId}`}>
-          Back to workflow
-        </Link>
-      )}
-    </main>
-  );
+  return <RunView run={runQuery.data} runId={runId} workflowId={workflowId} />;
 }
