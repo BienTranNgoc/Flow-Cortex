@@ -44,7 +44,8 @@ class MediaTopologyConfigTest {
                         null,
                         null,
                         Duration.ofSeconds(30),
-                        Duration.ofSeconds(10)));
+                        Duration.ofSeconds(10),
+                        Duration.ofMinutes(2)));
 
         Declarables topology = new MediaTopologyConfig().mediaTopology(properties);
 

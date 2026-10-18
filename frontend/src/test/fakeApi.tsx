@@ -41,8 +41,13 @@ export function stubApi(routes: Record<string, Handler>): RecordedCall[] {
   return calls;
 }
 
-/** Renders `element` on `path` inside a fresh query client, starting at `url`. */
-export function renderRoute(path: string, url: string, element: ReactElement, extra?: ReactElement) {
+/** Renders `element` on `path` inside a fresh query client, starting at `url` (with router state). */
+export function renderRoute(
+  path: string,
+  url: string | { pathname: string; search?: string; state?: unknown },
+  element: ReactElement,
+  extra?: ReactElement,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });

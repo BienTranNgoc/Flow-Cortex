@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.credit.infrastructure.CreditLedgerRepository;
-import com.flowcortex.user.api.UserCreatedEvent;
+import com.flowcortex.user.api.UserActivatedEvent;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -24,10 +24,10 @@ class SignupGrantListenerTest {
     private final UUID userId = UUID.randomUUID();
 
     @Test
-    void aNewAccountReceivesTheSignupGrant() {
+    void anActivatedAccountReceivesTheSignupGrant() {
         when(ledger.grant(any(), eq(userId), eq(SignupGrantListener.SIGNUP_GRANT), eq(NOW))).thenReturn(1);
 
-        listener.on(new UserCreatedEvent(userId));
+        listener.on(new UserActivatedEvent(userId));
 
         verify(ledger).grant(any(), eq(userId), eq(SignupGrantListener.SIGNUP_GRANT), eq(NOW));
     }
@@ -37,8 +37,8 @@ class SignupGrantListenerTest {
         when(ledger.grant(any(), eq(userId), eq(SignupGrantListener.SIGNUP_GRANT), eq(NOW)))
                 .thenReturn(1).thenReturn(0);
 
-        listener.on(new UserCreatedEvent(userId));
-        listener.on(new UserCreatedEvent(userId));
+        listener.on(new UserActivatedEvent(userId));
+        listener.on(new UserActivatedEvent(userId));
 
         verify(ledger, times(2)).grant(any(), eq(userId), eq(SignupGrantListener.SIGNUP_GRANT), eq(NOW));
     }

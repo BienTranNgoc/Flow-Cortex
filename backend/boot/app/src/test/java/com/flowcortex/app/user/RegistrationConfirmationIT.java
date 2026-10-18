@@ -2,10 +2,16 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.user.domain.AppUser;
+import com.flowcortex.user.emailconfirm.UnconfirmedAccountPurgeJob;
+import com.flowcortex.user.infrastructure.AppUserRepository;
 import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,13 +23,18 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.restclient.RestTemplateBuilder;
@@ -44,6 +55,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -55,6 +67,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.registration.owner-email=" + RegistrationConfirmationIT.OWNER_EMAIL,
+        "flowcortex.auth.email-confirmation.purge-batch-size=2",
         "flowcortex.security.oauth.google.client-id=test-client.apps.googleusercontent.com",
         "flowcortex.security.oauth.google.client-secret=test-secret",
         "flowcortex.security.oauth.google.redirect-uri=http://localhost:5173/api/v1/auth/oauth/google/callback"})
@@ -69,6 +82,8 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     private static final String USERNAME_RULE = "Use 3–20 lowercase letters, digits or _";
     private static final Pattern LINK = Pattern.compile(
             "http://localhost:5173/confirm-email\\?token=([A-Za-z0-9_-]+)");
+    private static final Pattern PASSWORD_LINK = Pattern.compile(
+            "http://localhost:5173/set-password\\?token=([A-Za-z0-9_-]+)");
     private static final AtomicInteger NEXT_CLIENT = new AtomicInteger(1);
 
     @Autowired
@@ -76,6 +91,12 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
 
     @Autowired
     private MovableClock clock;
+
+    @Autowired
+    private UnconfirmedAccountPurgeJob purgeJob;
+
+    @Autowired
+    private DataSource dataSource;
 
     /** The JDK client returns a 429 as is; the default one would sleep through Retry-After. */
     private TestRestTemplate client;
@@ -87,6 +108,20 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     }
 
     record ResendRequest(String email) {
+    }
+
+    record ConfirmedView(String accessToken, long expiresIn, boolean passwordSetupRequired,
+            String passwordSetupToken) {
+    }
+
+    record PasswordRequest(String passwordSetupToken, String password, String firstName, String lastName,
+            String username) {
+    }
+
+    record SessionView(String accessToken, long expiresIn) {
+    }
+
+    record MeView(String name, boolean hasPassword, boolean passwordSetupRequired) {
     }
 
     record StatusView(String status) {
@@ -220,10 +255,286 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
                 String.class);
         assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(confirmed.getBody()).contains("\"accessToken\"").contains("\"expiresIn\"")
-                .doesNotContain("refreshToken");
+                .contains("\"passwordSetupRequired\":true").doesNotContain("refreshToken");
         assertThat(confirmed.getHeaders().get(HttpHeaders.SET_COOKIE))
                 .anyMatch(cookie -> cookie.startsWith("refresh_token=") && cookie.contains("HttpOnly"));
-        assertThat(login(expected, PASSWORD)).isNotBlank();
+        assertThat(login(expected, PASSWORD)).as("the password chosen before the email was proven").isNull();
+    }
+
+    @Test
+    void confirmingDropsThePasswordAndEndsEarlierSessionsAndTheMemberSetsANewOneOnce() {
+        String email = uniqueEmail("set-password");
+        String token = registerAndReadToken(email);
+        UUID userId = userIdOf(email);
+        UUID earlierSession = UUID.randomUUID();
+        jdbc.update("INSERT INTO refresh_token (id, user_id, token_hash, family_id, issued_at, expires_at)"
+                + " VALUES (?, ?, ?, ?, now(), now() + interval '1 day')", earlierSession, userId,
+                "earlier-" + earlierSession, UUID.randomUUID());
+
+        ResponseEntity<ConfirmedView> confirmed = postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(token),
+                ConfirmedView.class);
+
+        assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(confirmed.getBody().passwordSetupRequired()).isTrue();
+        String setupToken = confirmed.getBody().passwordSetupToken();
+        assertThat(setupToken).isNotBlank();
+        assertThat(jdbc.queryForObject("SELECT has_password FROM app_user WHERE id = ?", Boolean.class, userId))
+                .isFalse();
+        assertThat(jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class, userId))
+                .isEmpty();
+        assertThat(jdbc.queryForObject("SELECT revoked_at IS NOT NULL FROM refresh_token WHERE id = ?",
+                Boolean.class, earlierSession)).isTrue();
+        assertThat(login(email, PASSWORD)).isNull();
+
+        String accessToken = confirmed.getBody().accessToken();
+        MeView me = get("/api/v1/auth/me", accessToken, MeView.class).getBody();
+        assertThat(me.hasPassword()).isFalse();
+        assertThat(me.passwordSetupRequired()).isTrue();
+        assertThat(me.name()).as("the name chosen at registration is dropped")
+                .isEqualTo(email.substring(0, email.indexOf('@')));
+
+        ResponseEntity<ProblemView> tooShort = put("/api/v1/me/password", accessToken,
+                new PasswordRequest(setupToken, "short", "Binh", "Le", null), ProblemView.class);
+        assertThat(tooShort.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(tooShort.getBody().errors()).containsKey("password");
+        ResponseEntity<ProblemView> bearerOnly = put("/api/v1/me/password", accessToken,
+                new PasswordRequest("guessed-token", "new-password-1", "Binh", "Le", null), ProblemView.class);
+        assertThat(bearerOnly.getStatusCode()).as("an access token alone sets no password")
+                .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(bearerOnly.getBody().code()).isEqualTo("PASSWORD_SETUP_TOKEN_INVALID");
+        assertThat(login(email, "new-password-1")).isNull();
+
+        String username = "sp_" + UUID.randomUUID().toString().substring(0, 8);
+        ResponseEntity<SessionView> set = put("/api/v1/me/password", accessToken,
+                new PasswordRequest(setupToken, "new-password-1", "Binh", "Le", username), SessionView.class);
+        assertThat(set.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(set.getBody().accessToken()).isNotBlank();
+        assertThat(set.getHeaders().get(HttpHeaders.SET_COOKIE))
+                .anyMatch(cookie -> cookie.startsWith("refresh_token=") && cookie.contains("Path=/api/v1/auth"));
+        assertThat(jdbc.queryForMap("SELECT name, username FROM app_user WHERE id = ?", userId))
+                .containsEntry("name", "Binh Le").containsEntry("username", username);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refresh_token WHERE user_id = ? AND revoked_at IS NULL",
+                Integer.class, userId)).as("only the session the response started").isEqualTo(1);
+        assertThat(mail.sentTo(email)).anyMatch(message -> message.subject()
+                .equals("Your Flow-Cortex password was set"));
+        assertThat(login(email, "new-password-1")).isNotBlank();
+
+        ResponseEntity<ProblemView> again = put("/api/v1/me/password", set.getBody().accessToken(),
+                new PasswordRequest(setupToken, "new-password-2", "A", "B", null), ProblemView.class);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(login(email, "new-password-1")).isNotBlank();
+        assertThat(put("/api/v1/me/password", null,
+                new PasswordRequest(setupToken, "new-password-3", "A", "B", null), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void aConfirmedAccountWithoutAPasswordGetsBackInThroughASetPasswordLinkAndNothingElseDoes() {
+        String email = uniqueEmail("password-link");
+        String confirmLink = registerAndReadToken(email);
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(confirmLink), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        String withPassword = uniqueEmail("password-link-has-one");
+        userService.createInitialAdmin(withPassword, PASSWORD, "Has Password");
+        String unknown = uniqueEmail("password-link-unknown");
+
+        ResponseEntity<ProblemView> noPassword = postFrom("/api/v1/auth/login", new LoginRequest(email, "anything-1"),
+                ProblemView.class);
+        ResponseEntity<ProblemView> unknownLogin = postFrom("/api/v1/auth/login",
+                new LoginRequest(unknown, "anything-1"), ProblemView.class);
+        assertThat(noPassword.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(noPassword.getBody().detail()).isEqualTo(unknownLogin.getBody().detail());
+
+        ResponseEntity<String> asked = postFrom("/api/v1/auth/resend-confirmation", new ResendRequest(email),
+                String.class);
+        ResponseEntity<String> askedWithPassword = postFrom("/api/v1/auth/resend-confirmation",
+                new ResendRequest(withPassword), String.class);
+        ResponseEntity<String> askedUnknown = postFrom("/api/v1/auth/resend-confirmation",
+                new ResendRequest(unknown), String.class);
+        assertThat(List.of(asked, askedWithPassword, askedUnknown)).allSatisfy(response -> {
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+            assertThat(response.getBody()).isEqualTo(asked.getBody());
+        });
+        assertThat(mail.sentTo(withPassword)).isEmpty();
+        assertThat(mail.sentTo(unknown)).isEmpty();
+        CapturedMail linkMail = mail.sentTo(email).getLast();
+        assertThat(linkMail.subject()).isEqualTo("Set your Flow-Cortex password");
+        Matcher matcher = PASSWORD_LINK.matcher(linkMail.body());
+        assertThat(matcher.find()).isTrue();
+        String link = matcher.group(1);
+
+        assertPasswordLinkInvalid(postFrom("/api/v1/auth/password-link", new ConfirmRequest(confirmLink),
+                ProblemView.class));
+        assertLinkInvalid(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(link), ProblemView.class));
+
+        ResponseEntity<ConfirmedView> opened = postFrom("/api/v1/auth/password-link", new ConfirmRequest(link),
+                ConfirmedView.class);
+        assertThat(opened.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(opened.getBody().passwordSetupRequired()).isTrue();
+        assertThat(put("/api/v1/me/password", opened.getBody().accessToken(),
+                new PasswordRequest(opened.getBody().passwordSetupToken(), "new-password-1", "An", "Tran", null),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(login(email, "new-password-1")).isNotBlank();
+
+        assertPasswordLinkInvalid(postFrom("/api/v1/auth/password-link", new ConfirmRequest(link),
+                ProblemView.class));
+        assertPasswordLinkInvalid(postFrom("/api/v1/auth/password-link", new ConfirmRequest("not-a-token"),
+                ProblemView.class));
+    }
+
+    private static void assertPasswordLinkInvalid(ResponseEntity<ProblemView> response) {
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody().code()).isEqualTo("PASSWORD_LINK_INVALID");
+        assertThat(response.getBody().detail()).isEqualTo("This set-password link is no longer valid");
+    }
+
+    @Test
+    void registeringAnUnconfirmedEmailAgainReplacesItsDetailsAndOnlyTheNewLinkWorks() {
+        String email = uniqueEmail("re-register");
+        String first = registerAndReadToken(email);
+        UUID userId = userIdOf(email);
+        String firstHash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class,
+                userId);
+        String username = "rr_" + UUID.randomUUID().toString().substring(0, 8);
+
+        ResponseEntity<String> again = register(
+                new RegisterRequest("Binh", "Le", username, email.toUpperCase(Locale.ROOT), "second-password-1"),
+                String.class);
+
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(again.getBody()).isEqualTo("{\"status\":\"confirmation_sent\"}");
+        assertThat(accountsWith(email)).isEqualTo(1);
+        assertThat(userIdOf(email)).isEqualTo(userId);
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT first_name, last_name, name, username, password_hash FROM app_user WHERE id = ?", userId);
+        assertThat(row).containsEntry("first_name", "Binh").containsEntry("last_name", "Le")
+                .containsEntry("name", "Binh Le").containsEntry("username", username);
+        assertThat(row.get("password_hash")).isNotEqualTo(firstHash);
+        assertThat(mail.sentTo(email)).hasSize(2);
+        String second = mail.lastTokenFor(email);
+
+        assertLinkInvalid(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(first), ProblemView.class));
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(second), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void googleSignInOnAnUnconfirmedEmailTakesTheAccountOverAndDropsItsPassword() {
+        String email = uniqueEmail("google-takeover");
+        String link = registerAndReadToken(email);
+        UUID userId = userIdOf(email);
+        String sub = "sub-" + UUID.randomUUID();
+        googleKnows(sub, email);
+        String ip = newClientIp();
+        Flow flow = authorize("/", false, ip);
+
+        ResponseEntity<String> response = callback(CODE, flow.state(), null, flow.cookie(), ip);
+
+        assertThat(cookieValue(response, REFRESH_COOKIE)).as("the Google sign-in opens a session").isNotNull();
+        Map<String, Object> row = jdbc.queryForMap("SELECT google_subject, has_password, password_hash, username,"
+                + " name, email_confirmed_at IS NOT NULL AS confirmed FROM app_user WHERE id = ?", userId);
+        assertThat(row).containsEntry("google_subject", sub).containsEntry("has_password", false)
+                .containsEntry("password_hash", "").containsEntry("confirmed", true)
+                .containsEntry("username", null)
+                .containsEntry("name", email.substring(0, email.indexOf('@')));
+        assertThat(accountsWith(email)).isEqualTo(1);
+        assertThat(login(email, PASSWORD)).isNull();
+        assertLinkInvalid(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(link), ProblemView.class));
+    }
+
+    @Test
+    void theSignupGrantWaitsForTheEmailConfirmation() throws InterruptedException {
+        String email = uniqueEmail("grant-on-confirm");
+        String token = registerAndReadToken(email);
+        UUID userId = userIdOf(email);
+
+        // Publications first: a grant handled in between leaves its ledger row behind for the next check.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM event_publication WHERE serialized_event LIKE ?",
+                Long.class, "%" + userId + "%")).as("no event names the unconfirmed account").isZero();
+        assertThat(grantRows(userId)).isZero();
+
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(token), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        while (grantRows(userId) == 0 && Instant.now().isBefore(deadline)) {
+            Thread.sleep(100);
+        }
+        assertThat(grantRows(userId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT balance FROM credit_wallet WHERE user_id = ?", Long.class, userId))
+                .isEqualTo(1000);
+    }
+
+    @Test
+    void unconfirmedAccountsPastTheRetentionWithNoLiveLinkAreDeletedWithTheirRowsAndOthersKept() {
+        String abandoned = uniqueEmail("abandoned");
+        registerAndReadToken(abandoned);
+        UUID abandonedId = userIdOf(abandoned);
+        jdbc.update("INSERT INTO refresh_token (id, user_id, token_hash, family_id, issued_at, expires_at)"
+                + " VALUES (?, ?, ?, ?, now(), now() + interval '1 day')", UUID.randomUUID(), abandonedId,
+                "abandoned-" + abandonedId, UUID.randomUUID());
+        String resent = uniqueEmail("resent-late");
+        registerAndReadToken(resent);
+        String confirmedEmail = uniqueEmail("confirmed-kept");
+        String token = registerAndReadToken(confirmedEmail);
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(token), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        clock.advance(Duration.ofHours(73));
+        try {
+            assertThat(postFrom("/api/v1/auth/resend-confirmation", new ResendRequest(resent), StatusView.class)
+                    .getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+            purgeJob.purge();
+        } finally {
+            clock.reset();
+        }
+
+        assertThat(accountsWith(abandoned)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM email_confirmation_token WHERE user_id = ?",
+                Integer.class, abandonedId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM refresh_token WHERE user_id = ?", Integer.class,
+                abandonedId)).isZero();
+        assertThat(accountsWith(resent)).as("a link mailed late keeps the account").isEqualTo(1);
+        assertThat(accountsWith(confirmedEmail)).isEqualTo(1);
+    }
+
+    @Test
+    void anAccountAConcurrentRequestHoldsIsSkippedByThePurge() throws SQLException {
+        String held = uniqueEmail("purge-held");
+        registerAndReadToken(held);
+        UUID heldId = userIdOf(held);
+        jdbc.update("UPDATE email_confirmation_token SET used_at = now() WHERE user_id = ?", heldId);
+
+        clock.advance(Duration.ofHours(73));
+        try (Connection other = dataSource.getConnection()) {
+            other.setAutoCommit(false);
+            try (PreparedStatement lock = other.prepareStatement("SELECT id FROM app_user WHERE id = ? FOR UPDATE")) {
+                lock.setObject(1, heldId);
+                lock.executeQuery().close();
+            }
+            purgeJob.purge();
+            assertThat(accountsWith(held)).as("a re-registration or resend holds the row").isEqualTo(1);
+            other.rollback();
+        } finally {
+            clock.reset();
+        }
+
+        clock.advance(Duration.ofHours(73));
+        try {
+            purgeJob.purge();
+        } finally {
+            clock.reset();
+        }
+        assertThat(accountsWith(held)).as("released, it is purged on the next run").isZero();
+    }
+
+    private long grantRows(UUID userId) {
+        return jdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ? AND kind = 'grant'",
+                Long.class, userId);
+    }
+
+    private UUID userIdOf(String email) {
+        return jdbc.queryForObject("SELECT id FROM app_user WHERE lower(email) = lower(?)", UUID.class, email);
     }
 
     @Test
@@ -270,9 +581,77 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     }
 
     @Test
-    void anEmailThatAlreadyHasAnAccountInAnotherCaseIsRefusedWith409() {
+    void aResendAnswersBeforeItsMailIsSentAndAKnownAddressAnswersLikeAnUnknownOne() {
+        String email = uniqueEmail("resend-async");
+        registerAndReadToken(email);
+        String unknown = uniqueEmail("resend-async-unknown");
+
+        mail.hold();
+        try {
+            ResponseEntity<String> known = postFrom("/api/v1/auth/resend-confirmation", new ResendRequest(email),
+                    String.class);
+            ResponseEntity<String> stranger = postFrom("/api/v1/auth/resend-confirmation",
+                    new ResendRequest(unknown), String.class);
+
+            assertThat(List.of(known, stranger)).allSatisfy(response -> {
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+                assertThat(response.getBody()).isEqualTo(known.getBody());
+            });
+            assertThat(mail.sentSoFar(email)).as("the request answered while its mail was still on the way")
+                    .hasSize(1);
+        } finally {
+            mail.release();
+        }
+        assertThat(mail.sentTo(email)).hasSize(2);
+        assertThat(mail.sentTo(unknown)).isEmpty();
+    }
+
+    @Test
+    void thePurgeWorksThroughMoreAccountsThanOneBatchInOneRun() {
+        List<String> abandoned = List.of(uniqueEmail("batch-1"), uniqueEmail("batch-2"), uniqueEmail("batch-3"),
+                uniqueEmail("batch-4"), uniqueEmail("batch-5"));
+        abandoned.forEach(this::registerAndReadToken);
+
+        clock.advance(Duration.ofHours(73));
+        try {
+            purgeJob.purge();
+        } finally {
+            clock.reset();
+        }
+
+        assertThat(abandoned).allSatisfy(email -> assertThat(accountsWith(email)).as(email).isZero());
+    }
+
+    @Test
+    void aSuspendedAccountConfirmingItsEmailGetsNoGrantUntilAnAdminReactivatesIt() throws InterruptedException {
+        String email = uniqueEmail("grant-suspended");
+        String token = registerAndReadToken(email);
+        UUID userId = userIdOf(email);
+        jdbc.update("UPDATE app_user SET status = 'SUSPENDED' WHERE id = ?", userId);
+
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(token), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(confirmed(email)).isTrue();
+        Thread.sleep(2000);
+        assertThat(grantRows(userId)).as("no grant while suspended").isZero();
+
+        String ownerToken = login(OWNER_EMAIL, OWNER_PASSWORD);
+        assertThat(put("/api/v1/users/" + userId, ownerToken, new UpdateUserRequestView(null, null, null, "ACTIVE"),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Instant deadline = Instant.now().plusSeconds(10);
+        while (grantRows(userId) == 0 && Instant.now().isBefore(deadline)) {
+            Thread.sleep(100);
+        }
+        assertThat(grantRows(userId)).isEqualTo(1);
+    }
+
+    @Test
+    void aConfirmedEmailInAnotherCaseIsRefusedWith409() {
         String email = uniqueEmail("duplicate");
-        assertThat(register(valid(email), String.class).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        String token = registerAndReadToken(email);
+        assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(token), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
 
         ResponseEntity<ProblemView> second = register(valid(email.toUpperCase(Locale.ROOT)), ProblemView.class);
 
@@ -335,6 +714,9 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
         @Autowired
         private JdbcTemplate nestedJdbc;
 
+        @Autowired
+        private AppUserRepository nestedUsers;
+
         @Test
         void registerAnswers201WithASessionAndTheAccountIsConfirmed() {
             String email = uniqueEmail("confirmation-off");
@@ -354,18 +736,68 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
             assertThat(nestedRestTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(email, PASSWORD),
                     String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         }
+
+        @Test
+        void registeringOverASuspendedUnconfirmedAccountIsRefusedWithoutASessionOrAGrant()
+                throws InterruptedException {
+            String email = uniqueEmail("off-suspended");
+            UUID ownerId = nestedJdbc.queryForObject("SELECT id FROM app_user WHERE email = ?", UUID.class,
+                    OWNER_EMAIL);
+            UUID userId = UUID.randomUUID();
+            nestedUsers.saveAndFlush(AppUser.selfRegistered(userId, ownerId, email, "earlier-hash", "An", "Tran",
+                    null, null));
+            nestedJdbc.update("UPDATE app_user SET status = 'SUSPENDED' WHERE id = ?", userId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Forwarded-For", nextIp());
+
+            ResponseEntity<String> response = nestedRestTemplate.exchange("/api/v1/auth/register", HttpMethod.POST,
+                    new HttpEntity<>(valid(email), headers), String.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNull();
+            assertThat(response.getBody()).doesNotContain("accessToken");
+            assertThat(nestedJdbc.queryForObject("SELECT count(*) FROM refresh_token WHERE user_id = ?",
+                    Integer.class, userId)).isZero();
+            Thread.sleep(2000);
+            assertThat(nestedJdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ?"
+                    + " AND kind = 'grant'", Long.class, userId)).as("no grant while suspended").isZero();
+        }
     }
 
     record CapturedMail(List<String> to, String subject, String body) {
     }
 
-    /** Records every message instead of opening an SMTP connection. */
+    /**
+     * Records every message instead of opening an SMTP connection. While held, a send blocks until
+     * released or for five seconds, whichever comes first.
+     */
     static class CapturingMailSender extends JavaMailSenderImpl {
 
         private final List<CapturedMail> sent = new CopyOnWriteArrayList<>();
 
+        private final ObjectProvider<ThreadPoolTaskExecutor> executor;
+
+        private volatile CountDownLatch held = new CountDownLatch(0);
+
+        CapturingMailSender(ObjectProvider<ThreadPoolTaskExecutor> executor) {
+            this.executor = executor;
+        }
+
+        void hold() {
+            held = new CountDownLatch(1);
+        }
+
+        void release() {
+            held.countDown();
+        }
+
         @Override
         protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) throws MailException {
+            try {
+                held.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
             for (MimeMessage message : mimeMessages) {
                 try {
                     Address[] recipients = message.getAllRecipients();
@@ -377,8 +809,30 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
             }
         }
 
+        /** Every mail to the address once the app's task executor, which sends account mail, has drained. */
         List<CapturedMail> sentTo(String address) {
+            awaitQueuedSends();
+            return sentSoFar(address);
+        }
+
+        List<CapturedMail> sentSoFar(String address) {
             return sent.stream().filter(message -> message.to().contains(address)).toList();
+        }
+
+        /** Two idle polls in a row: a worker between taking a task and starting it reads as idle once. */
+        private void awaitQueuedSends() {
+            ThreadPoolExecutor pool = executor.getObject().getThreadPoolExecutor();
+            Instant deadline = Instant.now().plusSeconds(10);
+            int idlePolls = 0;
+            while (idlePolls < 2 && Instant.now().isBefore(deadline)) {
+                idlePolls = pool.getActiveCount() == 0 && pool.getQueue().isEmpty() ? idlePolls + 1 : 0;
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
 
         String lastTokenFor(String address) {
@@ -421,8 +875,8 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     static class MailAndClock {
 
         @Bean
-        CapturingMailSender capturingMailSender() {
-            return new CapturingMailSender();
+        CapturingMailSender capturingMailSender(ObjectProvider<ThreadPoolTaskExecutor> executor) {
+            return new CapturingMailSender(executor);
         }
 
         @Bean

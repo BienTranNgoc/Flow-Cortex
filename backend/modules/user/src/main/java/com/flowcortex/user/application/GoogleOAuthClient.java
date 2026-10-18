@@ -31,6 +31,9 @@ public class GoogleOAuthClient {
 
     private static final String SCOPES = "openid email profile";
 
+    /** Well inside {@code app_user.name}, which holds 255 characters. */
+    private static final int DISPLAY_NAME_MAX_CODE_POINTS = 100;
+
     private final GoogleOAuthProperties properties;
 
     private final JwtDecoder idTokenDecoder;
@@ -107,7 +110,35 @@ public class GoogleOAuthClient {
         if (sub == null || sub.isEmpty() || email == null || email.isEmpty()) {
             throw new OAuthVerificationException("id_token missing sub or email");
         }
-        return new GoogleIdTokenClaims(sub, email, true);
+        return new GoogleIdTokenClaims(sub, email, true, displayName(jwt));
+    }
+
+    /** {@code name}, else "given_name family_name"; {@code null} when neither is a non-blank string. */
+    static String displayName(Jwt jwt) {
+        String full = textClaim(jwt, "name");
+        if (full != null) {
+            return full;
+        }
+        String given = textClaim(jwt, "given_name");
+        String family = textClaim(jwt, "family_name");
+        if (given == null && family == null) {
+            return null;
+        }
+        return limit(given == null ? family : family == null ? given : given + " " + family);
+    }
+
+    private static String textClaim(Jwt jwt, String claim) {
+        if (!(jwt.getClaims().get(claim) instanceof String value) || value.isBlank()) {
+            return null;
+        }
+        return limit(value.trim());
+    }
+
+    private static String limit(String value) {
+        if (value.codePointCount(0, value.length()) <= DISPLAY_NAME_MAX_CODE_POINTS) {
+            return value;
+        }
+        return value.substring(0, value.offsetByCodePoints(0, DISPLAY_NAME_MAX_CODE_POINTS)).trim();
     }
 
     private static String encode(String value) {

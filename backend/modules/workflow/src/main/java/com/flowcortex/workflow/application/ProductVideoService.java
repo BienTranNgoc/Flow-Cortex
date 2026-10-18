@@ -88,14 +88,17 @@ public class ProductVideoService {
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
         String productJson = productJson(draft);
+        // Copied before the run's transaction opens, so no database transaction waits on the object store.
+        UUID runId = UUID.randomUUID();
+        List<MediaAssetInput> copies = mediaJobs.copyRunInputs(runId, assets);
+        String assetJson = json(copies.stream().map(MediaAssetInput::input).toList());
         Instant now = Instant.now();
 
         return transactions.execute(status -> {
-            WorkflowRun run = runs.save(new WorkflowRun(UUID.randomUUID(), ProductVideoWorkflow.ID, ownerId, productJson, now));
+            WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, now));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
-            List<MediaAssetInput> bound = mediaJobs.bindRunInputs(run.getId(), assets);
-            String assetJson = json(bound.stream().map(MediaAssetInput::input).toList());
+            mediaJobs.bindRunInputs(run.getId(), copies);
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
                 String storedInput = registry.usesStoredInput(definition.getType())

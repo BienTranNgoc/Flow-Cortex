@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.app.workflow.AbstractWorkflowHttpIT;
 import com.flowcortex.credit.api.CreditAccounts;
-import com.flowcortex.user.api.UserCreatedEvent;
+import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.RunStepView;
@@ -210,7 +210,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         UserView member = newUser("signup");
         awaitWallet(member.id());
 
-        transactionTemplate.executeWithoutResult(status -> events.publishEvent(new UserCreatedEvent(member.id())));
+        transactionTemplate.executeWithoutResult(status -> events.publishEvent(new UserActivatedEvent(member.id())));
         await(() -> outstandingGrantPublications(member.id()) == 0);
 
         assertThat(balance(member)).isEqualTo(1000);
@@ -337,7 +337,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
 
     private long outstandingGrantPublications(UUID userId) {
         Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication "
-                + "WHERE event_type LIKE '%UserCreatedEvent%' AND serialized_event LIKE ? AND completion_date IS NULL",
+                + "WHERE event_type LIKE '%UserActivatedEvent%' AND serialized_event LIKE ? AND completion_date IS NULL",
                 Long.class, "%" + userId + "%");
         return count == null ? 0 : count;
     }

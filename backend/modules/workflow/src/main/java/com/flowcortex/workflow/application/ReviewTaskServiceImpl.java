@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 class ReviewTaskServiceImpl implements ReviewTaskService {
 
     private static final String TASK_NOT_FOUND = "Review task not found";
-    private static final String NOT_YOUR_RUN = "You can't decide on this run";
     private static final String RUN_STOPPING = "RUN_STOPPING";
     private static final String RUN_STOPPING_DETAIL = "This run is being stopped";
     private static final String EMPTY_CONTENT = "Content can't be empty";
@@ -205,8 +203,9 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     }
 
     /**
-     * The task a decision may act on. Refuses, in this order, an unknown task (not found), another
-     * member's run (forbidden) and a run being stopped (unprocessable), before anything is changed.
+     * The task a decision may act on. Refuses, in this order, an unknown task or another member's
+     * (the same not found, so a stranger learns nothing) and a run being stopped (unprocessable),
+     * before anything is changed.
      */
     private Decidable decidableTask(UUID taskId, UUID reviewerId) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
@@ -217,7 +216,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         WorkflowRun run = workflowRunRepository.findById(task.getRunId())
                 .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
         if (!run.getOwnerId().equals(reviewerId)) {
-            throw new AccessDeniedException(NOT_YOUR_RUN);
+            throw new NotFoundException(TASK_NOT_FOUND);
         }
         if (run.getStatus() == RunStatus.CANCELLING || run.getStatus() == RunStatus.CANCELLED) {
             throw new UnprocessableEntityException(RUN_STOPPING_DETAIL, RUN_STOPPING);

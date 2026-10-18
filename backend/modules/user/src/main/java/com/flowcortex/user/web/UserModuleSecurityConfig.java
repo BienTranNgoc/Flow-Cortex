@@ -51,6 +51,7 @@ class UserModuleSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/confirm-email").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-link").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/resend-confirmation").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()

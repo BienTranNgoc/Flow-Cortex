@@ -74,10 +74,12 @@ class GoogleOAuthIT extends AbstractGoogleOAuthIT {
         assertThat(refresh).contains("HttpOnly", "Secure", "SameSite=Lax", "Path=/api/v1/auth", "Max-Age=");
         assertThat(setCookieHeader(response, FLOW_COOKIE)).contains("Max-Age=0");
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT owner_id, has_password, google_subject, email, role FROM app_user WHERE google_subject = ?",
-                sub);
+                "SELECT owner_id, has_password, google_subject, email, role, name FROM app_user"
+                        + " WHERE google_subject = ?", sub);
         assertThat(row).containsEntry("owner_id", ownerId).containsEntry("has_password", false)
-                .containsEntry("email", email).containsEntry("role", "MEMBER");
+                .containsEntry("email", email).containsEntry("role", "MEMBER")
+                .as("no name in the token: the email's local part").containsEntry("name",
+                        email.substring(0, email.indexOf('@')));
         assertThat(auditCount("OAUTH_LOGIN_SUCCESS", null)).isPositive();
 
         HttpHeaders headers = new HttpHeaders();

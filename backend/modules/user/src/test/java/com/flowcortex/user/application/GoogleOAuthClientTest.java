@@ -73,6 +73,35 @@ class GoogleOAuthClientTest {
     }
 
     @Test
+    void theDisplayNameIsTheTrimmedNameElseTheGivenAndFamilyNamesElseNothing() {
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of("name", "  Nguyen Van A ",
+                "given_name", "A")))).isEqualTo("Nguyen Van A");
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of("name", "   ", "given_name", " Binh ",
+                "family_name", "Le")))).isEqualTo("Binh Le");
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of("family_name", "Le")))).isEqualTo("Le");
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of("name", List.of("not", "text"))))).isNull();
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of()))).isNull();
+    }
+
+    @Test
+    void aLongDisplayNameIsCutToOneHundredCharactersWithoutSplittingOne() {
+        String emoji = "😀";
+
+        String cut = GoogleOAuthClient.displayName(withNames(Map.of("name", emoji.repeat(150))));
+
+        assertThat(cut).isEqualTo(emoji.repeat(100));
+        assertThat(GoogleOAuthClient.displayName(withNames(Map.of("given_name", "g".repeat(80),
+                "family_name", "f".repeat(80))))).hasSize(100);
+    }
+
+    private static Jwt withNames(Map<String, Object> names) {
+        Jwt.Builder token = Jwt.withTokenValue("id-token").header("alg", "RS256").subject("sub-1")
+                .claim("email", "a@example.com");
+        names.forEach(token::claim);
+        return token.build();
+    }
+
+    @Test
     void aTokenWithAnotherNonceIsRefused() {
         tokenEndpointAnswers("{\"id_token\":\"raw\"}");
         when(decoder.decode("raw")).thenReturn(idToken("someone-elses-nonce", "a@example.com"));

@@ -215,6 +215,8 @@ What to know about the media path:
   also reads each file's first bytes and refuses one whose content does not match its extension
   (`FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED`). An upload
   URL is valid for 15 minutes, and uploaded files are deleted after **1 day**.
+  The video cap used to be `FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES`; a `.env` that still sets only
+  the old name keeps its value, but rename it to `FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES`.
   A run keeps its own copy of each input image (`runs/<run>/inputs/` in the media
   bucket), tagged so the store deletes it after `RUN_INPUT_RETENTION_DAYS` (30);
   keep that at least as long as a run may wait for its script review.
@@ -262,16 +264,39 @@ the member app reads it once per session.
 
 - **Email.** Every email the backend sends lands in Mailpit at
   <http://localhost:8025>; open the confirmation link from there. The link points
-  at `FLOWCORTEX_APP_PUBLIC_URL` (default `http://localhost:5173`). A bare `bootRun`
-  sends to `localhost:1025`, so start the sink first:
-  `docker compose up -d mailpit`.
-- **SMS.** No SMS is delivered. Each code goes to the `sms_outbox` table, which
-  admins read in the console (`GET /api/v1/admin/sms-outbox`), or:
+  at `FLOWCORTEX_APP_PUBLIC_URL` (compose default `http://localhost:5173`) and signs
+  the member in; the app then asks for a name, an optional username and a new
+  password, because confirming drops everything chosen at registration. The page
+  works for 30 minutes; after that, or for an account that left without saving a
+  password, "Email me a link" on the sign-in page mails a one-time set-password
+  link (also to Mailpit). Saving a password ends the account's other sessions and
+  mails a notice. With confirmation on, the backend refuses to
+  start while `FLOWCORTEX_APP_PUBLIC_URL` or `SPRING_MAIL_HOST` is unset; the
+  `dev` profile defaults them to `http://localhost:5173` and `localhost:1025`, so
+  for a bare `bootRun` start the sink first: `docker compose up -d mailpit`.
+  The public overlay (`compose.aws.yaml`) refuses to start until
+  `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT` (usually 587), `SPRING_MAIL_USERNAME`
+  and `SPRING_MAIL_PASSWORD` name a real SMTP relay, and it turns on SMTP login
+  over STARTTLS, so account mail never lands in a sink there. To try a relay
+  from the local stack, set the same four plus `SPRING_MAIL_SMTP_AUTH=true` and
+  `SPRING_MAIL_SMTP_STARTTLS=true` in `.env`.
+  Accounts still unconfirmed after `FLOWCORTEX_AUTH_UNCONFIRMED_ACCOUNT_RETENTION`
+  (72h) are deleted.
+- **SMS.** No SMS is delivered. Compose sets `FLOWCORTEX_SMS_SENDER=outbox`, so each code
+  goes to the `sms_outbox` table (kept 7 days), which admins read in the console
+  (`GET /api/v1/admin/sms-outbox`, mapped only with that setting), or:
 
   ```bash
   docker compose exec postgres psql -U flowcortex flowcortex \
     -c "SELECT phone_e164, body, created_at FROM sms_outbox ORDER BY created_at DESC LIMIT 5"
   ```
+
+  A bare `bootRun` has no sender: with `FLOWCORTEX_PHONE_VERIFICATION_ENABLED=true` it refuses
+  to start until `FLOWCORTEX_SMS_SENDER=outbox` and a `FLOWCORTEX_PHONE_HASH_SECRET` of at
+  least 32 characters are set too (compose supplies a dev-only one). The public overlay
+  `compose.aws.yaml` turns phone verification off until a real SMS sender exists. Sending
+  codes is rate-limited per member (10 codes and 3 different numbers a day), per client IP
+  (30 an hour), per number and overall; the `FLOWCORTEX_PHONE_*` variables in `.env.example` set the limits.
 
 **Resetting state.** `docker compose down -v` deletes every volume (database,
 broker, store), so the next `up` seeds from scratch. You need it, or the narrower

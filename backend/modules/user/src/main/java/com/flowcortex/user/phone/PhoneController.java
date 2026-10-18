@@ -3,6 +3,7 @@ package com.flowcortex.user.phone;
 import com.flowcortex.user.phone.PhoneVerificationService.PhoneStatus;
 import com.flowcortex.user.phone.PhoneVerificationService.SentCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -40,8 +41,8 @@ class PhoneController {
     @PostMapping(value = "/send-code", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<SendCodeResponse> sendCode(@AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody SendCodeRequest request) {
-        SentCode sent = service.sendCode(userId(jwt), request.phone());
+            @Valid @RequestBody SendCodeRequest request, HttpServletRequest servletRequest) {
+        SentCode sent = service.sendCode(userId(jwt), request.phone(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok(new SendCodeResponse(sent.maskedPhone(), sent.resendAfterSeconds(), sent.expiresAt()));
     }
 

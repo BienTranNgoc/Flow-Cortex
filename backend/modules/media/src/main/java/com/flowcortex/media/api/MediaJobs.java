@@ -38,24 +38,39 @@ public interface MediaJobs {
     UploadGrant prepareUpload(UUID ownerId, String fileName, long size);
 
     /**
-     * The stored object of {@code ownerId}'s upload {@code uploadId}, re-checked, as a job input.
-     * The key is derived from both ids, so another owner's upload id finds nothing.
+     * The stored object of {@code ownerId}'s upload {@code uploadId}, re-checked and registered as an asset.
+     * The key is derived from both ids, so another owner's upload id finds nothing. The input still points
+     * at the upload, which its presigned URL can overwrite: copy it with {@link #copyRunInputs}, bind the
+     * copy with {@link #bindRunInputs} and hand the worker only the copy.
      * @throws UploadRejectedException on field {@code uploadId} if the object is missing, too large or not one of
      *         the audio/video types
      */
-    MediaJobInput resolveUpload(UUID ownerId, UUID uploadId);
+    MediaAssetInput resolveUpload(UUID ownerId, UUID uploadId);
 
     /** Resolves and registers 1-10 uploads, preserving their order as {@code image_1..image_N}. */
     List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds);
 
     /**
-     * Snapshots already owner-verified assets against a run in the caller's transaction, copying each
-     * object into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket first. The uploads bucket
-     * expires objects after a day while an approval may wait far longer, so only the copy is bound.
-     * @return the bound inputs, each pointing at its copy in the media bucket
-     * @throws UploadRejectedException on field {@code uploadIds} if an upload vanished before it was copied
+     * Copies already owner-verified assets into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket,
+     * for a run that does not exist yet: call it outside any transaction, before the run's own opens, since a
+     * video copy can take minutes. The uploads bucket expires objects after a day while an approval may wait far
+     * longer, and an upload URL can rewrite its object, so the worker reads only the copy. With the content check
+     * on, the first bytes of each copy must match its kind. Copies of a start that fails later are not deleted;
+     * the media bucket's run-input lifecycle rule expires them.
+     * @return the inputs, each pointing at its copy in the media bucket
+     * @throws UploadRejectedException on field {@code uploadId} for the single media upload, {@code uploadIds}
+     *         otherwise, if an upload vanished before it was copied; on field {@code uploadId} if a copy's
+     *         content is not its kind
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
-    List<MediaAssetInput> bindRunInputs(UUID runId, List<MediaAssetInput> inputs);
+    List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs);
+
+    /**
+     * Snapshots the copies {@link #copyRunInputs} made for {@code runId} against that run, in the caller's
+     * transaction, once the run is saved.
+     * @throws IllegalArgumentException if an input is not a copy under {@code runs/<runId>/inputs/} of the media bucket
+     */
+    void bindRunInputs(UUID runId, List<MediaAssetInput> copies);
 
     /**
      * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after

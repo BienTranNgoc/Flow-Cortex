@@ -16,9 +16,15 @@ import org.springframework.data.repository.query.Param;
  */
 public interface PhoneChallengeRepository extends JpaRepository<PhoneChallenge, UUID> {
 
-    /** When codes went to this number after {@code since}, whoever asked — the send caps are per number. */
+    /** When codes went to this number after {@code since}, whoever asked: the per-number ceiling. */
     @Query("SELECT c.createdAt FROM PhoneChallenge c WHERE c.phoneE164 = :phone AND c.createdAt > :since")
     List<Instant> findSendTimesSince(@Param("phone") String phoneE164, @Param("since") Instant since);
+
+    /** When this member sent codes to this number after {@code since}: the caps and the cooldown ladder. */
+    @Query("SELECT c.createdAt FROM PhoneChallenge c "
+            + "WHERE c.userId = :userId AND c.phoneE164 = :phone AND c.createdAt > :since")
+    List<Instant> findSendTimesByUserSince(@Param("userId") UUID userId, @Param("phone") String phoneE164,
+            @Param("since") Instant since);
 
     Optional<PhoneChallenge> findFirstByUserIdOrderByCreatedAtDesc(UUID userId);
 

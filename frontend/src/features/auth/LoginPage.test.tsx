@@ -67,6 +67,14 @@ describe('LoginPage', () => {
     );
   });
 
+  it('offers an account without a password a set-password link by email', () => {
+    renderLogin(null);
+    expect(screen.getByRole('link', { name: 'Email me a link' })).toHaveAttribute(
+      'href',
+      '/set-password',
+    );
+  });
+
   it('redirects to the `from` page when a token is already present', () => {
     setToken('existing-token', true);
 

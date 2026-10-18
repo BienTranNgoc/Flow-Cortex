@@ -61,6 +61,6 @@ class PresignedGetExpiryIT extends AbstractPostgresBootTest {
                         new MediaProperties.Upload.ContentCheck(true)),
                 new MediaProperties.S3(internalEndpoint(), publicEndpoint(), "us-east-1", true, UPLOAD_BUCKET,
                         MEDIA_BUCKET, SILO.getUserName(), SILO.getPassword(), Duration.ofSeconds(5),
-                        Duration.ofSeconds(2)));
+                        Duration.ofSeconds(2), Duration.ofMinutes(2)));
     }
 }

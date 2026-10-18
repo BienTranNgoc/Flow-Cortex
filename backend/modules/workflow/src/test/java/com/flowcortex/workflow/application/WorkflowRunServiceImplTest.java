@@ -193,8 +193,7 @@ class WorkflowRunServiceImplTest {
         UUID uploadId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "probe");
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveUpload(ownerId, uploadId))
-                .thenReturn(new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+        givenStoredUpload(ownerId, uploadId);
 
         RunView started = service.startRun(ownerId, workflow.getId(), "{\"bucket\":\"elsewhere\"}", uploadId,
                 "../a\u0007b.mp4");
@@ -203,24 +202,25 @@ class WorkflowRunServiceImplTest {
     }
 
     @Test
-    void oneResolvedUploadBecomesTheInputOfEveryRemoteStep() {
+    void oneUploadIsCopiedIntoTheRunAndOnlyTheCopyBecomesTheInputOfEveryRemoteStep() {
         WorkflowRunServiceImpl service = newService(true);
         UUID ownerId = UUID.randomUUID();
         UUID uploadId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "probe", "extract_audio", "echo");
-        MediaJobInput input = new MediaJobInput(
-                "media", "flowcortex-uploads", ownerId + "/" + uploadId);
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveUpload(ownerId, uploadId)).thenReturn(input);
+        MediaAssetInput upload = givenStoredUpload(ownerId, uploadId);
 
-        service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
 
         List<RunStep> steps = List.copyOf(savedSteps());
-        String expected = "{\"key\":\"media\",\"bucket\":\"flowcortex-uploads\","
-                + "\"objectKey\":\"" + ownerId + "/" + uploadId + "\"}";
+        String expected = "{\"key\":\"media\",\"bucket\":\"flowcortex-media\","
+                + "\"objectKey\":\"runs/" + started.id() + "/inputs/media\"}";
         assertThat(steps).extracting(RunStep::getInput)
                 .containsExactly(expected, expected, null);
         verify(mediaJobs).resolveUpload(ownerId, uploadId);
+        verify(mediaJobs).copyRunInputs(started.id(), List.of(upload));
+        verify(mediaJobs).bindRunInputs(started.id(), List.of(new MediaAssetInput(uploadId,
+                new MediaJobInput("media", "flowcortex-media", "runs/" + started.id() + "/inputs/media"))));
     }
 
     @Test
@@ -240,7 +240,7 @@ class WorkflowRunServiceImplTest {
                         "runs/" + runId + "/inputs/image_1")),
                 new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "media",
                         "runs/" + runId + "/inputs/image_2")));
-        when(mediaJobs.bindRunInputs(any(UUID.class), eq(assets))).thenReturn(copied);
+        when(mediaJobs.copyRunInputs(any(UUID.class), eq(assets))).thenReturn(copied);
 
         RunView started = service.startRun(ownerId, workflow.getId(), null, null, uploadIds, null);
 
@@ -249,25 +249,50 @@ class WorkflowRunServiceImplTest {
                         + "/inputs/image_1\"},"
                         + "{\"key\":\"image_2\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId
                         + "/inputs/image_2\"}]");
-        verify(mediaJobs).bindRunInputs(started.id(), assets);
+        verify(mediaJobs).copyRunInputs(started.id(), assets);
+        verify(mediaJobs).bindRunInputs(started.id(), copied);
     }
 
     @Test
-    void theUploadIsLookedUpInTheObjectStoreBeforeTheRunTransactionOpens() {
+    void theUploadIsLookedUpAndCopiedBeforeTheRunTransactionOpensAndBoundOnlyOnceTheRunIsSaved() {
         WorkflowRunServiceImpl service = newService(true);
         UUID ownerId = UUID.randomUUID();
         UUID uploadId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "probe");
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveUpload(ownerId, uploadId))
-                .thenReturn(new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+        givenStoredUpload(ownerId, uploadId);
 
-        service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
 
         InOrder order = inOrder(mediaJobs, transactions, workflowRunRepository);
         order.verify(mediaJobs).resolveUpload(ownerId, uploadId);
+        order.verify(mediaJobs).copyRunInputs(eq(started.id()), any());
         order.verify(transactions).getTransaction(any());
         order.verify(workflowRunRepository).save(any());
+        order.verify(mediaJobs).bindRunInputs(eq(started.id()), any());
+    }
+
+    @Test
+    void aCopyRefusedByTheContentCheckOpensNoTransactionAndCreatesNothing() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "probe");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        when(mediaJobs.resolveUpload(ownerId, uploadId)).thenReturn(new MediaAssetInput(uploadId,
+                new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId)));
+        when(mediaJobs.copyRunInputs(any(UUID.class), any())).thenThrow(new UploadRejectedException("uploadId",
+                "This file isn't a valid video file. Accepted: .mp4, .mov, .webm, .mkv."));
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4"))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(e.field()).isEqualTo("uploadId"));
+
+        verify(transactions, never()).getTransaction(any());
+        verify(workflowRunRepository, never()).save(any());
+        verify(mediaJobs, never()).bindRunInputs(any(), any());
+        verify(runStepRepository, never()).saveAll(any());
+        verify(events, never()).publishEvent(any());
     }
 
     @Test
@@ -277,8 +302,7 @@ class WorkflowRunServiceImplTest {
         UUID uploadId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "probe");
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveUpload(ownerId, uploadId))
-                .thenReturn(new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+        givenStoredUpload(ownerId, uploadId);
 
         RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "x".repeat(296) + ".mp4");
 
@@ -296,6 +320,24 @@ class WorkflowRunServiceImplTest {
         assertThat(started.input()).isEqualTo("hello");
         assertThat(savedSteps()).singleElement().extracting(RunStep::getInput).isNull();
         verify(mediaJobs, never()).resolveUpload(any(), any());
+        verify(mediaJobs, never()).copyRunInputs(any(), any());
+        verify(mediaJobs, never()).bindRunInputs(any(), any());
+    }
+
+    /** The media module resolves the upload and, like the real one, copies each input under the run. */
+    @SuppressWarnings("unchecked")
+    private MediaAssetInput givenStoredUpload(UUID ownerId, UUID uploadId) {
+        MediaAssetInput upload = new MediaAssetInput(uploadId,
+                new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+        when(mediaJobs.resolveUpload(ownerId, uploadId)).thenReturn(upload);
+        when(mediaJobs.copyRunInputs(any(UUID.class), any())).thenAnswer(call -> {
+            UUID runId = call.getArgument(0);
+            return ((List<MediaAssetInput>) call.getArgument(1)).stream()
+                    .map(input -> new MediaAssetInput(input.assetId(), new MediaJobInput(input.input().key(),
+                            "flowcortex-media", "runs/" + runId + "/inputs/" + input.input().key())))
+                    .toList();
+        });
+        return upload;
     }
 
     @SuppressWarnings("unchecked")

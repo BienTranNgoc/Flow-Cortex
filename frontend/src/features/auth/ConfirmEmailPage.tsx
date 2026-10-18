@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { resendEmailSchema } from './registerSchema';
@@ -14,11 +14,19 @@ const LINK_INVALID_MESSAGE = 'This confirmation link is no longer valid';
 
 interface ResendConfirmationProps {
   /** The address to send to; when omitted the member types it in. */
-  email?: string;
+  email?: string | undefined;
+  /** The button and the form's name; the same request mails a set-password link when that is needed. */
+  action?: string;
+  /** Shown once sent; it never says whether the address has an account. */
+  sentMessage?: string;
 }
 
 /** "Resend confirmation email" with its sending, sent and refused states. */
-export function ResendConfirmation({ email }: ResendConfirmationProps) {
+export function ResendConfirmation({
+  email,
+  action = 'Resend confirmation email',
+  sentMessage = 'If an account needs confirming, we sent a new link',
+}: ResendConfirmationProps) {
   const resend = useResendConfirmationMutation();
   const [typedEmail, setTypedEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -39,7 +47,12 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
     : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Resend confirmation" className="auth-form">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-label={action === 'Resend confirmation email' ? 'Resend confirmation' : action}
+      className="auth-form"
+    >
       {email === undefined && (
         <div className="field">
           <label htmlFor="resend-email">Email</label>
@@ -60,11 +73,11 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
         </div>
       )}
       <button type="submit" disabled={resend.isPending}>
-        {resend.isPending ? 'Sending…' : 'Resend confirmation email'}
+        {resend.isPending ? 'Sending…' : action}
       </button>
       {resend.isSuccess && (
         <p role="status" className="auth-subtitle">
-          If an account needs confirming, we sent a new link
+          {sentMessage}
         </p>
       )}
       {refusal && (
@@ -76,7 +89,10 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
   );
 }
 
-/** Opened from the emailed link: spends `?token=` once, then lands on the home page signed in. */
+/**
+ * Opened from the emailed link: spends `?token=` once and signs the member in, then asks for a
+ * password when the account has none (confirming drops the one chosen at sign-up), else goes home.
+ */
 export function ConfirmEmailPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
@@ -86,13 +102,24 @@ export function ConfirmEmailPage() {
   // A link spends on first use, so StrictMode's second effect run must not send it again.
   const sent = useRef(false);
 
+  const spend = useCallback(
+    () =>
+      mutate(token, {
+        onSuccess: ({ passwordSetupRequired, passwordSetupToken }) =>
+          passwordSetupRequired
+            ? navigate('/set-password', { replace: true, state: { passwordSetupToken } })
+            : navigate('/', { replace: true }),
+      }),
+    [token, mutate, navigate],
+  );
+
   useEffect(() => {
     if (!token || sent.current) {
       return;
     }
     sent.current = true;
-    mutate(token, { onSuccess: () => navigate('/', { replace: true }) });
-  }, [token, mutate, navigate]);
+    spend();
+  }, [token, spend]);
 
   const linkInvalid =
     !token || (confirm.isError && problemCodeFrom(confirm.error) === CONFIRMATION_LINK_INVALID);
@@ -124,11 +151,7 @@ export function ConfirmEmailPage() {
             <p role="alert" className="form-error">
               {otherFailure}
             </p>
-            <button
-              type="button"
-              disabled={confirm.isPending}
-              onClick={() => mutate(token, { onSuccess: () => navigate('/', { replace: true }) })}
-            >
+            <button type="button" disabled={confirm.isPending} onClick={spend}>
               Try again
             </button>
           </>
