@@ -117,12 +117,18 @@ describe('RunsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
     expect(await screen.findByText('Loading runs…')).toBeInTheDocument();
-    expect(screen.getByRole('table').closest('.table-wrapper')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('table').closest('.cortex-admin-table-wrapper')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
 
     release(page([run({ id: 'run-p1' })], 45, 1));
     expect(await screen.findByText('Page 2 of 3 · 45 runs')).toBeInTheDocument();
     expect(screen.queryByText('Loading runs…')).not.toBeInTheDocument();
-    expect(screen.getByRole('table').closest('.table-wrapper')).toHaveAttribute('aria-busy', 'false');
+    expect(screen.getByRole('table').closest('.cortex-admin-table-wrapper')).toHaveAttribute(
+      'aria-busy',
+      'false',
+    );
   });
 
   it('offers the first page and keeps the pager when a later page comes back empty', async () => {

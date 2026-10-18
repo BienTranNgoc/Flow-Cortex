@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './lib/i18n';
 import { App } from './App';
 import { configureAdminClient } from './app/configureClient';
+import { initTheme } from './app/useTheme';
 
 configureAdminClient();
+initTheme();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

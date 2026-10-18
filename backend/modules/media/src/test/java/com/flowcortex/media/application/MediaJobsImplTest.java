@@ -30,6 +30,7 @@ import com.flowcortex.media.infrastructure.S3MediaStore;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
 import com.flowcortex.media.domain.MediaAsset;
+import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Duration;
 import java.time.Instant;
@@ -111,6 +112,7 @@ class MediaJobsImplTest {
         "flowcortex.media.s3.secret-key=backend-secret-value",
         "flowcortex.media.s3.api-call-timeout=5s",
         "flowcortex.media.s3.api-call-attempt-timeout=2s",
+        "flowcortex.media.s3.copy-timeout=2m",
     };
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -312,10 +314,13 @@ class MediaJobsImplTest {
             List<MediaAssetInput> uploads = List.of(
                     new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "uploads", "a")),
                     new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_2", "uploads", "b")));
+            uploads.forEach(upload -> givenRegistered(context, upload.assetId(), "image"));
+            when(store.readPrefix(eq("flowcortex-media"), anyString(), eq(16))).thenReturn(Optional.of(PNG_PREFIX));
 
-            List<MediaAssetInput> bound = tx.execute(status -> jobs.bindRunInputs(runId, uploads));
+            List<MediaAssetInput> copies = jobs.copyRunInputs(runId, uploads);
+            tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copies));
 
-            assertThat(bound).extracting(MediaAssetInput::input)
+            assertThat(copies).extracting(MediaAssetInput::input)
                     .containsExactly(
                             new MediaJobInput("image_1", "flowcortex-media",
                                     "runs/" + runId + "/inputs/image_1"),
@@ -323,9 +328,143 @@ class MediaJobsImplTest {
                                     "runs/" + runId + "/inputs/image_2"));
             org.mockito.InOrder order = org.mockito.Mockito.inOrder(store, bindings);
             order.verify(store).copy("uploads", "a", "flowcortex-media", "runs/" + runId + "/inputs/image_1");
+            order.verify(store).readPrefix("flowcortex-media", "runs/" + runId + "/inputs/image_1", 16);
             order.verify(store).copy("uploads", "b", "flowcortex-media", "runs/" + runId + "/inputs/image_2");
+            order.verify(store).readPrefix("flowcortex-media", "runs/" + runId + "/inputs/image_2", 16);
             order.verify(bindings).saveAll(any());
+            verify(store, never()).readPrefix(eq("uploads"), anyString(), anyInt());
         });
+    }
+
+    @Test
+    void theCopyAndItsContentCheckRunWithNoTransactionOpenAndRefuseToJoinOne() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID assetId = UUID.randomUUID();
+            UUID runId = UUID.randomUUID();
+            givenRegistered(context, assetId, "video");
+            List<Boolean> inTransaction = new ArrayList<>();
+            org.mockito.Mockito.doAnswer(call -> inTransaction.add(
+                    TransactionSynchronizationManager.isActualTransactionActive()))
+                    .when(store).copy(anyString(), anyString(), anyString(), anyString());
+            when(store.readPrefix(anyString(), anyString(), anyInt())).thenAnswer(call -> {
+                inTransaction.add(TransactionSynchronizationManager.isActualTransactionActive());
+                return Optional.of(MP4_PREFIX);
+            });
+            List<MediaAssetInput> upload = List.of(
+                    new MediaAssetInput(assetId, new MediaJobInput("media", "flowcortex-uploads", "o/u")));
+
+            jobs.copyRunInputs(runId, upload);
+
+            assertThat(inTransaction).containsExactly(false, false);
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.copyRunInputs(runId, upload)))
+                    .isInstanceOf(IllegalTransactionStateException.class);
+            verify(store, org.mockito.Mockito.times(1)).copy(anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void onlyACopyUnderTheRunsOwnInputsCanBeBoundAndOnlyInsideTheCallersTransaction() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID assetId = UUID.randomUUID();
+            List<MediaAssetInput> copy = List.of(new MediaAssetInput(assetId,
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media")));
+
+            assertThatThrownBy(() -> jobs.bindRunInputs(runId, copy))
+                    .isInstanceOf(IllegalTransactionStateException.class);
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, List.of(
+                    new MediaAssetInput(assetId, new MediaJobInput("media", "flowcortex-uploads", "o/u"))))))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(UUID.randomUUID(), copy)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(bindings, never()).saveAll(any());
+        });
+    }
+
+    @Test
+    void aSingleUploadIsCopiedUnderTheRunAndTheCopyIsWhatIsSniffedAndBound() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            UUID runId = UUID.randomUUID();
+            String copyKey = "runs/" + runId + "/inputs/media";
+            when(store.head("flowcortex-uploads", ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            when(store.readPrefix("flowcortex-media", copyKey, 16)).thenReturn(Optional.of(MP4_PREFIX));
+
+            MediaAssetInput upload = jobs.resolveUpload(ownerId, uploadId);
+            givenRegistered(context, uploadId, "video");
+            List<MediaAssetInput> copies = jobs.copyRunInputs(runId, List.of(upload));
+            tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copies));
+
+            assertThat(copies).extracting(MediaAssetInput::input)
+                    .containsExactly(new MediaJobInput("media", "flowcortex-media", copyKey));
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).copy("flowcortex-uploads", ownerId + "/" + uploadId, "flowcortex-media", copyKey);
+            order.verify(store).readPrefix("flowcortex-media", copyKey, 16);
+            verify(store, never()).readPrefix(eq("flowcortex-uploads"), anyString(), anyInt());
+            verify(context.getBean(MediaAssetBindingRepository.class)).saveAll(any());
+        });
+    }
+
+    @Test
+    void aCopyWhoseContentIsNotItsKindIsRefusedOnTheUploadFieldAndNothingIsBound() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID assetId = UUID.randomUUID();
+            UUID runId = UUID.randomUUID();
+            givenRegistered(context, assetId, "video");
+            when(store.readPrefix("flowcortex-media", "runs/" + runId + "/inputs/media", 16))
+                    .thenReturn(Optional.of("my meeting notes".getBytes()));
+
+            assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
+                    new MediaAssetInput(assetId, new MediaJobInput("media", "flowcortex-uploads", "o/u")))))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(english(e.detail()))
+                                .isEqualTo("This file isn't a valid video file. Accepted: .mp4, .mov, .webm, .mkv.");
+                    });
+            verify(context.getBean(MediaAssetBindingRepository.class), never()).saveAll(any());
+        });
+    }
+
+    @Test
+    void aSingleUploadGoneBeforeItsCopyIsRefusedOnTheUploadField() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID runId = UUID.randomUUID();
+            doThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again")))
+                    .when(store).copy(anyString(), anyString(), anyString(), anyString());
+
+            assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("media", "flowcortex-uploads", "o/u")))))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
+                    });
+            assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "flowcortex-uploads", "o/i")))))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.field()).isEqualTo("uploadIds"));
+        });
+    }
+
+    private static void givenRegistered(org.springframework.context.ApplicationContext context, UUID assetId,
+            String kind) {
+        when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(
+                assetId, UUID.randomUUID(), kind, "flowcortex-uploads", "o/" + assetId, kind + "/x", 16L, null,
+                Instant.now())));
     }
 
     @Test
@@ -334,13 +473,12 @@ class MediaJobsImplTest {
             MediaJobs jobs = context.getBean(MediaJobs.class);
             S3MediaStore store = context.getBean(S3MediaStore.class);
             MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
-            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
             UUID runId = UUID.randomUUID();
             doThrow(new IllegalStateException("store unreachable"))
                     .when(store).copy("uploads", "a", "flowcortex-media", "runs/" + runId + "/inputs/image_1");
 
-            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, List.of(
-                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "uploads", "a"))))))
+            assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
+                    new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "uploads", "a")))))
                     .isInstanceOf(IllegalStateException.class);
             verify(bindings, never()).saveAll(any());
         });
@@ -691,50 +829,35 @@ class MediaJobsImplTest {
     }
 
     @Test
-    void aStoredUploadResolvesToTheObjectAtTheCallersKey() {
+    void aStoredUploadResolvesToTheObjectAtTheCallersKeyWithoutReadingItsContent() {
         runner.run(context -> {
             UUID ownerId = UUID.randomUUID();
             UUID uploadId = UUID.randomUUID();
             S3MediaStore store = context.getBean(S3MediaStore.class);
             when(store.head("flowcortex-uploads", ownerId + "/" + uploadId))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
-            when(store.readPrefix("flowcortex-uploads", ownerId + "/" + uploadId, 16))
-                    .thenReturn(Optional.of(MP4_PREFIX));
 
             assertThat(context.getBean(MediaJobs.class).resolveUpload(ownerId, uploadId))
-                    .isEqualTo(new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+                    .isEqualTo(new MediaAssetInput(uploadId,
+                            new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId)));
+            verify(store, never()).readPrefix(anyString(), anyString(), anyInt());
         });
     }
 
     @Test
-    void anUploadWhoseContentIsNotItsKindIsRefusedAndNotRegistered() {
-        runner.run(context -> {
-            S3MediaStore store = context.getBean(S3MediaStore.class);
-            when(store.head(anyString(), anyString()))
-                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
-            when(store.readPrefix(anyString(), anyString(), anyInt()))
-                    .thenReturn(Optional.of("my meeting notes".getBytes()));
-
-            assertThatThrownBy(() -> context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
-                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
-                        assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(english(e.detail()))
-                                .isEqualTo("This file isn't a valid video file. Accepted: .mp4, .mov, .webm, .mkv.");
-                    });
-            verify(context.getBean(MediaAssetRepository.class), never()).save(any());
-        });
-    }
-
-    @Test
-    void withTheContentCheckOffTheFirstBytesAreNeverRead() {
+    void withTheContentCheckOffTheCopyIsMadeWithoutReadingItsFirstBytes() {
         runner.withPropertyValues("flowcortex.media.upload.content-check.enabled=false").run(context -> {
             S3MediaStore store = context.getBean(S3MediaStore.class);
-            when(store.head(anyString(), anyString()))
-                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            UUID runId = UUID.randomUUID();
 
-            assertThat(context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()).key())
-                    .isEqualTo("media");
+            List<MediaAssetInput> copies = context.getBean(MediaJobs.class).copyRunInputs(runId,
+                    List.of(new MediaAssetInput(UUID.randomUUID(),
+                            new MediaJobInput("media", "flowcortex-uploads", "o/u"))));
+
+            assertThat(copies).singleElement().extracting(input -> input.input().objectKey())
+                    .isEqualTo("runs/" + runId + "/inputs/media");
             verify(store, never()).readPrefix(anyString(), anyString(), anyInt());
+            verify(context.getBean(MediaAssetRepository.class), never()).findById(any());
         });
     }
 
@@ -745,8 +868,6 @@ class MediaJobsImplTest {
             List<UUID> uploadIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
             when(context.getBean(S3MediaStore.class).head(eq("flowcortex-uploads"), anyString()))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png", "etag")));
-            when(context.getBean(S3MediaStore.class).readPrefix(eq("flowcortex-uploads"), anyString(), eq(16)))
-                    .thenReturn(Optional.of(PNG_PREFIX));
 
             List<MediaAssetInput> inputs = context.getBean(MediaJobs.class).resolveImageUploads(ownerId, uploadIds);
 
@@ -850,7 +971,6 @@ class MediaJobsImplTest {
             when(store.head(anyString(), anyString()))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/jpeg")))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
-            when(store.readPrefix(anyString(), anyString(), eq(16))).thenReturn(Optional.of(PNG_PREFIX));
 
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {

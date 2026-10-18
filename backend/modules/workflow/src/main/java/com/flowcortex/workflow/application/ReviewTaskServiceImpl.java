@@ -204,8 +204,9 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     }
 
     /**
-     * The task a decision may act on. Refuses, in this order, an unknown task (not found), another
-     * member's run (forbidden) and a run being stopped (unprocessable), before anything is changed.
+     * The task a decision may act on. Refuses, in this order, an unknown task or another member's
+     * (the same not found, so a stranger learns nothing) and a run being stopped (unprocessable),
+     * before anything is changed.
      */
     private Decidable decidableTask(UUID taskId, UUID reviewerId) {
         ReviewTask task = reviewTaskRepository.findById(taskId)
@@ -216,7 +217,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         WorkflowRun run = workflowRunRepository.findById(task.getRunId())
                 .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
         if (!run.getOwnerId().equals(reviewerId)) {
-            throw new ReviewDecisionForbiddenException(new LocalizedMessage("reviewTask.notYourRun"));
+            throw new NotFoundException(TASK_NOT_FOUND);
         }
         if (run.getStatus() == RunStatus.CANCELLING || run.getStatus() == RunStatus.CANCELLED) {
             throw new UnprocessableEntityException(RUN_STOPPING_DETAIL, RUN_STOPPING);

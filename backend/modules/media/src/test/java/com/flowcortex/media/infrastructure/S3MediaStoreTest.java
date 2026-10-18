@@ -38,6 +38,11 @@ class S3MediaStoreTest {
 
     private static MediaProperties properties(String endpoint, Duration apiCallTimeout,
             Duration apiCallAttemptTimeout) {
+        return properties(endpoint, apiCallTimeout, apiCallAttemptTimeout, Duration.ofMinutes(2));
+    }
+
+    private static MediaProperties properties(String endpoint, Duration apiCallTimeout,
+            Duration apiCallAttemptTimeout, Duration copyTimeout) {
         return new MediaProperties(true, Duration.ofMinutes(30),
                 Map.of(
                         "probe", Duration.ofMinutes(5),
@@ -53,7 +58,7 @@ class S3MediaStoreTest {
                         Duration.ofMinutes(15), new MediaProperties.Upload.ContentCheck(true)),
                 new MediaProperties.S3(endpoint, "http://localhost:9000", "us-east-1", true,
                         "flowcortex-uploads", "flowcortex-media", "backend-key", "backend-secret-value",
-                        apiCallTimeout, apiCallAttemptTimeout));
+                        apiCallTimeout, apiCallAttemptTimeout, copyTimeout));
     }
 
     @AfterEach
@@ -78,8 +83,19 @@ class S3MediaStoreTest {
     /** A one-route stand-in for the store: answers every request with {@code status} and {@code body}. */
     private static HttpServer fakeStore(int status, String body, Map<String, String> requestHeaders)
             throws IOException {
+        return fakeStore(status, body, requestHeaders, Duration.ZERO);
+    }
+
+    /** As above, answering each request only after {@code delay}. */
+    private static HttpServer fakeStore(int status, String body, Map<String, String> requestHeaders, Duration delay)
+            throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", exchange -> {
+            try {
+                Thread.sleep(delay.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             exchange.getRequestHeaders().forEach((name, values) ->
                     requestHeaders.put(name.toLowerCase(java.util.Locale.ROOT), String.join(",", values)));
             exchange.getRequestBody().readAllBytes();
@@ -138,6 +154,32 @@ class S3MediaStoreTest {
                     .isNotInstanceOf(UploadRejectedException.class);
         } finally {
             denied.stop(0);
+        }
+    }
+
+    @Test
+    void aRunInputCopyOutlivesTheApiCallTimeoutsUpToItsOwnCopyTimeoutWhileOtherCallsDoNot() throws IOException {
+        HttpServer slow = fakeStore(200, "<CopyObjectResult><ETag>\"etag\"</ETag>"
+                + "<LastModified>2026-10-14T10:00:00.000Z</LastModified></CopyObjectResult>",
+                new ConcurrentHashMap<>(), Duration.ofMillis(700));
+        try (S3MediaStore local = new S3MediaStore(properties("http://127.0.0.1:" + slow.getAddress().getPort(),
+                Duration.ofMillis(400), Duration.ofMillis(200), Duration.ofSeconds(5)))) {
+            local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media", "runs/r/inputs/media");
+
+            assertThatThrownBy(() -> local.headBucket("flowcortex-media"))
+                    .isInstanceOfAny(ApiCallTimeoutException.class, ApiCallAttemptTimeoutException.class);
+        } finally {
+            slow.stop(0);
+        }
+
+        HttpServer slower = fakeStore(200, "<CopyObjectResult/>", new ConcurrentHashMap<>(), Duration.ofSeconds(2));
+        try (S3MediaStore local = new S3MediaStore(properties("http://127.0.0.1:" + slower.getAddress().getPort(),
+                Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofMillis(500)))) {
+            assertThatThrownBy(() -> local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media",
+                    "runs/r/inputs/media"))
+                    .isInstanceOfAny(ApiCallTimeoutException.class, ApiCallAttemptTimeoutException.class);
+        } finally {
+            slower.stop(0);
         }
     }
 

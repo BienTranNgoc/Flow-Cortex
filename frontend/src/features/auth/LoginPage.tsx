@@ -30,6 +30,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const loginMutation = useLoginMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const {
     register,
     handleSubmit,
@@ -78,7 +79,7 @@ export function LoginPage() {
     <div className="auth-page">
       <BrandPanel />
 
-      <section className="auth-card">
+      <section className="auth-card auth-card--surface">
         <h1 className="auth-card__title">{t('auth.login.title')}</h1>
         <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
 
@@ -88,10 +89,6 @@ export function LoginPage() {
             label={t('auth.login.google')}
             href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
           />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>{t('auth.login.divider')}</span>
         </div>
 
         <form
@@ -113,13 +110,52 @@ export function LoginPage() {
           </div>
           <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
             <label htmlFor="login-password">{t('auth.login.passwordLabel')}</label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              aria-invalid={errors.password ? 'true' : 'false'}
-              {...register('password')}
-            />
+            <div className="field__password">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                aria-invalid={errors.password ? 'true' : 'false'}
+                className="field__password-input"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                className="field__password-toggle"
+                aria-label={
+                  showPassword ? t('auth.login.hidePassword') : t('auth.login.showPassword')
+                }
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                <svg
+                  className="field__password-icon"
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {showPassword ? (
+                    <>
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-6.5 0-10-7-10-7a18.45 18.45 0 0 1 4.22-5.19" />
+                      <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19" />
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                      <line x1="2" y1="2" x2="22" y2="22" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            </div>
             {errors.password?.message && <p role="alert">{t(errors.password.message)}</p>}
           </div>
           <div className="login-meta-row">
@@ -127,10 +163,17 @@ export function LoginPage() {
               <input id="login-remember" type="checkbox" {...register('rememberMe')} />
               <span>{t('auth.login.rememberMe')}</span>
             </label>
-            {passwordResetEnabled() && (
+            {passwordResetEnabled() ? (
               <Link to="/forgot-password" className="forgot-password-link">
                 {t('auth.login.forgotPassword')}
               </Link>
+            ) : (
+              <span
+                className="forgot-password-link forgot-password-link--disabled"
+                title={t('auth.login.forgotPasswordDisabled')}
+              >
+                {t('auth.login.forgotPassword')}
+              </span>
             )}
           </div>
           {serverError && (
@@ -152,6 +195,10 @@ export function LoginPage() {
           <ResendConfirmation email={loginMutation.variables.email} />
         )}
 
+        <p className="auth-footer">
+          {t('auth.login.noPassword')}{' '}
+          <Link to="/set-password">{t('auth.login.emailMeLink')}</Link>
+        </p>
         <p className="auth-footer">
           {t('auth.login.newHere')} <Link to="/register">{t('auth.login.createAccount')}</Link>
         </p>

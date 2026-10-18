@@ -1,5 +1,7 @@
 {
   "title": "SMS outbox",
+  "eyebrow": "Administration",
+  "description": "One-time codes the development SMS sender stored instead of sending.",
   "loading": "Loading SMS messages…",
   "loadError": "Could not load SMS messages.",
   "empty": "No SMS messages yet.",

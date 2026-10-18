@@ -4,10 +4,12 @@ import { initReactI18next } from 'react-i18next';
 import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
 import enCredits from '../locales/en/credits.json';
+import enDashboard from '../locales/en/dashboard.json';
 import enWorkflow from '../locales/en/workflow.json';
 import viAuth from '../locales/vi/auth.json';
 import viCommon from '../locales/vi/common.json';
 import viCredits from '../locales/vi/credits.json';
+import viDashboard from '../locales/vi/dashboard.json';
 import viWorkflow from '../locales/vi/workflow.json';
 
 export const SUPPORTED_LOCALES = ['vi', 'en'] as const;
@@ -45,10 +47,22 @@ void i18n
   .init({
     resources: {
       vi: {
-        translation: { common: viCommon, auth: viAuth, workflow: viWorkflow, credits: viCredits },
+        translation: {
+          common: viCommon,
+          auth: viAuth,
+          workflow: viWorkflow,
+          credits: viCredits,
+          dashboard: viDashboard,
+        },
       },
       en: {
-        translation: { common: enCommon, auth: enAuth, workflow: enWorkflow, credits: enCredits },
+        translation: {
+          common: enCommon,
+          auth: enAuth,
+          workflow: enWorkflow,
+          credits: enCredits,
+          dashboard: enDashboard,
+        },
       },
     },
     supportedLngs: SUPPORTED_LOCALES,

@@ -28,6 +28,7 @@
   "create": {
     "form": "Thêm người dùng",
     "title": "Tạo người dùng",
+    "hint": "Đặt mật khẩu và vai trò ban đầu. Người dùng có thể đổi cả hai sau này.",
     "email": "Email",
     "password": "Mật khẩu",
     "name": "Tên",
@@ -38,7 +39,7 @@
   "directory": {
     "label": "Danh sách người dùng",
     "title": "Tất cả người dùng",
-    "count": "{{visible}} trên {{total}} tài khoản",
+    "count": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
     "refresh": "Làm mới",
     "refreshing": "Đang làm mới…",
     "search": "Tìm kiếm",
@@ -50,8 +51,10 @@
     "loading": "Đang tải người dùng…",
     "loadError": "Không tải được danh sách người dùng.",
     "retry": "Thử lại",
-    "empty": "Chưa có người dùng nào — hãy thêm ở phía trên.",
-    "noMatch": "Không có người dùng nào khớp với bộ lọc này."
+    "empty": "Chưa có người dùng nào.",
+    "emptyHint": "Hãy thêm quản trị viên hoặc thành viên đầu tiên ở phía trên.",
+    "noMatch": "Không có người dùng nào khớp với bộ lọc này.",
+    "clearFilters": "Xóa bộ lọc"
   },
   "columns": {
     "name": "Tên",
@@ -81,10 +84,11 @@
     "loading": "Đang tải người dùng…",
     "loadError": "Không tải được người dùng này.",
     "retry": "Thử lại",
-    "allUsers": "← Tất cả người dùng",
+    "allUsers": "Tất cả người dùng",
     "eyebrow": "Tài khoản người dùng",
+    "userFallback": "Người dùng",
     "accountInfo": "Thông tin tài khoản",
-    "accountInfoHint": "Thông tin định danh và quyền truy cập",
+    "accountInfoHint": "Thông tin định danh và quyền truy cập.",
     "userId": "ID người dùng",
     "email": "Email",
     "role": "Vai trò",

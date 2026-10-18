@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
@@ -15,11 +15,15 @@ const EMAIL_INVALID_KEY = 'auth.validation.emailInvalid';
 
 interface ResendConfirmationProps {
   /** The address to send to; when omitted the member types it in. */
-  email?: string;
+  email?: string | undefined;
+  /** Translated button and form name; the same request mails a set-password link when needed. */
+  action?: string;
+  /** Translated, shown once sent; it never says whether the address has an account. */
+  sentMessage?: string;
 }
 
 /** "Resend confirmation email" with its sending, sent and refused states. */
-export function ResendConfirmation({ email }: ResendConfirmationProps) {
+export function ResendConfirmation({ email, action, sentMessage }: ResendConfirmationProps) {
   const { t } = useTranslation();
   const resend = useResendConfirmationMutation();
   const [typedEmail, setTypedEmail] = useState('');
@@ -42,7 +46,7 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
     <form
       onSubmit={onSubmit}
       noValidate
-      aria-label={t('auth.confirm.resend.formLabel')}
+      aria-label={action ?? t('auth.confirm.resend.formLabel')}
       className="auth-form"
     >
       {email === undefined && (
@@ -65,11 +69,13 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
         </div>
       )}
       <button type="submit" disabled={resend.isPending}>
-        {resend.isPending ? t('auth.confirm.resend.sending') : t('auth.confirm.resend.submit')}
+        {resend.isPending
+          ? t('auth.confirm.resend.sending')
+          : (action ?? t('auth.confirm.resend.submit'))}
       </button>
       {resend.isSuccess && (
         <p role="status" className="auth-subtitle">
-          {t('auth.confirm.resend.sent')}
+          {sentMessage ?? t('auth.confirm.resend.sent')}
         </p>
       )}
       {refusal && (
@@ -81,7 +87,10 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
   );
 }
 
-/** Opened from the emailed link: spends `?token=` once, then lands on the home page signed in. */
+/**
+ * Opened from the emailed link: spends `?token=` once and signs the member in, then asks for a
+ * password when the account has none (confirming drops the one chosen at sign-up), else goes home.
+ */
 export function ConfirmEmailPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -92,13 +101,24 @@ export function ConfirmEmailPage() {
   // A link spends on first use, so StrictMode's second effect run must not send it again.
   const sent = useRef(false);
 
+  const spend = useCallback(
+    () =>
+      mutate(token, {
+        onSuccess: ({ passwordSetupRequired, passwordSetupToken }) =>
+          passwordSetupRequired
+            ? navigate('/set-password', { replace: true, state: { passwordSetupToken } })
+            : navigate('/', { replace: true }),
+      }),
+    [token, mutate, navigate],
+  );
+
   useEffect(() => {
     if (!token || sent.current) {
       return;
     }
     sent.current = true;
-    mutate(token, { onSuccess: () => navigate('/', { replace: true }) });
-  }, [token, mutate, navigate]);
+    spend();
+  }, [token, spend]);
 
   const linkInvalid =
     !token || (confirm.isError && problemCodeFrom(confirm.error) === CONFIRMATION_LINK_INVALID);
@@ -127,11 +147,7 @@ export function ConfirmEmailPage() {
             <p role="alert" className="form-error">
               {otherFailure}
             </p>
-            <button
-              type="button"
-              disabled={confirm.isPending}
-              onClick={() => mutate(token, { onSuccess: () => navigate('/', { replace: true }) })}
-            >
+            <button type="button" disabled={confirm.isPending} onClick={spend}>
               {t('auth.confirm.tryAgain')}
             </button>
           </>

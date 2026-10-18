@@ -1,0 +1,68 @@
+.dashboard-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 0.75rem 0 2.4rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--input-bg) 80%, transparent);
+  transition: border-color var(--dur-quick) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard);
+}
+
+.dashboard-search:focus-within {
+  border-color: color-mix(in srgb, var(--teal-glow) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal-glow) 18%, transparent);
+}
+
+.dashboard-search__icon {
+  position: absolute;
+  left: 0.85rem;
+  display: inline-flex;
+  color: var(--ink-4);
+  pointer-events: none;
+}
+
+.dashboard-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.92rem;
+  padding: 0.45rem 0;
+  outline: none;
+  appearance: none;
+}
+
+.dashboard-search__input::placeholder {
+  color: var(--ink-4);
+}
+
+.dashboard-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.dashboard-search__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-5) 25%, transparent);
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+
+.dashboard-search__clear:hover {
+  background: color-mix(in srgb, var(--teal-glow) 25%, transparent);
+  color: var(--ink);
+}

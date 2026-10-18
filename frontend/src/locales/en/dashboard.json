@@ -1,0 +1,55 @@
+{
+  "status": {
+    "ready": "Ready",
+    "reviewRequired": "Review required",
+    "failureDemo": "Demo: failure"
+  },
+  "description": {
+    "echo": "Try a simple two-step pipeline that just echoes your input back. Great for learning how runs work.",
+    "failure": "Run a workflow that fails on purpose so you can see how errors look and get reported.",
+    "repurpose": "Take a long video and turn it into a short clip sized for social feeds.",
+    "productVideo": "Generate a product video end-to-end: script, voice, and final render.",
+    "probe": "Upload a media file and get a quick technical report (length, size, codecs).",
+    "extractAudio": "Pull the audio track out of a video and save it as a separate file.",
+    "default": "Run this pipeline with your own input and download the result when it finishes."
+  },
+  "card": {
+    "open": "Open {{name}}",
+    "openUnnamed": "Open workflow",
+    "untitled": "Untitled workflow",
+    "sharedWithAll": "Shared with every member",
+    "stepFallback": "Step {{order}}",
+    "etaSeconds": "~{{value}}s",
+    "etaMinutes": "~{{value}}m",
+    "steps": "{{n}} steps",
+    "launch": "Launch"
+  },
+  "thumb": {
+    "empty": "No steps configured.",
+    "label": "Workflow steps"
+  },
+  "filter": {
+    "legend": "Filter workflows by category",
+    "all": "All",
+    "video": "Video",
+    "audio": "Audio",
+    "demo": "Demos",
+    "production": "Production",
+    "count": "{{n}} workflows"
+  },
+  "search": {
+    "label": "Search workflows",
+    "placeholder": "Search workflows…",
+    "clear": "Clear search"
+  },
+  "icon": {
+    "video": "Video",
+    "tiktok": "Social video",
+    "terminal": "Terminal",
+    "alert": "Warning",
+    "cart": "Cart",
+    "audio": "Audio",
+    "image": "Image",
+    "spark": "Spark"
+  }
+}

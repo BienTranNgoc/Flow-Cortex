@@ -28,6 +28,7 @@
   "create": {
     "form": "Add user",
     "title": "Create user",
+    "hint": "Sets the initial password and role. The user can change both later.",
     "email": "Email",
     "password": "Password",
     "name": "Name",
@@ -38,7 +39,7 @@
   "directory": {
     "label": "User directory",
     "title": "All users",
-    "count": "{{visible}} of {{total}} accounts",
+    "count": "Showing {{visible}} of {{total}} accounts",
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "search": "Search",
@@ -50,8 +51,10 @@
     "loading": "Loading users…",
     "loadError": "Could not load users.",
     "retry": "Retry",
-    "empty": "No users yet — add one above.",
-    "noMatch": "No users match these filters."
+    "empty": "No users yet.",
+    "emptyHint": "Add the first admin or member above.",
+    "noMatch": "No users match these filters.",
+    "clearFilters": "Clear filters"
   },
   "columns": {
     "name": "Name",
@@ -81,10 +84,11 @@
     "loading": "Loading user…",
     "loadError": "Could not load this user.",
     "retry": "Retry",
-    "allUsers": "← All users",
+    "allUsers": "All users",
     "eyebrow": "User account",
+    "userFallback": "User",
     "accountInfo": "Account information",
-    "accountInfoHint": "Identity and access details",
+    "accountInfoHint": "Identity and access details.",
     "userId": "User ID",
     "email": "Email",
     "role": "Role",

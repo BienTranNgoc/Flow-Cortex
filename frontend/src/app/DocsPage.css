@@ -1,0 +1,104 @@
+.docs-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.75rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.docs-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.docs-page__header h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.docs-page__subtitle {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.95rem;
+  max-width: 60ch;
+}
+
+.docs-page__nav {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--card-edge);
+  padding-bottom: 0.4rem;
+}
+
+.docs-page__nav-link {
+  padding: 0.4rem 0.85rem;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.docs-page__nav-link.is-active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  font-weight: 600;
+}
+
+.docs-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-2) 60%, transparent);
+}
+
+.docs-page__section h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.docs-page__section h3 {
+  margin: 0.4rem 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--ink-2);
+}
+
+.docs-page__section code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--input-bg) 60%, transparent);
+  padding: 0.08rem 0.3rem;
+  border-radius: 4px;
+  color: var(--teal-bright);
+}
+
+.docs-page__snippet {
+  margin: 0.2rem 0;
+  padding: 0.85rem 1rem;
+  background: var(--paper-1);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+}
+
+.docs-page__snippet code {
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.82rem;
+  padding: 0;
+}
+
+.docs-page__hint {
+  margin: 0.4rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}

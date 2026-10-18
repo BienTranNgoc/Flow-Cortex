@@ -1,34 +1,12 @@
-import { type WorkflowResponse, type WorkflowStepResponseMode } from '@flow-cortex/api-client';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import { FilterBar } from '../features/dashboard/FilterBar';
+import { SearchBar } from '../features/dashboard/SearchBar';
+import { useDashboardWorkflows } from '../features/dashboard/useDashboardWorkflows';
+import { WorkflowCard } from '../features/dashboard/WorkflowCard';
 import './HomePage.css';
-
-type StageTone = 'blue' | 'cyan' | 'violet' | 'amber' | 'green' | 'rose';
-type IconTone = 'blue' | 'cyan' | 'amber';
-
-const TONE_BY_MODE: Record<WorkflowStepResponseMode, IconTone> = {
-  inline: 'blue',
-  remote: 'cyan',
-};
-const DEFAULT_TONE: IconTone = 'amber';
-const WORKFLOWS_PATH = '/workflows';
-
-const STAGE_TONE_CYCLE: readonly StageTone[] = ['blue', 'cyan', 'violet', 'amber', 'green', 'rose'];
-
-function firstStepMode(workflow: WorkflowResponse): WorkflowStepResponseMode | undefined {
-  const first = workflow.steps?.[0];
-  return first?.mode;
-}
-
-function iconFor(workflow: WorkflowResponse): string {
-  return (workflow.name ?? workflow.id ?? '?').slice(0, 2).toUpperCase();
-}
-
-function stageToneAt(index: number): StageTone {
-  return STAGE_TONE_CYCLE[index % STAGE_TONE_CYCLE.length] as StageTone;
-}
 
 const STAGES = [
   { order: 1, title: 'common.home.stages.source.title', body: 'common.home.stages.source.body' },
@@ -41,7 +19,12 @@ export function HomePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
-  if (meQuery.isLoading) return <output>{t('common.home.loading')}</output>;
+  const workflows = workflowsQuery.data ?? [];
+  const dashboard = useDashboardWorkflows(workflows);
+  const { filtered, counts, query, setQuery, category, setCategory, reset } = dashboard;
+  const hasWorkflows = workflows.length > 0;
+
+  if (meQuery.isLoading) return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   if (meQuery.isError) {
     return (
       <main className="launchpad">
@@ -55,25 +38,61 @@ export function HomePage() {
     );
   }
   if (!meQuery.data) {
-    return <output>{t('common.home.loading')}</output>;
+    return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   }
-
-  const workflows = workflowsQuery.data ?? [];
 
   return (
     <main className="launchpad">
-      <section className="launchpad-hero">
-        <p className="eyebrow">{t('common.home.eyebrow')}</p>
-        <h1>
-          <Trans i18nKey="common.home.headline" components={{ highlight: <span /> }} />
+      <section className="launchpad-hero" aria-labelledby="launchpad-hero-title">
+        <div className="launchpad-hero__glow" aria-hidden="true">
+          <span className="launchpad-hero__glow-a" />
+          <span className="launchpad-hero__glow-b" />
+        </div>
+        <div className="launchpad-hero__badge">
+          <span className="launchpad-hero__pulse" aria-hidden="true" />
+          <span className="launchpad-hero__bolt" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+              <path d="M13 2L4 14h6l-1 8 9-12h-6z" />
+            </svg>
+          </span>
+          <span>{t('common.home.eyebrow')}</span>
+        </div>
+        <h1 id="launchpad-hero-title" className="launchpad-hero__title">
+          <Trans
+            i18nKey="common.home.headline"
+            components={{
+              strong: <span className="launchpad-hero__title-strong" />,
+              accent: <span className="launchpad-hero__title-accent" />,
+            }}
+          />
         </h1>
-        <p>{t('common.home.lede')}</p>
+        <p className="launchpad-hero__lede">{t('common.home.lede')}</p>
       </section>
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
-        <h2 id="launchpad-cards-title" className="launchpad-section-title">
-          {t('common.home.pickTitle')}
-        </h2>
+        <header className="launchpad-cards__head">
+          <h2 id="launchpad-cards-title" className="launchpad-section-title">
+            {t('common.home.pickTitle')}
+          </h2>
+          {hasWorkflows && (
+            <Link to="/workflows" className="launchpad-cards__see-all">
+              {t('common.home.viewAll')}
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </Link>
+          )}
+        </header>
+
+        {hasWorkflows && (
+          <div className="launchpad-cards__controls">
+            <div className="launchpad-cards__search">
+              <SearchBar value={query} onChange={setQuery} />
+            </div>
+            <FilterBar value={category} onChange={setCategory} counts={counts} />
+          </div>
+        )}
+
         {workflowsQuery.isLoading && <output>{t('common.home.loadingWorkflows')}</output>}
         {workflowsQuery.isError && (
           <p role="alert" className="form-error">
@@ -83,48 +102,23 @@ export function HomePage() {
             </button>
           </p>
         )}
-        {!workflowsQuery.isLoading && !workflowsQuery.isError && workflows.length === 0 && (
+        {hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && filtered.length === 0 && (
+          <div className="launchpad-cards__empty">
+            <p role="status">{t('common.home.noMatch')}</p>
+            <button type="button" onClick={reset}>
+              {t('common.home.clearFilters')}
+            </button>
+          </div>
+        )}
+        {!hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && (
           <p>{t('common.home.empty')}</p>
         )}
-        {workflows.length > 0 && (
+
+        {filtered.length > 0 && (
           <div className="workflow-grid">
-            {workflows.map((workflow) => {
-              const mode = firstStepMode(workflow);
-              const iconTone: IconTone = mode ? TONE_BY_MODE[mode] : DEFAULT_TONE;
-              const linkTo = workflow.id ? `${WORKFLOWS_PATH}/${workflow.id}` : WORKFLOWS_PATH;
-              return (
-                <article key={workflow.id ?? workflow.name} className="workflow-card-tile">
-                  <header className="workflow-card-header">
-                    <span className={`workflow-card-icon tone-${iconTone}`} aria-hidden="true">
-                      {iconFor(workflow)}
-                    </span>
-                    <h3 className="workflow-card-title">
-                      {workflow.name ?? t('common.home.untitled')}
-                    </h3>
-                  </header>
-
-                  {workflow.steps && workflow.steps.length > 0 && (
-                    <ul className="workflow-card-stages">
-                      {workflow.steps.map((step, index) => (
-                        <li
-                          key={step.id ?? `${index}-${step.name}`}
-                          className={`workflow-card-stage tone-${stageToneAt(index)}`}
-                        >
-                          {step.name ??
-                            t('common.home.stepFallback', { order: step.stepOrder ?? index + 1 })}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <footer className="workflow-card-footer">
-                    <Link className="workflow-card-launch" to={linkTo}>
-                      {t('common.home.launch')}
-                    </Link>
-                  </footer>
-                </article>
-              );
-            })}
+            {filtered.map((workflow) => (
+              <WorkflowCard key={workflow.id ?? workflow.name} workflow={workflow} />
+            ))}
           </div>
         )}
       </section>
@@ -147,7 +141,7 @@ export function HomePage() {
       <section className="launchpad-footer">
         <p>
           {t('common.home.welcome', { name: meQuery.data.name })} ·{' '}
-          <Link to="/workflows">{t('common.home.viewAll')}</Link>
+          <Link to="/profile">{t('common.home.manageProfile')}</Link>
         </p>
       </section>
     </main>

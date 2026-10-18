@@ -119,7 +119,7 @@ class ApprovalCheckpointIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
-    void anotherMembersDecisionIsForbiddenAndTheirRunStaysHidden() {
+    void anotherMembersDecisionIsNotFoundAndTheirRunStaysHidden() {
         UserView owner = newUser("task-owner");
         UserView stranger = newUser("task-stranger");
         String ownerToken = loginAs(owner);
@@ -132,8 +132,8 @@ class ApprovalCheckpointIT extends AbstractWorkflowHttpIT {
         for (String decision : new String[] {"approve", "reject"}) {
             ResponseEntity<ProblemView> refused = post("/api/v1/review-tasks/" + task.id() + "/" + decision,
                     strangerToken, null, ProblemView.class);
-            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-            assertThat(refused.getBody().detail()).isEqualTo("You can't decide on this run");
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(refused.getBody().detail()).isEqualTo("Review task not found");
         }
         assertThat(singlePendingTask(ownerToken, runId).status()).isEqualTo("pending");
         assertThat(workflowRunService.getRun(owner.id(), runId).status()).isEqualTo("waiting_approval");

@@ -47,7 +47,7 @@ export function MediaJobsPage() {
         onPageChange={setPage}
       >
         {(jobs) => (
-          <table className="admin-table">
+          <table className="cortex-admin-table">
             <thead>
               <tr>
                 <th scope="col">{columns.jobId}</th>
@@ -71,18 +71,22 @@ export function MediaJobsPage() {
                 return (
                   <tr key={job.jobId}>
                     <td data-label={columns.jobId}>
-                      <code className="job-id">{job.jobId}</code>
+                      <code className="cortex-admin-table-job-id">{job.jobId}</code>
                     </td>
                     <td data-label={columns.run}>
-                      <code className="job-id">{job.runId}</code>
+                      <code className="cortex-admin-table-job-id">{job.runId}</code>
                     </td>
                     <td data-label={columns.step}>{job.stepOrder}</td>
                     <td data-label={columns.capability}>{job.capability}</td>
                     <td data-label={columns.status}>{jobStatusLabel(t, job.status)}</td>
                     <td data-label={columns.detail} data-testid="job-detail">
-                      {detail.marker ? <strong className="job-marker">{detailText}</strong> : <span>{detailText}</span>}
+                      {detail.marker ? (
+                        <strong className="cortex-admin-table-job-marker">{detailText}</strong>
+                      ) : (
+                        <span>{detailText}</span>
+                      )}
                       {'message' in detail && detail.message && (
-                        <span className="job-message">{detail.message}</span>
+                        <span className="cortex-admin-table-job-message">{detail.message}</span>
                       )}
                     </td>
                     <td data-label={columns.attempt} data-testid="job-attempt">

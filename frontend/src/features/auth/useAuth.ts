@@ -5,13 +5,20 @@ import {
   confirmEmail as confirmEmailRequest,
   login as loginRequest,
   me as meRequest,
+  openPasswordLink as openPasswordLinkRequest,
   register as registerRequest,
   resendConfirmation as resendConfirmationRequest,
+  setPassword as setPasswordRequest,
   setToken,
   unwrap,
   useAuthToken,
 } from '@flow-cortex/api-client';
-import type { LoginRequest, RegisterRequest } from '@flow-cortex/api-client';
+import type {
+  ConfirmEmailResponse,
+  LoginRequest,
+  RegisterRequest,
+  SetPasswordRequest,
+} from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 import { formatDateTime } from '../../lib/format';
 import type { Locale } from '../../lib/i18n';
@@ -64,11 +71,54 @@ export function useRegisterMutation() {
   });
 }
 
-/** Spends an emailed confirmation link; the server signs the member in for this browser session only. */
+/** What an opened emailed link leads to: a password to set, with the one-time token it needs. */
+export interface OpenedLink {
+  passwordSetupRequired: boolean;
+  passwordSetupToken: string | null;
+}
+
+/**
+ * Spends an emailed confirmation link; the server signs the member in for this browser session only.
+ * Confirming drops the password chosen at sign-up, so the result usually asks for a new one.
+ */
 export function useConfirmEmailMutation() {
+  return useLinkMutation((token) => unwrap(confirmEmailRequest({ token })));
+}
+
+/** Spends an emailed set-password link; like confirming, it signs in and hands out a setup token. */
+export function useOpenPasswordLinkMutation() {
+  return useLinkMutation((token) => unwrap(openPasswordLinkRequest({ token })));
+}
+
+function useLinkMutation(spend: (token: string) => Promise<object>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (token: string) => unwrap(confirmEmailRequest({ token })),
+    mutationFn: async (token: string): Promise<OpenedLink> => {
+      const data = await spend(token);
+      const opened = 'accessToken' in data ? (data as ConfirmEmailResponse) : null;
+      setToken(opened?.accessToken ?? null, false);
+      return {
+        passwordSetupRequired: opened?.passwordSetupRequired ?? false,
+        passwordSetupToken: opened?.passwordSetupToken ?? null,
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export type SetPasswordVariables = Omit<SetPasswordRequest, 'username'> & { username?: string };
+
+/**
+ * The signed-in account's first password, with the names and username chosen alongside it. The server
+ * answers 409 once it has one, 422 when the setup token is spent or expired; on success it ends every
+ * other session and this one continues on the token it returns.
+ */
+export function useSetPasswordMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetPasswordVariables) => unwrap(setPasswordRequest(input, authHeaders())),
     onSuccess: (data) => {
       setToken('accessToken' in data ? (data.accessToken ?? null) : null, false);
       queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -85,6 +135,8 @@ export function useResendConfirmationMutation() {
 
 export const EMAIL_NOT_CONFIRMED = 'EMAIL_NOT_CONFIRMED';
 export const CONFIRMATION_LINK_INVALID = 'CONFIRMATION_LINK_INVALID';
+export const PASSWORD_LINK_INVALID = 'PASSWORD_LINK_INVALID';
+export const PASSWORD_SETUP_TOKEN_INVALID = 'PASSWORD_SETUP_TOKEN_INVALID';
 
 /** The problem's `code` extension member, when the error is an API refusal that carries one. */
 export function problemCodeFrom(error: unknown): unknown {

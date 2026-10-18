@@ -47,9 +47,11 @@ public class S3MediaStore implements AutoCloseable {
 
     private final S3Client client;
     private final S3Presigner presigner;
+    private final Duration copyTimeout;
 
     public S3MediaStore(MediaProperties properties) {
         MediaProperties.S3 s3 = properties.s3();
+        this.copyTimeout = s3.copyTimeout();
         Region region = Region.of(s3.region());
         AwsCredentialsProvider credentials = credentials(s3);
         S3Configuration addressing = S3Configuration.builder().pathStyleAccessEnabled(s3.pathStyle()).build();
@@ -127,7 +129,8 @@ public class S3MediaStore implements AutoCloseable {
 
     /**
      * A server-side copy of an upload into a run's inputs; nothing streams through this process. The
-     * copy carries only {@value #RUN_INPUT_TAG}, which the media bucket's lifecycle rule expires by.
+     * copy carries only {@value #RUN_INPUT_TAG}, which the media bucket's lifecycle rule expires by. Bounded
+     * by the copy timeout rather than the client's API-call timeouts: its duration grows with the object.
      * @throws UploadRejectedException on field {@code uploadIds} if the upload is gone
      */
     public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
@@ -136,7 +139,10 @@ public class S3MediaStore implements AutoCloseable {
                     .sourceBucket(sourceBucket).sourceKey(sourceKey)
                     .destinationBucket(targetBucket).destinationKey(targetKey)
                     .tagging(RUN_INPUT_TAG)
-                    .taggingDirective(TaggingDirective.REPLACE));
+                    .taggingDirective(TaggingDirective.REPLACE)
+                    .overrideConfiguration(timeouts -> timeouts
+                            .apiCallTimeout(copyTimeout)
+                            .apiCallAttemptTimeout(copyTimeout)));
         } catch (NoSuchKeyException e) {
             LOG.info("Upload refused at run start: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));

@@ -40,6 +40,21 @@ services:
   backend:
     environment:
       S3_PUBLIC_ENDPOINT: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
+      # Confirmation links open the public member app, not the base file's localhost default.
+      FLOWCORTEX_APP_PUBLIC_URL: https://app.${DOMAIN:?Set DOMAIN (see .env.example)}
+      # Email confirmation is on, so its mail needs a real relay; the base file's Mailpit sink
+      # (port 1025, no login) would swallow every confirmation and set-password link.
+      # The relay takes a login, sent only once STARTTLS has encrypted the session.
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:?Set SPRING_MAIL_HOST to a real SMTP relay (see .env.example)}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:?Set SPRING_MAIL_PORT to the relay's STARTTLS port, usually 587 (see .env.example)}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:?Set SPRING_MAIL_USERNAME to the relay login (see .env.example)}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:?Set SPRING_MAIL_PASSWORD to the relay password (see .env.example)}
+      SPRING_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_SMTP_STARTTLS: "true"
+      # Off until a real SMS sender exists: the dev `outbox` sender keeps codes in a DB table.
+      FLOWCORTEX_SMS_SENDER: ""
+      FLOWCORTEX_PHONE_VERIFICATION_ENABLED: "false"
+      FLOWCORTEX_PHONE_HASH_SECRET: ""
 
   # Seedance and Wan read the product photo through a presigned URL on this host.
   provider-video-worker:

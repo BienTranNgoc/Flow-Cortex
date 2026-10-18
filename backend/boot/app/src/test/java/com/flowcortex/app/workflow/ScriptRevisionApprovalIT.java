@@ -203,7 +203,7 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
                         .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(post("/api/v1/review-tasks/" + task.id() + "/approve", strangerToken,
                 new ApproveScriptView(task.currentRevisionId(), task.version()), String.class).getStatusCode())
-                        .isEqualTo(HttpStatus.FORBIDDEN);
+                        .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(singlePendingTask(run).approvedRevisionId()).isNull();
     }
 

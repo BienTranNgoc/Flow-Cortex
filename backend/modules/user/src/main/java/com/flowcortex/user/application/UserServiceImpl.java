@@ -3,7 +3,7 @@ package com.flowcortex.user.application;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
-import com.flowcortex.user.api.UserCreatedEvent;
+import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
@@ -59,7 +59,8 @@ class UserServiceImpl implements UserService {
         AppUser user = new AppUser(id, ownerId, email, passwordEncoder.encode(rawPassword), name, role,
                 UserStatus.ACTIVE);
         UserView created = save(user, email);
-        events.publishEvent(new UserCreatedEvent(id));
+        // An admin-created account is confirmed on creation, so it is usable at once.
+        events.publishEvent(new UserActivatedEvent(id));
         return created;
     }
 
@@ -100,10 +101,15 @@ class UserServiceImpl implements UserService {
         }
         if (status != null && !status.isBlank()) {
             UserStatus newStatus = parseStatus(status);
+            boolean reactivated = user.getStatus() != UserStatus.ACTIVE && newStatus == UserStatus.ACTIVE;
             user.changeStatus(newStatus);
             if (newStatus == UserStatus.SUSPENDED) {
                 // Refresh tokens would otherwise keep minting access tokens for a suspended account.
                 refreshTokenService.revokeAllFor(id);
+            }
+            // An account confirmed while suspended was never activated; listeners tolerate a repeat.
+            if (reactivated && user.isEmailConfirmed()) {
+                events.publishEvent(new UserActivatedEvent(id));
             }
         }
         return save(user, email);

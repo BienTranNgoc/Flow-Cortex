@@ -13,6 +13,9 @@
     "seconds": "{{value}} giây",
     "minutes": "{{value}} phút",
     "minutesSeconds": "{{minutes}} phút {{seconds}} giây",
+    "hours": "{{value}} giờ",
+    "hoursMinutes": "{{hours}} giờ {{minutes}} phút",
+    "days": "{{value}} ngày",
     "megabytes": "{{value}} MB"
   },
   "language": {
@@ -20,16 +23,34 @@
     "vi": "Tiếng Việt",
     "en": "English"
   },
+  "theme": {
+    "switchToLight": "Chuyển sang giao diện sáng",
+    "switchToDark": "Chuyển sang giao diện tối",
+    "light": "Sáng",
+    "dark": "Tối"
+  },
   "nav": {
     "homeLink": "Trang chủ FlowCortex",
     "label": "Điều hướng chính",
     "home": "Trang chủ",
     "workflows": "Quy trình",
-    "profile": "Hồ sơ",
+    "runs": "Lượt chạy",
+    "integrations": "Tích hợp",
     "docs": "Tài liệu",
-    "api": "API",
     "credits": "{{amount}} Credit",
     "signOut": "Đăng xuất"
+  },
+  "userMenu": {
+    "open": "Mở menu tài khoản",
+    "openFor": "Mở menu tài khoản của {{email}}",
+    "quotas": "Hạn mức tài nguyên",
+    "gpuMinutes": "Phút GPU",
+    "quotaUsage": "{{used}} / {{total}}",
+    "tokenBalance": "Số dư token",
+    "accountSettings": "Cài đặt tài khoản",
+    "connectedServices": "Dịch vụ đã kết nối",
+    "helpDocs": "Trợ giúp và tài liệu",
+    "signingOut": "Đang đăng xuất…"
   },
   "shell": {
     "brandPanel": {
@@ -42,20 +63,6 @@
     "footer": {
       "tagline": "Quy trình media dùng AI cho nhà sáng tạo cần đầu ra ổn định.",
       "social": "FlowCortex trên {{network}}",
-      "product": "Sản phẩm",
-      "features": "Tính năng",
-      "pricing": "Bảng giá",
-      "changelog": "Nhật ký thay đổi",
-      "roadmap": "Lộ trình",
-      "resources": "Tài nguyên",
-      "documentation": "Tài liệu",
-      "apiReference": "Tài liệu tham khảo API",
-      "guides": "Hướng dẫn",
-      "systemStatus": "Trạng thái hệ thống",
-      "legal": "Pháp lý",
-      "privacy": "Chính sách quyền riêng tư",
-      "terms": "Điều khoản dịch vụ",
-      "cookies": "Chính sách cookie",
       "copyright": "© {{year}} FlowCortex. Bảo lưu mọi quyền."
     }
   },
@@ -64,15 +71,15 @@
     "loadProfileError": "Không tải được hồ sơ của bạn.",
     "retry": "Thử lại",
     "eyebrow": "KHÔNG GIAN SÁNG TẠO · SẴN SÀNG BẮT ĐẦU",
-    "headline": "<highlight>Studio</highlight> media AI của bạn",
+    "headline": "<accent>Studio</accent> <strong>media AI của bạn</strong>",
     "lede": "Một cú nhấp khởi chạy quy trình sẵn sàng cho sản xuất: lấy nguồn, xử lý, duyệt, xuất.",
     "pickTitle": "Chọn một quy trình",
+    "viewAll": "Xem tất cả quy trình",
     "loadingWorkflows": "Đang tải quy trình…",
     "loadWorkflowsError": "Không tải được danh sách quy trình.",
+    "noMatch": "Không có quy trình nào khớp với bộ lọc của bạn.",
+    "clearFilters": "Xóa bộ lọc",
     "empty": "Chưa có quy trình nào.",
-    "untitled": "Quy trình chưa đặt tên",
-    "stepFallback": "Bước {{order}}",
-    "launch": "Khởi chạy quy trình →",
     "stagesTitle": "Cách Flow-Cortex xử lý các lượt chạy video của bạn",
     "stages": {
       "source": {
@@ -93,6 +100,102 @@
       }
     },
     "welcome": "Chào mừng, {{name}}",
-    "viewAll": "Xem tất cả quy trình"
+    "manageProfile": "Quản lý hồ sơ của bạn"
+  },
+  "docs": {
+    "eyebrow": "TÀI LIỆU",
+    "title": "Cách FlowCortex hoạt động",
+    "subtitle": "Hướng dẫn khái niệm, hướng dẫn từng bước và toàn bộ HTTP API cho các quy trình bạn xây dựng.",
+    "sectionsLabel": "Các mục tài liệu",
+    "menuHint": "Xem toàn bộ tài liệu tham khảo API →",
+    "tabs": {
+      "overview": "Tổng quan",
+      "api": "Tài liệu tham khảo API",
+      "guides": "Hướng dẫn"
+    },
+    "overview": {
+      "body": "FlowCortex là môi trường chạy quy trình AI: một chuỗi các bước có kiểu, có thể gọi mô hình, chờ người duyệt, kết xuất video hoặc đăng lên tài khoản mạng xã hội. Mỗi quy trình là một đồ thị; mỗi lượt chạy là một hành trình qua đồ thị đó.",
+      "whereToStart": "Bắt đầu từ đâu",
+      "readGuide": "Đọc hướng dẫn từng bước →",
+      "browseApi": "Xem HTTP API →",
+      "openEditor": "Mở trình chỉnh sửa quy trình →"
+    },
+    "api": {
+      "intro": "HTTP API là cùng giao diện mà ứng dụng thành viên và ứng dụng quản trị sử dụng. Token lấy từ <code>POST /api/v1/auth/login</code> và được gửi dưới dạng <code>Authorization: Bearer …</code> trong mọi yêu cầu.",
+      "authentication": "Xác thực",
+      "workflows": "Quy trình",
+      "listWorkflows": "— liệt kê các quy trình bạn có thể chạy.",
+      "startRun": "— bắt đầu một lượt chạy mới.",
+      "readRun": "— đọc trạng thái hiện tại của một lượt chạy.",
+      "listReviewTasks": "— liệt kê các bước duyệt còn mở.",
+      "schemaHint": "Toàn bộ lược đồ được công bố tại <code>docs/openapi.yaml</code> và được sinh vào API client ở<code> packages/api-client</code>. Hãy dùng các kiểu được sinh ra trong mã ứng dụng của bạn."
+    },
+    "guides": {
+      "firstRun": "<strong>Chạy quy trình đầu tiên.</strong> Mở <homeLink>Trang chủ</homeLink>, chọn một mẫu, gửi dữ liệu đầu vào và theo dõi lượt chạy cập nhật từng bước.",
+      "approveOnRuns": "<strong>Duyệt một bước.</strong> Khi lượt chạy tới bước duyệt, nó ở trạng thái <em>Chờ duyệt</em> trên trang <runsLink>Lượt chạy</runsLink> cho tới khi bạn xử lý.",
+      "approveOnRun": "<strong>Duyệt một bước.</strong> Khi lượt chạy tới bước duyệt, nó ở trạng thái <em>Chờ duyệt</em> trên trang lượt chạy cho tới khi bạn xử lý.",
+      "byoProvider": "<strong>Dùng nhà cung cấp AI của riêng bạn.</strong> Thêm khóa trên trang <integrationsLink>Tích hợp</integrationsLink>; mọi quy trình cần mô hình đó sẽ tự động dùng nó."
+    }
+  },
+  "runs": {
+    "eyebrow": "LỊCH SỬ LƯỢT CHẠY",
+    "title": "Lượt chạy gần đây",
+    "subtitle": "Theo dõi mọi quy trình bạn đã khởi chạy: lượt nào đang chạy, lượt nào cần bạn duyệt và lượt nào thất bại.",
+    "searchPlaceholder": "Tìm theo tên quy trình…",
+    "searchLabel": "Tìm lượt chạy",
+    "filterLegend": "Lọc theo trạng thái",
+    "status": {
+      "all": "Tất cả",
+      "success": "Thành công",
+      "failure": "Thất bại",
+      "waiting": "Chờ duyệt",
+      "running": "Đang chạy"
+    },
+    "trigger": {
+      "label": "Kích hoạt",
+      "manual": "Thủ công",
+      "webhook": "Webhook",
+      "schedule": "Theo lịch"
+    },
+    "empty": "Không có lượt chạy nào khớp với bộ lọc hiện tại.",
+    "runId": "Mã lượt chạy",
+    "copy": "Sao chép {{value}}",
+    "started": "Bắt đầu",
+    "ago": "{{time}} trước",
+    "justNow": "vừa xong",
+    "duration": "Thời lượng",
+    "durationRunning": "{{duration}} · đang chạy",
+    "retry": "Thử lại",
+    "retryNamed": "Thử lại {{name}}",
+    "viewDetail": "Xem chi tiết lượt chạy →",
+    "demoFailure": "Bước \"throw\" thất bại: lỗi cố ý để kiểm thử."
+  },
+  "integrations": {
+    "eyebrow": "DỊCH VỤ ĐÃ KẾT NỐI",
+    "title": "Tích hợp",
+    "subtitle": "Kết nối các nhà cung cấp AI và tài khoản mạng xã hội mà quy trình của bạn cần. Khóa được lưu trong tài khoản của bạn và dùng lại cho mọi lượt chạy.",
+    "tabsLegend": "Nhóm tích hợp",
+    "tabs": {
+      "models": "Nhà cung cấp AI",
+      "social": "Tài khoản mạng xã hội"
+    },
+    "category": {
+      "text": "LLM văn bản",
+      "media": "AI media / video",
+      "audio": "AI âm thanh và giọng nói",
+      "social": "Mạng xã hội"
+    },
+    "maskedKey": "Khóa API (đã che)",
+    "connected": "Đã kết nối",
+    "notConnected": "Chưa kết nối",
+    "reconnectNeeded": "Cần kết nối lại",
+    "lastUsed": "dùng lần cuối {{when}}",
+    "lastUsedHoursAgo": "2 giờ trước",
+    "lastUsedYesterday": "hôm qua",
+    "rotateKey": "Đổi khóa",
+    "addKey": "Thêm khóa",
+    "noHandle": "— chưa kết nối —",
+    "manage": "Quản lý",
+    "connect": "Kết nối"
   }
 }

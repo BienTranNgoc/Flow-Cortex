@@ -24,6 +24,47 @@ export interface UserResponse {
   updatedAt?: string;
 }
 
+export interface SetPasswordRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  passwordSetupToken: string;
+  /**
+   * @minLength 8
+   * @maxLength 72
+   */
+  password: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  firstName: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  lastName: string;
+  /** @pattern ^[a-z0-9_]{3,20}$ */
+  username?: string;
+}
+
+export type ProblemDetailProperties = { [key: string]: unknown };
+
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  properties?: ProblemDetailProperties;
+}
+
+export interface AccessTokenResponse {
+  accessToken?: string;
+  expiresIn?: number;
+}
+
 export interface ProfileUpdateRequest {
   /** @minLength 1 */
   name: string;
@@ -35,6 +76,8 @@ export interface MeResponse {
   name?: string;
   role?: string;
   status?: string;
+  hasPassword?: boolean;
+  passwordSetupRequired?: boolean;
 }
 
 export interface StartRunRequest {
@@ -283,20 +326,19 @@ export interface RegisterRequest {
   rememberMe?: boolean;
 }
 
-export interface AccessTokenResponse {
-  accessToken?: string;
-  expiresIn?: number;
+export interface ConfirmEmailRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  token: string;
 }
 
-export type ProblemDetailProperties = { [key: string]: unknown };
-
-export interface ProblemDetail {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  properties?: ProblemDetailProperties;
+export interface ConfirmEmailResponse {
+  accessToken: string;
+  expiresIn: number;
+  passwordSetupRequired: boolean;
+  passwordSetupToken?: string;
 }
 
 export interface LoginRequest {
@@ -308,14 +350,6 @@ export interface LoginRequest {
   /** @minLength 1 */
   password: string;
   rememberMe?: boolean;
-}
-
-export interface ConfirmEmailRequest {
-  /**
-   * @minLength 0
-   * @maxLength 128
-   */
-  token: string;
 }
 
 export type WorkflowStepResponseMode =
@@ -590,6 +624,65 @@ export const _delete = async (
   return customFetch<_deleteResponse>(getDeleteUrl(id), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type setPasswordResponse200 = {
+  data: AccessTokenResponse;
+  status: 200;
+};
+
+export type setPasswordResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type setPasswordResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type setPasswordResponseSuccess = setPasswordResponse200 & {
+  headers: Headers;
+};
+export type setPasswordResponseError = (setPasswordResponse409 | setPasswordResponse422) & {
+  headers: Headers;
+};
+
+export type setPasswordResponse = setPasswordResponseSuccess | setPasswordResponseError;
+
+export const getSetPasswordUrl = () => {
+  return `/api/v1/me/password`;
+};
+
+export const setPassword = async (
+  setPasswordRequest: SetPasswordRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setPasswordResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setPasswordResponse>(getSetPasswordUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setPasswordRequest),
   });
 };
 
@@ -1221,6 +1314,61 @@ export const refresh = async (
   });
 };
 
+export type openPasswordLinkResponse200 = {
+  data: ConfirmEmailResponse;
+  status: 200;
+};
+
+export type openPasswordLinkResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type openPasswordLinkResponseSuccess = openPasswordLinkResponse200 & {
+  headers: Headers;
+};
+export type openPasswordLinkResponseError = openPasswordLinkResponse422 & {
+  headers: Headers;
+};
+
+export type openPasswordLinkResponse =
+  openPasswordLinkResponseSuccess | openPasswordLinkResponseError;
+
+export const getOpenPasswordLinkUrl = () => {
+  return `/api/v1/auth/password-link`;
+};
+
+export const openPasswordLink = async (
+  confirmEmailRequest: ConfirmEmailRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<openPasswordLinkResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<openPasswordLinkResponse>(getOpenPasswordLinkUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(confirmEmailRequest),
+  });
+};
+
 export type logoutResponse204 = {
   data: void;
   status: 204;
@@ -1290,7 +1438,7 @@ export const login = async (
 };
 
 export type confirmEmailResponse200 = {
-  data: AccessTokenResponse;
+  data: ConfirmEmailResponse;
   status: 200;
 };
 

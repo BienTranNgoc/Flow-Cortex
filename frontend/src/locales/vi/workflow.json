@@ -180,11 +180,47 @@
   },
   "list": {
     "heading": "Quy trình",
-    "yours": "Quy trình của bạn",
+    "welcomeBack": "Chào mừng trở lại, <strong>{{name}}</strong>. Quản lý các quy trình của bạn.",
+    "nameFallback": "bạn",
+    "searchLabel": "Tìm quy trình",
+    "searchPlaceholder": "Tìm quy trình...",
+    "scope": {
+      "legend": "Phạm vi",
+      "prefix": "Phạm vi:",
+      "all": "Tất cả",
+      "shared": "Được chia sẻ",
+      "mine": "Của tôi"
+    },
+    "layout": {
+      "legend": "Bố cục",
+      "grid": "Bố cục lưới",
+      "list": "Bố cục danh sách"
+    },
     "loading": "Đang tải danh sách quy trình…",
     "loadError": "Không tải được danh sách quy trình.",
-    "empty": "Chưa có quy trình nào.",
-    "shared": "Được chia sẻ",
-    "welcome": "Chào mừng, {{name}}"
+    "noMatch": "Không có quy trình nào khớp với bộ lọc hiện tại.",
+    "tableLabel": "Bảng quy trình",
+    "column": {
+      "name": "Tên",
+      "status": "Trạng thái",
+      "owner": "Chủ sở hữu",
+      "steps": "Số bước",
+      "actions": "Thao tác"
+    },
+    "untitled": "Quy trình chưa đặt tên",
+    "stepOne": "{{n}} bước",
+    "stepOther": "{{n}} bước",
+    "rowActions": "Thao tác trên dòng",
+    "runTitle": "Chạy quy trình",
+    "runNamed": "Chạy {{name}}",
+    "showing": "Đang hiển thị {{shown}} trên {{total}} quy trình"
+  },
+  "owner": {
+    "you": "Bạn",
+    "sharedTeam": "Nhóm dùng chung",
+    "ownedByYou": "Do bạn sở hữu",
+    "sharedWorkflow": "Quy trình được chia sẻ",
+    "mine": "Của tôi",
+    "shared": "Được chia sẻ"
   }
 }

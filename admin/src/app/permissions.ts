@@ -1,4 +1,17 @@
-export const ACTIONS = ['console.enter', 'runs.view', 'mediaJobs.view', 'users.manage'] as const;
+export const ACTIONS = [
+  'console.enter',
+  'runs.view',
+  'mediaJobs.view',
+  'workflows.view',
+  'approvals.view',
+  'credits.view',
+  'providers.view',
+  'features.toggle',
+  'audit.view',
+  'voice.view',
+  'health.view',
+  'users.manage',
+] as const;
 
 export type Action = (typeof ACTIONS)[number];
 
@@ -8,6 +21,7 @@ const GRANTS: Record<string, readonly Action[]> = {
   MEMBER: [],
 };
 
+/** Single arbiter: a role may use `action` only when listed in its grant row. */
 export function can(role: string | undefined, action: Action): boolean {
   return role !== undefined && Object.hasOwn(GRANTS, role) && (GRANTS[role]?.includes(action) ?? false);
 }

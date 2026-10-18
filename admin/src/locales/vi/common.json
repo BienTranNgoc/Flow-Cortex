@@ -12,46 +12,65 @@
     "vi": "Tiếng Việt",
     "en": "English"
   },
+  "theme": {
+    "switchToLight": "Chuyển sang giao diện sáng",
+    "switchToDark": "Chuyển sang giao diện tối",
+    "light": "Sáng",
+    "dark": "Tối"
+  },
   "header": {
-    "title": "Quản trị Flow-Cortex"
+    "title": "Quản trị Flow-Cortex",
+    "homeLink": "Trang chủ quản trị FlowCortex",
+    "console": "Trang quản trị"
   },
   "account": {
     "fallbackName": "Tài khoản",
     "trigger": "{{name}}, menu tài khoản",
     "menu": "Menu tài khoản",
-    "summary": "Tài khoản đang đăng nhập",
-    "account": "Tài khoản",
-    "settings": "Cài đặt",
-    "comingSoon": "Sắp ra mắt",
+    "details": "Thông tin tài khoản",
     "signOut": "Đăng xuất",
     "dialogTitle": "Tài khoản",
-    "close": "Đóng thông tin tài khoản",
-    "name": "Tên",
-    "email": "Email",
-    "role": "Vai trò"
+    "copyEmail": "Sao chép email vào bộ nhớ tạm",
+    "copyEmailShort": "Sao chép email",
+    "close": "Đóng hộp thoại tài khoản",
+    "dangerZone": "Vùng nguy hiểm",
+    "delete": "Xóa tài khoản",
+    "deleteDisabled": "Không áp dụng cho quản trị viên",
+    "deleteHint": "Không thể xóa tài khoản quản trị trong hộp thoại này. Hãy dùng nhà cung cấp định danh."
   },
   "shell": {
     "noPage": "Tài khoản này không có trang nào để truy cập.",
     "nav": {
       "label": "Điều hướng quản trị",
       "menu": "Menu",
-      "comingSoon": "(Sắp ra mắt)",
+      "hideMenu": "Ẩn menu",
+      "expand": "Mở rộng thanh bên",
+      "collapse": "Thu gọn thanh bên",
+      "comingSoon": "Sắp ra mắt",
+      "disabledTitle": "{{label}} — {{tag}}",
       "unavailable": "không khả dụng",
+      "systemStatus": "Mọi hệ thống hoạt động bình thường",
       "groups": {
         "overview": "Tổng quan",
-        "operations": "Vận hành",
-        "administration": "Quản trị"
+        "workflowOps": "Vận hành quy trình",
+        "creditsBilling": "Credit & thanh toán",
+        "administration": "Quản trị",
+        "system": "Hệ thống"
       },
       "items": {
         "dashboard": "Tổng quan",
+        "workflows": "Quy trình & mẫu",
         "runs": "Lượt chạy",
-        "mediaJobs": "Tác vụ media",
-        "providers": "Nhà cung cấp",
-        "usage": "Mức sử dụng",
+        "approvals": "Hàng chờ duyệt",
+        "credits": "Credit & ví",
+        "providers": "Nhà cung cấp mô hình",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
-        "settings": "Cài đặt",
-        "auditLog": "Nhật ký kiểm toán"
+        "features": "Công tắc tính năng",
+        "auditLog": "Nhật ký kiểm toán",
+        "mediaJobs": "Tác vụ media",
+        "voiceQuota": "Hạn mức giọng nói",
+        "health": "Tình trạng hệ thống"
       }
     },
     "noAccess": {

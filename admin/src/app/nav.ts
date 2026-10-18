@@ -1,12 +1,29 @@
+import type { LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  AudioWaveform,
+  Boxes,
+  ClipboardList,
+  Coins,
+  Cpu,
+  LayoutDashboard,
+  ListChecks,
+  MessageSquare,
+  Play,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { can, type Action } from './permissions';
 
-/** `label` is an i18n key; the sidebar translates it. */
+/** `label` and `tag` are i18n keys; the sidebar translates them. */
 export interface NavItem {
   label: string;
   path: string;
-  icon: string;
+  icon: LucideIcon;
   action: Action;
   disabled?: boolean;
+  tag?: string;
 }
 
 export interface NavGroup {
@@ -14,6 +31,8 @@ export interface NavGroup {
   label: string;
   items: NavItem[];
 }
+
+const COMING_SOON = 'common.shell.nav.comingSoon';
 
 export const NAV: NavGroup[] = [
   {
@@ -23,35 +42,53 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.dashboard',
         path: '/dashboard',
-        icon: '▦',
+        icon: LayoutDashboard,
         action: 'runs.view',
       },
     ],
   },
   {
-    id: 'operations',
-    label: 'common.shell.nav.groups.operations',
+    id: 'workflow-ops',
+    label: 'common.shell.nav.groups.workflowOps',
     items: [
-      { label: 'common.shell.nav.items.runs', path: '/runs', icon: '▶', action: 'runs.view' },
       {
-        label: 'common.shell.nav.items.mediaJobs',
-        path: '/media-jobs',
-        icon: '◆',
-        action: 'mediaJobs.view',
+        label: 'common.shell.nav.items.workflows',
+        path: '/workflows',
+        icon: Boxes,
+        action: 'workflows.view',
+        disabled: true,
+        tag: COMING_SOON,
+      },
+      { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, action: 'runs.view' },
+      {
+        label: 'common.shell.nav.items.approvals',
+        path: '/approvals',
+        icon: ListChecks,
+        action: 'approvals.view',
+        disabled: true,
+        tag: COMING_SOON,
+      },
+    ],
+  },
+  {
+    id: 'credits-billing',
+    label: 'common.shell.nav.groups.creditsBilling',
+    items: [
+      {
+        label: 'common.shell.nav.items.credits',
+        path: '/credits',
+        icon: Coins,
+        action: 'credits.view',
+        disabled: true,
+        tag: COMING_SOON,
       },
       {
         label: 'common.shell.nav.items.providers',
         path: '/providers',
-        icon: '◇',
-        action: 'runs.view',
+        icon: Cpu,
+        action: 'providers.view',
         disabled: true,
-      },
-      {
-        label: 'common.shell.nav.items.usage',
-        path: '/usage',
-        icon: '▤',
-        action: 'runs.view',
-        disabled: true,
+        tag: COMING_SOON,
       },
     ],
   },
@@ -59,26 +96,56 @@ export const NAV: NavGroup[] = [
     id: 'administration',
     label: 'common.shell.nav.groups.administration',
     items: [
-      { label: 'common.shell.nav.items.users', path: '/users', icon: '●', action: 'users.manage' },
+      { label: 'common.shell.nav.items.users', path: '/users', icon: Users, action: 'users.manage' },
       {
         label: 'common.shell.nav.items.smsOutbox',
         path: '/sms-outbox',
-        icon: '✉',
+        icon: MessageSquare,
         action: 'users.manage',
       },
       {
-        label: 'common.shell.nav.items.settings',
-        path: '/settings',
-        icon: '⚙',
-        action: 'users.manage',
+        label: 'common.shell.nav.items.features',
+        path: '/features',
+        icon: Settings2,
+        action: 'features.toggle',
         disabled: true,
+        tag: COMING_SOON,
       },
       {
         label: 'common.shell.nav.items.auditLog',
         path: '/audit',
-        icon: '☰',
-        action: 'users.manage',
+        icon: ClipboardList,
+        action: 'audit.view',
         disabled: true,
+        tag: COMING_SOON,
+      },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'common.shell.nav.groups.system',
+    items: [
+      {
+        label: 'common.shell.nav.items.mediaJobs',
+        path: '/media-jobs',
+        icon: Activity,
+        action: 'mediaJobs.view',
+      },
+      {
+        label: 'common.shell.nav.items.voiceQuota',
+        path: '/voice-quota',
+        icon: AudioWaveform,
+        action: 'voice.view',
+        disabled: true,
+        tag: COMING_SOON,
+      },
+      {
+        label: 'common.shell.nav.items.health',
+        path: '/health',
+        icon: ShieldCheck,
+        action: 'health.view',
+        disabled: true,
+        tag: COMING_SOON,
       },
     ],
   },

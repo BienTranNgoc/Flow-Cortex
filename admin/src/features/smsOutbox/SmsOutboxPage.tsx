@@ -1,6 +1,7 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useTranslation } from 'react-i18next';
 import { Timestamp } from '../../app/AdminList';
+import { PageHeading } from '../../app/PageHeading';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useSmsOutbox } from './useSmsOutbox';
 
@@ -18,54 +19,58 @@ export function SmsOutboxPage() {
   };
 
   return (
-    <main>
-      <h1>{t('smsOutbox.title')}</h1>
-      <div className="list-toolbar">
-        <button type="button" onClick={() => query.refetch()}>
-          {t('common.shell.list.refresh')}
-        </button>
-      </div>
-
-      {disabled && <output className="disabled-banner">{t('common.shell.list.disabled')}</output>}
-      {error && !disabled && (
-        <div className="list-error">
-          <p role="alert">{t('smsOutbox.loadError')}</p>
-          <button type="button" onClick={() => query.refetch()}>
-            {t('common.shell.list.retry')}
+    <div>
+      <PageHeading
+        eyebrow={t('smsOutbox.eyebrow')}
+        title={t('smsOutbox.title')}
+        description={t('smsOutbox.description')}
+      />
+      <div className="cortex-admin-panel">
+        <div className="cortex-admin-toolbar">
+          <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
+            {t('common.shell.list.refresh')}
           </button>
         </div>
-      )}
-      {query.isPending && <output>{t('smsOutbox.loading')}</output>}
-      {data && error && <p className="stale-note">{t('common.shell.list.stale')}</p>}
-      {data?.length === 0 && (
-        <div className="list-empty">
-          <p>{t('smsOutbox.empty')}</p>
-        </div>
-      )}
-      {data && data.length > 0 && (
-        <div className="table-wrapper" aria-busy={query.isFetching}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th scope="col">{columns.number}</th>
-                <th scope="col">{columns.text}</th>
-                <th scope="col">{columns.sent}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((message) => (
-                <tr key={message.id}>
-                  <td data-label={columns.number}>{message.phone}</td>
-                  <td data-label={columns.text}>{message.body}</td>
-                  <td data-label={columns.sent}>
-                    <Timestamp value={message.createdAt} />
-                  </td>
+
+        {disabled && (
+          <output className="cortex-admin-disabled-banner">{t('common.shell.list.disabled')}</output>
+        )}
+        {error && !disabled && (
+          <div className="cortex-admin-error">
+            <p role="alert">{t('smsOutbox.loadError')}</p>
+            <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
+              {t('common.shell.list.retry')}
+            </button>
+          </div>
+        )}
+        {query.isPending && <output className="cortex-admin-loading">{t('smsOutbox.loading')}</output>}
+        {data && error && <p className="cortex-admin-stale">{t('common.shell.list.stale')}</p>}
+        {data?.length === 0 && <div className="cortex-admin-empty">{t('smsOutbox.empty')}</div>}
+        {data && data.length > 0 && (
+          <div className="cortex-admin-table-wrapper" aria-busy={query.isFetching}>
+            <table className="cortex-admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">{columns.number}</th>
+                  <th scope="col">{columns.text}</th>
+                  <th scope="col">{columns.sent}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </main>
+              </thead>
+              <tbody>
+                {data.map((message) => (
+                  <tr key={message.id}>
+                    <td data-label={columns.number}>{message.phone}</td>
+                    <td data-label={columns.text}>{message.body}</td>
+                    <td data-label={columns.sent}>
+                      <Timestamp value={message.createdAt} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

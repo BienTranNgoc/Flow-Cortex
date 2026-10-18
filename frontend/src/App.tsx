@@ -5,14 +5,20 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import './styles/tokens.css';
 import './app/base.css';
 import { AppShell } from './app/AppShell';
+import { DocsPage } from './app/DocsPage';
+import { demoPagesEnabled } from './app/featureFlags';
 import { HomePage } from './app/HomePage';
+import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
+import { RunsPage } from './app/RunsPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
+import { SetPasswordPage } from './features/auth/SetPasswordPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -50,11 +56,15 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
+            {/* Not behind RequireAuth: the emailed link opens it signed out. */}
+            <Route path="/set-password" element={<SetPasswordPage />} />
           </Route>
           <Route
             element={
               <RequireAuth>
-                <Layout />
+                <PasswordSetupGate>
+                  <Layout />
+                </PasswordSetupGate>
               </RequireAuth>
             }
           >
@@ -64,7 +74,12 @@ export function App() {
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
+              {demoPagesEnabled() && <Route path="runs" element={<RunsPage />} />}
               <Route path="runs/:runId" element={<RunProgressPage />} />
+              {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
+              <Route path="docs" element={<DocsPage />} />
+              <Route path="docs/api" element={<DocsPage initialTab="api" />} />
+              <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

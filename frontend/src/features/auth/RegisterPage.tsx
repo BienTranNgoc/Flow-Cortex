@@ -156,8 +156,7 @@ export function RegisterPage() {
     <div className="auth-page">
       <BrandPanel />
 
-      <section className="auth-card">
-        <p className="eyebrow">{t('auth.register.eyebrow')}</p>
+      <section className="auth-card auth-card--surface">
         <h1 className="auth-card__title">{t('auth.register.title')}</h1>
         <p className="auth-subtitle">{t('auth.register.subtitle')}</p>
 
@@ -167,10 +166,6 @@ export function RegisterPage() {
             label={t('auth.register.google')}
             href={googleAuthorizeUrl(true, '/')}
           />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>{t('auth.register.divider')}</span>
         </div>
 
         <form

@@ -13,14 +13,14 @@
     "activeUsers": "Active users",
     "activeUsersHint": "Accounts currently enabled",
     "newUsers": "New in 7 days",
-    "newUsersHint": "Based on account registration date",
+    "newUsersHint": "Based on registration date",
     "totalRuns": "Total workflow runs",
     "totalRunsHint": "All workflows, all time"
   },
   "runStatus": {
     "title": "Run status",
-    "description": "Totals reported by the admin run filters; approval-waiting runs are not included here.",
-    "viewRuns": "View runs",
+    "description": "Totals reported by the admin run filters.",
+    "viewRuns": "View runs →",
     "running": "Running",
     "completed": "Completed",
     "failed": "Failed",
@@ -30,12 +30,13 @@
   },
   "failures": {
     "title": "Recent failures",
-    "description": "Most recent runs reported with an error",
-    "allRuns": "All runs",
+    "description": "Most recent runs reported with an error.",
+    "allRuns": "All runs →",
     "loading": "Loading failed runs…",
     "loadError": "Could not load recent failures.",
     "retry": "Retry",
     "empty": "No failed runs.",
+    "emptyHint": "Nothing to investigate right now.",
     "note": "Run failed; open the runs list for details."
   }
 }

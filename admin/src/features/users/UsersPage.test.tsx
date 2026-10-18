@@ -115,8 +115,8 @@ describe('UsersPage', () => {
       renderRoute('/users', '/users', <UsersPage />);
       const row = (await screen.findByText(ALICE.email)).closest('tr') as HTMLElement;
 
-      expect(within(row).getByText(viUsers.role.MEMBER)).toHaveClass('status-badge');
-      expect(within(row).getByText(viUsers.status.ACTIVE)).toHaveClass('status-badge');
+      expect(within(row).getByText(viUsers.role.MEMBER)).toHaveClass('cortex-admin-pill');
+      expect(within(row).getByText(viUsers.status.ACTIVE)).toHaveClass('cortex-admin-pill');
     });
   });
 });

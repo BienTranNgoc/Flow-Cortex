@@ -1,5 +1,7 @@
 {
   "title": "Lượt chạy",
+  "eyebrow": "Vận hành quy trình",
+  "description": "Mọi lượt chạy quy trình trên toàn nền tảng. Dùng bộ lọc để thu hẹp theo trạng thái.",
   "noun": "lượt chạy",
   "deletedUser": "(người dùng đã bị xóa)",
   "columns": {

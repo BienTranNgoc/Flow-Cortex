@@ -225,6 +225,13 @@ describe('RegisterPage', () => {
     expect(Object.fromEntries(url.searchParams)).toEqual({ remember_me: 'true', return_to: '/' });
   });
 
+  it('links to no legal page the app does not serve', () => {
+    renderRoute('/register', '/register', <RegisterPage />);
+
+    expect(screen.queryByRole('link', { name: 'Terms of Service' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Privacy Policy' })).not.toBeInTheDocument();
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -308,7 +315,7 @@ describe('RegisterPage', () => {
 
       expect(await screen.findByText(viAuth.register.sent.title)).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent(
-        'Chúng tôi đã gửi liên kết xác nhận đến an@example.com. Hãy mở liên kết trong vòng 24 giờ để kích hoạt tài khoản và đăng nhập.',
+        'Chúng tôi đã gửi liên kết xác nhận đến an@example.com. Hãy mở liên kết trong vòng 24 giờ để kích hoạt tài khoản; liên kết sẽ đăng nhập cho bạn và mời bạn chọn mật khẩu.',
       );
       expect(screen.getByText('an@example.com').tagName).toBe('STRONG');
       expect(

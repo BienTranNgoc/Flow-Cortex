@@ -1,9 +1,178 @@
-/* Member SPA design tokens: the only file that holds colour values. */
+/* Member SPA design tokens. The light scheme is the default; dark opt-in via
+   [data-theme="dark"] on the root element. Dark values are the previous build's
+   palette verbatim, so nothing about the existing dark look changes. */
 
 :root {
+  color-scheme: light;
+
+  /* Surface — light: bright paper, soft borders, gentle gradient. */
+  --paper: #f3f6fa;
+  --paper-2: #ffffff;
+  --paper-3: #e9eef4;
+  --btn-bg: #ffffff;
+  --btn-bg-hover: #f1f4f9;
+  --input-bg: #ffffff;
+  --card-from: #ffffff;
+  --card-to: #eef2f7;
+  --glow: #d9e4f3;
+  --header-bg: #ffffff;
+  --footer-bg: #eef2f7;
+  --aurora-top: #eef2f8;
+  --aurora-mid: #f6f8fb;
+  --aurora-bottom: #ffffff;
+  --disabled-from: #5a6b78;
+  --disabled-to: #354250;
+
+  /* Text — light: dark ink, softer grays for secondary copy. */
+  --ink: #0c1620;
+  --ink-2: #1c2530;
+  --ink-3: #2b3641;
+  --ink-4: #4a5762;
+  --ink-5: #76838f;
+  --nav-ink: #2b3641;
+  --ink-disabled: #ffffff;
+
+  /* Border */
+  --line: #98a3ad;
+  --line-2: #76838f;
+  --line-3: #b6c0cb;
+  --line-soft: #c4ccd5;
+  --line-subtle: #b6c0cb;
+  --card-border: #98a3ad;
+  --control-border: #76838f;
+  --input-border: #5a6b78;
+  --input-border-hover: #3a4a5b;
+  --edge: #5a6b78;
+
+  /* Brand */
+  --primary: #066058;
+  --primary-foreground: #ffffff;
+  --cta-from: #2a4acc;
+  --cta-to: #6f5cff;
+  --accent: #2a4acc;
+  --accent-soft: #e3ebff;
+  --primary-soft: #cfeae6;
+  --teal: #066058;
+  --teal-bright: #054842;
+  --teal-glow: #066058;
+  --teal-deep: #04332f;
+  --violet: #6f5cff;
+  --indigo: #2a2a8c;
+  --aurora-teal: #14c8b6;
+  --aurora-indigo: #4a6cff;
+  --aurora-cyan: #14c8b6;
+
+  /* Brand: workflow category tones */
+  --tone-blue-text: #1d4ed8;
+  --tone-blue-bg: #e6efff;
+  --tone-blue-line: #b9d0ff;
+  --tone-cyan-text: #0b6f7a;
+  --tone-cyan-bg: #dff7fb;
+  --tone-cyan-line: #95dde6;
+  --tone-cyan-from: #066058;
+  --tone-cyan-to: #2a4acc;
+  --tone-violet-text: #4f3bd6;
+  --tone-violet-bg: #ece6ff;
+  --tone-violet-line: #c4b6ff;
+  --tone-amber-text: #92580a;
+  --tone-amber-bg: #fff3dd;
+  --tone-amber-line: #f4d99a;
+  --tone-amber-from: #f4a04a;
+  --tone-amber-to: #e25c3a;
+  --tone-amber-on: #3a1503;
+  --tone-green-bg: #d6f3df;
+  --tone-green-line: #95d8aa;
+  --tone-rose-text: #b8264b;
+  --tone-rose-bg: #fde0e6;
+  --tone-rose-line: #f0a8b6;
+
+  /* Status */
+  --red: #b8264b;
+  --red-soft: #fde0e6;
+  --red-strong: #d12d57;
+  --red-light: #b8264b;
+  --warning: #92580a;
+  --warning-soft: #fff3dd;
+  --green: #0a6b3e;
+  --green-soft: #cdebd6;
+  --green-bright: #0a6b3e;
+  --green-vivid: #0a6b3e;
+
+  /* Form controls */
+  --input-text: var(--ink);
+  --input-placeholder: var(--ink-3);
+
+  /* Gradients and shadows */
+  --gradient-cta: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  --gradient-card: linear-gradient(145deg, var(--card-from), var(--card-to));
+  --gradient-page-glow: radial-gradient(circle at 80% 20%, var(--glow) 0, transparent 35%);
+  --shadow-lg: 0 18px 50px rgba(15, 36, 60, 0.12);
+  --shadow: 0 14px 36px rgba(15, 36, 60, 0.08);
+  --shadow-color: #0c1620;
+
+  /* Shape and size */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --target-min: 44px;
+
+  /* Motion */
+  --dur-quick: 120ms;
+  --dur-standard: 220ms;
+  --dur-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Dashboard tokens (Home redesign) — additive, no change to existing values. */
+  --header-glass-bg: color-mix(in srgb, var(--header-bg) 80%, transparent);
+  --header-glass-blur: 14px;
+  --header-glass-border: color-mix(in srgb, var(--indigo) 22%, transparent);
+  --nav-active-bg: color-mix(in srgb, var(--teal-glow) 18%, transparent);
+  --nav-active-fg: var(--teal-deep);
+  --nav-inactive-fg: var(--ink-3);
+
+  --hero-headline-from: #0c1620;
+  --hero-headline-via: #2b3641;
+  --hero-headline-to: #56636f;
+  --hero-accent-from: var(--cta-from);
+  --hero-accent-via: var(--accent);
+  --hero-accent-to: var(--violet);
+  --hero-eyebrow-border: color-mix(in srgb, var(--aurora-cyan) 40%, transparent);
+  --hero-eyebrow-bg: color-mix(in srgb, var(--aurora-cyan) 14%, transparent);
+  --hero-eyebrow-fg: var(--teal-deep);
+  --hero-eyebrow-pulse: var(--cta-from);
+  --hero-glow-cyan: color-mix(in srgb, var(--aurora-cyan) 22%, transparent);
+  --hero-glow-indigo: color-mix(in srgb, var(--aurora-indigo) 24%, transparent);
+
+  --card-surface: #ffffff;
+  --card-surface-2: #f7f9fc;
+  --card-edge: color-mix(in srgb, var(--ink-5) 32%, transparent);
+  --card-edge-strong: color-mix(in srgb, var(--teal-glow) 55%, transparent);
+  --card-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 4%, transparent);
+  --card-hover-glow: color-mix(in srgb, var(--aurora-cyan) 18%, transparent);
+
+  --pill-warning-fg: var(--warning);
+  --pill-warning-bg: var(--warning-soft);
+  --pill-error-fg: var(--red);
+  --pill-error-bg: var(--red-soft);
+  --pill-info-fg: var(--ink-2);
+  --pill-info-bg: color-mix(in srgb, var(--ink-5) 22%, transparent);
+
+  --connector: color-mix(in srgb, var(--ink-5) 50%, transparent);
+
+  /* Logo glow — referenced from the header logo + footer mark so they
+     stay in sync, light or dark. */
+  --logo-glow-1: color-mix(in srgb, var(--teal-glow) 60%, transparent);
+  --logo-glow-2: color-mix(in srgb, var(--accent) 45%, transparent);
+  --logo-stroke-violet: #2a2a8c;
+  --logo-stroke-teal: #0fb5a8;
+  --logo-fill-violet: #2a2a8c;
+  --logo-fill-teal: #0fb5a8;
+}
+
+:root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* Surface */
   --paper: #080c13;
   --paper-2: #0d131c;
   --paper-3: #101721;
@@ -21,7 +190,6 @@
   --disabled-from: #1a3540;
   --disabled-to: #2a3a55;
 
-  /* Text */
   --ink: #e8f1f2;
   --ink-2: #c8d4dc;
   --ink-3: #9eacb6;
@@ -30,7 +198,6 @@
   --nav-ink: #8a9ab5;
   --ink-disabled: #a8b6c2;
 
-  /* Border */
   --line: #26313d;
   --line-2: #334352;
   --line-3: #2e3b49;
@@ -42,7 +209,6 @@
   --input-border-hover: #3a4a5b;
   --edge: var(--input-border);
 
-  /* Brand */
   --primary: #35e5e0;
   --primary-foreground: #061016;
   --cta-from: #1be0d1;
@@ -60,7 +226,6 @@
   --aurora-indigo: #4338ca;
   --aurora-cyan: #06b6d4;
 
-  /* Brand: workflow category tones (text on bg, line edge; icon gradients) */
   --tone-blue-text: #9fc4ff;
   --tone-blue-bg: #0a1a2c;
   --tone-blue-line: #1d3a66;
@@ -84,7 +249,6 @@
   --tone-rose-bg: #2a0e16;
   --tone-rose-line: #6a2536;
 
-  /* Status */
   --red: #ff9a9a;
   --red-soft: #3b1518;
   --red-strong: #ff7a7a;
@@ -96,11 +260,9 @@
   --green-bright: #69f0a8;
   --green-vivid: #4ade80;
 
-  /* Form controls */
   --input-text: var(--ink);
   --input-placeholder: var(--ink-3);
 
-  /* Gradients and shadows */
   --gradient-cta: linear-gradient(100deg, var(--cta-from), var(--cta-to));
   --gradient-card: linear-gradient(145deg, var(--card-from), var(--card-to));
   --gradient-page-glow: radial-gradient(circle at 80% 20%, var(--glow) 0, transparent 35%);
@@ -108,16 +270,45 @@
   --shadow: 0 20px 60px #0005;
   --shadow-color: #000000;
 
-  /* Shape and size */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
-  --radius-full: 9999px;
-  --target-min: 44px;
+  --header-glass-bg: color-mix(in srgb, var(--header-bg) 78%, transparent);
+  --header-glass-blur: 18px;
+  --header-glass-border: color-mix(in srgb, var(--indigo) 55%, transparent);
+  --nav-active-bg: color-mix(in srgb, var(--teal-glow) 12%, transparent);
+  --nav-active-fg: var(--ink);
+  --nav-inactive-fg: var(--ink-4);
 
-  /* Motion */
-  --dur-quick: 120ms;
-  --dur-standard: 220ms;
-  --dur-slow: 360ms;
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --hero-headline-from: #ffffff;
+  --hero-headline-via: #c8d4dc;
+  --hero-headline-to: #81919e;
+  --hero-accent-from: #1be0d1;
+  --hero-accent-via: #5f9cff;
+  --hero-accent-to: #b3a4ff;
+  --hero-eyebrow-border: color-mix(in srgb, var(--aurora-cyan) 30%, transparent);
+  --hero-eyebrow-bg: color-mix(in srgb, var(--aurora-cyan) 10%, transparent);
+  --hero-eyebrow-fg: #7fe1f5;
+  --hero-eyebrow-pulse: #5ef0e0;
+  --hero-glow-cyan: color-mix(in srgb, var(--aurora-cyan) 22%, transparent);
+  --hero-glow-indigo: color-mix(in srgb, var(--aurora-indigo) 28%, transparent);
+
+  --card-surface: #0f172a;
+  --card-surface-2: #111827;
+  --card-edge: color-mix(in srgb, var(--ink-5) 8%, transparent);
+  --card-edge-strong: color-mix(in srgb, var(--teal-glow) 40%, transparent);
+  --card-hover-glow: color-mix(in srgb, var(--aurora-cyan) 15%, transparent);
+
+  --pill-warning-fg: var(--warning);
+  --pill-warning-bg: var(--warning-soft);
+  --pill-error-fg: var(--red);
+  --pill-error-bg: var(--red-soft);
+  --pill-info-fg: var(--ink-2);
+  --pill-info-bg: color-mix(in srgb, var(--ink-5) 18%, transparent);
+
+  --connector: color-mix(in srgb, var(--ink-5) 35%, transparent);
+
+  --logo-glow-1: color-mix(in srgb, var(--teal-glow) 65%, transparent);
+  --logo-glow-2: color-mix(in srgb, var(--accent) 55%, transparent);
+  --logo-stroke-violet: #120074;
+  --logo-stroke-teal: #00d4ce;
+  --logo-fill-violet: #120074;
+  --logo-fill-teal: #00d4ce;
 }

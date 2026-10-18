@@ -110,9 +110,10 @@ class ProductVideoServiceTest {
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
                 .thenReturn(definitions);
         when(media.resolveImageUploads(ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
-        when(media.bindRunInputs(any(), eq(assets))).thenReturn(List.of(
+        List<MediaAssetInput> copies = List.of(
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "media", "runs/x/inputs/image_1")),
-                new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "media", "runs/x/inputs/image_2"))));
+                new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "media", "runs/x/inputs/image_2")));
+        when(media.copyRunInputs(any(), eq(assets))).thenReturn(copies);
         when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(runSteps.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -125,7 +126,10 @@ class ProductVideoServiceTest {
                 .contains("\"price\":\"299.000đ\"")
                 .doesNotContain("claim");
         verify(inputs).save(any(ProductVideoInput.class));
-        verify(media).bindRunInputs(run.getValue().getId(), assets);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(media, runs);
+        order.verify(media).copyRunInputs(run.getValue().getId(), assets);
+        order.verify(runs).save(any());
+        order.verify(media).bindRunInputs(run.getValue().getId(), copies);
         ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
         verify(runSteps).saveAll(steps.capture());
         assertThat(steps.getValue()).hasSize(5);

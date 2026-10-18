@@ -5,6 +5,7 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AccessTokenResponse;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
+import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -96,15 +97,39 @@ class AuthController {
             schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(value = "/confirm-email", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<AccessTokenResponse> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request,
+    ResponseEntity<ConfirmEmailResponse> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request,
             HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        AuthSession session = authService.confirmEmail(request.token(), servletRequest.getRemoteAddr(),
+        ConfirmedEmailSession confirmed = authService.confirmEmail(request.token(), servletRequest.getRemoteAddr(),
                 servletRequest.getHeader(HttpHeaders.USER_AGENT));
-        cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
-        return ResponseEntity.ok(session.toResponse());
+        return signedInFromLink(confirmed, servletRequest, servletResponse);
     }
 
-    /** Always 202, whether or not the email belongs to an account that needs confirming. */
+    /** Opens an emailed set-password link: signs its account in and hands out the password-setup token. */
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping(value = "/password-link", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<ConfirmEmailResponse> openPasswordLink(@Valid @RequestBody ConfirmEmailRequest request,
+            HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        ConfirmedEmailSession opened = authService.openPasswordLink(request.token(), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        return signedInFromLink(opened, servletRequest, servletResponse);
+    }
+
+    private ResponseEntity<ConfirmEmailResponse> signedInFromLink(ConfirmedEmailSession opened,
+            HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
+        AuthSession session = opened.session();
+        cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
+        return ResponseEntity.ok(new ConfirmEmailResponse(session.accessToken(), session.expiresIn(),
+                opened.passwordSetupRequired(), opened.passwordSetupToken()));
+    }
+
+    /**
+     * Always 202, whether or not the email belongs to an account that needs a confirmation or
+     * set-password link.
+     */
     @SecurityRequirements
     @ApiResponse(responseCode = "202")
     @PostMapping(value = "/resend-confirmation", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -181,6 +206,17 @@ class AuthController {
     record ConfirmEmailRequest(@NotBlank @Size(max = 128) String token) {
     }
 
+    /**
+     * {@code passwordSetupRequired}: the account has no password yet; the app asks for one next and
+     * sends {@code passwordSetupToken} with it ({@code null} when no password is needed).
+     */
+    record ConfirmEmailResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String accessToken,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long expiresIn,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean passwordSetupRequired,
+            String passwordSetupToken) {
+    }
+
     record ResendConfirmationRequest(@NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email) {
     }
 
@@ -191,9 +227,15 @@ class AuthController {
     record ProfileUpdateRequest(@NotBlank String name) {
     }
 
-    record MeResponse(UUID id, String email, String name, String role, String status) {
+    /**
+     * {@code passwordSetupRequired}: the account has no password and no Google sign-in, so once this
+     * session ends nothing gets it back in; the app sends the member to set a password first.
+     */
+    record MeResponse(UUID id, String email, String name, String role, String status, boolean hasPassword,
+            boolean passwordSetupRequired) {
         static MeResponse from(CurrentUser user) {
-            return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status());
+            return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status(),
+                    user.hasPassword(), user.passwordSetupRequired());
         }
     }
 }

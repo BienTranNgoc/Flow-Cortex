@@ -180,11 +180,47 @@
   },
   "list": {
     "heading": "Workflows",
-    "yours": "Your workflows",
+    "welcomeBack": "Welcome back, <strong>{{name}}</strong>. Manage your pipelines.",
+    "nameFallback": "there",
+    "searchLabel": "Search workflows",
+    "searchPlaceholder": "Search workflows...",
+    "scope": {
+      "legend": "Scope",
+      "prefix": "Scope:",
+      "all": "All",
+      "shared": "Shared",
+      "mine": "Mine"
+    },
+    "layout": {
+      "legend": "Layout",
+      "grid": "Grid layout",
+      "list": "List layout"
+    },
     "loading": "Loading workflows…",
     "loadError": "Could not load workflows.",
-    "empty": "No workflows yet.",
-    "shared": "Shared",
-    "welcome": "Welcome, {{name}}"
+    "noMatch": "No workflows match the current filter.",
+    "tableLabel": "Workflows table",
+    "column": {
+      "name": "Name",
+      "status": "Status",
+      "owner": "Owner",
+      "steps": "Steps",
+      "actions": "Actions"
+    },
+    "untitled": "Untitled workflow",
+    "stepOne": "{{n}} step",
+    "stepOther": "{{n}} steps",
+    "rowActions": "Row actions",
+    "runTitle": "Run workflow",
+    "runNamed": "Run {{name}}",
+    "showing": "Showing {{shown}} of {{total}} workflows"
+  },
+  "owner": {
+    "you": "You",
+    "sharedTeam": "Shared team",
+    "ownedByYou": "Owned by you",
+    "sharedWorkflow": "Shared workflow",
+    "mine": "Mine",
+    "shared": "Shared"
   }
 }

@@ -2,7 +2,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import './app/base.css';
+import './styles/tokens.css';
+import './styles/base.css';
 import { AdminLayout } from './app/AdminLayout';
 import { reachableItems } from './app/nav';
 import { queryClient } from './app/queryClient';
@@ -19,9 +20,9 @@ import { UsersPage } from './features/users/UsersPage';
 const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
   '/runs': <RunsPage />,
-  '/media-jobs': <MediaJobsPage />,
   '/users': <UsersPage />,
   '/sms-outbox': <SmsOutboxPage />,
+  '/media-jobs': <MediaJobsPage />,
 };
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */

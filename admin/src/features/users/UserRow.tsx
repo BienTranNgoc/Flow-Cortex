@@ -42,6 +42,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
 
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
+  const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
 
   if (editing) {
     return (
@@ -52,18 +53,30 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
             noValidate
             aria-label={t('users.row.editForm', { target: user.email ?? id })}
           >
-            <div className="field">
+            <div className="cortex-admin-field">
               <label htmlFor={`edit-email-${id}`}>{t('users.row.email')}</label>
               <input id={`edit-email-${id}`} type="email" {...register('email')} />
-              {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
-              {updateError?.errors?.email && <p role="alert">{updateError.errors.email}</p>}
+              {errors.email?.message && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {t(errors.email.message)}
+                </p>
+              )}
+              {updateError?.errors?.email && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {updateError.errors.email}
+                </p>
+              )}
             </div>
-            <div className="field">
+            <div className="cortex-admin-field">
               <label htmlFor={`edit-name-${id}`}>{t('users.row.name')}</label>
               <input id={`edit-name-${id}`} {...register('name')} />
-              {errors.name?.message && <p role="alert">{t(errors.name.message)}</p>}
+              {errors.name?.message && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {t(errors.name.message)}
+                </p>
+              )}
             </div>
-            <div className="field">
+            <div className="cortex-admin-field">
               <label htmlFor={`edit-role-${id}`}>{t('users.row.role')}</label>
               <select id={`edit-role-${id}`} {...register('role')}>
                 <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
@@ -71,18 +84,26 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
                 <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
               </select>
             </div>
-            <div className="field">
+            <div className="cortex-admin-field">
               <label htmlFor={`edit-status-${id}`}>{t('users.row.status')}</label>
               <select id={`edit-status-${id}`} {...register('status')}>
                 <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
                 <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
               </select>
             </div>
-            {updateError && !updateError.errors && <p role="alert">{updateError.detail}</p>}
-            <button type="submit" disabled={updateMutation.isPending}>
+            {updateError && !updateError.errors && (
+              <p className="cortex-admin-form-error" role="alert">
+                {updateError.detail}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="cortex-admin-btn cortex-admin-btn--primary"
+              disabled={updateMutation.isPending}
+            >
               {updateMutation.isPending ? t('users.row.saving') : t('users.row.save')}
             </button>
-            <button type="button" onClick={() => setEditing(false)}>
+            <button type="button" className="cortex-admin-btn" onClick={() => setEditing(false)}>
               {t('users.row.cancel')}
             </button>
           </form>
@@ -94,20 +115,24 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   return (
     <tr>
       <td data-label={t('users.columns.name')}>
-        <span className="user-name-cell">
-          <span className="user-avatar" aria-hidden="true">
-            {user.name?.trim().charAt(0).toUpperCase() || '?'}
+        <span className="cortex-admin-user-cell">
+          <span className="cortex-admin-user-avatar" aria-hidden="true">
+            {initials}
           </span>
           {user.name}
         </span>
       </td>
       <td data-label={t('users.columns.email')}>{user.email}</td>
       <td data-label={t('users.columns.role')}>
-        <span className="status-badge">{roleLabel(t, user.role)}</span>
+        <span className="cortex-admin-pill cortex-admin-pill--info">{roleLabel(t, user.role)}</span>
       </td>
       <td data-label={t('users.columns.status')}>
         <span
-          className={`status-badge ${user.status === 'ACTIVE' ? 'status-success' : 'status-warning'}`}
+          className={
+            user.status === 'ACTIVE'
+              ? 'cortex-admin-pill cortex-admin-pill--success'
+              : 'cortex-admin-pill cortex-admin-pill--warning'
+          }
         >
           {statusLabel(t, user.status)}
         </span>
@@ -120,10 +145,14 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
         )}
       </td>
       <td data-label={t('users.columns.actions')}>
-        <Link className="table-link" to={`/users/${id}`}>
+        <Link className="cortex-admin-link" to={`/users/${id}`}>
           {t('users.row.view')}
         </Link>
-        <button type="button" onClick={() => setEditing(true)}>
+        <button
+          type="button"
+          className="cortex-admin-btn cortex-admin-btn--sm"
+          onClick={() => setEditing(true)}
+        >
           {t('users.row.edit')}
         </button>
       </td>

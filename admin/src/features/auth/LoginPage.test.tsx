@@ -48,6 +48,34 @@ describe('LoginPage', () => {
       await i18n.changeLanguage('en');
     });
 
+    it('renders the auth shell and its language toggle in Vietnamese', () => {
+      renderLogin();
+
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(viAuth.login.title);
+      expect(screen.getByText(viAuth.login.eyebrow)).toBeInTheDocument();
+      expect(screen.getByText(viAuth.login.subtitle)).toBeInTheDocument();
+      expect(screen.getByText(viAuth.login.pitch.title)).toBeInTheDocument();
+      expect(screen.getByText(viAuth.login.pitch.mediaJobs)).toBeInTheDocument();
+      expect(screen.getByText(viAuth.login.asideFoot)).toBeInTheDocument();
+      expect(screen.getByRole('form', { name: viAuth.login.title })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: viAuth.login.contactOwner })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: viCommon.language.groupLabel })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^VI/ })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('shows the required-field messages in Vietnamese', async () => {
+      const user = userEvent.setup();
+      renderLogin();
+
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+
+      const alerts = await screen.findAllByRole('alert');
+      expect(alerts.map((alert) => alert.textContent)).toEqual([
+        viAuth.validation.emailRequired,
+        viAuth.validation.passwordRequired,
+      ]);
+    });
+
     it('shows the generic retry message when the request never reaches the server', async () => {
       stubApi({
         'POST /api/v1/auth/login': () => {

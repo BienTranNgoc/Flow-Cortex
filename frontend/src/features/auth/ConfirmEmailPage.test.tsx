@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route } from 'react-router-dom';
+import { Route, useLocation } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
 import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
@@ -11,8 +11,16 @@ function renderConfirm(search: string) {
     '/confirm-email',
     `/confirm-email${search}`,
     <ConfirmEmailPage />,
-    <Route path="/" element={<p>Home</p>} />,
+    <>
+      <Route path="/" element={<p>Home</p>} />
+      <Route path="/set-password" element={<SetPasswordStep />} />
+    </>,
   );
+}
+
+function SetPasswordStep() {
+  const state = useLocation().state as { passwordSetupToken?: string } | null;
+  return <p>Set password step with {state?.passwordSetupToken ?? 'no token'}</p>;
 }
 
 const LINK_INVALID = {
@@ -34,7 +42,7 @@ describe('ConfirmEmailPage', () => {
     const calls = stubApi({
       'POST /api/v1/auth/confirm-email': {
         status: 200,
-        body: { accessToken: 'jwt-c', expiresIn: 900 },
+        body: { accessToken: 'jwt-c', expiresIn: 900, passwordSetupRequired: false },
       },
     });
 
@@ -45,6 +53,26 @@ describe('ConfirmEmailPage', () => {
     expect(calls).toEqual([
       { method: 'POST', path: '/api/v1/auth/confirm-email', body: { token: 'link-token-1' } },
     ]);
+  });
+
+  it('signs the member in and asks for a new password when confirming dropped the old one', async () => {
+    stubApi({
+      'POST /api/v1/auth/confirm-email': {
+        status: 200,
+        body: {
+          accessToken: 'jwt-d',
+          expiresIn: 900,
+          passwordSetupRequired: true,
+          passwordSetupToken: 'setup-1',
+        },
+      },
+    });
+
+    renderConfirm('?token=link-token-2');
+
+    expect(await screen.findByText('Set password step with setup-1')).toBeInTheDocument();
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(getToken()).toBe('jwt-d');
   });
 
   it('says the link is no longer valid and resends a link to the address typed', async () => {

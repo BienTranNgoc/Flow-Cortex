@@ -1,5 +1,7 @@
 {
   "title": "Runs",
+  "eyebrow": "Workflow Ops",
+  "description": "Every workflow execution across the platform. Use filters to narrow by status.",
   "noun": "runs",
   "deletedUser": "(deleted user)",
   "columns": {

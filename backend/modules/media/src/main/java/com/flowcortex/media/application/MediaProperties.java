@@ -175,7 +175,10 @@ public record MediaProperties(
         }
     }
 
-    /** Provider-neutral object-store settings; {@link #toString()} never prints the credential. */
+    /**
+     * Provider-neutral object-store settings; {@link #toString()} never prints the credential.
+     * {@code copyTimeout} bounds a run-input copy, call and attempt alike, in place of the two API-call timeouts.
+     */
     public record S3(
             String endpoint,
             String publicEndpoint,
@@ -186,14 +189,16 @@ public record MediaProperties(
             String accessKey,
             String secretKey,
             @NotNull Duration apiCallTimeout,
-            @NotNull Duration apiCallAttemptTimeout) {
+            @NotNull Duration apiCallAttemptTimeout,
+            @NotNull Duration copyTimeout) {
 
         @Override
         public String toString() {
             return "S3[endpoint=" + endpoint + ", publicEndpoint=" + publicEndpoint + ", region=" + region
                     + ", pathStyle=" + pathStyle + ", uploadBucket=" + uploadBucket + ", bucket=" + bucket
                     + ", accessKey=" + redacted(accessKey) + ", secretKey=" + redacted(secretKey)
-                    + ", apiCallTimeout=" + apiCallTimeout + ", apiCallAttemptTimeout=" + apiCallAttemptTimeout + "]";
+                    + ", apiCallTimeout=" + apiCallTimeout + ", apiCallAttemptTimeout=" + apiCallAttemptTimeout
+                    + ", copyTimeout=" + copyTimeout + "]";
         }
 
         private static String redacted(String value) {

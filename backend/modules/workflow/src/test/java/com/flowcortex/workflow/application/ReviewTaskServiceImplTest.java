@@ -35,7 +35,6 @@ import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ReviewTaskServiceImplTest {
@@ -135,16 +134,16 @@ class ReviewTaskServiceImplTest {
     }
 
     @Test
-    void aDecisionByAnotherMemberIsForbiddenAndLeavesTheTaskPending() {
+    void aDecisionByAnotherMemberIsNotFoundAndLeavesTheTaskPending() {
         givenOwnedTask();
         UUID otherMember = UUID.randomUUID();
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), otherMember, null, null, null))
-                .isInstanceOf(AccessDeniedException.class)
-                .satisfies(detail("You can't decide on this run"));
+                .isInstanceOf(NotFoundException.class)
+                .satisfies(detail("Review task not found"));
         assertThatThrownBy(() -> service.rejectTask(task.getId(), otherMember))
-                .isInstanceOf(AccessDeniedException.class)
-                .satisfies(detail("You can't decide on this run"));
+                .isInstanceOf(NotFoundException.class)
+                .satisfies(detail("Review task not found"));
         assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
         verify(reviewTaskRepository, never()).save(any());
         verify(events, never()).publishEvent(any());
@@ -337,7 +336,6 @@ class ReviewTaskServiceImplTest {
         return e -> assertThat(english(switch (e) {
             case NotFoundException notFound -> notFound.getDetail();
             case ConflictException conflict -> conflict.getDetail();
-            case ReviewDecisionForbiddenException forbidden -> forbidden.getDetail();
             default -> throw new AssertionError("No localized detail on " + e);
         })).isEqualTo(text);
     }

@@ -1,5 +1,5 @@
 import { setToken } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import i18n from '../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
 import { Header } from './Header';
@@ -12,8 +12,17 @@ const FEATURES = {
   credits: true,
 };
 
+const ME = {
+  status: 200,
+  body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
+};
+
+function stubWithMe(routes: Parameters<typeof stubApi>[0]) {
+  return stubApi({ 'GET /api/v1/auth/me': ME, ...routes });
+}
+
 function renderHeader() {
-  return renderRoute('/', '/', <Header email="member1@flowcortex.dev" />);
+  return renderRoute('/', '/', <Header />);
 }
 
 function balanceCalls(calls: { path: string }[]) {
@@ -33,6 +42,32 @@ describe('Header', () => {
     expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'VI Tiếng Việt' })).toBeInTheDocument();
   });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the navigation, the theme switch and the language group next to it', () => {
+      stubApi({});
+
+      renderHeader();
+
+      const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+      expect(within(nav).getByRole('link', { name: 'Trang chủ' })).toBeInTheDocument();
+      expect(within(nav).getByRole('link', { name: 'Quy trình' })).toBeInTheDocument();
+      expect(within(nav).getByRole('button', { name: 'Tài liệu' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Trang chủ FlowCortex' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Chuyển sang giao diện (tối|sáng)$/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mở menu tài khoản' })).toBeInTheDocument();
+    });
+  });
 });
 
 describe('Header credits', () => {
@@ -44,7 +79,7 @@ describe('Header credits', () => {
   });
 
   it('shows the balance from the credits endpoint, grouped the en-US way', async () => {
-    stubApi({
+    stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
@@ -57,7 +92,7 @@ describe('Header credits', () => {
 
   it('shows no credits and never asks for the balance when credits are off', async () => {
     vi.stubEnv('VITE_ACCOUNT_STATS_ENABLED', 'true');
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: { ...FEATURES, credits: false } },
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
@@ -71,7 +106,7 @@ describe('Header credits', () => {
   });
 
   it('shows no credits when the balance request fails', async () => {
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': {
         status: 503,
@@ -88,7 +123,7 @@ describe('Header credits', () => {
 
   it('reloads the balance once a run on screen reaches a terminal status', async () => {
     let reply: FakeReply = { status: 200, body: { balance: 1000 } };
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': () => reply,
     });
