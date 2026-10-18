@@ -121,24 +121,28 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       )}
       {fileName && <p className="run-file">File: {fileName}</p>}
       {selected && (
-        <>
-          <Pipeline
-            steps={steps.map((step) => ({ id: stepKey(step), name: stepLabel(step), run: step }))}
-            runStatus={run.status}
-            selectedId={stepKey(selected)}
-            onSelect={onSelect}
-            panelId={panelId}
-          />
-          <StepDetail
-            id={panelId}
-            panelRef={panelRef}
-            runId={runId}
-            step={selected}
-            awaitingApproval={needsYouStep(steps, run.status) !== undefined}
-            needsYou={selectedState === 'needs-you'}
-            fileName={fileName}
-          />
-        </>
+        <div className="run-layout">
+          <div className="run-layout-pipeline">
+            <Pipeline
+              steps={steps.map((step) => ({ id: stepKey(step), name: stepLabel(step), run: step }))}
+              runStatus={run.status}
+              selectedId={stepKey(selected)}
+              onSelect={onSelect}
+              panelId={panelId}
+            />
+          </div>
+          <div className="run-layout-detail">
+            <StepDetail
+              id={panelId}
+              panelRef={panelRef}
+              runId={runId}
+              step={selected}
+              awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+              needsYou={selectedState === 'needs-you'}
+              fileName={fileName}
+            />
+          </div>
+        </div>
       )}
       {backTo && (
         <Link className="run-back-link action-link" to={`/workflows/${backTo}`}>

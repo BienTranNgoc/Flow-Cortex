@@ -235,11 +235,16 @@ flowcortex:
       render_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:5m}
     # The broker's per-delivery ack deadline; must outlast every max run time.
     consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
-    # The provider runtime (script and speech) runs on the same ack deadline, so its ceiling
-    # is checked against consumer-timeout too. Both are queue arguments fixed once the queue
-    # exists: changing consumer-timeout needs provider.jobs deleted (LOCAL_SETUP.md §3).
+    # The provider runtime runs on the same ack deadline, so its ceilings are checked against
+    # consumer-timeout too. Both are queue arguments fixed once the queue exists: changing
+    # consumer-timeout needs provider.jobs and provider.video.jobs deleted (LOCAL_SETUP.md §3).
+    # Script, storyboard and speech jobs (provider.jobs):
     provider-max-runtime: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:2m}
     provider-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:5m}
+    # Video clips (provider.video.jobs): a clip polls its vendor for up to 8 minutes, and a third
+    # concurrent clip waits for one of the two video workers to finish.
+    provider-video-max-runtime: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME:10m}
+    provider-video-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:15m}
     presign-ttl: 15m
     upload:
       max-bytes: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:524288000}

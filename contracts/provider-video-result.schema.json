@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-video-result.schema.json",
+  "title": "ProviderVideoData",
+  "description": "The completed MediaResult.data payload returned by generate_video/vertical_ad_clip_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "durationSeconds",
+    "provider",
+    "model",
+    "aspectRatio",
+    "resolution",
+    "sourceRevisionId",
+    "idempotencyKey",
+    "providerTaskId",
+    "format"
+  ],
+  "properties": {
+    "profile": { "const": "vertical_ad_clip_v1" },
+    "durationSeconds": { "const": 5 },
+    "provider": { "enum": ["seedance", "veo", "wan", "fixture"] },
+    "model": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "aspectRatio": { "const": "9:16" },
+    "resolution": { "enum": ["480p", "720p"] },
+    "sourceRevisionId": { "type": "string", "format": "uuid" },
+    "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "providerTaskId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "format": { "const": "mp4" }
+  }
+}

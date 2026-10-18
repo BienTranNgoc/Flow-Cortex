@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Input resolution: step 1 resolves to the run's own input; step N defaults to the preceding
- * step's output, unless {@code input_ref} is {@code {step:K.field}}, in which case that field
- * is read out of step K's output (parsed as JSON). Any unresolved/incomplete reference (bad
+ * step's output. {@code {step:K}} returns a prior step's complete output, while
+ * {@code {step:K.field}} reads one field from that output. Any unresolved reference (bad
  * format, unknown/forward step, missing output, non-JSON, missing field) throws rather than
  * returning empty, so the orchestrator turns it into a run error.
  *
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 @Component
 class InputResolver {
 
-    private static final Pattern REF_PATTERN = Pattern.compile("^\\{step:(\\d+)\\.(\\w+)}$");
+    private static final Pattern REF_PATTERN = Pattern.compile("^\\{step:(\\d+)(?:\\.(\\w+))?}$");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -60,6 +60,9 @@ class InputResolver {
         if (referencedOutput == null) {
             throw new IllegalStateException(
                     "input_ref " + inputRef + " references step " + referencedOrder + " with no output available");
+        }
+        if (field == null) {
+            return referencedOutput;
         }
         JsonNode node;
         try {

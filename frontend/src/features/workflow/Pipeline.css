@@ -31,17 +31,17 @@
   position: relative;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'order type name'
-    'pill pill pill'
-    'meta meta meta';
+    'order type name duration'
+    'pill pill pill pill'
+    'meta meta meta meta';
   align-items: center;
   gap: 0.5rem;
   width: 100%;
   min-height: var(--target-min);
   margin: 0;
-  padding: 0.625rem 0.75rem;
+  padding: 0.625rem 0.85rem;
   border: 1px solid var(--line);
   border-left: 4px solid var(--bar);
   border-radius: var(--radius-lg);
@@ -49,21 +49,53 @@
   color: var(--ink);
   font: inherit;
   text-align: left;
+  transition: transform var(--dur-quick) var(--ease-standard),
+              border-color var(--dur-quick) var(--ease-standard),
+              box-shadow var(--dur-quick) var(--ease-standard);
 }
 
 button.pipeline-node {
   cursor: pointer;
 }
 
+button.pipeline-node:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
 .pipeline-node[aria-pressed='true'] {
   border-color: var(--primary);
   border-left-color: var(--bar);
-  box-shadow: inset 0 0 0 1px var(--primary);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 20%, transparent),
+              inset 0 0 0 1px var(--primary);
 }
 
 .pipeline-node:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+.pipeline-duration {
+  grid-area: duration;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pipeline-clock-icon {
+  flex: none;
+  opacity: 0.85;
 }
 
 .pipeline-node[data-state='waiting'],
@@ -201,10 +233,135 @@ button.pipeline-node {
 
 .step-detail {
   margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow);
   overflow-wrap: break-word;
+}
+
+.step-timing-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-timing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--paper-3);
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+}
+
+.step-timing-pill .timing-label {
+  color: var(--ink-4);
+}
+
+.step-timing-pill .timing-val {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.video-artifact-card {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--card-from), var(--card-to));
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow);
+}
+
+.video-artifact-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.video-artifact-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--teal-bright);
+}
+
+.video-player-frame {
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+  background: var(--paper);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.video-player-element {
+  max-width: 100%;
+  max-height: 480px;
+  outline: none;
+  border-radius: var(--radius-md);
+}
+
+.video-artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.video-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--paper-3);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--dur-quick) var(--ease-standard);
+}
+
+.video-toggle-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.video-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--gradient-cta);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--cta-from) 35%, transparent);
+  transition: transform var(--dur-quick) var(--ease-standard),
+              box-shadow var(--dur-quick) var(--ease-standard);
+}
+
+.video-download-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--cta-from) 50%, transparent);
 }
 
 .pipeline-hint {
@@ -353,4 +510,74 @@ button.pipeline-node {
   .pipeline[data-layout] .pipeline-flow {
     display: none;
   }
+}
+
+/* Two-column layout for workflow run: steps on the left, detail on the right */
+.run-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 900px) {
+  .run-layout {
+    grid-template-columns: minmax(350px, 420px) 1fr;
+  }
+
+  .run-layout-detail {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+
+/* Inside the two-column run layout, keep the pipeline list stacked vertically */
+.run-layout .pipeline .pipeline-list {
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+.run-layout .pipeline .pipeline-item {
+  position: relative !important;
+  flex: none !important;
+  flex-direction: column !important;
+  width: 100% !important;
+}
+
+.run-layout .pipeline .pipeline-node {
+  flex: none !important;
+  width: 100% !important;
+}
+
+.run-layout .pipeline .pipeline-connector {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  align-self: center !important;
+  width: 2px !important;
+  height: var(--pipeline-gap) !important;
+}
+
+.run-layout .pipeline .pipeline-flow {
+  width: 100% !important;
+  height: 12px !important;
+  animation-name: pipeline-flow-down !important;
+}
+
+.run-layout .pipeline .pipeline-connector::before,
+.run-layout .pipeline .pipeline-connector::after {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+}
+
+.run-layout .pipeline .pipeline-connector::before {
+  top: -3px !important;
+  bottom: auto !important;
+}
+
+.run-layout .pipeline .pipeline-connector::after {
+  bottom: -3px !important;
+  top: auto !important;
 }

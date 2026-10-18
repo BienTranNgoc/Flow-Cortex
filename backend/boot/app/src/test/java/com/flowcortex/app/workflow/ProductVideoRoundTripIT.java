@@ -48,13 +48,13 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     @BeforeEach
     void prepareQueues() {
         org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
-        for (String queue : List.of("provider.jobs", "media.jobs")) {
+        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs")) {
             amqpAdmin.purgeQueue(queue, false);
         }
     }
 
     @Test
-    void fixtureArtifactsCarryAProductVideoThroughAllFourSteps() throws Exception {
+    void fixtureArtifactsCarryAProductVideoThroughTwoGeneratedClips() throws Exception {
         UserView owner = newUser("product-round-trip");
         String token = loginAs(owner);
         List<UUID> uploads = List.of(uploadImage(owner), uploadImage(owner));
@@ -77,6 +77,15 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                 new ApprovalView(review.currentRevisionId(), review.version()), String.class);
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
 
+        JsonNode storyboardJob = receiveJob("provider.jobs", runId, "generate_storyboard");
+        assertThat(storyboardJob.path("params").path("payload").path("sourceRevisionId").asString())
+                .isEqualTo(review.currentRevisionId().toString());
+        publishResult("provider", runId, storyboardJob, null,
+                "{\"profile\":\"product_ad_storyboard_v1\","
+                        + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
+                        + "\"scene1Prompt\":\"Opening hero scene\","
+                        + "\"scene2Prompt\":\"Benefit closing scene\"}");
+
         JsonNode speechJob = receiveJob("provider.jobs", runId, "generate_speech");
         assertThat(speechJob.path("params").path("payload").path("sourceRevisionId").asString())
                 .isEqualTo(review.currentRevisionId().toString());
@@ -87,27 +96,69 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         publishResult("provider", runId, speechJob,
                 output("speech.wav", speechKey, "audio/wav", 17) + ","
                         + output("manifest.json", manifestKey, "application/json", 2),
-                "{\"profile\":\"vi_voice_v1\",\"durationMs\":15000,"
+                "{\"profile\":\"vi_voice_v1\",\"durationMs\":9000,"
                         + "\"provider\":\"fixture\",\"voice\":\"silence\",\"speed\":\"+0%\","
                         + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
+        JsonNode firstVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
+        assertThat(firstVideoJob.path("params").path("payload").path("prompt").asString())
+                .isEqualTo("Opening hero scene");
+        assertSendsFirstProductImage(firstVideoJob, runId);
+        String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
+        put(MEDIA_BUCKET, firstClipKey, "video/mp4", "fixture clip one");
+        publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
+
+        JsonNode secondVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
+        assertThat(secondVideoJob.path("params").path("payload").path("prompt").asString())
+                .isEqualTo("Benefit closing scene");
+        assertSendsFirstProductImage(secondVideoJob, runId);
+        String secondClipKey = outputKey(secondVideoJob, "clip.mp4");
+        put(MEDIA_BUCKET, secondClipKey, "video/mp4", "fixture clip two");
+        publishVideoResult(runId, secondVideoJob, secondClipKey, "c");
+        // Every provider job of the run was taken off its own queue; nothing went to the wrong one.
+        assertThat(rabbit.receive("provider.jobs", 200)).isNull();
+
         JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
-                renderInputs.get(2).get("key").asString()))
-                .containsExactly("image_1", "image_2", "speech");
+                renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString(),
+                renderInputs.get(4).get("key").asString()))
+                .containsExactly("image_1", "image_2", "speech", "generated_video_1", "generated_video_2");
         assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(speechKey);
+        assertThat(renderJob.get("inputs").get(3).get("objectKey").asString()).isEqualTo(firstClipKey);
+        assertThat(renderJob.get("inputs").get(4).get("objectKey").asString()).isEqualTo(secondClipKey);
 
         String videoKey = outputKey(renderJob, "video.mp4");
         put(MEDIA_BUCKET, videoKey, "video/mp4", "fixture mp4");
         publishResult("media", runId, renderJob, output("video.mp4", videoKey, "video/mp4", 11),
-                "{\"profile\":\"vertical_ad_v1\",\"aspectRatio\":\"9:16\",\"durationSeconds\":15}");
+                "{\"profile\":\"vertical_ad_v1\",\"aspectRatio\":\"9:16\",\"durationSeconds\":10}");
 
         assertThat(pollUntil(owner.id(), runId, run -> "completed".equals(run.status()), WAIT).steps())
                 .allMatch(step -> "completed".equals(step.status()));
-        assertThat(get("/api/v1/runs/" + runId + "/steps/4/outputs/video.mp4/url", token, String.class)
+        assertThat(get("/api/v1/runs/" + runId + "/steps/7/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private static void assertSendsFirstProductImage(JsonNode videoJob, UUID runId) {
+        JsonNode inputs = videoJob.get("inputs");
+        assertThat(inputs).hasSize(1);
+        assertThat(inputs.get(0).get("key").asString()).isEqualTo("image_1");
+        assertThat(inputs.get(0).get("bucket").asString()).isEqualTo(MEDIA_BUCKET);
+        assertThat(inputs.get(0).get("objectKey").asString()).isEqualTo("runs/" + runId + "/inputs/image_1");
+    }
+
+    private void publishVideoResult(UUID runId, JsonNode job, String clipKey, String hashCharacter) {
+        publishResult("provider", runId, job,
+                output("clip.mp4", clipKey, "video/mp4", 16),
+                "{\"profile\":\"vertical_ad_clip_v1\",\"durationSeconds\":5,"
+                        + "\"provider\":\"wan\",\"model\":\"wan-video/wan-2.2-5b-fast\","
+                        + "\"aspectRatio\":\"9:16\",\"resolution\":\"480p\","
+                        + "\"sourceRevisionId\":\"" + job.path("params").path("payload")
+                                .path("sourceRevisionId").asString() + "\","
+                        + "\"idempotencyKey\":\"" + hashCharacter.repeat(64) + "\","
+                        + "\"providerTaskId\":\"prediction-" + job.get("stepOrder").asInt() + "\","
+                        + "\"format\":\"mp4\"}");
     }
 
     private JsonNode receiveJob(String queue, UUID runId, String capability) throws Exception {
@@ -118,6 +169,8 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                 JsonNode body = JSON.readTree(message.getBody());
                 if (runId.toString().equals(body.get("runId").asString())
                         && capability.equals(body.get("capability").asString())) {
+                    assertThat(message.getMessageProperties().getMessageId())
+                            .isEqualTo(body.get("jobId").asString());
                     return body;
                 }
             }

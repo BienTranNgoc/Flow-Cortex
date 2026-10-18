@@ -96,7 +96,10 @@ class MediaJobsImpl implements MediaJobs {
     private void validateProviderParams(ProviderJob job) {
         ProviderParams contract = switch (job.capability()) {
             case "generate_script" -> new ProviderParams("product_ad_v1", ProviderJobPayload.ProductAd.class);
+            case "generate_storyboard" -> new ProviderParams("product_ad_storyboard_v1",
+                    ProviderJobPayload.Storyboard.class);
             case "generate_speech" -> new ProviderParams("vi_voice_v1", ProviderJobPayload.Speech.class);
+            case "generate_video" -> new ProviderParams("vertical_ad_clip_v1", ProviderJobPayload.Video.class);
             default -> null;
         };
         if (contract == null) {
@@ -141,7 +144,11 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
-    public MediaLimits providerLimits() {
+    public MediaLimits providerLimits(String capability) {
+        if ("generate_video".equals(capability)) {
+            return new MediaLimits(properties.providerVideoQueueTimeout(), properties.providerVideoMaxRuntime(),
+                    properties.upload().maxBytes());
+        }
         return new MediaLimits(properties.providerQueueTimeout(), properties.providerMaxRuntime(),
                 properties.upload().maxBytes());
     }

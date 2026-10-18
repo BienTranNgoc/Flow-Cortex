@@ -56,7 +56,7 @@ class RemoteStepExecutorTest {
     }
 
     private static StepContext context(String input, String config) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 4, "render_video", (short) 1, input, config);
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 4, "render_video", (short) 1, input, config, null);
     }
 
     private static String inputs(int count) {

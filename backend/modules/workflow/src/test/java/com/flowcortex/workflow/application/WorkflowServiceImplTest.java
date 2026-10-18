@@ -102,9 +102,11 @@ class WorkflowServiceImplTest {
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, echo, "
-                                        + "extract_audio, fail, generate_script, generate_speech, probe, render_video",
+                                        + "extract_audio, fail, generate_script, generate_speech, generate_storyboard, "
+                                        + "generate_video, probe, render_video",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, align_audio, echo, "
-                                        + "extract_audio, fail, generate_script, generate_speech, probe, render_video"));
+                                        + "extract_audio, fail, generate_script, generate_speech, generate_storyboard, "
+                                        + "generate_video, probe, render_video"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());

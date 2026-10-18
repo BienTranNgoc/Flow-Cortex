@@ -65,6 +65,8 @@ jobs:
         run: curl -fsS localhost:8080/readyz
 
       - name: Smoke
+        env:
+          POLL_SECONDS: "300"
         run: scripts/smoke-probe.sh
 
       - name: Collect diagnostics

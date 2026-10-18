@@ -123,3 +123,63 @@ export function selectedStep(
       : undefined;
   return picked ?? defaultStep(steps, runStatus);
 }
+
+/** Formats an ISO date string to a localized time string (HH:MM:SS). */
+export function formatTime(iso?: string): string | null {
+  if (!iso) {
+    return null;
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+/**
+ * Execution duration of a step, formatted as human-readable string (e.g. "11.3s", "1m 20s").
+ * Evaluates step timestamps (startedAt & finishedAt), falling back to output reports with duration.
+ */
+export function stepDuration(step: RunStepResponse): string | null {
+  if (step.startedAt && step.finishedAt) {
+    const start = new Date(step.startedAt).getTime();
+    const end = new Date(step.finishedAt).getTime();
+    if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+      const ms = end - start;
+      const s = ms / 1000;
+      if (s < 0.1) {
+        return `${ms}ms`;
+      }
+      if (s < 60) {
+        return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
+      }
+      const mins = Math.floor(s / 60);
+      const remSecs = Math.round(s % 60);
+      return remSecs > 0 ? `${mins}m ${remSecs}s` : `${mins}m`;
+    }
+  }
+
+  if (step.output) {
+    try {
+      const report: unknown = JSON.parse(step.output);
+      if (report && typeof report === 'object') {
+        const r = report as Record<string, unknown>;
+        if (typeof r.durationMs === 'number') {
+          const s = r.durationMs / 1000;
+          return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
+        }
+        if (typeof r.durationSeconds === 'number') {
+          const s = r.durationSeconds;
+          return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
+        }
+        if (typeof r.duration === 'string') {
+          return r.duration;
+        }
+      }
+    } catch {
+      // not a json report
+    }
+  }
+
+  return null;
+}

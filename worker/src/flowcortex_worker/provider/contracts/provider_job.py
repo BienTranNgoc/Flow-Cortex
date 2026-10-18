@@ -2,13 +2,9 @@
 #   filename:  provider-job.schema.json
 
 from __future__ import annotations
-from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
+from typing import Annotated, Literal
 from uuid import UUID
-
-
-class CommonProperties(RootModel[Any]):
-    root: Any
 
 
 class ProductAdPayload(BaseModel):
@@ -38,12 +34,60 @@ class SpeechPayload(BaseModel):
     sourceRevisionId: UUID
 
 
+class StoryboardPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
+    sourceRevisionId: UUID
+
+
+class StoryboardParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["product_ad_storyboard_v1"]
+    payload: StoryboardPayload
+
+
 class SpeechParams(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     profile: Literal["vi_voice_v1"]
     payload: SpeechPayload
+
+
+class VideoPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prompt: Annotated[StrictStr, Field(max_length=2500, min_length=1)]
+    sourceRevisionId: UUID
+
+
+class VideoInput(BaseModel):
+    """
+    A reference image the worker fetches from the media store and forwards to the video provider as the first frame.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        StrictStr,
+        Field(description="Logical name inside this job; e.g. 'reference'.", min_length=1),
+    ]
+    bucket: Annotated[StrictStr, Field(min_length=1)]
+    objectKey: Annotated[StrictStr, Field(min_length=1)]
+
+
+class VideoParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["vertical_ad_clip_v1"]
+    payload: VideoPayload
 
 
 class GenerateScriptJob(BaseModel):
@@ -102,9 +146,74 @@ class GenerateSpeechJob(BaseModel):
     issuedAt: AwareDatetime
 
 
-class ProviderJob(RootModel[GenerateScriptJob | GenerateSpeechJob]):
+class GenerateStoryboardJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: Annotated[
+        UUID,
+        Field(
+            description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        ),
+    ]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    capability: Literal["generate_storyboard"]
+    params: StoryboardParams
+    outputPrefix: Annotated[
+        StrictStr,
+        Field(
+            description="The only object-key prefix under which this job may publish outputs.",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+        ),
+    ]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    issuedAt: AwareDatetime
+
+
+class GenerateVideoJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: Annotated[
+        UUID,
+        Field(
+            description="Equal to runId (enforced by the producer); also sent as the AMQP correlation id."
+        ),
+    ]
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    capability: Literal["generate_video"]
+    params: VideoParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional reference image; the worker fetches it and forwards it to the video provider as the first frame.",
+            max_length=1,
+        ),
+    ] = None
+    outputPrefix: Annotated[
+        StrictStr,
+        Field(
+            description="The only object-key prefix under which this job may publish outputs.",
+            pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
+        ),
+    ]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    issuedAt: AwareDatetime
+
+
+class ProviderJob(
+    RootModel[GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob]
+):
     root: Annotated[
-        GenerateScriptJob | GenerateSpeechJob,
+        GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
         Field(
             description="A typed provider job. Product content is carried only in params.payload and must not be logged.",
             title="ProviderJob",

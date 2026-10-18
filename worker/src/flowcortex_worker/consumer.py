@@ -295,17 +295,25 @@ class Consumer:
         )
         outcome = "abandoned"
         try:
-            # Inputs stay on disk until the result is out, then the stack removes them.
-            with ExitStack() as stack:
-                if job is not None:
-                    self._publish(run_id, PROGRESS_KEY, self._progress(job, delivery, "started"))
-                    heartbeat.start()
-                result = build(stack)
-                # No heartbeat may follow the result: stop it before the result goes out.
+            try:
+                # Inputs stay on disk until the result is out, then the stack removes them.
+                with ExitStack() as stack:
+                    if job is not None:
+                        self._publish(
+                            run_id, PROGRESS_KEY, self._progress(job, delivery, "started")
+                        )
+                        heartbeat.start()
+                    result = build(stack)
+                    # No heartbeat may follow the result: stop it before the result goes out.
+                    heartbeat.stop(join=True)
+                    self._publish_result(run_id, result)
+            except TransientError as exc:
+                exhausted = self._budget_exhausted(job, delivery, exc)
+                if exhausted is None:
+                    raise
                 heartbeat.stop(join=True)
-                self._publish(
-                    run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
-                )
+                result = exhausted
+                self._publish_result(run_id, result)
             self._call_in_main(lambda: self._settle_now(delivery, "ack"))
             outcome = result.status if isinstance(result, CompletedResult) else result.error.code
             if isinstance(result, ErrorResult):
@@ -405,27 +413,44 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
-        except TransientError as exc:
+        except TransientError:
             if runner.killed is not None:
                 return self._killed(job, delivery, runner.killed)
-            budget = self._max_transient_redeliveries
-            if budget is None or delivery.count < budget:
-                raise
-            log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
-            return self._error(
-                job.jobId,
-                job.runId,
-                job.attempt,
-                delivery.count,
-                self._transient_exhausted_code,
-                f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
-            )
+            raise
         except Exception:
             if runner.killed is None:
                 raise
             return self._killed(job, delivery, runner.killed)
         finally:
             watchdog.cancel()
+
+    def _budget_exhausted(
+        self, job: Any | None, delivery: Delivery, exc: TransientError
+    ) -> ErrorResult | None:
+        """The terminal answer once a transient failure hits the last delivery the broker allows.
+
+        `None` while redeliveries remain, or for a job too unreadable to answer: the job then
+        goes back to the broker instead.
+        """
+        budget = self._max_transient_redeliveries
+        if job is None or budget is None or delivery.count < budget:
+            return None
+        # The job scope already stamps deliveryCount on every record; logging it again here
+        # would make the logger raise KeyError.
+        log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+        return self._error(
+            job.jobId,
+            job.runId,
+            job.attempt,
+            delivery.count,
+            self._transient_exhausted_code,
+            f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+        )
+
+    def _publish_result(self, run_id: UUID, result: Result) -> None:
+        self._publish(
+            run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
+        )
 
     def _killed(self, job: MediaJob, delivery: Delivery, reason: str) -> Result:
         if reason != "run_timeout":

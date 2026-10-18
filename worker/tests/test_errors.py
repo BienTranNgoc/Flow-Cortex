@@ -30,7 +30,7 @@ from conftest import (
 )
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from flowcortex_worker.consumer import Consumer
+from flowcortex_worker.consumer import Abandoned, Consumer
 from flowcortex_worker.contracts.media_result import MediaError
 from flowcortex_worker.errors import ErrorCode, PermanentError, TransientError, backoff_seconds
 from flowcortex_worker.handlers.registry import HandlerOutcome
@@ -200,6 +200,69 @@ def test_unconfirmed_budget_exhausted_result_is_requeued() -> None:
     assert conn.consume.acks == []
     assert conn.consume.rejects == [(1, True)]
     assert waits == [backoff_seconds(3)]
+
+
+def _started_fails_transiently(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A transient failure before the job runs: the `started` progress cannot be built."""
+    original = Consumer._progress
+
+    def progress(self: Consumer, job: Any, delivery: Any, kind: str) -> Any:
+        if kind == "started":
+            raise TransientError("progress unavailable")
+        return original(self, job, delivery, kind)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Consumer, "_progress", progress)
+
+
+def test_transient_failure_outside_the_job_on_the_last_delivery_answers_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _started_fails_transiently(monkeypatch)
+    conn = FakeConnection()
+    conn.deliver(job_body(), headers={"x-delivery-count": 3})
+    waits: list[float] = []
+
+    run_consumer(conn, max_transient_redeliveries=3, wait=waits.append, until=settled)
+
+    [result] = published(conn, "result")
+    message = assert_valid(result.body, "media-result")
+    assert message["error"]["code"] == "provider_request_failed"
+    assert message["error"]["message"] == (
+        "transient retry budget exhausted after 3 redeliveries: progress unavailable"
+    )
+    assert conn.consume.acks == [1]
+    assert conn.consume.rejects == []
+    assert waits == []
+
+
+def test_budget_exhausted_answer_that_cannot_be_acked_is_abandoned_not_crashed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _started_fails_transiently(monkeypatch)
+    original = Consumer._settle_now
+
+    def settle(self: Consumer, delivery: Any, action: Any) -> None:
+        if action == "ack":
+            raise Abandoned("channel closed")
+        original(self, delivery, action)
+
+    monkeypatch.setattr(Consumer, "_settle_now", settle)
+    conn = FakeConnection()
+    conn.deliver(job_body(), headers={"x-delivery-count": 3})
+
+    with captured_logs() as lines:
+        run_consumer(
+            conn,
+            max_transient_redeliveries=3,
+            wait=lambda s: None,
+            grace_seconds=0.1,
+            until=lambda c: bool(c.channels and published(c, "result")),
+        )
+
+    messages = [line["message"] for line in lines]
+    assert "job thread crashed" not in messages
+    assert "job abandoned; the broker redelivers it" in messages
+    assert conn.consume.acks == []
 
 
 @pytest.mark.parametrize(

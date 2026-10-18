@@ -28,6 +28,8 @@ public record MediaProperties(
         @NotNull Duration consumerTimeout,
         @NotNull Duration providerMaxRuntime,
         @NotNull Duration providerQueueTimeout,
+        @NotNull Duration providerVideoMaxRuntime,
+        @NotNull Duration providerVideoQueueTimeout,
         @NotNull Duration presignTtl,
         @NotNull @Valid Upload upload,
         @NotNull @Valid S3 s3) {
@@ -54,13 +56,19 @@ public record MediaProperties(
                         + ") must exceed the longest max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
             }
         }
-        // The provider runtime shares both queues' ack deadline, so its own ceiling counts too.
-        if (providerMaxRuntime != null && consumerTimeout != null) {
-            Duration required = providerMaxRuntime.plus(MAX_WORKER_BACKOFF).plus(CONSUMER_TIMEOUT_MARGIN);
-            if (consumerTimeout.compareTo(required) <= 0) {
-                throw new IllegalArgumentException("flowcortex.media.consumer-timeout (" + consumerTimeout
-                        + ") must exceed provider-max-runtime plus the worker backoff and a 60 s margin (" + required + ")");
-            }
+        // The provider job queues share that ack deadline, so their own ceilings count too.
+        requireWithinConsumerTimeout(consumerTimeout, providerMaxRuntime, "provider-max-runtime");
+        requireWithinConsumerTimeout(consumerTimeout, providerVideoMaxRuntime, "provider-video-max-runtime");
+    }
+
+    private static void requireWithinConsumerTimeout(Duration consumerTimeout, Duration runtime, String name) {
+        if (runtime == null || consumerTimeout == null) {
+            return;
+        }
+        Duration required = runtime.plus(MAX_WORKER_BACKOFF).plus(CONSUMER_TIMEOUT_MARGIN);
+        if (consumerTimeout.compareTo(required) <= 0) {
+            throw new IllegalArgumentException("flowcortex.media.consumer-timeout (" + consumerTimeout
+                    + ") must exceed " + name + " plus the worker backoff and a 60 s margin (" + required + ")");
         }
     }
 

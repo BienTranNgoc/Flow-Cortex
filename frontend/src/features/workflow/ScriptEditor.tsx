@@ -3,6 +3,16 @@ import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/ap
 import { isLostRace } from './lostRace';
 import { useSaveRevisionMutation } from './useWorkflows';
 
+/**
+ * The script generator aims for 22–30 whitespace-separated words to fill about 10 seconds of
+ * speech, and the video is 10 seconds long; past this many words the voice-over likely overruns.
+ */
+const MAX_SCRIPT_WORDS = 30;
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 interface ScriptEditorProps {
   runId: string;
   task: ReviewTaskResponse;
@@ -28,6 +38,7 @@ export function ScriptEditor({
   const save = useSaveRevisionMutation(runId, task.id ?? '');
   const dirty = draft.trim() !== saved.trim();
   const revisionIsCurrent = latest?.id === task.currentRevisionId && task.version !== undefined;
+  const tooLong = wordCount(draft) > MAX_SCRIPT_WORDS;
 
   // Another tab can move the current revision while this one is open; adopting its text is what
   // makes the 409 below the answer, rather than this editor silently holding text nobody can approve.
@@ -53,7 +64,17 @@ export function ScriptEditor({
           rows={6}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
+          aria-describedby={tooLong ? 'script-length-warning' : undefined}
         />
+        {/* The live region stays mounted so the warning is announced when it appears. */}
+        <div aria-live="polite">
+          {tooLong && (
+            <p id="script-length-warning" className="field-hint">
+              This script is likely longer than the 10-second video. Keep it to about{' '}
+              {MAX_SCRIPT_WORDS} words — a voice-over longer than 10 seconds stops the run.
+            </p>
+          )}
+        </div>
       </div>
       <button
         type="button"

@@ -44,3 +44,7 @@ tmp/
 
 # Local docker compose override
 docker-compose.override.yml
+
+.mypy_cache/
+.ruff_cache/
+*.uv-cache/

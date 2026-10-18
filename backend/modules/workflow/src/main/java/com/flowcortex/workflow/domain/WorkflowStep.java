@@ -10,7 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * One ordered step in a {@link Workflow} definition. {@code inputRef}, when set, is the raw
- * {@code {step:K.field}} reference resolved at run time; {@code null} defaults to the previous
+ * {@code {step:K}} or {@code {step:K.field}} reference resolved at run time; {@code null} defaults to the previous
  * step's output (or, for step 1, the run's input). {@code config} is reserved for a future step
  * type's settings — the MVP types ({@code echo}/{@code fail}) need none.
  */
