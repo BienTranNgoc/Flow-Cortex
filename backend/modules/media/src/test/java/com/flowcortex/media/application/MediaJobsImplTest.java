@@ -90,6 +90,8 @@ class MediaJobsImplTest {
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
         "flowcortex.media.provider-queue-timeout=5m",
+        "flowcortex.media.provider-video-max-runtime=10m",
+        "flowcortex.media.provider-video-queue-timeout=15m",
         "flowcortex.media.presign-ttl=15m",
         "flowcortex.media.upload.max-video-bytes=524288000",
         "flowcortex.media.upload.max-audio-bytes=104857600",
@@ -165,7 +167,7 @@ class MediaJobsImplTest {
     private static ProviderJob providerJob(String capability, Map<String, Object> params) {
         UUID runId = UUID.randomUUID();
         return new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, capability, params,
-                "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
+                List.of(), "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
     }
 
     private static Map<String, Object> scriptParams(Map<String, Object> payload) {
@@ -222,7 +224,7 @@ class MediaJobsImplTest {
             UUID runId = UUID.randomUUID();
             ProviderJob legacy = new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, "generate_script",
                     scriptParams(Map.of("productName", "Máy lọc nước", "description", "Lọc sạch", "cta", "Mua ngay")),
-                    "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
+                    List.of(), "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
 
             assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(legacy)))
                     .isInstanceOf(ConstraintViolationException.class)
@@ -490,20 +492,45 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void aConsumerTimeoutShorterThanTheVideoCeilingFailsStartup() {
+        runner.withPropertyValues(
+                "flowcortex.media.provider-video-max-runtime=1081s",
+                "flowcortex.media.consumer-timeout=20m")
+        .run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .rootCause()
+                    .hasMessageContaining("provider-video-max-runtime");
+        });
+    }
+
+    @Test
     void theProviderLimitsComeFromTheProviderPropertiesNotAMediaCapability() {
         runner.withPropertyValues(
                 "flowcortex.media.provider-max-runtime=3m",
-                "flowcortex.media.provider-queue-timeout=9m")
+                "flowcortex.media.provider-queue-timeout=9m",
+                "flowcortex.media.provider-video-max-runtime=11m",
+                "flowcortex.media.provider-video-queue-timeout=17m")
         .run(context -> {
-            MediaLimits limits = context.getBean(MediaJobs.class).providerLimits();
-            assertThat(limits.maxRuntime()).isEqualTo(Duration.ofMinutes(3));
-            assertThat(limits.queueTimeout()).isEqualTo(Duration.ofMinutes(9));
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            for (String capability : List.of("generate_script", "generate_storyboard", "generate_speech")) {
+                MediaLimits limits = jobs.providerLimits(capability);
+                assertThat(limits.maxRuntime()).as(capability).isEqualTo(Duration.ofMinutes(3));
+                assertThat(limits.queueTimeout()).as(capability).isEqualTo(Duration.ofMinutes(9));
+            }
+            MediaLimits video = jobs.providerLimits("generate_video");
+            assertThat(video.maxRuntime()).isEqualTo(Duration.ofMinutes(11));
+            assertThat(video.queueTimeout()).isEqualTo(Duration.ofMinutes(17));
         });
     }
 
     @Test
     void aMissingProviderCeilingFailsStartupInsteadOfDefaulting() {
         withoutProperty("flowcortex.media.provider-max-runtime")
+                .run(context -> assertThat(context).hasFailed());
+        withoutProperty("flowcortex.media.provider-video-max-runtime")
+                .run(context -> assertThat(context).hasFailed());
+        withoutProperty("flowcortex.media.provider-video-queue-timeout")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -527,6 +554,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
     }

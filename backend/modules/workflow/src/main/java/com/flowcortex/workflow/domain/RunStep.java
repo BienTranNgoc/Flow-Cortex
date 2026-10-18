@@ -85,6 +85,13 @@ public class RunStep {
     @Column(name = "delivery_count", nullable = false)
     private short deliveryCount;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "config", updatable = false)
+    private String config;
+
+    @Column(name = "input_ref", updatable = false)
+    private String inputRef;
+
     /** Required by JPA. */
     protected RunStep() {
     }
@@ -95,11 +102,22 @@ public class RunStep {
 
     /** A pending step whose input is fixed when its run starts rather than resolved at dispatch. */
     public RunStep(UUID id, UUID runId, short stepOrder, String type, String input) {
+        this(id, runId, stepOrder, type, input, null, null);
+    }
+
+    /**
+     * A pending step carrying the {@code config} and {@code inputRef} of the definition it was
+     * started from; dispatch reads only these, so later edits to the workflow never reach it.
+     */
+    public RunStep(UUID id, UUID runId, short stepOrder, String type, String input, String config,
+            String inputRef) {
         this.id = id;
         this.runId = runId;
         this.stepOrder = stepOrder;
         this.type = type;
         this.input = input;
+        this.config = config;
+        this.inputRef = inputRef;
         this.status = RunStepStatus.PENDING;
     }
 
@@ -125,6 +143,16 @@ public class RunStep {
 
     public String getInput() {
         return input;
+    }
+
+    /** The definition's step settings as JSON, fixed when the run started; {@code null} when it had none. */
+    public String getConfig() {
+        return config;
+    }
+
+    /** The definition's {@code {step:K}} input reference, fixed when the run started; {@code null} = default. */
+    public String getInputRef() {
+        return inputRef;
     }
 
     public String getOutput() {

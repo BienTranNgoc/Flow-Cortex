@@ -138,6 +138,7 @@ def test_output_keys_are_deterministic_and_overwrite(silo: Silo) -> None:
     listed = silo.client().list_objects_v2(Bucket=MEDIA_BUCKET, Prefix=f"runs/{job.runId}/")
     assert [o["Key"] for o in listed["Contents"]] == [key]
 
+
 def test_path_output_is_streamed_and_reports_its_size(tmp_path: Path) -> None:
     content = b"wave-data" * 1024
     output = tmp_path / "source-audio.wav"
@@ -163,6 +164,7 @@ def test_path_output_is_streamed_and_reports_its_size(tmp_path: Path) -> None:
 
     assert size == len(content)
     assert captured == {"content": content, "mime": "audio/wav"}
+
 
 class StalledBody:
     """A response body whose read blocks until the stream is closed, like a stuck socket."""
@@ -215,6 +217,44 @@ def test_a_kill_before_the_output_upload_stops_it() -> None:
         storage.put("runs/r/steps/1/a", b"{}", "x", runner)
 
     client.put_object.assert_not_called()
+
+
+def test_reuse_head_treats_a_missing_object_as_absent() -> None:
+    client = boto3.client(
+        "s3",
+        endpoint_url="http://127.0.0.1:1",
+        region_name="us-east-1",
+        aws_access_key_id="x",
+        aws_secret_access_key="y",
+    )
+    stubber = Stubber(client)
+    stubber.add_client_error("head_object", service_error_code="404", http_status_code=404)
+
+    with stubber:
+        storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+        assert storage.head_object(MEDIA_BUCKET, "missing") is None
+
+
+def test_reuse_head_forbidden_is_transient_and_logged_for_the_operator() -> None:
+    client = boto3.client(
+        "s3",
+        endpoint_url="http://127.0.0.1:1",
+        region_name="us-east-1",
+        aws_access_key_id="x",
+        aws_secret_access_key="y",
+    )
+    stubber = Stubber(client)
+    stubber.add_client_error("head_object", service_error_code="403", http_status_code=403)
+    key = "runs/r/steps/3/attempts/1/speech.wav"
+
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+    with stubber, captured_logs() as lines, pytest.raises(TransientError):
+        storage.head_object(MEDIA_BUCKET, key)
+
+    [warning] = [line for line in lines if line["level"] == "WARNING"]
+    assert warning["bucket"] == MEDIA_BUCKET
+    assert warning["objectKey"] == key
+    assert "http" not in str(warning)
 
 
 def test_forbidden_input_is_transient_and_logged_for_the_operator() -> None:
@@ -278,3 +318,48 @@ def test_leftover_job_directories_are_removed_at_startup(tmp_path: Path) -> None
 
     assert not stale.exists()
     assert unrelated.exists()
+
+
+def _settings(public_endpoint: str) -> Any:
+    from flowcortex_worker.config import Settings
+
+    return Settings(
+        amqp_url="amqp://user:pass@rabbitmq:5672/%2F",
+        s3_endpoint="http://minio:9000",
+        s3_public_endpoint=public_endpoint,
+        s3_path_style=True,
+        s3_upload_bucket=UPLOAD_BUCKET,
+        s3_bucket=MEDIA_BUCKET,
+        s3_access_key="provider",
+        s3_secret_key="secret",
+    )
+
+
+def test_a_url_for_a_provider_is_signed_for_the_public_store_never_the_internal_one() -> None:
+    from urllib.parse import urlparse
+
+    from flowcortex_worker.storage import client_from
+
+    settings = _settings("https://media.example.com")
+    storage = Storage(
+        client_from(settings),
+        MEDIA_BUCKET,
+        UPLOAD_BUCKET,
+        presign_client=client_from(settings, settings.s3_public_endpoint),
+    )
+
+    url = urlparse(storage.presigned_get_url(MEDIA_BUCKET, "runs/r/inputs/image_1"))
+
+    assert (url.scheme, url.netloc) == ("https", "media.example.com")
+    assert url.path == f"/{MEDIA_BUCKET}/runs/r/inputs/image_1"
+    assert "X-Amz-Expires=600" in url.query
+
+
+def test_a_worker_without_a_public_store_signs_no_url() -> None:
+    from flowcortex_worker.storage import client_from
+
+    storage = Storage(client_from(_settings("")), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with pytest.raises(PermanentError) as refused:
+        storage.presigned_get_url(MEDIA_BUCKET, "runs/r/inputs/image_1")
+    assert refused.value.code == "provider_capability_unavailable"

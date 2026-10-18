@@ -16,6 +16,43 @@
 # compose.observability.yaml. No credential has a default here: a committed
 # value would be a known secret.
 
+# What provider-worker and provider-video-worker share: one image, one broker and
+# store identity, the same health and shutdown handling. Each service adds the
+# queue it consumes and the vendor settings of its own capabilities.
+x-provider-worker: &provider-worker
+  build:
+    context: ./worker
+    target: provider-runtime
+  image: flow-cortex-provider-worker:local
+  depends_on:
+    rabbitmq-init:
+      condition: service_completed_successfully
+    minio-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  stop_grace_period: 40s
+  restart: unless-stopped
+
+x-provider-worker-env: &provider-worker-env
+  AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_PATH_STYLE: "true"
+  S3_UPLOAD_BUCKET: flowcortex-uploads
+  S3_BUCKET: flowcortex-media
+  S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
+  S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_TRACES_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+
 services:
   postgres:
     image: postgres:17
@@ -57,8 +94,9 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Creates the restricted broker identity used by provider-worker. The data volume, read-only,
-  # gives rabbitmqctl the node cookie; no password is passed on a command line.
+  # Creates the restricted broker identity used by provider-worker and provider-video-worker.
+  # The data volume, read-only, gives rabbitmqctl the node cookie; no password is passed on a
+  # command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
     entrypoint: ["/bin/sh", "/init/init.sh"]
@@ -191,6 +229,8 @@ services:
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
+      FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME:-10m}
+      FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:-15m}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_VIDEO_BYTES:-524288000}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_AUDIO_BYTES:-104857600}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_IMAGE_BYTES:-10485760}
@@ -279,48 +319,67 @@ services:
     stop_grace_period: 40s
     restart: unless-stopped
 
+  # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:
-    build:
-      context: ./worker
-      target: provider-runtime
-    image: flow-cortex-provider-worker:local
+    <<: *provider-worker
     environment:
-      AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_PATH_STYLE: "true"
-      S3_UPLOAD_BUCKET: flowcortex-uploads
-      S3_BUCKET: flowcortex-media
-      S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
-      S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      <<: *provider-worker-env
+      PROVIDER_QUEUE: provider.jobs
       WORKER_ID: ${PROVIDER_WORKER_ID:-provider-worker-1}
       OTEL_SERVICE_NAME: provider-worker
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_TRACES_EXPORTER: none
-      OTEL_LOGS_EXPORTER: none
-      OTEL_METRICS_EXPORTER: none
-      # Provider adapter for `generate_script`. `openai` is the only real adapter now
-      # (GitHub Models sunset, removed 2026-10-11); any other value (or unset) keeps the
-      # deterministic stub for local-only demos. The worker refuses to boot when the
-      # secret does not match the chosen adapter (see `select_adapter`).
+      # PROVIDER_ADAPTER is the backwards-compatible fallback. New deployments route each
+      # capability independently so OpenAI copy and Edge speech can run in one workflow.
       PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
+      SCRIPT_PROVIDER: ${SCRIPT_PROVIDER:-}
+      SPEECH_PROVIDER: ${SPEECH_PROVIDER:-}
+      SCRIPT_PROVIDER_API_KEY: ${SCRIPT_PROVIDER_API_KEY:-}
+      SPEECH_PROVIDER_API_KEY: ${SPEECH_PROVIDER_API_KEY:-}
+      SCRIPT_PROVIDER_BASE_URL: ${SCRIPT_PROVIDER_BASE_URL:-}
+      SCRIPT_PROVIDER_MODEL: ${SCRIPT_PROVIDER_MODEL:-}
+      SPEECH_PROVIDER_BASE_URL: ${SPEECH_PROVIDER_BASE_URL:-}
+      SPEECH_PROVIDER_MODEL: ${SPEECH_PROVIDER_MODEL:-}
+      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-HoaiMyNeural}
+      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
+      FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
       FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}
-    depends_on:
-      rabbitmq-init:
-        condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    stop_grace_period: 40s
-    restart: unless-stopped
+
+  # Video worker pool: consumes provider.video.jobs (generate_video), so a clip that runs for
+  # minutes never holds up the jobs above. One job per container: the broker connection is
+  # not thread-safe, so the pool size is the replica count. No WORKER_ID: each replica
+  # reports its own container hostname.
+  provider-video-worker:
+    <<: *provider-worker
+    environment:
+      <<: *provider-worker-env
+      PROVIDER_QUEUE: provider.video.jobs
+      OTEL_SERVICE_NAME: provider-video-worker
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-fixture}
+      VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
+      VIDEO_PROVIDER_BASE_URL: ${VIDEO_PROVIDER_BASE_URL:-}
+      VIDEO_PROVIDER_MODEL: ${VIDEO_PROVIDER_MODEL:-}
+      SEEDANCE_API_KEY: ${SEEDANCE_API_KEY:-}
+      SEEDANCE_BASE_URL: ${SEEDANCE_BASE_URL:-}
+      SEEDANCE_MODEL: ${SEEDANCE_MODEL:-}
+      SEEDANCE_RESOLUTION: ${SEEDANCE_RESOLUTION:-480p}
+      VEO_API_KEY: ${VEO_API_KEY:-}
+      VEO_BASE_URL: ${VEO_BASE_URL:-}
+      VEO_MODEL: ${VEO_MODEL:-}
+      WAN_API_KEY: ${WAN_API_KEY:-}
+      WAN_BASE_URL: ${WAN_BASE_URL:-https://api.replicate.com/v1}
+      WAN_MODEL: ${WAN_MODEL:-wan-video/wan-2.2-5b-fast}
+      WAN_RESOLUTION: ${WAN_RESOLUTION:-480p}
+      WAN_FRAMES_PER_SECOND: ${WAN_FRAMES_PER_SECOND:-24}
+      WAN_NUM_FRAMES: ${WAN_NUM_FRAMES:-121}
+      VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
+      VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
+      VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
+      # Seedance and Wan fetch the product photo themselves, so its URL is signed for the store's
+      # public HTTPS address; they refuse to start without one. Fixture and Veo do not need it.
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+    deploy:
+      replicas: ${PROVIDER_VIDEO_WORKERS:-2}
 
   frontend:
     build:

@@ -16,11 +16,13 @@ import urllib.error
 import urllib.request
 from typing import Any, cast
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import openai_adapter
+from flowcortex_worker.provider.adapter import SpeechRequest, StoryboardRequest
 from flowcortex_worker.provider.contracts.provider_job import ProductAdPayload
 
 SAMPLE_PAYLOAD = ProductAdPayload(
@@ -104,6 +106,66 @@ def test_generate_script_uses_response_format_json_schema(monkeypatch: pytest.Mo
     assert "Vietnamese" in messages[0]["content"]
     assert "productName: Bình giữ nhiệt" in messages[1]["content"]
     assert "cta: Đặt mua ngay" in messages[1]["content"]
+
+
+def test_generate_storyboard_returns_two_distinct_visual_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _patch_urlopen(
+        monkeypatch,
+        _http_response(
+            _ok_body(
+                json.dumps(
+                    {
+                        "scene1Prompt": "Vertical hero shot with a fast camera push-in.",
+                        "scene2Prompt": "Product-in-use shot ending on a clean beauty frame.",
+                    }
+                )
+            )
+        ),
+    )
+
+    storyboard = _adapter().generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=1))
+    )
+
+    assert storyboard.scene_1_prompt.startswith("Vertical hero")
+    assert storyboard.scene_2_prompt.startswith("Product-in-use")
+    body: dict[str, Any] = captured["body"]
+    assert body["response_format"]["json_schema"]["name"] == "product_ad_storyboard_v1"
+    assert "Approved Vietnamese script" in body["messages"][1]["content"]
+
+
+@pytest.mark.parametrize(
+    "provider_content",
+    [
+        {
+            "scene_1_prompt": "Vertical opening hero shot.",
+            "scene_2_prompt": "Vertical closing benefit shot.",
+        },
+        {
+            "scenes": [
+                {"prompt": "Vertical opening hero shot."},
+                {"visualPrompt": "Vertical closing benefit shot."},
+            ]
+        },
+    ],
+)
+def test_generate_storyboard_accepts_openai_compatible_proxy_shapes(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_content: dict[str, Any],
+) -> None:
+    _patch_urlopen(
+        monkeypatch,
+        _http_response(_ok_body(json.dumps(provider_content))),
+    )
+
+    storyboard = _adapter("https://llm-proxy.example/v1").generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=1))
+    )
+
+    assert storyboard.scene_1_prompt == "Vertical opening hero shot."
+    assert storyboard.scene_2_prompt == "Vertical closing benefit shot."
 
 
 def test_generate_script_ignores_proxy_extra_content(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -240,7 +302,10 @@ def test_generate_speech_fails_instead_of_returning_an_empty_artifact() -> None:
     adapter = _adapter()
 
     with pytest.raises(PermanentError) as raised:
-        adapter.generate_speech("Đặt mua ngay")
+        adapter.generate_speech(
+            SpeechRequest("Đặt mua ngay", UUID("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4")),
+            MagicMock(),
+        )
 
     assert raised.value.code == "provider_capability_unavailable"
 
@@ -254,34 +319,93 @@ def test_build_adapter_rejects_an_unrecognised_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("PROVIDER_ADAPTER", "opnai")
+    monkeypatch.delenv("SCRIPT_PROVIDER", raising=False)
+    monkeypatch.delenv("SPEECH_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
-    with pytest.raises(RuntimeError, match=r"PROVIDER_ADAPTER.*opnai.*fixture, openai"):
+    with pytest.raises(RuntimeError, match=r"SCRIPT_PROVIDER.*opnai.*fixture, openai"):
         provider_main._build_adapter()
 
 
 def test_build_adapter_defaults_to_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PROVIDER_ADAPTER", raising=False)
+    monkeypatch.delenv("SCRIPT_PROVIDER", raising=False)
+    monkeypatch.delenv("SPEECH_PROVIDER", raising=False)
 
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
-    assert provider_main._build_adapter().__class__.__name__ == "FixtureProviderAdapter"
+    adapter = provider_main._build_adapter()
+    assert adapter.script_adapter.__class__.__name__ == "FixtureProviderAdapter"
+    assert adapter.speech_adapter.__class__.__name__ == "FixtureProviderAdapter"
 
 
 def test_build_adapter_uses_openai_when_provider_is_openai(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("PROVIDER_ADAPTER", "openai")
+    monkeypatch.delenv("SCRIPT_PROVIDER", raising=False)
+    monkeypatch.delenv("SPEECH_PROVIDER", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     from flowcortex_worker.provider import __main__ as provider_main
 
     importlib.reload(provider_main)
     adapter = provider_main._build_adapter()
-    assert isinstance(adapter, openai_adapter.OpenAIProviderAdapter)
-    assert adapter.config.api_key == "sk-test"
-    assert adapter.config.base_url == openai_adapter._OPENAI_BASE_URL
+    assert isinstance(adapter.script_adapter, openai_adapter.OpenAIProviderAdapter)
+    assert isinstance(adapter.speech_adapter, openai_adapter.OpenAIProviderAdapter)
+    assert adapter.script_adapter.config.api_key == "sk-test"
+    assert adapter.script_adapter.config.base_url == openai_adapter._OPENAI_BASE_URL
+
+
+def test_build_adapter_routes_openai_script_to_edge_speech(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PROVIDER_ADAPTER", "fixture")
+    monkeypatch.setenv("SCRIPT_PROVIDER", "openai")
+    monkeypatch.setenv("SPEECH_PROVIDER", "edge")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("SCRIPT_PROVIDER_BASE_URL", "https://third-party.example/v1")
+    monkeypatch.setenv("SCRIPT_PROVIDER_MODEL", "vendor/model")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+    from flowcortex_worker.provider.edge_adapter import EdgeSpeechAdapter
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter()
+
+    assert isinstance(adapter.script_adapter, openai_adapter.OpenAIProviderAdapter)
+    assert isinstance(adapter.speech_adapter, EdgeSpeechAdapter)
+    assert adapter.script_adapter.config.base_url == "https://third-party.example/v1"
+    assert adapter.script_adapter.config.model == "vendor/model"
+
+
+def test_build_adapter_keeps_capability_api_keys_separate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SCRIPT_PROVIDER", "openai")
+    monkeypatch.setenv("SPEECH_PROVIDER", "openai")
+    monkeypatch.setenv("SCRIPT_PROVIDER_API_KEY", "script-key")
+    monkeypatch.setenv("SPEECH_PROVIDER_API_KEY", "speech-key")
+    monkeypatch.setenv("SCRIPT_PROVIDER_BASE_URL", "https://script.example/v1")
+    monkeypatch.setenv("SPEECH_PROVIDER_BASE_URL", "https://speech.example/v1")
+    monkeypatch.setenv("SCRIPT_PROVIDER_MODEL", "script-model")
+    monkeypatch.setenv("SPEECH_PROVIDER_MODEL", "speech-model")
+    monkeypatch.setenv("OPENAI_API_KEY", "legacy-key")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter()
+
+    assert isinstance(adapter.script_adapter, openai_adapter.OpenAIProviderAdapter)
+    assert isinstance(adapter.speech_adapter, openai_adapter.OpenAIProviderAdapter)
+    assert adapter.script_adapter.config.api_key == "script-key"
+    assert adapter.speech_adapter.config.api_key == "speech-key"
+    assert adapter.script_adapter.config.base_url == "https://script.example/v1"
+    assert adapter.speech_adapter.config.base_url == "https://speech.example/v1"
+    assert adapter.script_adapter.config.model == "script-model"
+    assert adapter.speech_adapter.config.model == "speech-model"

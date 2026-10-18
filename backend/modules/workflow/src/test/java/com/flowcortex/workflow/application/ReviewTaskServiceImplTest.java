@@ -103,7 +103,19 @@ class ReviewTaskServiceImplTest {
 
         assertThat(view.status()).isEqualTo("approved");
         assertThat(view.reviewedAt()).isEqualTo(NOW);
-        verify(events).publishEvent(new ReviewTaskApprovedEvent(task.getId(), run.getId(), "hello"));
+        verify(events).publishEvent(new ReviewTaskApprovedEvent(task.getId(), run.getId(), "hello", null));
+    }
+
+    @Test
+    void approvingAScriptPublishesTheApprovedRevisionId() {
+        ScriptRevision revision = givenScriptTask();
+        when(scriptRevisionRepository.findByIdAndReviewTaskId(revision.getId(), task.getId()))
+                .thenReturn(Optional.of(revision));
+
+        service.approveTask(task.getId(), ownerId, null, revision.getId(), taskVersion());
+
+        verify(events).publishEvent(new ReviewTaskApprovedEvent(
+                task.getId(), run.getId(), revision.getContent(), revision.getId()));
     }
 
     @Test

@@ -98,9 +98,10 @@ public class ProductVideoService {
             String assetJson = json(bound.stream().map(MediaAssetInput::input).toList());
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
-                String storedInput = registry.usesStoredInput(definition.getType()) ? assetJson : null;
+                String storedInput = registry.usesStoredInput(definition.getType())
+                        || namesReferenceImage(definition.getConfig()) ? assetJson : null;
                 steps.add(new RunStep(UUID.randomUUID(), run.getId(), definition.getStepOrder(),
-                        definition.getType(), storedInput));
+                        definition.getType(), storedInput, definition.getConfig(), definition.getInputRef()));
             }
             steps = runSteps.saveAll(steps);
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
@@ -120,6 +121,18 @@ public class ProductVideoService {
             payload.put("promotion", draft.promotion());
         }
         return json(payload);
+    }
+
+    /** A step that sends one of the run's product images to its provider reads it from its stored input. */
+    private boolean namesReferenceImage(String config) {
+        if (config == null || config.isBlank()) {
+            return false;
+        }
+        try {
+            return json.readTree(config).has("referenceImage");
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Product Video step config is not valid JSON", e);
+        }
     }
 
     private String json(Object value) {

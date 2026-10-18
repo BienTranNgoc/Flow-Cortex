@@ -105,6 +105,8 @@ class Consumer:
         parse_job: Callable[[bytes], Any] | None = None,
         execute_job: Callable[[Any, ProcessRunner], Any] | None = None,
         wait: Callable[[float], Any] | None = None,
+        max_transient_redeliveries: int | None = None,
+        transient_exhausted_code: ErrorCode = "provider_request_failed",
     ) -> None:
         self._connection = connection
         self._storage = storage
@@ -120,6 +122,8 @@ class Consumer:
         self._parse_job = parse_job or MediaJob.model_validate_json
         self._execute_job = execute_job
         self._wait = wait or self._backoff_wait
+        self._max_transient_redeliveries = max_transient_redeliveries
+        self._transient_exhausted_code = transient_exhausted_code
         self._closed = threading.Event()
         self._cancelled = False
         self._in_flight: Delivery | None = None
@@ -291,17 +295,25 @@ class Consumer:
         )
         outcome = "abandoned"
         try:
-            # Inputs stay on disk until the result is out, then the stack removes them.
-            with ExitStack() as stack:
-                if job is not None:
-                    self._publish(run_id, PROGRESS_KEY, self._progress(job, delivery, "started"))
-                    heartbeat.start()
-                result = build(stack)
-                # No heartbeat may follow the result: stop it before the result goes out.
+            try:
+                # Inputs stay on disk until the result is out, then the stack removes them.
+                with ExitStack() as stack:
+                    if job is not None:
+                        self._publish(
+                            run_id, PROGRESS_KEY, self._progress(job, delivery, "started")
+                        )
+                        heartbeat.start()
+                    result = build(stack)
+                    # No heartbeat may follow the result: stop it before the result goes out.
+                    heartbeat.stop(join=True)
+                    self._publish_result(run_id, result)
+            except TransientError as exc:
+                exhausted = self._budget_exhausted(job, delivery, exc)
+                if exhausted is None:
+                    raise
                 heartbeat.stop(join=True)
-                self._publish(
-                    run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
-                )
+                result = exhausted
+                self._publish_result(run_id, result)
             self._call_in_main(lambda: self._settle_now(delivery, "ack"))
             outcome = result.status if isinstance(result, CompletedResult) else result.error.code
             if isinstance(result, ErrorResult):
@@ -366,7 +378,14 @@ class Consumer:
             outputs = []
             for file in outcome.files:
                 key = output_key(job, file.name)
-                size = self._storage.put(key, file.body, file.mime, runner)
+                if getattr(file, "stored", False):
+                    size = (
+                        len(file.body)
+                        if isinstance(file.body, bytes)
+                        else file.body.stat().st_size
+                    )
+                else:
+                    size = self._storage.put(key, file.body, file.mime, runner)
                 outputs.append(
                     MediaOutput(
                         name=file.name,
@@ -394,12 +413,44 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
+        except TransientError:
+            if runner.killed is not None:
+                return self._killed(job, delivery, runner.killed)
+            raise
         except Exception:
             if runner.killed is None:
                 raise
             return self._killed(job, delivery, runner.killed)
         finally:
             watchdog.cancel()
+
+    def _budget_exhausted(
+        self, job: Any | None, delivery: Delivery, exc: TransientError
+    ) -> ErrorResult | None:
+        """The terminal answer once a transient failure hits the last delivery the broker allows.
+
+        `None` while redeliveries remain, or for a job too unreadable to answer: the job then
+        goes back to the broker instead.
+        """
+        budget = self._max_transient_redeliveries
+        if job is None or budget is None or delivery.count < budget:
+            return None
+        # The job scope already stamps deliveryCount on every record; logging it again here
+        # would make the logger raise KeyError.
+        log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+        return self._error(
+            job.jobId,
+            job.runId,
+            job.attempt,
+            delivery.count,
+            self._transient_exhausted_code,
+            f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+        )
+
+    def _publish_result(self, run_id: UUID, result: Result) -> None:
+        self._publish(
+            run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
+        )
 
     def _killed(self, job: MediaJob, delivery: Delivery, reason: str) -> Result:
         if reason != "run_timeout":

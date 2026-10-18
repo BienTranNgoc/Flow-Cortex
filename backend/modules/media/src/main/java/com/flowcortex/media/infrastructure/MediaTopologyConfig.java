@@ -53,8 +53,18 @@ class MediaTopologyConfig {
     static final String PROVIDER_RESULTS = "provider.results";
     static final String PROVIDER_PROGRESS = "provider.progress";
     /**
+     * Video clips run for minutes, so they get their own queue and worker pool: a clip in progress
+     * must not hold a script, storyboard or speech job past its pickup deadline.
+     */
+    static final String PROVIDER_VIDEO_JOBS = "provider.video.jobs";
+    static final String VIDEO_JOB_KEY = "video.job";
+    private static final String VIDEO_CAPABILITY = "generate_video";
+    /**
      * Returns of a job the broker counts before it dead-letters it. A constant, not a setting: queue
      * arguments are immutable once the queue exists, so a new value means re-creating the job queues.
+     * {@code providerJobDeliveryLimit} in {@code contracts/limits.json} mirrors it, and the provider
+     * worker's transient-retry budget equals it, so its terminal result arrives before the broker
+     * dead-letters the job; change all three together.
      */
     static final int JOB_DELIVERY_LIMIT = 3;
 
@@ -89,7 +99,13 @@ class MediaTopologyConfig {
                 .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE).build();
         Queue providerProgress = QueueBuilder.durable(PROVIDER_PROGRESS).quorum()
                 .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE).build();
+        Queue providerVideoJobs = QueueBuilder.durable(PROVIDER_VIDEO_JOBS).quorum()
+                .deliveryLimit(JOB_DELIVERY_LIMIT)
+                .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE)
+                .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
+                .build();
         Queue providerJobsDlq = QueueBuilder.durable(PROVIDER_JOBS + ".dlq").quorum().build();
+        Queue providerVideoJobsDlq = QueueBuilder.durable(PROVIDER_VIDEO_JOBS + ".dlq").quorum().build();
         Queue providerResultsDlq = QueueBuilder.durable(PROVIDER_RESULTS + ".dlq").quorum().build();
         Queue providerProgressDlq = QueueBuilder.durable(PROVIDER_PROGRESS + ".dlq").quorum().build();
         return new Declarables(media, unrouted, deadLetters,
@@ -105,7 +121,15 @@ class MediaTopologyConfig {
                 bind(providerProgress, provider, PROGRESS_KEY),
                 bind(providerJobsDlq, providerDeadLetters, JOB_KEY),
                 bind(providerResultsDlq, providerDeadLetters, RESULT_KEY),
-                bind(providerProgressDlq, providerDeadLetters, PROGRESS_KEY));
+                bind(providerProgressDlq, providerDeadLetters, PROGRESS_KEY),
+                providerVideoJobs, providerVideoJobsDlq,
+                bind(providerVideoJobs, provider, VIDEO_JOB_KEY),
+                bind(providerVideoJobsDlq, providerDeadLetters, VIDEO_JOB_KEY));
+    }
+
+    /** The routing key a provider job of {@code capability} is published with. */
+    static String providerJobKey(String capability) {
+        return VIDEO_CAPABILITY.equals(capability) ? VIDEO_JOB_KEY : JOB_KEY;
     }
 
     /**

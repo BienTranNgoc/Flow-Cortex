@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { _delete, authHeaders, create, list, unwrap, update } from '@flow-cortex/api-client';
-import type { CreateUserRequest, UpdateUserRequest } from '@flow-cortex/api-client';
+import { authHeaders, create, get, list, unwrap, update } from '@flow-cortex/api-client';
+import type { CreateUserRequest, UpdateUserRequest, UserResponse } from '@flow-cortex/api-client';
 
 const USERS_QUERY_KEY = ['users'] as const;
 
@@ -9,6 +9,14 @@ export function useUsersQuery() {
   return useQuery({
     queryKey: USERS_QUERY_KEY,
     queryFn: () => unwrap(list(authHeaders())),
+  });
+}
+
+export function useUserQuery(id: string) {
+  return useQuery({
+    queryKey: ['user', id],
+    queryFn: () => unwrap(get(id, authHeaders())),
+    enabled: id.length > 0,
   });
 }
 
@@ -25,14 +33,9 @@ export function useUpdateUserMutation() {
   return useMutation({
     mutationFn: ({ id, changes }: { id: string; changes: UpdateUserRequest }) =>
       unwrap(update(id, changes, authHeaders())),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY }),
-  });
-}
-
-export function useDeleteUserMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => unwrap(_delete(id, authHeaders())),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY }),
+    onSuccess: (_user: UserResponse, { id }) => {
+      queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['user', id] });
+    },
   });
 }

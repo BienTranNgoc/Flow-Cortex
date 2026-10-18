@@ -21,7 +21,18 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 from ..errors import PermanentError, TransientError
-from .adapter import SpeechArtifact
+from .adapter import (
+    Abort,
+    SpeechArtifact,
+    SpeechIdentity,
+    SpeechRequest,
+    StoryboardArtifact,
+    StoryboardRequest,
+    VideoAbort,
+    VideoArtifact,
+    VideoIdentity,
+    VideoRequest,
+)
 from .contracts.provider_job import ProductAdPayload
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
@@ -67,11 +78,40 @@ _SCRIPT_RESPONSE_FORMAT: dict[str, Any] = {
     },
 }
 
+_STORYBOARD_RESPONSE_FORMAT: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "product_ad_storyboard_v1",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["scene1Prompt", "scene2Prompt"],
+            "properties": {
+                "scene1Prompt": {"type": "string", "minLength": 1, "maxLength": 2500},
+                "scene2Prompt": {"type": "string", "minLength": 1, "maxLength": 2500},
+            },
+        },
+    },
+}
+
+_STORYBOARD_SYSTEM_PROMPT = (
+    "You are a visual director for vertical short-form product advertisements. "
+    "Convert the approved Vietnamese voice-over into exactly two distinct English video "
+    "generation prompts, each designed for a five-second 9:16 clip. Scene 1 must be an "
+    "attention-grabbing product hook. Scene 2 must demonstrate the primary benefit and end "
+    "with a clean product beauty shot suitable for a CTA overlay. Specify subject action, "
+    "environment, lighting and camera movement. Keep product appearance consistent. Do not "
+    "request generated text, captions, logos, voice, music, unsupported claims or transitions "
+    "inside a clip. Return only one JSON object with exactly two string fields named "
+    "`scene1Prompt` and `scene2Prompt`; do not rename, nest or wrap these fields."
+)
+
 _SYSTEM_PROMPT = (
     "You are an expert Vietnamese short-form video advertising copywriter "
     "specializing in TikTok, Facebook Reels, and YouTube Shorts.\n"
     "Write a compelling, natural Vietnamese voice-over script for a "
-    "15-second product advertisement.\n\n"
+    "10-second product advertisement.\n\n"
 
     "OUTPUT FORMAT:\n"
     "- Return ONLY a valid JSON object with exactly one string field: `script`.\n"
@@ -101,8 +141,8 @@ _SYSTEM_PROMPT = (
     "- Do not include emojis, hashtags, scene directions, or timestamps.\n\n"
 
     "DURATION CONSTRAINTS:\n"
-    "- Target 35-45 Vietnamese whitespace-separated words in total.\n"
-    "- Optimize for approximately 15 seconds of natural speech.\n"
+    "- Target 22-30 Vietnamese whitespace-separated words in total.\n"
+    "- Optimize for approximately 10 seconds of natural speech.\n"
     "- Prioritize the hook, strongest benefit, and CTA.\n"
     "- If the supplied CTA, price, or promotion makes the target "
     "impossible, preserve required information and minimize other text.\n\n"
@@ -118,12 +158,33 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _storyboard_prompts(result: dict[str, Any]) -> tuple[Any, Any]:
+    """Read common OpenAI-compatible variants without weakening the public result contract."""
+    first = result.get("scene1Prompt", result.get("scene_1_prompt", result.get("scene1")))
+    second = result.get("scene2Prompt", result.get("scene_2_prompt", result.get("scene2")))
+    scenes = result.get("scenes")
+    if (first is None or second is None) and isinstance(scenes, list) and len(scenes) == 2:
+        first, second = scenes
+    return _prompt_text(first), _prompt_text(second)
+
+
+def _prompt_text(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    for key in ("prompt", "visualPrompt", "visual_prompt", "description"):
+        candidate = value.get(key)
+        if isinstance(candidate, str):
+            return candidate
+    return value
+
+
 @dataclass(frozen=True)
 class OpenAIConfig:
-    """The two values needed by the urllib adapter; no provider SDK is required."""
+    """Capability-scoped OpenAI-compatible endpoint configuration."""
 
     api_key: str
     base_url: str = _OPENAI_BASE_URL
+    model: str = _OPENAI_SCRIPT_MODEL
 
 
 @dataclass(frozen=True)
@@ -148,22 +209,92 @@ class OpenAIProviderAdapter:
             )
         return script
 
-    def generate_speech(self, script: str) -> SpeechArtifact:
+    def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
+        result = self._request_json(
+            _STORYBOARD_SYSTEM_PROMPT,
+            "Approved Vietnamese voice-over:\n" + request.script,
+            _STORYBOARD_RESPONSE_FORMAT,
+            temperature=0.6,
+        )
+        first, second = _storyboard_prompts(result)
+        if not isinstance(first, str) or not isinstance(second, str):
+            raise PermanentError(
+                "provider_response_invalid", "provider storyboard fields must be strings"
+            )
+        first = first.strip()
+        second = second.strip()
+        if not first or not second or len(first) > 2500 or len(second) > 2500:
+            raise PermanentError(
+                "provider_response_invalid", "provider storyboard prompts are invalid"
+            )
+        if first == second:
+            raise PermanentError(
+                "provider_response_invalid", "provider storyboard scenes must be distinct"
+            )
+        return StoryboardArtifact(first, second)
+
+    def speech_identity(self) -> SpeechIdentity:
         raise PermanentError(
             "provider_capability_unavailable",
             "OpenAI speech generation is not implemented",
         )
 
+    def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable",
+            "OpenAI speech generation is not implemented",
+        )
+
+    def video_identity(self) -> VideoIdentity:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def submit_video(self, request: VideoRequest) -> str:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
     def _request_script(self, payload: ProductAdPayload) -> str:
+        script_obj = self._request_json(
+            _SYSTEM_PROMPT,
+            self._user_message(payload),
+            _SCRIPT_RESPONSE_FORMAT,
+            temperature=0.4,
+        )
+        if "script" not in script_obj:
+            raise PermanentError(
+                "provider_response_invalid", "provider response has no script field"
+            )
+        script_value = script_obj["script"]
+        if not isinstance(script_value, str):
+            raise PermanentError(
+                "provider_response_invalid", "provider script field is not a string"
+            )
+        return script_value
+
+    def _request_json(
+        self,
+        system_prompt: str,
+        user_message: str,
+        response_format: dict[str, Any],
+        *,
+        temperature: float,
+    ) -> dict[str, Any]:
         body = json.dumps({
-            "model": _OPENAI_SCRIPT_MODEL,
+            "model": self.config.model,
             "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": self._user_message(payload)},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
             ],
-            "response_format": _SCRIPT_RESPONSE_FORMAT,
-            "temperature": 0.4,
-        }).encode("utf-8")
+            "response_format": response_format,
+            "temperature": temperature,
+        }).encode()
         api_key = self.config.api_key
         base_url = self.config.base_url
         url = f"{base_url.rstrip('/')}/chat/completions"
@@ -210,21 +341,16 @@ class OpenAIProviderAdapter:
                 "provider_response_invalid", "provider response has no message content"
             ) from exc
         try:
-            script_obj = json.loads(raw)
+            result = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise PermanentError(
                 "provider_response_invalid", "provider did not honour the response format"
             ) from exc
-        if not isinstance(script_obj, dict) or "script" not in script_obj:
+        if not isinstance(result, dict):
             raise PermanentError(
-                "provider_response_invalid", "provider response has no script field"
+                "provider_response_invalid", "provider structured response is not an object"
             )
-        script_value = script_obj["script"]
-        if not isinstance(script_value, str):
-            raise PermanentError(
-                "provider_response_invalid", "provider script field is not a string"
-            )
-        return script_value
+        return result
 
     @staticmethod
     def _user_message(payload: ProductAdPayload) -> str:
@@ -269,10 +395,18 @@ def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
             return None
 
 
-def select_adapter(provider: str, openai_key: str) -> OpenAIProviderAdapter:
+def select_adapter(
+    provider: str,
+    openai_key: str,
+    *,
+    base_url: str = _OPENAI_BASE_URL,
+    model: str = _OPENAI_SCRIPT_MODEL,
+) -> OpenAIProviderAdapter:
     """Builds the adapter for `provider`; `openai` requires a key, any other name raises."""
     if provider == PROVIDER_OPENAI:
         if not openai_key:
-            raise RuntimeError("PROVIDER_ADAPTER=openai requires OPENAI_API_KEY")
-        return OpenAIProviderAdapter(OpenAIConfig(api_key=openai_key, base_url=_OPENAI_BASE_URL))
+            raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
+        return OpenAIProviderAdapter(
+            OpenAIConfig(api_key=openai_key, base_url=base_url, model=model)
+        )
     raise ValueError(f"Unknown provider adapter: {provider}")

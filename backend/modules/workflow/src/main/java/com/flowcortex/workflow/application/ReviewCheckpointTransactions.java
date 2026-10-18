@@ -16,6 +16,7 @@ import com.flowcortex.workflow.infrastructure.ScriptRevisionRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -93,8 +94,11 @@ class ReviewCheckpointTransactions {
         if (run == null || run.getStatus() != RunStatus.WAITING_APPROVAL) {
             return false;
         }
+        if (isProductVideo(run) && !Objects.equals(task.getApprovedRevisionId(), event.revisionId())) {
+            return false;
+        }
         if (runStepRepository.completePendingApproval(task.getRunStepId(), run.getId(),
-                stepOutput(run, event.payload()), now) != 1) {
+                stepOutput(run, event.payload(), event.revisionId()), now) != 1) {
             return false;
         }
         run.resume();
@@ -104,16 +108,18 @@ class ReviewCheckpointTransactions {
 
     /**
      * The approved Product Video script is handed to {@code generate_speech}, whose step reads
-     * {@code {step:2.script}} — so the checkpoint step's output must stay the provider result shape
-     * that {@link #scriptFrom} unwrapped at pause time. Every other checkpoint keeps the payload as
-     * reviewed.
+     * the whole checkpoint output so speech provenance remains tied to the exact approved revision.
+     * Every other checkpoint keeps the payload as reviewed.
      */
-    private String stepOutput(WorkflowRun run, String payload) {
+    private String stepOutput(WorkflowRun run, String payload, UUID revisionId) {
         if (!isProductVideo(run)) {
             return payload;
         }
+        if (revisionId == null) {
+            throw new IllegalArgumentException("Approved Product Video script has no revision ID");
+        }
         try {
-            return json.writeValueAsString(Map.of("script", payload));
+            return json.writeValueAsString(Map.of("script", payload, "sourceRevisionId", revisionId));
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Approved Product Video script is not serializable", e);
         }

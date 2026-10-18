@@ -39,6 +39,30 @@ def make_inputs(directory: Path, keys: list[str]) -> dict[str, Path]:
     return resolved
 
 
+def make_media_inputs(directory: Path) -> tuple[list[str], dict[str, Path]]:
+    keys = ["image_1", "image_2", "speech", "generated_video_1", "generated_video_2"]
+    resolved = make_inputs(directory, keys)
+    subprocess.run(
+        [
+            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", "10",
+            "-c:a", "pcm_s16le", "-f", "wav", str(resolved["speech"]),
+        ],
+        check=True,
+    )
+    for index, colour in enumerate(("red", "blue"), start=1):
+        subprocess.run(
+            [
+                "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", f"color=c={colour}:s=480x832:r=24", "-t", "5",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-f", "mp4",
+                str(resolved[f"generated_video_{index}"]),
+            ],
+            check=True,
+        )
+    return keys, resolved
+
+
 def inspect_video(path: Path) -> dict[str, Any]:
     completed = subprocess.run(
         [
@@ -62,19 +86,20 @@ def inspect_video(path: Path) -> dict[str, Any]:
     reason="ffmpeg is installed in the worker image",
 )
 def test_fixture_is_deterministic_vertical_mp4_with_audio(tmp_path: Path) -> None:
-    keys = ["image_1", "image_2", "speech"]
+    keys, first_inputs = make_media_inputs(tmp_path / "first")
     first = render_video.handle(
         make_job(keys),
-        make_inputs(tmp_path / "first", keys),
+        first_inputs,
         ProcessRunner(),
     )
     first_video, first_manifest = first.files
     assert isinstance(first_video.body, Path)
     first_bytes = first_video.body.read_bytes()
 
+    second_keys, second_inputs = make_media_inputs(tmp_path / "second")
     second = render_video.handle(
-        make_job(keys),
-        make_inputs(tmp_path / "second", keys),
+        make_job(second_keys),
+        second_inputs,
         ProcessRunner(),
     )
     second_video, _ = second.files
@@ -87,15 +112,15 @@ def test_fixture_is_deterministic_vertical_mp4_with_audio(tmp_path: Path) -> Non
     audio = next(stream for stream in report["streams"] if stream["codec_type"] == "audio")
     assert (video["codec_name"], video["width"], video["height"]) == ("h264", 360, 640)
     assert audio["codec_name"] == "aac"
-    assert 15 <= float(report["format"]["duration"]) < 16
+    assert 9.9 <= float(report["format"]["duration"]) <= 10.1
 
     expected = {
         "aspectRatio": "9:16",
-        "durationSeconds": 15,
+        "durationSeconds": 10,
         "height": 640,
         "imageCount": 2,
         "profile": "vertical_ad_v1",
-        "renderer": "fixture",
+        "renderer": "generated_clip",
         "width": 360,
     }
     assert first.data == expected
@@ -106,7 +131,7 @@ def test_fixture_is_deterministic_vertical_mp4_with_audio(tmp_path: Path) -> Non
 
 @pytest.mark.parametrize("profile", ["", "vertical_ad_v2", "product_ad_v1"])
 def test_unknown_profile_is_rejected(tmp_path: Path, profile: str) -> None:
-    keys = ["image_1", "speech"]
+    keys = ["image_1", "speech", "generated_video_1", "generated_video_2"]
     with pytest.raises(PermanentError) as failed:
         render_video.handle(
             make_job(keys, profile),
@@ -120,14 +145,20 @@ def test_unknown_profile_is_rejected(tmp_path: Path, profile: str) -> None:
 @pytest.mark.parametrize(
     "keys",
     [
-        ["speech"],
-        [*[f"image_{index}" for index in range(1, 12)], "speech"],
+        ["speech", "generated_video_1", "generated_video_2"],
+        [
+            *[f"image_{index}" for index in range(1, 12)],
+            "speech",
+            "generated_video_1",
+            "generated_video_2",
+        ],
         ["image_1"],
-        ["image_1", "image_3", "speech"],
-        ["image_2", "image_1", "speech"],
-        ["image_1", "speech", "subtitle"],
-        ["image_1", "image_1", "speech"],
-        ["image_1", "speech", "speech"],
+        ["image_1", "image_3", "speech", "generated_video_1", "generated_video_2"],
+        ["image_2", "image_1", "speech", "generated_video_1", "generated_video_2"],
+        ["image_1", "speech", "generated_video_1", "generated_video_2", "subtitle"],
+        ["image_1", "image_1", "speech", "generated_video_1", "generated_video_2"],
+        ["image_1", "speech", "speech", "generated_video_1", "generated_video_2"],
+        ["image_1", "speech", "generated_video_1"],
     ],
     ids=[
         "no-image",
@@ -138,6 +169,7 @@ def test_unknown_profile_is_rejected(tmp_path: Path, profile: str) -> None:
         "extra-input",
         "duplicate-image",
         "duplicate-speech",
+        "missing-second-video",
     ],
 )
 def test_invalid_input_bindings_are_rejected(tmp_path: Path, keys: list[str]) -> None:
@@ -152,7 +184,7 @@ def test_invalid_input_bindings_are_rejected(tmp_path: Path, keys: list[str]) ->
 
 
 def test_resolved_inputs_must_match_declared_inputs(tmp_path: Path) -> None:
-    keys = ["image_1", "speech"]
+    keys = ["image_1", "speech", "generated_video_1", "generated_video_2"]
     inputs = make_inputs(tmp_path, keys)
     del inputs["image_1"]
 
@@ -163,12 +195,13 @@ def test_resolved_inputs_must_match_declared_inputs(tmp_path: Path) -> None:
 
 
 def test_empty_speech_is_rejected(tmp_path: Path) -> None:
-    inputs = make_inputs(tmp_path, ["image_1", "speech"])
+    keys = ["image_1", "speech", "generated_video_1", "generated_video_2"]
+    inputs = make_inputs(tmp_path, keys)
     inputs["speech"].write_bytes(b"")
 
     with pytest.raises(PermanentError, match="non-empty speech"):
         render_video.handle(
-            make_job(["image_1", "speech"]),
+            make_job(keys),
             inputs,
             ProcessRunner(),
         )

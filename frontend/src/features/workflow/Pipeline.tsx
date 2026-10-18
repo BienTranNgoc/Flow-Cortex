@@ -1,6 +1,6 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
 import './Pipeline.css';
-import { edgeState, STATE_WORDS, stepNameId, stepState, type StepState } from './stepDisplay';
+import { edgeState, STATE_WORDS, stepDuration, stepNameId, stepState, type StepState } from './stepDisplay';
 import { outputFields, parseReport } from './stepOutputFields';
 import { StatusGlyph, TypeGlyph } from './stepGlyphs';
 
@@ -48,6 +48,7 @@ interface NodeProps {
 }
 
 function Node({ step, order, state, selected, panelId, onSelect, problem }: Readonly<NodeProps>) {
+  const duration = step.run ? stepDuration(step.run) : null;
   const content = (
     <>
       <span className="pipeline-order">{order}</span>
@@ -67,6 +68,26 @@ function Node({ step, order, state, selected, panelId, onSelect, problem }: Read
         <span className="run-step-status" data-state="error">
           <StatusGlyph state="error" />
           Not configured
+        </span>
+      )}
+      {duration && (
+        <span className="pipeline-duration" title="Time taken">
+          <svg
+            className="pipeline-clock-icon"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          {duration}
         </span>
       )}
       {step.run && <span className="pipeline-meta">{metaLine(step.run)}</span>}

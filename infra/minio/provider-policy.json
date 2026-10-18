@@ -4,7 +4,16 @@
     {
       "Effect": "Allow",
       "Action": ["s3:PutObject"],
-      "Resource": ["arn:aws:s3:::flowcortex-media/runs/*"]
+      "Resource": ["arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": [
+        "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
+        "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1"
+      ]
     }
   ]
 }

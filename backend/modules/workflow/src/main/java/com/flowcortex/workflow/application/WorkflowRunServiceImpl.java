@@ -180,7 +180,9 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                         run.getId(),
                         stepDef.getStepOrder(),
                         stepDef.getType(),
-                        stepInput));
+                        stepInput,
+                        stepDef.getConfig(),
+                        stepDef.getInputRef()));
             }
             runSteps = runStepRepository.saveAll(runSteps);
 

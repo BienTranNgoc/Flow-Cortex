@@ -1,7 +1,9 @@
 package com.flowcortex.media.api;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /**
  * The {@code params.payload} of a {@link ProviderJob}, as {@code contracts/provider-job.schema.json}
@@ -23,6 +25,15 @@ public final class ProviderJobPayload {
     }
 
     /** {@code speechParams.payload} of a {@code generate_speech/vi_voice_v1} step. */
-    public record Speech(@NotBlank @Size(max = 8000) String script) {
+    public record Speech(@NotBlank @Size(max = 8000) String script, @NotNull UUID sourceRevisionId) {
+    }
+
+    /** {@code storyboardParams.payload} of a Product Video visual-storyboard step. */
+    public record Storyboard(@NotBlank @Size(max = 8000) String script,
+            @NotNull UUID sourceRevisionId) {
+    }
+
+    /** {@code videoParams.payload} of a {@code generate_video/vertical_ad_clip_v1} step. */
+    public record Video(@NotBlank @Size(max = 2500) String prompt, @NotNull UUID sourceRevisionId) {
     }
 }

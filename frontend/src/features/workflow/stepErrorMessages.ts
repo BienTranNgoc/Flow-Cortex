@@ -8,6 +8,8 @@ const SENTENCES: Record<string, string> = {
   run_timeout: 'This file took too long to process and was stopped. Try a shorter file.',
   media_disabled: 'The media engine is switched off right now.',
   contract_violation: 'The media engine rejected this job. Try again later.',
+  speech_too_long:
+    'The approved script is too long for the 10-second video. Start a new run with a shorter script.',
   APPROVAL_REJECTED: 'You rejected this content, so the run stopped.',
 };
 
@@ -18,6 +20,9 @@ const REAPED_CODES: ReadonlySet<string> = new Set([
   'run_timeout',
 ]);
 const REAPED_INLINE = 'This step stopped before it finished. Try running again.';
+
+/** Codes whose server message is written for members and carries specifics the sentence lacks. */
+const MEMBER_MESSAGE_CODES: ReadonlySet<string> = new Set(['speech_too_long']);
 
 export const NO_MESSAGE = 'This step stopped with an error.';
 
@@ -33,6 +38,9 @@ export function stepErrorSentence(
 ): string {
   if (code && REAPED_CODES.has(code) && !remote) {
     return REAPED_INLINE;
+  }
+  if (code && MEMBER_MESSAGE_CODES.has(code) && message) {
+    return message;
   }
   return (code ? SENTENCES[code] : undefined) ?? message ?? NO_MESSAGE;
 }
