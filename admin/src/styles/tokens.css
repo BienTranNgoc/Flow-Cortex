@@ -1,0 +1,245 @@
+/* Member SPA design tokens — ported to admin with a leading `--admin-` on
+   variables most likely to collide (surfaces, ink, brand, status, shadows,
+   gradients). Pure-shape variables (radii, motion, borders, target size) keep
+   the original names so the same `tokens.css` source remains the single source
+   of truth. Light is the default; dark opt-in via [data-theme="dark"] on root.
+
+   The admin app keeps dark as the first paint to match the existing console
+   look — see [data-theme="dark"] override below. */
+
+:root {
+  color-scheme: light;
+
+  /* Surface — light: bright paper, soft borders, gentle gradient. */
+  --admin-paper: #f3f6fa;
+  --admin-paper-2: #ffffff;
+  --admin-paper-3: #e9eef4;
+  --admin-btn-bg: #ffffff;
+  --admin-btn-bg-hover: #f1f4f9;
+  --admin-input-bg: #ffffff;
+  --admin-card-from: #ffffff;
+  --admin-card-to: #eef2f7;
+  --admin-glow: #d9e4f3;
+  --admin-header-bg: #ffffff;
+  --admin-footer-bg: #eef2f7;
+  --admin-aurora-top: #eef2f8;
+  --admin-aurora-mid: #f6f8fb;
+  --admin-aurora-bottom: #ffffff;
+  --admin-disabled-from: #5a6b78;
+  --admin-disabled-to: #354250;
+
+  /* Text — light: dark ink, softer grays for secondary copy. */
+  --admin-ink: #0c1620;
+  --admin-ink-2: #1c2530;
+  --admin-ink-3: #2b3641;
+  --admin-ink-4: #4a5762;
+  --admin-ink-5: #76838f;
+  --admin-nav-ink: #2b3641;
+  --admin-ink-disabled: #ffffff;
+
+  /* Brand */
+  --admin-primary: #066058;
+  --admin-primary-foreground: #ffffff;
+  --admin-cta-from: #2a4acc;
+  --admin-cta-to: #6f5cff;
+  --admin-accent: #2a4acc;
+  --admin-accent-soft: #e3ebff;
+  --admin-primary-soft: #cfeae6;
+  --admin-teal: #066058;
+  --admin-teal-bright: #054842;
+  --admin-teal-glow: #066058;
+  --admin-teal-deep: #04332f;
+  --admin-violet: #6f5cff;
+  --admin-indigo: #2a2a8c;
+  --admin-aurora-teal: #14c8b6;
+  --admin-aurora-indigo: #4a6cff;
+  --admin-aurora-cyan: #14c8b6;
+
+  /* Brand mark (FlowCortex logo) — light */
+  --logo-stroke-violet: #2a2a8c;
+  --logo-stroke-teal: #0fb5a8;
+  --logo-fill-violet: #2a2a8c;
+  --logo-fill-teal: #0fb5a8;
+  --logo-glow-1: color-mix(in srgb, var(--admin-teal-glow) 60%, transparent);
+  --logo-glow-2: color-mix(in srgb, var(--admin-accent) 45%, transparent);
+
+  /* Status */
+  --admin-red: #b8264b;
+  --admin-red-soft: #fde0e6;
+  --admin-red-strong: #d12d57;
+  --admin-red-light: #b8264b;
+  --admin-warning: #92580a;
+  --admin-warning-soft: #fff3dd;
+  --admin-green: #0a6b3e;
+  --admin-green-soft: #cdebd6;
+  --admin-green-bright: #0a6b3e;
+  --admin-green-vivid: #0a6b3e;
+
+  /* Form controls */
+  --admin-input-text: var(--admin-ink);
+  --admin-input-placeholder: var(--admin-ink-3);
+
+  /* Gradients and shadows */
+  --admin-gradient-cta: linear-gradient(100deg, var(--admin-cta-from), var(--admin-cta-to));
+  --admin-gradient-card: linear-gradient(145deg, var(--admin-card-from), var(--admin-card-to));
+  --admin-shadow-lg: 0 18px 50px rgba(15, 36, 60, 0.12);
+  --admin-shadow: 0 14px 36px rgba(15, 36, 60, 0.08);
+  --admin-shadow-color: #0c1620;
+
+  /* Shape and size (no prefix — shape semantics are universal) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --target-min: 44px;
+
+  /* Motion */
+  --dur-quick: 120ms;
+  --dur-standard: 220ms;
+  --dur-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Header (admin glass) */
+  --admin-header-glass-bg: color-mix(in srgb, var(--admin-header-bg) 80%, transparent);
+  --admin-header-glass-blur: 14px;
+  --admin-header-glass-border: color-mix(in srgb, var(--admin-indigo) 22%, transparent);
+  --admin-nav-active-bg: color-mix(in srgb, var(--admin-teal-glow) 18%, transparent);
+  --admin-nav-active-fg: var(--admin-teal-deep);
+  --admin-nav-inactive-fg: var(--admin-ink-3);
+
+  /* Card surface (admin panels) */
+  --admin-card-surface: #ffffff;
+  --admin-card-surface-2: #f7f9fc;
+  --admin-card-edge: color-mix(in srgb, var(--admin-ink-5) 32%, transparent);
+  --admin-card-edge-strong: color-mix(in srgb, var(--admin-teal-glow) 55%, transparent);
+  --admin-card-shadow: 0 2px 8px color-mix(in srgb, var(--admin-ink) 4%, transparent);
+  --admin-card-hover-glow: color-mix(in srgb, var(--admin-aurora-cyan) 18%, transparent);
+
+  --admin-pill-warning-fg: var(--admin-warning);
+  --admin-pill-warning-bg: var(--admin-warning-soft);
+  --admin-pill-error-fg: var(--admin-red);
+  --admin-pill-error-bg: var(--admin-red-soft);
+  --admin-pill-info-fg: var(--admin-ink-2);
+  --admin-pill-info-bg: color-mix(in srgb, var(--admin-ink-5) 22%, transparent);
+
+  --admin-connector: color-mix(in srgb, var(--admin-ink-5) 50%, transparent);
+
+  /* Shared borders / lines (no prefix — identical semantics to user). */
+  --line: #98a3ad;
+  --line-2: #76838f;
+  --line-3: #b6c0cb;
+  --line-soft: #c4ccd5;
+  --line-subtle: #b6c0cb;
+  --card-border: #98a3ad;
+  --control-border: #76838f;
+  --input-border: #5a6b78;
+  --input-border-hover: #3a4a5b;
+  --edge: #5a6b78;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --admin-paper: #080c13;
+  --admin-paper-2: #0d131c;
+  --admin-paper-3: #101721;
+  --admin-btn-bg: #182232;
+  --admin-btn-bg-hover: #1f2c40;
+  --admin-input-bg: #0b1119;
+  --admin-card-from: #101a24;
+  --admin-card-to: #0c111a;
+  --admin-glow: #152b38;
+  --admin-header-bg: #0f0f1e;
+  --admin-footer-bg: #080812;
+  --admin-aurora-top: #0d1828;
+  --admin-aurora-mid: #060a12;
+  --admin-aurora-bottom: #04060c;
+  --admin-disabled-from: #1a3540;
+  --admin-disabled-to: #2a3a55;
+
+  --admin-ink: #e8f1f2;
+  --admin-ink-2: #c8d4dc;
+  --admin-ink-3: #9eacb6;
+  --admin-ink-4: #81919e;
+  --admin-ink-5: #5a6b78;
+  --admin-nav-ink: #8a9ab5;
+  --admin-ink-disabled: #a8b6c2;
+
+  --admin-primary: #35e5e0;
+  --admin-primary-foreground: #061016;
+  --admin-cta-from: #1be0d1;
+  --admin-cta-to: #5174ff;
+  --admin-accent: #5f9cff;
+  --admin-accent-soft: #1b2440;
+  --admin-primary-soft: #0b2a2c;
+  --admin-teal: #00e5db;
+  --admin-teal-bright: #5ef0e0;
+  --admin-teal-glow: #5eead4;
+  --admin-teal-deep: #00d4ce;
+  --admin-violet: #b3a4ff;
+  --admin-indigo: #120074;
+  --admin-aurora-teal: #0fb5a8;
+  --admin-aurora-indigo: #4338ca;
+  --admin-aurora-cyan: #06b6d4;
+
+  /* Brand mark (FlowCortex logo) — dark */
+  --logo-stroke-violet: #120074;
+  --logo-stroke-teal: #00d4ce;
+  --logo-fill-violet: #120074;
+  --logo-fill-teal: #00d4ce;
+  --logo-glow-1: color-mix(in srgb, var(--admin-teal-glow) 65%, transparent);
+  --logo-glow-2: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+
+  --admin-red: #ff9a9a;
+  --admin-red-soft: #3b1518;
+  --admin-red-strong: #ff7a7a;
+  --admin-red-light: #ffb8b8;
+  --admin-warning: #ffd766;
+  --admin-warning-soft: #3a2f0b;
+  --admin-green: #7ee2a8;
+  --admin-green-soft: #0f3320;
+  --admin-green-bright: #69f0a8;
+  --admin-green-vivid: #4ade80;
+
+  --admin-input-text: var(--admin-ink);
+  --admin-input-placeholder: var(--admin-ink-3);
+
+  --admin-gradient-cta: linear-gradient(100deg, var(--admin-cta-from), var(--admin-cta-to));
+  --admin-gradient-card: linear-gradient(145deg, var(--admin-card-from), var(--admin-card-to));
+  --admin-shadow-lg: 0 24px 70px #0008;
+  --admin-shadow: 0 20px 60px #0005;
+  --admin-shadow-color: #000000;
+
+  --admin-header-glass-bg: color-mix(in srgb, var(--admin-header-bg) 78%, transparent);
+  --admin-header-glass-blur: 18px;
+  --admin-header-glass-border: color-mix(in srgb, var(--admin-indigo) 55%, transparent);
+  --admin-nav-active-bg: color-mix(in srgb, var(--admin-teal-glow) 12%, transparent);
+  --admin-nav-active-fg: var(--admin-ink);
+  --admin-nav-inactive-fg: var(--admin-ink-4);
+
+  --admin-card-surface: #0f172a;
+  --admin-card-surface-2: #1a2333;
+  --admin-card-edge: color-mix(in srgb, var(--admin-ink-5) 18%, transparent);
+  --admin-card-edge-strong: color-mix(in srgb, var(--admin-teal-glow) 45%, transparent);
+  --admin-card-hover-glow: color-mix(in srgb, var(--admin-aurora-cyan) 18%, transparent);
+
+  --admin-pill-warning-fg: var(--admin-warning);
+  --admin-pill-warning-bg: var(--admin-warning-soft);
+  --admin-pill-error-fg: var(--admin-red);
+  --admin-pill-error-bg: var(--admin-red-soft);
+  --admin-pill-info-fg: var(--admin-ink-2);
+  --admin-pill-info-bg: color-mix(in srgb, var(--admin-ink-5) 18%, transparent);
+
+  --admin-connector: color-mix(in srgb, var(--admin-ink-5) 35%, transparent);
+
+  --line: #26313d;
+  --line-2: #334352;
+  --line-3: #2e3b49;
+  --line-soft: #1c2935;
+  --line-subtle: #233443;
+  --card-border: #253746;
+  --control-border: #2a3a4a;
+  --input-border: #62727f;
+  --input-border-hover: #3a4a5b;
+  --edge: var(--input-border);
+}

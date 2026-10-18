@@ -1,4 +1,4 @@
-import { FlowCortexLogo } from './FlowCortexLogo';
+import { FlowCortexLogo } from '@flow-cortex/ui-kit';
 import './BrandPanel.css';
 
 const BULLETS = [

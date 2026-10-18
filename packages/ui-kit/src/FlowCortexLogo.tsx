@@ -1,3 +1,5 @@
+import './flowCortexLogo.css';
+
 interface LogoProps {
   readonly size?: number;
 }
@@ -8,6 +10,11 @@ interface LogoProps {
  * the circuit side as silicon. Teal nodes pulse on a staggered loop, the
  * rest stay steady so the eye follows the activity. Tokens drive every
  * colour so light and dark themes both look balanced.
+ *
+ * Shared between the member SPA and the admin console (this package is the
+ * single source of truth for the mark). Consumer apps must define the four
+ * `--logo-stroke-violet / --logo-stroke-teal / --logo-fill-violet /
+ * --logo-fill-teal / --logo-glow-1 / --logo-glow-2` tokens.
  */
 export function FlowCortexLogo({ size = 34 }: LogoProps) {
   return (

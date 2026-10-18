@@ -2,8 +2,10 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { configureAdminClient } from './app/configureClient';
+import { initTheme } from './app/useTheme';
 
 configureAdminClient();
+initTheme();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

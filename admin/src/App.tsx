@@ -1,24 +1,39 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import './app/base.css';
+import './styles/tokens.css';
+import './styles/base.css';
 import { AdminLayout } from './app/AdminLayout';
 import { reachableItems } from './app/nav';
 import { queryClient } from './app/queryClient';
 import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
+import { AuditLogPage } from './features/audit/AuditLogPage';
+import { ApprovalQueuePage } from './features/approvals/ApprovalQueuePage';
+import { CreditsPage } from './features/credits/CreditsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { FeaturesPage } from './features/features/FeaturesPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { ProvidersPage } from './features/providers/ProvidersPage';
 import { RunsPage } from './features/runs/RunsPage';
+import { SmsOutboxPage } from './features/sms/SmsOutboxPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
+import { WorkflowsPage } from './features/workflows/WorkflowsPage';
 
 const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
+  '/workflows': <WorkflowsPage />,
   '/runs': <RunsPage />,
-  '/media-jobs': <MediaJobsPage />,
+  '/approvals': <ApprovalQueuePage />,
+  '/credits': <CreditsPage />,
+  '/providers': <ProvidersPage />,
   '/users': <UsersPage />,
+  '/sms-outbox': <SmsOutboxPage />,
+  '/features': <FeaturesPage />,
+  '/audit': <AuditLogPage />,
+  '/media-jobs': <MediaJobsPage />,
 };
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */

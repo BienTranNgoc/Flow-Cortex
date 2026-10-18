@@ -2,6 +2,9 @@ import { ApiError } from '@flow-cortex/api-client';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
+import { ArrowLeft } from 'lucide-react';
+import { PageHeading } from '../../app/PageHeading';
+import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
@@ -20,41 +23,41 @@ export function UserDetailPage() {
 
   if (!parsedId.success) {
     return (
-      <main>
+      <div>
         <h1>User not found</h1>
-        <p className="list-error" role="alert">
+        <p className="cortex-admin-error" role="alert">
           The user ID is not valid.
         </p>
-        <Link className="table-link" to="/users">
+        <Link className="cortex-admin-link" to="/users">
           Back to users
         </Link>
-      </main>
+      </div>
     );
   }
 
   if (userQuery.isLoading) {
     return (
-      <main>
+      <div>
         <h1>User details</h1>
-        <output>Loading user…</output>
-      </main>
+        <output className="cortex-admin-loading">Loading user…</output>
+      </div>
     );
   }
 
   if (userQuery.isError || !userQuery.data) {
     return (
-      <main>
+      <div>
         <h1>User details</h1>
-        <div className="list-error">
+        <div className="cortex-admin-error">
           <p role="alert">Could not load this user.</p>
-          <button type="button" onClick={() => userQuery.refetch()}>
+          <button type="button" className="cortex-admin-btn" onClick={() => userQuery.refetch()}>
             Retry
           </button>
-          <Link className="table-link" to="/users">
+          <Link className="cortex-admin-link" to="/users">
             Back to users
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -62,6 +65,7 @@ export function UserDetailPage() {
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+  const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
     const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
@@ -73,41 +77,53 @@ export function UserDetailPage() {
   };
 
   return (
-    <main className="user-detail-page">
-      <Link className="back-link" to="/users">
-        ← All users
+    <div>
+      <Link className="cortex-admin-back-link" to="/users">
+        <ArrowLeft size={16} aria-hidden="true" /> All users
       </Link>
-      <div className="page-heading">
-        <div className="user-profile-heading">
-          <span className="user-avatar user-avatar-large" aria-hidden="true">
-            {user.name?.trim().charAt(0).toUpperCase() || '?'}
+      <PageHeading
+        eyebrow="User account"
+        title={user.name || user.email || 'User'}
+        description={user.email}
+        actions={
+          <span
+            className={
+              user.status === 'ACTIVE'
+                ? 'cortex-admin-pill cortex-admin-pill--success'
+                : 'cortex-admin-pill cortex-admin-pill--warning'
+            }
+          >
+            {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
           </span>
-          <div>
-            <p className="eyebrow">User account</p>
-            <h1>{user.name || user.email}</h1>
-            <p className="page-description">{user.email}</p>
-          </div>
-        </div>
-        <span
-          className={`status-badge ${user.status === 'ACTIVE' ? 'status-success' : 'status-warning'}`}
-        >
-          {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
-        </span>
-      </div>
+        }
+      />
 
-      <div className="detail-grid">
-        <section className="detail-panel">
-          <div className="section-heading">
+      <div className="cortex-admin-detail-grid">
+        <section className="cortex-admin-panel">
+          <header className="cortex-admin-section-heading">
             <div>
               <h2>Account information</h2>
-              <p>Identity and access details</p>
+              <p>Identity and access details.</p>
+            </div>
+          </header>
+          <div className="cortex-admin-user-cell">
+            <span
+              className="cortex-admin-user-avatar cortex-admin-user-avatar--lg"
+              aria-hidden="true"
+            >
+              {initials}
+            </span>
+            <div>
+              <strong>{user.name || '—'}</strong>
+              <p className="cortex-admin-page-description">{user.email}</p>
             </div>
           </div>
-          <dl className="user-meta-list">
+          <hr className="cortex-admin-divider" />
+          <dl className="cortex-admin-meta-list">
             <div>
               <dt>User ID</dt>
               <dd>
-                <code>{user.id}</code>
+                <code className="cortex-admin-table-job-id">{user.id}</code>
               </dd>
             </div>
             <div>
@@ -120,7 +136,12 @@ export function UserDetailPage() {
             </div>
             <div>
               <dt>Status</dt>
-              <dd>{user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}</dd>
+              <dd>
+                <StatusPill
+                  tone={user.status === 'ACTIVE' ? 'success' : 'warning'}
+                  label={user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+                />
+              </dd>
             </div>
             <div>
               <dt>Registered</dt>
@@ -137,14 +158,14 @@ export function UserDetailPage() {
           </dl>
         </section>
 
-        <section className="detail-panel">
-          <div className="section-heading">
+        <section className="cortex-admin-panel">
+          <header className="cortex-admin-section-heading">
             <div>
               <h2>Access management</h2>
               <p>Changes are recorded without deleting account history.</p>
             </div>
-          </div>
-          <div className="field">
+          </header>
+          <div className="cortex-admin-field">
             <label htmlFor="user-role">Role</label>
             <select
               id="user-role"
@@ -161,15 +182,21 @@ export function UserDetailPage() {
           </div>
           <button
             type="button"
+            className="cortex-admin-btn cortex-admin-btn--primary"
             onClick={saveRole}
             disabled={updateMutation.isPending || (role || user.role) === user.role}
           >
             {updateMutation.isPending ? 'Saving…' : 'Save role'}
           </button>
-          {roleError && <p role="alert">{roleError}</p>}
+          {roleError && <p className="cortex-admin-form-error" role="alert">{roleError}</p>}
+          <hr className="cortex-admin-divider" />
           <button
-            className={nextStatus === 'SUSPENDED' ? 'button-danger' : ''}
             type="button"
+            className={
+              nextStatus === 'SUSPENDED'
+                ? 'cortex-admin-btn cortex-admin-btn--danger'
+                : 'cortex-admin-btn'
+            }
             onClick={() =>
               updateMutation.mutate({ id: parsedId.data, changes: { status: nextStatus } })
             }
@@ -177,10 +204,12 @@ export function UserDetailPage() {
           >
             {nextStatus === 'SUSPENDED' ? 'Suspend account' : 'Reactivate account'}
           </button>
-          {updateError && <p role="alert">{updateError.detail}</p>}
-          {updateMutation.isSuccess && <output className="success-note">Account updated.</output>}
+          {updateError && <p className="cortex-admin-form-error" role="alert">{updateError.detail}</p>}
+          {updateMutation.isSuccess && (
+            <p className="cortex-admin-form-success">Account updated.</p>
+          )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

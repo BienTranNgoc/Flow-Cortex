@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
-import { FlowCortexLogo } from './FlowCortexLogo';
+import { FlowCortexLogo } from '@flow-cortex/ui-kit';
 import { ThemeToggle } from './ThemeToggle';
 import { accountStatsEnabled } from './featureFlags';
 import { DocsMenu } from './DocsMenu';
