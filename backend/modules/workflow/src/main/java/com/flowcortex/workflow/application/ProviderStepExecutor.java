@@ -141,6 +141,7 @@ class ProviderStepExecutor implements StepExecutor {
         return new StepFailedException("contract_violation",
                 "Product image " + key + " is missing from the run inputs", cause);
     }
+
     private Map<String, Object> payload(String input) {
         if (input == null || input.isBlank()) {
             throw new StepFailedException("contract_violation", "The provider step has no input");

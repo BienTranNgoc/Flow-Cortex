@@ -149,6 +149,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         assertThat(inputs.get(0).get("bucket").asString()).isEqualTo(MEDIA_BUCKET);
         assertThat(inputs.get(0).get("objectKey").asString()).isEqualTo("runs/" + runId + "/inputs/image_1");
     }
+
     private void publishVideoResult(UUID runId, JsonNode job, String clipKey, String hashCharacter) {
         publishResult("provider", runId, job,
                 output("clip.mp4", clipKey, "video/mp4", 16),

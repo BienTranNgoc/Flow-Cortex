@@ -129,6 +129,7 @@ class ProviderStepExecutorTest {
         assertThat(sent.getValue().inputs()).hasSize(1);
         assertThat(sent.getValue().inputs().getFirst().key()).isEqualTo("image_1");
     }
+
     @SuppressWarnings("unchecked")
     private static java.util.Map<String, Object> castPayload(ProviderJob job) {
         return (java.util.Map<String, Object>) job.params().get("payload");
