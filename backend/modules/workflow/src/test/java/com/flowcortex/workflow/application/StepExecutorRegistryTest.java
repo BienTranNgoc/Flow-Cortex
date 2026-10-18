@@ -30,7 +30,7 @@ class StepExecutorRegistryTest {
     }
 
     private static StepContext context(String input) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null);
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null, null);
     }
 
     @Test
@@ -72,7 +72,8 @@ class StepExecutorRegistryTest {
         assertThat(registry.isRemote("extract_audio")).isTrue();
         assertThat(registry.isRemote("echo")).isFalse();
         assertThat(registry.usesStoredInput("render_video")).isTrue();
-        assertThat(registry.usesStoredInput("generate_script")).isFalse();
+        assertThat(registry.usesStoredInput("generate_script")).isTrue();
+        assertThat(registry.usesStoredInput("generate_video")).isTrue();
     }
 
     @Test

@@ -106,6 +106,13 @@ class GenerateScriptJob(BaseModel):
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_script"]
     params: ProductAdParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional product image the worker forwards to the multimodal script provider.",
+            max_length=1,
+        ),
+    ] = None
     outputPrefix: Annotated[
         StrictStr,
         Field(

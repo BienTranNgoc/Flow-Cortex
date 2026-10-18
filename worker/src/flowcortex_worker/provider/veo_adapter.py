@@ -47,7 +47,9 @@ class VeoConfig:
 class VeoAdapter:
     config: VeoConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         raise PermanentError(
             "provider_capability_unavailable", "Veo script generation is not implemented"
         )

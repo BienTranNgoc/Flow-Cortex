@@ -100,7 +100,9 @@ def _generate_script(
 ) -> ProviderOutcome:
     if not isinstance(job, GenerateScriptJob):
         raise UnsupportedCapability("generate_script received the wrong job shape")
-    script = adapter.generate_script(job.params.payload)
+    script = adapter.generate_script(
+        job.params.payload, _fetch_reference_image(job, context)
+    )
     return ProviderOutcome(
         data={"profile": "product_ad_v1", "language": "vi", "script": script}
     )
@@ -221,9 +223,21 @@ def _resolve_reference_image(
 ) -> tuple[bytes | None, str | None]:
     """Returns (bytes, url). Exactly one is populated: bytes for byte-only adapters, URL for
     URL-based adapters. The executor decides which side to fill based on the provider."""
+    body = _fetch_reference_image(job, context)
+    if body is None:
+        return None, None
+    if not job.inputs:
+        raise AssertionError("resolved reference image has no input")
+    reference = job.inputs[0]
+    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+
+
+def _fetch_reference_image(
+    job: GenerateScriptJob | GenerateVideoJob, context: ExecutionContext
+) -> bytes | None:
     inputs = job.inputs or ()
     if not inputs:
-        return None, None
+        return None
     if len(inputs) > 1:
         raise PermanentError(
             "contract_violation",
@@ -236,10 +250,7 @@ def _resolve_reference_image(
             "input_rejected",
             f"reference image '{reference.key}' is not a recognised image format",
         )
-    # The URL-based providers (Seedance, Wan) cannot read our private bucket; the byte-based
-    # provider (Veo) accepts inline base64, so the URL is unused there. The URL is a short-lived
-    # presigned GET scoped to this object only.
-    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+    return body
 
 
 def _looks_like_image(body: bytes) -> bool:

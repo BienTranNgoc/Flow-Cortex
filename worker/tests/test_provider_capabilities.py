@@ -108,6 +108,31 @@ def test_product_script_includes_confirmed_price_and_promotion() -> None:
     assert "Ưu đãi: Giảm 10% hôm nay" in outcome.data["script"]
 
 
+def test_product_script_fetches_and_passes_reference_image() -> None:
+    request = job(
+        "generate_script",
+        "product_ad_v1",
+        {"productName": "Bình giữ nhiệt", "description": "Giữ đồ uống tiện lợi"},
+    )
+    request["inputs"] = [
+        {"key": "image_1", "bucket": "flowcortex-media", "objectKey": "runs/r/inputs/image_1"}
+    ]
+    storage = MagicMock()
+    image = b"\x89PNG\r\n\x1a\nproduct"
+    storage.fetch_bytes.return_value = image
+    adapter = MagicMock()
+    adapter.generate_script.return_value = "Kịch bản có hình ảnh"
+
+    execute(
+        ProviderJob.model_validate(request),
+        adapter,
+        ExecutionContext(storage, BUCKET, f"runs/{RUN_ID}/steps/1/attempts/1/", MagicMock()),
+    )
+
+    adapter.generate_script.assert_called_once()
+    assert adapter.generate_script.call_args.args[1] == image
+
+
 def test_storyboard_creates_two_typed_scenes_from_approved_revision() -> None:
     outcome = execute(
         ProviderJob.model_validate(

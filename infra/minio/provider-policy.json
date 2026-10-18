@@ -10,6 +10,7 @@
       "Effect": "Allow",
       "Action": ["s3:GetObject"],
       "Resource": [
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/*",
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json"
       ]

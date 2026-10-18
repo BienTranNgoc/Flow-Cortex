@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -51,7 +52,9 @@ class WanConfig:
 class WanAdapter:
     config: WanConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         raise PermanentError(
             "provider_capability_unavailable", "Wan script generation is not implemented"
         )
@@ -107,7 +110,11 @@ class WanAdapter:
             "frames_per_second": self.config.frames_per_second,
             "disable_safety_checker": False,
         }
-        if request.reference_image_url:
+        if request.reference_image_bytes:
+            mime = _image_mime(request.reference_image_bytes)
+            encoded = base64.b64encode(request.reference_image_bytes).decode("ascii")
+            input_body["image"] = f"data:{mime};base64,{encoded}"
+        elif request.reference_image_url:
             input_body["image"] = request.reference_image_url
         body = json.dumps({"input": input_body}).encode()
         response = self._json_request(
@@ -138,10 +145,17 @@ class WanAdapter:
                     )
                 return VideoArtifact(self._download_video(video_url), task_id)
             if status in _TERMINAL_FAILURES:
-                log.warning("Wan prediction failed", extra={"taskStatus": status})
-                raise PermanentError(
-                    "provider_request_failed", f"Wan prediction ended with status {status}"
+                error_detail = _string(response, "error")
+                log.warning(
+                    "Wan prediction failed",
+                    extra={"taskStatus": status, "error": error_detail},
                 )
+                message = (
+                    f"Wan prediction ended with status {status}: {error_detail}"
+                    if error_detail
+                    else f"Wan prediction ended with status {status}"
+                )
+                raise PermanentError("provider_request_failed", message)
             if status not in {"starting", "processing"}:
                 raise PermanentError(
                     "provider_response_invalid", "Wan returned an unknown prediction status"
@@ -241,3 +255,16 @@ def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
     raise PermanentError(
         "provider_request_failed", f"Wan rejected the request with HTTP {exc.code}"
     ) from exc
+
+
+def _image_mime(body: bytes) -> str:
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if body[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    raise PermanentError("input_rejected", "product image format is not supported")
+

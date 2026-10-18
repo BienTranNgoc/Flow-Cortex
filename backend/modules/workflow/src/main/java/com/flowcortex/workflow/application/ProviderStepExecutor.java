@@ -44,6 +44,11 @@ class ProviderStepExecutor implements StepExecutor {
     }
 
     @Override
+    public boolean bindsRunInputs() {
+        return "generate_script".equals(capability) || "generate_video".equals(capability);
+    }
+
+    @Override
     public Duration maxRuntime() {
         return mediaJobs.providerLimits().maxRuntime();
     }
@@ -60,7 +65,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", profile(context.config()));
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params, videoInputs(context.config()),
+                context.stepOrder(), capability, params, providerInputs(context.storedInput(), context.config()),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
         try {
@@ -72,15 +77,19 @@ class ProviderStepExecutor implements StepExecutor {
         return null;
     }
 
-    /**
-     * Video steps may carry at most one reference image; the schema enforces {@code maxItems:1}.
-     * Script and speech steps have no inputs. The image reference is read from the step config's
-     * {@code referenceInput} entry (a single {@code {key, bucket, objectKey}} object) so the
-     * producer wires the reference alongside the visual-direction instructions.
-     */
-    private List<ProviderInput> videoInputs(String config) {
-        if (!"generate_video".equals(capability)) {
+    /** Script and video use the first immutable product image; config remains a legacy fallback. */
+    private List<ProviderInput> providerInputs(String storedInput, String config) {
+        if (!bindsRunInputs()) {
             return List.of();
+        }
+        if (storedInput != null && !storedInput.isBlank()) {
+            try {
+                List<ProviderInput> inputs = objectMapper.readValue(storedInput, new TypeReference<>() { });
+                return inputs.isEmpty() ? List.of() : List.of(inputs.getFirst());
+            } catch (JsonProcessingException e) {
+                throw new StepFailedException("contract_violation",
+                        "Provider image input is not a valid ordered list", e);
+            }
         }
         if (config == null || config.isBlank()) {
             return List.of();

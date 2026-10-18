@@ -1,10 +1,11 @@
-"""The provider identity reads back only its own speech artifacts, never run inputs or videos."""
+"""The provider identity reads product inputs and its own speech artifacts, never video outputs."""
 
 from __future__ import annotations
 
 import json
 import uuid
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from botocore.exceptions import ClientError
@@ -17,6 +18,7 @@ SPEECH_ARTIFACTS = {
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
 }
+RUN_INPUTS = "arn:aws:s3:::flowcortex-media/runs/*/inputs/*"
 
 
 def _resources_for(action: str) -> set[str]:
@@ -35,11 +37,11 @@ def _status(response: dict[str, Any]) -> int:
     return int(response["ResponseMetadata"]["HTTPStatusCode"])
 
 
-def test_provider_reads_only_speech_artifacts() -> None:
+def test_provider_reads_only_run_inputs_and_speech_artifacts() -> None:
     readable = _resources_for("s3:GetObject")
 
     assert not [resource for resource in readable if resource.endswith("runs/*")]
-    assert readable == SPEECH_ARTIFACTS
+    assert readable == SPEECH_ARTIFACTS | {RUN_INPUTS}
 
 
 def test_provider_still_writes_under_runs() -> None:
@@ -64,11 +66,19 @@ def test_store_answers_404_for_a_missing_speech_artifact_so_reuse_sees_it_absent
     assert storage.head_object(MEDIA_BUCKET, manifest) is None
 
 
-@pytest.mark.parametrize("name", ["inputs/x", "steps/4/attempts/1/video.mp4"])
-def test_store_answers_403_when_the_provider_reads_a_run_input_or_video(
-    provider_silo: ProviderSilo, name: str
+def test_provider_can_fetch_a_snapshotted_run_input(provider_silo: ProviderSilo) -> None:
+    key = f"runs/{uuid.uuid4()}/inputs/image_1"
+    provider_silo.root.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"run data")
+    client = provider_silo.provider.client()
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    assert storage.fetch_bytes(MEDIA_BUCKET, key, MagicMock()) == b"run data"
+
+
+def test_store_answers_403_when_the_provider_reads_a_video_output(
+    provider_silo: ProviderSilo,
 ) -> None:
-    key = f"runs/{uuid.uuid4()}/{name}"
+    key = f"runs/{uuid.uuid4()}/steps/4/attempts/1/video.mp4"
     provider_silo.root.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"run data")
     client = provider_silo.provider.client()
     storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)

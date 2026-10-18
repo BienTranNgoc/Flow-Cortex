@@ -10,6 +10,7 @@ boundary, and the worker redaction rule is enforced by the runtime logger (see
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -154,6 +155,9 @@ _SYSTEM_PROMPT = (
     "- Never invent features, materials, discounts, guarantees, "
     "scarcity, customer reviews, or product performance claims.\n"
     "- Never invent a price or promotion.\n"
+    "- Treat the attached product image as visual ground truth for appearance, colour, shape, "
+    "packaging and visible details. Do not infer materials, performance or claims that are not "
+    "confirmed by the text input.\n"
     "- If a CTA is provided, never modify it. If omitted, create an appropriate call-to-action.\n"
     "- Ensure the final script is coherent, persuasive, and ready "
     "for direct text-to-speech generation."
@@ -199,8 +203,10 @@ class OpenAIProviderAdapter:
 
     config: OpenAIConfig
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
-        script = self._request_script(payload)
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
+        script = self._request_script(payload, reference_image)
         # One last defensive cap: an OpenAI-compatible server may ignore the requested schema, so
         # a future schema edit must keep this boundary check in lockstep.
         if not isinstance(script, str) or not script:
@@ -262,10 +268,12 @@ class OpenAIProviderAdapter:
             "provider_capability_unavailable", "OpenAI video generation is not implemented"
         )
 
-    def _request_script(self, payload: ProductAdPayload) -> str:
+    def _request_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None
+    ) -> str:
         script_obj = self._request_json(
             _SYSTEM_PROMPT,
-            self._user_message(payload),
+            self._user_content(payload, reference_image),
             _SCRIPT_RESPONSE_FORMAT,
             temperature=0.4,
         )
@@ -283,7 +291,7 @@ class OpenAIProviderAdapter:
     def _request_json(
         self,
         system_prompt: str,
-        user_message: str,
+        user_message: str | list[dict[str, Any]],
         response_format: dict[str, Any],
         *,
         temperature: float,
@@ -370,6 +378,38 @@ class OpenAIProviderAdapter:
         if payload.promotion is not None:
             parts.append(f"promotion: {payload.promotion}")
         return "\n".join(parts)
+
+    @classmethod
+    def _user_content(
+        cls, payload: ProductAdPayload, reference_image: bytes | None
+    ) -> str | list[dict[str, Any]]:
+        text = cls._user_message(payload)
+        if reference_image is None:
+            return text
+        mime = _image_mime(reference_image)
+        encoded = base64.b64encode(reference_image).decode("ascii")
+        return [
+            {
+                "type": "text",
+                "text": text + "\nUse the attached product image as visual ground truth.",
+            },
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{encoded}", "detail": "high"},
+            },
+        ]
+
+
+def _image_mime(body: bytes) -> str:
+    if body[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if body[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp"
+    raise PermanentError("input_rejected", "product image format is not supported")
 
 
 def _provider_error_code(exc: urllib.error.HTTPError) -> str:

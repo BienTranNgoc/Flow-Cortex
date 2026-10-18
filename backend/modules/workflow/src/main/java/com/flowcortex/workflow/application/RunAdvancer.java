@@ -275,7 +275,7 @@ class RunAdvancer {
                         run.getInput(), outputsByOrder);
             };
             StepContext context = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
-                    resolvedInput, definition == null ? null : definition.getConfig());
+                    resolvedInput, step.getInput(), definition == null ? null : definition.getConfig());
             if (executor.isEmpty()) {
                 inClaim = () -> {
                     throw new StepFailedException(null, "Unsupported step type: " + step.getType());
@@ -315,7 +315,7 @@ class RunAdvancer {
     private void submitInline(UUID runId, RunStep step, StepExecutor executor, String resolvedInput,
             WorkflowStep definition) {
         StepContext context = new StepContext(runId, step.getId(), step.getStepOrder(), step.getType(),
-                step.getAttempt(), resolvedInput, definition == null ? null : definition.getConfig());
+                step.getAttempt(), resolvedInput, step.getInput(), definition == null ? null : definition.getConfig());
         try {
             taskExecutor.execute(() -> inRun(runId, () -> {
                 try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),

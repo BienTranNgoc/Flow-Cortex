@@ -93,7 +93,9 @@ class VideoAbort(Protocol):
 
 
 class ScriptAdapter(Protocol):
-    def generate_script(self, payload: ProductAdPayload) -> str: ...
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str: ...
     def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact: ...
 
 
@@ -126,8 +128,10 @@ class CapabilityProviderAdapter:
     speech_adapter: SpeechAdapter
     video_adapter: VideoAdapter
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
-        return self.script_adapter.generate_script(payload)
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
+        return self.script_adapter.generate_script(payload, reference_image)
 
     def generate_storyboard(self, request: StoryboardRequest) -> StoryboardArtifact:
         return self.script_adapter.generate_storyboard(request)
@@ -151,7 +155,9 @@ class CapabilityProviderAdapter:
 class FixtureProviderAdapter:
     """Deterministic local adapter for development and contract tests."""
 
-    def generate_script(self, payload: ProductAdPayload) -> str:
+    def generate_script(
+        self, payload: ProductAdPayload, reference_image: bytes | None = None
+    ) -> str:
         parts = [
             f"Khám phá {payload.productName}.",
             payload.description,

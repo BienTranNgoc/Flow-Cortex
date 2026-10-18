@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.media.api.provider.ProviderInput;
 import com.flowcortex.media.api.provider.ProviderJob;
 import java.time.Clock;
 import java.time.Duration;
@@ -35,6 +36,24 @@ class ProviderStepExecutorTest {
         assertThat(sent.getValue().capability()).isEqualTo("generate_script");
         assertThat(sent.getValue().params()).containsEntry("profile", "product_ad_v1");
         assertThat(castPayload(sent.getValue())).containsOnlyKeys("productName", "description", "cta");
+    }
+
+    @Test
+    void scriptJobCarriesTheFirstSnapshottedProductImage() {
+        ProviderStepExecutor executor = executor("generate_script", "product_ad_v1");
+        StepContext context = context("""
+                {"productName":"Bình giữ nhiệt","description":"Giữ đồ uống"}
+                """, """
+                [{"key":"image_1","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_1"},
+                 {"key":"image_2","bucket":"flowcortex-media","objectKey":"runs/r/inputs/image_2"}]
+                """, "{\"profile\":\"product_ad_v1\"}");
+
+        executor.execute(context);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).containsExactly(
+                new ProviderInput("image_1", "flowcortex-media", "runs/r/inputs/image_1"));
     }
 
     @Test
@@ -84,7 +103,11 @@ class ProviderStepExecutorTest {
     }
 
     private static StepContext context(String input, String config) {
+        return context(input, null, config);
+    }
+
+    private static StepContext context(String input, String storedInput, String config) {
         UUID runId = UUID.randomUUID();
-        return new StepContext(runId, UUID.randomUUID(), 1, "provider", (short) 1, input, config);
+        return new StepContext(runId, UUID.randomUUID(), 1, "provider", (short) 1, input, storedInput, config);
     }
 }

@@ -138,6 +138,12 @@
         "stepOrder": { "type": "integer", "minimum": 1 },
         "capability": { "const": "generate_script" },
         "params": { "$ref": "#/$defs/productAdParams" },
+        "inputs": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/videoInput" },
+          "description": "Optional product image the worker forwards to the multimodal script provider."
+        },
         "outputPrefix": {
           "type": "string",
           "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",

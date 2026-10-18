@@ -67,6 +67,8 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         UUID runId = started.getBody().id();
 
         JsonNode scriptJob = receiveJob("provider.jobs", runId, "generate_script");
+        assertThat(scriptJob.path("inputs").get(0).path("key").asString()).isEqualTo("image_1");
+        String productImageKey = scriptJob.path("inputs").get(0).path("objectKey").asString();
         publishResult("provider", runId, scriptJob, null,
                 "{\"profile\":\"product_ad_v1\",\"language\":\"vi\",\"script\":\"Đặt mua ngay\"}");
         pollUntil(owner.id(), runId, run -> "waiting_approval".equals(run.status()), WAIT);
@@ -102,6 +104,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
         JsonNode firstVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        assertThat(firstVideoJob.path("inputs").get(0).path("objectKey").asString()).isEqualTo(productImageKey);
         assertThat(firstVideoJob.path("params").path("payload").path("prompt").asString())
                 .isEqualTo("Opening hero scene");
         String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
@@ -109,6 +112,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
 
         JsonNode secondVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        assertThat(secondVideoJob.path("inputs").get(0).path("objectKey").asString()).isEqualTo(productImageKey);
         assertThat(secondVideoJob.path("params").path("payload").path("prompt").asString())
                 .isEqualTo("Benefit closing scene");
         String secondClipKey = outputKey(secondVideoJob, "clip.mp4");

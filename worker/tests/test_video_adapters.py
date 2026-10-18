@@ -701,6 +701,29 @@ def test_wan_submit_with_reference_image_sends_image_url(monkeypatch: pytest.Mon
     assert input_body["prompt"] == "A cap rotating."
 
 
+def test_wan_submit_with_reference_image_bytes_sends_data_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"id": "wan-task-with-bytes"})
+
+    adapter = wan_adapter.WanAdapter(wan_adapter.WanConfig(api_key="wan-test-key"))
+    png = _png_header(b"wan-image")
+    task_id = adapter.submit_video(
+        VideoRequest(
+            "A cap rotating.",
+            REVISION_ID,
+            reference_image_bytes=png,
+        )
+    )
+    assert task_id == "wan-task-with-bytes"
+    input_body = captured["calls"][0]["body"]["input"]
+    assert input_body["image"].startswith("data:image/png;base64,")
+    assert input_body["prompt"] == "A cap rotating."
+
+
 # ---------------------------------------------------------------------------
 # Adapter wiring (VIDEO_PROVIDER env)
 # ---------------------------------------------------------------------------
