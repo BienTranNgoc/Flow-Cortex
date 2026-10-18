@@ -90,7 +90,9 @@ def main() -> int:
     params.heartbeat = 60
     params.blocked_connection_timeout = 300
     params.client_properties = {"connection_name": f"provider-worker {settings.worker_id}"}
-    adapter: CapabilityProviderAdapter = _build_adapter(settings.s3_public_endpoint)
+    adapter: CapabilityProviderAdapter = _build_adapter(
+        settings.s3_public_endpoint, video_enabled=queue == VIDEO_QUEUE
+    )
     storage = Storage(
         client_from(settings),
         settings.s3_bucket,
@@ -188,7 +190,9 @@ def make_execute_job(
     return execute_job
 
 
-def _build_adapter(s3_public_endpoint: str = "") -> CapabilityProviderAdapter:
+def _build_adapter(
+    s3_public_endpoint: str = "", *, video_enabled: bool = True
+) -> CapabilityProviderAdapter:
     """Build independently configurable script and speech providers.
 
     `PROVIDER_ADAPTER` remains the backwards-compatible fallback for both selectors. New
@@ -198,7 +202,10 @@ def _build_adapter(s3_public_endpoint: str = "") -> CapabilityProviderAdapter:
     legacy = os.environ.get("PROVIDER_ADAPTER", PROVIDER_FIXTURE).strip().lower()
     script_provider = os.environ.get("SCRIPT_PROVIDER", "").strip().lower() or legacy
     speech_provider = os.environ.get("SPEECH_PROVIDER", "").strip().lower() or legacy
-    video_provider = os.environ.get("VIDEO_PROVIDER", PROVIDER_FIXTURE).strip().lower()
+    configured_video_provider = os.environ.get(
+        "VIDEO_PROVIDER", PROVIDER_FIXTURE
+    ).strip().lower()
+    video_provider = configured_video_provider if video_enabled else PROVIDER_FIXTURE
     legacy_openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     script_api_key = (
         os.environ.get("SCRIPT_PROVIDER_API_KEY", "").strip() or legacy_openai_key
@@ -360,7 +367,6 @@ def _build_video_adapter(
     if provider == PROVIDER_WAN:
         if not api_key:
             raise RuntimeError("Wan video provider requires WAN_API_KEY")
-        _require_public_endpoint(s3_public_endpoint)
         return WanAdapter(
             WanConfig(
                 api_key=api_key,

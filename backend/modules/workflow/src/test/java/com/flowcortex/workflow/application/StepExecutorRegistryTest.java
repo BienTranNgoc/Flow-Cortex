@@ -74,6 +74,12 @@ class StepExecutorRegistryTest {
         assertThat(registry.isRemote("echo")).isFalse();
         assertThat(registry.usesStoredInput("render_video")).isTrue();
         assertThat(registry.usesStoredInput("generate_script")).isFalse();
+        assertThat(registry.usesStoredInput("generate_video")).isFalse();
+        assertThat(registry.snapshotsRunInputs("render_video")).isTrue();
+        assertThat(registry.snapshotsRunInputs("generate_script")).isTrue();
+        assertThat(registry.snapshotsRunInputs("generate_storyboard")).isTrue();
+        assertThat(registry.snapshotsRunInputs("generate_video")).isTrue();
+        assertThat(registry.snapshotsRunInputs("generate_speech")).isFalse();
     }
 
     @Test

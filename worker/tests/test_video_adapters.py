@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
 from flowcortex_worker.provider.adapter import (
+    FixtureProviderAdapter,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -614,9 +615,9 @@ def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: 
 
 
 @pytest.mark.parametrize(
-    ("provider", "sends_url"), [("veo", False), ("seedance", True), ("wan", True)]
+    ("provider", "sends_url"), [("veo", False), ("seedance", True), ("wan", False)]
 )
-def test_video_job_with_a_product_image_sends_bytes_to_veo_and_a_url_to_seedance_and_wan(
+def test_video_job_with_a_product_image_sends_bytes_to_veo_and_wan_and_a_url_to_seedance(
     monkeypatch: pytest.MonkeyPatch, provider: str, sends_url: bool
 ) -> None:
     from flowcortex_worker.provider import capabilities as capabilities_module
@@ -751,6 +752,50 @@ def test_wan_submit_with_reference_image_sends_image_url(monkeypatch: pytest.Mon
     assert input_body["prompt"] == "A cap rotating."
 
 
+def test_wan_submit_with_reference_image_bytes_sends_data_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    captured = _capture_urlopen(monkeypatch)
+    captured["responses"].append({"id": "wan-task-with-bytes"})
+
+    adapter = wan_adapter.WanAdapter(wan_adapter.WanConfig(api_key="wan-test-key"))
+    png = _png_header(b"wan-image")
+    task_id = adapter.submit_video(
+        VideoRequest(
+            "A cap rotating.",
+            REVISION_ID,
+            reference_image_bytes=png,
+        )
+    )
+    assert task_id == "wan-task-with-bytes"
+    input_body = captured["calls"][0]["body"]["input"]
+    assert input_body["image"].startswith("data:image/png;base64,")
+    assert input_body["prompt"] == "A cap rotating."
+
+
+def test_wan_failed_prediction_keeps_the_provider_error_out_of_logs_and_message(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    captured = _capture_urlopen(monkeypatch)
+    raw_error = "CUDA OOM at /srv/replicate/run.py token=r8_secret prompt='Bình giữ nhiệt'"
+    captured["responses"].append({"status": "failed", "error": raw_error})
+    adapter = wan_adapter.WanAdapter(_fast_config(wan_adapter.WanConfig(api_key="wan-test-key")))
+
+    with caplog.at_level("WARNING"), pytest.raises(PermanentError) as failure:
+        adapter.await_video("wan-task-failed", _Abort())
+
+    assert failure.value.code == "provider_request_failed"
+    assert failure.value.message == "Wan prediction ended with status failed"
+    assert any(getattr(record, "taskStatus", None) == "failed" for record in caplog.records)
+    for record in caplog.records:
+        assert raw_error not in record.getMessage()
+        assert all(raw_error not in str(value) for value in vars(record).values())
+
+
 # ---------------------------------------------------------------------------
 # Adapter wiring (VIDEO_PROVIDER env)
 # ---------------------------------------------------------------------------
@@ -835,7 +880,6 @@ def test_video_provider_seedance_uses_capability_scoped_credentials(
     ("provider", "credentials"),
     [
         ("seedance", {"SEEDANCE_API_KEY": "key", "SEEDANCE_BASE_URL": "https://ark.example.com"}),
-        ("wan", {"WAN_API_KEY": "key"}),
     ],
 )
 @pytest.mark.parametrize("public_endpoint", ["", "http://localhost:9000", "https://"])
@@ -892,6 +936,33 @@ def test_video_provider_wan_starts_with_a_public_https_store(
     assert isinstance(adapter.video_adapter, wan_adapter.WanAdapter)
 
 
+def test_video_provider_wan_starts_without_a_public_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "key")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter("")
+    assert isinstance(adapter.video_adapter, wan_adapter.WanAdapter)
+
+
+def test_non_video_worker_does_not_initialize_configured_video_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+
+    from flowcortex_worker.provider import __main__ as provider_main
+
+    importlib.reload(provider_main)
+    adapter = provider_main._build_adapter("", video_enabled=False)
+    assert isinstance(adapter.video_adapter, FixtureProviderAdapter)
 def test_video_provider_veo_uses_default_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     _clear_env(monkeypatch)
     monkeypatch.setenv("VIDEO_PROVIDER", "veo")

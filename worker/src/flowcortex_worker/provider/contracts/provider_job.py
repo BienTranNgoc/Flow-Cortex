@@ -13,7 +13,7 @@ class ProductAdPayload(BaseModel):
     )
     productName: Annotated[StrictStr, Field(max_length=200, min_length=1)]
     description: Annotated[StrictStr, Field(max_length=4000, min_length=1)]
-    cta: Annotated[StrictStr, Field(max_length=500, min_length=1)]
+    cta: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
     price: Annotated[StrictStr | None, Field(max_length=200, min_length=1)] = None
     promotion: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
 
@@ -106,6 +106,13 @@ class GenerateScriptJob(BaseModel):
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_script"]
     params: ProductAdParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional product image the worker forwards to the multimodal script provider.",
+            max_length=1,
+        ),
+    ] = None
     outputPrefix: Annotated[
         StrictStr,
         Field(
@@ -162,6 +169,13 @@ class GenerateStoryboardJob(BaseModel):
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Literal["generate_storyboard"]
     params: StoryboardParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Optional product image the worker forwards to the multimodal storyboard provider.",
+            max_length=1,
+        ),
+    ] = None
     outputPrefix: Annotated[
         StrictStr,
         Field(

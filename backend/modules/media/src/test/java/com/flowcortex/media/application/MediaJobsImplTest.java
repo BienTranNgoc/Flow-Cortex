@@ -22,7 +22,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
-import com.flowcortex.media.api.ProviderJob;
+import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;

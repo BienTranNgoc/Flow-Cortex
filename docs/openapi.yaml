@@ -1243,7 +1243,6 @@ components:
         acknowledgeCost:
           type: boolean
       required:
-      - cta
       - description
       - productName
       - uploadIds

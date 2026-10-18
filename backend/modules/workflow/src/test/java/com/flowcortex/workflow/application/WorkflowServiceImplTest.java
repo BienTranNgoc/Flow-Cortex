@@ -143,6 +143,21 @@ class WorkflowServiceImplTest {
     }
 
     @Test
+    void createWorkflowAcceptsAProviderStepAfterAnInlineStepBecauseItNeedsNoUploadedFile() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Script from text", false, List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("script", "generate_script", null),
+                new NewWorkflowStep("storyboard", "generate_storyboard", null),
+                new NewWorkflowStep("clip", "generate_video", null)));
+
+        assertThat(created.steps()).extracting(step -> step.type())
+                .containsExactly("echo", "generate_script", "generate_storyboard", "generate_video");
+    }
+
+    @Test
     void createWorkflowAcceptsAMediaFirstStepFollowedByInlineSteps() {
         when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));

@@ -17,7 +17,7 @@ export type MultiUploadPhase =
   | { kind: 'done' };
 
 const MIN_IMAGES = 1;
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 1;
 
 export interface ImageProblem {
   message: string;
@@ -37,7 +37,7 @@ export const EMPTY_IMAGE_LIST: ImageProblem = {
 };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
-  message: `At most ${MAX_IMAGES} images per run.`,
+  message: 'At most 1 image per run.',
 };
 
 /** Walks `files`; returns the first ImageProblem found or null. */

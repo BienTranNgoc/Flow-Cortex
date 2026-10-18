@@ -133,7 +133,7 @@ class ProductVideoServiceTest {
         ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
         verify(runSteps).saveAll(steps.capture());
         assertThat(steps.getValue()).hasSize(5);
-        assertThat(steps.getValue().get(0).getInput()).isNull();
+        assertThat(steps.getValue().get(0).getInput()).contains("image_1", "image_2");
         assertThat(steps.getValue().get(2).getInput()).isNull();
         assertThat(steps.getValue().get(3).getInput()).contains("image_1", "image_2");
         assertThat(steps.getValue().get(4).getInput())
