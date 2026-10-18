@@ -8,11 +8,14 @@ import { queryClient } from './app/queryClient';
 import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
+import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { RunsPage } from './features/runs/RunsPage';
+import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
 
 const PAGES: Record<string, ReactElement> = {
+  '/dashboard': <DashboardPage />,
   '/runs': <RunsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/users': <UsersPage />,
@@ -29,9 +32,14 @@ function AdminRoutes() {
         {items.map((item) => (
           <Route key={item.path} path={item.path} element={PAGES[item.path]} />
         ))}
+        {items.some((item) => item.path === '/users') && (
+          <Route path="/users/:userId" element={<UserDetailPage />} />
+        )}
         <Route
           path="*"
-          element={home ? <Navigate to={home} replace /> : <p>No page is available to this account.</p>}
+          element={
+            home ? <Navigate to={home} replace /> : <p>No page is available to this account.</p>
+          }
         />
       </Route>
     </Routes>

@@ -15,6 +15,10 @@ export interface NavGroup {
 
 export const NAV: NavGroup[] = [
   {
+    label: 'Overview',
+    items: [{ label: 'Dashboard', path: '/dashboard', icon: '▦', action: 'runs.view' }],
+  },
+  {
     label: 'Operations',
     items: [
       { label: 'Runs', path: '/runs', icon: '▶', action: 'runs.view' },
@@ -35,5 +39,7 @@ export const NAV: NavGroup[] = [
 
 /** Enabled entries the role may open, in sidebar order: these are also the only routable pages. */
 export function reachableItems(role: string | undefined): NavItem[] {
-  return NAV.flatMap((group) => group.items).filter((item) => !item.disabled && can(role, item.action));
+  return NAV.flatMap((group) => group.items).filter(
+    (item) => !item.disabled && can(role, item.action),
+  );
 }
