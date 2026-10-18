@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.phone.PhoneNumberHasher;
+import com.flowcortex.user.phone.PhoneRetentionJob;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -21,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,12 +64,21 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
     private static final Pattern CODE_IN_BODY =
             Pattern.compile("^Your Flow-Cortex code is (\\d{6})\\. It expires in 5 minutes\\.$");
     private static final String NO_LONGER_VALID = "This code is no longer valid. Request a new one.";
+    private static final AtomicInteger NEXT_CLIENT = new AtomicInteger(1);
 
     @Autowired
     private SettableClock clock;
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private PhoneRetentionJob retentionJob;
+
+    @Autowired
+    private PhoneNumberHasher phoneHasher;
+
+    private String clientIp;
 
     record ProblemView(int status, String detail, String code, Long retryAfterSeconds, Map<String, String> errors) {
     }
@@ -87,6 +99,12 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
     @BeforeEach
     void answerRefusalsWithoutRetrying() {
         restTemplate.getRestTemplate().setRequestFactory(new JdkClientHttpRequestFactory());
+    }
+
+    // The per-IP bucket runs on the real clock across the whole class; one IP per case keeps cases apart.
+    @BeforeEach
+    void sendFromAnIpOfItsOwn() {
+        clientIp = "203.0.113." + NEXT_CLIENT.getAndIncrement();
     }
 
     record VerifyBody(String code) {
@@ -280,6 +298,106 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
     }
 
     @Test
+    void aFourthDifferentNumberInADayIsRefusedAndNothingIsSentToIt() {
+        String token = memberToken("phone-distinct");
+        for (int i = 0; i < 3; i++) {
+            sendOk(token);
+        }
+        String local = randomLocalNumber();
+
+        ResponseEntity<ProblemView> fourth = sendCode(token, local, ProblemView.class);
+
+        assertThat(fourth.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(fourth.getBody().code()).isEqualTo("OTP_USER_NUMBER_LIMIT");
+        assertThat(fourth.getBody().retryAfterSeconds()).isPositive();
+        assertThat(fourth.getHeaders().getFirst(HttpHeaders.RETRY_AFTER))
+                .isEqualTo(fourth.getBody().retryAfterSeconds().toString());
+        assertThat(outboxRowsFor("+84" + local.substring(1))).isZero();
+    }
+
+    @Test
+    void probingANumberVerifiedElsewhereSpendsTheProbersNumberQuotaAndStoresOnlyAHash() {
+        String owner = memberToken("phone-probed-owner");
+        String taken = sendOk(owner);
+        assertThat(verify(owner, latestCodeFor(taken), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        UserView prober = newMember("phone-prober");
+        String token = loginAs(prober);
+
+        assertThat(sendCode(token, "0" + taken.substring(3), ProblemView.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        sendOk(token);
+        sendOk(token);
+        ResponseEntity<ProblemView> third = sendCode(token, randomLocalNumber(), ProblemView.class);
+
+        assertThat(third.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(third.getBody().code()).isEqualTo("OTP_USER_NUMBER_LIMIT");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM phone_send_attempt WHERE user_id = ? "
+                        + "AND outcome = 'number_taken' AND phone_hash = ?",
+                Long.class, prober.id(), phoneHasher.hash(taken))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM phone_send_attempt WHERE phone_hash LIKE ?",
+                Long.class, "%" + taken.substring(3) + "%")).isZero();
+    }
+
+    @Test
+    void anotherMemberExhaustingTheirSendsToANumberDoesNotStopItsOwnerVerifyingIt() {
+        String other = memberToken("phone-squatter");
+        String owner = memberToken("phone-rightful");
+        String local = randomLocalNumber();
+        String e164 = "+84" + local.substring(1);
+        Instant start = clock.instant();
+        for (long at : new long[] {0, 60, 180, 480, 780}) {
+            clock.set(start.plusSeconds(at));
+            assertThat(sendCode(other, local, String.class).getStatusCode()).as("other's send at t=%d", at)
+                    .isEqualTo(HttpStatus.OK);
+        }
+        clock.set(start.plusSeconds(781));
+        assertThat(sendCode(other, local, ProblemView.class).getBody().code()).isEqualTo("OTP_HOURLY_LIMIT");
+
+        ResponseEntity<SendCodeView> sent = sendCode(owner, local, SendCodeView.class);
+
+        assertThat(sent.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(sent.getBody().resendAfterSeconds()).isEqualTo(60L);
+        assertThat(verify(owner, latestCodeFor(e164), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(get("/api/v1/me/phone", owner, PhoneView.class).getBody())
+                .isEqualTo(new PhoneView(e164, true, masked(e164)));
+    }
+
+    @Test
+    void theRetentionJobDeletesOnlyAttemptsAndOutboxMessagesPastTheirWindows() {
+        UserView member = newMember("phone-retention");
+        Instant now = clock.instant();
+        UUID oldAttempt = insertAttempt(member.id(), now.minus(Duration.ofDays(31)));
+        UUID recentAttempt = insertAttempt(member.id(), now.minus(Duration.ofDays(29)));
+        UUID oldMessage = insertOutbox(now.minus(Duration.ofDays(8)));
+        UUID recentMessage = insertOutbox(now.minus(Duration.ofDays(6)));
+
+        retentionJob.purge();
+
+        assertThat(rowExists("phone_send_attempt", oldAttempt)).isFalse();
+        assertThat(rowExists("phone_send_attempt", recentAttempt)).isTrue();
+        assertThat(rowExists("sms_outbox", oldMessage)).isFalse();
+        assertThat(rowExists("sms_outbox", recentMessage)).isTrue();
+    }
+
+    private UUID insertAttempt(UUID userId, Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO phone_send_attempt (id, user_id, phone_hash, ip, outcome, created_at) "
+                + "VALUES (?, ?, repeat('0', 64), '203.0.113.250', 'sent', ?)", id, userId, Timestamp.from(at));
+        return id;
+    }
+
+    private UUID insertOutbox(Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO sms_outbox (id, phone_e164, body, created_at) VALUES (?, '+84900000000', 'x', ?)",
+                id, Timestamp.from(at));
+        return id;
+    }
+
+    private boolean rowExists(String table, UUID id) {
+        return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE id = ?", Long.class, id) == 1;
+    }
+
+    @Test
     void verifyingASecondNumberReplacesTheFirst() {
         String token = memberToken("phone-replace");
         String first = sendOk(token);
@@ -380,6 +498,66 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
         }
     }
 
+    /**
+     * The clock runs ten years ahead of every other case, so the window holds only this case's sends;
+     * they are deleted again because the budget query has no upper bound.
+     */
+    @Nested
+    @TestPropertySource(properties = "flowcortex.phone-verification.limits.global-sends-per-day=3")
+    class WithASmallGlobalBudget {
+
+        @Autowired
+        private TestRestTemplate budgetRestTemplate;
+
+        @Autowired
+        private UserService budgetUserService;
+
+        @Autowired
+        private SettableClock budgetClock;
+
+        @Autowired
+        private JdbcTemplate budgetJdbc;
+
+        @Test
+        void theBudgetRefusesUntilTheSendThatFilledItLeavesTheWindow() {
+            budgetRestTemplate.getRestTemplate().setRequestFactory(new JdkClientHttpRequestFactory());
+            Instant now = Instant.now().plus(Duration.ofDays(3650)).truncatedTo(ChronoUnit.SECONDS);
+            budgetClock.set(now);
+            UserView others = budgetUserService.createInitialAdmin(uniqueEmail("phone-budget-others"),
+                    "password123", "Others");
+            UserView asker = budgetUserService.createInitialAdmin(uniqueEmail("phone-budget"), "password123",
+                    "Asker");
+            try {
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(1)));
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(3)));
+                insertAttempt(others, "cooldown", now.minus(Duration.ofHours(4)));
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(5)));
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(25)));
+                ResponseEntity<TokenResponse> login = budgetRestTemplate.postForEntity("/api/v1/auth/login",
+                        new LoginRequest(asker.email(), "password123"), TokenResponse.class);
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(login.getBody().accessToken());
+                headers.set("X-Forwarded-For", "198.51.100.7");
+
+                ResponseEntity<ProblemView> response = budgetRestTemplate.exchange("/api/v1/me/phone/send-code",
+                        HttpMethod.POST, new HttpEntity<>(new SendCodeBody(randomLocalNumber()), headers),
+                        ProblemView.class);
+
+                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                assertThat(response.getBody().code()).isEqualTo("OTP_GLOBAL_LIMIT");
+                assertThat(response.getBody().retryAfterSeconds()).isEqualTo(Duration.ofHours(19).toSeconds());
+            } finally {
+                budgetJdbc.update("DELETE FROM phone_send_attempt WHERE user_id IN (?, ?)", others.id(), asker.id());
+            }
+        }
+
+        private void insertAttempt(UserView user, String outcome, Instant at) {
+            budgetJdbc.update("INSERT INTO phone_send_attempt (id, user_id, phone_hash, ip, outcome, created_at) "
+                    + "VALUES (?, ?, ?, '198.51.100.8', ?, ?)", UUID.randomUUID(), user.id(), "b".repeat(64),
+                    outcome, Timestamp.from(at));
+        }
+    }
+
     private String memberToken(String prefix) {
         return loginAs(newMember(prefix));
     }
@@ -403,7 +581,11 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
     }
 
     private <T> ResponseEntity<T> sendCode(String token, String phone, Class<T> type) {
-        return post("/api/v1/me/phone/send-code", token, new SendCodeBody(phone), type);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("X-Forwarded-For", clientIp);
+        return restTemplate.exchange("/api/v1/me/phone/send-code", HttpMethod.POST,
+                new HttpEntity<>(new SendCodeBody(phone), headers), type);
     }
 
     private <T> ResponseEntity<T> verify(String token, String code, Class<T> type) {

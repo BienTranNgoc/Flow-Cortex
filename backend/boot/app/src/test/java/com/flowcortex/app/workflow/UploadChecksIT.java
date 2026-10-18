@@ -49,6 +49,9 @@ class UploadChecksIT extends AbstractWorkflowHttpIT {
     record ProblemView(String detail, String code, Map<String, String> errors) {
     }
 
+    record StartedRunView(UUID id) {
+    }
+
     @Test
     void anAudioFileExactlyAtItsCapIsGrantedAndOneByteMoreIsRefusedNamingTheCapAndTheFormats() {
         String token = loginAs(newUser("upload-cap-audio"));
@@ -103,6 +106,30 @@ class UploadChecksIT extends AbstractWorkflowHttpIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(runsOf(workflow)).isEqualTo(1L);
+    }
+
+    @Test
+    void rewritingTheUploadAfterTheRunStartedLeavesTheRunsCheckedCopyUnchanged() {
+        UserView user = newUser("upload-sniff-rewrite");
+        String token = loginAs(user);
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("Inspect", "probe", null));
+        UUID uploadId = uploaded(user, token, "clip.mp4", MP4_HEADER);
+
+        ResponseEntity<StartedRunView> started = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("uploadId", uploadId, "originalName", "clip.mp4"), StartedRunView.class);
+        assertThat(started.getStatusCode()).isEqualTo(HttpStatus.OK);
+        UUID runId = started.getBody().id();
+        byte[] text = "These are my meeting notes.".getBytes(StandardCharsets.UTF_8);
+        try (S3Client store = objectStore()) {
+            store.putObject(o -> o.bucket(UPLOAD_BUCKET).key(user.id() + "/" + uploadId).contentType("video/mp4"),
+                    RequestBody.fromBytes(text));
+
+            byte[] copy = store.getObjectAsBytes(o -> o.bucket(MEDIA_BUCKET)
+                    .key("runs/" + runId + "/inputs/media")).asByteArray();
+            assertThat(copy).isEqualTo(MP4_HEADER);
+        }
+        assertThat(jdbc.queryForObject("SELECT input FROM run_step WHERE run_id = ?", String.class, runId))
+                .contains("\"bucket\":\"" + MEDIA_BUCKET + "\"", "\"objectKey\":\"runs/" + runId + "/inputs/media\"");
     }
 
     @Test

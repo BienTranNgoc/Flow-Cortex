@@ -1,15 +1,30 @@
 import { ListAdminRunsStatus } from '@flow-cortex/api-client';
 import { Link } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
+import { EmptyState } from '../../app/EmptyState';
+import { MetricCard } from '../../app/MetricCard';
+import { PageHeading } from '../../app/PageHeading';
+import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useAdminRuns } from '../runs/useAdminRuns';
 import { useUsersQuery } from '../users/useUsers';
 
 const RUN_STATES = [
-  { label: 'Running', status: ListAdminRunsStatus.running, tone: 'running' },
-  { label: 'Completed', status: ListAdminRunsStatus.completed, tone: 'completed' },
-  { label: 'Failed', status: ListAdminRunsStatus.error, tone: 'failed' },
-] as const;
+  { label: 'Running', status: ListAdminRunsStatus.running, tone: 'info' as const },
+  { label: 'Completed', status: ListAdminRunsStatus.completed, tone: 'success' as const },
+  { label: 'Failed', status: ListAdminRunsStatus.error, tone: 'error' as const },
+];
+
+const RUN_FILL_CLASS = {
+  info: 'running',
+  success: 'completed',
+  error: 'failed',
+} as const;
+
+function fillClass(tone: keyof typeof RUN_FILL_CLASS): string {
+  return `cortex-admin-status-fill--${RUN_FILL_CLASS[tone]}`;
+}
 
 export function DashboardPage() {
   usePageTitle('Dashboard');
@@ -26,89 +41,81 @@ export function DashboardPage() {
   const statusQueries = [runningRuns, completedRuns, failedRuns];
   const failedItems = failedRuns.data?.items.slice(0, 5) ?? [];
   const isRefreshing =
-    usersQuery.isFetching || allRuns.isFetching || statusQueries.some((query) => query.isFetching);
+    usersQuery.isFetching ||
+    allRuns.isFetching ||
+    statusQueries.some((query) => query.isFetching);
+
+  const refresh = () => {
+    void Promise.all([
+      usersQuery.refetch(),
+      allRuns.refetch(),
+      ...statusQueries.map((query) => query.refetch()),
+    ]);
+  };
 
   return (
-    <main className="dashboard-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Flow-Cortex operations</p>
-          <h1>Dashboard</h1>
-          <p className="page-description">A live snapshot of accounts and workflow activity.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            void Promise.all([
-              usersQuery.refetch(),
-              allRuns.refetch(),
-              ...statusQueries.map((query) => query.refetch()),
-            ]);
-          }}
-          disabled={isRefreshing}
-        >
-          {isRefreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-
-      {(usersQuery.isError || allRuns.isError) && (
-        <div className="list-error" role="alert">
-          <p>Some dashboard data could not be loaded.</p>
+    <div className="cortex-admin-dashboard">
+      <PageHeading
+        eyebrow="Flow-Cortex operations"
+        title="Dashboard"
+        description="A live snapshot of accounts and workflow activity."
+        actions={
           <button
             type="button"
-            onClick={() => {
-              void Promise.all([
-                usersQuery.refetch(),
-                allRuns.refetch(),
-                ...statusQueries.map((query) => query.refetch()),
-              ]);
-            }}
+            className="cortex-admin-btn cortex-admin-btn--ghost"
+            onClick={refresh}
+            disabled={isRefreshing}
           >
+            <RefreshCw size={16} aria-hidden="true" />
+            <span>{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
+          </button>
+        }
+      />
+
+      {(usersQuery.isError || allRuns.isError) && (
+        <div className="cortex-admin-error" role="alert">
+          <p>Some dashboard data could not be loaded.</p>
+          <button type="button" className="cortex-admin-btn" onClick={refresh}>
             Retry
           </button>
         </div>
       )}
 
-      <section className="metric-grid" aria-label="Account statistics">
-        <article className="metric-card">
-          <span>Total users</span>
-          <strong>{usersQuery.data ? users.length : '—'}</strong>
-          <small>Across all account statuses</small>
-        </article>
-        <article className="metric-card">
-          <span>Active users</span>
-          <strong>
-            {usersQuery.data ? users.filter((user) => user.status === 'ACTIVE').length : '—'}
-          </strong>
-          <small>Accounts currently enabled</small>
-        </article>
-        <article className="metric-card">
-          <span>New in 7 days</span>
-          <strong>{usersQuery.data ? newUsers : '—'}</strong>
-          <small>Based on account registration date</small>
-        </article>
-        <article className="metric-card">
-          <span>Total workflow runs</span>
-          <strong>{allRuns.data?.total ?? '—'}</strong>
-          <small>All workflows, all time</small>
-        </article>
+      <section className="cortex-admin-metric-grid" aria-label="Account statistics">
+        <MetricCard
+          label="Total users"
+          value={usersQuery.data ? users.length : '—'}
+          hint="Across all account statuses"
+        />
+        <MetricCard
+          label="Active users"
+          value={usersQuery.data ? users.filter((user) => user.status === 'ACTIVE').length : '—'}
+          hint="Accounts currently enabled"
+        />
+        <MetricCard
+          label="New in 7 days"
+          value={usersQuery.data ? newUsers : '—'}
+          hint="Based on registration date"
+        />
+        <MetricCard
+          label="Total workflow runs"
+          value={allRuns.data?.total ?? '—'}
+          hint="All workflows, all time"
+        />
       </section>
 
-      <div className="dashboard-grid">
-        <section className="dashboard-panel">
-          <div className="section-heading">
+      <div className="cortex-admin-panel-grid">
+        <section className="cortex-admin-panel">
+          <header className="cortex-admin-section-heading">
             <div>
               <h2>Run status</h2>
-              <p>
-                Totals reported by the admin run filters; approval-waiting runs are not included
-                here.
-              </p>
+              <p>Totals reported by the admin run filters.</p>
             </div>
-            <Link className="table-link" to="/runs">
-              View runs
+            <Link className="cortex-admin-link" to="/runs">
+              View runs →
             </Link>
-          </div>
-          <div className="run-status-list">
+          </header>
+          <div className="cortex-admin-status-list">
             {RUN_STATES.map((state, index) => {
               const query = statusQueries[index];
               const total = query?.data?.total ?? 0;
@@ -118,14 +125,13 @@ export function DashboardPage() {
                   ? Math.min(100, Math.round((total / allCount) * 100))
                   : 0;
               return (
-                <div className="run-status-row" key={state.status}>
-                  <div className="run-status-label">
-                    <span className={`status-dot status-dot-${state.tone}`} aria-hidden="true" />
-                    <span>{state.label}</span>
+                <div key={state.status} className="cortex-admin-status-list__row">
+                  <div className="cortex-admin-status-list__label">
+                    <StatusPill tone={state.tone} label={state.label} dot />
                     <strong>{query?.data ? total : '—'}</strong>
                   </div>
                   <div
-                    className="status-track"
+                    className="cortex-admin-status-track"
                     role="img"
                     aria-label={
                       query?.data && allRuns.data
@@ -134,7 +140,7 @@ export function DashboardPage() {
                     }
                   >
                     <span
-                      className={`status-fill status-fill-${state.tone}`}
+                      className={`cortex-admin-status-fill ${fillClass(state.tone)}`}
                       style={{ width: `${percent}%` }}
                     />
                   </div>
@@ -143,34 +149,34 @@ export function DashboardPage() {
             })}
           </div>
           {statusQueries.some((query) => query.isError) && (
-            <p className="stale-note">Run status counts are temporarily unavailable.</p>
+            <p className="cortex-admin-stale">Run status counts are temporarily unavailable.</p>
           )}
         </section>
 
-        <section className="dashboard-panel">
-          <div className="section-heading">
+        <section className="cortex-admin-panel">
+          <header className="cortex-admin-section-heading">
             <div>
               <h2>Recent failures</h2>
-              <p>Most recent runs reported with an error</p>
+              <p>Most recent runs reported with an error.</p>
             </div>
-            <Link className="table-link" to="/runs">
-              All runs
+            <Link className="cortex-admin-link" to="/runs">
+              All runs →
             </Link>
-          </div>
-          {failedRuns.isLoading && <output>Loading failed runs…</output>}
+          </header>
+          {failedRuns.isLoading && <output className="cortex-admin-loading">Loading failed runs…</output>}
           {failedRuns.isError && (
-            <div className="list-error">
+            <div className="cortex-admin-error">
               <p role="alert">Could not load recent failures.</p>
-              <button type="button" onClick={() => void failedRuns.refetch()}>
+              <button type="button" className="cortex-admin-btn" onClick={() => void failedRuns.refetch()}>
                 Retry
               </button>
             </div>
           )}
           {failedRuns.data && failedItems.length === 0 && (
-            <p className="list-empty">No failed runs.</p>
+            <EmptyState title="No failed runs." description="Nothing to investigate right now." />
           )}
           {failedItems.length > 0 && (
-            <ul className="failure-list">
+            <ul className="cortex-admin-failure-list">
               {failedItems.map((run) => (
                 <li key={run.id}>
                   <div>
@@ -185,6 +191,6 @@ export function DashboardPage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -1,0 +1,71 @@
+.pipeline-thumb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.35rem;
+  align-items: center;
+}
+
+.pipeline-thumb__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pipeline-thumb__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline-thumb__icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.pipeline-thumb__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pipeline-thumb__chip--normal {
+  color: var(--tone-cyan-text);
+  background: var(--tone-cyan-bg);
+  border-color: var(--tone-cyan-line);
+}
+
+.pipeline-thumb__chip--checkpoint {
+  color: var(--pill-warning-fg);
+  background: var(--pill-warning-bg);
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+
+.pipeline-thumb__chip--failure {
+  color: var(--pill-error-fg);
+  background: var(--pill-error-bg);
+  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+}
+
+.pipeline-thumb__connector {
+  display: inline-flex;
+  color: var(--connector);
+}
+
+.pipeline-thumb__empty {
+  margin: 0;
+  color: var(--ink-4);
+  font-size: 0.82rem;
+}

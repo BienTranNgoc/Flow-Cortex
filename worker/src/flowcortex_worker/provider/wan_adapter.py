@@ -147,17 +147,12 @@ class WanAdapter:
                     )
                 return VideoArtifact(self._download_video(video_url), task_id)
             if status in _TERMINAL_FAILURES:
-                error_detail = _string(response, "error")
-                log.warning(
-                    "Wan prediction failed",
-                    extra={"taskStatus": status, "error": error_detail},
+                # Replicate's `error` is free text with no machine code; it can echo paths,
+                # prompts or tokens, so only the fixed status reaches logs and members.
+                log.warning("Wan prediction failed", extra={"taskStatus": status})
+                raise PermanentError(
+                    "provider_request_failed", f"Wan prediction ended with status {status}"
                 )
-                message = (
-                    f"Wan prediction ended with status {status}: {error_detail}"
-                    if error_detail
-                    else f"Wan prediction ended with status {status}"
-                )
-                raise PermanentError("provider_request_failed", message)
             if status not in {"starting", "processing"}:
                 raise PermanentError(
                     "provider_response_invalid", "Wan returned an unknown prediction status"

@@ -54,7 +54,7 @@ class MediaResultListenerTest {
                     Duration.ofMinutes(15), new MediaProperties.Upload.ContentCheck(true)),
             new MediaProperties.S3("http://minio:9000", "http://localhost:9000", "us-east-1", true,
                     "flowcortex-uploads", "flowcortex-media", "backend-key", "backend-secret-value",
-                    Duration.ofSeconds(5), Duration.ofSeconds(2)));
+                    Duration.ofSeconds(5), Duration.ofSeconds(2), Duration.ofMinutes(2)));
 
     private final ValidatorFactory validation = Validation.buildDefaultValidatorFactory();
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);

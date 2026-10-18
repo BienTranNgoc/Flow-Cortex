@@ -42,7 +42,7 @@ export function AdminList<T>({
     empty = (
       <>
         <p>No {noun} on this page.</p>
-        <button type="button" onClick={() => onPageChange(0)}>
+        <button type="button" className="cortex-admin-btn" onClick={() => onPageChange(0)}>
           Back to first page
         </button>
       </>
@@ -51,7 +51,7 @@ export function AdminList<T>({
     empty = (
       <>
         <p>No {noun} match this filter</p>
-        <button type="button" onClick={() => onStatusChange('')}>
+        <button type="button" className="cortex-admin-btn" onClick={() => onStatusChange('')}>
           Clear filter
         </button>
       </>
@@ -62,8 +62,8 @@ export function AdminList<T>({
 
   return (
     <>
-      <div className="list-toolbar">
-        <div className="field">
+      <div className="cortex-admin-toolbar">
+        <div className="cortex-admin-field">
           <label htmlFor={filterId}>Status</label>
           <select id={filterId} value={status} onChange={(event) => onStatusChange(event.target.value)}>
             <option value="">All statuses</option>
@@ -74,27 +74,31 @@ export function AdminList<T>({
             ))}
           </select>
         </div>
-        <button type="button" onClick={() => query.refetch()}>
+        <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
           Refresh
         </button>
       </div>
 
       {disabled && (
-        <output className="disabled-banner">Admin console is disabled</output>
+        <output className="cortex-admin-disabled-banner">Admin console is disabled</output>
       )}
       {error && !disabled && (
-        <div className="list-error">
+        <div className="cortex-admin-error">
           <p role="alert">Could not load {noun}.</p>
-          <button type="button" onClick={() => query.refetch()}>
+          <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
             Retry
           </button>
         </div>
       )}
-      {(query.isPending || query.isPlaceholderData) && <output>Loading {noun}…</output>}
-      {data && error && <p className="stale-note">Showing the results loaded before this error.</p>}
-      {data?.items.length === 0 && <div className="list-empty">{empty}</div>}
+      {(query.isPending || query.isPlaceholderData) && (
+        <output className="cortex-admin-loading">Loading {noun}…</output>
+      )}
+      {data && error && (
+        <p className="cortex-admin-stale">Showing the results loaded before this error.</p>
+      )}
+      {data?.items.length === 0 && <div className="cortex-admin-empty">{empty}</div>}
       {data && data.items.length > 0 && (
-        <div className="table-wrapper" aria-busy={query.isPlaceholderData}>
+        <div className="cortex-admin-table-wrapper" aria-busy={query.isPlaceholderData}>
           {children(data.items)}
         </div>
       )}
@@ -119,9 +123,10 @@ function Pager({
 
   // aria-disabled rather than disabled, so focus stays on the button when the last page is reached.
   return (
-    <div className="pager">
+    <div className="cortex-admin-pager">
       <button
         type="button"
+        className="cortex-admin-btn"
         aria-disabled={!hasPrevious}
         onClick={() => hasPrevious && onPageChange(page - 1)}
       >
@@ -130,7 +135,12 @@ function Pager({
       <span>
         Page {page + 1} of {pages} · {total} {noun}
       </span>
-      <button type="button" aria-disabled={!hasNext} onClick={() => hasNext && onPageChange(page + 1)}>
+      <button
+        type="button"
+        className="cortex-admin-btn"
+        aria-disabled={!hasNext}
+        onClick={() => hasNext && onPageChange(page + 1)}
+      >
         Next page
       </button>
     </div>

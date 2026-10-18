@@ -67,6 +67,14 @@ describe('LoginPage', () => {
     );
   });
 
+  it('offers an account without a password a set-password link by email', () => {
+    renderLogin(null);
+    expect(screen.getByRole('link', { name: 'Email me a link' })).toHaveAttribute(
+      'href',
+      '/set-password',
+    );
+  });
+
   it('redirects to the `from` page when a token is already present', () => {
     setToken('existing-token', true);
 
@@ -196,6 +204,13 @@ describe('LoginPage', () => {
       const url = new URL(href ?? '', 'http://localhost');
       return { path: url.pathname, params: Object.fromEntries(url.searchParams) };
     }
+
+    it('offers Google as the only provider, the one the backend implements', () => {
+      renderLogin({});
+
+      expect(screen.getByRole('link', { name: 'Continue with Google' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /GitHub/ })).not.toBeInTheDocument();
+    });
 
     it('starts the authorize flow with the checkbox state and the page login returns to', async () => {
       const user = userEvent.setup();

@@ -773,6 +773,29 @@ def test_wan_submit_with_reference_image_bytes_sends_data_uri(
     input_body = captured["calls"][0]["body"]["input"]
     assert input_body["image"].startswith("data:image/png;base64,")
     assert input_body["prompt"] == "A cap rotating."
+
+
+def test_wan_failed_prediction_keeps_the_provider_error_out_of_logs_and_message(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    captured = _capture_urlopen(monkeypatch)
+    raw_error = "CUDA OOM at /srv/replicate/run.py token=r8_secret prompt='Bình giữ nhiệt'"
+    captured["responses"].append({"status": "failed", "error": raw_error})
+    adapter = wan_adapter.WanAdapter(_fast_config(wan_adapter.WanConfig(api_key="wan-test-key")))
+
+    with caplog.at_level("WARNING"), pytest.raises(PermanentError) as failure:
+        adapter.await_video("wan-task-failed", _Abort())
+
+    assert failure.value.code == "provider_request_failed"
+    assert failure.value.message == "Wan prediction ended with status failed"
+    assert any(getattr(record, "taskStatus", None) == "failed" for record in caplog.records)
+    for record in caplog.records:
+        assert raw_error not in record.getMessage()
+        assert all(raw_error not in str(value) for value in vars(record).values())
+
+
 # ---------------------------------------------------------------------------
 # Adapter wiring (VIDEO_PROVIDER env)
 # ---------------------------------------------------------------------------

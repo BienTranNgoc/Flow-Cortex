@@ -1,5 +1,6 @@
 import { setToken, type WorkflowResponse, type WorkflowStepResponse } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { renderRoute, stubApi } from '../test/fakeApi';
 import { HomePage } from './HomePage';
@@ -77,7 +78,7 @@ describe('HomePage — launchpad cards', () => {
 
     renderHome();
 
-    const link = await screen.findByRole('link', { name: /Launch Workflow/ });
+    const link = await screen.findByRole('link', { name: /Open Check a video file/ });
     expect(link).toHaveAttribute('href', '/workflows/wf-check');
   });
 
@@ -134,5 +135,110 @@ describe('HomePage — launchpad cards', () => {
     renderHome();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your profile');
+  });
+
+  it('renders the hero badge, the search bar and the filter chips', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)],
+      },
+    });
+
+    renderHome();
+
+    expect(await screen.findByText(/CREATOR LAUNCHPAD · READY TO CREATE/)).toBeInTheDocument();
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /filter workflows/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.getByText('studio')).toBeInTheDocument();
+  });
+
+  it('filters cards by search and shows an empty state with a reset', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [
+          workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS),
+          workflow('wf-b', 'Echo Demo (all steps succeed)', []),
+        ],
+      },
+    });
+
+    renderHome();
+
+    const search = await screen.findByRole('searchbox');
+    await user.type(search, 'douyin');
+    expect(
+      screen.getByRole('heading', { name: 'Douyin Video Repurpose' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Echo Demo (all steps succeed)' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('filters cards by category chip', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [
+          workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS),
+          workflow('wf-b', 'Echo Demo (all steps succeed)', []),
+        ],
+      },
+    });
+
+    renderHome();
+
+    const demos = await screen.findByRole('button', { name: /Demos/ });
+    expect(demos).toHaveAttribute('aria-pressed', 'false');
+    await user.click(demos);
+    expect(demos).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('heading', { name: 'Echo Demo (all steps succeed)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Douyin Video Repurpose' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a status badge and an ETA on each card', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)],
+      },
+    });
+
+    renderHome();
+
+    expect(await screen.findByText('Review required')).toBeInTheDocument();
+    expect(screen.getByText('3 steps')).toBeInTheDocument();
+    expect(screen.getByText(/^~\d/)).toBeInTheDocument();
+  });
+
+  it('shows a short non-technical description below each card', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [
+          workflow('wf-echo', 'Echo Demo (all steps succeed)', [
+            { id: 'e-1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
+          ]),
+        ],
+      },
+    });
+
+    renderHome();
+    expect(
+      await screen.findByText(/Try a simple two-step pipeline that just echoes your input back/),
+    ).toBeInTheDocument();
   });
 });

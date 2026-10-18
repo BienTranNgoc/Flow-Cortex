@@ -7,6 +7,7 @@ import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.ReviewTask;
 import com.flowcortex.workflow.domain.ReviewTaskStatus;
 import com.flowcortex.workflow.domain.ScriptRevision;
@@ -44,13 +45,23 @@ class ReviewCheckpointTransactions {
         this.scriptRevisionRepository = scriptRevisionRepository;
     }
 
+    /**
+     * Opens the review of a pending checkpoint step. The caller's entities only name the run and the
+     * step: both are re-read under the run's row lock, the lock a stop takes first, so a run stopped
+     * after the caller read it stays stopped and gets no review task.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    boolean pause(WorkflowRun run, RunStep step, String payload, Instant now) {
-        if (run.getStatus() != RunStatus.RUNNING || step.getStatus()
-                != com.flowcortex.workflow.domain.RunStepStatus.PENDING) {
+    boolean pause(WorkflowRun runSnapshot, RunStep stepSnapshot, String payload, Instant now) {
+        workflowRunRepository.lockById(runSnapshot.getId());
+        WorkflowRun run = workflowRunRepository.findById(runSnapshot.getId()).orElse(null);
+        RunStep step = runStepRepository.findById(stepSnapshot.getId()).orElse(null);
+        if (run == null || step == null || step.getStatus() != RunStepStatus.PENDING) {
             return false;
         }
         if (reviewTaskRepository.findByRunStepId(step.getId()).isPresent()) {
+            return false;
+        }
+        if (!run.markWaitingApproval()) {
             return false;
         }
         String reviewPayload = isProductVideo(run) ? scriptFrom(payload) : payload;
@@ -62,7 +73,6 @@ class ReviewCheckpointTransactions {
             task.attachRevision(revision.getId(), task.getVersion() == null ? 0L : task.getVersion());
             reviewTaskRepository.save(task);
         }
-        run.markWaitingApproval();
         workflowRunRepository.save(run);
         return true;
     }

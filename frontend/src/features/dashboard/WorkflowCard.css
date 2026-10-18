@@ -1,0 +1,181 @@
+.workflow-card {
+  position: relative;
+  display: flex;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--card-surface) 0%, var(--card-surface-2) 100%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink-5) 4%, transparent) inset,
+    var(--card-shadow);
+  transition: border-color var(--dur-standard) var(--ease-standard),
+    box-shadow var(--dur-standard) var(--ease-standard),
+    transform var(--dur-standard) var(--ease-standard);
+  overflow: hidden;
+}
+
+.workflow-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at top right,
+    color-mix(in srgb, var(--aurora-cyan) 8%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity var(--dur-standard) var(--ease-standard);
+}
+
+.workflow-card:hover,
+.workflow-card:focus-within {
+  border-color: var(--card-edge-strong);
+  box-shadow: 0 0 0 1px var(--card-edge-strong), 0 12px 32px var(--card-hover-glow);
+  transform: translateY(-2px);
+}
+
+.workflow-card:hover::after,
+.workflow-card:focus-within::after {
+  opacity: 1;
+}
+
+.workflow-card__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 1.05rem 1.1rem 1rem;
+  color: inherit;
+  text-decoration: none;
+  position: relative;
+  z-index: 1;
+}
+
+.workflow-card__head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.workflow-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--aurora-cyan) 22%, transparent),
+    color-mix(in srgb, var(--aurora-indigo) 30%, transparent));
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--teal-glow) 25%, transparent);
+  flex-shrink: 0;
+}
+
+.workflow-card__head-text {
+  min-width: 0;
+}
+
+.workflow-card__title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.workflow-card__sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-4);
+}
+
+.workflow-card__status {
+  align-self: start;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.workflow-card__status--ready {
+  color: var(--green-bright);
+  background: var(--green-soft);
+  border-color: color-mix(in srgb, var(--green-bright) 35%, transparent);
+}
+
+.workflow-card__status--experimental {
+  color: var(--pill-warning-fg);
+  background: var(--pill-warning-bg);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
+.workflow-card__status--attention {
+  color: var(--pill-error-fg);
+  background: var(--pill-error-bg);
+  border-color: color-mix(in srgb, var(--red) 35%, transparent);
+}
+
+.workflow-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.15rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--card-edge);
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.workflow-card__description {
+  margin: -0.1rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.workflow-card__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.workflow-card__meta-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-5);
+}
+
+.workflow-card__cta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--card-edge);
+  transition: color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard),
+    background var(--dur-quick) var(--ease-standard);
+}
+
+.workflow-card:hover .workflow-card__cta,
+.workflow-card:focus-within .workflow-card__cta {
+  color: var(--ink);
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--aurora-cyan) 18%, transparent),
+    color-mix(in srgb, var(--aurora-indigo) 22%, transparent));
+  border-color: color-mix(in srgb, var(--teal-glow) 45%, transparent);
+}

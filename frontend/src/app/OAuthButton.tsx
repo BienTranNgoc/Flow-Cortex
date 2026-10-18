@@ -6,7 +6,7 @@
 import { oauthEnabled } from './featureFlags';
 
 export interface OAuthButtonProps {
-  readonly provider: 'google' | 'github' | 'microsoft';
+  readonly provider: 'google' | 'microsoft';
   readonly label: string;
   readonly href?: string;
   readonly onSelect?: (provider: OAuthButtonProps['provider']) => void;
@@ -35,19 +35,6 @@ const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {
       <path
         fill="#1976D2"
         d="M43.6 20.5H42V20H24v8h11.3c-.7 2-2 3.8-3.7 5.1l6.2 5.2c-.4.4 6.2-4.5 6.2-14.3 0-1.2-.1-2.3-.4-3.5z"
-      />
-    </svg>
-  ),
-  github: (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        fill="currentColor"
-        d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2.1c-3.2.7-3.8-1.5-3.8-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.7 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"
       />
     </svg>
   ),

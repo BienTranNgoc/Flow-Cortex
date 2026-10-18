@@ -11,8 +11,17 @@ const FEATURES = {
   credits: true,
 };
 
+const ME = {
+  status: 200,
+  body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
+};
+
+function stubWithMe(routes: Parameters<typeof stubApi>[0]) {
+  return stubApi({ 'GET /api/v1/auth/me': ME, ...routes });
+}
+
 function renderHeader() {
-  return renderRoute('/', '/', <Header email="member1@flowcortex.dev" />);
+  return renderRoute('/', '/', <Header />);
 }
 
 function balanceCalls(calls: { path: string }[]) {
@@ -28,7 +37,7 @@ describe('Header credits', () => {
   });
 
   it('shows the balance from the credits endpoint, grouped the en-US way', async () => {
-    stubApi({
+    stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
@@ -41,7 +50,7 @@ describe('Header credits', () => {
 
   it('shows no credits and never asks for the balance when credits are off', async () => {
     vi.stubEnv('VITE_ACCOUNT_STATS_ENABLED', 'true');
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: { ...FEATURES, credits: false } },
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
@@ -55,7 +64,7 @@ describe('Header credits', () => {
   });
 
   it('shows no credits when the balance request fails', async () => {
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': {
         status: 503,
@@ -72,7 +81,7 @@ describe('Header credits', () => {
 
   it('reloads the balance once a run on screen reaches a terminal status', async () => {
     let reply: FakeReply = { status: 200, body: { balance: 1000 } };
-    const calls = stubApi({
+    const calls = stubWithMe({
       'GET /api/v1/features': { status: 200, body: FEATURES },
       'GET /api/v1/credits/balance': () => reply,
     });

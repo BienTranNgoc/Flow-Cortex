@@ -1,35 +1,6 @@
 /* Card list + step list — inherently narrow, single-column content; the one
    breakpoint (480px) only stacks a step's fields and actions. */
 
-.workflow-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.workflow-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  max-width: 100%;
-}
-
-.workflow-badge {
-  font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent);
-  white-space: nowrap;
-}
-
 .run-step-output,
 .run-step-error {
   margin: 0.35rem 0 0;
@@ -323,33 +294,5 @@
   .stop-run-actions button,
   .media-start-form button {
     width: 100%;
-  }
-}
-
-.workflows {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 3rem 0;
-}
-
-.workflows-list-section {
-  margin: 0 0 1.5rem;
-}
-
-.workflows-list-section h2 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1rem, 2.3vw, 1.2rem);
-  color: var(--ink);
-}
-
-.workflows-footer {
-  margin: 1.25rem 0 0;
-  color: var(--ink-4);
-  font-size: 0.9rem;
-}
-
-@media (max-width: 680px) {
-  .workflows {
-    padding: 1.5rem 0;
   }
 }

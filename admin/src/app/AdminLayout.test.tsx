@@ -29,7 +29,10 @@ const showModalDescriptor = Object.getOwnPropertyDescriptor(
   HTMLDialogElement.prototype,
   'showModal',
 );
-const closeDialogDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+const closeDialogDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLDialogElement.prototype,
+  'close',
+);
 
 beforeEach(() => {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
@@ -85,7 +88,7 @@ describe('AdminLayout', () => {
     expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /account menu/i })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin navigation' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Media jobs/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Media Jobs/i })).toBeInTheDocument();
     expect(consoleError.mock.calls.filter(([first]) => first === 'client_error')).toEqual([
       ['client_error', { route: '/runs', name: 'TypeError' }],
     ]);
@@ -104,12 +107,10 @@ describe('AdminLayout', () => {
     const menu = screen.getByRole('menu', { name: 'Account menu' });
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(menu).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Signed-in account' })).toHaveTextContent(
-      ADMIN_ME.email,
-    );
-    expect(screen.getByRole('menuitem', { name: 'Account' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Settings.*Coming soon/ })).toBeDisabled();
-    expect(screen.getByRole('menuitem', { name: /Language.*Coming soon/ })).toBeDisabled();
+    expect(menu).toHaveTextContent(ADMIN_ME.email);
+    expect(menu).toHaveTextContent(ADMIN_ME.role);
+    expect(screen.getByRole('menuitem', { name: 'Account details' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Page action' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -123,8 +124,9 @@ describe('AdminLayout', () => {
 
     const trigger = await screen.findByRole('button', { name: /account menu/i });
     await userEvent.click(trigger);
-    const account = screen.getByRole('menuitem', { name: 'Account' });
+    const account = screen.getByRole('menuitem', { name: 'Account details' });
     const signOut = screen.getByRole('menuitem', { name: 'Sign out' });
+    expect(screen.queryByRole('menuitem', { name: 'Help & docs' })).not.toBeInTheDocument();
     expect(account).toHaveFocus();
 
     await userEvent.keyboard('{ArrowDown}');
@@ -143,12 +145,15 @@ describe('AdminLayout', () => {
 
     const trigger = await screen.findByRole('button', { name: /account menu/i });
     await userEvent.click(trigger);
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Account' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Account details' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Account' });
     expect(dialog).toHaveTextContent(ADMIN_ME.email);
     expect(dialog).toHaveTextContent(ADMIN_ME.role);
-    await userEvent.click(screen.getByRole('button', { name: 'Close account details' }));
+    expect(dialog).not.toHaveTextContent('Two-factor authentication');
+    expect(dialog).not.toHaveTextContent('Session timeout');
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Close account dialog' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();

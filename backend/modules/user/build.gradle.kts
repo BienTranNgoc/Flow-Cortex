@@ -20,6 +20,8 @@ dependencies {
     implementation("tools.jackson.core:jackson-databind")
     // Email confirmation links go out over SMTP (Mailpit in the local stack).
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // Confirmation mails the SMTP server refused are counted.
+    implementation("io.micrometer:micrometer-core")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")

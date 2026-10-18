@@ -116,12 +116,12 @@ export function RegisterPage() {
             <h1 className="auth-card__title">Check your inbox to confirm your email</h1>
             <p className="auth-subtitle">
               We sent a confirmation link to <strong>{sentTo}</strong>. Open it within 24 hours to
-              activate your account and sign in.
+              activate your account; it signs you in and asks you to choose your password.
             </p>
           </div>
           <ResendConfirmation email={sentTo} />
           <p className="auth-footer">
-            Already confirmed? <Link to="/login">Sign in to workspace</Link>
+            Already confirmed and chose a password? <Link to="/login">Sign in to workspace</Link>
           </p>
         </section>
       </div>
@@ -147,9 +147,8 @@ export function RegisterPage() {
     <div className="auth-page">
       <BrandPanel />
 
-      <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1 className="auth-card__title">Create your free creator account</h1>
+      <section className="auth-card auth-card--surface">
+        <h1 className="auth-card__title">Create your account</h1>
         <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
 
         <div className="oauth-row">
@@ -158,10 +157,6 @@ export function RegisterPage() {
             label="Sign up with Google"
             href={googleAuthorizeUrl(true, '/')}
           />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>or sign up with email</span>
         </div>
 
         <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">

@@ -103,7 +103,7 @@ describe('MediaJobsPage', () => {
 
     const detail = detailOf('job-under-test');
     expect(detail).toHaveTextContent(label);
-    expect(detail.querySelector('.job-marker') !== null).toBe(isMarker);
+    expect(detail.querySelector('.cortex-admin-table-job-marker') !== null).toBe(isMarker);
   });
 
   it('shows the engine message under the error code', async () => {
