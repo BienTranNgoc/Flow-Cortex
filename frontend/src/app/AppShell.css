@@ -116,7 +116,7 @@
 .brand-panel {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   padding: clamp(2.5rem, 6vw, 5rem) clamp(2rem, 4vw, 4rem);
   position: relative;
   overflow: hidden;
@@ -124,9 +124,10 @@
 
 .brand-panel__inner {
   max-width: 520px;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.1rem;
   animation: auth-card-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.05s backwards;
 }
 
@@ -201,6 +202,23 @@
   animation: auth-card-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
 }
 
+.auth-card--surface {
+  margin: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 3vw, 2.5rem);
+  padding: clamp(1.75rem, 3vw, 2.5rem) clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid color-mix(in srgb, var(--ink-5) 18%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--ink-5) 18%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--paper-2) 82%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:
+    0 8px 30px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 1px 0 color-mix(in srgb, var(--paper) 80%, transparent) inset;
+  max-width: 480px;
+  width: calc(100% - 2rem);
+  align-self: center;
+}
+
 @keyframes auth-card-in {
   from {
     opacity: 0;
@@ -214,10 +232,11 @@
 
 .auth-card__title {
   margin: 0.4rem 0 0.5rem;
-  font-size: clamp(1.75rem, 2.4vw, 2.4rem);
-  line-height: 1.12;
+  font-size: 1.5rem;
+  line-height: 1.2;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .auth-subtitle {
@@ -339,6 +358,91 @@
   color: var(--teal);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.forgot-password-link--disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.auth-terms {
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.auth-terms a {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s ease;
+}
+
+.auth-terms a:hover {
+  color: var(--teal);
+}
+
+/* Password field with inline reveal toggle.
+   Wrapper is the only child of `.field` between label and error.
+   Input is full width; button is absolutely positioned on top of it.
+   No fixed width on button — only padding — so it never reads as a
+   solid square next to the input. */
+.auth-card .field__password {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.auth-card .field__password-input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.auth-card .field__password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink-4);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.auth-card .field__password-toggle:hover,
+.auth-card .field__password-toggle:focus,
+.auth-card .field__password-toggle:active {
+  background: transparent;
+  border: 0;
+  transform: translateY(-50%);
+  color: var(--ink-2);
+}
+
+.auth-card .field__password-toggle:focus-visible {
+  outline: 2px solid var(--cta-from);
+  outline-offset: 2px;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.auth-card .field__password-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 .remember-row input[type='checkbox'] {
@@ -469,5 +573,10 @@
   .auth-card {
     border-left: none;
     padding: clamp(2rem, 7vw, 3rem) clamp(1.25rem, 5vw, 2rem);
+  }
+
+  .auth-card--surface {
+    margin: clamp(1rem, 4vw, 1.5rem) clamp(0.75rem, 3vw, 1.25rem);
+    width: calc(100% - 1.5rem);
   }
 }

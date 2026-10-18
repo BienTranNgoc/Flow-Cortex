@@ -49,9 +49,8 @@ export function RegisterPage() {
     <div className="auth-page">
       <BrandPanel />
 
-      <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1 className="auth-card__title">Create your free creator account</h1>
+      <section className="auth-card auth-card--surface">
+        <h1 className="auth-card__title">Create your account</h1>
         <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
 
         <div className="oauth-row">
@@ -60,10 +59,6 @@ export function RegisterPage() {
             label="Sign up with Google"
             href={googleAuthorizeUrl(true, '/')}
           />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>or sign up with email</span>
         </div>
 
         <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">
@@ -126,6 +121,18 @@ export function RegisterPage() {
             {buttonLabel}
           </button>
         </form>
+
+        <p className="auth-terms">
+          By creating an account, you agree to our{' '}
+          <a href="/legal/terms" target="_blank" rel="noopener noreferrer">
+            Terms of Service
+          </a>{' '}
+          and{' '}
+          <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">
+            Privacy Policy
+          </a>
+          .
+        </p>
 
         <p className="auth-footer">
           Already have an account? <Link to="/login">Sign in to workspace</Link>
