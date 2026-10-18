@@ -6,8 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * 429 Problem Detail naming why no code was sent ({@code code}: {@code OTP_COOLDOWN},
- * {@code OTP_HOURLY_LIMIT} or {@code OTP_DAILY_LIMIT}) and when to ask again, as the
+ * 429 Problem Detail naming why no code was sent ({@code code}: {@code OTP_} plus a
+ * {@link PhoneSendPolicies.Refusal} name, e.g. {@code OTP_COOLDOWN}) and when to ask again, as the
  * {@code retryAfterSeconds} property and the {@code Retry-After} header.
  */
 class OtpRateLimitedException extends ResponseStatusException {

@@ -2,15 +2,18 @@ package com.flowcortex.user.emailconfirm;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One emailed confirmation link, stored as the SHA-256 hex of its token — the raw token exists
- * only in the mail. A token is spent by {@link EmailConfirmationTokenRepository#consume}, never
- * through this entity, so two concurrent opens of the same link cannot both succeed.
+ * One single-use token of the kind its {@link EmailLinkPurpose} names, stored as the SHA-256 hex of
+ * the token — the raw token exists only in the mail or the response that carried it. A token is
+ * spent by {@link EmailConfirmationTokenRepository#consume}, never through this entity, so two
+ * concurrent opens of the same link cannot both succeed.
  */
 @Entity
 @Table(name = "email_confirmation_token")
@@ -35,12 +38,18 @@ public class EmailConfirmationToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, updatable = false)
+    private EmailLinkPurpose purpose;
+
     protected EmailConfirmationToken() {
     }
 
-    EmailConfirmationToken(UUID id, UUID userId, String tokenHash, Instant createdAt, Instant expiresAt) {
+    EmailConfirmationToken(UUID id, UUID userId, EmailLinkPurpose purpose, String tokenHash, Instant createdAt,
+            Instant expiresAt) {
         this.id = id;
         this.userId = userId;
+        this.purpose = purpose;
         this.tokenHash = tokenHash;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
@@ -68,5 +77,9 @@ public class EmailConfirmationToken {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public EmailLinkPurpose getPurpose() {
+        return purpose;
     }
 }

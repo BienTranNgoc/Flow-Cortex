@@ -21,7 +21,9 @@ final class AppUserMapper {
                 user.getEmail(),
                 user.getName(),
                 user.getRole().name(),
-                user.getStatus().name());
+                user.getStatus().name(),
+                user.hasPassword(),
+                user.getGoogleSubject() != null);
     }
 
     static UserView toUserView(AppUser user) {

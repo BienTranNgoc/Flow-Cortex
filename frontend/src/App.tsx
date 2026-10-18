@@ -9,9 +9,11 @@ import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
+import { SetPasswordPage } from './features/auth/SetPasswordPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -41,11 +43,15 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
+            {/* Not behind RequireAuth: the emailed link opens it signed out. */}
+            <Route path="/set-password" element={<SetPasswordPage />} />
           </Route>
           <Route
             element={
               <RequireAuth>
-                <Layout />
+                <PasswordSetupGate>
+                  <Layout />
+                </PasswordSetupGate>
               </RequireAuth>
             }
           >

@@ -6,10 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
@@ -32,9 +34,9 @@ class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService,
-                    mock(ApplicationEventPublisher.class));
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -129,6 +131,42 @@ class UserServiceImplTest {
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
         verify(refreshTokenService, never()).revokeAllFor(any());
+    }
+
+    @Test
+    void reactivatingAConfirmedAccountPublishesItsActivation() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser suspended = ownedMember(ownerId, UserStatus.SUSPENDED);
+
+        service.updateUser(ownerId, suspended.getId(), null, null, null, "ACTIVE");
+
+        verify(events).publishEvent(new UserActivatedEvent(suspended.getId()));
+    }
+
+    @Test
+    void reactivatingAnUnconfirmedAccountOrKeepingAStatusPublishesNothing() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser unconfirmed = AppUser.selfRegistered(UUID.randomUUID(), ownerId, "person@example.com", "$2a$hash",
+                "A", "B", null, null);
+        unconfirmed.changeStatus(UserStatus.SUSPENDED);
+        when(repository.findByOwnerIdAndId(ownerId, unconfirmed.getId())).thenReturn(Optional.of(unconfirmed));
+        AppUser active = ownedMember(ownerId, UserStatus.ACTIVE);
+        AppUser suspended = ownedMember(ownerId, UserStatus.SUSPENDED);
+
+        service.updateUser(ownerId, unconfirmed.getId(), null, null, null, "ACTIVE");
+        service.updateUser(ownerId, active.getId(), null, null, null, "ACTIVE");
+        service.updateUser(ownerId, suspended.getId(), null, null, null, "SUSPENDED");
+
+        verifyNoInteractions(events);
+    }
+
+    private AppUser ownedMember(UUID ownerId, UserStatus status) {
+        AppUser member = new AppUser(UUID.randomUUID(), ownerId, "person@example.com", "$2a$hash", "Person",
+                Role.MEMBER, status);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, member.getId())).thenReturn(Optional.of(member));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        return member;
     }
 
     @Test

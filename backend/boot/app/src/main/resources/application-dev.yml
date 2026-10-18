@@ -14,3 +14,9 @@ flowcortex:
     owner-email: ${FLOWCORTEX_REGISTRATION_OWNER_EMAIL:admin1@flowcortex.dev}
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
+  # Confirmation links open the Vite dev server; mail goes to a local Mailpit.
+  app:
+    public-url: ${FLOWCORTEX_APP_PUBLIC_URL:http://localhost:5173}
+spring:
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}

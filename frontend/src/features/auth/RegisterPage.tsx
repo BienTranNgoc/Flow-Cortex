@@ -116,12 +116,12 @@ export function RegisterPage() {
             <h1 className="auth-card__title">Check your inbox to confirm your email</h1>
             <p className="auth-subtitle">
               We sent a confirmation link to <strong>{sentTo}</strong>. Open it within 24 hours to
-              activate your account and sign in.
+              activate your account; it signs you in and asks you to choose your password.
             </p>
           </div>
           <ResendConfirmation email={sentTo} />
           <p className="auth-footer">
-            Already confirmed? <Link to="/login">Sign in to workspace</Link>
+            Already confirmed and chose a password? <Link to="/login">Sign in to workspace</Link>
           </p>
         </section>
       </div>

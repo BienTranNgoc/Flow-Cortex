@@ -47,4 +47,20 @@ class WorkflowRunTest {
         assertThat(run.getErrorMessage()).isEqualTo("boom");
         assertThat(run.getFinishedAt()).isEqualTo(finishedAt);
     }
+
+    @Test
+    void onlyARunningRunCanWaitForApproval() {
+        WorkflowRun running = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        WorkflowRun finished = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        Instant finishedAt = Instant.now();
+        finished.markError("boom", finishedAt);
+
+        assertThat(running.markWaitingApproval()).isTrue();
+        assertThat(running.getStatus()).isEqualTo(RunStatus.WAITING_APPROVAL);
+        assertThat(finished.markWaitingApproval()).isFalse();
+        assertThat(finished.getStatus()).isEqualTo(RunStatus.ERROR);
+        assertThat(finished.getFinishedAt()).isEqualTo(finishedAt);
+    }
 }

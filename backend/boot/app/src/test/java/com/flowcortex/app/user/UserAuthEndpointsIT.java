@@ -2,7 +2,7 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flowcortex.user.api.UserCreatedEvent;
+import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
 import java.util.Arrays;
 import java.util.List;
@@ -42,7 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT,
         properties = "flowcortex.registration.owner-email=" + UserAuthEndpointsIT.OWNER_EMAIL)
 @AutoConfigureTestRestTemplate
-@Import(UserAuthEndpointsIT.UserCreatedEvents.class)
+@Import(UserAuthEndpointsIT.UserActivatedEvents.class)
 class UserAuthEndpointsIT extends AbstractUserModuleIT {
 
     static final String OWNER_EMAIL = "registration-owner@example.com";
@@ -62,7 +62,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     private JdbcTemplate jdbc;
 
     @Autowired
-    private UserCreatedEvents createdEvents;
+    private UserActivatedEvents activatedEvents;
 
     record ProblemView(int status, String detail) {
     }
@@ -113,10 +113,11 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         MeView me = meResponse.getBody();
         assertThat(me.email()).isEqualTo(email);
         assertThat(me.role()).isEqualTo("ADMIN");
-        // MeView has no password field at all — the JSON body cannot carry
-        // one either, confirmed by grepping the raw body too.
+        // The body says whether a password exists, never the password or its hash.
         ResponseEntity<String> rawMe = get("/api/v1/auth/me", token, String.class);
-        assertThat(rawMe.getBody()).doesNotContain("password");
+        assertThat(rawMe.getBody()).doesNotContain("\"password\"").doesNotContain("passwordHash")
+                .doesNotContain("$2a$").contains("\"hasPassword\":true")
+                .contains("\"passwordSetupRequired\":false");
     }
 
     @Test
@@ -369,7 +370,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     }
 
     @Test
-    void registeringAndAdminCreatingAnAccountEachPublishOneUserCreatedEventInTheirTransaction() {
+    void registeringWithConfirmationOffAndAdminCreatingAnAccountEachPublishOneActivationInTheirTransaction() {
         ResponseEntity<TokenResponse> response = register(newClientIp(),
                 new RegisterRequest(uniqueEmail("register-event"), "register-password-1", "Event"),
                 TokenResponse.class);
@@ -377,8 +378,8 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         UUID adminCreated = userService.createInitialAdmin(uniqueEmail("admin-event"), "admin-password-1",
                 "Event Admin").id();
 
-        assertThat(createdEvents.received()).filteredOn(event -> event.userId().equals(registered)).hasSize(1);
-        assertThat(createdEvents.received()).filteredOn(event -> event.userId().equals(adminCreated)).hasSize(1);
+        assertThat(activatedEvents.received()).filteredOn(event -> event.userId().equals(registered)).hasSize(1);
+        assertThat(activatedEvents.received()).filteredOn(event -> event.userId().equals(adminCreated)).hasSize(1);
     }
 
     @Test
@@ -422,16 +423,16 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
      * committed, so a recorded event proves both. Registration answers on a server thread, which
      * {@code @RecordApplicationEvents} does not see.
      */
-    static class UserCreatedEvents {
+    static class UserActivatedEvents {
 
-        private final List<UserCreatedEvent> received = new CopyOnWriteArrayList<>();
+        private final List<UserActivatedEvent> received = new CopyOnWriteArrayList<>();
 
         @TransactionalEventListener
-        void on(UserCreatedEvent event) {
+        void on(UserActivatedEvent event) {
             received.add(event);
         }
 
-        List<UserCreatedEvent> received() {
+        List<UserActivatedEvent> received() {
             return received;
         }
     }

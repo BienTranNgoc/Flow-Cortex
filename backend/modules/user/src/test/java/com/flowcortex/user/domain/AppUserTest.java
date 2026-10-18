@@ -87,6 +87,111 @@ class AppUserTest {
         assertThat(user.getLockedUntil()).isNull();
     }
 
+    @Test
+    void theFirstConfirmationDropsThePasswordAndItsLockoutAndALaterOneChangesNothing() {
+        AppUser user = unconfirmed();
+        for (int i = 0; i < 3; i++) {
+            user.recordFailedLogin(3, java.time.Duration.ofMinutes(15), NOW);
+        }
+
+        assertThat(user.confirmEmailDroppingUnprovenChoices(NOW, null)).isTrue();
+
+        assertThat(user.getEmailConfirmedAt()).isEqualTo(NOW);
+        assertThat(user.hasPassword()).isFalse();
+        assertThat(user.getPasswordHash()).isEmpty();
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        assertThat(user.getLockedUntil()).isNull();
+        user.setUpFirstPassword("new-hash", "An", "Tran", null);
+        assertThat(user.confirmEmailDroppingUnprovenChoices(NOW.plusSeconds(60), "Other")).isFalse();
+        assertThat(user.getEmailConfirmedAt()).isEqualTo(NOW);
+        assertThat(user.getPasswordHash()).isEqualTo("new-hash");
+        assertThat(user.getName()).isEqualTo("An Tran");
+    }
+
+    @Test
+    void confirmingDropsTheUsernameAndNamesChosenBeforeTheEmailWasProven() {
+        AppUser user = unconfirmed();
+
+        user.confirmEmailDroppingUnprovenChoices(NOW, "  ");
+
+        assertThat(user.getUsername()).isNull();
+        assertThat(user.getFirstName()).isNull();
+        assertThat(user.getLastName()).isNull();
+        assertThat(user.getName()).isEqualTo("person");
+    }
+
+    @Test
+    void aTakeoverKeepsTheProvidersNameCappedToTheColumn() {
+        AppUser named = unconfirmed();
+        named.confirmEmailDroppingUnprovenChoices(NOW, " Nguyen Van A ");
+        assertThat(named.getName()).isEqualTo("Nguyen Van A");
+
+        AppUser longNamed = unconfirmed();
+        longNamed.confirmEmailDroppingUnprovenChoices(NOW, "x".repeat(300));
+        assertThat(longNamed.getName()).hasSize(255);
+    }
+
+    @Test
+    void aSecondRegistrationReplacesEverythingTheFirstChoseWhileUnconfirmed() {
+        AppUser user = unconfirmed();
+
+        user.replaceUnconfirmedRegistration("hash-2", "Binh", "Le", null, null);
+
+        assertThat(user.getPasswordHash()).isEqualTo("hash-2");
+        assertThat(user.getFirstName()).isEqualTo("Binh");
+        assertThat(user.getLastName()).isEqualTo("Le");
+        assertThat(user.getName()).isEqualTo("Binh Le");
+        assertThat(user.getUsername()).isNull();
+        assertThat(user.isEmailConfirmed()).isFalse();
+    }
+
+    @Test
+    void aConfirmedAccountIsNeverRegisteredAgain() {
+        AppUser user = newUser();
+
+        assertThatThrownBy(() -> user.replaceUnconfirmedRegistration("hash-2", "A", "B", null, null))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(user.getPasswordHash()).isEqualTo("hash");
+    }
+
+    @Test
+    void aFirstPasswordIsSetOnlyOnAnAccountWithoutAndTakesTheChosenIdentity() {
+        AppUser oauthOnly = newUser(false);
+        oauthOnly.setUpFirstPassword("hash-1", "Binh", "Le", "binh_le");
+        assertThat(oauthOnly.hasPassword()).isTrue();
+        assertThat(oauthOnly.getPasswordHash()).isEqualTo("hash-1");
+        assertThat(oauthOnly.getName()).isEqualTo("Binh Le");
+        assertThat(oauthOnly.getFirstName()).isEqualTo("Binh");
+        assertThat(oauthOnly.getLastName()).isEqualTo("Le");
+        assertThat(oauthOnly.getUsername()).isEqualTo("binh_le");
+
+        assertThatThrownBy(() -> oauthOnly.setUpFirstPassword("hash-2", "A", "B", null))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(oauthOnly.getPasswordHash()).isEqualTo("hash-1");
+        assertThat(oauthOnly.getUsername()).isEqualTo("binh_le");
+    }
+
+    @Test
+    void aGoogleSignUpIsALinkedPasswordlessMemberNamedLikeATakeover() {
+        AppUser named = AppUser.googleSignedUp(UUID.randomUUID(), UUID.randomUUID(), "an.tran@example.com", "sub-1",
+                " Tran An ");
+        AppUser unnamed = AppUser.googleSignedUp(UUID.randomUUID(), UUID.randomUUID(), "an.tran@example.com", "sub-2",
+                null);
+
+        assertThat(named.getName()).isEqualTo("Tran An");
+        assertThat(unnamed.getName()).isEqualTo("an.tran");
+        assertThat(named.getGoogleSubject()).isEqualTo("sub-1");
+        assertThat(named.hasPassword()).isFalse();
+        assertThat(named.isEmailConfirmed()).isTrue();
+        assertThat(named.getRole()).isEqualTo(Role.MEMBER);
+        assertThat(named.getStatus()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    private static AppUser unconfirmed() {
+        return AppUser.selfRegistered(UUID.randomUUID(), UUID.randomUUID(), "person@example.com", "hash-1", "An",
+                "Tran", "an_1", null);
+    }
+
     private static AppUser newUser() {
         return newUser(true);
     }

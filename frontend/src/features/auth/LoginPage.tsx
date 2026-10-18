@@ -142,6 +142,9 @@ export function LoginPage() {
         )}
 
         <p className="auth-footer">
+          No password yet? <Link to="/set-password">Email me a link</Link>
+        </p>
+        <p className="auth-footer">
           New to Flow-Cortex? <Link to="/register">Create a free account</Link>
         </p>
       </section>

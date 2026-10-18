@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Min;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,8 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /api/v1/admin/sms-outbox} — the development SMS outbox, newest first, for an ADMIN. The
  * admin filter chain and the admin kill switch both cover this path; the role is checked again
  * against the user's row, so an admin demoted since the token was issued is refused at once.
+ * Mapped only with {@code flowcortex.sms.sender=outbox}, like the sender that fills the table.
  */
 @RestController
+@ConditionalOnProperty(name = "flowcortex.sms.sender", havingValue = "outbox")
 @RequestMapping("/api/v1/admin/sms-outbox")
 @PreAuthorize("hasRole('ADMIN')")
 class AdminSmsOutboxController {
