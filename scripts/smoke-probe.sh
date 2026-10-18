@@ -166,13 +166,17 @@ api "$admin" "/api/v1/admin/runs?size=100" | jq -e --arg r "$run" 'any(.items[];
 pass "admin Runs list shows run $run"
 
 printf 'not a video' >"$work/bad.mp4"
-run="$(start_run "$work/bad.mp4" bad.mp4)" || fail "start a run on the text file"
-body="$(await_run "$run")"
-error_code="$(jq -r '.steps[0].errorCode' <<<"$body")"
-audio_status="$(jq -r '.steps[1].status' <<<"$body")"
-[[ "$(jq -r .status <<<"$body")" == error && "$error_code" == probe_failed && "$audio_status" == pending ]] \
-  || fail "text-file run $run ended $(jq -c '{status, step1: .steps[0] | {status, errorCode}, step2: .steps[1] | {status}}' <<<"$body"), expected error/probe_failed and pending step 2"
-pass "text-file run $run ended with probe_failed"
+g="$(grant bad.mp4 "$(stat -c %s "$work/bad.mp4")")" || fail "upload grant for bad.mp4"
+code="$(put "$work/bad.mp4" "$(jq -er .url <<<"$g")")"
+[[ "$code" == 200 ]] || fail "PUT bad.mp4 answered $code: $(cat "$work/put-body")"
+code="$(curl -sS -o "$work/start-body" -w '%{http_code}' -H "Authorization: Bearer $member" \
+  -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg u "$(jq -er .uploadId <<<"$g")" '{uploadId: $u, originalName: "bad.mp4"}')" \
+  "$API_URL/api/v1/workflows/$workflow/runs")"
+reason="$(jq -r '.errors.uploadId // empty' "$work/start-body")"
+[[ "$code" == 400 && "$reason" == "This file isn't a valid video file."* ]] \
+  || fail "starting a run on a text file renamed .mp4 answered $code: $(cat "$work/start-body")"
+pass "text file renamed .mp4 refused at run start (400)"
 
 if [[ "$PRODUCT_VIDEO" != true ]]; then
   echo "SKIP  Product Video (FLOWCORTEX_PRODUCT_VIDEO_ENABLED is not true)"
@@ -215,7 +219,7 @@ jq -e 'all(.steps[]; .status == "completed")' <<<"$body" >/dev/null \
   || fail "Product Video run $run completed with a step not completed: $(jq -c '[.steps[] | .status]' <<<"$body")"
 pass "Product Video run $run approved, spoken and rendered: completed"
 
-url="$(api "$member" "/api/v1/runs/$run/steps/4/outputs/video.mp4/url" | jq -er .url)" \
+url="$(api "$member" "/api/v1/runs/$run/steps/7/outputs/video.mp4/url" | jq -er .url)" \
   || fail "download URL for video.mp4"
 code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
 [[ "$code" == 200 && -s "$work/video.mp4" ]] || fail "video.mp4 download answered $code"

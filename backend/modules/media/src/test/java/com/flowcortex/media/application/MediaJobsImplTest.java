@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -66,7 +67,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ExtendWith(OutputCaptureExtension.class)
 class MediaJobsImplTest {
 
-    private static final String SIZE_SENTENCE = "Files must be between 1 byte and 500 MB.";
+    private static final String SIZE_SENTENCE =
+            "Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.";
+    private static final String AUDIO_SIZE_SENTENCE =
+            "Files of this type must be at most 100 MB. Accepted: .mp3, .wav, .m4a.";
+    private static final String IMAGE_SIZE_SENTENCE =
+            "Files of this type must be at most 10 MB. Accepted: .jpg, .jpeg, .png, .webp.";
+    private static final byte[] MP4_PREFIX = {0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm'};
+    private static final byte[] PNG_PREFIX = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     private static final String TYPE_SENTENCE =
             "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3, .wav, .jpg, .jpeg, .png or .webp.";
     private static final String MEDIA_TYPE_SENTENCE =
@@ -82,8 +90,13 @@ class MediaJobsImplTest {
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
         "flowcortex.media.provider-queue-timeout=5m",
+        "flowcortex.media.provider-video-max-runtime=10m",
+        "flowcortex.media.provider-video-queue-timeout=15m",
         "flowcortex.media.presign-ttl=15m",
-        "flowcortex.media.upload.max-bytes=524288000",
+        "flowcortex.media.upload.max-video-bytes=524288000",
+        "flowcortex.media.upload.max-audio-bytes=104857600",
+        "flowcortex.media.upload.max-image-bytes=10485760",
+        "flowcortex.media.upload.content-check.enabled=true",
         "flowcortex.media.upload.extensions=mp4,MOV,webm,mkv,m4a,mp3,wav",
         "flowcortex.media.upload.product-image-extensions=jpg,jpeg,png,webp",
         "flowcortex.media.upload.url-ttl=15m",
@@ -154,7 +167,7 @@ class MediaJobsImplTest {
     private static ProviderJob providerJob(String capability, Map<String, Object> params) {
         UUID runId = UUID.randomUUID();
         return new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, capability, params,
-                "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
+                List.of(), "runs/" + runId + "/steps/1/attempts/1/", 1, 120, Instant.now());
     }
 
     private static Map<String, Object> scriptParams(Map<String, Object> payload) {
@@ -211,7 +224,7 @@ class MediaJobsImplTest {
             UUID runId = UUID.randomUUID();
             ProviderJob legacy = new ProviderJob("1", UUID.randomUUID(), runId, runId, 1, "generate_script",
                     scriptParams(Map.of("productName", "Máy lọc nước", "description", "Lọc sạch", "cta", "Mua ngay")),
-                    "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
+                    List.of(), "runs/" + runId + "/steps/1/", 1, 120, Instant.now());
 
             assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.enqueueProvider(legacy)))
                     .isInstanceOf(ConstraintViolationException.class)
@@ -479,20 +492,45 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void aConsumerTimeoutShorterThanTheVideoCeilingFailsStartup() {
+        runner.withPropertyValues(
+                "flowcortex.media.provider-video-max-runtime=1081s",
+                "flowcortex.media.consumer-timeout=20m")
+        .run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .rootCause()
+                    .hasMessageContaining("provider-video-max-runtime");
+        });
+    }
+
+    @Test
     void theProviderLimitsComeFromTheProviderPropertiesNotAMediaCapability() {
         runner.withPropertyValues(
                 "flowcortex.media.provider-max-runtime=3m",
-                "flowcortex.media.provider-queue-timeout=9m")
+                "flowcortex.media.provider-queue-timeout=9m",
+                "flowcortex.media.provider-video-max-runtime=11m",
+                "flowcortex.media.provider-video-queue-timeout=17m")
         .run(context -> {
-            MediaLimits limits = context.getBean(MediaJobs.class).providerLimits();
-            assertThat(limits.maxRuntime()).isEqualTo(Duration.ofMinutes(3));
-            assertThat(limits.queueTimeout()).isEqualTo(Duration.ofMinutes(9));
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            for (String capability : List.of("generate_script", "generate_storyboard", "generate_speech")) {
+                MediaLimits limits = jobs.providerLimits(capability);
+                assertThat(limits.maxRuntime()).as(capability).isEqualTo(Duration.ofMinutes(3));
+                assertThat(limits.queueTimeout()).as(capability).isEqualTo(Duration.ofMinutes(9));
+            }
+            MediaLimits video = jobs.providerLimits("generate_video");
+            assertThat(video.maxRuntime()).isEqualTo(Duration.ofMinutes(11));
+            assertThat(video.queueTimeout()).isEqualTo(Duration.ofMinutes(17));
         });
     }
 
     @Test
     void aMissingProviderCeilingFailsStartupInsteadOfDefaulting() {
         withoutProperty("flowcortex.media.provider-max-runtime")
+                .run(context -> assertThat(context).hasFailed());
+        withoutProperty("flowcortex.media.provider-video-max-runtime")
+                .run(context -> assertThat(context).hasFailed());
+        withoutProperty("flowcortex.media.provider-video-queue-timeout")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -516,6 +554,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
     }
@@ -615,6 +654,28 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void eachKindIsCappedAtItsOwnSizeAndExactlyTheCapIsGranted() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            when(store.presignPut(anyString(), anyString(), anyString(), anyLong(), any())).thenReturn(signed());
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+
+            assertThat(jobs.prepareUpload(UUID.randomUUID(), "voice.wav", 104_857_600L).maxBytes())
+                    .isEqualTo(104_857_600L);
+            assertThat(jobs.prepareUpload(UUID.randomUUID(), "photo.png", 10_485_760L).maxBytes())
+                    .isEqualTo(10_485_760L);
+            assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "voice.wav", 104_857_601L))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("size");
+                        assertThat(e.getMessage()).isEqualTo(AUDIO_SIZE_SENTENCE);
+                    });
+            assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "photo.png", 10_485_761L))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.getMessage()).isEqualTo(IMAGE_SIZE_SENTENCE));
+        });
+    }
+
+    @Test
     void anUploadOutsideTheAllowlistIsRefusedWithTheTypeSentence() {
         runner.run(context -> {
             MediaJobs jobs = context.getBean(MediaJobs.class);
@@ -633,11 +694,46 @@ class MediaJobsImplTest {
         runner.run(context -> {
             UUID ownerId = UUID.randomUUID();
             UUID uploadId = UUID.randomUUID();
-            when(context.getBean(S3MediaStore.class).head("flowcortex-uploads", ownerId + "/" + uploadId))
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            when(store.head("flowcortex-uploads", ownerId + "/" + uploadId))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            when(store.readPrefix("flowcortex-uploads", ownerId + "/" + uploadId, 16))
+                    .thenReturn(Optional.of(MP4_PREFIX));
 
             assertThat(context.getBean(MediaJobs.class).resolveUpload(ownerId, uploadId))
                     .isEqualTo(new MediaJobInput("media", "flowcortex-uploads", ownerId + "/" + uploadId));
+        });
+    }
+
+    @Test
+    void anUploadWhoseContentIsNotItsKindIsRefusedAndNotRegistered() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            when(store.head(anyString(), anyString()))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            when(store.readPrefix(anyString(), anyString(), anyInt()))
+                    .thenReturn(Optional.of("my meeting notes".getBytes()));
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.getMessage())
+                                .isEqualTo("This file isn't a valid video file. Accepted: .mp4, .mov, .webm, .mkv.");
+                    });
+            verify(context.getBean(MediaAssetRepository.class), never()).save(any());
+        });
+    }
+
+    @Test
+    void withTheContentCheckOffTheFirstBytesAreNeverRead() {
+        runner.withPropertyValues("flowcortex.media.upload.content-check.enabled=false").run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            when(store.head(anyString(), anyString()))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+
+            assertThat(context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()).key())
+                    .isEqualTo("media");
+            verify(store, never()).readPrefix(anyString(), anyString(), anyInt());
         });
     }
 
@@ -648,6 +744,8 @@ class MediaJobsImplTest {
             List<UUID> uploadIds = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
             when(context.getBean(S3MediaStore.class).head(eq("flowcortex-uploads"), anyString()))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png", "etag")));
+            when(context.getBean(S3MediaStore.class).readPrefix(eq("flowcortex-uploads"), anyString(), eq(16)))
+                    .thenReturn(Optional.of(PNG_PREFIX));
 
             List<MediaAssetInput> inputs = context.getBean(MediaJobs.class).resolveImageUploads(ownerId, uploadIds);
 
@@ -681,8 +779,8 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> context.getBean(MediaJobs.class)
                     .resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID())))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
-                        assertThat(e.field()).isEqualTo("uploadIds");
-                        assertThat(e.getMessage()).isEqualTo("Each product image must be no larger than 10 MB");
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.getMessage()).isEqualTo(IMAGE_SIZE_SENTENCE);
                     });
             verify(context.getBean(MediaAssetRepository.class), never()).save(any());
         });
@@ -751,6 +849,7 @@ class MediaJobsImplTest {
             when(store.head(anyString(), anyString()))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/jpeg")))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            when(store.readPrefix(anyString(), anyString(), eq(16))).thenReturn(Optional.of(PNG_PREFIX));
 
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {

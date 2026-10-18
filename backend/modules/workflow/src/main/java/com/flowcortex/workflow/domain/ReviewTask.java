@@ -7,12 +7,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.UUID;
 
 @Entity
 @Table(name = "review_task")
 public class ReviewTask {
+
+    /** The refusal every losing or late decision on a task answers with. */
+    public static final String NOT_WAITING_FOR_REVIEW = "This step is no longer waiting for review";
 
     @Id
     private UUID id;
@@ -162,8 +164,7 @@ public class ReviewTask {
 
     private void requirePending() {
         if (this.status != ReviewTaskStatus.PENDING) {
-            throw new ConflictException("ReviewTask " + this.id + " is already "
-                    + this.status.name().toLowerCase(Locale.ROOT));
+            throw new ConflictException(NOT_WAITING_FOR_REVIEW);
         }
     }
 

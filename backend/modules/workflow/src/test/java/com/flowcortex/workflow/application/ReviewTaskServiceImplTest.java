@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,9 +13,12 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ReviewTaskView;
 import com.flowcortex.workflow.api.ScriptRevisionView;
 import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.domain.ReviewTaskStatus;
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.ScriptRevision;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
@@ -28,6 +32,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ReviewTaskServiceImplTest {
@@ -50,6 +56,7 @@ class ReviewTaskServiceImplTest {
     private void givenOwnedTask() {
         when(reviewTaskRepository.findById(task.getId())).thenReturn(Optional.of(task));
         when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.of(run));
+        when(workflowRunRepository.findById(run.getId())).thenReturn(Optional.of(run));
         when(reviewTaskRepository.save(task)).thenReturn(task);
     }
 
@@ -89,10 +96,10 @@ class ReviewTaskServiceImplTest {
     }
 
     @Test
-    void approvingWithABlankPayloadPublishesTheOriginalPayloadForTheTasksRun() {
+    void approvingWithoutAPayloadPublishesTheOriginalPayloadForTheTasksRun() {
         givenOwnedTask();
 
-        ReviewTaskView view = service.approveTask(task.getId(), ownerId, " ", null, null);
+        ReviewTaskView view = service.approveTask(task.getId(), ownerId, null, null, null);
 
         assertThat(view.status()).isEqualTo("approved");
         assertThat(view.reviewedAt()).isEqualTo(NOW);
@@ -112,12 +119,99 @@ class ReviewTaskServiceImplTest {
     }
 
     @Test
+    void approvingWithABlankPayloadIsUnprocessableAndLeavesTheTaskPending() {
+        givenOwnedTask();
+
+        assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "   ", null, null))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getMessage()).isEqualTo("Content can't be empty");
+                    assertThat(e.getErrors()).containsKey("reviewedPayload");
+                });
+        assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
+        verify(reviewTaskRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aDecisionByAnotherMemberIsForbiddenAndLeavesTheTaskPending() {
+        givenOwnedTask();
+        UUID otherMember = UUID.randomUUID();
+
+        assertThatThrownBy(() -> service.approveTask(task.getId(), otherMember, null, null, null))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("You can't decide on this run");
+        assertThatThrownBy(() -> service.rejectTask(task.getId(), otherMember))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("You can't decide on this run");
+        assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
+        verify(reviewTaskRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aDecisionOnAnUnknownTaskIsNotFound() {
+        UUID unknown = UUID.randomUUID();
+        when(reviewTaskRepository.findById(unknown)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.approveTask(unknown, ownerId, null, null, null))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Review task not found");
+        assertThatThrownBy(() -> service.rejectTask(unknown, ownerId))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Review task not found");
+    }
+
+    @Test
+    void aDecisionOnAStoppingOrStoppedRunIsUnprocessable() {
+        givenOwnedTask();
+        for (RunStatus stopping : new RunStatus[] {RunStatus.CANCELLING, RunStatus.CANCELLED}) {
+            ReflectionTestUtils.setField(run, "status", stopping);
+
+            assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, null, null))
+                    .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                        assertThat(e.getMessage()).isEqualTo("This run is being stopped");
+                        assertThat(e.getCode()).isEqualTo("RUN_STOPPING");
+                    });
+            assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
+                    .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                            e -> assertThat(e.getCode()).isEqualTo("RUN_STOPPING"));
+        }
+        assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
+        verify(runStepRepository, never()).failPendingApproval(any(), any(), anyString(), anyString(), any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aDecisionOnATaskThatIsNoLongerPendingIsAConflictSayingSo() {
+        givenOwnedTask();
+        service.approveTask(task.getId(), ownerId, null, null, null);
+
+        assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This step is no longer waiting for review");
+    }
+
+    @Test
+    void losingTheVersionCheckToAConcurrentDecisionIsTheSameConflict() {
+        givenOwnedTask();
+        doThrow(new ObjectOptimisticLockingFailureException(ReviewTask.class, task.getId()))
+                .when(reviewTaskRepository).flush();
+
+        assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, null, null))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This step is no longer waiting for review");
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
     void rejectingWhenTheCheckpointStepIsNoLongerPendingIsAConflict() {
         givenOwnedTask();
         when(runStepRepository.failPendingApproval(eq(task.getRunStepId()), eq(run.getId()), anyString(), anyString(),
                 eq(NOW))).thenReturn(0);
 
-        assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId)).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("This step is no longer waiting for review");
         verify(workflowRunRepository, never()).save(any());
     }
 

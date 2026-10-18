@@ -93,11 +93,12 @@ class DevDataSeeder {
     }
 
     /**
-     * Three {@code is_shared=true} demo workflows so both the success and run-error UI are
+     * Four {@code is_shared=true} demo workflows so both the success and run-error UI are
      * reachable without a real provider: an all-{@code echo} success path, one whose middle
-     * step deliberately fails ({@code fail} type), and one that inspects an uploaded video or
-     * audio file on the media worker. Runs still land owner-scoped to whoever starts one — a
-     * shared definition never implies shared runs.
+     * step deliberately fails ({@code fail} type), one that inspects an uploaded video or
+     * audio file on the media worker, and one whose step 2 reads from a step that does not
+     * exist, so every start is refused as not fully configured. Runs still land owner-scoped to
+     * whoever starts one — a shared definition never implies shared runs.
      *
      * <p>Idempotent by name (no unique constraint on {@code name}, unlike {@code
      * app_user.email}): checks {@link WorkflowService#listVisibleWorkflows} first and skips an
@@ -119,6 +120,9 @@ class DevDataSeeder {
                     new NewWorkflowStep("Inspect the file", "probe", null),
                     new NewWorkflowStep("Extract source audio", "extract_audio", null)
                 ));
+            seedWorkflowIfAbsent(workflowService, "Incomplete Demo (step 2 not configured)", List.of(
+                    new NewWorkflowStep("Echo step 1", "echo", null),
+                    new NewWorkflowStep("Echo step 2", "echo", "{step:5.output}")));
         };
     }
 

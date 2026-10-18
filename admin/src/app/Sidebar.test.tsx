@@ -24,7 +24,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/runs');
     expect(screen.getByRole('link', { name: /Media Jobs/i })).toHaveAttribute('href', '/media-jobs');
     expect(screen.getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/users');
-    expect(screen.queryByText('SMS Outbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /SMS Outbox/ })).toHaveAttribute('href', '/sms-outbox');
 
     const voice = screen.getByText('Voice Quota').closest('[aria-disabled]');
     expect(voice).toHaveAttribute('aria-disabled', 'true');

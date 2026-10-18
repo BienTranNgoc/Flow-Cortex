@@ -8,6 +8,7 @@ import {
   Cpu,
   LayoutDashboard,
   ListChecks,
+  MessageSquare,
   Play,
   Settings2,
   ShieldCheck,
@@ -88,6 +89,7 @@ export const NAV: NavGroup[] = [
     label: 'Administration',
     items: [
       { label: 'Users', path: '/users', icon: Users, action: 'users.manage' },
+      { label: 'SMS Outbox', path: '/sms-outbox', icon: MessageSquare, action: 'users.manage' },
       {
         label: 'Feature Switches',
         path: '/features',

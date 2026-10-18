@@ -15,6 +15,7 @@ import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOutputUrlView;
+import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.domain.RunStatus;
@@ -81,12 +82,13 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final MediaJobs mediaJobs;
     private final UserDirectory userDirectory;
     private final TransactionTemplate transactionTemplate;
+    private final RunStartGuards runStartGuards;
     private final boolean workflowEnabled;
 
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, StepExecutorRegistry registry, MediaJobs mediaJobs,
-            UserDirectory userDirectory, TransactionTemplate transactionTemplate,
+            UserDirectory userDirectory, TransactionTemplate transactionTemplate, RunStartGuards runStartGuards,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -97,6 +99,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         this.mediaJobs = mediaJobs;
         this.userDirectory = userDirectory;
         this.transactionTemplate = transactionTemplate;
+        this.runStartGuards = runStartGuards;
         this.workflowEnabled = workflowEnabled;
     }
 
@@ -115,6 +118,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName) {
+        return startRun(currentUserId, workflowId, input, uploadId, uploadIds, originalName, false);
+    }
+
+    @Override
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -133,6 +142,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
         }
+        runStartGuards.check(currentUserId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
         String runInput = input;
@@ -170,7 +180,9 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                         run.getId(),
                         stepDef.getStepOrder(),
                         stepDef.getType(),
-                        stepInput));
+                        stepInput,
+                        stepDef.getConfig(),
+                        stepDef.getInputRef()));
             }
             runSteps = runStepRepository.saveAll(runSteps);
 

@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   authHeaders,
+  confirmEmail as confirmEmailRequest,
   login as loginRequest,
   me as meRequest,
   register as registerRequest,
+  resendConfirmation as resendConfirmationRequest,
   setToken,
   unwrap,
   useAuthToken,
@@ -41,16 +43,55 @@ export function useLoginMutation() {
 
 export type LoginVariables = LoginRequest & { rememberMe: boolean };
 
+/** `confirmation_sent` (202) leaves the visitor signed out until the emailed link is opened. */
+export type RegisterOutcome = 'signed_in' | 'confirmation_sent';
+
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: RegisterRequest) =>
-      unwrap(registerRequest({ ...input, rememberMe: true })),
-    onSuccess: (data) => {
+    mutationFn: async (input: Omit<RegisterRequest, 'rememberMe'>): Promise<RegisterOutcome> => {
+      const data = await unwrap(registerRequest({ ...input, rememberMe: true }));
+      if (!('accessToken' in data)) {
+        return 'confirmation_sent';
+      }
       setToken(data.accessToken ?? null, true);
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      return 'signed_in';
+    },
+  });
+}
+
+/** Spends an emailed confirmation link; the server signs the member in for this browser session only. */
+export function useConfirmEmailMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) => unwrap(confirmEmailRequest({ token })),
+    onSuccess: (data) => {
+      setToken('accessToken' in data ? (data.accessToken ?? null) : null, false);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
+}
+
+/** Always answered 202 by the server, so success says nothing about whether the email exists. */
+export function useResendConfirmationMutation() {
+  return useMutation({
+    mutationFn: (email: string) => unwrap(resendConfirmationRequest({ email })),
+  });
+}
+
+export const EMAIL_NOT_CONFIRMED = 'EMAIL_NOT_CONFIRMED';
+export const CONFIRMATION_LINK_INVALID = 'CONFIRMATION_LINK_INVALID';
+
+/** The problem's `code` extension member, when the error is an API refusal that carries one. */
+export function problemCodeFrom(error: unknown): unknown {
+  const problem = error instanceof ApiError ? error.problem : undefined;
+  return problem && 'code' in problem ? problem.code : undefined;
+}
+
+/** Field name to message from a 400/409 problem's `errors`; empty for any other error. */
+export function fieldErrorsFrom(error: unknown): Record<string, string> {
+  return (error instanceof ApiError ? error.problem?.errors : undefined) ?? {};
 }
 
 const REMEMBERED_EMAIL_KEY = 'flowcortex.auth.rememberedEmail';

@@ -278,7 +278,6 @@ def test_ffmpeg_runs_through_the_job_runner_in_a_job_temp_dir() -> None:
     abort.run.side_effect = run
 
     assert edge_adapter._to_wav(b"mp3", abort) == _wav()
-
     [argv] = abort.run.call_args.args
     assert argv[0] == "ffmpeg"
     assert "-nostdin" in argv

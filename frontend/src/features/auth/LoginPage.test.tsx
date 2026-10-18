@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { setToken } from '@flow-cortex/api-client';
-import { stubApi } from '../../test/fakeApi';
+import { stubApi, type FakeReply } from '../../test/fakeApi';
 import { LoginPage } from './LoginPage';
 
 const PERSISTENT_KEY = 'flowcortex.auth.token';
@@ -105,6 +105,84 @@ describe('LoginPage', () => {
       email: 'member1@flowcortex.dev',
       password: 'secret',
       rememberMe: remember,
+    });
+  });
+
+  describe('an account that has not confirmed its email', () => {
+    const NOT_CONFIRMED: FakeReply = {
+      status: 403,
+      body: {
+        status: 403,
+        detail: 'Email address is not confirmed',
+        code: 'EMAIL_NOT_CONFIRMED',
+      },
+    };
+
+    async function signInUnconfirmed(resend: FakeReply) {
+      const calls = stubApi({
+        'POST /api/v1/auth/login': NOT_CONFIRMED,
+        'POST /api/v1/auth/resend-confirmation': resend,
+      });
+      const user = userEvent.setup();
+      renderLogin(null);
+      await user.type(screen.getByLabelText('Email'), 'an@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Secret123');
+      await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
+      return { calls, user };
+    }
+
+    it('asks to confirm the email and resends the link to the typed address', async () => {
+      const { calls, user } = await signInUnconfirmed({
+        status: 202,
+        body: { status: 'confirmation_sent' },
+      });
+
+      expect(await screen.findByText('Confirm your email before signing in')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Resend confirmation email' }));
+
+      expect(
+        await screen.findByText('If an account needs confirming, we sent a new link'),
+      ).toBeInTheDocument();
+      expect(calls.filter((call) => call.path === '/api/v1/auth/resend-confirmation')).toEqual([
+        {
+          method: 'POST',
+          path: '/api/v1/auth/resend-confirmation',
+          body: { email: 'an@example.com' },
+        },
+      ]);
+      expect(window.localStorage.getItem(PERSISTENT_KEY)).toBeNull();
+    });
+
+    it('shows the server detail when the resend is rate-limited', async () => {
+      const { user } = await signInUnconfirmed({
+        status: 429,
+        body: { status: 429, detail: 'Too many registration attempts; try again later' },
+      });
+
+      await user.click(await screen.findByRole('button', { name: 'Resend confirmation email' }));
+
+      expect(
+        await screen.findByText('Too many registration attempts; try again later'),
+      ).toHaveAttribute('role', 'alert');
+    });
+
+    it('offers no resend for any other refusal', async () => {
+      stubApi({
+        'POST /api/v1/auth/login': {
+          status: 401,
+          body: { status: 401, detail: 'Invalid email or password' },
+        },
+      });
+      const user = userEvent.setup();
+      renderLogin(null);
+      await user.type(screen.getByLabelText('Email'), 'an@example.com');
+      await user.type(screen.getByLabelText('Password'), 'wrong-one');
+      await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
+
+      expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Resend confirmation email' }),
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -23,13 +23,12 @@ import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
-import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
-import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Tracer;
@@ -78,7 +77,6 @@ class RunAdvancerTest {
 
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
-    private final WorkflowStepRepository workflowStepRepository = mock(WorkflowStepRepository.class);
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final TaskScheduler scheduler = mock(TaskScheduler.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -90,14 +88,15 @@ class RunAdvancerTest {
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
-    private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository, workflowRunRepository);
+    private final RunStepTransactions transactions =
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class));
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
-        return new RunAdvancer(workflowRunRepository, runStepRepository, workflowStepRepository, transactions,
-                new InputResolver(), registry, taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters,
-                LEASE, clock, checkpoints, validator);
+        return new RunAdvancer(workflowRunRepository, runStepRepository, transactions, new InputResolver(), registry,
+                taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters, LEASE, clock, checkpoints,
+                validator);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
@@ -106,16 +105,11 @@ class RunAdvancerTest {
     private final UUID workflowId = UUID.randomUUID();
     private final WorkflowRun run = new WorkflowRun(runId, workflowId, UUID.randomUUID(), "hello", NOW);
 
-    private void givenRun(List<WorkflowStep> defs, List<RunStep> steps) {
+    private void givenRun(List<RunStep> steps) {
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
         when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(steps);
-        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflowId)).thenReturn(defs);
         when(scheduler.scheduleAtFixedRate(any(), any(Instant.class), any(Duration.class)))
                 .thenAnswer(invocation -> mock(ScheduledFuture.class));
-    }
-
-    private WorkflowStep def(int order, String type) {
-        return new WorkflowStep(UUID.randomUUID(), workflowId, (short) order, "step-" + order, type, null);
     }
 
     private RunStep pending(int order, String type) {
@@ -159,7 +153,7 @@ class RunAdvancerTest {
             CapturedOutput output) {
         RunStep step1 = pending(1, "echo");
         RunStep step2 = pending(2, "echo");
-        givenRun(List.of(def(1, "echo"), def(2, "echo")), List.of(step1, step2));
+        givenRun(List.of(step1, step2));
         when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
                 .thenReturn(List.of(step1, step2), List.of(completed(1, step1.getId(), "hello"), step2));
         when(runStepRepository.claimPending(eq(step1.getId()), any(), any(), any())).thenReturn(1);
@@ -182,7 +176,7 @@ class RunAdvancerTest {
         givenMediaEnabled();
         RunStep step1 = completed(1, UUID.randomUUID(), "{}");
         RunStep step2 = pending(2, "echo");
-        givenRun(List.of(def(1, "probe"), def(2, "echo")), List.of(step1, step2));
+        givenRun(List.of(step1, step2));
         when(runStepRepository.findById(step1.getId())).thenReturn(Optional.of(step1));
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(0);
@@ -197,7 +191,7 @@ class RunAdvancerTest {
     void aCheckpointStepPausesTheRunWithThePreviousStepsOutputInsteadOfDispatching() {
         RunStep step1 = completed(1, UUID.randomUUID(), null);
         RunStep checkpoint = pending(2, "APPROVAL_CHECKPOINT");
-        givenRun(List.of(def(1, "echo"), def(2, "APPROVAL_CHECKPOINT")), List.of(step1, checkpoint));
+        givenRun(List.of(step1, checkpoint));
 
         advancer.advance(runId);
 
@@ -209,7 +203,7 @@ class RunAdvancerTest {
     void anApprovalThatResumesTheCheckpointAdvancesTheEventsRun() {
         RunStep step1 = completed(1, UUID.randomUUID(), "hello");
         RunStep step2 = pending(2, "echo");
-        givenRun(List.of(def(1, "echo"), def(2, "echo")), List.of(step1, step2));
+        givenRun(List.of(step1, step2));
         ReviewTaskApprovedEvent event = new ReviewTaskApprovedEvent(UUID.randomUUID(), runId, "hello", null);
         when(checkpoints.resume(event, NOW)).thenReturn(true);
 
@@ -248,7 +242,7 @@ class RunAdvancerTest {
         RunStep step2 = pending(2, "echo");
         RunStep step1Done = completed(1, step1.getId(), "HELLO");
         RunStep step2Done = completed(2, step2.getId(), "HELLO");
-        givenRun(List.of(def(1, "upper"), def(2, "echo")), List.of(step1, step2));
+        givenRun(List.of(step1, step2));
         when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
                 .thenReturn(List.of(step1, step2), List.of(step1Done, step2), List.of(step1Done, step2Done));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
@@ -271,7 +265,7 @@ class RunAdvancerTest {
     @Test
     void aRunLogsItsStartOnceWithItsStepCountAndThatItCompleted(CapturedOutput output) {
         RunStep step1 = pending(1, "echo");
-        givenRun(List.of(def(1, "echo")), List.of(step1));
+        givenRun(List.of(step1));
         when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
                 .thenReturn(List.of(step1), List.of(completed(1, step1.getId(), "hello")));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
@@ -290,7 +284,7 @@ class RunAdvancerTest {
     @Test
     void aRunThatFailsLogsThatItFinishedInError(CapturedOutput output) {
         RunStep step1 = pending(1, "fail");
-        givenRun(List.of(def(1, "fail"), def(2, "echo")), List.of(step1, pending(2, "echo")));
+        givenRun(List.of(step1, pending(2, "echo")));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
@@ -304,7 +298,7 @@ class RunAdvancerTest {
     @Test
     void aFailingInlineStepErrorsTheStepAndTheRunAndStopsThere(CapturedOutput output) {
         RunStep step1 = pending(1, "fail");
-        givenRun(List.of(def(1, "fail"), def(2, "echo")), List.of(step1, pending(2, "echo")));
+        givenRun(List.of(step1, pending(2, "echo")));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
@@ -325,7 +319,7 @@ class RunAdvancerTest {
     void aRemoteStepIsEnqueuedInsideTheClaimAndTheAdvanceReturnsWithoutWaiting() {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
 
         advancer.on(new WorkflowRunStartedEvent(runId));
@@ -364,9 +358,7 @@ class RunAdvancerTest {
         RunStep extractAudio = new RunStep(
                 UUID.randomUUID(), runId, (short) 2, "extract_audio", UPLOAD_REF);
 
-        givenRun(
-                List.of(def(1, "probe"), def(2, "extract_audio")),
-                List.of(completedProbe, extractAudio));
+        givenRun(List.of(completedProbe, extractAudio));
         when(runStepRepository.findById(probe.getId())).thenReturn(Optional.of(probe));
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any()))
                 .thenReturn(1);
@@ -405,13 +397,12 @@ class RunAdvancerTest {
                 + speechKey + "\",\"mime\":\"audio/wav\",\"bytes\":42}]";
         RunStep speech = new RunStep(UUID.randomUUID(), runId, (short) 3, "generate_speech");
         speech.markRunning(NOW);
-        speech.markCompleted("script", "{\"durationMs\":15000}", NOW, speechOutputs);
-        RunStep render = new RunStep(UUID.randomUUID(), runId, (short) 4, "render_video", images);
-        WorkflowStep definition = mock(WorkflowStep.class);
-        when(definition.getStepOrder()).thenReturn((short) 4);
-        when(definition.getConfig()).thenReturn("{\"profile\":\"vertical_ad_v1\",\"outputInputs\":["
-                + "{\"stepOrder\":3,\"outputName\":\"speech.wav\",\"inputKey\":\"speech\"}]}");
-        givenRun(List.of(definition), List.of(speech, render));
+        speech.markCompleted("script", "{\"durationMs\":9000}", NOW, speechOutputs);
+        RunStep render = new RunStep(UUID.randomUUID(), runId, (short) 4, "render_video", images,
+                "{\"profile\":\"vertical_ad_v1\",\"outputInputs\":["
+                        + "{\"stepOrder\":3,\"outputName\":\"speech.wav\",\"inputKey\":\"speech\"}]}",
+                null);
+        givenRun(List.of(speech, render));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
 
         advancer.advance(runId);
@@ -424,12 +415,25 @@ class RunAdvancerTest {
     }
 
     @Test
+    void aStepResolvesItsInputFromTheReferenceItsRunStartedWith() {
+        RunStep first = completed(1, UUID.randomUUID(), "FIRST");
+        RunStep second = completed(2, UUID.randomUUID(), "SECOND");
+        RunStep third = new RunStep(UUID.randomUUID(), runId, (short) 3, "echo", null, null, "{step:1}");
+        givenRun(List.of(first, second, third));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).claimPending(third.getId(), NOW, NOW.plus(LEASE), "FIRST");
+    }
+
+    @Test
     void aProviderResultThatBreaksTheJsonSchemaFailsTheStepAtTheTrustBoundaryWithContractViolation(
             CapturedOutput output) {
         givenMediaEnabled();
         RunStep step = pending(1, "generate_script");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
-        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
@@ -460,7 +464,7 @@ class RunAdvancerTest {
         givenMediaEnabled();
         RunStep step = pending(1, "generate_script");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
-        givenRun(List.of(def(1, "generate_script")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
@@ -515,11 +519,52 @@ class RunAdvancerTest {
         verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
     }
 
+    @Test
+    void speechExactlyAsLongAsTheVideoIsAccepted() {
+        RunStep step = speechStep("{\"script\":\"Xin chào\",\"sourceRevisionId\":\"" + SPEECH_REVISION + "\"}");
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("durationMs", 10_000), null)));
+
+        verify(runStepRepository).completeIfRunning(eq(step.getId()), eq(runId), eq((short) 1), any(), any(),
+                eq(NOW));
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void speechLongerThanTheVideoFailsTheStepWithSpeechTooLong() {
+        RunStep step = speechStep("{\"script\":\"Xin chào\",\"sourceRevisionId\":\"" + SPEECH_REVISION + "\"}");
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("durationMs", 10_001), null)));
+
+        verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "speech_too_long",
+                "The approved script reads for 10.1 s, longer than the 10 s video. "
+                        + "Start a new run with a shorter script.", NOW);
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void theSpeechTooLongMessageStatesTheSpokenLengthToATenthOfASecond() {
+        RunStep step = speechStep("{\"script\":\"Xin chào\",\"sourceRevisionId\":\"" + SPEECH_REVISION + "\"}");
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                speechData("durationMs", 13_400), null)));
+
+        verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "speech_too_long",
+                "The approved script reads for 13.4 s, longer than the 10 s video. "
+                        + "Start a new run with a shorter script.", NOW);
+    }
+
     private RunStep speechStep(String input) {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "generate_speech", input);
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
-        givenRun(List.of(def(1, "generate_speech")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         return step;
     }
@@ -528,7 +573,7 @@ class RunAdvancerTest {
     void aJobThatBreaksTheContractFailsTheStepWithContractViolationInsteadOfLeavingItPending() {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
         org.mockito.Mockito.doThrow(new ConstraintViolationException("inputs: must not be empty", Set.of()))
@@ -546,7 +591,7 @@ class RunAdvancerTest {
         givenMediaEnabled();
         RunStep step = pending(1, "probe");
         WorkflowRun referenceRun = new WorkflowRun(runId, workflowId, UUID.randomUUID(), UPLOAD_REF, NOW);
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(referenceRun));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
@@ -563,7 +608,7 @@ class RunAdvancerTest {
         when(mediaJobs.isEnabled()).thenReturn(false);
         when(mediaJobs.limitsFor("probe")).thenReturn(new MediaLimits(PROBE_QUEUE, PROBE_RUNTIME, 1000L));
         RunStep step = pending(1, "probe");
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
@@ -576,7 +621,7 @@ class RunAdvancerTest {
 
     @Test
     void aLostClaimIsANoOp() {
-        givenRun(List.of(def(1, "echo")), List.of(pending(1, "echo")));
+        givenRun(List.of(pending(1, "echo")));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(0);
 
         advancer.on(new WorkflowRunStartedEvent(runId));
@@ -589,7 +634,7 @@ class RunAdvancerTest {
     @Test
     void anUnknownStepTypeErrorsTheStep() {
         RunStep step = pending(1, "nope");
-        givenRun(List.of(def(1, "nope")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
@@ -603,7 +648,7 @@ class RunAdvancerTest {
     void aStepAlreadyInFlightIsNotClaimedAgain() {
         RunStep step = pending(1, "echo");
         step.markRunning(NOW);
-        givenRun(List.of(def(1, "echo")), List.of(step));
+        givenRun(List.of(step));
 
         advancer.on(new WorkflowRunStartedEvent(runId));
 
@@ -615,7 +660,7 @@ class RunAdvancerTest {
         RunAdvancer saturated = advancer(task -> {
             throw new TaskRejectedException("queue full");
         });
-        givenRun(List.of(def(1, "echo")), List.of(pending(1, "echo")));
+        givenRun(List.of(pending(1, "echo")));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
 
         saturated.on(new WorkflowRunStartedEvent(runId));
@@ -630,7 +675,7 @@ class RunAdvancerTest {
         givenMediaEnabled();
         RunStep step = pending(1, "probe");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
@@ -655,7 +700,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, "probe");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         step.recordPickup(NOW.minusMillis(2_500), NOW.plus(LEASE), NOW.plus(PROBE_RUNTIME), (short) 0);
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
@@ -674,7 +719,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, "probe");
         step.markRunning(NOW);
         step.markError(null, "lease_expired", "No heartbeat within the lease", NOW);
-        givenRun(List.of(def(1, "probe")), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
 
@@ -723,7 +768,7 @@ class RunAdvancerTest {
     private void assertProviderDataRejected(String capability, Map<String, Object> data, String field) {
         RunStep step = pending(1, capability);
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
-        givenRun(List.of(def(1, capability)), List.of(step));
+        givenRun(List.of(step));
         when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
@@ -754,11 +799,11 @@ class RunAdvancerTest {
     private static Map<String, Object> speechData(String field, Object value) {
         Map<String, Object> data = new HashMap<>(Map.of(
                 "profile", "vi_voice_v1",
-                "durationMs", 15_000,
+                "durationMs", 9_000,
                 "provider", "edge",
                 "voice", "vi-VN-HoaiMyNeural",
                 "speed", "+0%",
-                "sourceRevisionId", SPEECH_REVISION,
+                "sourceRevisionId", UUID.fromString("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4"),
                 "idempotencyKey", "a".repeat(64),
                 "format", "wav"));
         data.put(field, value);

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-storyboard-result.schema.json",
+  "title": "ProviderStoryboardData",
+  "description": "The completed MediaResult.data payload returned by generate_storyboard/product_ad_storyboard_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "sourceRevisionId", "scene1Prompt", "scene2Prompt"],
+  "properties": {
+    "profile": { "const": "product_ad_storyboard_v1" },
+    "sourceRevisionId": { "type": "string", "format": "uuid" },
+    "scene1Prompt": { "type": "string", "minLength": 1, "maxLength": 2500 },
+    "scene2Prompt": { "type": "string", "minLength": 1, "maxLength": 2500 }
+  }
+}

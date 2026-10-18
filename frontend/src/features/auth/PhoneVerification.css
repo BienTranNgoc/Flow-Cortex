@@ -1,0 +1,69 @@
+/* Phone verification section inside the profile form card */
+
+.phone-verification .field input:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: 0.125rem;
+}
+
+.phone-verification .field input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.phone-verification__code {
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-verification__current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.phone-verification__number {
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-verification__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.phone-verification__resend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 0;
+}
+
+.phone-verification__countdown {
+  color: var(--ink-3);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-verification .cortex-btn {
+  min-height: var(--target-min);
+}
+
+.phone-verification .cortex-btn:disabled {
+  filter: none;
+  box-shadow: none;
+}
+
+.phone-verification__actions {
+  flex-wrap: wrap;
+}

@@ -58,7 +58,7 @@ class WorkflowRunServiceImplTest {
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
                 runStepRepository, events, registry, mediaJobs, mock(UserDirectory.class),
-                new TransactionTemplate(transactions), workflowEnabled);
+                new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -131,7 +131,8 @@ class WorkflowRunServiceImplTest {
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
         WorkflowStep step1 = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "first", "echo", null);
-        WorkflowStep step2 = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "second", "echo", null);
+        WorkflowStep step2 = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "second", "echo",
+                "{step:1}");
         when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
         when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId()))
                 .thenReturn(List.of(step1, step2));
@@ -145,6 +146,7 @@ class WorkflowRunServiceImplTest {
         assertThat(started.input()).isEqualTo("hello");
         assertThat(started.steps()).hasSize(2);
         assertThat(started.steps()).allSatisfy(step -> assertThat(step.status()).isEqualTo("pending"));
+        assertThat(savedSteps()).extracting(RunStep::getInputRef).containsExactly(null, "{step:1}");
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
     }
 

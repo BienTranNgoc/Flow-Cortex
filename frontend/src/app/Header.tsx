@@ -1,8 +1,9 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
+import { formatCredits } from '../features/credits/formatCredits';
+import { useBalance } from '../features/credits/useBalance';
 import { FlowCortexLogo, ThemeToggle } from '@flow-cortex/ui-kit';
 import { useTheme } from './useTheme';
-import { accountStatsEnabled } from './featureFlags';
 import { DocsMenu } from './DocsMenu';
 import { primaryNavItems } from './navItems';
 import { UserMenu } from './UserMenu';
@@ -13,6 +14,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
 export function Header() {
   const meQuery = useMeQuery();
+  const credits = useBalance();
   const displayName = meQuery.data?.name;
   const email = meQuery.data?.email;
   const location = useLocation();
@@ -40,7 +42,7 @@ export function Header() {
         </nav>
 
         <div className="cortex-header__actions">
-          {accountStatsEnabled() && (
+          {credits !== undefined && (
             <span className="cortex-gpu-pill">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -52,7 +54,7 @@ export function Header() {
               >
                 <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
               </svg>
-              <span>18 GPU Credits</span>
+              <span>{formatCredits(credits)} credits</span>
             </span>
           )}
           <ThemeToggle theme={theme} onToggle={toggle} compact />

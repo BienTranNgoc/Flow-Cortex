@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":modules:user"))
     implementation(project(":modules:media"))
+    implementation(project(":modules:credit"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -45,4 +46,8 @@ tasks.withType<Test> {
     val migrations = rootProject.projectDir.resolve("boot/app/src/main/resources/db/migration")
     systemProperty("flowcortex.migrations.dir", migrations.absolutePath)
     inputs.dir(migrations).withPropertyName("migrations").withPathSensitivity(PathSensitivity.RELATIVE)
+    // contracts/limits.json (the repo root is backend/'s parent) holds values the worker shares.
+    val contracts = rootProject.projectDir.parentFile.resolve("contracts")
+    systemProperty("flowcortex.contracts.dir", contracts.absolutePath)
+    inputs.dir(contracts).withPropertyName("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -4,12 +4,14 @@ One Python codebase serves two isolated runtimes:
 
 - the media worker consumes `media.jobs`, reads assets, runs FFmpeg/FFprobe capabilities and
   publishes through exchange `media`;
-- the provider worker consumes `provider.jobs`, runs provider capabilities and publishes through
+- the provider worker consumes the queue `PROVIDER_QUEUE` names — `provider.jobs` (script,
+  storyboard, speech; the default) or `provider.video.jobs` (video clips, compose service
+  `provider-video-worker`) — runs provider capabilities and publishes through
   exchange `provider`. Its deterministic fixture adapter is for development until OpenAI is wired.
 
 Message shapes live in `../contracts/*.schema.json`.
 
-**Run** — `docker compose up worker provider-worker` from the repo root (env in `.env`, see
+**Run** — `docker compose up worker provider-worker provider-video-worker` from the repo root (env in `.env`, see
 `.env.example`). Local entrypoints are `uv run python -m flowcortex_worker` and
 `uv run python -m flowcortex_worker.provider`. The API declares both broker topologies; workers
 only consume and publish.

@@ -17,6 +17,19 @@ const MEMBER_ME = {
   },
 };
 
+const FEATURES_OFF = {
+  'GET /api/v1/features': {
+    status: 200,
+    body: {
+      emailConfirmation: false,
+      phoneVerification: false,
+      uploadContentCheck: false,
+      runCancellation: false,
+      credits: false,
+    },
+  },
+};
+
 describe('App', () => {
   it('redirects an unauthenticated visitor to the sign-in page', async () => {
     stubApi({ 'POST /api/v1/auth/refresh': { status: 401, body: { status: 401 } } });
@@ -26,7 +39,7 @@ describe('App', () => {
 
   it('contains a page that throws inside the layout, with Reload and one structured event', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    stubApi(MEMBER_ME);
+    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
     setToken('t', true);
     window.history.pushState({}, '', '/');
 

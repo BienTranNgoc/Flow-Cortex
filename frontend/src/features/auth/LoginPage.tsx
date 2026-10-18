@@ -5,12 +5,15 @@ import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
+import { ResendConfirmation } from './ConfirmEmailPage';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { googleAuthorizeUrl, oauthErrorMessage } from './oauth';
 import {
   clearRememberedEmail,
   detailFrom,
+  EMAIL_NOT_CONFIRMED,
   getRememberedEmail,
+  problemCodeFrom,
   setRememberedEmail,
   submitState,
   useAuthToken,
@@ -53,8 +56,10 @@ export function LoginPage() {
   });
 
   const oauthError = searchParams.get('oauth_error');
-  const serverError =
-    detailFrom(loginMutation) ?? (oauthError ? oauthErrorMessage(oauthError) : undefined);
+  const notConfirmed = problemCodeFrom(loginMutation.error) === EMAIL_NOT_CONFIRMED;
+  const serverError = notConfirmed
+    ? 'Confirm your email before signing in'
+    : (detailFrom(loginMutation) ?? (oauthError ? oauthErrorMessage(oauthError) : undefined));
   const isPending = loginMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
@@ -142,11 +147,7 @@ export function LoginPage() {
           </div>
           <div className="login-meta-row">
             <label className="remember-row" htmlFor="login-remember">
-              <input
-                id="login-remember"
-                type="checkbox"
-                {...register('rememberMe')}
-              />
+              <input id="login-remember" type="checkbox" {...register('rememberMe')} />
               <span>Remember me</span>
             </label>
             {passwordResetEnabled() ? (
@@ -176,6 +177,10 @@ export function LoginPage() {
             {buttonLabel}
           </button>
         </form>
+
+        {notConfirmed && loginMutation.variables && (
+          <ResendConfirmation email={loginMutation.variables.email} />
+        )}
 
         <p className="auth-footer">
           New to FlowCortex? <Link to="/register">Create a free account</Link>

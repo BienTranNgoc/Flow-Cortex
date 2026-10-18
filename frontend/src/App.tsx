@@ -11,6 +11,7 @@ import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { RunsPage } from './app/RunsPage';
+import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
@@ -43,6 +44,7 @@ export function App() {
           >
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/confirm-email" element={<ConfirmEmailPage />} />
           </Route>
           <Route
             element={

@@ -14,6 +14,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.domain.ProductVideoInput;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
@@ -25,6 +26,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +51,7 @@ class ProductVideoServiceTest {
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                transactions, enabled, true);
+                transactions, new RunStartGuards(List.of()), enabled, true);
     }
 
     @Test
@@ -64,6 +66,30 @@ class ProductVideoServiceTest {
     }
 
     @Test
+    void aRefusingStartGuardStopsTheRunBeforeUploadsAreResolved() {
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(ProductVideoWorkflow.ID, UUID.randomUUID(), "Product Video", true);
+        when(media.isEnabled()).thenReturn(true);
+        when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
+                .thenReturn(List.of(step(1, "generate_script")));
+        List<Boolean> acknowledged = new ArrayList<>();
+        RunStartGuard refusing = (owner, workflowId, steps, context) -> {
+            acknowledged.add(context.acknowledgeCost());
+            throw new IllegalStateException("refused");
+        };
+        ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
+                registry, events, transactions, new RunStartGuards(List.of(refusing)), true, true);
+
+        assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
+                .hasMessage("refused");
+
+        assertThat(acknowledged).containsExactly(true);
+        verify(media, never()).resolveImageUploads(any(), any());
+        verify(runs, never()).save(any());
+    }
+
+    @Test
     void snapshotsConfirmedMetadataAndOrderedAssets() {
         UUID ownerId = UUID.randomUUID();
         UUID firstUpload = UUID.randomUUID();
@@ -72,8 +98,10 @@ class ProductVideoServiceTest {
         List<WorkflowStep> definitions = List.of(
                 step(1, "generate_script"),
                 step(2, "APPROVAL_CHECKPOINT"),
-                step(3, "generate_speech"),
-                step(4, "render_video"));
+                configured(3, "generate_speech", "{\"profile\":\"vi_voice_v1\"}", "{step:2}"),
+                step(4, "render_video"),
+                configured(5, "generate_video",
+                        "{\"profile\":\"vertical_ad_clip_v1\",\"referenceImage\":\"image_1\"}", "{step:4}"));
         List<MediaAssetInput> assets = List.of(
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "uploads", "first")),
                 new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "uploads", "second")));
@@ -100,16 +128,33 @@ class ProductVideoServiceTest {
         verify(media).bindRunInputs(run.getValue().getId(), assets);
         ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
         verify(runSteps).saveAll(steps.capture());
-        assertThat(steps.getValue()).hasSize(4);
+        assertThat(steps.getValue()).hasSize(5);
         assertThat(steps.getValue().get(0).getInput()).isNull();
+        assertThat(steps.getValue().get(2).getInput()).isNull();
         assertThat(steps.getValue().get(3).getInput()).contains("image_1", "image_2");
-        assertThat(started.steps()).hasSize(4);
+        assertThat(steps.getValue().get(4).getInput())
+                .isEqualTo(steps.getValue().get(3).getInput())
+                .contains("runs/x/inputs/image_1");
+        assertThat(steps.getValue().get(2).getConfig()).isEqualTo("{\"profile\":\"vi_voice_v1\"}");
+        assertThat(steps.getValue().get(2).getInputRef()).isEqualTo("{step:2}");
+        assertThat(steps.getValue().get(0).getConfig()).isNull();
+        assertThat(started.steps()).hasSize(5);
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
     }
 
     private static WorkflowStep step(int order, String type) {
         return new WorkflowStep(UUID.randomUUID(), ProductVideoWorkflow.ID, (short) order,
                 "step-" + order, type, null);
+    }
+
+    /** A definition with step settings; the entity has no config setter outside persistence. */
+    private static WorkflowStep configured(int order, String type, String config, String inputRef) {
+        WorkflowStep definition = mock(WorkflowStep.class);
+        when(definition.getStepOrder()).thenReturn((short) order);
+        when(definition.getType()).thenReturn(type);
+        when(definition.getConfig()).thenReturn(config);
+        when(definition.getInputRef()).thenReturn(inputRef);
+        return definition;
     }
 
     private static ProductVideoDraft draft() {
