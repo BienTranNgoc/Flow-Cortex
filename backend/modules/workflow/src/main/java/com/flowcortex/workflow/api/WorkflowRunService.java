@@ -16,12 +16,18 @@ public interface WorkflowRunService {
      * <p>When the first step processes media, the run takes the caller's upload {@code uploadId} as that step's
      * input, and keeps {@code originalName} (cleaned) as its display input; {@code input} is not used. Otherwise
      * {@code input} is the run's input and the upload is not consulted.
+     * <p>The run keeps {@code options} for its steps; {@code null}, or a {@code null} voice, means
+     * {@link RunOptions#DEFAULTS}. The caller has checked the voice is one the steps know.
      * @throws ResponseStatusException 503 if {@code flowcortex.workflow.enabled} is off, or if the workflow has a
      *         remote (media) step while the media engine is disabled; nothing is created either way
      * @throws com.flowcortex.media.api.UploadRejectedException if a media first step has no upload, or the upload
      *         is missing, not the caller's, or not acceptable; nothing is created
      * @throws NotFoundException if {@code workflowId} is not visible to {@code currentUserId}
      */
+    RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName,
+            RunOptions options);
+
+    /** {@link #startRun(UUID, UUID, String, UUID, String, RunOptions)} with the default options. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName);
 
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */

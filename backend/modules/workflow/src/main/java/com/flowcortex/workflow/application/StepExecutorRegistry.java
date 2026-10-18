@@ -16,7 +16,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types plus one remote executor per media capability. Workflow creation rejects any other type.
+ * types, the dub steps, and one remote executor per media capability. Workflow creation rejects
+ * any other type.
  */
 @Component
 class StepExecutorRegistry {
@@ -24,8 +25,8 @@ class StepExecutorRegistry {
     private final Map<String, StepExecutor> byType = new LinkedHashMap<>();
 
     @Autowired
-    StepExecutorRegistry(MediaJobs mediaJobs) {
-        this(mediaJobs, Clock.systemUTC());
+    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts) {
+        this(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -48,8 +49,20 @@ class StepExecutorRegistry {
         return executors;
     }
 
+    private static List<StepExecutor> withDubSteps(List<StepExecutor> executors, StepExecutor translate,
+            StepExecutor tts) {
+        executors.add(translate);
+        executors.add(tts);
+        return executors;
+    }
+
     Optional<StepExecutor> find(String type) {
         return Optional.ofNullable(byType.get(type));
+    }
+
+    /** An unknown type counts as available: it fails at dispatch with its own message. */
+    boolean isAvailable(String type) {
+        return find(type).map(StepExecutor::available).orElse(true);
     }
 
     boolean isRemote(String type) {

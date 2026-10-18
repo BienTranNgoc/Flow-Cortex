@@ -49,7 +49,10 @@ class PresignedGetExpiryIT extends AbstractPostgresBootTest {
     private static MediaProperties properties() {
         return new MediaProperties(true, Duration.ofMinutes(30), Map.of(
             "probe", Duration.ofMinutes(5),
-            "extract_audio", Duration.ofMinutes(10)),
+            "extract_audio", Duration.ofMinutes(10),
+            "transcribe", Duration.ofMinutes(2),
+            "separate_audio", Duration.ofMinutes(4),
+            "compose_dub", Duration.ofMinutes(6)),
                 Duration.ofMinutes(20), Duration.ofSeconds(1),
                 new MediaProperties.Upload(524_288_000L, List.of("mp4"), Duration.ofMinutes(15)),
                 new MediaProperties.S3(internalEndpoint(), publicEndpoint(), "us-east-1", true, UPLOAD_BUCKET,

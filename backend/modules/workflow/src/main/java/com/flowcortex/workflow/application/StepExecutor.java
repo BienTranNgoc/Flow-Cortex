@@ -27,5 +27,10 @@ interface StepExecutor {
         return lease;
     }
 
+    /** Whether this step type may run now; a workflow with a step that may not is refused at start. */
+    default boolean available() {
+        return true;
+    }
+
     String execute(StepContext context);
 }

@@ -33,6 +33,9 @@ public interface MediaJobs {
      */
     MediaJobInput resolveUpload(UUID ownerId, UUID uploadId);
 
+    /** Whether an output stored in {@code bucket} can be signed for download: only the media bucket's can. */
+    boolean isDownloadable(String bucket);
+
     /**
      * A time-limited GET of the stored output {@code bucket}/{@code key} that the browser saves as
      * {@code fileName}. Only objects in the media bucket are ever signed for download.
@@ -40,4 +43,15 @@ public interface MediaJobs {
      *         plain server-chosen file name
      */
     MediaDownload presignedGet(String bucket, String key, String fileName);
+
+    /**
+     * Stores {@code bytes} as object {@code name} of step {@code stepOrder} of run {@code runId}, at
+     * {@code runs/{runId}/steps/{stepOrder}/{name}} in the uploads bucket — the only bucket the server
+     * writes; its lifecycle expires the object, and it is never signed for download. Writing the same
+     * step and name again overwrites the object.
+     * @return the object as a step records it, like an output the worker wrote
+     * @throws IllegalArgumentException if {@code name} is not a plain server-chosen file name; nothing is written
+     * @throws MediaStoreUnavailableException if the store does not take the write
+     */
+    MediaOutput putRunObject(UUID runId, int stepOrder, String name, String mime, byte[] bytes);
 }

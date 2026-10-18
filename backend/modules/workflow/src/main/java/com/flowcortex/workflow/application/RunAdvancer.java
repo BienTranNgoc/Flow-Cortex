@@ -3,9 +3,11 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaJobCompleted;
+import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobProgressed;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -23,6 +25,7 @@ import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -181,6 +184,7 @@ class RunAdvancer {
             LOG.info("Workflow run started: runId={} steps={}", runId, runSteps.size());
         }
         Map<Integer, String> outputsByOrder = new LinkedHashMap<>();
+        Map<Integer, String> objectsByOrder = new LinkedHashMap<>();
         RunStep next = null;
         for (RunStep runStep : runSteps) {
             if (runStep.getStatus() != RunStepStatus.COMPLETED) {
@@ -188,6 +192,7 @@ class RunAdvancer {
                 break;
             }
             outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
+            objectsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
         }
         if (next == null) {
             transactions.completeRunIfDone(runId, clock.instant());
@@ -202,10 +207,11 @@ class RunAdvancer {
             checkpointTransactions.pause(run, next, payload, clock.instant());
             return;
         }
-        dispatch(run, next, outputsByOrder);
+        dispatch(run, next, outputsByOrder, objectsByOrder);
     }
 
-    private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder) {
+    private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
+            Map<Integer, String> objectsByOrder) {
         int order = step.getStepOrder();
         WorkflowStep definition = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(run.getWorkflowId())
                 .stream()
@@ -214,32 +220,44 @@ class RunAdvancer {
         Optional<StepExecutor> executor = registry.find(step.getType());
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), remote, step.getAttempt(), null)) {
-            dispatch(run, step, definition, executor, outputsByOrder);
+            dispatch(run, step, definition, executor, outputsByOrder, objectsByOrder);
         }
     }
 
     private void dispatch(WorkflowRun run, RunStep step, WorkflowStep definition, Optional<StepExecutor> executor,
-            Map<Integer, String> outputsByOrder) {
+            Map<Integer, String> outputsByOrder, Map<Integer, String> objectsByOrder) {
         int order = step.getStepOrder();
+        String config = definition == null ? null : definition.getConfig();
+        boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         String resolvedInput = null;
+        StepContext context = null;
         Runnable inClaim;
         try {
-            // A remote step takes only the object its run start resolved from the caller's upload.
-            resolvedInput = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent()
+            // A remote step's stored input stays the run's upload reference, whatever it declares,
+            // so the claim's rewrite of the stored input never loses it for a later dispatch.
+            resolvedInput = remote
                     ? step.getInput()
                     : inputResolver.resolve(order, definition == null ? null : definition.getInputRef(),
                             run.getInput(), outputsByOrder);
-            StepContext context = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
-                    resolvedInput, definition == null ? null : definition.getConfig());
+            List<MediaJobInput> jobInputs = remote
+                    ? DeclaredInputs.resolve(order, config, step.getInput(), objectsByOrder)
+                    : null;
+            StepContext built = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
+                    resolvedInput, config, options(run), jobInputs, new ArrayList<>());
+            context = built;
             if (executor.isEmpty()) {
                 inClaim = () -> {
                     throw new StepFailedException(null, "Unsupported step type: " + step.getType());
                 };
-            } else if (executor.get().mode() == StepExecutor.Mode.REMOTE) {
-                inClaim = () -> executor.get().execute(context);
+            } else if (remote) {
+                inClaim = () -> executor.get().execute(built);
             } else {
                 inClaim = () -> { };
             }
+        } catch (StepFailedException e) {
+            inClaim = () -> {
+                throw e;
+            };
         } catch (IllegalStateException e) {
             inClaim = () -> {
                 throw new StepFailedException(null, e.getMessage());
@@ -260,17 +278,26 @@ class RunAdvancer {
                     LOG.info("Job dispatched: runId={} jobId={} stepOrder={} capability={} attempt={}", run.getId(),
                             step.getId(), order, step.getType(), step.getAttempt());
                 } else {
-                    submitInline(run.getId(), step, claimed, resolvedInput, definition);
+                    submitInline(run.getId(), step, claimed, context);
                 }
             }
             default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
         }
     }
 
-    private void submitInline(UUID runId, RunStep step, StepExecutor executor, String resolvedInput,
-            WorkflowStep definition) {
-        StepContext context = new StepContext(runId, step.getId(), step.getStepOrder(), step.getType(),
-                step.getAttempt(), resolvedInput, definition == null ? null : definition.getConfig());
+    /** The options the run was started with; a run started before runs kept options gets the defaults. */
+    private RunOptions options(WorkflowRun run) {
+        if (run.getOptions() == null) {
+            return RunOptions.DEFAULTS;
+        }
+        try {
+            return objectMapper.readValue(run.getOptions(), RunOptions.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Run " + run.getId() + " holds options that are not a JSON object", e);
+        }
+    }
+
+    private void submitInline(UUID runId, RunStep step, StepExecutor executor, StepContext context) {
         try {
             taskExecutor.execute(() -> inRun(runId, () -> {
                 try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),
@@ -299,18 +326,22 @@ class RunAdvancer {
         try {
             output = executor.execute(context);
         } catch (StepFailedException e) {
-            failInline(context, e.code(), e.getMessage(), null);
+            failInline(context, e.code(), e.getMessage(), null, pickedUpAt);
             return;
         } catch (RuntimeException e) {
-            failInline(context, null, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(), e);
+            failInline(context, null, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(), e,
+                    pickedUpAt);
             return;
         } finally {
             heartbeat.cancel(false);
         }
         try {
-            if (transactions.complete(context.runId(), context.stepId(), context.attempt(), output, null,
-                    clock.instant())) {
-                LOG.info("Step {} completed", context.stepOrder());
+            String stored = context.storedOutputs().isEmpty() ? null : json(context.storedOutputs());
+            Instant now = clock.instant();
+            if (transactions.complete(context.runId(), context.stepId(), context.attempt(), output, stored, now)) {
+                LOG.info("Step finished: runId={} runStepId={} stepOrder={} type={} outcome=completed durationMs={}",
+                        context.runId(), context.stepId(), context.stepOrder(), context.type(),
+                        Duration.between(pickedUpAt, now).toMillis());
             } else {
                 discardLate(context.stepId(), context.attempt(), "completed");
             }
@@ -321,9 +352,13 @@ class RunAdvancer {
         }
     }
 
-    private void failInline(StepContext context, String code, String message, Throwable cause) {
-        if (transactions.fail(context.runId(), context.stepId(), context.attempt(), code, message, clock.instant())) {
-            LOG.warn("Step {} failed: {} — run halted, later steps stay pending", context.stepOrder(), message, cause);
+    private void failInline(StepContext context, String code, String message, Throwable cause, Instant pickedUpAt) {
+        Instant now = clock.instant();
+        if (transactions.fail(context.runId(), context.stepId(), context.attempt(), code, message, now)) {
+            LOG.warn("Step finished: runId={} runStepId={} stepOrder={} type={} outcome=error code={} durationMs={} "
+                    + "— run halted, later steps stay pending: {}", context.runId(), context.stepId(),
+                    context.stepOrder(), context.type(), code, Duration.between(pickedUpAt, now).toMillis(), message,
+                    cause);
         } else {
             discardLate(context.stepId(), context.attempt(), "error");
         }
@@ -343,10 +378,11 @@ class RunAdvancer {
     private void applyResult(MediaResult result) {
         short attempt = result.attempt().shortValue();
         Instant now = clock.instant();
-        // Read before the transition: pickup time and type do not change when the step closes.
-        Optional<RunStep> step = runStepRepository.findById(result.jobId());
-        String capability = step.map(RunStep::getType).orElse("unknown");
-        String durationMs = step.map(RunStep::getPickedUpAt)
+        // Read before the transition: pickup time and type do not change when the step closes. Not
+        // as an entity: the advance after the transition must see the step closed, not as cached here.
+        Optional<RunStepRepository.Timing> step = runStepRepository.findTimingById(result.jobId());
+        String capability = step.map(RunStepRepository.Timing::getType).orElse("unknown");
+        String durationMs = step.map(RunStepRepository.Timing::getPickedUpAt)
                 .map(pickedUpAt -> String.valueOf(Duration.between(pickedUpAt, result.finishedAt()).toMillis()))
                 .orElse("n/a");
         if (result.status() == MediaResult.Status.COMPLETED) {

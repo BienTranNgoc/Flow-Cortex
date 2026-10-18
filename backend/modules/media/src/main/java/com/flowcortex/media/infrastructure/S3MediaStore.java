@@ -16,6 +16,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
@@ -91,6 +92,15 @@ public class S3MediaStore implements AutoCloseable {
                 .signatureDuration(ttl)
                 .getObjectRequest(get -> get.bucket(bucket).key(key).responseContentDisposition(contentDisposition)));
         return new PresignedGet(signed.url().toString(), signed.expiration());
+    }
+
+    /**
+     * Writes {@code bytes} at {@code key}, replacing any object there.
+     * @throws software.amazon.awssdk.core.exception.SdkException if the store does not take the write
+     */
+    public void put(String bucket, String key, String contentType, byte[] bytes) {
+        client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType),
+                RequestBody.fromBytes(bytes));
     }
 
     /** @throws software.amazon.awssdk.core.exception.SdkException if the bucket cannot be reached or does not exist */

@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * One execution of a {@link Workflow}. {@code status} is DERIVED from this
@@ -45,15 +47,25 @@ public class WorkflowRun {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    /** The JSON options the run was started with; {@code null} for a run started before they existed. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options", updatable = false)
+    private String options;
+
     /** Required by JPA. */
     protected WorkflowRun() {
     }
 
     public WorkflowRun(UUID id, UUID workflowId, UUID ownerId, String input, Instant startedAt) {
+        this(id, workflowId, ownerId, input, null, startedAt);
+    }
+
+    public WorkflowRun(UUID id, UUID workflowId, UUID ownerId, String input, String options, Instant startedAt) {
         this.id = id;
         this.workflowId = workflowId;
         this.ownerId = ownerId;
         this.input = input;
+        this.options = options;
         this.status = RunStatus.RUNNING;
         this.startedAt = startedAt;
     }
@@ -85,6 +97,10 @@ public class WorkflowRun {
 
     public String getInput() {
         return input;
+    }
+
+    public String getOptions() {
+        return options;
     }
 
     public String getErrorMessage() {

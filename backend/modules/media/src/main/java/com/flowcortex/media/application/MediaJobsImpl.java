@@ -6,6 +6,8 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.media.api.MediaOutput;
+import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
@@ -24,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.core.exception.SdkException;
 
 @Service
 class MediaJobsImpl implements MediaJobs {
@@ -104,8 +107,13 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
+    public boolean isDownloadable(String bucket) {
+        return properties.s3().bucket().equals(bucket);
+    }
+
+    @Override
     public MediaDownload presignedGet(String bucket, String key, String fileName) {
-        if (!properties.s3().bucket().equals(bucket)) {
+        if (!isDownloadable(bucket)) {
             throw new IllegalArgumentException("Only objects in the media bucket are downloadable, not " + bucket);
         }
         // The name goes into Content-Disposition as a quoted-string; anything else would need RFC 6266 encoding.
@@ -116,6 +124,24 @@ class MediaJobsImpl implements MediaJobs {
                 properties.presignTtl());
         LOG.info("Download URL issued: bucket={} key={} expiresAt={}", bucket, key, get.expiresAt());
         return new MediaDownload(get.url(), get.expiresAt());
+    }
+
+    @Override
+    public MediaOutput putRunObject(UUID runId, int stepOrder, String name, String mime, byte[] bytes) {
+        if (!PLAIN_FILE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Not a plain file name: " + name.replaceAll("\\p{Cntrl}", "?"));
+        }
+        String bucket = properties.s3().uploadBucket();
+        String key = MediaJob.outputPrefix(runId, stepOrder) + name;
+        try {
+            store.put(bucket, key, mime, bytes);
+        } catch (SdkException e) {
+            // The message may reach a step's error message; where the object was going stays in the log.
+            LOG.warn("Run object not stored: bucket={} key={} bytes={}", bucket, key, bytes.length, e);
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", e);
+        }
+        LOG.info("Run object stored: bucket={} key={} bytes={}", bucket, key, bytes.length);
+        return new MediaOutput(name, bucket, key, mime, (long) bytes.length, null);
     }
 
     private static UploadRejectedException refused(String bucket, String key, String reason, String sentence) {

@@ -296,4 +296,40 @@ class WorkflowRunServiceImplTest {
         assertThat(view.id()).isEqualTo(run.getId());
         assertThat(view.steps()).hasSize(1);
     }
+
+    /** A completed step 7 of a run of {@code ownerId} that recorded {@code voice.wav} in {@code bucket}. */
+    private WorkflowRun givenRecordedOutput(UUID ownerId, String bucket) {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), ownerId, "in", Instant.now());
+        RunStep step = new RunStep(UUID.randomUUID(), run.getId(), (short) 7, "tts");
+        step.markRunning(Instant.now());
+        step.markCompleted("in", "{}", Instant.now(), "[{\"name\":\"voice.wav\",\"bucket\":\"" + bucket
+                + "\",\"objectKey\":\"runs/" + run.getId() + "/steps/7/voice.wav\",\"mime\":\"audio/wav\",\"bytes\":4}]");
+        when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.of(run));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(run.getId())).thenReturn(List.of(step));
+        return run;
+    }
+
+    @Test
+    void anOutputInABucketThatIsNotDownloadableIsNotFoundAndNothingIsSigned() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenRecordedOutput(ownerId, "flowcortex-uploads");
+        when(mediaJobs.isDownloadable("flowcortex-uploads")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 7, "voice.wav"))
+                .isInstanceOf(NotFoundException.class);
+        verify(mediaJobs, never()).presignedGet(any(), any(), any());
+    }
+
+    @Test
+    void aSigningFaultOnADownloadableOutputIsNotTurnedIntoNotFound() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenRecordedOutput(ownerId, "flowcortex-media");
+        when(mediaJobs.isDownloadable("flowcortex-media")).thenReturn(true);
+        when(mediaJobs.presignedGet(any(), any(), any())).thenThrow(new IllegalArgumentException("Not a plain file name"));
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 7, "voice.wav"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

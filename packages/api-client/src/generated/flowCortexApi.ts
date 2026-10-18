@@ -36,6 +36,22 @@ export interface MeResponse {
   status?: string;
 }
 
+/**
+ * @pattern female|male
+ */
+export type RunOptionsRequestVoice =
+  (typeof RunOptionsRequestVoice)[keyof typeof RunOptionsRequestVoice];
+
+export const RunOptionsRequestVoice = {
+  female: 'female',
+  male: 'male',
+} as const;
+
+export interface RunOptionsRequest {
+  /** @pattern female|male */
+  voice?: RunOptionsRequestVoice;
+}
+
 export interface StartRunRequest {
   /**
    * @minLength 0
@@ -48,6 +64,7 @@ export interface StartRunRequest {
    * @maxLength 1024
    */
   originalName?: string;
+  options?: RunOptionsRequest;
 }
 
 export interface RunStepOutputResponse {
@@ -193,6 +210,7 @@ export interface WorkflowResponse {
   createdAt?: string;
   updatedAt?: string;
   steps?: WorkflowStepResponse[];
+  available: boolean;
 }
 
 export interface OutputUrlResponse {

@@ -16,6 +16,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.application.StoringStepTestConfig;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
@@ -41,6 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -55,10 +57,13 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * One remote step through the real broker and object store, with this test as the worker: the
  * job leaves through the outbox as the bare contract body, and what the worker sends back is
- * applied by the workflow module's transition, not just received.
+ * applied by the workflow module's transition, not just received. A later remote step receives
+ * what earlier steps of the same run stored, remote or inline.
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+// The reaper's stalled-run sweep also advances runs; an hour apart it cannot be what moves a run here.
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.workflow.reaper-interval-ms=3600000")
 @AutoConfigureTestRestTemplate
+@Import(StoringStepTestConfig.class)
 class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -160,6 +165,48 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
 
         ResponseEntity<String> read = get("/api/v1/runs/" + run.runId(), run.token(), String.class);
         assertThat(read.getBody()).contains("\"input\":\"clip.mp4\"").doesNotContain(UPLOAD_BUCKET, run.objectKey());
+    }
+
+    @Test
+    void aLaterRemoteStepGetsTheUploadAnEarlierRemoteOutputAndAnInlineStepsObjectWhichIsNotDownloadable()
+            throws IOException {
+        UserView user = newUser("roundtrip-handoff");
+        WorkflowView workflow = newWorkflow(user.id(), false,
+                new NewWorkflowStep("Inspect the file", "probe", null),
+                new NewWorkflowStep("Voice it", StoringStepTestConfig.TYPE, null),
+                new NewWorkflowStep("Compose", "extract_audio", null, "{\"inputs\":{\"media\":\"upload\","
+                        + "\"details\":\"step:1/video-details.json\",\"voice\":\"step:2/*\"},\"label\":\"x\"}"));
+        UUID uploadId = UUID.randomUUID();
+        String objectKey = user.id() + "/" + uploadId;
+        putClip(objectKey);
+        String token = loginAs(user);
+        StartedRunView started = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                new StartUploadRunView(uploadId, "clip.mp4"), StartedRunView.class).getBody();
+        DispatchedRun probe = new DispatchedRun(started.id(), started.steps().get(0).id(), objectKey,
+                receiveJob(started.steps().get(0).id()), token);
+
+        publish("result", completedResult(probe), probe);
+        Message compose = receiveJob(started.steps().get(2).id(), Duration.ofSeconds(10));
+
+        JsonNode body = JSON.readTree(compose.getBody());
+        assertThat(jobSchema().validate(body)).isEmpty();
+        String voiceKey = "runs/" + probe.runId() + "/steps/2/" + StoringStepTestConfig.OBJECT_NAME;
+        // jsonb keeps object keys in its own order, so the declared order does not survive storage.
+        assertThat(body.get("inputs").values()).containsExactlyInAnyOrder(
+                JSON.readTree("{\"key\":\"media\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + objectKey
+                        + "\"}"),
+                JSON.readTree("{\"key\":\"details\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/"
+                        + probe.runId() + "/steps/1/video-details.json\"}"),
+                JSON.readTree("{\"key\":\"voice.wav\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + voiceKey
+                        + "\"}"));
+        assertThat(body.get("params")).isEqualTo(JSON.readTree("{\"label\":\"x\"}"));
+        try (S3Client store = objectStore()) {
+            assertThat(store.headObject(o -> o.bucket(UPLOAD_BUCKET).key(voiceKey)).contentLength()).isEqualTo(4L);
+        }
+
+        ResponseEntity<String> url = get("/api/v1/runs/" + probe.runId() + "/steps/2/outputs/"
+                + StoringStepTestConfig.OBJECT_NAME + "/url", token, String.class);
+        assertThat(url.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -270,14 +317,18 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
     }
 
     private Message receiveJob(UUID stepId) {
-        Instant deadline = Instant.now().plus(WAIT);
+        return receiveJob(stepId, WAIT);
+    }
+
+    private Message receiveJob(UUID stepId, Duration wait) {
+        Instant deadline = Instant.now().plus(wait);
         while (Instant.now().isBefore(deadline)) {
             Message message = rabbit.receive("media.jobs", 1_000);
             if (message != null && stepId.toString().equals(message.getMessageProperties().getMessageId())) {
                 return message;
             }
         }
-        throw new AssertionError("No job for step " + stepId + " reached media.jobs within " + WAIT);
+        throw new AssertionError("No job for step " + stepId + " reached media.jobs within " + wait);
     }
 
     /** Other tests' jobs may still arrive here; only one for {@code stepId} counts. */

@@ -1,4 +1,4 @@
-"""Object-store access: inputs by reference from the uploads bucket, outputs to the media one.
+"""Object-store access: inputs by reference, outputs to the media bucket.
 
 Errors name objects by bucket and key only: botocore messages carry the endpoint URL.
 """
@@ -13,6 +13,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import UUID
 
 import boto3
 from botocore.config import Config
@@ -44,6 +45,13 @@ class Abort(Protocol):
 
 def output_key(job: MediaJob, name: str) -> str:
     return f"runs/{job.runId}/steps/{job.stepOrder}/{name}"
+
+
+def _is_below(prefix: str, key: str) -> bool:
+    """`key` names an object under `prefix`; no empty, `.` or `..` segment can climb out of it."""
+    if not key.startswith(prefix) or key == prefix:
+        return False
+    return all(segment not in {"", ".", ".."} for segment in key[len(prefix) :].split("/"))
 
 
 def client_from(settings: Settings) -> Any:
@@ -80,11 +88,24 @@ class Storage:
         self.upload_bucket = upload_bucket
 
     @contextmanager
-    def fetched(self, ref: MediaJobInput, max_bytes: int, abort: Abort) -> Iterator[Path]:
-        """Downloads one input to a private temporary file that is removed on exit."""
-        if ref.bucket != self.upload_bucket:
+    def fetched(
+        self, ref: MediaJobInput, max_bytes: int, abort: Abort, *, run_id: UUID
+    ) -> Iterator[Path]:
+        """Downloads one input to a private temporary file that is removed on exit.
+
+        An input is a member's upload, or an object of the job's own run: under its
+        `runs/{run_id}/` in the media bucket, or in the uploads bucket, where the server keeps
+        inline steps' intermediates. A job can never make the worker read another run's objects.
+        """
+        own_run = _is_below(f"runs/{run_id}/", ref.objectKey)
+        if ref.bucket == self.upload_bucket:
+            allowed = own_run or not ref.objectKey.startswith("runs/")
+        else:
+            allowed = ref.bucket == self.bucket and own_run
+        if not allowed:
             raise PermanentError(
-                "contract_violation", f"input '{ref.key}' is not in the uploads bucket"
+                "contract_violation",
+                f"input '{ref.key}' is neither an upload nor an object of this run",
             )
         size, etag = self._head(ref)
         if size > max_bytes:

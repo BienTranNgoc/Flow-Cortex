@@ -48,7 +48,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * runs and every remote step, newest first, for an ADMIN only.
  *
  * <p>The admin lists see every row in the shared database, so each test seeds its rows later
- * than anything seeded before it ({@link #nextBase()}); its own rows are then the newest.
+ * than anything seeded before it ({@link #nextBase()}); its own rows are then the newest. A total
+ * is checked by how much the test's own rows move it, whatever other tests left behind.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
@@ -86,6 +87,9 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
     private static final ParameterizedTypeReference<PageView<MediaJobItem>> JOB_PAGE =
             new ParameterizedTypeReference<>() {
             };
+    private static final ParameterizedTypeReference<PageView<Object>> ANY_PAGE =
+            new ParameterizedTypeReference<>() {
+            };
 
     @Test
     void anAdminSeesEveryUsersRunsNewestFirstWithTheOwnerEmailEvenForASuspendedOrDeletedOwner() {
@@ -97,19 +101,21 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         userService.updateUser(admin.id(), suspended.id(), null, null, null, "SUSPENDED");
         UUID deletedOwner = UUID.randomUUID();
         WorkflowView workflow = newWorkflow(admin.id(), true, new NewWorkflowStep("only", "echo", null));
+        String token = loginAs(admin);
+        long before = total("/api/v1/admin/runs?size=1", token);
         Instant base = nextBase();
         UUID oldest = seedRun(workflow.id(), active.id(), "completed", null, base);
         UUID middle = seedRun(workflow.id(), suspended.id(), "error", "Step 1 failed: boom", base.plusSeconds(60));
         UUID newest = seedRun(workflow.id(), deletedOwner, "completed", null, base.plusSeconds(120));
 
         ResponseEntity<PageView<AdminRunItem>> response =
-                getPage("/api/v1/admin/runs?page=0&size=3", loginAs(admin), RUN_PAGE);
+                getPage("/api/v1/admin/runs?page=0&size=3", token, RUN_PAGE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         PageView<AdminRunItem> page = response.getBody();
         assertThat(page.page()).isZero();
         assertThat(page.size()).isEqualTo(3);
-        assertThat(page.total()).isEqualTo(count("SELECT count(*) FROM workflow_run"));
+        assertThat(page.total()).isEqualTo(before + 3);
         assertThat(page.items()).extracting(AdminRunItem::id).containsExactly(newest, middle, oldest);
         Map<UUID, AdminRunItem> byId = page.items().stream()
                 .collect(Collectors.toMap(AdminRunItem::id, Function.identity()));
@@ -127,6 +133,8 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
     void theStatusFilterReturnsOnlyMatchingRunsAndTheTotalCountsEveryMatch() {
         UserView admin = newUser("admin-filter");
         WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        String token = loginAs(admin);
+        long errorsBefore = total("/api/v1/admin/runs?size=1&status=error", token);
         Instant base = nextBase();
         seedRun(workflow.id(), admin.id(), "error", "old", base);
         UUID secondNewestError = seedRun(workflow.id(), admin.id(), "error", "mid", base.plusSeconds(10));
@@ -135,11 +143,11 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         seedRun(workflow.id(), admin.id(), "completed", null, base.plusSeconds(40));
 
         PageView<AdminRunItem> page =
-                getPage("/api/v1/admin/runs?page=0&size=2&status=error", loginAs(admin), RUN_PAGE).getBody();
+                getPage("/api/v1/admin/runs?page=0&size=2&status=error", token, RUN_PAGE).getBody();
 
         assertThat(page.items()).extracting(AdminRunItem::id).containsExactly(newestError, secondNewestError);
         assertThat(page.items()).allSatisfy(run -> assertThat(run.status()).isEqualTo("error"));
-        assertThat(page.total()).isEqualTo(count("SELECT count(*) FROM workflow_run WHERE status = 'error'"));
+        assertThat(page.total()).isEqualTo(errorsBefore + 3);
     }
 
     @Test
@@ -328,6 +336,9 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
     void mediaJobsListsRemoteStepsWithTheirDeliveryAndDeadlineFieldsAndNoInlineStep() {
         UserView admin = newUser("admin-jobs");
         WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        String token = loginAs(admin);
+        long jobsBefore = total("/api/v1/admin/media/jobs?size=1", token);
+        long runningBefore = total("/api/v1/admin/media/jobs?size=1&status=running", token);
         Instant base = nextBase();
         UUID runningRun = seedRun(workflow.id(), admin.id(), "running", null, base);
         UUID pickedUp = seedStep(runningRun, 1, "probe", "running", base.plusSeconds(1), base.plusSeconds(2),
@@ -338,7 +349,6 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         UUID failed = seedStep(errorRun, 1, "probe", "error", base.plusSeconds(6), base.plusSeconds(7),
                 base.plusSeconds(1806), base.plusSeconds(127), base.plusSeconds(306), 1, 0, "probe_failed");
         UUID inline = seedStep(errorRun, 2, "echo", "pending", null, null, null, null, null, 1, 0, null);
-        String token = loginAs(admin);
 
         PageView<MediaJobItem> all = getPage("/api/v1/admin/media/jobs?page=0&size=3", token, JOB_PAGE).getBody();
         PageView<MediaJobItem> running =
@@ -346,7 +356,7 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
 
         assertThat(all.items()).extracting(MediaJobItem::jobId).containsExactly(failed, waiting, pickedUp);
         assertThat(all.items()).extracting(MediaJobItem::jobId).doesNotContain(inline);
-        assertThat(all.total()).isEqualTo(count("SELECT count(*) FROM run_step WHERE type = 'probe'"));
+        assertThat(all.total()).isEqualTo(jobsBefore + 3);
         MediaJobItem job = all.items().get(2);
         assertThat(job.runId()).isEqualTo(runningRun);
         assertThat(job.stepOrder()).isEqualTo(1);
@@ -362,8 +372,7 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(all.items().get(1).leaseUntil()).isNull();
         assertThat(all.items().get(0).errorCode()).isEqualTo("probe_failed");
         assertThat(running.items()).extracting(MediaJobItem::jobId).containsExactly(waiting, pickedUp);
-        assertThat(running.total())
-                .isEqualTo(count("SELECT count(*) FROM run_step WHERE type = 'probe' AND status = 'running'"));
+        assertThat(running.total()).isEqualTo(runningBefore + 2);
     }
 
     private static Instant nextBase() {
@@ -383,8 +392,8 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         return restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), type);
     }
 
-    private long count(String sql) {
-        return jdbc.queryForObject(sql, Long.class);
+    private long total(String path, String token) {
+        return getPage(path, token, ANY_PAGE).getBody().total();
     }
 
     private UUID seedRun(UUID workflowId, UUID ownerId, String status, String errorMessage, Instant startedAt) {

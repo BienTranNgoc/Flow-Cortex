@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -153,6 +154,32 @@ class MediaContractSchemaTest {
         tree.put("capability", "transcode");
 
         assertThat(jobSchema.validate(tree)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"transcribe", "separate_audio", "compose_dub"})
+    void dubCapabilitiesConformToTheJobSchema(String capability) {
+        MediaJob source = job();
+        MediaJob dub = new MediaJob(source.schemaVersion(), source.jobId(), source.runId(),
+                source.correlationId(), source.stepOrder(), MediaCapability.fromValue(capability),
+                source.inputs(), source.params(), source.outputPrefix(), source.attempt(),
+                source.maxRuntimeSeconds(), source.maxInputBytes(), source.issuedAt());
+
+        assertThat(errors(jobSchema, dub)).isEmpty();
+        assertThat(VALIDATOR.validate(dub)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "duration_exceeded", "no_audio_stream", "no_speech_detected",
+        "separation_failed", "compose_failed", "voice_alignment_failed"})
+    void dubErrorCodesConformToTheResultSchema(String code) {
+        MediaError.Code parsed = Arrays.stream(MediaError.Code.values())
+                .filter(c -> c.value().equals(code)).findFirst().orElseThrow();
+        MediaResult failed = new MediaResult("1", JOB_ID, RUN_ID, 1, 0,
+                MediaResult.Status.ERROR, null, null, new MediaError(parsed, "limit", false), AT, "worker-1");
+
+        assertThat(errors(resultSchema, failed)).isEmpty();
     }
 
     @Test

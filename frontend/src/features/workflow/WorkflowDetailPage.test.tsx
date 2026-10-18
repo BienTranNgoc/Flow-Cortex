@@ -10,6 +10,7 @@ const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
   isShared: true,
+  available: true,
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
 };
 
@@ -17,6 +18,7 @@ const ECHO: WorkflowResponse = {
   id: 'w1',
   name: 'Echo Demo',
   isShared: true,
+  available: true,
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 

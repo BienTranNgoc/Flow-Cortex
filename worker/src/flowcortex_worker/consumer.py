@@ -58,7 +58,7 @@ class ObjectStore(Protocol):
     bucket: str
 
     def fetched(
-        self, ref: MediaJobInput, max_bytes: int, abort: ProcessRunner
+        self, ref: MediaJobInput, max_bytes: int, abort: ProcessRunner, *, run_id: UUID
     ) -> AbstractContextManager[Path]: ...
 
     def put(self, key: str, body: bytes | Path, mime: str, abort: ProcessRunner) -> int: ...
@@ -336,7 +336,9 @@ class Consumer:
                 raise PermanentError("contract_violation", "outputPrefix does not match the step")
             handler = self._resolve(job.capability)
             inputs = {
-                ref.key: stack.enter_context(self._storage.fetched(ref, job.maxInputBytes, runner))
+                ref.key: stack.enter_context(
+                    self._storage.fetched(ref, job.maxInputBytes, runner, run_id=job.runId)
+                )
                 for ref in job.inputs
             }
             outcome = handler(job, inputs, runner)

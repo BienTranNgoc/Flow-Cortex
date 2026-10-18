@@ -24,6 +24,17 @@ class WorkflowRunTest {
     }
 
     @Test
+    void aRunKeepsTheOptionsItWasStartedWithAndARunStartedWithoutThemHasNone() {
+        WorkflowRun withOptions = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "clip.mp4", "{\"voice\":\"male\"}", Instant.now());
+        WorkflowRun withoutOptions = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+
+        assertThat(withOptions.getOptions()).isEqualTo("{\"voice\":\"male\"}");
+        assertThat(withoutOptions.getOptions()).isNull();
+    }
+
+    @Test
     void markCompletedSetsStatusAndFinishedAt() {
         WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
                 Instant.now());

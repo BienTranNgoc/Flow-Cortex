@@ -19,7 +19,21 @@ IMAGE_CODECS = frozenset(
 )
 
 
-def handle(_job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
+def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
+    max_duration_ms = job.params.get("maxDurationMs")
+    require_audio = job.params.get("requireAudio", False)
+    if max_duration_ms is not None and (
+        isinstance(max_duration_ms, bool)
+        or not isinstance(max_duration_ms, int)
+        or max_duration_ms < 1
+    ):
+        raise PermanentError(
+            "contract_violation", "probe param 'maxDurationMs' must be a positive integer"
+        )
+    if not isinstance(require_audio, bool):
+        raise PermanentError(
+            "contract_violation", "probe param 'requireAudio' must be a boolean"
+        )
     media = inputs.get("media")
     if media is None:
         raise PermanentError("contract_violation", "probe needs an input with key 'media'")
@@ -40,6 +54,15 @@ def handle(_job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner)
         raise PermanentError("probe_failed", "the input has no audio or video stream")
     if _still_image(report):
         raise PermanentError("probe_failed", "the input is a still image, not audio or video")
+    if max_duration_ms is not None:
+        if summary["durationMs"] is None:
+            raise PermanentError("probe_failed", "the input's duration could not be determined")
+        if summary["durationMs"] > max_duration_ms:
+            raise PermanentError(
+                "duration_exceeded", f"the input is longer than the {max_duration_ms} ms limit"
+            )
+    if require_audio and summary["audioCodec"] is None:
+        raise PermanentError("no_audio_stream", "the input has no audio stream")
     return HandlerOutcome(
         data=summary,
         files=[OutputFile(REPORT_NAME, "application/json", completed.stdout)],

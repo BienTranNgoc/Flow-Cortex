@@ -20,8 +20,9 @@ import java.util.Map;
  * transaction — a claim that rolls back publishes nothing. The {@code media} module owns the
  * kill switch and the per-capability limits; this class only reads them.
  *
- * <p>The job's input is the step's stored input: the object reference the run start resolved
- * from the caller's own upload. Nothing a client sent and no earlier step's output reaches it.
+ * <p>The job's inputs are those the step declared, as the API resolved them from what it recorded
+ * for the run; a step that declares none gets its stored input, the object reference the run start
+ * resolved from the caller's own upload. Nothing a client sent reaches a job.
  */
 class RemoteStepExecutor implements StepExecutor {
 
@@ -64,8 +65,10 @@ class RemoteStepExecutor implements StepExecutor {
             throw new StepFailedException("media_disabled", "Media engine is currently disabled");
         }
         MediaLimits limits = mediaJobs.limitsFor(capability);
+        List<MediaJobInput> inputs = context.jobInputs() != null ? context.jobInputs()
+                : List.of(DeclaredInputs.uploadReference(context.input()));
         MediaJob job = new MediaJob("1", context.stepId(), context.runId(), context.runId(), context.stepOrder(),
-                MediaCapability.fromValue(capability), List.of(jobInput(context.input())), params(context.config()),
+                MediaCapability.fromValue(capability), inputs, params(context.config()),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder()), (int) context.attempt(),
                 Math.toIntExact(limits.maxRuntime().toSeconds()), limits.maxInputBytes(), clock.instant());
         try {
@@ -77,27 +80,21 @@ class RemoteStepExecutor implements StepExecutor {
         return null;
     }
 
-    /** The {@code {key, bucket, objectKey}} reference stored on the step when its run started. */
-    private MediaJobInput jobInput(String storedInput) {
-        if (storedInput == null || storedInput.isBlank()) {
-            throw new StepFailedException("contract_violation", "The step has no input object to process");
-        }
-        try {
-            return objectMapper.readValue(storedInput, MediaJobInput.class);
-        } catch (JsonProcessingException e) {
-            throw new StepFailedException("contract_violation",
-                    "The step input is not an object reference {key, bucket, objectKey}", e);
-        }
-    }
-
+    /** The step's config as job params, without the input declaration the API has already resolved. */
     private Map<String, Object> params(String config) {
         if (config == null || config.isBlank()) {
             return Map.of();
         }
+        Map<String, Object> params;
         try {
-            return objectMapper.readValue(config, PARAMS);
+            params = objectMapper.readValue(config, PARAMS);
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation", "The step config is not a JSON object", e);
         }
+        if (params == null) {
+            throw new StepFailedException("contract_violation", "The step config is not a JSON object");
+        }
+        params.remove(DeclaredInputs.CONFIG_KEY);
+        return params;
     }
 }

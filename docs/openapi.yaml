@@ -505,6 +505,16 @@ components:
           type: string
         status:
           type: string
+    RunOptionsRequest:
+      type: object
+      properties:
+        voice:
+          type: string
+          default: female
+          enum:
+          - female
+          - male
+          pattern: female|male
     StartRunRequest:
       type: object
       properties:
@@ -519,6 +529,8 @@ components:
           type: string
           maxLength: 1024
           minLength: 0
+        options:
+          $ref: "#/components/schemas/RunOptionsRequest"
     RunResponse:
       type: object
       properties:
@@ -763,6 +775,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowStepResponse"
+        available:
+          type: boolean
+      required:
+      - available
     WorkflowStepResponse:
       type: object
       properties:

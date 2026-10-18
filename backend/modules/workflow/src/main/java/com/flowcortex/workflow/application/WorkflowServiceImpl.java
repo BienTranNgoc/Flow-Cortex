@@ -40,7 +40,8 @@ class WorkflowServiceImpl implements WorkflowService {
     @Transactional(readOnly = true)
     public List<WorkflowView> listVisibleWorkflows(UUID currentUserId) {
         return workflowRepository.findAllVisibleTo(currentUserId).stream()
-                .map(workflow -> WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote))
+                .map(workflow -> WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote,
+                        registry::isAvailable))
                 .toList();
     }
 
@@ -49,7 +50,7 @@ class WorkflowServiceImpl implements WorkflowService {
     public WorkflowView getVisibleWorkflow(UUID currentUserId, UUID workflowId) {
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException("Workflow not found: " + workflowId));
-        return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote);
+        return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote, registry::isAvailable);
     }
 
     @Override
@@ -68,12 +69,12 @@ class WorkflowServiceImpl implements WorkflowService {
         for (NewWorkflowStep step : steps) {
             stepEntities.add(
                     new WorkflowStep(UUID.randomUUID(), workflow.getId(), order, step.name(), step.type(),
-                            step.inputRef()));
+                            step.inputRef(), step.config()));
             order++;
         }
         stepEntities = workflowStepRepository.saveAll(stepEntities);
 
-        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote);
+        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable);
     }
 
     private List<WorkflowStep> stepsOf(Workflow workflow) {

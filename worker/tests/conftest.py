@@ -261,7 +261,7 @@ class FakeStorage:
     puts: dict[str, tuple[bytes, str]] = field(default_factory=dict)
 
     @contextmanager
-    def fetched(self, ref: Any, max_bytes: int, abort: Any) -> Iterator[Path]:
+    def fetched(self, ref: Any, max_bytes: int, abort: Any, *, run_id: Any) -> Iterator[Path]:
         if self.error is not None:
             raise self.error
         # A transfer that never finishes on its own: only a kill of the job ends it.

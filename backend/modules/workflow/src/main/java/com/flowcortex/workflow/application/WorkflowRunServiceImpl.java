@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJob;
-import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -13,6 +12,7 @@ import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
+import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
@@ -104,10 +104,16 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         return startRun(currentUserId, workflowId, input, null, null);
     }
 
+    @Override
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName) {
+        return startRun(currentUserId, workflowId, input, uploadId, originalName, null);
+    }
+
     // Not @Transactional: the checks and the object-store lookup run before the run's own
     // transaction opens, so a slow store never holds a database connection.
     @Override
-    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName) {
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName,
+            RunOptions options) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -121,6 +127,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         // Refused up front: a run whose remote step would only fail media_disabled later.
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
+        }
+        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
+            ResponseStatusException refused = new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Vietnamese dubbing is switched off right now.");
+            refused.getBody().setProperty("code", "dub_disabled");
+            throw refused;
         }
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
@@ -136,9 +148,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         String displayedInput = runInput;
         String storedRemoteInput = remoteStepInput;
+        String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(UUID.randomUUID(), workflow.getId(),
-                    currentUserId, displayedInput, Instant.now()));
+                    currentUserId, displayedInput, runOptions, Instant.now()));
             List<RunStep> runSteps = new ArrayList<>();
             for (WorkflowStep stepDef : stepDefs) {
                 String stepInput = registry.isRemote(stepDef.getType()) ? storedRemoteInput : null;
@@ -154,15 +167,15 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             // Published within this tx; RunAdvancer's @ApplicationModuleListener only
             // fires after commit — this method returns first.
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, runSteps, registry::isRemote);
+            return WorkflowMapper.toRunView(run, runSteps, registry::isRemote, mediaJobs::isDownloadable);
         });
     }
 
-    private String json(MediaJobInput reference) {
+    private String json(Object value) {
         try {
-            return objectMapper.writeValueAsString(reference);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("An object reference could not be serialized", e);
+            throw new IllegalStateException(value.getClass().getSimpleName() + " could not be serialized", e);
         }
     }
 
@@ -184,7 +197,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
                 .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
-        return WorkflowMapper.toRunView(run, steps, registry::isRemote);
+        return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
     }
 
     @Override
@@ -203,6 +216,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (!MediaJob.isBelow(MediaJob.outputPrefix(runId, stepOrder), output.objectKey())) {
             LOG.warn("Stored output not signed, it lies outside its step: runId={} stepOrder={} name={} bucket={} key={}",
                     runId, stepOrder, name, output.bucket(), output.objectKey());
+            throw new NotFoundException("Step " + stepOrder + " has no output named " + name);
+        }
+        if (!mediaJobs.isDownloadable(output.bucket())) {
+            // An inline step's intermediate in the uploads bucket is recorded but never offered for download.
+            LOG.info("Stored output not signed, its bucket is not downloadable: runId={} stepOrder={} name={} bucket={}",
+                    runId, stepOrder, name, output.bucket());
             throw new NotFoundException("Step " + stepOrder + " has no output named " + name);
         }
         MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());

@@ -12,7 +12,13 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         PROBE_FAILED("probe_failed"),
         AUDIO_EXTRACTION_FAILED("audio_extraction_failed"),
         CONTRACT_VIOLATION("contract_violation"),
-        RUN_TIMEOUT("run_timeout");
+        RUN_TIMEOUT("run_timeout"),
+        DURATION_EXCEEDED("duration_exceeded"),
+        NO_AUDIO_STREAM("no_audio_stream"),
+        NO_SPEECH_DETECTED("no_speech_detected"),
+        SEPARATION_FAILED("separation_failed"),
+        COMPOSE_FAILED("compose_failed"),
+        VOICE_ALIGNMENT_FAILED("voice_alignment_failed");
 
         private final String value;
 

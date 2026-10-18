@@ -18,6 +18,8 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.media.api.MediaOutput;
+import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
@@ -50,6 +52,7 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.SmartTransactionObject;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.core.exception.SdkException;
 
 /**
  * Runs {@link MediaJobsImpl} in a small Spring context — real Bean Validation, real property
@@ -68,6 +71,9 @@ class MediaJobsImplTest {
         "flowcortex.media.queue-timeout=30m",
         "flowcortex.media.max-runtime.probe=5m",
         "flowcortex.media.max-runtime.extract_audio=10m",
+        "flowcortex.media.max-runtime.transcribe=2m",
+        "flowcortex.media.max-runtime.separate_audio=4m",
+        "flowcortex.media.max-runtime.compose_dub=6m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.presign-ttl=15m",
         "flowcortex.media.upload.max-bytes=524288000",
@@ -160,6 +166,27 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void limitsForEveryDubCapabilityReturnTheConfiguredValues() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            assertThat(jobs.limitsFor("transcribe").maxRuntime()).isEqualTo(Duration.ofMinutes(2));
+            assertThat(jobs.limitsFor("separate_audio").maxRuntime()).isEqualTo(Duration.ofMinutes(4));
+            assertThat(jobs.limitsFor("compose_dub").maxRuntime()).isEqualTo(Duration.ofMinutes(6));
+        });
+    }
+
+    @Test
+    void aDubCapabilityWithoutAMaxRuntimeFailsStartup() {
+        runner.withPropertyValues("flowcortex.media.max-runtime.compose_dub=")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .hasMessageContaining("max-runtime.compose_dub");
+                });
+    }
+
+    @Test
     void limitsForAnUnknownCapabilityIsRefused() {
         runner.run(context -> assertThatThrownBy(() -> context.getBean(MediaJobs.class).limitsFor("transcode"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -223,6 +250,7 @@ class MediaJobsImplTest {
         runner.withPropertyValues(
         "flowcortex.media.max-runtime.probe=5m",
         "flowcortex.media.max-runtime.extract_audio=5m",
+        "flowcortex.media.max-runtime.compose_dub=5m",
         "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
             assertThat(context).hasFailed();
@@ -234,6 +262,7 @@ class MediaJobsImplTest {
         runner.withPropertyValues(
                 "flowcortex.media.max-runtime.probe=5m",
                 "flowcortex.media.max-runtime.extract_audio=5m",
+                "flowcortex.media.max-runtime.compose_dub=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
     }
@@ -314,6 +343,64 @@ class MediaJobsImplTest {
                         .as(name).isInstanceOf(IllegalArgumentException.class);
             }
             verify(context.getBean(S3MediaStore.class), never()).presignGet(any(), any(), any(), any());
+        });
+    }
+
+    @Test
+    void aRunObjectIsWrittenUnderItsStepInTheUploadsBucketAndDescribedLikeAWorkerOutput(CapturedOutput output) {
+        runner.run(context -> {
+            UUID runId = UUID.randomUUID();
+            byte[] voice = {1, 2, 3};
+
+            MediaOutput stored = context.getBean(MediaJobs.class).putRunObject(runId, 7, "voice.wav", "audio/wav",
+                    voice);
+
+            String key = "runs/" + runId + "/steps/7/voice.wav";
+            verify(context.getBean(S3MediaStore.class)).put("flowcortex-uploads", key, "audio/wav", voice);
+            assertThat(stored).isEqualTo(new MediaOutput("voice.wav", "flowcortex-uploads", key, "audio/wav", 3L,
+                    null));
+            assertThat(output.getAll()).contains("flowcortex-uploads", key, "bytes=3");
+        });
+    }
+
+    @Test
+    void onlyTheMediaBucketIsDownloadable() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+
+            assertThat(jobs.isDownloadable("flowcortex-media")).isTrue();
+            assertThat(jobs.isDownloadable("flowcortex-uploads")).isFalse();
+            assertThat(jobs.isDownloadable(null)).isFalse();
+        });
+    }
+
+    @Test
+    void aRunObjectTheStoreRefusesSurfacesAsStoreUnavailableNamingTheObjectOnlyInTheLog(CapturedOutput output) {
+        runner.run(context -> {
+            org.mockito.Mockito.doThrow(SdkException.builder().message("connection refused").build())
+                    .when(context.getBean(S3MediaStore.class)).put(anyString(), anyString(), anyString(), any());
+            UUID runId = UUID.randomUUID();
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).putRunObject(runId, 7,
+                    "voice.wav", "audio/wav", new byte[] {1}))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCauseInstanceOf(SdkException.class)
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("flowcortex-uploads", "runs/",
+                            "voice.wav"));
+            assertThat(output.getAll()).contains("WARN").contains("flowcortex-uploads",
+                    "runs/" + runId + "/steps/7/voice.wav", "connection refused");
+        });
+    }
+
+    @Test
+    void aRunObjectNameThatIsNotAPlainFileNameIsRefusedAndNothingIsWritten() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            for (String name : List.of("../voice.wav", "a/b.wav", "")) {
+                assertThatThrownBy(() -> jobs.putRunObject(UUID.randomUUID(), 7, name, "audio/wav", new byte[] {1}))
+                        .as(name).isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(context.getBean(S3MediaStore.class), never()).put(any(), any(), any(), any());
         });
     }
 

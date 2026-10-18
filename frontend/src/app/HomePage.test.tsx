@@ -13,6 +13,7 @@ function workflow(id: string, name: string, types: string[]): WorkflowResponse {
     id,
     name,
     isShared: true,
+    available: true,
     steps: types.map((type, index) => ({
       id: `${id}-s${index + 1}`,
       stepOrder: index + 1,

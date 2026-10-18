@@ -5,6 +5,7 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +26,21 @@ import org.springframework.data.repository.query.Param;
 public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
 
     List<RunStep> findByRunIdOrderByStepOrderAsc(UUID runId);
+
+    /** A step's type and pickup time. */
+    interface Timing {
+
+        String getType();
+
+        Instant getPickedUpAt();
+    }
+
+    /**
+     * Columns, not the entity: a caller that transitions the step in another transaction and then
+     * reads the run's steps in its own would otherwise get this step back as it was before.
+     */
+    @Query("SELECT r.type AS type, r.pickedUpAt AS pickedUpAt FROM RunStep r WHERE r.id = :id")
+    Optional<Timing> findTimingById(@Param("id") UUID id);
 
     long countByRunIdAndStatusNot(UUID runId, RunStepStatus status);
 

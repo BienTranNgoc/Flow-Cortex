@@ -8,6 +8,7 @@ import com.flowcortex.workflow.api.WorkflowView;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -183,6 +184,39 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
         assertThat(response.getBody()).contains("\"input\"");
+    }
+
+    @Test
+    void startRunWithAVoiceOtherThanFemaleOrMaleReturns400NamingOptionsVoiceAndCreatesNoRun() {
+        UserView user = newUser("http-robot-voice");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "echo", null));
+        String token = loginAs(user);
+
+        ResponseEntity<String> response = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("input", "hello", "options", Map.of("voice", "robot")), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
+        assertThat(response.getBody()).contains("\"errors\":{\"options.voice\":");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM workflow_run WHERE workflow_id = ?", Long.class,
+                workflow.id())).isZero();
+    }
+
+    @Test
+    void aRunKeepsTheChosenVoiceAndFemaleWhenNoneIsChosen() {
+        UserView user = newUser("http-run-voice");
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "echo", null));
+        String token = loginAs(user);
+
+        RunResponseView unchosen = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                new StartRunRequestView("hello"), RunResponseView.class).getBody();
+        RunResponseView male = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("input", "hello", "options", Map.of("voice", "male")), RunResponseView.class).getBody();
+
+        assertThat(jdbcTemplate.queryForObject("SELECT options->>'voice' FROM workflow_run WHERE id = ?",
+                String.class, unchosen.id())).isEqualTo("female");
+        assertThat(jdbcTemplate.queryForObject("SELECT options->>'voice' FROM workflow_run WHERE id = ?",
+                String.class, male.id())).isEqualTo("male");
     }
 
     @Test

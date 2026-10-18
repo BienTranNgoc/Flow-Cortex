@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.workflow.api.RunOptions;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -20,12 +21,14 @@ class StepExecutorRegistryTest {
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
 
     private static StepContext context(String input) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null);
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null,
+                RunOptions.DEFAULTS, null, new java.util.ArrayList<>());
     }
 
     @Test
     void theDemoTypesAndEveryMediaCapabilityAreKnown() {
-        assertThat(registry.knownTypes()).containsExactlyInAnyOrder("echo", "fail", "probe", "extract_audio");
+        assertThat(registry.knownTypes()).containsExactlyInAnyOrder("echo", "fail", "probe", "extract_audio",
+                "transcribe", "separate_audio", "compose_dub");
     }
 
     @Test

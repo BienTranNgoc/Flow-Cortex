@@ -6,7 +6,10 @@ import java.util.Arrays;
 /** Capabilities the worker executes; the closed {@code capability} enum of the job schema. */
 public enum MediaCapability {
     PROBE("probe"),
-    EXTRACT_AUDIO("extract_audio");
+    EXTRACT_AUDIO("extract_audio"),
+    TRANSCRIBE("transcribe"),
+    SEPARATE_AUDIO("separate_audio"),
+    COMPOSE_DUB("compose_dub");
 
     private final String value;
 

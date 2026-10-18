@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
 import jakarta.validation.Valid;
@@ -61,8 +62,9 @@ class WorkflowsController {
     ResponseEntity<RunResponse> startRun(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody StartRunRequest request) {
         UUID currentUserId = currentUserResolver.require(jwt);
+        RunOptions options = request.options() == null ? null : new RunOptions(request.options().voice());
         RunResponse body = RunResponse.from(workflowRunService.startRun(currentUserId, id, request.input(),
-                request.uploadId(), request.originalName()));
+                request.uploadId(), request.originalName(), options));
         return ResponseEntity.ok(body);
     }
 }
