@@ -176,7 +176,9 @@ class FixtureProviderAdapter:
 
     def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         abort.check()
-        duration_ms = min(30_000, max(15_000, len(request.script) * 55))
+        # Capped at the 10 s video (contracts/limits.json productVideoDurationSeconds): the
+        # backend fails a longer speech step, and the offline path must still complete a run.
+        duration_ms = min(10_000, max(4_000, len(request.script) * 55))
         frames = duration_ms * 16
         output = io.BytesIO()
         with wave.open(output, "wb") as wav:

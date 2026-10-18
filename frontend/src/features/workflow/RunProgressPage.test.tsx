@@ -983,6 +983,43 @@ describe('RunProgressPage', () => {
       expect(leaving.defaultPrevented).toBe(true);
     });
 
+    it('warns while editing when the script is likely longer than the 10-second video', async () => {
+      const user = userEvent.setup();
+      renderScript([{ ...REVISION, content: Array(30).fill('từ').join(' ') }]);
+
+      await screen.findByLabelText('Script to approve');
+      expect(screen.queryByText(/longer than the 10-second video/)).not.toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Script to approve'), ' thêm');
+
+      const warning = await screen.findByText(/longer than the 10-second video/);
+      expect(warning.closest('[aria-live="polite"]')).not.toBeNull();
+      expect(screen.getByLabelText('Script to approve')).toHaveAccessibleDescription(
+        warning.textContent ?? '',
+      );
+    });
+
+    it('lets a long saved script be approved while the warning shows', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([{ ...REVISION, content: Array(31).fill('từ').join(' ') }], {
+        [APPROVE]: {
+          status: 200,
+          body: { ...SCRIPT_TASK, status: 'approved', approvedRevisionId: 'rev1' },
+        },
+      });
+
+      expect(await screen.findByText(/longer than the 10-second video/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Approve' }));
+
+      await waitFor(() =>
+        expect(calls).toContainEqual({
+          method: 'POST',
+          path: '/api/v1/review-tasks/t1/approve',
+          body: { revisionId: 'rev1', expectedVersion: 3 },
+        }),
+      );
+    });
+
     it('keeps the reviewer on the page when an internal link would discard unsaved changes', async () => {
       const user = userEvent.setup();
       const confirm = vi.fn(() => false);

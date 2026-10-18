@@ -16,11 +16,46 @@
 # compose.observability.yaml. No credential has a default here: a committed
 # value would be a known secret.
 
+# What provider-worker and provider-video-worker share: one image, one broker and
+# store identity, the same health and shutdown handling. Each service adds the
+# queue it consumes and the vendor settings of its own capabilities.
+x-provider-worker: &provider-worker
+  build:
+    context: ./worker
+    target: provider-runtime
+  image: flow-cortex-provider-worker:local
+  depends_on:
+    rabbitmq-init:
+      condition: service_completed_successfully
+    minio-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  stop_grace_period: 40s
+  restart: unless-stopped
+
+x-provider-worker-env: &provider-worker-env
+  AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_PATH_STYLE: "true"
+  S3_UPLOAD_BUCKET: flowcortex-uploads
+  S3_BUCKET: flowcortex-media
+  S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
+  S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_TRACES_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+
 services:
   postgres:
     image: postgres:17
-    ports:
-      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_DB: flowcortex
       POSTGRES_USER: flowcortex
@@ -28,7 +63,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U flowcortex -d flowcortex']
+      test: ["CMD-SHELL", "pg_isready -U flowcortex -d flowcortex"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -48,22 +83,23 @@ services:
     networks: [default, internal]
     # AMQP + management UI on loopback only; the metrics port 15692 is never published.
     ports:
-      - '127.0.0.1:5672:5672'
-      - '127.0.0.1:15672:15672'
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     healthcheck:
       # Healthy only once the AMQP listener accepts connections, not merely when the node runs.
-      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'check_port_connectivity']
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
     restart: unless-stopped
 
-  # Creates the restricted broker identity used by provider-worker. The data volume, read-only,
-  # gives rabbitmqctl the node cookie; no password is passed on a command line.
+  # Creates the restricted broker identity used by provider-worker and provider-video-worker.
+  # The data volume, read-only, gives rabbitmqctl the node cookie; no password is passed on a
+  # command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
-    entrypoint: ['/bin/sh', '/init/init.sh']
+    entrypoint: ["/bin/sh", "/init/init.sh"]
     environment:
       RABBITMQ_NODENAME: rabbit@rabbitmq
       PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
@@ -74,11 +110,11 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: 'no'
+    restart: "no"
 
   minio:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
-    command: ['server', '/data', '--console-address', ':9001']
+    command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
@@ -89,10 +125,10 @@ services:
       - minio_data:/data
     networks: [default, internal]
     ports:
-      - '127.0.0.1:9000:9000'
-      - '127.0.0.1:9001:9001'
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     healthcheck:
-      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -103,7 +139,7 @@ services:
   # Root credentials exist only here and in `minio`. Idempotent; never restarted.
   minio-init:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
-    entrypoint: ['/bin/sh', '/init/init.sh']
+    entrypoint: ["/bin/sh", "/init/init.sh"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER (see .env.example)}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD (see .env.example)}
@@ -120,7 +156,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    restart: 'no'
+    restart: "no"
 
   backend:
     build:
@@ -129,9 +165,9 @@ services:
     # The API on loopback only. Health and metrics answer on 8081 inside the
     # service network and are never published.
     ports:
-      - '127.0.0.1:8080:8080'
+      - "127.0.0.1:8080:8080"
     expose:
-      - '8081'
+      - "8081"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
@@ -152,7 +188,7 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
+      S3_PATH_STYLE: "true"
       S3_UPLOAD_BUCKET: flowcortex-uploads
       S3_BUCKET: flowcortex-media
       S3_ACCESS_KEY: ${BACKEND_S3_ACCESS_KEY:?Set BACKEND_S3_ACCESS_KEY (see .env.example)}
@@ -182,8 +218,10 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
-      FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-10m}
+      FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
+      FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME:-10m}
+      FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:-15m}
       FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES: ${FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES:-524288000}
       FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_EXTENSIONS:-mp4,mov,webm,mkv,m4a,mp3,wav}
       FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS: ${FLOWCORTEX_MEDIA_UPLOAD_PRODUCT_IMAGE_EXTENSIONS:-jpg,jpeg,png,webp}
@@ -204,7 +242,7 @@ services:
     # The probe Docker uses to gate the frontend below. On 8080, not 8081: the
     # management port can answer while the API port is broken.
     healthcheck:
-      test: ['CMD', 'curl', '-fsS', 'http://localhost:8080/readyz']
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/readyz"]
       interval: 15s
       timeout: 3s
       retries: 5
@@ -227,7 +265,7 @@ services:
       AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
       S3_ENDPOINT: http://minio:9000
       S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
+      S3_PATH_STYLE: "true"
       S3_UPLOAD_BUCKET: flowcortex-uploads
       S3_BUCKET: flowcortex-media
       S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
@@ -248,7 +286,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
+      test: ["CMD", "python", "-m", "flowcortex_worker.healthcheck"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -257,40 +295,44 @@ services:
     stop_grace_period: 40s
     restart: unless-stopped
 
+  # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:
-    build:
-      context: ./worker
-      target: provider-runtime
-    image: flow-cortex-provider-worker:local
+    <<: *provider-worker
     environment:
-      AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
-      S3_UPLOAD_BUCKET: flowcortex-uploads
-      S3_BUCKET: flowcortex-media
-      S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
-      S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      <<: *provider-worker-env
+      PROVIDER_QUEUE: provider.jobs
       WORKER_ID: ${PROVIDER_WORKER_ID:-provider-worker-1}
       OTEL_SERVICE_NAME: provider-worker
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_TRACES_EXPORTER: none
-      OTEL_LOGS_EXPORTER: none
-      OTEL_METRICS_EXPORTER: none
       # PROVIDER_ADAPTER is the backwards-compatible fallback. New deployments route each
       # capability independently so OpenAI copy and Edge speech can run in one workflow.
       PROVIDER_ADAPTER: ${PROVIDER_ADAPTER:-fixture}
       SCRIPT_PROVIDER: ${SCRIPT_PROVIDER:-}
       SPEECH_PROVIDER: ${SPEECH_PROVIDER:-}
-      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-fixture}
       SCRIPT_PROVIDER_API_KEY: ${SCRIPT_PROVIDER_API_KEY:-}
       SPEECH_PROVIDER_API_KEY: ${SPEECH_PROVIDER_API_KEY:-}
-      VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
       SCRIPT_PROVIDER_BASE_URL: ${SCRIPT_PROVIDER_BASE_URL:-}
       SCRIPT_PROVIDER_MODEL: ${SCRIPT_PROVIDER_MODEL:-}
       SPEECH_PROVIDER_BASE_URL: ${SPEECH_PROVIDER_BASE_URL:-}
       SPEECH_PROVIDER_MODEL: ${SPEECH_PROVIDER_MODEL:-}
+      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-HoaiMyNeural}
+      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
+      FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
+      FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}
+
+  # Video worker pool: consumes provider.video.jobs (generate_video), so a clip that runs for
+  # minutes never holds up the jobs above. One job per container: the broker connection is
+  # not thread-safe, so the pool size is the replica count. No WORKER_ID: each replica
+  # reports its own container hostname.
+  provider-video-worker:
+    <<: *provider-worker
+    environment:
+      <<: *provider-worker-env
+      PROVIDER_QUEUE: provider.video.jobs
+      OTEL_SERVICE_NAME: provider-video-worker
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-fixture}
+      VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
       VIDEO_PROVIDER_BASE_URL: ${VIDEO_PROVIDER_BASE_URL:-}
       VIDEO_PROVIDER_MODEL: ${VIDEO_PROVIDER_MODEL:-}
       SEEDANCE_API_KEY: ${SEEDANCE_API_KEY:-}
@@ -309,25 +351,11 @@ services:
       VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
       VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
       VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
-      EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-HoaiMyNeural}
-      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
-      FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
-      FLOWCORTEX_PROVIDER_BASE_URL: ${FLOWCORTEX_PROVIDER_BASE_URL:-}
-    depends_on:
-      rabbitmq-init:
-        condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    stop_grace_period: 40s
-    restart: unless-stopped
+      # Seedance and Wan fetch the product photo themselves, so its URL is signed for the store's
+      # public HTTPS address; they refuse to start without one. Fixture and Veo do not need it.
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-}
+    deploy:
+      replicas: ${PROVIDER_VIDEO_WORKERS:-2}
 
   frontend:
     build:
@@ -335,9 +363,9 @@ services:
       dockerfile: frontend/Dockerfile
     image: flow-cortex-frontend:local
     ports:
-      - '127.0.0.1:5173:8080'
+      - "127.0.0.1:5173:8080"
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1']
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 5
@@ -352,9 +380,9 @@ services:
       dockerfile: admin/Dockerfile
     image: flow-cortex-admin:local
     ports:
-      - '127.0.0.1:5174:8080'
+      - "127.0.0.1:5174:8080"
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1']
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 5

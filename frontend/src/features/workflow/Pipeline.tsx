@@ -60,7 +60,7 @@ function Node({ step, order, state, selected, panelId, onSelect }: Readonly<Node
         </span>
       )}
       {duration && (
-        <span className="pipeline-duration" title="Thời gian hoàn thành">
+        <span className="pipeline-duration" title="Time taken">
           <svg
             className="pipeline-clock-icon"
             width="12"

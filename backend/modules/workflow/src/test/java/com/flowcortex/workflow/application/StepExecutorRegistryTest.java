@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,12 +26,12 @@ class StepExecutorRegistryTest {
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
 
     StepExecutorRegistryTest() {
-        when(mediaJobs.providerLimits())
+        when(mediaJobs.providerLimits(anyString()))
                 .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
     }
 
     private static StepContext context(String input) {
-        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null);
+        return new StepContext(UUID.randomUUID(), UUID.randomUUID(), 1, "echo", (short) 1, input, null, null);
     }
 
     @Test

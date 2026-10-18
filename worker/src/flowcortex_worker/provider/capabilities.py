@@ -31,6 +31,11 @@ from .contracts.provider_job import (
     ProviderJob,
 )
 from .contracts.provider_speech_result import ProviderSpeechData
+from .seedance_adapter import PROVIDER_SEEDANCE
+from .wan_adapter import PROVIDER_WAN
+
+# Providers that fetch the reference image themselves from a URL instead of taking its bytes.
+_URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE, PROVIDER_WAN})
 
 
 class UnsupportedCapability(ValueError):
@@ -174,14 +179,16 @@ def _generate_video(
     if not isinstance(job, GenerateVideoJob):
         raise UnsupportedCapability("generate_video received the wrong job shape")
     payload = job.params.payload
-    image_bytes, image_url = _resolve_reference_image(job, context)
+    identity = adapter.video_identity()
+    image_bytes, image_url = _resolve_reference_image(
+        job, context, by_url=identity.provider in _URL_REFERENCE_PROVIDERS
+    )
     request = VideoRequest(
         payload.prompt,
         payload.sourceRevisionId,
         reference_image_url=image_url,
         reference_image_bytes=image_bytes,
     )
-    identity = adapter.video_identity()
     idempotency_key = _video_idempotency_key(request, identity)
     task_id = _load_video_task(context, idempotency_key, identity)
     if task_id is None:
@@ -217,10 +224,13 @@ def _generate_video(
 
 
 def _resolve_reference_image(
-    job: GenerateVideoJob, context: ExecutionContext
+    job: GenerateVideoJob, context: ExecutionContext, *, by_url: bool
 ) -> tuple[bytes | None, str | None]:
-    """Returns (bytes, url). Exactly one is populated: bytes for byte-only adapters, URL for
-    URL-based adapters. The executor decides which side to fill based on the provider."""
+    """Returns (bytes, url) of the job's reference image, or (None, None) without one.
+
+    The bytes are always read: they are checked to be an image and key the job's idempotency.
+    The URL is signed only when the provider reads the image ``by_url`` (Seedance, Wan); Veo
+    takes the bytes inline, so no URL to our store leaves the worker for it."""
     inputs = job.inputs or ()
     if not inputs:
         return None, None
@@ -236,9 +246,9 @@ def _resolve_reference_image(
             "input_rejected",
             f"reference image '{reference.key}' is not a recognised image format",
         )
-    # The URL-based providers (Seedance, Wan) cannot read our private bucket; the byte-based
-    # provider (Veo) accepts inline base64, so the URL is unused there. The URL is a short-lived
-    # presigned GET scoped to this object only.
+    if not by_url:
+        return body, None
+    # A short-lived presigned GET for this one object, signed for the public store endpoint.
     return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
 
 

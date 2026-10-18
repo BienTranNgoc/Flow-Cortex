@@ -48,7 +48,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     @BeforeEach
     void prepareQueues() {
         org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
-        for (String queue : List.of("provider.jobs", "media.jobs")) {
+        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs")) {
             amqpAdmin.purgeQueue(queue, false);
         }
     }
@@ -96,24 +96,28 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         publishResult("provider", runId, speechJob,
                 output("speech.wav", speechKey, "audio/wav", 17) + ","
                         + output("manifest.json", manifestKey, "application/json", 2),
-                "{\"profile\":\"vi_voice_v1\",\"durationMs\":15000,"
+                "{\"profile\":\"vi_voice_v1\",\"durationMs\":9000,"
                         + "\"provider\":\"fixture\",\"voice\":\"silence\",\"speed\":\"+0%\","
                         + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
-        JsonNode firstVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        JsonNode firstVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
         assertThat(firstVideoJob.path("params").path("payload").path("prompt").asString())
                 .isEqualTo("Opening hero scene");
+        assertSendsFirstProductImage(firstVideoJob, runId);
         String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
         put(MEDIA_BUCKET, firstClipKey, "video/mp4", "fixture clip one");
         publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
 
-        JsonNode secondVideoJob = receiveJob("provider.jobs", runId, "generate_video");
+        JsonNode secondVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
         assertThat(secondVideoJob.path("params").path("payload").path("prompt").asString())
                 .isEqualTo("Benefit closing scene");
+        assertSendsFirstProductImage(secondVideoJob, runId);
         String secondClipKey = outputKey(secondVideoJob, "clip.mp4");
         put(MEDIA_BUCKET, secondClipKey, "video/mp4", "fixture clip two");
         publishVideoResult(runId, secondVideoJob, secondClipKey, "c");
+        // Every provider job of the run was taken off its own queue; nothing went to the wrong one.
+        assertThat(rabbit.receive("provider.jobs", 200)).isNull();
 
         JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
@@ -134,6 +138,14 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                 .allMatch(step -> "completed".equals(step.status()));
         assertThat(get("/api/v1/runs/" + runId + "/steps/7/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private static void assertSendsFirstProductImage(JsonNode videoJob, UUID runId) {
+        JsonNode inputs = videoJob.get("inputs");
+        assertThat(inputs).hasSize(1);
+        assertThat(inputs.get(0).get("key").asString()).isEqualTo("image_1");
+        assertThat(inputs.get(0).get("bucket").asString()).isEqualTo(MEDIA_BUCKET);
+        assertThat(inputs.get(0).get("objectKey").asString()).isEqualTo("runs/" + runId + "/inputs/image_1");
     }
 
     private void publishVideoResult(UUID runId, JsonNode job, String clipKey, String hashCharacter) {
@@ -157,6 +169,8 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                 JsonNode body = JSON.readTree(message.getBody());
                 if (runId.toString().equals(body.get("runId").asString())
                         && capability.equals(body.get("capability").asString())) {
+                    assertThat(message.getMessageProperties().getMessageId())
+                            .isEqualTo(body.get("jobId").asString());
                     return body;
                 }
             }

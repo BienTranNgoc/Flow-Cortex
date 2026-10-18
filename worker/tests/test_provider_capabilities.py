@@ -126,7 +126,7 @@ def test_storyboard_creates_two_typed_scenes_from_approved_revision() -> None:
     assert outcome.data["scene1Prompt"] != outcome.data["scene2Prompt"]
 
 
-def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
+def test_speech_is_typed_wav_that_fits_the_ten_second_video() -> None:
     outcome = execute(
         ProviderJob.model_validate(
             job(
@@ -140,7 +140,7 @@ def test_speech_is_typed_wav_between_fifteen_and_thirty_seconds() -> None:
     )
 
     ProviderSpeechData.model_validate(outcome.data)
-    assert 15_000 <= outcome.data["durationMs"] <= 30_000
+    assert 4_000 <= outcome.data["durationMs"] <= 10_000
     assert len(outcome.files) == 2
     assert outcome.data["sourceRevisionId"] == REVISION_ID
     assert outcome.data["provider"] == "fixture"

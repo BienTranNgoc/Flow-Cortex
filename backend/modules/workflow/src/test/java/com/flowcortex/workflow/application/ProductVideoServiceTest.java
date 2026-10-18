@@ -72,8 +72,10 @@ class ProductVideoServiceTest {
         List<WorkflowStep> definitions = List.of(
                 step(1, "generate_script"),
                 step(2, "APPROVAL_CHECKPOINT"),
-                step(3, "generate_speech"),
-                step(4, "render_video"));
+                configured(3, "generate_speech", "{\"profile\":\"vi_voice_v1\"}", "{step:2}"),
+                step(4, "render_video"),
+                configured(5, "generate_video",
+                        "{\"profile\":\"vertical_ad_clip_v1\",\"referenceImage\":\"image_1\"}", "{step:4}"));
         List<MediaAssetInput> assets = List.of(
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "uploads", "first")),
                 new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "uploads", "second")));
@@ -100,16 +102,33 @@ class ProductVideoServiceTest {
         verify(media).bindRunInputs(run.getValue().getId(), assets);
         ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
         verify(runSteps).saveAll(steps.capture());
-        assertThat(steps.getValue()).hasSize(4);
+        assertThat(steps.getValue()).hasSize(5);
         assertThat(steps.getValue().get(0).getInput()).isNull();
+        assertThat(steps.getValue().get(2).getInput()).isNull();
         assertThat(steps.getValue().get(3).getInput()).contains("image_1", "image_2");
-        assertThat(started.steps()).hasSize(4);
+        assertThat(steps.getValue().get(4).getInput())
+                .isEqualTo(steps.getValue().get(3).getInput())
+                .contains("runs/x/inputs/image_1");
+        assertThat(steps.getValue().get(2).getConfig()).isEqualTo("{\"profile\":\"vi_voice_v1\"}");
+        assertThat(steps.getValue().get(2).getInputRef()).isEqualTo("{step:2}");
+        assertThat(steps.getValue().get(0).getConfig()).isNull();
+        assertThat(started.steps()).hasSize(5);
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
     }
 
     private static WorkflowStep step(int order, String type) {
         return new WorkflowStep(UUID.randomUUID(), ProductVideoWorkflow.ID, (short) order,
                 "step-" + order, type, null);
+    }
+
+    /** A definition with step settings; the entity has no config setter outside persistence. */
+    private static WorkflowStep configured(int order, String type, String config, String inputRef) {
+        WorkflowStep definition = mock(WorkflowStep.class);
+        when(definition.getStepOrder()).thenReturn((short) order);
+        when(definition.getType()).thenReturn(type);
+        when(definition.getConfig()).thenReturn(config);
+        when(definition.getInputRef()).thenReturn(inputRef);
+        return definition;
     }
 
     private static ProductVideoDraft draft() {

@@ -22,6 +22,8 @@ class StateSettings(BaseSettings):
 class Settings(StateSettings):
     amqp_url: SecretStr
     s3_endpoint: str = Field(min_length=1)
+    # The store as a video provider reaches it; URLs handed to a provider are signed for this host.
+    s3_public_endpoint: str = ""
     s3_region: str = "us-east-1"
     s3_path_style: bool
     s3_upload_bucket: str = Field(min_length=1)

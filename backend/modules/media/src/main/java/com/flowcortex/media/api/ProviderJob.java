@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Provider job envelope consumed from {@code provider.jobs}. */
+/** Provider job envelope consumed from {@code provider.jobs}, or {@code provider.video.jobs} for video clips. */
 public record ProviderJob(
         @NotNull @Pattern(regexp = "1") String schemaVersion,
         @NotNull UUID jobId,

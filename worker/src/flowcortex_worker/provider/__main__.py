@@ -6,15 +6,18 @@ import signal
 import sys
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import Any
+from urllib.parse import urlparse
 
 import pika
 
 from flowcortex_worker import telemetry
 from flowcortex_worker.config import Settings
 from flowcortex_worker.consumer import Consumer
+from flowcortex_worker.errors import PermanentError
 from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
 from flowcortex_worker.storage import Storage, client_from, remove_leftovers
@@ -45,13 +48,30 @@ PROVIDER_FIXTURE = "fixture"
 TELEMETRY_FLUSH_SECONDS = 5.0
 JOB_THREAD_PREFIX = "provider-job"
 # Mirrors providerJobDeliveryLimit in contracts/limits.json, the x-delivery-limit the backend
-# declares on provider.jobs. Equal values put the terminal error on the broker's last delivery;
-# a higher value lets the broker dead-letter first, so the backend never receives a result.
+# declares on both provider job queues. Equal values put the terminal error on the broker's
+# last delivery; a higher value lets the broker dead-letter first, so the backend never
+# receives a result.
 MAX_TRANSIENT_REDELIVERIES = 3
+# Video clips run for minutes, so they have their own queue and worker pool; a clip in progress
+# never holds up a script, storyboard or speech job waiting on provider.jobs.
+PROVIDER_QUEUES = ("provider.jobs", "provider.video.jobs")
+VIDEO_QUEUE = PROVIDER_QUEUES[1]
+VIDEO_CAPABILITY = "generate_video"
+
+
+def provider_queue() -> str:
+    """The job queue this container consumes, from PROVIDER_QUEUE (unset: provider.jobs)."""
+    queue = os.environ.get("PROVIDER_QUEUE", "").strip() or PROVIDER_QUEUES[0]
+    if queue not in PROVIDER_QUEUES:
+        raise RuntimeError(
+            f"Unknown PROVIDER_QUEUE '{queue}'; accepted values: {', '.join(PROVIDER_QUEUES)}"
+        )
+    return queue
 
 
 def main() -> int:
     telemetry.configure_logging()
+    queue = provider_queue()
     settings = Settings()
     prepare_state_dir(settings.worker_state_dir)
     liveness_file = settings.liveness_file
@@ -70,25 +90,23 @@ def main() -> int:
     params.heartbeat = 60
     params.blocked_connection_timeout = 300
     params.client_properties = {"connection_name": f"provider-worker {settings.worker_id}"}
-    storage = Storage(client_from(settings), settings.s3_bucket, settings.s3_upload_bucket)
-    adapter: CapabilityProviderAdapter = _build_adapter()
+    adapter: CapabilityProviderAdapter = _build_adapter(settings.s3_public_endpoint)
+    storage = Storage(
+        client_from(settings),
+        settings.s3_bucket,
+        settings.s3_upload_bucket,
+        presign_client=(
+            client_from(settings, settings.s3_public_endpoint)
+            if settings.s3_public_endpoint
+            else None
+        ),
+    )
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=JOB_THREAD_PREFIX)
 
     def parse_job(body: bytes) -> Any:
         return ProviderJob.model_validate_json(body).root
 
-    def execute_job(job: Any, runner: ProcessRunner) -> Any:
-        runner.check()
-        request = job.root if hasattr(job, "root") else job
-        context = ExecutionContext(
-            storage=storage,
-            bucket=storage.bucket,
-            output_prefix=request.outputPrefix,
-            abort=runner,
-        )
-        outcome = execute(ProviderJob(root=job), adapter, context)
-        runner.check()
-        return outcome
+    execute_job = make_execute_job(queue, storage, adapter)
 
     def make_consumer(connection: Any) -> Consumer:
         return Consumer(
@@ -99,7 +117,7 @@ def main() -> int:
             stop=stop,
             executor=executor,
             liveness_file=liveness_file,
-            queue="provider.jobs",
+            queue=queue,
             exchange="provider",
             parse_job=parse_job,
             execute_job=execute_job,
@@ -112,7 +130,7 @@ def main() -> int:
             liveness_file.touch()
             stop.wait(min(left, 1.0))
 
-    log.info("provider worker starting", extra={"workerId": settings.worker_id})
+    log.info("provider worker starting", extra={"workerId": settings.worker_id, "queue": queue})
     remove_leftovers()
     liveness_file.touch()
     Supervisor(
@@ -134,11 +152,48 @@ def main() -> int:
     return 0
 
 
-def _build_adapter() -> CapabilityProviderAdapter:
+def make_execute_job(
+    queue: str, storage: Any, adapter: ScriptAdapter | SpeechAdapter | VideoAdapter
+) -> Callable[[Any, ProcessRunner], Any]:
+    """Runs one job; a job that reached the other pool's queue is answered, never executed.
+
+    A clip job an older backend left on provider.jobs would otherwise get the fixture clip from
+    provider-worker, which has no video vendor settings.
+    """
+
+    def execute_job(job: Any, runner: ProcessRunner) -> Any:
+        runner.check()
+        request = job.root if hasattr(job, "root") else job
+        is_video = request.capability == VIDEO_CAPABILITY
+        if queue == VIDEO_QUEUE and not is_video:
+            raise PermanentError(
+                "contract_violation",
+                f"{request.capability} jobs are handled by provider-worker on provider.jobs",
+            )
+        if queue != VIDEO_QUEUE and is_video:
+            raise PermanentError(
+                "contract_violation",
+                "generate_video jobs are handled by provider-video-worker on provider.video.jobs",
+            )
+        context = ExecutionContext(
+            storage=storage,
+            bucket=storage.bucket,
+            output_prefix=request.outputPrefix,
+            abort=runner,
+        )
+        outcome = execute(ProviderJob(root=job), adapter, context)
+        runner.check()
+        return outcome
+
+    return execute_job
+
+
+def _build_adapter(s3_public_endpoint: str = "") -> CapabilityProviderAdapter:
     """Build independently configurable script and speech providers.
 
     `PROVIDER_ADAPTER` remains the backwards-compatible fallback for both selectors. New
     deployments should set `SCRIPT_PROVIDER` and `SPEECH_PROVIDER` explicitly.
+    `s3_public_endpoint` is where a URL-reading video provider fetches the product image.
     """
     legacy = os.environ.get("PROVIDER_ADAPTER", PROVIDER_FIXTURE).strip().lower()
     script_provider = os.environ.get("SCRIPT_PROVIDER", "").strip().lower() or legacy
@@ -196,7 +251,7 @@ def _build_adapter() -> CapabilityProviderAdapter:
         speech_provider, speech_api_key, speech_base_url, speech_model
     )
     video_adapter = _build_video_adapter(
-        video_provider, video_api_key, video_base_url, video_model
+        video_provider, video_api_key, video_base_url, video_model, s3_public_endpoint
     )
     log.info(
         "provider adapters selected",
@@ -248,14 +303,24 @@ def _build_speech_adapter(
     )
 
 
+def _require_public_endpoint(s3_public_endpoint: str) -> None:
+    endpoint = urlparse(s3_public_endpoint.strip())
+    if endpoint.scheme != "https" or not endpoint.netloc:
+        raise RuntimeError(
+            "Seedance/Wan read the product image from a public HTTPS URL: set "
+            "S3_PUBLIC_ENDPOINT to the public object-store URL (https://media.<domain>)"
+        )
+
+
 def _build_video_adapter(
-    provider: str, api_key: str, base_url: str, model: str
+    provider: str, api_key: str, base_url: str, model: str, s3_public_endpoint: str = ""
 ) -> VideoAdapter:
     if provider == PROVIDER_SEEDANCE:
         if not api_key:
             raise RuntimeError("Seedance video provider requires SEEDANCE_API_KEY")
         if not base_url:
             raise RuntimeError("Seedance video provider requires SEEDANCE_BASE_URL")
+        _require_public_endpoint(s3_public_endpoint)
         return SeedanceAdapter(
             SeedanceConfig(
                 api_key=api_key,
@@ -295,6 +360,7 @@ def _build_video_adapter(
     if provider == PROVIDER_WAN:
         if not api_key:
             raise RuntimeError("Wan video provider requires WAN_API_KEY")
+        _require_public_endpoint(s3_public_endpoint)
         return WanAdapter(
             WanConfig(
                 api_key=api_key,
