@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -197,6 +198,18 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
         assertThat(old.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(old.getBody().detail()).isEqualTo(NO_LONGER_VALID);
         assertThat(verify(token, second, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void aResendExactlyAtTheCooldownIsAllowedWhenTheClockCarriesNanoseconds() {
+        String token = memberToken("phone-nanos");
+        String local = randomLocalNumber();
+        clock.set(clock.instant().truncatedTo(ChronoUnit.MICROS).plus(1, ChronoUnit.MICROS).plusNanos(700));
+        assertThat(sendCode(token, local, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        clock.advance(Duration.ofSeconds(60));
+
+        assertThat(sendCode(token, local, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test

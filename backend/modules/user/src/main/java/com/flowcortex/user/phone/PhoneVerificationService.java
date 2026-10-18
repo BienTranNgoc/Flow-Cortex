@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -80,7 +81,7 @@ class PhoneVerificationService {
     SentCode sendCode(UUID userId, String rawPhone) {
         String phone = PhoneNumbers.normalize(rawPhone)
                 .orElseThrow(() -> new IllegalArgumentException("Not a Vietnamese mobile number"));
-        Instant now = Instant.now(clock);
+        Instant now = now();
         long resendAfterSeconds = transaction.execute(status -> {
             jdbc.query("SELECT pg_advisory_xact_lock(hashtext(?))", (RowCallbackHandler) row -> { }, phone);
             if (phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(phone, userId)) {
@@ -105,12 +106,17 @@ class PhoneVerificationService {
         return new SentCode(PhoneNumbers.mask(phone), resendAfterSeconds, now.plus(CODE_TTL));
     }
 
+    // Postgres keeps microseconds: a nanosecond "now" would sit just before a stored time it rounded up.
+    private Instant now() {
+        return Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+    }
+
     /**
      * Checks the code against the member's latest challenge. A wrong entry is counted in its own
      * committed transaction before the refusal is thrown, so the count survives the error response.
      */
     void verify(UUID userId, String code) {
-        Instant now = Instant.now(clock);
+        Instant now = now();
         Verification verification;
         try {
             verification = transaction.execute(status -> verifyLatest(userId, code, now));
