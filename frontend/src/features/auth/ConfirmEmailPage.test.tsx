@@ -1,16 +1,27 @@
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { stubApi } from '../../test/fakeApi';
+import { AuthLayout } from './AuthLayout';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
 
 function renderConfirm(search: string) {
-  return renderRoute(
-    '/confirm-email',
-    `/confirm-email${search}`,
-    <ConfirmEmailPage />,
-    <Route path="/" element={<p>Home</p>} />,
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/confirm-email${search}`]}>
+        <Routes>
+          <Route element={<AuthLayout />}>
+            <Route path="/confirm-email" element={<ConfirmEmailPage />} />
+          </Route>
+          <Route path="/" element={<p>Home</p>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -27,6 +38,19 @@ describe('ConfirmEmailPage', () => {
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
+  });
+
+  it('renders inside the auth shell with its mascot, banner stage and one level-1 heading', async () => {
+    stubApi({});
+
+    renderConfirm('');
+
+    expect(await screen.findByText('Liên kết xác nhận này không còn hiệu lực')).toBeInTheDocument();
+    expect(document.querySelector('.auth-card svg.nodi-peek')).not.toBeNull();
+    expect(document.querySelector('.auth-shell__stage')).not.toBeNull();
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent('Xác nhận email');
   });
 
   it('confirms the token once, signs the member in and lands on the home page', async () => {
@@ -58,15 +82,13 @@ describe('ConfirmEmailPage', () => {
 
     renderConfirm('?token=used-token');
 
-    expect(
-      await screen.findByText('This confirmation link is no longer valid'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Liên kết xác nhận này không còn hiệu lực')).toBeInTheDocument();
     expect(getToken()).toBeNull();
     await user.type(screen.getByLabelText('Email'), 'an@example.com');
-    await user.click(screen.getByRole('button', { name: 'Resend confirmation email' }));
+    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác nhận' }));
 
     expect(
-      await screen.findByText('If an account needs confirming, we sent a new link'),
+      await screen.findByText('Nếu tài khoản cần xác nhận, chúng tôi đã gửi một liên kết mới'),
     ).toBeInTheDocument();
     expect(calls.filter((call) => call.path === '/api/v1/auth/resend-confirmation')).toEqual([
       {
@@ -83,9 +105,9 @@ describe('ConfirmEmailPage', () => {
     renderConfirm('?token=used-token');
 
     await user.type(await screen.findByLabelText('Email'), 'an.example.com');
-    await user.click(screen.getByRole('button', { name: 'Resend confirmation email' }));
+    await user.click(screen.getByRole('button', { name: 'Gửi lại email xác nhận' }));
 
-    expect(await screen.findByText('Enter a valid email address')).toBeInTheDocument();
+    expect(await screen.findByText('Nhập một địa chỉ email hợp lệ')).toBeInTheDocument();
     expect(calls.map((call) => call.path)).toEqual(['/api/v1/auth/confirm-email']);
   });
 
@@ -94,11 +116,18 @@ describe('ConfirmEmailPage', () => {
 
     renderConfirm('');
 
-    expect(
-      await screen.findByText('This confirmation link is no longer valid'),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Resend confirmation email' })).toBeInTheDocument();
+    expect(await screen.findByText('Liên kết xác nhận này không còn hiệu lực')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gửi lại email xác nhận' })).toBeInTheDocument();
     expect(calls).toEqual([]);
+  });
+
+  it('worries alongside the alert when the link has no token', async () => {
+    stubApi({});
+
+    renderConfirm('');
+
+    expect(await screen.findByText('Liên kết xác nhận này không còn hiệu lực')).toBeInTheDocument();
+    expect(document.querySelector('.auth-card .nodi-peek')).toHaveAttribute('data-pose', 'worried');
   });
 
   it('shows the server detail and lets the member retry any other failure', async () => {
@@ -116,7 +145,7 @@ describe('ConfirmEmailPage', () => {
     renderConfirm('?token=link-token-2');
 
     expect(await screen.findByText('Service unavailable')).toHaveAttribute('role', 'alert');
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(screen.getByRole('button', { name: 'Thử lại' }));
 
     expect(await screen.findByText('Home')).toBeInTheDocument();
     expect(getToken()).toBe('jwt-c2');

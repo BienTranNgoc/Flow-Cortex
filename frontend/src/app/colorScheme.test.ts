@@ -32,6 +32,22 @@ describe('colour scheme', () => {
     expect(rule(css, 'button')).toMatch(/background:\s*var\(--btn-bg\);/);
   });
 
+  it('lets the auth screens opt into a light scheme locally', () => {
+    expect(rule(read('../features/auth/AuthShell.css'), '.auth-shell')).toMatch(
+      /color-scheme:\s*light;/,
+    );
+  });
+
+  it('never lets the auth card drop below 90% of --auth-card', () => {
+    const css = read('../features/auth/AuthShell.css');
+    const cardRules = Array.from(css.matchAll(/(?:^|\n)\.auth-card\s*\{([^}]*)\}/g), (m) => m[1]);
+    const stops = cardRules.flatMap((body) =>
+      Array.from(body!.matchAll(/var\(--auth-card\)\s+(\d+)%/g), (m) => Number(m[1])),
+    );
+    expect(stops.length).toBeGreaterThan(0);
+    expect(Math.min(...stops)).toBeGreaterThanOrEqual(90);
+  });
+
   it('finds the member stylesheets', () => {
     expect(stylesheets.length).toBeGreaterThanOrEqual(2);
   });

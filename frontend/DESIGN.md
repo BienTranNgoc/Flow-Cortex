@@ -2,7 +2,8 @@
 version: alpha
 name: Flow-Cortex member
 description: >-
-  Dark-only design system for the Flow-Cortex member SPA. Values mirror
+  Dark design system for the Flow-Cortex member SPA, with a fixed light
+  palette for the public auth screens. Values mirror
   `src/styles/tokens.css`, which wins on any conflict.
 colors:
   paper: '#080c13'
@@ -16,9 +17,6 @@ colors:
   glow: '#152b38'
   header-bg: '#0f0f1e'
   footer-bg: '#080812'
-  aurora-top: '#0d1828'
-  aurora-mid: '#060a12'
-  aurora-bottom: '#04060c'
   disabled-from: '#1a3540'
   disabled-to: '#2a3a55'
   ink: '#e8f1f2'
@@ -51,9 +49,6 @@ colors:
   teal-deep: '#00d4ce'
   violet: '#b3a4ff'
   indigo: '#120074'
-  aurora-teal: '#0fb5a8'
-  aurora-indigo: '#4338ca'
-  aurora-cyan: '#06b6d4'
   tone-blue-text: '#9fc4ff'
   tone-blue-bg: '#0a1a2c'
   tone-blue-line: '#1d3a66'
@@ -87,16 +82,41 @@ colors:
   green-bright: '#69f0a8'
   green-vivid: '#4ade80'
   shadow-color: '#000000'
+  auth-ocean: '#0b57a6'
+  auth-ocean-mid: '#0b6fa3'
+  auth-card: '#f1f6f8'
+  auth-ink: '#061016'
+  auth-ink-2: '#26343d'
+  auth-ink-3: '#4d5f6b'
+  auth-ink-4: '#5b6b76'
+  auth-field: '#e9f0f3'
+  auth-field-border: '#6b7b86'
+  auth-accent: '#0b6a80'
+  auth-google: '#0d1a24'
+  auth-glass-dark: '#062b52'
+  auth-on-ocean: '#ffffff'
+  auth-line: '#d3dee4'
+  nodi-body: '#35e5e0'
+  nodi-ink: '#061016'
+  nodi-cheek: '#5174ff'
+  nodi-blush: '#ff8fa3'
+  nodi-eye: '#ffffff'
+  nodi-port: '#0b6a80'
+typography:
+  sans:
+    fontFamily: Google Sans Flex Variable
 rounded:
   sm: 4px
   md: 8px
   lg: 14px
   full: 9999px
+  auth-card: 20px
+  auth-control: 6px
 ---
 
 ## Overview
 
-The member app has one theme: dark. The document declares `color-scheme: dark`, so browser-drawn controls (file picker, progress bars) match. One accent family, cyan (`primary`) with blue (`accent`), carries links, eyebrows and the call to action.
+Signed-in screens have one theme: dark; the public auth screens use the fixed light auth palette (see Colors). The document declares `color-scheme: dark`, so browser-drawn controls (file picker, progress bars) match. One accent family, cyan (`primary`) with blue (`accent`), carries links, eyebrows and the call to action.
 
 ## Colors
 
@@ -107,6 +127,41 @@ The member app has one theme: dark. The document declares `color-scheme: dark`, 
 - Links use `primary`; the header navigation uses `nav-ink` on `header-bg`.
 - Translucent fills and glows are `color-mix(in srgb, var(--token) N%, transparent)` over an opaque token (`teal-glow`, `indigo`, `cta-from`, `red-strong`, `green-bright`), never an `rgba()` literal.
 - Workflow categories each pair a `tone-*-text` with its `tone-*-bg` and `tone-*-line`; icon tiles paint `tone-*-from` to `tone-*-to`.
+
+### Auth palette
+
+The public auth screens (sign in, register, confirm email) are a fixed light brand surface: a frosted light card on an ocean banner. Their shell root sets `color-scheme: light` and ignores the operating-system preference; nothing outside that root changes, so every signed-in screen stays dark.
+
+| token               | value     | use                                                                |
+| ------------------- | --------- | ------------------------------------------------------------------ |
+| `auth-ocean`        | `#0b57a6` | banner base; `auth-on-ocean` text 7.17:1                           |
+| `auth-ocean-mid`    | `#0b6fa3` | art reference only: baked into the banner WebP, no CSS user        |
+| `auth-card`         | `#f1f6f8` | card fill, never below 90% where text sits                         |
+| `auth-ink`          | `#061016` | headings and body on the card (17.63:1)                            |
+| `auth-ink-2`        | `#26343d` | field labels                                                       |
+| `auth-ink-3`        | `#4d5f6b` | secondary text on the card (6.09:1)                                |
+| `auth-ink-4`        | `#5b6b76` | placeholder on the field (4.78:1)                                  |
+| `auth-field`        | `#e9f0f3` | field fill                                                         |
+| `auth-field-border` | `#6b7b86` | field edge (3.79:1 on the field, 4.01:1 on the card)               |
+| `auth-accent`       | `#0b6a80` | links and focus outline on the card (5.69:1)                       |
+| `auth-google`       | `#0d1a24` | Google button fill; `auth-on-ocean` text 17.64:1                   |
+| `auth-glass-dark`   | `#062b52` | banner chips at 45% over `auth-ocean`; `auth-on-ocean` text 9.88:1 |
+| `auth-on-ocean`     | `#ffffff` | text on the banner, chips and the Google button                    |
+| `auth-line`         | `#d3dee4` | decorative divider only, never a field edge                        |
+| `nodi-body`         | `#35e5e0` | mascot body (non-text art, as are all `nodi-*`)                    |
+| `nodi-ink`          | `#061016` | mascot outline and pupils                                          |
+| `nodi-cheek`        | `#5174ff` | mascot cheek panel                                                 |
+| `nodi-blush`        | `#ff8fa3` | mascot blush                                                       |
+| `nodi-eye`          | `#ffffff` | mascot eye white                                                   |
+| `nodi-port`         | `#0b6a80` | mascot port dots                                                   |
+
+The call to action keeps the `cta-from` to `cta-to` gradient with `primary-foreground` text, and the promo pill keeps `tone-amber-from` to `tone-amber-to` with `tone-amber-on`. The promo card is light frosted glass, `auth-on-ocean` from 50% to 34% over the banner, with `auth-ink` text (5.73:1 at the 34% end over `auth-ocean`). Auth cards round to `auth-card` (20px), auth controls to `auth-control` (6px).
+
+The auth card is frosted, but its gradient never drops below 90% `auth-card` anywhere from the brand row to the footnote: at 90% over `auth-ink`, taken as the worst-case backdrop, `auth-accent` holds 4.61:1 and `auth-ink-3` 4.94:1. The invalid field edge is `red-strong` at 55% over `auth-ink`, 5.60:1 on `auth-field` and 5.92:1 on `auth-card`.
+
+## Typography
+
+One family, `--font-sans`: Google Sans Flex Variable, self-hosted from `@fontsource-variable/google-sans-flex` (latin, latin-ext and vietnamese subsets) and imported once in `main.tsx`, falling back to Inter, then the system sans-serif. Every screen, signed-in and auth, uses it; controls inherit it.
 
 ## Layout
 

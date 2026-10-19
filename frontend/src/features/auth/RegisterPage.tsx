@@ -1,10 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
-import { Link, Navigate } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { Navigate } from 'react-router-dom';
 import { OAuthButton } from '../../app/OAuthButton';
+import { AuthLink } from './AuthLink';
+import { authCopy } from './authCopy';
+import { useAuthPose } from './authPose';
 import { ResendConfirmation } from './ConfirmEmailPage';
+import { nodiPeekState, type NodiPeekInput } from './nodiPeekState';
 import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
@@ -16,6 +19,7 @@ import {
 } from './useAuth';
 
 type FieldName = keyof RegisterFormValues;
+type Focused = NodiPeekInput['focused'];
 
 /** Server-side field names the form can show a refusal at. */
 const SERVER_FIELDS: readonly FieldName[] = [
@@ -28,30 +32,54 @@ const SERVER_FIELDS: readonly FieldName[] = [
 
 interface FieldProps {
   name: FieldName;
-  label: string;
-  index: number;
   type?: 'text' | 'email' | 'password';
   autoComplete: string;
+  /** Which way the card mascot turns while this field has focus. */
+  focusAs?: Focused;
+  onFocused: (focused: Focused) => void;
+  onEdited: () => void;
   register: UseFormRegister<RegisterFormValues>;
   errors: FieldErrors<RegisterFormValues>;
 }
 
-function Field({ name, label, index, type = 'text', autoComplete, register, errors }: FieldProps) {
+function Field({
+  name,
+  type = 'text',
+  autoComplete,
+  focusAs = null,
+  onFocused,
+  onEdited,
+  register,
+  errors,
+}: FieldProps) {
   const id = `register-${name}`;
   const message = errors[name]?.message;
+  const { label, placeholder } = authCopy.register.fields[name];
+  const field = register(name, { onChange: onEdited });
   return (
-    <div className="field" style={{ '--i': index } as CSSProperties}>
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type={type}
-        autoComplete={autoComplete}
-        aria-invalid={message ? 'true' : 'false'}
-        aria-describedby={message ? `${id}-error` : undefined}
-        {...register(name)}
-      />
+    <div className="auth-field">
+      <label htmlFor={id} className="auth-label">
+        {label}
+      </label>
+      <div className="auth-control">
+        <input
+          id={id}
+          type={type}
+          className="auth-input"
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          aria-invalid={message ? 'true' : 'false'}
+          aria-describedby={message ? `${id}-error` : undefined}
+          {...field}
+          onFocus={() => onFocused(focusAs)}
+          onBlur={(event) => {
+            onFocused(null);
+            return field.onBlur(event);
+          }}
+        />
+      </div>
       {message && (
-        <p id={`${id}-error`} role="alert">
+        <p id={`${id}-error`} role="alert" className="auth-error">
           {message}
         </p>
       )}
@@ -60,9 +88,12 @@ function Field({ name, label, index, type = 'text', autoComplete, register, erro
 }
 
 export function RegisterPage() {
+  const copy = authCopy.register;
   const token = useAuthToken();
   const registerMutation = useRegisterMutation();
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [focused, setFocused] = useState<Focused>(null);
+  const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
   const {
     register,
     handleSubmit,
@@ -79,12 +110,22 @@ export function RegisterPage() {
       confirmPassword: '',
     },
   });
+  const isPending = registerMutation.isPending;
+  useAuthPose(
+    nodiPeekState({
+      focused,
+      pending: isPending,
+      failed: registerMutation.isError && !editedSinceSubmit,
+      succeeded: registerMutation.isSuccess,
+    }),
+  );
 
   if (token) {
     return <Navigate to="/" replace />;
   }
 
   const onSubmit = handleSubmit(({ confirmPassword: _confirmPassword, username, ...values }) => {
+    setEditedSinceSubmit(false);
     registerMutation.mutate(username ? { ...values, username } : values, {
       onSuccess: (outcome) => {
         if (outcome === 'confirmation_sent') {
@@ -107,128 +148,97 @@ export function RegisterPage() {
 
   if (sentTo !== null) {
     return (
-      <div className="auth-page">
-        <BrandPanel />
-
-        <section className="auth-card">
-          <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-          <div role="status">
-            <h1 className="auth-card__title">Check your inbox to confirm your email</h1>
-            <p className="auth-subtitle">
-              We sent a confirmation link to <strong>{sentTo}</strong>. Open it within 24 hours to
-              activate your account and sign in.
-            </p>
-          </div>
-          <ResendConfirmation email={sentTo} />
-          <p className="auth-footer">
-            Already confirmed? <Link to="/login">Sign in to workspace</Link>
-          </p>
-        </section>
-      </div>
+      <>
+        <h1 className="auth-title" tabIndex={-1}>
+          {copy.sentTitle}
+        </h1>
+        <p className="auth-status" role="status">
+          {copy.sentBefore} <strong>{sentTo}</strong>
+          {copy.sentAfter}
+        </p>
+        <ResendConfirmation email={sentTo} />
+        <p className="auth-footnote">
+          {copy.alreadyConfirmed} <AuthLink to="/login">{copy.signIn}</AuthLink>
+        </p>
+      </>
     );
   }
 
-  // A refusal shown at its field is not repeated under the form.
+  // A refusal shown at its field is not repeated above the form.
   const refusedFields = fieldErrorsFrom(registerMutation.error);
-  const serverError = SERVER_FIELDS.some((field) => refusedFields[field])
-    ? undefined
-    : detailFrom(registerMutation);
-  const isPending = registerMutation.isPending;
+  const serverError =
+    !registerMutation.isError || SERVER_FIELDS.some((field) => refusedFields[field])
+      ? undefined
+      : (detailFrom(registerMutation) ?? copy.retryLater);
   const dataState = submitState(registerMutation.isSuccess, isPending);
-  const fieldProps = { register, errors };
+  const fieldProps = {
+    register,
+    errors,
+    onFocused: setFocused,
+    onEdited: () => setEditedSinceSubmit(true),
+  };
 
   const buttonLabel = (() => {
-    if (registerMutation.isSuccess) return '✓ Account created';
-    if (isPending) return 'Creating account…';
-    return 'Get started free →';
+    if (registerMutation.isSuccess) return copy.submitSuccess;
+    if (isPending) return copy.submitPending;
+    return copy.submit;
   })();
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
+    <>
+      <h1 className="auth-title" tabIndex={-1}>
+        {copy.title} <span className="auth-title__accent">{copy.titleAccent}</span>
+      </h1>
+      <p className="auth-subtitle">{copy.subtitle}</p>
 
-      <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
-        <h1 className="auth-card__title">Create your free creator account</h1>
-        <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
-
-        <div className="oauth-row">
-          <OAuthButton
-            provider="google"
-            label="Sign up with Google"
-            href={googleAuthorizeUrl(true, '/')}
-          />
-        </div>
-
-        <div className="auth-divider" aria-hidden="true">
-          <span>or sign up with email</span>
-        </div>
-
-        <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">
-          <Field
-            name="firstName"
-            label="First name"
-            index={0}
-            autoComplete="given-name"
-            {...fieldProps}
-          />
-          <Field
-            name="lastName"
-            label="Last name"
-            index={1}
-            autoComplete="family-name"
-            {...fieldProps}
-          />
-          <Field
-            name="email"
-            label="Email"
-            index={2}
-            type="email"
-            autoComplete="email"
-            {...fieldProps}
-          />
-          <Field
-            name="username"
-            label="Username (optional)"
-            index={3}
-            autoComplete="username"
-            {...fieldProps}
-          />
-          <Field
-            name="password"
-            label="Password"
-            index={4}
-            type="password"
-            autoComplete="new-password"
-            {...fieldProps}
-          />
-          <Field
-            name="confirmPassword"
-            label="Confirm password"
-            index={5}
-            type="password"
-            autoComplete="new-password"
-            {...fieldProps}
-          />
-          {serverError && (
-            <p role="alert" className="form-error">
-              {serverError}
-            </p>
-          )}
-          <button
-            className="primary-button"
-            type="submit"
-            data-state={dataState}
-            disabled={isPending}
-          >
-            {buttonLabel}
-          </button>
-        </form>
-
-        <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in to workspace</Link>
+      {serverError && (
+        <p id="register-alert" role="alert" className="auth-alert">
+          {serverError}
         </p>
-      </section>
-    </div>
+      )}
+
+      <form onSubmit={onSubmit} noValidate aria-label={copy.formLabel}>
+        <Field name="firstName" autoComplete="given-name" {...fieldProps} />
+        <Field name="lastName" autoComplete="family-name" {...fieldProps} />
+        <Field name="email" type="email" autoComplete="email" focusAs="email" {...fieldProps} />
+        <Field name="username" autoComplete="username" {...fieldProps} />
+        <Field
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          focusAs="password"
+          {...fieldProps}
+        />
+        <Field
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          focusAs="password"
+          {...fieldProps}
+        />
+        <button
+          className="auth-btn auth-btn--primary"
+          type="submit"
+          data-state={dataState}
+          disabled={isPending}
+          aria-busy={isPending}
+        >
+          {isPending && <span className="auth-spinner" aria-hidden="true" />}
+          {buttonLabel}
+        </button>
+      </form>
+
+      <hr className="auth-divider" />
+      <OAuthButton
+        provider="google"
+        label={copy.google}
+        href={googleAuthorizeUrl(true, '/')}
+        className="auth-btn auth-btn--google"
+      />
+
+      <p className="auth-footnote">
+        {copy.haveAccount} <AuthLink to="/login">{copy.signIn}</AuthLink>
+      </p>
+    </>
   );
 }

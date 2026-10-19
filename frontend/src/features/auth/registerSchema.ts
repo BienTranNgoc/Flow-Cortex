@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { authCopy } from './authCopy';
 
 const USERNAME = /^[a-z0-9_]{3,20}$/;
+const message = authCopy.register.validation;
 
 /** Mirrors the server's register constraints so a refusal shows at its field before any request. */
 export const registerSchema = z
@@ -8,29 +10,26 @@ export const registerSchema = z
     firstName: z
       .string()
       .trim()
-      .min(1, 'First name is required')
-      .max(100, 'First name is too long'),
-    lastName: z.string().trim().min(1, 'Last name is required').max(100, 'Last name is too long'),
-    email: z.string().trim().email('Enter a valid email address'),
+      .min(1, message.firstNameRequired)
+      .max(100, message.firstNameTooLong),
+    lastName: z.string().trim().min(1, message.lastNameRequired).max(100, message.lastNameTooLong),
+    email: z.string().trim().email(message.emailInvalid),
     // Empty means "no username"; the server refuses an empty string, so it is omitted on submit.
     username: z
       .string()
-      .refine(
-        (value) => value === '' || USERNAME.test(value),
-        'Use 3–20 lowercase letters, digits or _',
-      ),
+      .refine((value) => value === '' || USERNAME.test(value), message.usernameFormat),
     // BCrypt reads at most 72 bytes; the server rejects longer UTF-8 passwords.
     password: z
       .string()
-      .min(8, 'Password must be at least 8 characters')
-      .refine((value) => new TextEncoder().encode(value).length <= 72, 'Password is too long'),
-    confirmPassword: z.string().min(1, 'Confirm your password'),
+      .min(8, message.passwordTooShort)
+      .refine((value) => new TextEncoder().encode(value).length <= 72, message.passwordTooLong),
+    confirmPassword: z.string().min(1, message.confirmRequired),
   })
   .refine((values) => values.password === values.confirmPassword, {
     path: ['confirmPassword'],
-    message: 'Passwords do not match',
+    message: message.passwordMismatch,
   });
 
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export const resendEmailSchema = z.string().trim().email('Enter a valid email address');
+export const resendEmailSchema = z.string().trim().email(authCopy.resend.invalidEmail);

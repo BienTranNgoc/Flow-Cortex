@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthLink } from './AuthLink';
+import { authCopy } from './authCopy';
+import { useAuthPose } from './authPose';
+import { nodiPeekState } from './nodiPeekState';
 import { resendEmailSchema } from './registerSchema';
 import {
   CONFIRMATION_LINK_INVALID,
@@ -10,65 +13,74 @@ import {
   useResendConfirmationMutation,
 } from './useAuth';
 
-const LINK_INVALID_MESSAGE = 'This confirmation link is no longer valid';
-
 interface ResendConfirmationProps {
   /** The address to send to; when omitted the member types it in. */
   email?: string;
+  autoFocus?: boolean;
 }
 
 /** "Resend confirmation email" with its sending, sent and refused states. */
-export function ResendConfirmation({ email }: ResendConfirmationProps) {
+export function ResendConfirmation({ email, autoFocus = false }: ResendConfirmationProps) {
   const resend = useResendConfirmationMutation();
   const [typedEmail, setTypedEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const copy = authCopy.resend;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     const parsed = resendEmailSchema.safeParse(email ?? typedEmail);
     if (!parsed.success) {
-      setEmailError(parsed.error.issues[0]?.message ?? 'Enter a valid email address');
+      setEmailError(copy.invalidEmail);
       return;
     }
     setEmailError(null);
     resend.mutate(parsed.data);
   };
 
-  const refusal = resend.isError
-    ? (detailFrom(resend) ?? 'Could not send a new link. Please try again.')
-    : null;
+  const refusal = resend.isError ? (detailFrom(resend) ?? copy.failed) : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Resend confirmation" className="auth-form">
+    <form onSubmit={onSubmit} noValidate aria-label={copy.formLabel} className="auth-form">
       {email === undefined && (
-        <div className="field">
-          <label htmlFor="resend-email">Email</label>
-          <input
-            id="resend-email"
-            type="email"
-            autoComplete="email"
-            value={typedEmail}
-            onChange={(event) => setTypedEmail(event.target.value)}
-            aria-invalid={emailError ? 'true' : 'false'}
-            aria-describedby={emailError ? 'resend-email-error' : undefined}
-          />
+        <div className="auth-field">
+          <label htmlFor="resend-email" className="auth-label">
+            {copy.emailLabel}
+          </label>
+          <div className="auth-control">
+            <input
+              id="resend-email"
+              type="email"
+              className="auth-input"
+              autoComplete="email"
+              value={typedEmail}
+              onChange={(event) => setTypedEmail(event.target.value)}
+              aria-invalid={emailError ? 'true' : 'false'}
+              aria-describedby={emailError ? 'resend-email-error' : undefined}
+            />
+          </div>
           {emailError && (
-            <p id="resend-email-error" role="alert">
+            <p id="resend-email-error" role="alert" className="auth-error">
               {emailError}
             </p>
           )}
         </div>
       )}
-      <button type="submit" disabled={resend.isPending}>
-        {resend.isPending ? 'Sending…' : 'Resend confirmation email'}
+      <button
+        type="submit"
+        className="auth-btn auth-btn--secondary"
+        disabled={resend.isPending}
+        aria-busy={resend.isPending}
+        autoFocus={autoFocus}
+      >
+        {resend.isPending ? copy.pending : copy.submit}
       </button>
       {resend.isSuccess && (
-        <p role="status" className="auth-subtitle">
-          If an account needs confirming, we sent a new link
+        <p role="status" className="auth-status">
+          {copy.sent}
         </p>
       )}
       {refusal && (
-        <p role="alert" className="form-error">
+        <p role="alert" className="auth-alert">
           {refusal}
         </p>
       )}
@@ -78,6 +90,7 @@ export function ResendConfirmation({ email }: ResendConfirmationProps) {
 
 /** Opened from the emailed link: spends `?token=` once, then lands on the home page signed in. */
 export function ConfirmEmailPage() {
+  const copy = authCopy.confirmEmail;
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
   const navigate = useNavigate();
@@ -97,53 +110,58 @@ export function ConfirmEmailPage() {
   const linkInvalid =
     !token || (confirm.isError && problemCodeFrom(confirm.error) === CONFIRMATION_LINK_INVALID);
   const otherFailure =
-    !linkInvalid && confirm.isError
-      ? (detailFrom(confirm) ?? 'Could not confirm your email. Please try again.')
-      : null;
+    !linkInvalid && confirm.isError ? (detailFrom(confirm) ?? copy.failedFallback) : null;
+  useAuthPose(
+    nodiPeekState({
+      focused: null,
+      pending: confirm.isPending,
+      failed: linkInvalid || confirm.isError,
+      succeeded: confirm.isSuccess,
+    }),
+  );
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
+    <>
+      <h1 className="auth-title" tabIndex={-1}>
+        {copy.title}
+      </h1>
 
-      <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · CONFIRM EMAIL</p>
-        <h1 className="auth-card__title">Confirm your email</h1>
+      {linkInvalid && (
+        <>
+          <div role="alert" className="auth-alert">
+            <p>{copy.linkInvalid}</p>
+            <p>{copy.linkInvalidHint}</p>
+          </div>
+          <ResendConfirmation />
+        </>
+      )}
 
-        {linkInvalid && (
-          <>
-            <p role="alert" className="form-error">
-              {LINK_INVALID_MESSAGE}
-            </p>
-            <p className="auth-subtitle">Enter your email and we will send you a new link.</p>
-            <ResendConfirmation />
-          </>
-        )}
-
-        {otherFailure && (
-          <>
-            <p role="alert" className="form-error">
-              {otherFailure}
-            </p>
-            <button
-              type="button"
-              disabled={confirm.isPending}
-              onClick={() => mutate(token, { onSuccess: () => navigate('/', { replace: true }) })}
-            >
-              Try again
-            </button>
-          </>
-        )}
-
-        {!linkInvalid && !otherFailure && (
-          <p role="status" className="auth-subtitle">
-            Confirming your email…
+      {otherFailure && (
+        <>
+          <p role="alert" className="auth-alert">
+            {otherFailure}
           </p>
-        )}
+          <button
+            type="button"
+            className="auth-btn auth-btn--secondary"
+            disabled={confirm.isPending}
+            aria-busy={confirm.isPending}
+            onClick={() => mutate(token, { onSuccess: () => navigate('/', { replace: true }) })}
+          >
+            {copy.retry}
+          </button>
+        </>
+      )}
 
-        <p className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
+      {!linkInvalid && !otherFailure && (
+        <p role="status" className="auth-status">
+          {copy.confirming}
         </p>
-      </section>
-    </div>
+      )}
+
+      <p className="auth-footnote">
+        <AuthLink to="/login">{copy.backToSignIn}</AuthLink>
+      </p>
+    </>
   );
 }
