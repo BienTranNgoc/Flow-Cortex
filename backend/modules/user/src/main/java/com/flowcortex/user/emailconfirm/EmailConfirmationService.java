@@ -1,5 +1,7 @@
 package com.flowcortex.user.emailconfirm;
 
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
@@ -14,12 +16,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.mail.SimpleMailMessage;
@@ -47,12 +51,6 @@ public class EmailConfirmationService {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmailConfirmationService.class);
 
-    static final String SUBJECT = "Confirm your Flow-Cortex email";
-
-    static final String PASSWORD_LINK_SUBJECT = "Set your Flow-Cortex password";
-
-    static final String PASSWORD_SET_SUBJECT = "Your Flow-Cortex password was set";
-
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private static final Base64.Encoder URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
@@ -65,13 +63,15 @@ public class EmailConfirmationService {
     private final Clock clock;
     private final String publicUrl;
     private final Counter sendFailures;
+    private final MessageSource messages;
+    private final RequestLocale requestLocale;
 
     /** Fails startup when confirmation is on and a link could not be built or mailed. */
     EmailConfirmationService(EmailConfirmationTokenRepository tokens, AppUserRepository users,
             JavaMailSender mailSender, @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor,
             EmailConfirmationProperties properties, Clock clock,
             @Value("${flowcortex.app.public-url:}") String publicUrl, @Value("${spring.mail.host:}") String mailHost,
-            MeterRegistry meters) {
+            MeterRegistry meters, MessageSource messages, RequestLocale requestLocale) {
         if (properties.enabled()) {
             requireSet(publicUrl, "flowcortex.app.public-url (FLOWCORTEX_APP_PUBLIC_URL), the member app origin"
                     + " the confirmation link opens");
@@ -88,6 +88,8 @@ public class EmailConfirmationService {
                 .description("Account mails (confirmation, set-password link, password notice) the SMTP server"
                         + " did not accept, or the send queue had no room for")
                 .register(meters);
+        this.messages = messages;
+        this.requestLocale = requestLocale;
     }
 
     private static void requireSet(String value, String what) {
@@ -186,10 +188,8 @@ public class EmailConfirmationService {
     /** Tells the account's address that a password was set, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailPasswordSetNotice(UUID userId, String email) {
-        mailAfterCommit(userId, email, PASSWORD_SET_SUBJECT, "Hello,\n\n"
-                + "A password was just set for your Flow-Cortex account, and every other signed-in session"
-                + " was ended.\n\n"
-                + "If this was not you, contact support right away.\n", "password_set_notice");
+        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordSet.subject"),
+                new LocalizedMessage("email.passwordSet.body"), "password_set_notice");
     }
 
     /**
@@ -221,22 +221,16 @@ public class EmailConfirmationService {
 
     private void mailConfirmationLink(UUID userId, String email) {
         String rawToken = store(userId, EmailLinkPurpose.EMAIL_CONFIRM, properties.validity());
-        long hours = properties.validity().toHours();
-        mailAfterCommit(userId, email, SUBJECT, "Hello,\n\n"
-                + "Confirm your email to finish creating your Flow-Cortex account:\n\n"
-                + publicUrl + "/confirm-email?token=" + rawToken + "\n\n"
-                + "The link works for " + hours + (hours == 1 ? " hour" : " hours") + " and only once. "
-                + "If you did not create an account, you can ignore this email.\n", "sent");
+        mailAfterCommit(userId, email, new LocalizedMessage("email.confirm.subject"),
+                new LocalizedMessage("email.confirm.body", publicUrl + "/confirm-email?token=" + rawToken,
+                        properties.validity().toHours()), "sent");
     }
 
     private void mailPasswordLink(UUID userId, String email) {
         String rawToken = store(userId, EmailLinkPurpose.PASSWORD_LINK, properties.passwordSetupValidity());
-        long minutes = properties.passwordSetupValidity().toMinutes();
-        mailAfterCommit(userId, email, PASSWORD_LINK_SUBJECT, "Hello,\n\n"
-                + "Your Flow-Cortex account has no password yet. Open this link to sign in and choose one:\n\n"
-                + publicUrl + "/set-password?token=" + rawToken + "\n\n"
-                + "The link works for " + minutes + (minutes == 1 ? " minute" : " minutes") + " and only once. "
-                + "If you did not ask for it, you can ignore this email.\n", "password_link_sent");
+        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordLink.subject"),
+                new LocalizedMessage("email.passwordLink.body", publicUrl + "/set-password?token=" + rawToken,
+                        properties.passwordSetupValidity().toMinutes()), "password_link_sent");
     }
 
     private String store(UUID userId, EmailLinkPurpose purpose, Duration validity) {
@@ -247,7 +241,15 @@ public class EmailConfirmationService {
         return rawToken;
     }
 
-    private void mailAfterCommit(UUID userId, String email, String subject, String body, String sentOutcome) {
+    /**
+     * The text is resolved here, on the request's thread: the mail executor runs after the request has
+     * ended, when its language can no longer be read.
+     */
+    private void mailAfterCommit(UUID userId, String email, LocalizedMessage subjectKey, LocalizedMessage bodyKey,
+            String sentOutcome) {
+        Locale locale = requestLocale.current();
+        String subject = messages.getMessage(subjectKey, locale);
+        String body = messages.getMessage(bodyKey, locale);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

@@ -5,16 +5,8 @@ interface LogoProps {
 }
 
 /**
- * Flow-Cortex mark — a brain half wired to a circuit half. The two halves
- * share the same node grid, so the brain side reads as neural pathways and
- * the circuit side as silicon. Teal nodes pulse on a staggered loop, the
- * rest stay steady so the eye follows the activity. Tokens drive every
- * colour so light and dark themes both look balanced.
- *
- * Shared between the member SPA and the admin console (this package is the
- * single source of truth for the mark). Consumer apps must define the four
- * `--logo-stroke-violet / --logo-stroke-teal / --logo-fill-violet /
- * --logo-fill-teal / --logo-glow-1 / --logo-glow-2` tokens.
+ * Decorative Flow-Cortex mark (aria-hidden). Consumer apps must define `--logo-stroke-violet`,
+ * `--logo-stroke-teal`, `--logo-fill-violet`, `--logo-fill-teal`, `--logo-glow-1` and `--logo-glow-2`.
  */
 export function FlowCortexLogo({ size = 34 }: LogoProps) {
   return (

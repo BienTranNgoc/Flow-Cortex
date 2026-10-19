@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Route } from 'react-router-dom';
 import { setToken } from '@flow-cortex/api-client';
+import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { PasswordSetupGate } from './PasswordSetupGate';
 
@@ -58,5 +59,23 @@ describe('PasswordSetupGate', () => {
     renderGated();
 
     expect(await screen.findByText('Workspace')).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('says it is checking the session in Vietnamese while /me is pending', async () => {
+      stubApi({ 'GET /api/v1/auth/me': () => new Promise<never>(() => {}) });
+
+      renderGated();
+
+      expect(await screen.findByText('Đang kiểm tra phiên đăng nhập…')).toBeInTheDocument();
+      expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
+    });
   });
 });

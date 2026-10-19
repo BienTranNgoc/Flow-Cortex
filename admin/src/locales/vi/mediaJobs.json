@@ -1,0 +1,31 @@
+{
+  "title": "Tác vụ media",
+  "noun": "tác vụ media",
+  "columns": {
+    "jobId": "ID tác vụ",
+    "run": "Lượt chạy",
+    "step": "Bước",
+    "capability": "Năng lực",
+    "status": "Trạng thái",
+    "detail": "Chi tiết",
+    "attempt": "Lần thử",
+    "deliveryCount": "Số lần giao",
+    "pickedUp": "Đã nhận lúc",
+    "queueDeadline": "Hạn chờ hàng đợi",
+    "leaseUntil": "Giữ đến",
+    "runDeadline": "Hạn lượt chạy"
+  },
+  "detail": {
+    "queueTimeoutPending": "sắp hết hạn hàng đợi",
+    "waiting": "đang chờ",
+    "runTimeoutPending": "sắp hết hạn lượt chạy",
+    "leaseExpired": "hết hạn giữ tác vụ",
+    "running": "đang chạy"
+  },
+  "status": {
+    "pending": "Chờ xử lý",
+    "running": "Đang chạy",
+    "completed": "Hoàn tất",
+    "error": "Lỗi"
+  }
+}

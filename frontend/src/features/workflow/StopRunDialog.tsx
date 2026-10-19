@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { activeLocale } from '../../lib/i18n';
 import { formatCredits } from '../credits/formatCredits';
 
 interface StopRunDialogProps {
@@ -22,6 +24,7 @@ export function StopRunDialog({
   onKeep,
   onStop,
 }: Readonly<StopRunDialogProps>) {
+  const { t } = useTranslation();
   const titleId = useId();
   const textId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -61,15 +64,13 @@ export function StopRunDialog({
         if (open) onKeep();
       }}
     >
-      <h2 id={titleId}>Stop this workflow?</h2>
-      <p id={textId}>
-        The current step will finish, then the run stops. Remaining steps won&apos;t run and
-        won&apos;t be charged. Results of finished steps are kept.
-      </p>
+      <h2 id={titleId}>{t('workflow.stop.title')}</h2>
+      <p id={textId}>{t('workflow.stop.text')}</p>
       {typeof chargedCredits === 'number' && (
         <p className="stop-run-charged">
-          Charged for this run so far: {formatCredits(chargedCredits)}{' '}
-          {chargedCredits === 1 ? 'credit' : 'credits'}
+          {t(chargedCredits === 1 ? 'credits.chargedSoFarOne' : 'credits.chargedSoFarOther', {
+            amount: formatCredits(chargedCredits, activeLocale()),
+          })}
         </p>
       )}
       <div className="stop-run-actions">
@@ -81,7 +82,7 @@ export function StopRunDialog({
           }}
           aria-disabled={stopping}
         >
-          Keep running
+          {t('workflow.stop.keep')}
         </button>
         <button
           type="button"
@@ -92,7 +93,7 @@ export function StopRunDialog({
           aria-disabled={stopping}
           aria-busy={stopping}
         >
-          {stopping ? 'Stopping…' : 'Stop'}
+          {stopping ? t('workflow.stop.stopping') : t('workflow.stop.confirm')}
         </button>
       </div>
     </dialog>

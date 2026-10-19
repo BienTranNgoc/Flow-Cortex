@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocaleConfig;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthSession;
@@ -38,6 +39,7 @@ import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +47,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -126,7 +130,11 @@ class AuthServiceImplTest {
                 "127.0.0.1", "ua"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-                    assertThat(e.getReason()).isEqualTo("Self-registration is not available");
+                    try (AnnotationConfigApplicationContext messages =
+                            new AnnotationConfigApplicationContext(LocaleConfig.class)) {
+                        assertThat(messages.getMessage(e.getDetailMessageCode(), e.getDetailMessageArguments(),
+                                Locale.ENGLISH)).isEqualTo("Self-registration is not available");
+                    }
                 });
         verify(repository, never()).saveAndFlush(any());
         verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
@@ -423,7 +431,8 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service(OWNER_EMAIL, true).register("person@example.com", "other-password-1", "A",
                 "B", null, false, "127.0.0.1", "ua"))
-                .isInstanceOf(ConflictException.class).hasMessage("An account with this email already exists");
+                .isInstanceOfSatisfying(ConflictException.class,
+                        e -> assertThat(english(e.getDetail())).isEqualTo("An account with this email already exists"));
 
         assertThat(confirmed.getPasswordHash()).isEqualTo(hash);
         verify(repository, never()).saveAndFlush(any());
@@ -456,8 +465,8 @@ class AuthServiceImplTest {
         when(emailConfirmation.confirm("raw-token")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.confirmEmail("raw-token", "127.0.0.1", "ua"))
-                .isInstanceOf(UnprocessableEntityException.class)
-                .hasMessage("This confirmation link is no longer valid");
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(english(e.getDetail())).isEqualTo("This confirmation link is no longer valid"));
 
         verifyNoInteractions(refreshTokenService, events);
     }
@@ -496,8 +505,8 @@ class AuthServiceImplTest {
         when(emailConfirmation.openPasswordLink("raw-link")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.openPasswordLink("raw-link", "127.0.0.1", "ua"))
-                .isInstanceOf(UnprocessableEntityException.class)
-                .hasMessage("This set-password link is no longer valid");
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(english(e.getDetail())).isEqualTo("This set-password link is no longer valid"));
 
         verifyNoInteractions(refreshTokenService);
     }
@@ -533,8 +542,8 @@ class AuthServiceImplTest {
         when(emailConfirmation.spendPasswordSetupToken(user.getId(), "stolen-or-stale")).thenReturn(false);
 
         assertThatThrownBy(() -> service.setPassword(user.getId(), setup("stolen-or-stale"), "127.0.0.1", "ua"))
-                .isInstanceOf(UnprocessableEntityException.class)
-                .hasMessage("This password setup has expired; ask for a new set-password link");
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(english(e.getDetail()))
+                        .isEqualTo("This password setup has expired; ask for a new set-password link"));
 
         assertThat(user.hasPassword()).isFalse();
         assertThat(user.getName()).isEqualTo("P");
@@ -565,7 +574,8 @@ class AuthServiceImplTest {
         when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.setPassword(user.getId(), setup("setup-token"), "127.0.0.1", "ua"))
-                .isInstanceOf(ConflictException.class).hasMessage("This account already has a password");
+                .isInstanceOfSatisfying(ConflictException.class,
+                        e -> assertThat(english(e.getDetail())).isEqualTo("This account already has a password"));
 
         assertThat(user.getPasswordHash()).isEqualTo(hash);
         verify(audit, never()).write(eq(AuthEventType.PASSWORD_SET), any(), any(), any(), any());
@@ -922,5 +932,11 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service.updateOwnProfile(id, "New Name"))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    private static String english(MessageSourceResolvable message) {
+        try (AnnotationConfigApplicationContext messages = new AnnotationConfigApplicationContext(LocaleConfig.class)) {
+            return messages.getMessage(message, Locale.ENGLISH);
+        }
     }
 }

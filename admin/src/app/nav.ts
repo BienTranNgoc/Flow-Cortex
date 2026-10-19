@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { can, type Action } from './permissions';
 
+/** `label` and `tag` are i18n keys; the sidebar translates them. */
 export interface NavItem {
   label: string;
   path: string;
@@ -26,16 +27,20 @@ export interface NavItem {
 }
 
 export interface NavGroup {
+  id: string;
   label: string;
   items: NavItem[];
 }
 
+const COMING_SOON = 'common.shell.nav.comingSoon';
+
 export const NAV: NavGroup[] = [
   {
-    label: 'Overview',
+    id: 'overview',
+    label: 'common.shell.nav.groups.overview',
     items: [
       {
-        label: 'Dashboard',
+        label: 'common.shell.nav.items.dashboard',
         path: '/dashboard',
         icon: LayoutDashboard,
         action: 'runs.view',
@@ -43,90 +48,104 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Workflow Ops',
+    id: 'workflow-ops',
+    label: 'common.shell.nav.groups.workflowOps',
     items: [
       {
-        label: 'Workflows & Templates',
+        label: 'common.shell.nav.items.workflows',
         path: '/workflows',
         icon: Boxes,
         action: 'workflows.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
-      { label: 'Runs', path: '/runs', icon: Play, action: 'runs.view' },
+      { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, action: 'runs.view' },
       {
-        label: 'Approval Queue',
+        label: 'common.shell.nav.items.approvals',
         path: '/approvals',
         icon: ListChecks,
         action: 'approvals.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
     ],
   },
   {
-    label: 'Credits & Billing',
+    id: 'credits-billing',
+    label: 'common.shell.nav.groups.creditsBilling',
     items: [
       {
-        label: 'Credits & Wallets',
+        label: 'common.shell.nav.items.credits',
         path: '/credits',
         icon: Coins,
         action: 'credits.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
       {
-        label: 'Model Providers',
+        label: 'common.shell.nav.items.providers',
         path: '/providers',
         icon: Cpu,
         action: 'providers.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
     ],
   },
   {
-    label: 'Administration',
+    id: 'administration',
+    label: 'common.shell.nav.groups.administration',
     items: [
-      { label: 'Users', path: '/users', icon: Users, action: 'users.manage' },
-      { label: 'SMS Outbox', path: '/sms-outbox', icon: MessageSquare, action: 'users.manage' },
+      { label: 'common.shell.nav.items.users', path: '/users', icon: Users, action: 'users.manage' },
       {
-        label: 'Feature Switches',
+        label: 'common.shell.nav.items.smsOutbox',
+        path: '/sms-outbox',
+        icon: MessageSquare,
+        action: 'users.manage',
+      },
+      {
+        label: 'common.shell.nav.items.features',
         path: '/features',
         icon: Settings2,
         action: 'features.toggle',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
       {
-        label: 'Audit Log',
+        label: 'common.shell.nav.items.auditLog',
         path: '/audit',
         icon: ClipboardList,
         action: 'audit.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
     ],
   },
   {
-    label: 'System',
+    id: 'system',
+    label: 'common.shell.nav.groups.system',
     items: [
-      { label: 'Media Jobs', path: '/media-jobs', icon: Activity, action: 'mediaJobs.view' },
       {
-        label: 'Voice Quota',
+        label: 'common.shell.nav.items.mediaJobs',
+        path: '/media-jobs',
+        icon: Activity,
+        action: 'mediaJobs.view',
+      },
+      {
+        label: 'common.shell.nav.items.voiceQuota',
         path: '/voice-quota',
         icon: AudioWaveform,
         action: 'voice.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
       {
-        label: 'Health',
+        label: 'common.shell.nav.items.health',
         path: '/health',
         icon: ShieldCheck,
         action: 'health.view',
         disabled: true,
-        tag: 'Coming soon',
+        tag: COMING_SOON,
       },
     ],
   },

@@ -3,6 +3,7 @@ import { setClientId } from './clientId';
 import { ensureSession } from './session';
 import { login, logout, me } from './generated/flowCortexApi';
 import { getToken, setToken } from './tokenStore';
+import { setLocaleProvider } from './locale';
 
 const PERSISTENT_KEY = 'flowcortex.auth.token';
 const SESSION_KEY = 'flowcortex.auth.sessionToken';
@@ -12,6 +13,7 @@ interface Call {
   method: string;
   authorization: string | null;
   client: string | null;
+  language: string | null;
 }
 
 /** Stubs `fetch`; `answer` decides each reply from the request path and the bearer it carried. */
@@ -25,6 +27,7 @@ function stubFetch(answer: (call: Call) => Response | Promise<Response>): Call[]
         method: init?.method ?? 'GET',
         authorization: new Headers(init?.headers).get('Authorization'),
         client: new Headers(init?.headers).get('X-FlowCortex-Client'),
+        language: new Headers(init?.headers).get('Accept-Language'),
       };
       calls.push(call);
       return answer(call);
@@ -171,6 +174,36 @@ describe('customFetch', () => {
       await ensureSession();
 
       expect(refreshCalls(calls).map((c) => c.client)).toEqual(['admin']);
+    });
+  });
+
+  describe('active language', () => {
+    afterEach(() => setLocaleProvider(() => null));
+
+    it('sends the provider language on the first request, the refresh and the replay', async () => {
+      setLocaleProvider(() => 'en');
+      setToken('old', true);
+      const calls = stubFetch((call) => {
+        if (call.path === '/api/v1/auth/refresh') return json(200, { accessToken: 'new', expiresIn: 900 });
+        return call.authorization === 'Bearer new' ? json(200, {}) : json(401, {});
+      });
+
+      await unwrap(me(authHeaders()));
+
+      expect(calls.map((c) => [c.path, c.authorization, c.language])).toEqual([
+        ['/api/v1/auth/me', 'Bearer old', 'en'],
+        ['/api/v1/auth/refresh', null, 'en'],
+        ['/api/v1/auth/me', 'Bearer new', 'en'],
+      ]);
+    });
+
+    it('sends no language header when the provider has none', async () => {
+      setLocaleProvider(() => null);
+      const calls = stubFetch(() => json(200, {}));
+
+      await me();
+
+      expect(calls.map((c) => c.language)).toEqual([null]);
     });
   });
 

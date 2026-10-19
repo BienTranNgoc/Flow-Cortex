@@ -2,6 +2,8 @@ package com.flowcortex.workflow.web;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadGrant;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import jakarta.validation.Valid;
@@ -21,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * {@code POST /api/v1/uploads} — a presigned PUT for one media file, keyed under the caller. The
@@ -45,7 +46,7 @@ class UploadsController {
             @Valid @RequestBody UploadRequest request) {
         UUID callerId = currentUserResolver.require(jwt);
         if (!mediaJobs.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
         UploadGrant grant = mediaJobs.prepareUpload(callerId, request.fileName(), request.size());
         return ResponseEntity.status(HttpStatus.CREATED).body(UploadResponse.from(grant));

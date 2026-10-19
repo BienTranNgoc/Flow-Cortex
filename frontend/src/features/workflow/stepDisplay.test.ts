@@ -1,4 +1,5 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
+import i18n from '../../lib/i18n';
 import {
   choiceTakenBack,
   defaultStep,
@@ -11,6 +12,7 @@ import {
   formatTime,
   type StepChoice,
 } from './stepDisplay';
+import { outputFields } from './stepOutputFields';
 
 function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
   return {
@@ -42,7 +44,7 @@ describe('stepLabel', () => {
     ['APPROVAL_CHECKPOINT', 2, 'Review'],
     ['echo', 3, 'Step 3'],
   ])('names type %s at order %i "%s"', (type, stepOrder, label) => {
-    expect(stepLabel(step({ type, stepOrder }))).toBe(label);
+    expect(stepLabel(step({ type, stepOrder }), i18n.getFixedT('en'))).toBe(label);
   });
 });
 
@@ -248,12 +250,14 @@ describe('selectedStep', () => {
 });
 
 describe('stepDuration', () => {
+  const en = i18n.getFixedT('en');
+
   it('calculates duration from startedAt and finishedAt', () => {
     const s = step({
       startedAt: '2026-10-17T10:00:00.000Z',
       finishedAt: '2026-10-17T10:00:11.300Z',
     });
-    expect(stepDuration(s)).toBe('11.3s');
+    expect(stepDuration(s, en, 'en')).toBe('11.3s');
   });
 
   it('formats minutes and seconds when duration exceeds 60s', () => {
@@ -261,38 +265,60 @@ describe('stepDuration', () => {
       startedAt: '2026-10-17T10:00:00.000Z',
       finishedAt: '2026-10-17T10:01:25.000Z',
     });
-    expect(stepDuration(s)).toBe('1m 25s');
+    expect(stepDuration(s, en, 'en')).toBe('1m 25s');
   });
 
   it('falls back to durationMs in output report', () => {
     const s = step({ output: '{"durationMs": 4200}' });
-    expect(stepDuration(s)).toBe('4.2s');
+    expect(stepDuration(s, en, 'en')).toBe('4.2s');
   });
 
   it('falls back to durationSeconds in output report', () => {
     const s = step({ output: '{"durationSeconds": 10}' });
-    expect(stepDuration(s)).toBe('10s');
+    expect(stepDuration(s, en, 'en')).toBe('10s');
   });
 
   it('falls back to duration string in output report', () => {
     const s = step({ output: '{"duration": "11.3 s"}' });
-    expect(stepDuration(s)).toBe('11.3 s');
+    expect(stepDuration(s, en, 'en')).toBe('11.3 s');
   });
 
   it('returns null when no timing or duration is available', () => {
-    expect(stepDuration(step())).toBeNull();
+    expect(stepDuration(step(), en, 'en')).toBeNull();
+  });
+
+  it('writes durations and sizes with Vietnamese units and a comma decimal in vi', () => {
+    const vi = i18n.getFixedT('vi');
+    const timed = (seconds: string) =>
+      step({ startedAt: '2026-10-17T10:00:00.000Z', finishedAt: `2026-10-17T10:${seconds}Z` });
+
+    expect(stepDuration(timed('00:11.300'), vi, 'vi')).toBe('11,3 giây');
+    expect(stepDuration(timed('01:25.000'), vi, 'vi')).toBe('1 phút 25 giây');
+    expect(outputFields({ durationMs: 11300, sourceBytes: 12.3 * 1024 * 1024 }, vi, 'vi')).toEqual([
+      { label: vi('workflow.output.field.duration'), value: '11,3 giây' },
+      { label: 'Source', value: '12,3 MB' },
+    ]);
+  });
+
+  it('groups thousands in vi durations and sizes', () => {
+    const vi = i18n.getFixedT('vi');
+
+    expect(stepDuration(step({ output: '{"durationSeconds": 3600}' }), vi, 'vi')).toBe('3.600 giây');
+    expect(outputFields({ sourceBytes: 1500 * 1024 * 1024 }, vi, 'vi')).toEqual([
+      { label: 'Source', value: '1.500,0 MB' },
+    ]);
   });
 });
 
 describe('formatTime', () => {
   it('formats ISO string to time string', () => {
-    const formatted = formatTime('2026-10-17T10:30:45.000Z');
+    const formatted = formatTime('2026-10-17T10:30:45.000Z', 'en');
     expect(formatted).not.toBeNull();
     expect(formatted).toMatch(/\d{1,2}:\d{2}:\d{2}/);
   });
 
   it('returns null for undefined or invalid input', () => {
-    expect(formatTime(undefined)).toBeNull();
-    expect(formatTime('invalid')).toBeNull();
+    expect(formatTime(undefined, 'en')).toBeNull();
+    expect(formatTime('invalid', 'en')).toBeNull();
   });
 });

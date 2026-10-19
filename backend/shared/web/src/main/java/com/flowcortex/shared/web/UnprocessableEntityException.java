@@ -10,17 +10,24 @@ import java.util.Map;
  */
 public class UnprocessableEntityException extends RuntimeException {
 
+    private final LocalizedMessage detail;
     private final String code;
-    private final Map<String, String> errors;
+    private final Map<String, LocalizedMessage> errors;
 
-    public UnprocessableEntityException(String detail, String code, Map<String, String> errors) {
-        super(detail);
+    public UnprocessableEntityException(LocalizedMessage detail, String code, Map<String, LocalizedMessage> errors) {
+        super(detail.toString());
+        this.detail = detail;
         this.code = code;
         this.errors = errors == null ? Map.of() : Map.copyOf(errors);
     }
 
-    public UnprocessableEntityException(String detail, String code) {
+    public UnprocessableEntityException(LocalizedMessage detail, String code) {
         this(detail, code, Map.of());
+    }
+
+    /** The bundle key for the problem detail. */
+    public LocalizedMessage getDetail() {
+        return detail;
     }
 
     /** The machine code, or {@code null} when the detail alone is the contract. */
@@ -28,7 +35,8 @@ public class UnprocessableEntityException extends RuntimeException {
         return code;
     }
 
-    public Map<String, String> getErrors() {
+    /** Field name to the bundle key of its reason. */
+    public Map<String, LocalizedMessage> getErrors() {
         return errors;
     }
 }

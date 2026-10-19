@@ -1,0 +1,201 @@
+{
+  "errorView": {
+    "title": "Something went wrong",
+    "message": "This page could not be shown. Reload it to try again.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "requestFailed": "Something went wrong. Try again."
+  },
+  "units": {
+    "milliseconds": "{{value}}ms",
+    "secondsShort": "{{value}}s",
+    "seconds": "{{value}} s",
+    "minutes": "{{value}}m",
+    "minutesSeconds": "{{minutes}}m {{seconds}}s",
+    "hours": "{{value}}h",
+    "hoursMinutes": "{{hours}}h {{minutes}}m",
+    "days": "{{value}}d",
+    "megabytes": "{{value}} MB"
+  },
+  "language": {
+    "groupLabel": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "theme": {
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "nav": {
+    "homeLink": "FlowCortex home",
+    "label": "Main navigation",
+    "home": "Home",
+    "workflows": "Workflows",
+    "runs": "Runs",
+    "integrations": "Integrations",
+    "docs": "Docs",
+    "credits": "{{amount}} credits",
+    "signOut": "Sign out"
+  },
+  "userMenu": {
+    "open": "Open account menu",
+    "openFor": "Open account menu for {{email}}",
+    "quotas": "Resource quotas",
+    "gpuMinutes": "GPU minutes",
+    "quotaUsage": "{{used}} / {{total}}",
+    "tokenBalance": "Token balance",
+    "accountSettings": "Account settings",
+    "connectedServices": "Connected services",
+    "helpDocs": "Help & docs",
+    "signingOut": "Signing out…"
+  },
+  "shell": {
+    "brandPanel": {
+      "headline": "Your AI media <highlight>studio</highlight> for production-grade pipelines.",
+      "lede": "Source, process, review and export media in one click — built for creators who need consistent output, not another toy.",
+      "pipelines": "Three production pipelines ready out of the box",
+      "reviewGates": "Human review gates built into every multi-step run",
+      "retention": "Output retention and signed download links by default"
+    },
+    "footer": {
+      "tagline": "AI-powered media pipeline for creators who need consistent output.",
+      "social": "FlowCortex on {{network}}",
+      "copyright": "© {{year}} FlowCortex. All rights reserved."
+    }
+  },
+  "home": {
+    "loading": "Loading…",
+    "loadProfileError": "Could not load your profile.",
+    "retry": "Retry",
+    "eyebrow": "CREATOR LAUNCHPAD · READY TO CREATE",
+    "headline": "<strong>Your AI media</strong> <accent>studio</accent>",
+    "lede": "One click launches a production-ready pipeline: source, process, review, export.",
+    "pickTitle": "Pick a pipeline",
+    "viewAll": "View all workflows",
+    "loadingWorkflows": "Loading workflows…",
+    "loadWorkflowsError": "Could not load workflows.",
+    "noMatch": "No workflows match your filter.",
+    "clearFilters": "Clear filters",
+    "empty": "No workflows available yet.",
+    "stagesTitle": "How Flow-Cortex Handles Your Video Runs",
+    "stages": {
+      "source": {
+        "title": "Source",
+        "body": "Submit a link or upload a media file. Required fields and limits are checked up front."
+      },
+      "process": {
+        "title": "Process",
+        "body": "Workers run each step in order. Status, attempts and errors are saved on every node."
+      },
+      "review": {
+        "title": "Review",
+        "body": "Pauses at the review gates you configured. Edit content, then approve to continue."
+      },
+      "export": {
+        "title": "Export",
+        "body": "Download the finished output while it is still within the asset retention window."
+      }
+    },
+    "welcome": "Welcome, {{name}}",
+    "manageProfile": "Manage your profile"
+  },
+  "docs": {
+    "eyebrow": "DOCUMENTATION",
+    "title": "How FlowCortex works",
+    "subtitle": "Concept guides, walk-throughs and the full HTTP API for the workflows you build.",
+    "sectionsLabel": "Docs sections",
+    "menuHint": "See full API Reference →",
+    "tabs": {
+      "overview": "Overview",
+      "api": "API Reference",
+      "guides": "Guides"
+    },
+    "overview": {
+      "body": "FlowCortex is a runtime for AI workflows: a chain of typed steps that can call a model, wait for a human to approve, render a video, or post to a social account. Every workflow is a graph; every run is a journey through that graph.",
+      "whereToStart": "Where to start",
+      "readGuide": "Read a guided walk-through →",
+      "browseApi": "Browse the HTTP API →",
+      "openEditor": "Open the workflow editor →"
+    },
+    "api": {
+      "intro": "The HTTP API is the same surface the Member and Admin apps use. Tokens come from <code>POST /api/v1/auth/login</code> and are sent as <code>Authorization: Bearer …</code> on every request.",
+      "authentication": "Authentication",
+      "workflows": "Workflows",
+      "listWorkflows": "— list the workflows you can run.",
+      "startRun": "— start a new run.",
+      "readRun": "— read the current state of a run.",
+      "listReviewTasks": "— list the approval checkpoints still open.",
+      "schemaHint": "The full schema is published as <code>docs/openapi.yaml</code> and generated into the API client at<code> packages/api-client</code>. Use the generated types in your own app code."
+    },
+    "guides": {
+      "firstRun": "<strong>Run your first pipeline.</strong> Open <homeLink>Home</homeLink>, pick a template, send the input and watch the run update step by step.",
+      "approveOnRuns": "<strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays <em>Waiting for review</em> on the <runsLink>Runs</runsLink> page until you act.",
+      "approveOnRun": "<strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays <em>Waiting for review</em> on the run page until you act.",
+      "byoProvider": "<strong>Bring your own AI provider.</strong> Add a key on the <integrationsLink>Integrations</integrationsLink> page; any workflow that needs that model will pick it up automatically."
+    }
+  },
+  "runs": {
+    "eyebrow": "RUN HISTORY",
+    "title": "Recent runs",
+    "subtitle": "Track every pipeline you started: what is running, what needs your review, and what failed.",
+    "searchPlaceholder": "Search by workflow name…",
+    "searchLabel": "Search runs",
+    "filterLegend": "Filter by status",
+    "status": {
+      "all": "All",
+      "success": "Succeeded",
+      "failure": "Failed",
+      "waiting": "Waiting for review",
+      "running": "Running"
+    },
+    "trigger": {
+      "label": "Trigger",
+      "manual": "Manual",
+      "webhook": "Webhook",
+      "schedule": "Scheduled"
+    },
+    "empty": "No runs match the current filter.",
+    "runId": "Run ID",
+    "copy": "Copy {{value}}",
+    "started": "Started",
+    "ago": "{{time}} ago",
+    "justNow": "just now",
+    "duration": "Duration",
+    "durationRunning": "{{duration}} · running",
+    "retry": "Retry",
+    "retryNamed": "Retry {{name}}",
+    "viewDetail": "View run detail →",
+    "demoFailure": "Step \"throw\" failed: deliberate failure for testing."
+  },
+  "integrations": {
+    "eyebrow": "CONNECTED SERVICES",
+    "title": "Integrations",
+    "subtitle": "Bring the AI providers and social accounts your workflows depend on. Keys stay on your account and are reused across every run.",
+    "tabsLegend": "Integration categories",
+    "tabs": {
+      "models": "AI providers",
+      "social": "Social accounts"
+    },
+    "category": {
+      "text": "Text LLMs",
+      "media": "Media / Video AI",
+      "audio": "Audio & Voice AI",
+      "social": "Social"
+    },
+    "maskedKey": "API key (masked)",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "reconnectNeeded": "Reconnect needed",
+    "lastUsed": "last used {{when}}",
+    "lastUsedHoursAgo": "2h ago",
+    "lastUsedYesterday": "yesterday",
+    "rotateKey": "Rotate key",
+    "addKey": "Add key",
+    "noHandle": "— not connected —",
+    "manage": "Manage",
+    "connect": "Connect"
+  }
+}

@@ -1,6 +1,7 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { PhoneVerification } from './PhoneVerification';
 import { ProfilePage } from './ProfilePage';
@@ -250,6 +251,42 @@ describe('PhoneVerification', () => {
       await settled(queryClient);
       expect(screen.queryByRole('region', { name: 'Phone number' })).not.toBeInTheDocument();
       expect(calls.some((call) => call.path === '/api/v1/me/phone')).toBe(false);
+    });
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('walks the code step in Vietnamese and words a failed verify with the generic retry message', async () => {
+      stubApi({
+        [PHONE]: UNVERIFIED,
+        [SEND]: SENT,
+        [VERIFY]: () => {
+          throw new TypeError('Failed to fetch');
+        },
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      expect(await screen.findByRole('region', { name: 'Số điện thoại' })).toBeInTheDocument();
+      await user.type(await screen.findByLabelText('Số di động'), '0912345678');
+      await user.click(screen.getByRole('button', { name: 'Gửi mã' }));
+
+      expect(
+        await screen.findByText('Chúng tôi đã gửi mã 6 chữ số đến +84 9•• ••• 678'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Gửi lại sau 1:00')).toBeInTheDocument();
+      await user.type(screen.getByLabelText('Mã 6 chữ số'), '123456');
+      await user.click(screen.getByRole('button', { name: 'Xác minh' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Không thực hiện được yêu cầu. Hãy thử lại.',
+      );
     });
   });
 });

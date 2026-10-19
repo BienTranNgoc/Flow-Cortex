@@ -1,6 +1,8 @@
 package com.flowcortex.user.phone;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.phone.PhoneSendPolicies.Refusal;
 import com.flowcortex.user.phone.PhoneSendPolicies.Verdict;
@@ -18,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class PhoneVerificationService {
 
     static final Duration CODE_TTL = Duration.ofMinutes(5);
-    static final String NUMBER_TAKEN = "This number is already verified on another account";
+    static final LocalizedMessage NUMBER_TAKEN = new LocalizedMessage("phone.numberTaken");
 
     private static final Logger LOG = LoggerFactory.getLogger(PhoneVerificationService.class);
     private static final String LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
@@ -54,6 +57,8 @@ class PhoneVerificationService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final Clock clock;
+    private final MessageSource messages;
+    private final RequestLocale requestLocale;
     private final SecureRandom random = new SecureRandom();
 
     /** Fails startup when the feature is on and no {@link SmsSender} is configured. */
@@ -62,7 +67,10 @@ class PhoneVerificationService {
             @Value("${flowcortex.phone-verification.enabled:false}") boolean enabled,
             PhoneSendAttemptStore attempts, PhoneNumberHasher phoneHasher, PhoneSendIpLimiter ipLimiter,
             PhoneSendLimits limits, PasswordEncoder passwordEncoder, JdbcTemplate jdbc,
-            PlatformTransactionManager transactionManager, Clock clock) {
+            PlatformTransactionManager transactionManager, Clock clock, MessageSource messages,
+            RequestLocale requestLocale) {
+        this.messages = messages;
+        this.requestLocale = requestLocale;
         this.smsSender = smsSenders.getIfAvailable();
         if (enabled && smsSender == null) {
             throw new IllegalStateException("flowcortex.phone-verification.enabled is true but no SMS sender is "
@@ -127,7 +135,8 @@ class PhoneVerificationService {
             String code = String.format("%06d", random.nextInt(1_000_000));
             challenges.save(new PhoneChallenge(UUID.randomUUID(), userId, phone, passwordEncoder.encode(code),
                     now.plus(CODE_TTL), now));
-            sender().send(phone, "Your Flow-Cortex code is " + code + ". It expires in 5 minutes.");
+            sender().send(phone, messages.getMessage(new LocalizedMessage("sms.otp.body", code),
+                    requestLocale.current()));
             pairSends.add(now);
             return new SendResult(null, OtpSendPolicy.decide(pairSends, now).retryAfterSeconds());
         });
@@ -176,12 +185,13 @@ class PhoneVerificationService {
             case VERIFIED -> {
                 return;
             }
-            case WRONG -> throw new UnprocessableEntityException(wrongCode(verification.triesLeft()), "OTP_INVALID");
-            case LOCKED -> throw new UnprocessableEntityException("Too many wrong codes. Request a new one.",
+            case WRONG -> throw new UnprocessableEntityException(
+                    new LocalizedMessage("phone.otp.wrong", verification.triesLeft()), "OTP_INVALID");
+            case LOCKED -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.locked"),
                     "OTP_LOCKED");
-            case EXPIRED -> throw new UnprocessableEntityException("This code has expired. Request a new one.",
+            case EXPIRED -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.expired"),
                     "OTP_EXPIRED");
-            case STALE -> throw new UnprocessableEntityException("This code is no longer valid. Request a new one.",
+            case STALE -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.stale"),
                     "OTP_INVALID");
             case NUMBER_TAKEN -> throw new ConflictException(NUMBER_TAKEN);
             default -> throw new IllegalStateException("Unhandled verification result " + verification.result());
@@ -257,47 +267,43 @@ class PhoneVerificationService {
                 PhoneNumbers.forLog(phone), outcomeOf(verdict.refusal()), seconds);
         return switch (verdict.refusal()) {
             case COUNTRY_NOT_ALLOWED -> new UnprocessableEntityException(
-                    "Codes can't be sent to numbers in this country.", "PHONE_COUNTRY_NOT_ALLOWED");
+                    new LocalizedMessage("phone.send.countryNotAllowed"), "PHONE_COUNTRY_NOT_ALLOWED");
             case NUMBER_TAKEN -> new ConflictException(NUMBER_TAKEN);
             case USER_DAILY_LIMIT -> rateLimited(verdict,
-                    "You've requested too many codes today. Try again in " + waitText(seconds) + ".");
+                    new LocalizedMessage("phone.send.userDailyLimit", waitText(seconds)));
             case USER_NUMBER_LIMIT -> rateLimited(verdict,
-                    "You've tried too many different numbers today. Try again in " + waitText(seconds) + ".");
-            case IP_LIMIT -> rateLimited(verdict,
-                    "Too many code requests from your network. Try again in " + waitText(seconds) + ".");
+                    new LocalizedMessage("phone.send.userNumberLimit", waitText(seconds)));
+            case IP_LIMIT -> rateLimited(verdict, new LocalizedMessage("phone.send.ipLimit", waitText(seconds)));
             case GLOBAL_LIMIT -> rateLimited(verdict,
-                    "Codes can't be sent right now. Try again in " + waitText(seconds) + ".");
+                    new LocalizedMessage("phone.send.globalLimit", waitText(seconds)));
             case NUMBER_LIMIT -> rateLimited(verdict,
-                    "This number has received too many codes today. Try again in " + waitText(seconds) + ".");
-            case COOLDOWN -> rateLimited(verdict, "Wait " + seconds + " seconds before requesting a new code.");
+                    new LocalizedMessage("phone.send.numberLimit", waitText(seconds)));
+            case COOLDOWN -> rateLimited(verdict, new LocalizedMessage("phone.otp.cooldown", seconds));
             case HOURLY_LIMIT -> rateLimited(verdict,
-                    "You've requested too many codes. Try again in " + minutes(seconds) + ".");
-            case DAILY_LIMIT -> rateLimited(verdict,
-                    "You've reached today's limit for this number. Try again tomorrow.");
+                    new LocalizedMessage("phone.otp.hourlyLimit", wholeMinutes(seconds)));
+            case DAILY_LIMIT -> rateLimited(verdict, new LocalizedMessage("phone.otp.dailyLimit"));
         };
     }
 
     /** 429 whose {@code code} is {@code OTP_} plus the refusal name. */
-    private static OtpRateLimitedException rateLimited(Verdict verdict, String detail) {
+    private static OtpRateLimitedException rateLimited(Verdict verdict, LocalizedMessage detail) {
         return new OtpRateLimitedException("OTP_" + verdict.refusal().name(), detail, verdict.retryAfterSeconds());
     }
 
-    private static String minutes(long seconds) {
-        long minutes = Math.max(1, (seconds + 59) / 60);
-        return minutes == 1 ? "1 minute" : minutes + " minutes";
+    private static long wholeMinutes(long seconds) {
+        return Math.max(1, (seconds + 59) / 60);
     }
 
-    /** Minutes up to two hours, whole hours (rounded up) beyond. */
-    private static String waitText(long seconds) {
-        long minutes = Math.max(1, (seconds + 59) / 60);
+    /**
+     * Minutes up to two hours, whole hours (rounded up) beyond; a nested message the bundle resolves
+     * in the same language as the sentence around it.
+     */
+    private static LocalizedMessage waitText(long seconds) {
+        long minutes = wholeMinutes(seconds);
         if (minutes < 120) {
-            return minutes(seconds);
+            return new LocalizedMessage("phone.wait.minutes", minutes);
         }
-        return (minutes + 59) / 60 + " hours";
-    }
-
-    private static String wrongCode(int triesLeft) {
-        return "Wrong code. " + triesLeft + (triesLeft == 1 ? " try left." : " tries left.");
+        return new LocalizedMessage("phone.wait.hours", (minutes + 59) / 60);
     }
 
     private enum Result {

@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import './SearchBar.css';
 
 interface SearchBarProps {
@@ -7,12 +8,13 @@ interface SearchBarProps {
   readonly placeholder?: string;
 }
 
-export function SearchBar({ value, onChange, placeholder = 'Search workflows…' }: Readonly<SearchBarProps>) {
+export function SearchBar({ value, onChange, placeholder }: Readonly<SearchBarProps>) {
+  const { t } = useTranslation();
   const id = useId();
   return (
     <div className="dashboard-search" role="search">
       <label htmlFor={id} className="visually-hidden">
-        Search workflows
+        {t('dashboard.search.label')}
       </label>
       <span className="dashboard-search__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="presentation">
@@ -26,7 +28,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search workflows…'
         className="dashboard-search__input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('dashboard.search.placeholder')}
         autoComplete="off"
         spellCheck={false}
       />
@@ -34,7 +36,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search workflows…'
         <button
           type="button"
           className="dashboard-search__clear"
-          aria-label="Clear search"
+          aria-label={t('dashboard.search.clear')}
           onClick={() => onChange('')}
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="presentation">

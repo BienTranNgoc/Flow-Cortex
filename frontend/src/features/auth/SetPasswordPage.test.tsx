@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
+import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { SetPasswordPage } from './SetPasswordPage';
 
@@ -265,5 +266,54 @@ describe('SetPasswordPage', () => {
     expect(getToken()).toBeNull();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the form and words the password rules in Vietnamese', async () => {
+      setToken('jwt-confirmed', false);
+      const calls = stubApi({ 'PUT /api/v1/me/password': { status: 200, body: {} } });
+      const user = userEvent.setup();
+      renderSetPassword(withSetupToken);
+
+      expect(screen.getByRole('heading', { name: 'Chọn mật khẩu của bạn' })).toBeInTheDocument();
+      expect(screen.getByRole('form', { name: 'Đặt mật khẩu' })).toBeInTheDocument();
+      await user.type(screen.getByLabelText('Tên'), 'Bình');
+      await user.type(screen.getByLabelText('Họ'), 'Lê');
+      await user.type(screen.getByLabelText('Mật khẩu mới'), 'short');
+      await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'other');
+      await user.click(screen.getByRole('button', { name: 'Lưu mật khẩu' }));
+
+      expect(await screen.findByText('Mật khẩu phải có ít nhất 8 ký tự')).toBeInTheDocument();
+      expect(screen.getByText('Mật khẩu xác nhận không khớp, hãy nhập lại')).toBeInTheDocument();
+      expect(calls.filter((call) => call.method === 'PUT')).toEqual([]);
+    });
+
+    it('says a spent link is no longer valid and offers a new one in Vietnamese', async () => {
+      stubApi({
+        'POST /api/v1/auth/password-link': {
+          status: 422,
+          body: { status: 422, code: 'PASSWORD_LINK_INVALID' },
+        },
+      });
+      renderSetPassword('/set-password?token=used-link');
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Liên kết đặt mật khẩu này không còn hiệu lực',
+      );
+      expect(
+        screen.getByRole('button', { name: 'Gửi cho tôi liên kết đặt mật khẩu' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Quay lại đăng nhập' })).toHaveAttribute(
+        'href',
+        '/login',
+      );
+    });
   });
 });

@@ -1,18 +1,13 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { Menu, PanelRight, PanelLeft, X } from 'lucide-react';
 import { NAV } from './nav';
 import { can } from './permissions';
 
 /**
- * Sidebar nav drawn from `NAV`. Each permitted entry links; each disabled entry
- * shows as inert text with a "Coming soon" tag. The shell passes a `collapsed`
- * flag (icon-only, 64px) controlled by the toggle so the user can pin the
- * sidebar as wide or as a rail.
- *
- * Structure (vertical): Header (brand + collapse toggle) → scrollable Content
- * (grouped menu items) → Footer (system status). The collapse toggle floats
- * on the right border so it never overlaps the first item.
+ * Navigation drawn from `NAV`: permitted entries link, disabled ones stay visible but inert.
+ * `collapsed` switches between the full width and the icon-only rail.
  */
 export function Sidebar({
   role,
@@ -20,11 +15,13 @@ export function Sidebar({
   onToggle,
 }: Readonly<{ role: string | undefined; collapsed: boolean; onToggle: () => void }>) {
   const [openMobile, setOpenMobile] = useState(false);
+  const { t } = useTranslation();
   const widthClass = collapsed ? ' cortex-admin-nav--collapsed' : '';
+  const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
 
   return (
     <nav
-      aria-label="Admin navigation"
+      aria-label={t('common.shell.nav.label')}
       className={`cortex-admin-nav${widthClass}`}
     >
       <div className="cortex-admin-nav__header" aria-hidden="true" />
@@ -32,8 +29,8 @@ export function Sidebar({
         type="button"
         className="cortex-admin-nav__collapse-toggle"
         aria-pressed={collapsed}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={collapseLabel}
+        title={collapseLabel}
         onClick={onToggle}
       >
         {collapsed ? (
@@ -50,7 +47,7 @@ export function Sidebar({
         onClick={() => setOpenMobile((value) => !value)}
       >
         {openMobile ? <X aria-hidden="true" size={16} /> : <Menu aria-hidden="true" size={16} />}
-        <span>{openMobile ? 'Hide menu' : 'Menu'}</span>
+        <span>{openMobile ? t('common.shell.nav.hideMenu') : t('common.shell.nav.menu')}</span>
       </button>
       <div
         id="cortex-admin-nav-groups"
@@ -65,34 +62,34 @@ export function Sidebar({
           if (items.length === 0) {
             return null;
           }
-          const labelId = `cortex-admin-nav-group-${group.label
-            .toLowerCase()
-            .replace(/\s+/g, '-')}`;
+          const labelId = `cortex-admin-nav-group-${group.id}`;
           return (
-            <div key={group.label} className="cortex-admin-nav__group">
+            <div key={group.id} className="cortex-admin-nav__group">
               <p id={labelId} className="cortex-admin-nav__group-label">
-                {group.label}
+                {t(group.label)}
               </p>
               <ul className="cortex-admin-nav__list" aria-labelledby={labelId}>
                 {items.map((item) => {
                   const Icon = item.icon;
+                  const label = t(item.label);
                   if (item.disabled) {
+                    const tag = t(item.tag ?? 'common.shell.nav.comingSoon');
                     return (
                       <li key={item.path}>
                         <span
                           className="cortex-admin-nav__item"
                           aria-disabled="true"
-                          data-tag={item.tag ?? 'Coming soon'}
-                          title={`${item.label} — ${item.tag ?? 'Coming soon'}`}
+                          data-tag={tag}
+                          title={t('common.shell.nav.disabledTitle', { label, tag })}
                         >
                           <span className="cortex-admin-nav__item-icon" aria-hidden="true">
                             <Icon size={18} />
                           </span>
-                          <span className="cortex-admin-nav__item-label">{item.label}</span>
-                          <span className="cortex-admin-nav__item-tag">
-                            {item.tag ?? 'Coming soon'}
+                          <span className="cortex-admin-nav__item-label">{label}</span>
+                          <span className="cortex-admin-nav__item-tag">{tag}</span>
+                          <span className="cortex-admin-nav__visually-hidden">
+                            {t('common.shell.nav.unavailable')}
                           </span>
-                          <span className="cortex-admin-nav__visually-hidden">unavailable</span>
                         </span>
                       </li>
                     );
@@ -107,12 +104,12 @@ export function Sidebar({
                             : 'cortex-admin-nav__item'
                         }
                         onClick={() => setOpenMobile(false)}
-                        title={item.label}
+                        title={label}
                       >
                         <span className="cortex-admin-nav__item-icon" aria-hidden="true">
                           <Icon size={18} />
                         </span>
-                        <span className="cortex-admin-nav__item-label">{item.label}</span>
+                        <span className="cortex-admin-nav__item-label">{label}</span>
                       </NavLink>
                     </li>
                   );
@@ -127,7 +124,7 @@ export function Sidebar({
           <span className="cortex-admin-nav__status-dot" />
         </span>
         {!collapsed && (
-          <span className="cortex-admin-nav__status-text">All systems normal</span>
+          <span className="cortex-admin-nav__status-text">{t('common.shell.nav.systemStatus')}</span>
         )}
       </div>
     </nav>

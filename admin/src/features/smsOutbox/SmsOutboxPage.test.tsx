@@ -1,6 +1,10 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { formatDateTime } from '../../lib/format';
+import i18n from '../../lib/i18n';
+import viCommon from '../../locales/vi/common.json';
+import viSmsOutbox from '../../locales/vi/smsOutbox.json';
 import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { SmsOutboxPage } from './SmsOutboxPage';
 
@@ -88,5 +92,55 @@ describe('SmsOutboxPage', () => {
     renderRoute('/sms-outbox', '/sms-outbox', <SmsOutboxPage />);
 
     await waitFor(() => expect(document.title).toBe('SMS outbox · Flow-Cortex Admin'));
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the page in Vietnamese, formats the sent time and keeps the message text as sent', async () => {
+      stubApi({
+        [OUTBOX_PATH]: {
+          status: 200,
+          body: [entry('s1', '+84912345678', 'Your Flow-Cortex code is 123456', '2026-10-16T10:00:00Z')],
+        },
+      });
+      renderRoute('/sms-outbox', '/sms-outbox', <SmsOutboxPage />);
+
+      const table = await screen.findByRole('table');
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(viSmsOutbox.title);
+      expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+        viSmsOutbox.columns.number,
+        viSmsOutbox.columns.text,
+        viSmsOutbox.columns.sent,
+      ]);
+      expect(screen.getByRole('button', { name: viCommon.shell.list.refresh })).toBeInTheDocument();
+      const row = within(table).getAllByRole('row')[1] as HTMLElement;
+      expect(row).toHaveTextContent('Your Flow-Cortex code is 123456');
+      expect(within(row).getByText(/./, { selector: 'time' })).toHaveTextContent(
+        formatDateTime('2026-10-16T10:00:00Z', 'vi', {
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          second: 'numeric',
+        }),
+      );
+      await waitFor(() =>
+        expect(document.title).toBe(`${viSmsOutbox.title} · ${viCommon.header.title}`),
+      );
+    });
+
+    it('shows the empty state in Vietnamese', async () => {
+      stubApi({ [OUTBOX_PATH]: { status: 200, body: [] } });
+      renderRoute('/sms-outbox', '/sms-outbox', <SmsOutboxPage />);
+
+      expect(await screen.findByText(viSmsOutbox.empty)).toBeInTheDocument();
+    });
   });
 });

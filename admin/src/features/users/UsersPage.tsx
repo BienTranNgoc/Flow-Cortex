@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import { Plus, RefreshCw } from 'lucide-react';
 import { UserRow } from './UserRow';
@@ -9,12 +10,16 @@ import { usePageTitle } from '../../app/usePageTitle';
 import { PageHeading } from '../../app/PageHeading';
 import { MetricCard } from '../../app/MetricCard';
 import { EmptyState } from '../../app/EmptyState';
+import { formatNumber } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
 
 const EMPTY_USERS: NonNullable<ReturnType<typeof useUsersQuery>['data']> = [];
 
 export function UsersPage() {
-  usePageTitle('Users');
+  const { t } = useTranslation();
+  const locale = activeLocale();
+  usePageTitle(t('users.title'));
   const usersQuery = useUsersQuery();
   const createMutation = useCreateUserMutation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -65,9 +70,9 @@ export function UsersPage() {
   return (
     <div className="cortex-admin-users">
       <PageHeading
-        eyebrow="Administration"
-        title="Users"
-        description="Manage account access and roles. Account history is preserved when access is suspended."
+        eyebrow={t('users.eyebrow')}
+        title={t('users.title')}
+        description={t('users.description')}
         actions={
           <>
             <button
@@ -77,7 +82,11 @@ export function UsersPage() {
               disabled={usersQuery.isFetching}
             >
               <RefreshCw size={16} aria-hidden="true" />
-              <span>{usersQuery.isFetching ? 'Refreshing…' : 'Refresh'}</span>
+              <span>
+                {usersQuery.isFetching
+                  ? t('users.directory.refreshing')
+                  : t('users.directory.refresh')}
+              </span>
             </button>
             <button
               type="button"
@@ -85,24 +94,30 @@ export function UsersPage() {
               onClick={() => setShowCreateForm((open) => !open)}
             >
               <Plus size={16} aria-hidden="true" />
-              <span>{showCreateForm ? 'Cancel' : 'Add user'}</span>
+              <span>{showCreateForm ? t('users.cancel') : t('users.addUser')}</span>
             </button>
           </>
         }
       />
 
       {usersQuery.data && (
-        <section className="cortex-admin-metric-grid" aria-label="User statistics">
-          <MetricCard label="Total users" value={users.length} />
+        <section className="cortex-admin-metric-grid" aria-label={t('users.stats.label')}>
+          <MetricCard label={t('users.stats.total')} value={formatNumber(users.length, locale)} />
           <MetricCard
-            label="Active"
-            value={users.filter((user) => user.status === 'ACTIVE').length}
+            label={t('users.stats.active')}
+            value={formatNumber(users.filter((user) => user.status === 'ACTIVE').length, locale)}
           />
           <MetricCard
-            label="Suspended"
-            value={users.filter((user) => user.status === 'SUSPENDED').length}
+            label={t('users.stats.suspended')}
+            value={formatNumber(
+              users.filter((user) => user.status === 'SUSPENDED').length,
+              locale,
+            )}
           />
-          <MetricCard label="New in 7 days" value={newThisWeek} />
+          <MetricCard
+            label={t('users.stats.newThisWeek')}
+            value={formatNumber(newThisWeek, locale)}
+          />
         </section>
       )}
 
@@ -111,133 +126,148 @@ export function UsersPage() {
           className="cortex-admin-panel"
           onSubmit={onCreate}
           noValidate
-          aria-label="Add user"
+          aria-label={t('users.create.form')}
         >
           <header className="cortex-admin-section-heading">
             <div>
-              <h2>Create user</h2>
-              <p>Sets the initial password and role. The user can change both later.</p>
+              <h2>{t('users.create.title')}</h2>
+              <p>{t('users.create.hint')}</p>
             </div>
           </header>
           <div className="cortex-admin-field">
-            <label htmlFor="new-user-email">Email</label>
+            <label htmlFor="new-user-email">{t('users.create.email')}</label>
             <input id="new-user-email" type="email" autoComplete="off" {...register('email')} />
-            {errors.email && (
-              <p className="cortex-admin-form-error" role="alert">{errors.email.message}</p>
+            {errors.email?.message && (
+              <p className="cortex-admin-form-error" role="alert">
+                {t(errors.email.message)}
+              </p>
             )}
             {createError?.errors?.email && (
-              <p className="cortex-admin-form-error" role="alert">{createError.errors.email}</p>
+              <p className="cortex-admin-form-error" role="alert">
+                {createError.errors.email}
+              </p>
             )}
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="new-user-password">Password</label>
+            <label htmlFor="new-user-password">{t('users.create.password')}</label>
             <input
               id="new-user-password"
               type="password"
               autoComplete="new-password"
               {...register('password')}
             />
-            {errors.password && (
-              <p className="cortex-admin-form-error" role="alert">{errors.password.message}</p>
+            {errors.password?.message && (
+              <p className="cortex-admin-form-error" role="alert">
+                {t(errors.password.message)}
+              </p>
             )}
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="new-user-name">Name</label>
+            <label htmlFor="new-user-name">{t('users.create.name')}</label>
             <input id="new-user-name" {...register('name')} />
-            {errors.name && (
-              <p className="cortex-admin-form-error" role="alert">{errors.name.message}</p>
+            {errors.name?.message && (
+              <p className="cortex-admin-form-error" role="alert">
+                {t(errors.name.message)}
+              </p>
             )}
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="new-user-role">Role</label>
+            <label htmlFor="new-user-role">{t('users.create.role')}</label>
             <select id="new-user-role" {...register('role')}>
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
             </select>
           </div>
           {createError && !createError.errors && (
-            <p className="cortex-admin-form-error" role="alert">{createError.detail}</p>
+            <p className="cortex-admin-form-error" role="alert">
+              {createError.detail}
+            </p>
           )}
           <button
             type="submit"
             className="cortex-admin-btn cortex-admin-btn--primary"
             disabled={createMutation.isPending}
           >
-            {createMutation.isPending ? 'Creating…' : 'Create user'}
+            {createMutation.isPending ? t('users.create.submitting') : t('users.create.submit')}
           </button>
         </form>
       )}
 
-      <section className="cortex-admin-panel" aria-label="User directory">
+      <section className="cortex-admin-panel" aria-label={t('users.directory.label')}>
         <header className="cortex-admin-section-heading">
           <div>
-            <h2>All users</h2>
+            <h2>{t('users.directory.title')}</h2>
             {usersQuery.data && (
               <p>
-                Showing {visibleUsers.length} of {users.length} accounts
+                {t('users.directory.count', {
+                  visible: formatNumber(visibleUsers.length, locale),
+                  total: formatNumber(users.length, locale),
+                })}
               </p>
             )}
           </div>
         </header>
         <div className="cortex-admin-filters">
           <div className="cortex-admin-field">
-            <label htmlFor="users-search">Search</label>
+            <label htmlFor="users-search">{t('users.directory.search')}</label>
             <input
               id="users-search"
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name or email"
+              placeholder={t('users.directory.searchPlaceholder')}
             />
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="users-status">Status</label>
+            <label htmlFor="users-status">{t('users.directory.status')}</label>
             <select
               id="users-status"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="">{t('users.directory.allStatuses')}</option>
+              <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
+              <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
             </select>
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="users-role">Role</label>
+            <label htmlFor="users-role">{t('users.directory.role')}</label>
             <select
               id="users-role"
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value)}
             >
-              <option value="">All roles</option>
-              <option value="ADMIN">Admin</option>
-              <option value="MEMBER">Member</option>
-              <option value="CREATOR">Creator</option>
+              <option value="">{t('users.directory.allRoles')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
             </select>
           </div>
         </div>
-        {usersQuery.isLoading && <output className="cortex-admin-loading">Loading users…</output>}
+        {usersQuery.isLoading && (
+          <output className="cortex-admin-loading">{t('users.directory.loading')}</output>
+        )}
         {usersQuery.isError && (
           <div className="cortex-admin-error" role="alert">
-            <p>Could not load users.</p>
+            <p>{t('users.directory.loadError')}</p>
             <button
               type="button"
               className="cortex-admin-btn"
               onClick={() => usersQuery.refetch()}
             >
-              Retry
+              {t('users.directory.retry')}
             </button>
           </div>
         )}
         {usersQuery.data?.length === 0 && (
           <EmptyState
-            title="No users yet."
-            description="Add the first admin or member above."
+            title={t('users.directory.empty')}
+            description={t('users.directory.emptyHint')}
           />
         )}
         {usersQuery.data && users.length > 0 && visibleUsers.length === 0 && (
           <EmptyState
-            title="No users match these filters."
+            title={t('users.directory.noMatch')}
             action={
               <button
                 type="button"
@@ -248,7 +278,7 @@ export function UsersPage() {
                   setRoleFilter('');
                 }}
               >
-                Clear filters
+                {t('users.directory.clearFilters')}
               </button>
             }
           />
@@ -258,12 +288,12 @@ export function UsersPage() {
             <table className="cortex-admin-table">
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Joined</th>
-                  <th scope="col">Actions</th>
+                  <th scope="col">{t('users.columns.name')}</th>
+                  <th scope="col">{t('users.columns.email')}</th>
+                  <th scope="col">{t('users.columns.role')}</th>
+                  <th scope="col">{t('users.columns.status')}</th>
+                  <th scope="col">{t('users.columns.joined')}</th>
+                  <th scope="col">{t('users.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>

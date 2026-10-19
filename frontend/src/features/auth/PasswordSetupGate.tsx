@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { useMeQuery } from './useAuth';
 
@@ -8,10 +9,11 @@ import { useMeQuery } from './useAuth';
  * page through; the page reports its own errors.
  */
 export function PasswordSetupGate({ children }: Readonly<{ children: ReactNode }>) {
+  const { t } = useTranslation();
   const me = useMeQuery();
 
   if (me.isPending) {
-    return <output>Checking your session…</output>;
+    return <output>{t('auth.session.checking')}</output>;
   }
   if (me.data?.passwordSetupRequired) {
     return <Navigate to="/set-password" replace />;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
 import { isLostRace } from './lostRace';
 import { useSaveRevisionMutation } from './useWorkflows';
@@ -32,6 +33,7 @@ export function ScriptEditor({
   revisions,
   onApprovalBlockedChange,
 }: Readonly<ScriptEditorProps>) {
+  const { t } = useTranslation();
   const latest = revisions.at(-1);
   const saved = latest?.content ?? '';
   const [draft, setDraft] = useState(saved);
@@ -58,7 +60,7 @@ export function ScriptEditor({
     <div className="script-editor">
       <RevisionHistory revisions={revisions} approvedRevisionId={task.approvedRevisionId} />
       <div className="field">
-        <label htmlFor="script-draft">Script to approve</label>
+        <label htmlFor="script-draft">{t('workflow.script.label')}</label>
         <textarea
           id="script-draft"
           rows={6}
@@ -70,8 +72,7 @@ export function ScriptEditor({
         <div aria-live="polite">
           {tooLong && (
             <p id="script-length-warning" className="field-hint">
-              This script is likely longer than the 10-second video. Keep it to about{' '}
-              {MAX_SCRIPT_WORDS} words — a voice-over longer than 10 seconds stops the run.
+              {t('workflow.script.tooLong', { max: MAX_SCRIPT_WORDS })}
             </p>
           )}
         </div>
@@ -85,14 +86,14 @@ export function ScriptEditor({
         disabled={!dirty || save.isPending || task.version === undefined}
         aria-busy={save.isPending}
       >
-        {save.isPending ? 'Saving…' : 'Save revision'}
+        {save.isPending ? t('workflow.script.saving') : t('workflow.script.save')}
       </button>
-      {dirty && <p className="field-hint">Unsaved changes — save a revision before approving.</p>}
+      {dirty && <p className="field-hint">{t('workflow.script.unsaved')}</p>}
       {save.isError && (
         <p role="alert" className="approval-error">
           {isLostRace(save.error)
-            ? 'This script moved on in another tab. Reload the page to see the latest revision.'
-            : 'Could not save this revision'}
+            ? t('workflow.approval.scriptMovedOn')
+            : t('workflow.script.saveFailed')}
         </p>
       )}
     </div>
@@ -104,6 +105,7 @@ export function ScriptEditor({
  * closed by accident would otherwise lose the text with no trace and no way to recover it.
  */
 function useWarnOnUnsavedChanges(dirty: boolean) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!dirty) {
       return;
@@ -129,7 +131,7 @@ function useWarnOnUnsavedChanges(dirty: boolean) {
       if (destination.origin !== window.location.origin) {
         return;
       }
-      if (!window.confirm('You have unsaved script changes. Leave this page?')) {
+      if (!window.confirm(t('workflow.script.leaveConfirm'))) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -140,7 +142,7 @@ function useWarnOnUnsavedChanges(dirty: boolean) {
       window.removeEventListener('beforeunload', warn);
       document.removeEventListener('click', warnForInternalLink, true);
     };
-  }, [dirty]);
+  }, [dirty, t]);
 }
 
 function RevisionHistory({
@@ -150,16 +152,19 @@ function RevisionHistory({
   revisions: ScriptRevisionResponse[];
   approvedRevisionId: string | undefined;
 }>) {
+  const { t } = useTranslation();
   if (revisions.length === 0) {
     return null;
   }
   return (
-    <ol className="revision-history" aria-label="Script revisions">
+    <ol className="revision-history" aria-label={t('workflow.script.history')}>
       {revisions.map((revision) => (
         <li key={revision.id}>
-          <span className="revision-number">Revision {revision.revisionNumber}</span>
+          <span className="revision-number">
+            {t('workflow.script.revision', { number: revision.revisionNumber })}
+          </span>
           {revision.id === approvedRevisionId && (
-            <span className="revision-approved">Approved</span>
+            <span className="revision-approved">{t('workflow.script.approved')}</span>
           )}
           <span className="revision-preview">{revision.content}</span>
         </li>

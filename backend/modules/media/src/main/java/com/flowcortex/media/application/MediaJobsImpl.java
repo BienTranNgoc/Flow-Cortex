@@ -17,6 +17,7 @@ import com.flowcortex.media.domain.MediaAsset;
 import com.flowcortex.media.domain.MediaAssetBinding;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
+import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -160,10 +161,10 @@ class MediaJobsImpl implements MediaJobs {
     @Override
     public UploadGrant prepareUpload(UUID ownerId, String fileName, long size) {
         String contentType = allowedType(fileName)
-                .orElseThrow(() -> new UploadRejectedException("fileName", typeSentence()));
+                .orElseThrow(() -> new UploadRejectedException("fileName", typeDetail()));
         String kind = MediaProperties.Upload.kindOf(contentType);
         if (!withinLimit(kind, size)) {
-            throw new UploadRejectedException("size", sizeSentence(kind));
+            throw new UploadRejectedException("size", sizeDetail(kind));
         }
         UUID uploadId = UUID.randomUUID();
         String bucket = properties.s3().uploadBucket();
@@ -185,7 +186,7 @@ class MediaJobsImpl implements MediaJobs {
     public List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds) {
         if (uploadIds == null || uploadIds.isEmpty() || uploadIds.size() > 10
                 || uploadIds.stream().distinct().count() != uploadIds.size()) {
-            throw new UploadRejectedException("uploadIds", "Choose between 1 and 10 different images");
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.imageCount"));
         }
         List<MediaAssetInput> resolved = new java.util.ArrayList<>();
         List<String> anyAllowed = List.copyOf(properties.upload().mimeTypes().keySet());
@@ -208,7 +209,7 @@ class MediaJobsImpl implements MediaJobs {
                 store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
             } catch (UploadRejectedException e) {
                 if (UPLOAD_INPUT_KEY.equals(source.key())) {
-                    throw new UploadRejectedException("uploadId", e.getMessage());
+                    throw new UploadRejectedException("uploadId", e.detail());
                 }
                 throw e;
             }
@@ -279,22 +280,22 @@ class MediaJobsImpl implements MediaJobs {
         Optional<MediaAsset> existing = assets.findById(uploadId);
         if (existing.isPresent() && !existing.orElseThrow().getOwnerId().equals(ownerId)) {
             throw refused(properties.s3().uploadBucket(), objectKey(ownerId, uploadId), "another owner",
-                    "Upload the file again");
+                    new LocalizedMessage("upload.again"));
         }
         String bucket = properties.s3().uploadBucket();
         String key = objectKey(ownerId, uploadId);
         S3MediaStore.StoredObject stored = store.head(bucket, key)
-                .orElseThrow(() -> refused(bucket, key, "no object", "Upload the file again"));
+                .orElseThrow(() -> refused(bucket, key, "no object", new LocalizedMessage("upload.again")));
         Map<String, String> mimeTypes = properties.upload().mimeTypes();
         if (allowedExtensions.stream().map(mimeTypes::get).noneMatch(type -> type.equals(stored.contentType()))) {
-            throw refused(bucket, key, "type " + stored.contentType(), typeSentence(allowedExtensions));
+            throw refused(bucket, key, "type " + stored.contentType(), typeDetail(allowedExtensions));
         }
         if (requiredMimePrefix != null && !stored.contentType().startsWith(requiredMimePrefix)) {
-            throw new UploadRejectedException("uploadIds", "Every product asset must be an image");
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.notAnImage"));
         }
         String kind = MediaProperties.Upload.kindOf(stored.contentType());
         if (!withinLimit(kind, stored.size())) {
-            throw refused(bucket, key, stored.size() + " bytes", sizeSentence(kind));
+            throw refused(bucket, key, stored.size() + " bytes", sizeDetail(kind));
         }
         MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, kind, bucket, key,
                 stored.contentType(), stored.size(), stored.checksum(), Instant.now()));
@@ -313,10 +314,10 @@ class MediaJobsImpl implements MediaJobs {
                 .orElseThrow(() -> new IllegalStateException("Bound asset is not registered: " + assetId))
                 .getKind();
         byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
-                .orElseThrow(() -> refused(bucket, key, "gone before the content check", "Upload the file again"));
+                .orElseThrow(() -> refused(bucket, key, "gone before the content check",
+                        new LocalizedMessage("upload.again")));
         if (!ContentSniffer.matches(kind, prefix)) {
-            throw refused(bucket, key, "content is not " + kind, "This file isn't a valid " + kind
-                    + " file. Accepted: " + formats(kind) + ".");
+            throw refused(bucket, key, "content is not " + kind, invalidContentDetail(kind));
         }
     }
 
@@ -335,9 +336,10 @@ class MediaJobsImpl implements MediaJobs {
         return new MediaDownload(get.url(), get.expiresAt());
     }
 
-    private static UploadRejectedException refused(String bucket, String key, String reason, String sentence) {
+    private static UploadRejectedException refused(String bucket, String key, String reason,
+            LocalizedMessage detail) {
         LOG.info("Upload refused at run start: bucket={} key={} reason={}", bucket, key, reason);
-        return new UploadRejectedException("uploadId", sentence);
+        return new UploadRejectedException("uploadId", detail);
     }
 
     private static String objectKey(UUID ownerId, UUID uploadId) {
@@ -357,26 +359,37 @@ class MediaJobsImpl implements MediaJobs {
         return size >= 1 && size <= properties.upload().maxBytesOf(kind);
     }
 
-    private String sizeSentence(String kind) {
+    private LocalizedMessage sizeDetail(String kind) {
         long max = properties.upload().maxBytesOf(kind);
-        String limit = max % MEGABYTE == 0 ? max / MEGABYTE + " MB" : max + " bytes";
-        return "Files of this type must be at most " + limit + ". Accepted: " + formats(kind) + ".";
+        return max % MEGABYTE == 0
+                ? new LocalizedMessage("upload.sizeMegabytes", max / MEGABYTE, formats(kind))
+                : new LocalizedMessage("upload.sizeBytes", max, formats(kind));
+    }
+
+    /** Only reached after the size check, which refuses every kind but video, audio and image. */
+    private LocalizedMessage invalidContentDetail(String kind) {
+        return switch (kind) {
+            case "video" -> new LocalizedMessage("upload.invalidVideo", formats(kind));
+            case "audio" -> new LocalizedMessage("upload.invalidAudio", formats(kind));
+            default -> new LocalizedMessage("upload.invalidImage", formats(kind));
+        };
     }
 
     private String formats(String kind) {
         return String.join(", ", properties.upload().extensionsOf(kind).stream().map(e -> "." + e).toList());
     }
 
-    private String typeSentence() {
+    private LocalizedMessage typeDetail() {
         List<String> extensions = new java.util.ArrayList<>(properties.upload().mediaExtensions());
         extensions.addAll(properties.upload().productImageExtensions());
-        return typeSentence(extensions);
+        return typeDetail(extensions);
     }
 
-    private static String typeSentence(List<String> allowedExtensions) {
+    private static LocalizedMessage typeDetail(List<String> allowedExtensions) {
         List<String> extensions = allowedExtensions.stream().map(e -> "." + e).toList();
-        String allowed = extensions.size() == 1 ? extensions.getFirst()
-                : String.join(", ", extensions.subList(0, extensions.size() - 1)) + " or " + extensions.getLast();
-        return "This file type can't be checked yet. Use " + allowed + ".";
+        return extensions.size() == 1
+                ? new LocalizedMessage("upload.typeOne", extensions.getFirst())
+                : new LocalizedMessage("upload.typeMany",
+                        String.join(", ", extensions.subList(0, extensions.size() - 1)), extensions.getLast());
     }
 }

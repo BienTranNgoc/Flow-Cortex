@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.credit.api.InsufficientCreditsException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
@@ -196,12 +197,12 @@ class RunStepTransactions {
             return true;
         }
         String type = runStepRepository.findById(stepId).map(RunStep::getType)
-                .orElseThrow(() -> new NotFoundException("Run step not found: " + stepId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.runStep.notFound", stepId)));
         return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, type);
     }
 
     private WorkflowRun requireRun(UUID runId) {
         return workflowRunRepository.findById(runId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
     }
 }

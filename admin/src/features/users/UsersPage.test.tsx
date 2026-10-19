@@ -1,6 +1,8 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viUsers from '../../locales/vi/users.json';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { UsersPage } from './UsersPage';
 
@@ -87,5 +89,34 @@ describe('UsersPage', () => {
     await waitFor(() =>
       expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({ role: 'CREATOR' }),
     );
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('shows the Vietnamese heading and the join date in vi-VN conventions', async () => {
+      const createdAt = '2026-10-18T03:04:05Z';
+      stubApi({ 'GET /api/v1/users': { status: 200, body: [{ ...ALICE, createdAt }] } });
+      renderRoute('/users', '/users', <UsersPage />);
+      await screen.findByText(ALICE.email);
+
+      expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(viUsers.title);
+      const joined = screen.getByText(new Intl.DateTimeFormat('vi-VN').format(new Date(createdAt)));
+      expect(joined).toHaveAttribute('dateTime', createdAt);
+    });
+
+    it('shows the role and status badges in Vietnamese', async () => {
+      stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+      renderRoute('/users', '/users', <UsersPage />);
+      const row = (await screen.findByText(ALICE.email)).closest('tr') as HTMLElement;
+
+      expect(within(row).getByText(viUsers.role.MEMBER)).toHaveClass('cortex-admin-pill');
+      expect(within(row).getByText(viUsers.status.ACTIVE)).toHaveClass('cortex-admin-pill');
+    });
   });
 });

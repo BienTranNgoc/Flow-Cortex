@@ -1,3 +1,4 @@
+import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { Footer } from './Footer';
 import './AppShell.css';
 
@@ -16,6 +17,10 @@ export function AppShell({ children }: { readonly children: React.ReactNode }) {
         <div className="aurora-blob aurora-blob--indigo" />
         <div className="aurora-blob aurora-blob--cyan" />
       </div>
+
+      <header className="public-shell__language">
+        <AppLanguageToggle />
+      </header>
 
       <main className="public-main">{children}</main>
 

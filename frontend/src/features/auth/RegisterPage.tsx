@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState, type CSSProperties } from 'react';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
@@ -8,7 +9,7 @@ import { ResendConfirmation } from './ConfirmEmailPage';
 import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
-  detailFrom,
+  failureMessage,
   fieldErrorsFrom,
   submitState,
   useAuthToken,
@@ -37,8 +38,11 @@ interface FieldProps {
 }
 
 function Field({ name, label, index, type = 'text', autoComplete, register, errors }: FieldProps) {
+  const { t } = useTranslation();
   const id = `register-${name}`;
-  const message = errors[name]?.message;
+  const error = errors[name];
+  // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
+  const message = error?.message && (error.type === 'server' ? error.message : t(error.message));
   return (
     <div className="field" style={{ '--i': index } as CSSProperties}>
       <label htmlFor={id}>{label}</label>
@@ -60,6 +64,7 @@ function Field({ name, label, index, type = 'text', autoComplete, register, erro
 }
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const token = useAuthToken();
   const registerMutation = useRegisterMutation();
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -111,17 +116,21 @@ export function RegisterPage() {
         <BrandPanel />
 
         <section className="auth-card">
-          <p className="eyebrow">CREATOR ACCESS · SIGN UP</p>
+          <p className="eyebrow">{t('auth.register.eyebrow')}</p>
           <div role="status">
-            <h1 className="auth-card__title">Check your inbox to confirm your email</h1>
+            <h1 className="auth-card__title">{t('auth.register.sent.title')}</h1>
             <p className="auth-subtitle">
-              We sent a confirmation link to <strong>{sentTo}</strong>. Open it within 24 hours to
-              activate your account; it signs you in and asks you to choose your password.
+              <Trans
+                i18nKey="auth.register.sent.body"
+                values={{ email: sentTo }}
+                components={{ strong: <strong /> }}
+              />
             </p>
           </div>
           <ResendConfirmation email={sentTo} />
           <p className="auth-footer">
-            Already confirmed and chose a password? <Link to="/login">Sign in to workspace</Link>
+            {t('auth.register.sent.alreadyConfirmed')}{' '}
+            <Link to="/login">{t('auth.register.signIn')}</Link>
           </p>
         </section>
       </div>
@@ -132,15 +141,15 @@ export function RegisterPage() {
   const refusedFields = fieldErrorsFrom(registerMutation.error);
   const serverError = SERVER_FIELDS.some((field) => refusedFields[field])
     ? undefined
-    : detailFrom(registerMutation);
+    : failureMessage(registerMutation, t);
   const isPending = registerMutation.isPending;
   const dataState = submitState(registerMutation.isSuccess, isPending);
   const fieldProps = { register, errors };
 
   const buttonLabel = (() => {
-    if (registerMutation.isSuccess) return '✓ Account created';
-    if (isPending) return 'Creating account…';
-    return 'Get started free →';
+    if (registerMutation.isSuccess) return t('auth.register.succeeded');
+    if (isPending) return t('auth.register.submitting');
+    return t('auth.register.submit');
   })();
 
   return (
@@ -148,35 +157,40 @@ export function RegisterPage() {
       <BrandPanel />
 
       <section className="auth-card auth-card--surface">
-        <h1 className="auth-card__title">Create your account</h1>
-        <p className="auth-subtitle">Start generating visual workflows in minutes.</p>
+        <h1 className="auth-card__title">{t('auth.register.title')}</h1>
+        <p className="auth-subtitle">{t('auth.register.subtitle')}</p>
 
         <div className="oauth-row">
           <OAuthButton
             provider="google"
-            label="Sign up with Google"
+            label={t('auth.register.google')}
             href={googleAuthorizeUrl(true, '/')}
           />
         </div>
 
-        <form onSubmit={onSubmit} noValidate aria-label="Create account" className="auth-form">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          aria-label={t('auth.register.formLabel')}
+          className="auth-form"
+        >
           <Field
             name="firstName"
-            label="First name"
+            label={t('auth.register.firstNameLabel')}
             index={0}
             autoComplete="given-name"
             {...fieldProps}
           />
           <Field
             name="lastName"
-            label="Last name"
+            label={t('auth.register.lastNameLabel')}
             index={1}
             autoComplete="family-name"
             {...fieldProps}
           />
           <Field
             name="email"
-            label="Email"
+            label={t('auth.register.emailLabel')}
             index={2}
             type="email"
             autoComplete="email"
@@ -184,14 +198,14 @@ export function RegisterPage() {
           />
           <Field
             name="username"
-            label="Username (optional)"
+            label={t('auth.register.usernameLabel')}
             index={3}
             autoComplete="username"
             {...fieldProps}
           />
           <Field
             name="password"
-            label="Password"
+            label={t('auth.register.passwordLabel')}
             index={4}
             type="password"
             autoComplete="new-password"
@@ -199,7 +213,7 @@ export function RegisterPage() {
           />
           <Field
             name="confirmPassword"
-            label="Confirm password"
+            label={t('auth.register.confirmPasswordLabel')}
             index={5}
             type="password"
             autoComplete="new-password"
@@ -221,7 +235,7 @@ export function RegisterPage() {
         </form>
 
         <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in to workspace</Link>
+          {t('auth.register.haveAccount')} <Link to="/login">{t('auth.register.signIn')}</Link>
         </p>
       </section>
     </div>

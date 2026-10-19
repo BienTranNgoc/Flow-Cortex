@@ -1,4 +1,5 @@
 import { withClientId } from './clientId';
+import { withLocale } from './locale';
 import { getToken } from './tokenStore';
 import { REFRESH_PATH, refreshAccessToken } from './session';
 
@@ -17,7 +18,10 @@ const NO_REFRESH_PATHS = [
  */
 export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
   const sentToken = bearerOf(options.headers);
-  let response = await fetch(url, { ...options, headers: withClientId(url, options.headers) });
+  let response = await fetch(url, {
+    ...options,
+    headers: withLocale(withClientId(url, options.headers)),
+  });
   if (response.status === 401 && !NO_REFRESH_PATHS.includes(url.split('?')[0] ?? url)) {
     const current = getToken();
     const token = current !== null && current !== sentToken ? current : await refreshAccessToken();
@@ -33,7 +37,7 @@ function bearerOf(headers: HeadersInit | undefined): string | null {
 }
 
 function withBearer(options: RequestInit, token: string): RequestInit {
-  const headers = new Headers(options.headers);
+  const headers = withLocale(options.headers);
   headers.set('Authorization', `Bearer ${token}`);
   return { ...options, headers };
 }

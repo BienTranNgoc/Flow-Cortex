@@ -1,4 +1,6 @@
 import type { RunStepOutputResponse } from '@flow-cortex/api-client';
+import { useTranslation } from 'react-i18next';
+import { activeLocale } from '../../lib/i18n';
 import { openInCurrentTab, saveTextFile } from './browser';
 import { outputFields, parseReport } from './stepOutputFields';
 import { summaryText } from './summaryText';
@@ -24,11 +26,15 @@ export function StepDownloads({
   details,
   fileName,
 }: Readonly<StepDownloadsProps>) {
+  const { t } = useTranslation();
   const outputUrl = useOutputUrlMutation(runId, stepOrder, details.name);
   const report = output === undefined ? null : parseReport(output);
 
   const saveSummary = () => {
-    saveTextFile('video-summary.txt', summaryText(fileName, report ? outputFields(report) : []));
+    saveTextFile(
+      'video-summary.txt',
+      summaryText(fileName, report ? outputFields(report, t, activeLocale()) : [], t),
+    );
   };
 
   // Busy rather than disabled, so focus stays on the button while the link is fetched.
@@ -42,7 +48,7 @@ export function StepDownloads({
   return (
     <div className="run-step-downloads">
       <button type="button" onClick={saveSummary}>
-        Download summary (.txt)
+        {t('workflow.download.summary')}
       </button>
       <button
         type="button"
@@ -50,11 +56,13 @@ export function StepDownloads({
         aria-disabled={outputUrl.isPending}
         aria-busy={outputUrl.isPending}
       >
-        {outputUrl.isPending ? 'Getting the file…' : 'Download technical details (JSON file)'}
+        {outputUrl.isPending
+          ? t('workflow.download.gettingFile')
+          : t('workflow.download.technical')}
       </button>
       {outputUrl.isError && (
         <p role="alert" className="run-step-download-error">
-          Could not get download link
+          {t('workflow.download.linkError')}
         </p>
       )}
     </div>

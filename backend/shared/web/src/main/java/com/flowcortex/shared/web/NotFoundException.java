@@ -8,7 +8,15 @@ package com.flowcortex.shared.web;
  */
 public class NotFoundException extends RuntimeException {
 
-    public NotFoundException(String message) {
-        super(message);
+    private final LocalizedMessage detail;
+
+    public NotFoundException(LocalizedMessage detail) {
+        super(detail.toString());
+        this.detail = detail;
+    }
+
+    /** The bundle key for the problem detail. */
+    public LocalizedMessage getDetail() {
+        return detail;
     }
 }

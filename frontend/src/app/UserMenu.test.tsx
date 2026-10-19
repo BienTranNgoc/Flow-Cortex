@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import i18n from '../lib/i18n';
 import { stubApi } from '../test/fakeApi';
 import { UserMenu } from './UserMenu';
 
@@ -92,6 +93,38 @@ describe('UserMenu', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the trigger and every item, and groups the quota the vi-VN way', async () => {
+      const user = userEvent.setup();
+      vi.stubEnv('VITE_ACCOUNT_STATS_ENABLED', 'true');
+      vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+      try {
+        renderMenu();
+        const trigger = screen.getByRole('button', {
+          name: 'Mở menu tài khoản của member1@flowcortex.dev',
+        });
+        await user.click(trigger);
+        const panel = panelOf(trigger);
+
+        expect(within(panel).getByRole('link', { name: 'Cài đặt tài khoản' })).toBeInTheDocument();
+        expect(within(panel).getByRole('link', { name: 'Dịch vụ đã kết nối' })).toBeInTheDocument();
+        expect(within(panel).getByRole('link', { name: 'Trợ giúp và tài liệu' })).toBeInTheDocument();
+        expect(within(panel).getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
+        expect(within(panel).getByText('Phút GPU')).toBeInTheDocument();
+        expect(within(panel).getByText('84.500')).toBeInTheDocument();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
   });
 
   it('logs the user out when the Sign out item is clicked', async () => {

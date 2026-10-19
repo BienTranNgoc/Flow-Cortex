@@ -5,40 +5,40 @@ const USERNAME = /^[a-z0-9_]{3,20}$/;
 // BCrypt reads at most 72 bytes; the server rejects longer UTF-8 passwords.
 const password = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .refine((value) => new TextEncoder().encode(value).length <= 72, 'Password is too long');
+  .min(8, 'auth.validation.passwordTooShort')
+  .refine(
+    (value) => new TextEncoder().encode(value).length <= 72,
+    'auth.validation.passwordTooLong',
+  );
 
-const confirmPassword = z.string().min(1, 'Confirm your password');
+const confirmPassword = z.string().min(1, 'auth.validation.confirmPasswordRequired');
 
 const passwordsMatch = {
   path: ['confirmPassword'],
-  message: 'Passwords do not match',
+  message: 'auth.validation.passwordsMismatch',
 };
 
 const firstName = z
   .string()
   .trim()
-  .min(1, 'First name is required')
-  .max(100, 'First name is too long');
+  .min(1, 'auth.validation.firstNameRequired')
+  .max(100, 'auth.validation.firstNameTooLong');
 const lastName = z
   .string()
   .trim()
-  .min(1, 'Last name is required')
-  .max(100, 'Last name is too long');
+  .min(1, 'auth.validation.lastNameRequired')
+  .max(100, 'auth.validation.lastNameTooLong');
 // Empty means "no username"; the server refuses an empty string, so it is omitted on submit.
 const username = z
   .string()
-  .refine(
-    (value) => value === '' || USERNAME.test(value),
-    'Use 3–20 lowercase letters, digits or _',
-  );
+  .refine((value) => value === '' || USERNAME.test(value), 'auth.validation.usernameInvalid');
 
 /** Mirrors the server's register constraints so a refusal shows at its field before any request. */
 export const registerSchema = z
   .object({
     firstName,
     lastName,
-    email: z.string().trim().email('Enter a valid email address'),
+    email: z.string().trim().email('auth.validation.emailInvalid'),
     username,
     password,
     confirmPassword,
@@ -54,4 +54,4 @@ export const setPasswordSchema = z
 
 export type SetPasswordFormValues = z.infer<typeof setPasswordSchema>;
 
-export const resendEmailSchema = z.string().trim().email('Enter a valid email address');
+export const resendEmailSchema = z.string().trim().email('auth.validation.emailInvalid');

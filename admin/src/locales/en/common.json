@@ -1,0 +1,107 @@
+{
+  "errorView": {
+    "title": "Something went wrong",
+    "message": "This page could not be shown. Reload it to try again.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "requestFailed": "Something went wrong. Try again."
+  },
+  "language": {
+    "groupLabel": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "theme": {
+    "switchToLight": "Switch to light theme",
+    "switchToDark": "Switch to dark theme",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "header": {
+    "title": "Flow-Cortex Admin",
+    "homeLink": "FlowCortex admin home",
+    "console": "Admin console"
+  },
+  "account": {
+    "fallbackName": "Account",
+    "trigger": "{{name}}, account menu",
+    "menu": "Account menu",
+    "details": "Account details",
+    "signOut": "Sign out",
+    "dialogTitle": "Account",
+    "copyEmail": "Copy email to clipboard",
+    "copyEmailShort": "Copy email",
+    "close": "Close account dialog",
+    "dangerZone": "Danger zone",
+    "delete": "Delete account",
+    "deleteDisabled": "Disabled for admin",
+    "deleteHint": "Admin accounts cannot be deleted from this dialog. Use the identity provider instead."
+  },
+  "shell": {
+    "noPage": "No page is available to this account.",
+    "nav": {
+      "label": "Admin navigation",
+      "menu": "Menu",
+      "hideMenu": "Hide menu",
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar",
+      "comingSoon": "Coming soon",
+      "disabledTitle": "{{label}} — {{tag}}",
+      "unavailable": "unavailable",
+      "systemStatus": "All systems normal",
+      "groups": {
+        "overview": "Overview",
+        "workflowOps": "Workflow Ops",
+        "creditsBilling": "Credits & Billing",
+        "administration": "Administration",
+        "system": "System"
+      },
+      "items": {
+        "dashboard": "Dashboard",
+        "workflows": "Workflows & Templates",
+        "runs": "Runs",
+        "approvals": "Approval Queue",
+        "credits": "Credits & Wallets",
+        "providers": "Model Providers",
+        "users": "Users",
+        "smsOutbox": "SMS Outbox",
+        "features": "Feature Switches",
+        "auditLog": "Audit Log",
+        "mediaJobs": "Media Jobs",
+        "voiceQuota": "Voice Quota",
+        "health": "Health"
+      }
+    },
+    "noAccess": {
+      "title": "No access",
+      "messageWithEmail": "<account>{{email}}</account> does not have the ADMIN role, so it cannot use the admin console.",
+      "message": "This account does not have the ADMIN role, so it cannot use the admin console.",
+      "signOut": "Sign out"
+    },
+    "session": {
+      "checkingSession": "Checking your session…",
+      "checkingAccount": "Checking your account…",
+      "accountError": "Could not check your account.",
+      "retry": "Retry"
+    },
+    "list": {
+      "emptyPage": "No {{noun}} on this page.",
+      "backToFirstPage": "Back to first page",
+      "noMatch": "No {{noun}} match this filter",
+      "clearFilter": "Clear filter",
+      "empty": "No {{noun}} yet.",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "refresh": "Refresh",
+      "disabled": "Admin console is disabled",
+      "loadError": "Could not load {{noun}}.",
+      "retry": "Retry",
+      "loading": "Loading {{noun}}…",
+      "stale": "Showing the results loaded before this error.",
+      "previousPage": "Previous page",
+      "pager": "Page {{page}} of {{pages}} · {{total}} {{noun}}",
+      "nextPage": "Next page"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import { setToken } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import i18n from '../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
 import { Header } from './Header';
 
@@ -27,6 +28,47 @@ function renderHeader() {
 function balanceCalls(calls: { path: string }[]) {
   return calls.filter((call) => call.path === '/api/v1/credits/balance');
 }
+
+describe('Header', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('offers the language toggle to a signed-in member', () => {
+    stubApi({});
+
+    renderHeader();
+
+    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'VI Tiếng Việt' })).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the navigation, the theme switch and the language group next to it', () => {
+      stubApi({});
+
+      renderHeader();
+
+      const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+      expect(within(nav).getByRole('link', { name: 'Trang chủ' })).toBeInTheDocument();
+      expect(within(nav).getByRole('link', { name: 'Quy trình' })).toBeInTheDocument();
+      expect(within(nav).getByRole('button', { name: 'Tài liệu' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Trang chủ FlowCortex' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Chuyển sang giao diện (tối|sáng)$/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mở menu tài khoản' })).toBeInTheDocument();
+    });
+  });
+});
 
 describe('Header credits', () => {
   beforeEach(() => setToken('t', true));
@@ -98,5 +140,25 @@ describe('Header credits', () => {
 
     expect(await screen.findByText('940 credits')).toBeInTheDocument();
     expect(balanceCalls(calls)).toHaveLength(2);
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('groups the balance the vi-VN way', async () => {
+      stubApi({
+        'GET /api/v1/features': { status: 200, body: FEATURES },
+        'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
+      });
+
+      renderHeader();
+
+      expect(await screen.findByText('1.000 Credit')).toBeInTheDocument();
+    });
   });
 });

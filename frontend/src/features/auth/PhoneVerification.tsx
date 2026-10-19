@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import {
   problemCode,
@@ -13,10 +14,12 @@ type Step = 'number' | 'code';
 
 interface Feedback {
   field?: 'phone' | 'code';
-  text: string;
+  /** The server's wording; absent means the generic retry message in the active language. */
+  text?: string | undefined;
 }
 
-const FALLBACK = 'Something went wrong. Try again.';
+const PHONE_FIELD = 'phone';
+const CODE_FIELD = 'code';
 
 /** Counts whole seconds down to a deadline; the deadline survives re-renders, the tick does not drift. */
 function useCountdown() {
@@ -47,15 +50,16 @@ function clock(seconds: number): string {
 }
 
 function feedbackFrom(error: unknown, field: 'phone' | 'code'): Feedback {
-  if (!(error instanceof ApiError)) return { text: FALLBACK };
+  if (!(error instanceof ApiError)) return {};
   const fieldMessage = error.problem?.errors?.[field];
   if (fieldMessage) return { field, text: fieldMessage };
-  const text = error.problem?.detail ?? FALLBACK;
+  const text = error.problem?.detail;
   return problemCode(error) === 'OTP_INVALID' ? { field, text } : { text };
 }
 
 /** Proves the member owns a mobile number with a one-time SMS code. */
 export function PhoneVerification() {
+  const { t } = useTranslation();
   const phoneQuery = usePhoneQuery();
   const sendMutation = useSendCodeMutation();
   const verifyMutation = useVerifyCodeMutation();
@@ -126,19 +130,19 @@ export function PhoneVerification() {
   const feedbackFor = (field: Feedback['field']) =>
     feedback && feedback.field === field ? (
       <p role="alert" className="form-error" id={field ? `${feedbackId}-${field}` : feedbackId}>
-        {feedback.text}
+        {feedback.text ?? t('common.errors.requestFailed')}
       </p>
     ) : null;
 
   let body: ReactNode;
   if (phoneQuery.isPending) {
-    body = <output>Loading your phone number…</output>;
+    body = <output>{t('auth.phone.loading')}</output>;
   } else if (phoneQuery.isError) {
     body = (
       <p role="alert" className="form-error">
-        Could not load your phone number.{' '}
+        {t('auth.phone.loadError')}{' '}
         <button type="button" onClick={() => void phoneQuery.refetch()}>
-          Retry
+          {t('auth.phone.retry')}
         </button>
       </p>
     );
@@ -148,16 +152,16 @@ export function PhoneVerification() {
       <>
         {justVerified && (
           <p className="profile-saved" role="status">
-            Phone number verified
+            {t('auth.phone.verifiedNotice')}
           </p>
         )}
         <div className="phone-verification__current">
           <span className="phone-verification__number">{status.phone}</span>
-          <span className="phone-verification__badge">Verified</span>
+          <span className="phone-verification__badge">{t('auth.phone.verifiedBadge')}</span>
         </div>
         <div className="profile-form__actions phone-verification__actions">
           <button type="button" className="cortex-btn cortex-btn--ghost" onClick={backToNumber}>
-            Change number
+            {t('auth.phone.changeNumber')}
           </button>
         </div>
       </>
@@ -167,10 +171,12 @@ export function PhoneVerification() {
     body = (
       <form onSubmit={onVerifySubmit} noValidate>
         <p className="profile-card__hint">
-          {sentTo ? `We sent a 6-digit code to ${sentTo}` : `Enter the code we last sent to ${phone.trim()}`}
+          {sentTo
+            ? t('auth.phone.codeSent', { phone: sentTo })
+            : t('auth.phone.codeSentEarlier', { phone: phone.trim() })}
         </p>
         <div className="field">
-          <label htmlFor={codeId}>6-digit code</label>
+          <label htmlFor={codeId}>{t('auth.phone.codeLabel')}</label>
           <input
             id={codeId}
             className="phone-verification__code"
@@ -182,7 +188,7 @@ export function PhoneVerification() {
             aria-invalid={feedback?.field === 'code' || undefined}
             aria-describedby={feedback?.field === 'code' ? `${feedbackId}-code` : undefined}
           />
-          {feedbackFor('code')}
+          {feedbackFor(CODE_FIELD)}
         </div>
         {feedbackFor(undefined)}
         <div className="phone-verification__resend">
@@ -192,10 +198,12 @@ export function PhoneVerification() {
             onClick={() => send('code')}
             disabled={resendLocked}
           >
-            Resend code
+            {t('auth.phone.resend')}
           </button>
           {countdown.remaining > 0 && (
-            <span className="phone-verification__countdown">Resend in {clock(countdown.remaining)}</span>
+            <span className="phone-verification__countdown">
+              {t('auth.phone.resendIn', { time: clock(countdown.remaining) })}
+            </span>
           )}
         </div>
         <div className="profile-form__actions phone-verification__actions">
@@ -205,14 +213,14 @@ export function PhoneVerification() {
             onClick={backToNumber}
             disabled={verifyMutation.isPending}
           >
-            Use a different number
+            {t('auth.phone.differentNumber')}
           </button>
           <button
             type="submit"
             className="cortex-btn cortex-btn--primary"
             disabled={verifyMutation.isPending}
           >
-            {verifyMutation.isPending ? 'Verifying…' : 'Verify'}
+            {verifyMutation.isPending ? t('auth.phone.verifying') : t('auth.phone.verify')}
           </button>
         </div>
       </form>
@@ -222,7 +230,7 @@ export function PhoneVerification() {
     body = (
       <form onSubmit={onSendSubmit} noValidate>
         <div className="field">
-          <label htmlFor={phoneId}>Mobile number</label>
+          <label htmlFor={phoneId}>{t('auth.phone.numberLabel')}</label>
           <input
             id={phoneId}
             type="tel"
@@ -230,11 +238,11 @@ export function PhoneVerification() {
             onChange={(event) => setPhone(event.target.value)}
             inputMode="tel"
             autoComplete="tel"
-            placeholder="0912345678"
+            placeholder={t('auth.phone.numberPlaceholder')}
             aria-invalid={feedback?.field === 'phone' || undefined}
             aria-describedby={feedback?.field === 'phone' ? `${feedbackId}-phone` : undefined}
           />
-          {feedbackFor('phone')}
+          {feedbackFor(PHONE_FIELD)}
         </div>
         {feedbackFor(undefined)}
         <div className="profile-form__actions phone-verification__actions">
@@ -248,11 +256,11 @@ export function PhoneVerification() {
               }}
               disabled={sendMutation.isPending}
             >
-              Cancel
+              {t('auth.phone.cancel')}
             </button>
           )}
           <button type="submit" className="cortex-btn cortex-btn--primary" disabled={sendMutation.isPending}>
-            {sendMutation.isPending ? 'Sending…' : 'Send code'}
+            {sendMutation.isPending ? t('auth.phone.sending') : t('auth.phone.send')}
           </button>
         </div>
       </form>
@@ -262,9 +270,9 @@ export function PhoneVerification() {
   return (
     <section className="phone-verification" aria-labelledby={titleId}>
       <h2 className="profile-card__title" id={titleId}>
-        Phone number
+        {t('auth.phone.title')}
       </h2>
-      <p className="profile-card__hint">We send a one-time code by SMS to confirm the number is yours.</p>
+      <p className="profile-card__hint">{t('auth.phone.hint')}</p>
       {body}
     </section>
   );

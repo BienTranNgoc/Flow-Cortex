@@ -2,9 +2,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { ApiError, type StartRunRequest, type WorkflowStepResponse } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
+import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { formatCredits } from '../credits/formatCredits';
 import { invalidateBalance } from '../credits/useBalance';
@@ -28,6 +31,7 @@ function InlineStartForm({
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
 }>) {
+  const { t } = useTranslation();
   const { go } = useTransitionNavigate();
   const queryClient = useQueryClient();
   const startRunMutation = useStartRunMutation(workflowId);
@@ -45,7 +49,9 @@ function InlineStartForm({
   const problem = startRunMutation.error
     ? startProblem(
         startRunMutation.error,
-        isExecutionDisabled ? 'Workflow execution is currently disabled.' : undefined,
+        isExecutionDisabled ? t('workflow.start.executionDisabled') : undefined,
+        t,
+        activeLocale(),
       )
     : null;
   const alertMessage =
@@ -65,7 +71,7 @@ function InlineStartForm({
         }
       },
       onError: (error) => {
-        const refused = startProblem(error);
+        const refused = startProblem(error, undefined, t, activeLocale());
         if (refused.kind === 'incomplete') {
           onIncomplete(refused);
         }
@@ -79,15 +85,15 @@ function InlineStartForm({
   });
 
   return (
-    <form onSubmit={onStart} noValidate aria-label="Start run">
+    <form onSubmit={onStart} noValidate aria-label={t('workflow.start.formLabel')}>
       <div className="field">
-        <label htmlFor="run-input">Input (optional)</label>
+        <label htmlFor="run-input">{t('workflow.start.inputLabel')}</label>
         <input id="run-input" {...register('input')} />
       </div>
       {alertMessage && (
         <div role="alert">
           <p>{alertMessage}</p>
-          <p>Try again later, or go back to the Workflows list.</p>
+          <p>{t('workflow.start.nextActionLater')}</p>
         </div>
       )}
       {problem?.kind === 'credits' && (
@@ -102,7 +108,7 @@ function InlineStartForm({
         />
       )}
       <button type="submit" disabled={startRunMutation.isPending || disabled}>
-        {startRunMutation.isPending ? 'Starting…' : 'Start run'}
+        {startRunMutation.isPending ? t('workflow.start.starting') : t('workflow.start.button')}
       </button>
     </form>
   );
@@ -119,9 +125,10 @@ function InlineStartForm({
  */
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
 
   if (!id) {
-    return <p role="alert">No workflow selected.</p>;
+    return <p role="alert">{t('workflow.detail.noWorkflow')}</p>;
   }
   return <WorkflowDetailView key={id} workflowId={id} />;
 }
@@ -130,12 +137,16 @@ export function WorkflowDetailPage() {
 function incompleteLine(
   step: IncompleteStep,
   steps: readonly WorkflowStepResponse[] | undefined,
+  t: TFunction,
 ): string {
   const name = steps?.find((candidate) => candidate.stepOrder === step.order)?.name;
-  return `Step ${step.order}${name ? ` · ${name}` : ''}: ${step.reason}`;
+  return name
+    ? t('workflow.incomplete.lineNamed', { order: step.order, name, reason: step.reason })
+    : t('workflow.incomplete.line', { order: step.order, reason: step.reason });
 }
 
 function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
+  const { t } = useTranslation();
   const workflowQuery = useWorkflowQuery(workflowId);
   const capabilitiesQuery = useCapabilitiesQuery();
   const workflow = workflowQuery.data;
@@ -170,19 +181,17 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
 
   return (
     <main>
-      <h1>{workflow?.name ?? 'Workflow'}</h1>
-      {workflow?.isShared && <p>Shared with every member.</p>}
-      {workflowQuery.isError && (
-        <p role="alert">Could not load this workflow. Try again, or pick another one.</p>
-      )}
+      <h1>{workflow?.name ?? t('workflow.detail.heading')}</h1>
+      {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
+      {workflowQuery.isError && <p role="alert">{t('workflow.detail.loadError')}</p>}
       {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
-        <output>Loading workflow…</output>
+        <output>{t('workflow.detail.loading')}</output>
       )}
       {workflow?.steps && workflow.steps.length > 0 && (
         <Pipeline
           steps={workflow.steps.map((step) => ({
             id: stepKey(step),
-            name: step.name ?? `Step ${step.stepOrder}`,
+            name: step.name ?? t('workflow.step.fallback', { order: step.stepOrder }),
             order: step.stepOrder,
           }))}
           problemOrder={incomplete?.firstOrder ?? undefined}
@@ -194,7 +203,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           {incomplete.steps.length > 0 && (
             <ul>
               {incomplete.steps.map((step) => (
-                <li key={step.order}>{incompleteLine(step, workflow?.steps)}</li>
+                <li key={step.order}>{incompleteLine(step, workflow?.steps, t)}</li>
               ))}
             </ul>
           )}
@@ -203,7 +212,9 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
       {startForm}
       {startForm && typeof workflow?.estimatedCredits === 'number' && (
         <p className="field-hint">
-          Estimated cost: {formatCredits(workflow.estimatedCredits)} credits
+          {t('credits.estimatedCost', {
+            amount: formatCredits(workflow.estimatedCredits, activeLocale()),
+          })}
         </p>
       )}
     </main>

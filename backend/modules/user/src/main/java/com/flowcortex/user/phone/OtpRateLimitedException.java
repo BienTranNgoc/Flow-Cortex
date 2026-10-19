@@ -1,22 +1,23 @@
 package com.flowcortex.user.phone;
 
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import java.net.URI;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 429 Problem Detail naming why no code was sent ({@code code}: {@code OTP_} plus a
  * {@link PhoneSendPolicies.Refusal} name, e.g. {@code OTP_COOLDOWN}) and when to ask again, as the
  * {@code retryAfterSeconds} property and the {@code Retry-After} header.
  */
-class OtpRateLimitedException extends ResponseStatusException {
+class OtpRateLimitedException extends LocalizedStatusException {
 
     private static final URI TYPE = URI.create("https://flow-cortex.dev/problems/too-many-requests");
 
     private final long retryAfterSeconds;
 
-    OtpRateLimitedException(String code, String detail, long retryAfterSeconds) {
+    OtpRateLimitedException(String code, LocalizedMessage detail, long retryAfterSeconds) {
         super(HttpStatus.TOO_MANY_REQUESTS, detail);
         this.retryAfterSeconds = retryAfterSeconds;
         setType(TYPE);

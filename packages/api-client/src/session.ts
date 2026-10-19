@@ -1,4 +1,5 @@
 import { withClientId } from './clientId';
+import { withLocale } from './locale';
 import { getToken, isTokenPersistent, setToken, syncTokenFromStorage } from './tokenStore';
 
 export const REFRESH_PATH = '/api/v1/auth/refresh';
@@ -37,7 +38,10 @@ async function requestNewToken(before: string | null): Promise<string | null> {
   }
   const persistent = isTokenPersistent();
   try {
-    const response = await fetch(REFRESH_PATH, { method: 'POST', headers: withClientId(REFRESH_PATH) });
+    const response = await fetch(REFRESH_PATH, {
+      method: 'POST',
+      headers: withLocale(withClientId(REFRESH_PATH)),
+    });
     if (response.ok) {
       const { accessToken } = (await response.json()) as { accessToken?: string };
       if (accessToken) {
@@ -55,7 +59,7 @@ async function requestNewToken(before: string | null): Promise<string | null> {
 /** Revokes the server session, then forgets the token; local state is cleared even if the call fails. */
 export async function signOut(): Promise<void> {
   try {
-    await fetch(LOGOUT_PATH, { method: 'POST', headers: withClientId(LOGOUT_PATH) });
+    await fetch(LOGOUT_PATH, { method: 'POST', headers: withLocale(withClientId(LOGOUT_PATH)) });
   } catch {
     // Offline: the refresh cookie stays until it expires, but this browser is signed out regardless.
   } finally {

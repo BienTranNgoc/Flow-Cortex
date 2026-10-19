@@ -2,6 +2,8 @@ import { setToken } from '@flow-cortex/api-client';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
+import i18n from '../lib/i18n';
+import viCommon from '../locales/vi/common.json';
 import { ADMIN_ME, stubApi } from '../test/fakeApi';
 import { queryClient } from './queryClient';
 import { Sidebar } from './Sidebar';
@@ -109,5 +111,39 @@ describe('Sidebar', () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the groups, links, disabled entries and system status in Vietnamese', () => {
+      render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
+        </MemoryRouter>,
+      );
+      const { nav } = viCommon.shell;
+
+      expect(screen.getByRole('navigation', { name: nav.label })).toBeInTheDocument();
+      expect(screen.getByText(nav.groups.workflowOps)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: nav.items.runs })).toHaveAttribute('href', '/runs');
+      expect(screen.getByRole('link', { name: nav.items.mediaJobs })).toHaveAttribute(
+        'href',
+        '/media-jobs',
+      );
+
+      const voice = screen.getByText(nav.items.voiceQuota).closest('[aria-disabled]');
+      expect(voice).toHaveTextContent(nav.comingSoon);
+      expect(voice).toHaveAttribute('title', `${nav.items.voiceQuota} — ${nav.comingSoon}`);
+      expect(voice?.querySelector('.cortex-admin-nav__visually-hidden')).toHaveTextContent(
+        nav.unavailable,
+      );
+      expect(screen.getByText(nav.systemStatus)).toBeInTheDocument();
+    });
   });
 });

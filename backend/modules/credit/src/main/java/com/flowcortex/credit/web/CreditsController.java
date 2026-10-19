@@ -1,6 +1,8 @@
 package com.flowcortex.credit.web;
 
 import com.flowcortex.credit.api.CreditAccounts;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
 import java.util.UUID;
@@ -12,7 +14,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** {@code /api/v1/credits} — the caller's own balance; 503 while credits are switched off. */
 @RestController
@@ -30,11 +31,11 @@ class CreditsController {
     @GetMapping(value = "/balance", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<BalanceResponse> balance(@AuthenticationPrincipal Jwt jwt) {
         if (!creditAccounts.enabled()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "This feature is turned off");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
         UUID id = UUID.fromString(jwt.getSubject());
         UUID userId = userDirectory.findById(id)
-                .orElseThrow(() -> new NotFoundException("Current user not found: " + id))
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.current.notFound", id)))
                 .id();
         return ResponseEntity.ok(new BalanceResponse(creditAccounts.balance(userId)));
     }

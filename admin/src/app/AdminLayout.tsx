@@ -11,8 +11,12 @@ import {
   UserCircle2,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
+import { roleLabel } from '../features/users/enumLabels';
+import { AppLanguageToggle } from '../lib/AppLanguageToggle';
+import { BRAND_NAME } from './brand';
 import { Sidebar } from './Sidebar';
 import { useTheme } from './useTheme';
 
@@ -33,6 +37,7 @@ function readCollapsed(): boolean {
 export function AdminLayout() {
   const me = useMeQuery().data;
   const { pathname } = useLocation();
+  const { t } = useTranslation();
   const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() =>
@@ -41,8 +46,9 @@ export function AdminLayout() {
   const accountDialogRef = useRef<HTMLDialogElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const displayName = me?.name?.trim() || me?.email || 'Account';
+  const displayName = me?.name?.trim() || me?.email || t('common.account.fallbackName');
   const avatarInitial = displayName.trim().charAt(0).toLocaleUpperCase();
+  const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
 
   useEffect(() => {
     try {
@@ -122,8 +128,8 @@ export function AdminLayout() {
             type="button"
             className="cortex-admin-header__collapse-toggle"
             aria-pressed={collapsed}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapseLabel}
+            title={collapseLabel}
             onClick={() => setCollapsed((value) => !value)}
           >
             {collapsed ? (
@@ -132,22 +138,37 @@ export function AdminLayout() {
               <PanelRight aria-hidden="true" size={16} />
             )}
           </button>
-          <a className="cortex-admin-header__brand" href="/dashboard" aria-label="FlowCortex admin home">
+          <a
+            className="cortex-admin-header__brand"
+            href="/dashboard"
+            aria-label={t('common.header.homeLink')}
+          >
             <span className="cortex-admin-header__brand-mark" aria-hidden="true">
               <FlowCortexLogo size={22} />
             </span>
-            <span className="cortex-admin-header__brand-name">FlowCortex</span>
-            <span className="cortex-admin-header__title">Admin console</span>
+            <span className="cortex-admin-header__brand-name">{BRAND_NAME}</span>
+            <span className="cortex-admin-header__title">{t('common.header.console')}</span>
           </a>
           <div className="cortex-admin-header__actions">
-            <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
+            <AppLanguageToggle />
+            <ThemeToggle
+              theme={theme}
+              onToggle={toggleTheme}
+              compact
+              labels={{
+                switchToLight: t('common.theme.switchToLight'),
+                switchToDark: t('common.theme.switchToDark'),
+                light: t('common.theme.light'),
+                dark: t('common.theme.dark'),
+              }}
+            />
             {me && (
               <div className="cortex-admin-user-menu">
                 <button
                   ref={triggerRef}
                   type="button"
                   className="cortex-admin-user-menu__trigger"
-                  aria-label={`${displayName}, account menu`}
+                  aria-label={t('common.account.trigger', { name: displayName })}
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   aria-controls="cortex-admin-account-menu"
@@ -171,7 +192,7 @@ export function AdminLayout() {
                     className="cortex-admin-user-menu__panel"
                     role="menu"
                     tabIndex={-1}
-                    aria-label="Account menu"
+                    aria-label={t('common.account.menu')}
                     onKeyDown={onMenuKeyDown}
                     onBlur={(event) => {
                       if (
@@ -195,7 +216,7 @@ export function AdminLayout() {
                         <span>{me.email}</span>
                         <span className="cortex-admin-user-menu__role-pill">
                           <ShieldCheck aria-hidden="true" size={11} />
-                          {me.role}
+                          {roleLabel(t, me.role)}
                         </span>
                       </div>
                     </div>
@@ -210,7 +231,7 @@ export function AdminLayout() {
                       }}
                     >
                       <UserCircle2 aria-hidden="true" size={16} />
-                      <span>Account details</span>
+                      <span>{t('common.account.details')}</span>
                     </button>
 
                     <div className="cortex-admin-user-menu__divider" aria-hidden="true" />
@@ -225,7 +246,7 @@ export function AdminLayout() {
                       }}
                     >
                       <LogOut aria-hidden="true" size={16} />
-                      <span>Sign out</span>
+                      <span>{t('common.account.signOut')}</span>
                     </button>
                   </div>
                 )}
@@ -236,7 +257,14 @@ export function AdminLayout() {
       </header>
       <Sidebar role={me?.role} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       <main className="cortex-admin-content">
-        <ErrorBoundary key={pathname}>
+        <ErrorBoundary
+          key={pathname}
+          labels={{
+            title: t('common.errorView.title'),
+            message: t('common.errorView.message'),
+            reload: t('common.errorView.reload'),
+          }}
+        >
           <Outlet />
         </ErrorBoundary>
       </main>
@@ -244,7 +272,7 @@ export function AdminLayout() {
         <dialog
           ref={accountDialogRef}
           className="cortex-admin-account-dialog"
-          aria-label="Account"
+          aria-label={t('common.account.dialogTitle')}
           onClose={() => {
             triggerRef.current?.focus();
           }}
@@ -263,7 +291,7 @@ export function AdminLayout() {
                 <h2 id="cortex-admin-account-dialog-title">{displayName}</h2>
                 <span className="cortex-admin-account-dialog__role-pill">
                   <ShieldCheck aria-hidden="true" size={12} />
-                  {me.role}
+                  {roleLabel(t, me.role)}
                 </span>
               </div>
               <div className="cortex-admin-account-dialog__email-row">
@@ -275,8 +303,8 @@ export function AdminLayout() {
                   onClick={() => {
                     if (me.email) void navigator.clipboard.writeText(me.email);
                   }}
-                  aria-label="Copy email to clipboard"
-                  title="Copy email"
+                  aria-label={t('common.account.copyEmail')}
+                  title={t('common.account.copyEmailShort')}
                 >
                   <Copy aria-hidden="true" size={12} />
                 </button>
@@ -286,23 +314,25 @@ export function AdminLayout() {
               type="button"
               className="cortex-admin-account-dialog__close"
               onClick={() => accountDialogRef.current?.close()}
-              aria-label="Close account dialog"
+              aria-label={t('common.account.close')}
             >
               ✕
             </button>
           </header>
 
           <section className="cortex-admin-account-dialog__section cortex-admin-account-dialog__section--danger" aria-labelledby="cortex-admin-account-dialog-danger">
-            <h3 id="cortex-admin-account-dialog-danger">Danger zone</h3>
+            <h3 id="cortex-admin-account-dialog-danger">{t('common.account.dangerZone')}</h3>
             <button
               type="button"
               className="cortex-admin-account-dialog__danger"
               disabled
-              title="Admin accounts cannot be deleted from this dialog. Use the identity provider instead."
+              title={t('common.account.deleteHint')}
             >
               <Trash2 aria-hidden="true" size={15} />
-              <span>Delete account</span>
-              <span className="cortex-admin-account-dialog__action-meta">Disabled for admin</span>
+              <span>{t('common.account.delete')}</span>
+              <span className="cortex-admin-account-dialog__action-meta">
+                {t('common.account.deleteDisabled')}
+              </span>
             </button>
           </section>
         </dialog>

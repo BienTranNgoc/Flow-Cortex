@@ -9,6 +9,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
+import i18n from '../../lib/i18n';
+import viWorkflow from '../../locales/vi/workflow.json';
 import { renderRoute, settled, stubApi, type FakeReply, type Handler } from '../../test/fakeApi';
 import { openInCurrentTab } from './browser';
 import { RunProgressPage } from './RunProgressPage';
@@ -1471,6 +1473,52 @@ describe('RunProgressPage', () => {
         expect(heading).not.toHaveFocus();
         expect(heading).toHaveAttribute('tabindex', '-1');
       });
+    });
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it("shows a known failure in Vietnamese without the English details, and an unknown code's message as stored", async () => {
+      const unknownMessage = 'The thumbnail could not be made.';
+      const user = userEvent.setup();
+      renderRun(
+        run(
+          [
+            step({
+              type: 'tts',
+              mode: 'inline',
+              status: 'error',
+              errorCode: 'speech_too_long',
+              errorMessage:
+                'The approved script reads for 11.2 s, longer than the 10 s video. Start a new run with a shorter script.',
+            }),
+            step({
+              id: 's2',
+              stepOrder: 2,
+              type: 'thumbnail',
+              status: 'error',
+              pickedUpAt: '2026-10-01T10:00:01Z',
+              errorCode: 'thumbnail_failed',
+              errorMessage: unknownMessage,
+            }),
+          ],
+          { status: 'error' },
+        ),
+      );
+
+      const speechAlert = await screen.findByRole('alert');
+      expect(speechAlert.textContent).toBe(viWorkflow.stepError.speech_too_long);
+      expect(speechAlert.textContent).not.toContain('11.2');
+
+      await user.click(screen.getByRole('button', { name: /Bước 2/ }));
+
+      expect(screen.getByRole('alert').textContent).toBe(unknownMessage);
     });
   });
 

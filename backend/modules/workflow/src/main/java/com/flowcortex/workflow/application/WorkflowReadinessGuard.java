@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.RunStartGuard;
 import java.util.LinkedHashMap;
@@ -31,10 +32,10 @@ class WorkflowReadinessGuard implements RunStartGuard {
 
     @Override
     public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
-        Map<String, String> failures = new LinkedHashMap<>();
+        Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
         Integer firstFailing = null;
         for (StepDef step : steps) {
-            Optional<String> reason = reason(step);
+            Optional<LocalizedMessage> reason = reason(step);
             if (reason.isPresent()) {
                 failures.put("step" + step.order(), reason.get());
                 if (firstFailing == null) {
@@ -43,25 +44,25 @@ class WorkflowReadinessGuard implements RunStartGuard {
             }
         }
         if (firstFailing != null) {
-            throw new UnprocessableEntityException(
-                    "This workflow can't run yet: step " + firstFailing + " is not fully configured.", CODE, failures);
+            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
+                    failures);
         }
     }
 
-    private Optional<String> reason(StepDef step) {
+    private Optional<LocalizedMessage> reason(StepDef step) {
         if (step.config() != null && !step.config().isBlank()) {
             JsonNode config;
             try {
                 config = objectMapper.readTree(step.config());
             } catch (JsonProcessingException e) {
-                return Optional.of("Configuration is not a JSON object");
+                return Optional.of(new LocalizedMessage("workflow.incomplete.configNotObject"));
             }
             if (!config.isObject()) {
-                return Optional.of("Configuration is not a JSON object");
+                return Optional.of(new LocalizedMessage("workflow.incomplete.configNotObject"));
             }
             JsonNode profile = config.get("profile");
             if (profile != null && (!profile.isTextual() || profile.asText().isBlank())) {
-                return Optional.of("Profile is empty");
+                return Optional.of(new LocalizedMessage("workflow.incomplete.profileEmpty"));
             }
         }
         if (step.inputRef() != null) {
@@ -72,7 +73,7 @@ class WorkflowReadinessGuard implements RunStartGuard {
                 long referenced = digits.length() > 9 ? Long.MAX_VALUE : Long.parseLong(digits);
                 if (referenced < 1 || referenced >= step.order()) {
                     String named = referenced == Long.MAX_VALUE ? digits : Long.toString(referenced);
-                    return Optional.of("Reads from step " + named + ", which is not an earlier step");
+                    return Optional.of(new LocalizedMessage("workflow.incomplete.notEarlierStep", named));
                 }
             }
         }

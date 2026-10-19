@@ -6,9 +6,16 @@ import { ThemeToggle } from './ThemeToggle';
 const STORAGE_KEY = 'flow-cortex:ui-kit-test:theme';
 const { useTheme } = createUseTheme({ storageKey: STORAGE_KEY, systemDefault: 'light' });
 
+const LABELS = {
+  switchToLight: 'Switch to light theme',
+  switchToDark: 'Switch to dark theme',
+  light: 'Light',
+  dark: 'Dark',
+};
+
 function WiredToggle({ compact }: { readonly compact?: boolean }) {
   const { theme, toggle } = useTheme();
-  return <ThemeToggle theme={theme} onToggle={toggle} compact={compact ?? false} />;
+  return <ThemeToggle theme={theme} onToggle={toggle} compact={compact ?? false} labels={LABELS} />;
 }
 
 afterEach(() => {
@@ -33,7 +40,7 @@ describe('ThemeToggle', () => {
   });
 
   it('renders the "switch to light" label when the active theme is dark', () => {
-    render(<ThemeToggle theme="dark" onToggle={() => {}} />);
+    render(<ThemeToggle theme="dark" onToggle={() => {}} labels={LABELS} />);
     expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
   });
 
@@ -44,6 +51,7 @@ describe('ThemeToggle', () => {
         <ThemeToggle
           theme={theme}
           compact={compact}
+          labels={LABELS}
           onToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
         />
       );

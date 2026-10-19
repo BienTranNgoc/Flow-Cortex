@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import static com.flowcortex.workflow.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -123,8 +125,8 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "   ", null, null))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
-                    assertThat(e.getMessage()).isEqualTo("Content can't be empty");
-                    assertThat(e.getErrors()).containsKey("reviewedPayload");
+                    assertThat(english(e.getDetail())).isEqualTo("Content can't be empty");
+                    assertThat(english(e.getErrors().get("reviewedPayload"))).isEqualTo("Content can't be empty");
                 });
         assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
         verify(reviewTaskRepository, never()).save(any());
@@ -138,10 +140,10 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), otherMember, null, null, null))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Review task not found");
+                .satisfies(detail("Review task not found"));
         assertThatThrownBy(() -> service.rejectTask(task.getId(), otherMember))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Review task not found");
+                .satisfies(detail("Review task not found"));
         assertThat(task.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
         verify(reviewTaskRepository, never()).save(any());
         verify(events, never()).publishEvent(any());
@@ -154,10 +156,10 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(unknown, ownerId, null, null, null))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Review task not found");
+                .satisfies(detail("Review task not found"));
         assertThatThrownBy(() -> service.rejectTask(unknown, ownerId))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Review task not found");
+                .satisfies(detail("Review task not found"));
     }
 
     @Test
@@ -168,7 +170,7 @@ class ReviewTaskServiceImplTest {
 
             assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, null, null))
                     .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
-                        assertThat(e.getMessage()).isEqualTo("This run is being stopped");
+                        assertThat(english(e.getDetail())).isEqualTo("This run is being stopped");
                         assertThat(e.getCode()).isEqualTo("RUN_STOPPING");
                     });
             assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
@@ -187,7 +189,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("This step is no longer waiting for review");
+                .satisfies(detail("This step is no longer waiting for review"));
     }
 
     @Test
@@ -198,7 +200,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, null, null))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("This step is no longer waiting for review");
+                .satisfies(detail("This step is no longer waiting for review"));
         verify(events, never()).publishEvent(any());
     }
 
@@ -210,7 +212,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.rejectTask(task.getId(), ownerId))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("This step is no longer waiting for review");
+                .satisfies(detail("This step is no longer waiting for review"));
         verify(workflowRunRepository, never()).save(any());
     }
 
@@ -251,7 +253,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.saveRevision(task.getId(), ownerId, "Kịch bản ba", 99L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("expected version 99");
+                .satisfies(detailContaining("expected version 99"));
     }
 
     @Test
@@ -260,7 +262,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.saveRevision(task.getId(), ownerId, "Kịch bản", 0L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("does not use script revisions");
+                .satisfies(detailContaining("does not use script revisions"));
     }
 
     @Test
@@ -269,7 +271,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "nội dung", null, null))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("revisionId and expectedVersion are required");
+                .satisfies(detailContaining("revisionId and expectedVersion are required"));
     }
 
     @Test
@@ -279,7 +281,7 @@ class ReviewTaskServiceImplTest {
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, "changed inline",
                 revision.getId(), taskVersion()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("reviewedPayload is not accepted");
+                .satisfies(detailContaining("reviewedPayload is not accepted"));
     }
 
     @Test
@@ -288,7 +290,7 @@ class ReviewTaskServiceImplTest {
 
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, UUID.randomUUID(), 0L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("not accepted for plain approval");
+                .satisfies(detailContaining("not accepted for plain approval"));
     }
 
     @Test
@@ -303,7 +305,7 @@ class ReviewTaskServiceImplTest {
         assertThat(second.revisionNumber()).isEqualTo(2);
         assertThatThrownBy(() -> service.approveTask(task.getId(), ownerId, null, first.getId(), 1L))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("Only the current script revision can be approved");
+                .satisfies(detailContaining("Only the current script revision can be approved"));
     }
 
     @Test
@@ -324,5 +326,17 @@ class ReviewTaskServiceImplTest {
         when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getRevisions(task.getId(), ownerId)).isInstanceOf(NotFoundException.class);
+    }
+
+    private static ThrowingConsumer<Throwable> detailContaining(String text) {
+        return e -> assertThat(english(((ConflictException) e).getDetail())).contains(text);
+    }
+
+    private static ThrowingConsumer<Throwable> detail(String text) {
+        return e -> assertThat(english(switch (e) {
+            case NotFoundException notFound -> notFound.getDetail();
+            case ConflictException conflict -> conflict.getDetail();
+            default -> throw new AssertionError("No localized detail on " + e);
+        })).isEqualTo(text);
     }
 }

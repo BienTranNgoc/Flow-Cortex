@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.web.LocaleConfig;
+import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
@@ -24,18 +26,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class EmailConfirmationServiceTest {
 
+    private static final AnnotationConfigApplicationContext LOCALE =
+            new AnnotationConfigApplicationContext(LocaleConfig.class);
+    private static final Pattern TOKEN = Pattern.compile("(?:confirm-email|set-password)\\?token=([A-Za-z0-9_-]+)");
     private static final Instant NOW = Instant.parse("2026-10-18T09:00:00Z");
 
     private final EmailConfirmationTokenRepository tokens = mock(EmailConfirmationTokenRepository.class);
@@ -48,7 +61,13 @@ class EmailConfirmationServiceTest {
         return new EmailConfirmationService(tokens, users, mailSender, mailExecutor,
                 new EmailConfirmationProperties(enabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
-                Clock.fixed(NOW, ZoneOffset.UTC), publicUrl, mailHost, meters);
+                Clock.fixed(NOW, ZoneOffset.UTC), publicUrl, mailHost, meters, LOCALE,
+                LOCALE.getBean(RequestLocale.class));
+    }
+
+    @AfterEach
+    void unbind() {
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -69,17 +88,79 @@ class EmailConfirmationServiceTest {
     }
 
     @Test
+    void withoutAnAcceptLanguageTheSubjectAndBodyAreTodaysEnglish() {
+        SimpleMailMessage mail = issueAndCommit();
+
+        assertThat(mail.getSubject()).isEqualTo("Confirm your Flow-Cortex email");
+        String link = "https://app.example/confirm-email?token=" + tokenIn(mail.getText());
+        assertThat(mail.getText()).isEqualTo("Hello,\n\n"
+                + "Confirm your email to finish creating your Flow-Cortex account:\n\n"
+                + link + "\n\n"
+                + "The link works for 24 hours and only once. "
+                + "If you did not create an account, you can ignore this email.\n");
+    }
+
+    @Test
+    void theLanguageOfTheRegistrationRequestOutlivesTheRequestUntilTheMailLeaves() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.ACCEPT_LANGUAGE, "vi-VN");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        SimpleMailMessage mail = issueAndCommit();
+
+        assertThat(mail.getSubject()).isEqualTo("Xác nhận email Flow-Cortex của bạn");
+        assertThat(mail.getText()).startsWith("Xin chào,").contains("24 giờ")
+                .contains("https://app.example/confirm-email?token=" + tokenIn(mail.getText()));
+    }
+
+    @Test
+    void withoutAnAcceptLanguageTheSetPasswordLinkAndNoticeAreTodaysEnglish() {
+        UUID userId = UUID.randomUUID();
+        EmailConfirmationService service = service(true, "https://app.example.com/", "mailpit");
+
+        runCommitting(() -> givenGoogleOnlyAccountResent(service));
+        runCommitting(() -> service.mailPasswordSetNotice(userId, "an@example.com"));
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, org.mockito.Mockito.times(2)).send(mail.capture());
+        SimpleMailMessage link = mail.getAllValues().get(0);
+        assertThat(link.getSubject()).isEqualTo("Set your Flow-Cortex password");
+        assertThat(link.getText()).isEqualTo("Hello,\n\n"
+                + "Your Flow-Cortex account has no password yet. Open this link to sign in and choose one:\n\n"
+                + "https://app.example.com/set-password?token=" + tokenIn(link.getText()) + "\n\n"
+                + "The link works for 30 minutes and only once. "
+                + "If you did not ask for it, you can ignore this email.\n");
+        SimpleMailMessage notice = mail.getAllValues().get(1);
+        assertThat(notice.getSubject()).isEqualTo("Your Flow-Cortex password was set");
+        assertThat(notice.getText()).isEqualTo("Hello,\n\n"
+                + "A password was just set for your Flow-Cortex account, and every other signed-in session"
+                + " was ended.\n\n"
+                + "If this was not you, contact support right away.\n");
+    }
+
+    @Test
+    void aVietnameseRequestGetsTheSetPasswordLinkAndNoticeInVietnamese() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+
+        runCommitting(() -> givenGoogleOnlyAccountResent(service));
+        runCommitting(() -> service.mailPasswordSetNotice(UUID.randomUUID(), "an@example.com"));
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, org.mockito.Mockito.times(2)).send(mail.capture());
+        assertThat(mail.getAllValues().get(0).getSubject()).isEqualTo("Đặt mật khẩu Flow-Cortex của bạn");
+        assertThat(mail.getAllValues().get(0).getText()).startsWith("Xin chào,").contains("30 phút");
+        assertThat(mail.getAllValues().get(1).getSubject()).isEqualTo("Mật khẩu Flow-Cortex của bạn đã được đặt");
+    }
+
+    @Test
     void aMailTheServerRefusesIsCountedAndDoesNotFailTheCaller() {
         doThrow(new MailSendException("refused")).when(mailSender).send(any(SimpleMailMessage.class));
         EmailConfirmationService service = service(true, "https://app.example.com/", "mailpit");
 
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            service.issue(UUID.randomUUID(), "an@example.com");
-            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
+        runCommitting(() -> service.issue(UUID.randomUUID(), "an@example.com"));
 
         assertThat(meters.get("email.confirmation.send_failed").counter().count()).isEqualTo(1.0);
     }
@@ -146,13 +227,9 @@ class EmailConfirmationServiceTest {
 
     @Test
     void aConfirmedAccountWithoutAPasswordIsMailedASetPasswordLink() {
-        AppUser googleOnly = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "an@example.com", "", "An",
-                Role.MEMBER, UserStatus.ACTIVE, false);
-        when(users.findIdByEmail("an@example.com")).thenReturn(Optional.of(googleOnly.getId()));
-        when(users.findByIdForUpdate(googleOnly.getId())).thenReturn(Optional.of(googleOnly));
         EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
 
-        runCommitting(() -> service.resend("an@example.com"));
+        AppUser googleOnly = committing(() -> givenGoogleOnlyAccountResent(service));
 
         ArgumentCaptor<EmailConfirmationToken> saved = ArgumentCaptor.forClass(EmailConfirmationToken.class);
         verify(tokens).save(saved.capture());
@@ -161,7 +238,7 @@ class EmailConfirmationServiceTest {
         verify(tokens).invalidateOpenFor(googleOnly.getId(), NOW);
         ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(mail.capture());
-        assertThat(mail.getValue().getSubject()).isEqualTo(EmailConfirmationService.PASSWORD_LINK_SUBJECT);
+        assertThat(mail.getValue().getSubject()).isEqualTo("Set your Flow-Cortex password");
         assertThat(mail.getValue().getText()).contains("https://app.example.com/set-password?token=");
     }
 
@@ -206,16 +283,6 @@ class EmailConfirmationServiceTest {
         assertThat(service.spendPasswordSetupToken(UUID.randomUUID(), "raw")).isFalse();
     }
 
-    private static void runCommitting(Runnable work) {
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            work.run();
-            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-    }
-
     @Test
     void aLinkThatCannotBeSpentConfirmsNothing() {
         UUID userId = UUID.randomUUID();
@@ -231,5 +298,54 @@ class EmailConfirmationServiceTest {
         assertThat(user.isEmailConfirmed()).isFalse();
         assertThat(user.hasPassword()).isTrue();
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    private AppUser givenGoogleOnlyAccountResent(EmailConfirmationService service) {
+        AppUser googleOnly = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "an@example.com", "", "An",
+                Role.MEMBER, UserStatus.ACTIVE, false);
+        when(users.findIdByEmail("an@example.com")).thenReturn(Optional.of(googleOnly.getId()));
+        when(users.findByIdForUpdate(googleOnly.getId())).thenReturn(Optional.of(googleOnly));
+        service.resend("an@example.com");
+        return googleOnly;
+    }
+
+    /** Unbinds the request before the commit, so only a language captured at issue time can reach the mail. */
+    private SimpleMailMessage issueAndCommit() {
+        EmailConfirmationService service = service(true, "https://app.example/", "mailpit");
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.issue(UUID.randomUUID(), "member@example.com");
+            RequestContextHolder.resetRequestAttributes();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+        ArgumentCaptor<SimpleMailMessage> sent = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(sent.capture());
+        return sent.getValue();
+    }
+
+    private static void runCommitting(Runnable work) {
+        committing(() -> {
+            work.run();
+            return null;
+        });
+    }
+
+    private static <T> T committing(java.util.function.Supplier<T> work) {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            T result = work.get();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            return result;
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    private static String tokenIn(String body) {
+        Matcher matcher = TOKEN.matcher(body);
+        assertThat(matcher.find()).isTrue();
+        return matcher.group(1);
     }
 }

@@ -1,11 +1,12 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { FlowCortexLogo } from '@flow-cortex/ui-kit';
 import './BrandPanel.css';
 
-const BULLETS = [
-  'Three production pipelines ready out of the box',
-  'Human review gates built into every multi-step run',
-  'Output retention and signed download links by default',
-];
+const BULLET_KEYS = [
+  'common.shell.brandPanel.pipelines',
+  'common.shell.brandPanel.reviewGates',
+  'common.shell.brandPanel.retention',
+] as const;
 
 function NeuralBackdrop() {
   return (
@@ -90,6 +91,7 @@ function CheckIcon() {
 }
 
 export function BrandPanel() {
+  const { t } = useTranslation();
   return (
     <aside className="brand-panel" aria-hidden="false">
       <NeuralBackdrop />
@@ -101,20 +103,17 @@ export function BrandPanel() {
 
         <p className="eyebrow">FLOWCORTEX AI 2.5</p>
         <h2 className="brand-panel__headline">
-          Your AI media <span>studio</span> for production-grade pipelines.
+          <Trans i18nKey="common.shell.brandPanel.headline" components={{ highlight: <span /> }} />
         </h2>
-        <p className="brand-panel__lede">
-          Source, process, review and export media in one click — built for creators
-          who need consistent output, not another toy.
-        </p>
+        <p className="brand-panel__lede">{t('common.shell.brandPanel.lede')}</p>
 
         <ul className="brand-panel__bullets">
-          {BULLETS.map((label) => (
-            <li key={label}>
+          {BULLET_KEYS.map((key) => (
+            <li key={key}>
               <span className="brand-panel__check" aria-hidden="true">
                 <CheckIcon />
               </span>
-              <span>{label}</span>
+              <span>{t(key)}</span>
             </li>
           ))}
         </ul>

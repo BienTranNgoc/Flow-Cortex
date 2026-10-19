@@ -519,6 +519,72 @@ a {
   display: none;
 }
 
+/* ===== LANGUAGE TOGGLE ================================================== */
+
+.language-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  border: 1px solid var(--admin-card-edge-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--admin-card-surface) 80%, transparent);
+}
+
+.language-toggle__option {
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+  margin: 0;
+  padding: 0 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--admin-nav-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    color var(--dur-quick) var(--ease-standard),
+    background var(--dur-quick) var(--ease-standard);
+}
+
+.language-toggle__option:hover {
+  color: var(--admin-ink);
+  background: color-mix(in srgb, var(--admin-teal-glow) 8%, transparent);
+}
+
+.language-toggle__option[aria-pressed='true'],
+.language-toggle__option[aria-pressed='true']:hover {
+  color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+  border-color: color-mix(in srgb, var(--admin-primary) 40%, transparent);
+}
+
+.language-toggle__option:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.auth-shell__language {
+  position: absolute;
+  top: clamp(1rem, 2vw, 1.5rem);
+  right: clamp(1rem, 2vw, 1.5rem);
+  z-index: 2;
+}
+
 /* ===== SIDEBAR NAV ====================================================== */
 
 .cortex-admin-nav {

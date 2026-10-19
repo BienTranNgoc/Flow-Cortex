@@ -1,5 +1,6 @@
 package com.flowcortex.media.application;
 
+import static com.flowcortex.media.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +30,7 @@ import com.flowcortex.media.infrastructure.S3MediaStore;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
 import com.flowcortex.media.domain.MediaAsset;
+import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Duration;
 import java.time.Instant;
@@ -429,7 +431,7 @@ class MediaJobsImplTest {
                     new MediaAssetInput(assetId, new MediaJobInput("media", "flowcortex-uploads", "o/u")))))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage())
+                        assertThat(english(e.detail()))
                                 .isEqualTo("This file isn't a valid video file. Accepted: .mp4, .mov, .webm, .mkv.");
                     });
             verify(context.getBean(MediaAssetBindingRepository.class), never()).saveAll(any());
@@ -442,14 +444,14 @@ class MediaJobsImplTest {
             MediaJobs jobs = context.getBean(MediaJobs.class);
             S3MediaStore store = context.getBean(S3MediaStore.class);
             UUID runId = UUID.randomUUID();
-            doThrow(new UploadRejectedException("uploadIds", "Upload the file again"))
+            doThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again")))
                     .when(store).copy(anyString(), anyString(), anyString(), anyString());
 
             assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
                     new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("media", "flowcortex-uploads", "o/u")))))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
             assertThatThrownBy(() -> jobs.copyRunInputs(runId, List.of(
                     new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "flowcortex-uploads", "o/i")))))
@@ -783,7 +785,7 @@ class MediaJobsImplTest {
                 assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "clip.mp4", size))
                         .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                             assertThat(e.field()).isEqualTo("size");
-                            assertThat(e.getMessage()).isEqualTo(SIZE_SENTENCE);
+                            assertThat(english(e.detail())).isEqualTo(SIZE_SENTENCE);
                         });
             }
             verify(context.getBean(S3MediaStore.class), never()).presignPut(any(), any(), any(), anyLong(), any());
@@ -804,11 +806,11 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "voice.wav", 104_857_601L))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("size");
-                        assertThat(e.getMessage()).isEqualTo(AUDIO_SIZE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(AUDIO_SIZE_SENTENCE);
                     });
             assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), "photo.png", 10_485_761L))
                     .isInstanceOfSatisfying(UploadRejectedException.class,
-                            e -> assertThat(e.getMessage()).isEqualTo(IMAGE_SIZE_SENTENCE));
+                            e -> assertThat(english(e.detail())).isEqualTo(IMAGE_SIZE_SENTENCE));
         });
     }
 
@@ -820,7 +822,7 @@ class MediaJobsImplTest {
                 assertThatThrownBy(() -> jobs.prepareUpload(UUID.randomUUID(), fileName, 16L))
                         .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                             assertThat(e.field()).isEqualTo("fileName");
-                            assertThat(e.getMessage()).isEqualTo(TYPE_SENTENCE);
+                            assertThat(english(e.detail())).isEqualTo(TYPE_SENTENCE);
                         });
             }
         });
@@ -900,7 +902,7 @@ class MediaJobsImplTest {
                     .resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID())))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(IMAGE_SIZE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(IMAGE_SIZE_SENTENCE);
                     });
             verify(context.getBean(MediaAssetRepository.class), never()).save(any());
         });
@@ -914,7 +916,7 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> context.getBean(MediaJobs.class).resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
         });
     }
@@ -932,7 +934,7 @@ class MediaJobsImplTest {
                     .resolveImageUploads(UUID.randomUUID(), List.of(uploadId)))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo("Upload the file again");
+                        assertThat(english(e.detail())).isEqualTo("Upload the file again");
                     });
             verify(context.getBean(S3MediaStore.class), never()).head(anyString(), anyString());
         });
@@ -950,12 +952,12 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(SIZE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(SIZE_SENTENCE);
                     });
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(MEDIA_TYPE_SENTENCE);
                     });
             verify(store, org.mockito.Mockito.times(2)).head(eq("flowcortex-uploads"), anyString());
         });
@@ -973,7 +975,7 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.resolveUpload(UUID.randomUUID(), UUID.randomUUID()))
                     .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
                         assertThat(e.field()).isEqualTo("uploadId");
-                        assertThat(e.getMessage()).isEqualTo(MEDIA_TYPE_SENTENCE);
+                        assertThat(english(e.detail())).isEqualTo(MEDIA_TYPE_SENTENCE);
                     });
             assertThat(jobs.resolveImageUploads(UUID.randomUUID(), List.of(UUID.randomUUID()))).hasSize(1);
             verify(context.getBean(MediaAssetRepository.class), org.mockito.Mockito.times(1)).save(any());

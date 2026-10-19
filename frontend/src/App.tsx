@@ -1,5 +1,6 @@
 import { ErrorBoundary } from '@flow-cortex/ui-kit';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import './styles/tokens.css';
 import './app/base.css';
@@ -25,8 +26,16 @@ import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
 /** The page area inside the layout; keyed by path so navigating away from a failed page clears it. */
 function ContainedOutlet() {
   const { pathname } = useLocation();
+  const { t } = useTranslation();
   return (
-    <ErrorBoundary key={pathname}>
+    <ErrorBoundary
+      key={pathname}
+      labels={{
+        title: t('common.errorView.title'),
+        message: t('common.errorView.message'),
+        reload: t('common.errorView.reload'),
+      }}
+    >
       <Outlet />
     </ErrorBoundary>
   );

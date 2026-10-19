@@ -1,9 +1,13 @@
+import type { TFunction } from 'i18next';
+import { formatNumber } from '../../lib/format';
+import type { Locale } from '../../lib/i18n';
+
 type Report = Record<string, unknown>;
 
 interface FieldDefinition {
-  label: string;
+  labelKey: string;
   keys: readonly string[];
-  format: (report: Report) => string | null;
+  format: (report: Report, t: TFunction, locale: Locale) => string | null;
 }
 
 export interface OutputField {
@@ -18,22 +22,47 @@ const scalar = (value: unknown) =>
 
 const text = (key: string) => (report: Report) => scalar(report[key]);
 
-const seconds = (ms: unknown) => (typeof ms === 'number' ? `${(ms / 1000).toFixed(1)} s` : null);
+/** One decimal, rounded by `toFixed` and grouped in vi only, so English keeps its old output. */
+const oneDecimal = (value: number, locale: Locale) =>
+  formatNumber(Number(value.toFixed(1)), locale, {
+    useGrouping: locale === 'vi',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 
-const megabytes = (bytes: unknown) =>
-  typeof bytes === 'number' ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : null;
+const seconds = (ms: unknown, t: TFunction, locale: Locale) =>
+  typeof ms === 'number'
+    ? t('common.units.seconds', { value: oneDecimal(ms / 1000, locale) })
+    : null;
+
+const megabytes = (bytes: unknown, t: TFunction, locale: Locale) =>
+  typeof bytes === 'number'
+    ? t('common.units.megabytes', { value: oneDecimal(bytes / (1024 * 1024), locale) })
+    : null;
 
 /** The one label table for structured step output: what the page shows and the summary file lists. */
 const FIELDS: readonly FieldDefinition[] = [
-  { label: 'Duration', keys: ['durationMs'], format: (report) => seconds(report.durationMs) },
   {
-    label: 'Dimensions',
+    labelKey: 'workflow.output.field.duration',
+    keys: ['durationMs'],
+    format: (report, t, locale) => seconds(report.durationMs, t, locale),
+  },
+  {
+    labelKey: 'workflow.output.field.dimensions',
     keys: ['width', 'height'],
     format: ({ width, height }) =>
       typeof width === 'number' && typeof height === 'number' ? `${width} × ${height}` : null,
   },
-  { label: 'Video codec', keys: ['videoCodec'], format: text('videoCodec') },
-  { label: 'Audio codec', keys: ['audioCodec'], format: text('audioCodec') },
+  {
+    labelKey: 'workflow.output.field.videoCodec',
+    keys: ['videoCodec'],
+    format: text('videoCodec'),
+  },
+  {
+    labelKey: 'workflow.output.field.audioCodec',
+    keys: ['audioCodec'],
+    format: text('audioCodec'),
+  },
 ];
 
 /** Keys no member can read (a demuxer list); kept for "Show raw" and the technical details file. */
@@ -51,9 +80,9 @@ function humanise(key: string): string {
 }
 
 /** A key outside the table gets a humanised label; a nested value is left to "Show raw". */
-function otherField(key: string, value: unknown): OutputField | null {
+function otherField(key: string, value: unknown, t: TFunction, locale: Locale): OutputField | null {
   if (key.endsWith('Bytes')) {
-    const size = megabytes(value);
+    const size = megabytes(value, t, locale);
     return size === null ? null : { label: humanise(key.slice(0, -'Bytes'.length)), value: size };
   }
   const shown = scalar(value);
@@ -73,16 +102,16 @@ export function parseReport(output: string): Report | null {
 }
 
 /** The labelled fields of a report, in table order: absent (`null`) and technical fields left out. */
-export function outputFields(report: Report): OutputField[] {
+export function outputFields(report: Report, t: TFunction, locale: Locale): OutputField[] {
   const known = FIELDS.flatMap((field) => {
-    const value = field.format(report);
-    return value === null ? [] : [{ label: field.label, value }];
+    const value = field.format(report, t, locale);
+    return value === null ? [] : [{ label: t(field.labelKey), value }];
   });
   const others = Object.entries(report).flatMap(([key, value]) => {
     if (KNOWN_KEYS.has(key) || TECHNICAL_KEYS.has(key)) {
       return [];
     }
-    const field = otherField(key, value);
+    const field = otherField(key, value, t, locale);
     return field ? [field] : [];
   });
   return [...known, ...others];

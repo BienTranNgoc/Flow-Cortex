@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
@@ -7,7 +8,15 @@ import { useDashboardWorkflows } from '../features/dashboard/useDashboardWorkflo
 import { WorkflowCard } from '../features/dashboard/WorkflowCard';
 import './HomePage.css';
 
+const STAGES = [
+  { order: 1, title: 'common.home.stages.source.title', body: 'common.home.stages.source.body' },
+  { order: 2, title: 'common.home.stages.process.title', body: 'common.home.stages.process.body' },
+  { order: 3, title: 'common.home.stages.review.title', body: 'common.home.stages.review.body' },
+  { order: 4, title: 'common.home.stages.export.title', body: 'common.home.stages.export.body' },
+] as const;
+
 export function HomePage() {
+  const { t } = useTranslation();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
   const workflows = workflowsQuery.data ?? [];
@@ -15,21 +24,21 @@ export function HomePage() {
   const { filtered, counts, query, setQuery, category, setCategory, reset } = dashboard;
   const hasWorkflows = workflows.length > 0;
 
-  if (meQuery.isLoading) return <output className="dashboard-loading">Loading…</output>;
+  if (meQuery.isLoading) return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   if (meQuery.isError) {
     return (
       <main className="launchpad">
         <p role="alert" className="form-error">
-          Could not load your profile.{' '}
+          {t('common.home.loadProfileError')}{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
-            Retry
+            {t('common.home.retry')}
           </button>
         </p>
       </main>
     );
   }
   if (!meQuery.data) {
-    return <output className="dashboard-loading">Loading…</output>;
+    return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   }
 
   return (
@@ -46,25 +55,28 @@ export function HomePage() {
               <path d="M13 2L4 14h6l-1 8 9-12h-6z" />
             </svg>
           </span>
-          <span>CREATOR LAUNCHPAD · READY TO CREATE</span>
+          <span>{t('common.home.eyebrow')}</span>
         </div>
         <h1 id="launchpad-hero-title" className="launchpad-hero__title">
-          <span className="launchpad-hero__title-strong">Your AI media</span>{' '}
-          <span className="launchpad-hero__title-accent">studio</span>
+          <Trans
+            i18nKey="common.home.headline"
+            components={{
+              strong: <span className="launchpad-hero__title-strong" />,
+              accent: <span className="launchpad-hero__title-accent" />,
+            }}
+          />
         </h1>
-        <p className="launchpad-hero__lede">
-          One click launches a production-ready pipeline: source, process, review, export.
-        </p>
+        <p className="launchpad-hero__lede">{t('common.home.lede')}</p>
       </section>
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
         <header className="launchpad-cards__head">
           <h2 id="launchpad-cards-title" className="launchpad-section-title">
-            Pick a pipeline
+            {t('common.home.pickTitle')}
           </h2>
           {hasWorkflows && (
             <Link to="/workflows" className="launchpad-cards__see-all">
-              View all workflows
+              {t('common.home.viewAll')}
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
@@ -81,25 +93,25 @@ export function HomePage() {
           </div>
         )}
 
-        {workflowsQuery.isLoading && <output>Loading workflows…</output>}
+        {workflowsQuery.isLoading && <output>{t('common.home.loadingWorkflows')}</output>}
         {workflowsQuery.isError && (
           <p role="alert" className="form-error">
-            Could not load workflows.{' '}
+            {t('common.home.loadWorkflowsError')}{' '}
             <button type="button" onClick={() => void workflowsQuery.refetch()}>
-              Retry
+              {t('common.home.retry')}
             </button>
           </p>
         )}
         {hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && filtered.length === 0 && (
           <div className="launchpad-cards__empty">
-            <p role="status">No workflows match your filter.</p>
+            <p role="status">{t('common.home.noMatch')}</p>
             <button type="button" onClick={reset}>
-              Clear filters
+              {t('common.home.clearFilters')}
             </button>
           </div>
         )}
         {!hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && (
-          <p>No workflows available yet.</p>
+          <p>{t('common.home.empty')}</p>
         )}
 
         {filtered.length > 0 && (
@@ -112,42 +124,24 @@ export function HomePage() {
       </section>
 
       <section className="launchpad-stages" aria-labelledby="launchpad-stages-title">
-        <h2 id="launchpad-stages-title">How Flow-Cortex Handles Your Video Runs</h2>
+        <h2 id="launchpad-stages-title">{t('common.home.stagesTitle')}</h2>
         <ol className="launchpad-stages-list">
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              1
-            </span>
-            <h3>Source</h3>
-            <p>Submit a link or upload a media file. Required fields and limits are checked up front.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              2
-            </span>
-            <h3>Process</h3>
-            <p>Workers run each step in order. Status, attempts and errors are saved on every node.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              3
-            </span>
-            <h3>Review</h3>
-            <p>Pauses at the review gates you configured. Edit content, then approve to continue.</p>
-          </li>
-          <li className="launchpad-stage">
-            <span className="launchpad-stage-order" aria-hidden="true">
-              4
-            </span>
-            <h3>Export</h3>
-            <p>Download the finished output while it is still within the asset retention window.</p>
-          </li>
+          {STAGES.map(({ order, title, body }) => (
+            <li key={order} className="launchpad-stage">
+              <span className="launchpad-stage-order" aria-hidden="true">
+                {order}
+              </span>
+              <h3>{t(title)}</h3>
+              <p>{t(body)}</p>
+            </li>
+          ))}
         </ol>
       </section>
 
       <section className="launchpad-footer">
         <p>
-          Welcome, {meQuery.data.name} · <Link to="/profile">Manage your profile</Link>
+          {t('common.home.welcome', { name: meQuery.data.name })} ·{' '}
+          <Link to="/profile">{t('common.home.manageProfile')}</Link>
         </p>
       </section>
     </main>

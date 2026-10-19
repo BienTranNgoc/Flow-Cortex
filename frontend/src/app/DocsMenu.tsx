@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { DOCS_SUB_ITEMS } from './navItems';
 import './DocsMenu.css';
@@ -9,6 +10,7 @@ interface DocsMenuProps {
 
 /** A "Docs" nav link that opens a small popover with Overview / API Reference / Guides. */
 export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -50,7 +52,7 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((prev) => !prev)}
       >
-        Docs
+        {t('common.nav.docs')}
         <svg
           className={`cortex-docs-menu__chevron${open ? ' is-open' : ''}`}
           viewBox="0 0 24 24"
@@ -78,7 +80,7 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
               }
               onClick={() => setOpen(false)}
             >
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
           <NavLink
@@ -87,7 +89,7 @@ export function DocsMenu({ pathname }: Readonly<DocsMenuProps>) {
             className="cortex-docs-menu__hint"
             onClick={() => setOpen(false)}
           >
-            See full API Reference →
+            {t('common.docs.menuHint')}
           </NavLink>
         </div>
       )}

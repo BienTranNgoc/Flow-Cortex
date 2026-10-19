@@ -3,6 +3,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import i18n from '../lib/i18n';
+import viCommon from '../locales/vi/common.json';
+import viUsers from '../locales/vi/users.json';
 import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { AdminLayout } from './AdminLayout';
 
@@ -111,6 +114,8 @@ describe('AdminLayout', () => {
     expect(menu).toHaveTextContent(ADMIN_ME.role);
     expect(screen.getByRole('menuitem', { name: 'Account details' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Language/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Page action' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -157,5 +162,49 @@ describe('AdminLayout', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the header, its toggles and the account menu in Vietnamese', async () => {
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      setToken('admin-token-layout-vi', true);
+      renderAdminPage();
+
+      const trigger = await screen.findByRole('button', {
+        name: `${ADMIN_ME.name}, menu tài khoản`,
+      });
+      expect(screen.getByRole('group', { name: viCommon.language.groupLabel })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: new RegExp(`${viCommon.theme.switchToLight}|${viCommon.theme.switchToDark}`),
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: viCommon.header.homeLink }),
+      ).toHaveTextContent(viCommon.header.console);
+      expect(
+        screen.getAllByRole('button', { name: viCommon.shell.nav.collapse }).length,
+      ).toBeGreaterThan(0);
+      expect(screen.getByRole('navigation', { name: viCommon.shell.nav.label })).toBeInTheDocument();
+
+      await userEvent.click(trigger);
+      const menu = screen.getByRole('menu', { name: viCommon.account.menu });
+      expect(menu).toHaveTextContent(viUsers.role.ADMIN);
+      expect(screen.getByRole('menuitem', { name: viCommon.account.details })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: viCommon.account.signOut })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('menuitem', { name: viCommon.account.details }));
+      const dialog = await screen.findByRole('dialog', { name: viCommon.account.dialogTitle });
+      expect(dialog).toHaveTextContent(viCommon.account.dangerZone);
+      expect(screen.getByRole('button', { name: viCommon.account.copyEmail })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: viCommon.account.close })).toBeInTheDocument();
+    });
   });
 });

@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import static com.flowcortex.workflow.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunStartGuard.StepDef;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,9 +54,9 @@ class WorkflowReadinessGuardTest {
         assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, List.of(FIRST, step), CONTEXT))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
                     assertThat(e.getCode()).isEqualTo("WORKFLOW_INCOMPLETE");
-                    assertThat(e.getMessage())
+                    assertThat(english(e.getDetail()))
                             .isEqualTo("This workflow can't run yet: step 2 is not fully configured.");
-                    assertThat(e.getErrors()).containsExactly(Map.entry("step2", reason));
+                    assertThat(englishErrors(e)).containsExactly(Map.entry("step2", reason));
                 });
     }
 
@@ -68,9 +70,9 @@ class WorkflowReadinessGuardTest {
 
         assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
-                    assertThat(e.getMessage())
+                    assertThat(english(e.getDetail()))
                             .isEqualTo("This workflow can't run yet: step 2 is not fully configured.");
-                    assertThat(e.getErrors()).containsOnly(
+                    assertThat(englishErrors(e)).containsOnly(
                             Map.entry("step2", "Profile is empty"),
                             Map.entry("step4", "Reads from step 9, which is not an earlier step"));
                 });
@@ -80,7 +82,7 @@ class WorkflowReadinessGuardTest {
     void aStepOneReferenceIsRefusedBecauseNoStepIsEarlier() {
         assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW,
                 List.of(new StepDef(1, "First", "echo", null, "{step:1.value}")), CONTEXT))
-                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(e.getErrors())
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(englishErrors(e))
                         .containsExactly(Map.entry("step1", "Reads from step 1, which is not an earlier step")));
     }
 
@@ -99,5 +101,11 @@ class WorkflowReadinessGuardTest {
     @Test
     void itRunsFirstAmongTheStartGuards() {
         assertThat(WorkflowReadinessGuard.class.getAnnotation(Order.class).value()).isEqualTo(1);
+    }
+
+    private static Map<String, String> englishErrors(UnprocessableEntityException e) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        e.getErrors().forEach((field, reason) -> errors.put(field, english(reason)));
+        return errors;
     }
 }

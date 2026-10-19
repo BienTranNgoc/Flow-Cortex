@@ -2,6 +2,8 @@ package com.flowcortex.user.application;
 
 import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthService;
@@ -53,24 +55,23 @@ class AuthServiceImpl implements AuthService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AuthServiceImpl.class);
 
-    private static final String REGISTRATION_CLOSED = "Self-registration is not available";
-
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
-
-    private static final String CONFIRMATION_LINK_INVALID = "This confirmation link is no longer valid";
 
     private static final String CONFIRMATION_LINK_INVALID_CODE = "CONFIRMATION_LINK_INVALID";
 
     private static final String USERNAME_UNIQUE_INDEX = "uq_app_user_username";
 
-    private static final String PASSWORD_ALREADY_SET = "This account already has a password";
+    private static final LocalizedMessage CONFIRMATION_LINK_INVALID =
+            new LocalizedMessage("auth.confirmationLinkInvalid");
 
-    private static final String PASSWORD_LINK_INVALID = "This set-password link is no longer valid";
+    private static final LocalizedMessage PASSWORD_ALREADY_SET = new LocalizedMessage("auth.password.alreadySet");
+
+    private static final LocalizedMessage PASSWORD_LINK_INVALID = new LocalizedMessage("auth.passwordLinkInvalid");
 
     private static final String PASSWORD_LINK_INVALID_CODE = "PASSWORD_LINK_INVALID";
 
-    private static final String PASSWORD_SETUP_TOKEN_INVALID =
-            "This password setup has expired; ask for a new set-password link";
+    private static final LocalizedMessage PASSWORD_SETUP_TOKEN_INVALID =
+            new LocalizedMessage("auth.passwordSetupExpired");
 
     private static final String PASSWORD_SETUP_TOKEN_INVALID_CODE = "PASSWORD_SETUP_TOKEN_INVALID";
 
@@ -255,7 +256,7 @@ class AuthServiceImpl implements AuthService {
         try {
             user = transaction.execute(status -> {
                 AppUser account = userRepository.findByIdForUpdate(userId)
-                        .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                        .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", userId)));
                 AccountStatusGuard.requireActive(account);
                 if (account.hasPassword()) {
                     LOG.info("Set password refused: outcome=already_set userId={}", userId);
@@ -361,7 +362,7 @@ class AuthServiceImpl implements AuthService {
     @Transactional
     public CurrentUser updateOwnProfile(UUID userId, String name) {
         AppUser user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", userId)));
         AccountStatusGuard.requireActive(user);
         user.changeName(name);
         return AppUserMapper.toCurrentUser(user);
@@ -536,7 +537,7 @@ class AuthServiceImpl implements AuthService {
         String ownerEmail = registration.ownerEmail() == null ? "" : registration.ownerEmail().trim();
         if (ownerEmail.isEmpty()) {
             LOG.info("Registration refused: reason=owner_not_configured");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+            throw registrationClosed();
         }
         AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
         String unusable = owner == null ? "owner_not_found"
@@ -545,9 +546,13 @@ class AuthServiceImpl implements AuthService {
                 : null;
         if (unusable != null) {
             LOG.warn("Registration refused: reason={} (check flowcortex.registration.owner-email)", unusable);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, REGISTRATION_CLOSED);
+            throw registrationClosed();
         }
         return owner;
+    }
+
+    private static LocalizedStatusException registrationClosed() {
+        return new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("auth.registrationClosed"));
     }
 
     private static String truncate(String value) {

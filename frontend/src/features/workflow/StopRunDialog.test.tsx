@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
+import i18n from '../../lib/i18n';
 import { StopRunDialog } from './StopRunDialog';
 
 const TEXT =
@@ -153,5 +154,29 @@ describe('StopRunDialog', () => {
     expect(busy).toHaveAttribute('aria-disabled', 'true');
     await user.click(busy);
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('asks, explains and offers both choices in Vietnamese, with the charge grouped the vi-VN way', async () => {
+      render(<Harness chargedCredits={1500} />);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Stop workflow' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Dừng quy trình này?' });
+
+      expect(dialog).toHaveTextContent(
+        'Bước hiện tại sẽ chạy xong, sau đó lượt chạy dừng lại. Các bước còn lại sẽ không chạy và không bị tính phí. Kết quả của các bước đã xong vẫn được giữ lại.',
+      );
+      expect(dialog).toHaveTextContent('Đã tính cho lượt chạy này: 1.500 Credit');
+      expect(screen.getByRole('button', { name: 'Tiếp tục chạy' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Dừng' })).toBeInTheDocument();
+    });
   });
 });
