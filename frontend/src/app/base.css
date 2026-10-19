@@ -472,7 +472,9 @@ a {
   }
 }
 
+/* An auto-margin flex item shrinks to its content, so a wide table would set the page width. */
 .app-content {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: 1.5rem;

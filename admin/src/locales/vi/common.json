@@ -49,7 +49,7 @@
       "comingSoon": "Sắp ra mắt",
       "disabledTitle": "{{label}} — {{tag}}",
       "unavailable": "không khả dụng",
-      "systemStatus": "Mọi hệ thống hoạt động bình thường",
+      "systemStatus": "Hệ thống ổn định",
       "groups": {
         "overview": "Tổng quan",
         "workflowOps": "Vận hành quy trình",
