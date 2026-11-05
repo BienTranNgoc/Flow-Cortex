@@ -57,6 +57,9 @@ services:
       FLOWCORTEX_PHONE_HASH_SECRET: ""
       # Ships off; once the release is live, switch it on here and restart the backend.
       FLOWCORTEX_AUTH_PASSWORD_RESET_ENABLED: "false"
+      # No dev fallback: with the assistant on, a blank secret stops startup instead of keying
+      # guest hashes with the key published in docker-compose.yml.
+      FLOWCORTEX_SUPPORT_HASH_SECRET: ${FLOWCORTEX_SUPPORT_HASH_SECRET:-}
 
   # Seedance and Wan read the product photo through a presigned URL on this host.
   provider-video-worker:

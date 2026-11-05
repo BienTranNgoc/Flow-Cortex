@@ -160,6 +160,10 @@
   background: var(--admin-paper-3);
 }
 
+.support-group-row .cortex-admin-btn--danger {
+  color: color-mix(in srgb, var(--admin-red) 72%, var(--admin-ink));
+}
+
 .support-group-name {
   display: flex;
   flex-direction: column;

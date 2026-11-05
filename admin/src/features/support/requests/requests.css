@@ -273,3 +273,20 @@
   border-radius: 6px;
   background: var(--admin-paper);
 }
+
+.request-detail input[type='file']::file-selector-button {
+  min-height: var(--target-min);
+  margin-right: 0.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--admin-btn-bg);
+  color: var(--admin-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.request-detail input[type='file']::file-selector-button:hover {
+  background: var(--admin-btn-bg-hover);
+}

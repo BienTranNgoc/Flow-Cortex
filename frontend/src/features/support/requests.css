@@ -206,6 +206,19 @@
   font: inherit;
 }
 
+select.support-field__input {
+  appearance: none;
+  padding-right: 2rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.1rem) 50%,
+    calc(100% - 0.8rem) 50%;
+  background-size: 0.3rem 0.3rem;
+  background-repeat: no-repeat;
+}
+
 .support-field__input--multiline {
   padding: 0.5rem 0.75rem;
   resize: vertical;
@@ -238,6 +251,18 @@
   color: var(--ink-3);
   font: inherit;
   font-size: 0.85rem;
+}
+
+.support-attachments__input::file-selector-button {
+  min-height: var(--target-min);
+  margin-right: 0.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  background: var(--btn-bg);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
 }
 
 .support-attachments {
