@@ -12,7 +12,7 @@ import org.springframework.http.HttpStatus;
 class Bucket4jLoginRateLimiterTest {
 
     private final Bucket4jLoginRateLimiter limiter = new Bucket4jLoginRateLimiter(
-            new LoginThrottleProperties(new RegistrationProperties.Limit(3, Duration.ofMinutes(15))));
+            new LoginThrottleProperties(new RateLimit(3, Duration.ofMinutes(15))));
 
     @Test
     void anIpWithNoFailuresIsAlwaysWithinTheLimit() {

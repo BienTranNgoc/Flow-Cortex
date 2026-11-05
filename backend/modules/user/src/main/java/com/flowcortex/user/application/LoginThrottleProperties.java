@@ -11,5 +11,5 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties("flowcortex.login")
-public record LoginThrottleProperties(@NotNull @Valid RegistrationProperties.Limit failuresPerIp) {
+public record LoginThrottleProperties(@NotNull @Valid RateLimit failuresPerIp) {
 }

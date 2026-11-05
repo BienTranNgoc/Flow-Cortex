@@ -55,6 +55,8 @@ services:
       FLOWCORTEX_SMS_SENDER: ""
       FLOWCORTEX_PHONE_VERIFICATION_ENABLED: "false"
       FLOWCORTEX_PHONE_HASH_SECRET: ""
+      # Ships off; once the release is live, switch it on here and restart the backend.
+      FLOWCORTEX_AUTH_PASSWORD_RESET_ENABLED: "false"
 
   # Seedance and Wan read the product photo through a presigned URL on this host.
   provider-video-worker:

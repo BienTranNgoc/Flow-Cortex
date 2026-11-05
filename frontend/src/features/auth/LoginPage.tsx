@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
-import { passwordResetEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
+import { useFeatures } from '../../app/useFeatures';
 import { ResendConfirmation } from './ConfirmEmailPage';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { googleAuthorizeUrl, oauthErrorKey } from './oauth';
@@ -16,6 +16,7 @@ import {
   EMAIL_NOT_CONFIRMED,
   failureMessage,
   getRememberedEmail,
+  lockedUntilFrom,
   problemCodeFrom,
   setRememberedEmail,
   submitState,
@@ -23,14 +24,29 @@ import {
   useLoginMutation,
 } from './useAuth';
 
+/** Router state other pages hand to sign-in: where to return, or a notice and the email to fill in. */
+interface LoginState {
+  from?: string;
+  notice?: string;
+  email?: string;
+}
+
+function localTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function LoginPage() {
   const { t } = useTranslation();
   const token = useAuthToken();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { passwordReset } = useFeatures();
   const loginMutation = useLoginMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const state = location.state as LoginState | null;
   const {
     register,
     handleSubmit,
@@ -38,9 +54,20 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: getRememberedEmail(), password: '', rememberMe: true },
+    defaultValues: { email: state?.email ?? getRememberedEmail(), password: '', rememberMe: true },
   });
-  const returnTo = (location.state as { from?: string } | null)?.from ?? '/';
+  const returnTo = state?.from ?? '/';
+  const [notice, setNotice] = useState(state?.notice);
+
+  // The browser restores history state on reload, so the notice leaves it once shown; the email stays.
+  useEffect(() => {
+    if (state?.notice === undefined) return;
+    const { notice: _shown, ...kept } = state;
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: kept },
+    );
+  }, [state, location.pathname, location.search, navigate]);
 
   if (token) {
     return <Navigate to={returnTo} replace />;
@@ -56,14 +83,19 @@ export function LoginPage() {
       onSuccess: () => {
         setSubmitSucceeded(true);
       },
+      onError: () => {
+        setNotice(undefined);
+      },
     });
   });
 
   const oauthError = searchParams.get('oauth_error');
   const notConfirmed = problemCodeFrom(loginMutation.error) === EMAIL_NOT_CONFIRMED;
+  const lockedUntil = lockedUntilFrom(loginMutation.error);
+  const lockedText = accountLockedMessage(loginMutation.error, t, activeLocale());
   const serverError = notConfirmed
     ? t('auth.login.emailNotConfirmed')
-    : (accountLockedMessage(loginMutation.error, t, activeLocale()) ??
+    : (lockedText ??
       failureMessage(loginMutation, t) ??
       (oauthError ? t(oauthErrorKey(oauthError)) : undefined));
   const isPending = loginMutation.isPending;
@@ -82,6 +114,11 @@ export function LoginPage() {
       <section className="auth-card auth-card--surface">
         <h1 className="auth-card__title">{t('auth.login.title')}</h1>
         <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
+        {notice && (
+          <p role="status" className="auth-subtitle">
+            {notice}
+          </p>
+        )}
 
         <div className="oauth-row">
           <OAuthButton
@@ -163,7 +200,7 @@ export function LoginPage() {
               <input id="login-remember" type="checkbox" {...register('rememberMe')} />
               <span>{t('auth.login.rememberMe')}</span>
             </label>
-            {passwordResetEnabled() ? (
+            {passwordReset ? (
               <Link to="/forgot-password" className="forgot-password-link">
                 {t('auth.login.forgotPassword')}
               </Link>
@@ -176,10 +213,37 @@ export function LoginPage() {
               </span>
             )}
           </div>
-          {serverError && (
+          {lockedUntil ? (
             <p role="alert" className="form-error">
-              {serverError}
+              {lockedText ? (
+                <>
+                  {lockedText}
+                  {passwordReset && (
+                    <>
+                      {' '}
+                      <Trans
+                        i18nKey="auth.login.lockedResetOffer"
+                        components={{ reset: <Link to="/forgot-password" /> }}
+                      />
+                    </>
+                  )}
+                </>
+              ) : passwordReset ? (
+                <Trans
+                  i18nKey="auth.login.lockedWithReset"
+                  values={{ time: localTime(lockedUntil) }}
+                  components={{ reset: <Link to="/forgot-password" /> }}
+                />
+              ) : (
+                t('auth.login.locked', { time: localTime(lockedUntil) })
+              )}
             </p>
+          ) : (
+            serverError && (
+              <p role="alert" className="form-error">
+                {serverError}
+              </p>
+            )
           )}
           <button
             className="primary-button"
@@ -196,8 +260,7 @@ export function LoginPage() {
         )}
 
         <p className="auth-footer">
-          {t('auth.login.noPassword')}{' '}
-          <Link to="/set-password">{t('auth.login.emailMeLink')}</Link>
+          {t('auth.login.noPassword')} <Link to="/set-password">{t('auth.login.emailMeLink')}</Link>
         </p>
         <p className="auth-footer">
           {t('auth.login.newHere')} <Link to="/register">{t('auth.login.createAccount')}</Link>

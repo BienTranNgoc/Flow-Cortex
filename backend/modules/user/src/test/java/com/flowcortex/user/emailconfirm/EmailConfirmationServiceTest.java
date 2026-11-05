@@ -156,6 +156,87 @@ class EmailConfirmationServiceTest {
     }
 
     @Test
+    void withoutAnAcceptLanguageTheResetLinkIsMailedInEnglishWithTheValidityInWholeUnits() {
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+        AppUser account = resetAccount();
+
+        runCommitting(() -> service.mailPasswordReset(account, Duration.ofHours(1)));
+        runCommitting(() -> service.mailPasswordReset(account, Duration.ofMinutes(90)));
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, org.mockito.Mockito.times(2)).send(mail.capture());
+        SimpleMailMessage hour = mail.getAllValues().get(0);
+        assertThat(hour.getSubject()).isEqualTo("Reset your Flow-Cortex password");
+        assertThat(hour.getText()).isEqualTo("Hello,\n\n"
+                + "Someone asked to reset the password of your Flow-Cortex account. Open this link to choose"
+                + " a new one:\n\n"
+                + "https://app.example.com/reset-password#token=" + fragmentTokenIn(hour.getText()) + "\n\n"
+                + "The link works for 1 hour and only once. "
+                + "If you did not ask for it, you can ignore this email; your password stays as it is.\n");
+        assertThat(mail.getAllValues().get(1).getText()).contains("The link works for 90 minutes and only once.");
+    }
+
+    @Test
+    void aVietnameseRequestGetsTheResetLinkInVietnameseEvenWhenTheMailLeavesAfterTheRequestEnded() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+        AppUser account = resetAccount();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.mailPasswordReset(account, Duration.ofHours(2));
+            RequestContextHolder.resetRequestAttributes();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertThat(mail.getValue().getSubject()).isEqualTo("Đặt lại mật khẩu Flow-Cortex của bạn");
+        assertThat(mail.getValue().getText()).startsWith("Xin chào,")
+                .contains("https://app.example.com/reset-password#token=")
+                .contains("có hiệu lực trong 2 giờ và chỉ dùng được một lần");
+    }
+
+    @Test
+    void aVietnameseRequestGetsTheGoogleNoticeAndThePasswordChangedNoticeInVietnamese() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+        AppUser account = resetAccount();
+
+        runCommitting(() -> service.mailGoogleSignInNotice(account));
+        runCommitting(() -> service.mailPasswordChangedNotice(account));
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, org.mockito.Mockito.times(2)).send(mail.capture());
+        assertThat(mail.getAllValues().get(0).getSubject()).isEqualTo("Tài khoản Flow-Cortex của bạn đăng nhập bằng Google");
+        assertThat(mail.getAllValues().get(0).getText()).contains("https://app.example.com/login");
+        assertThat(mail.getAllValues().get(1).getSubject()).isEqualTo("Mật khẩu Flow-Cortex của bạn đã được thay đổi");
+        assertThat(mail.getAllValues().get(1).getText()).contains("tối đa 15 phút")
+                .contains("https://app.example.com/login");
+    }
+
+    @Test
+    void aResetOfAnUnconfirmedAccountIsMailedTheResetWordedConfirmation() {
+        EmailConfirmationService service = service(true, "https://app.example.com", "mailpit");
+        AppUser unconfirmed = AppUser.selfRegistered(UUID.randomUUID(), UUID.randomUUID(), "an@example.com", "hash",
+                "An", "Tran", null, null);
+
+        runCommitting(() -> service.reissueLinkFor(unconfirmed, EmailConfirmationService.LinkRequest.PASSWORD_RESET));
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertThat(mail.getValue().getText()).startsWith("You asked to reset your Flow-Cortex password.")
+                .endsWith("The link works for 24 hours and only once.\n")
+                .doesNotContain("you can ignore this email");
+    }
+
+    @Test
     void aMailTheServerRefusesIsCountedAndDoesNotFailTheCaller() {
         doThrow(new MailSendException("refused")).when(mailSender).send(any(SimpleMailMessage.class));
         EmailConfirmationService service = service(true, "https://app.example.com/", "mailpit");
@@ -298,6 +379,17 @@ class EmailConfirmationServiceTest {
         assertThat(user.isEmailConfirmed()).isFalse();
         assertThat(user.hasPassword()).isTrue();
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    private static AppUser resetAccount() {
+        return AppUser.selfRegistered(UUID.randomUUID(), UUID.randomUUID(), "an@example.com", "hash", "An", "Tran",
+                null, NOW);
+    }
+
+    private static String fragmentTokenIn(String body) {
+        Matcher matcher = Pattern.compile("reset-password#token=([A-Za-z0-9_-]+)").matcher(body);
+        assertThat(matcher.find()).isTrue();
+        return matcher.group(1);
     }
 
     private AppUser givenGoogleOnlyAccountResent(EmailConfirmationService service) {

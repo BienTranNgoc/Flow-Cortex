@@ -288,6 +288,24 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export interface ResetPasswordRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  token: string;
+  /**
+   * @minLength 8
+   * @maxLength 72
+   */
+  password: string;
+}
+
+export interface PasswordResetResponse {
+  status: string;
+  email: string;
+}
+
 export interface ResendConfirmationRequest {
   /**
    * @minLength 0
@@ -352,6 +370,18 @@ export interface LoginRequest {
   rememberMe?: boolean;
 }
 
+export interface ForgotPasswordRequest {
+  /**
+   * @minLength 0
+   * @maxLength 254
+   */
+  email: string;
+}
+
+export interface ResetRequestedResponse {
+  status: string;
+}
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -396,6 +426,7 @@ export interface FeaturesResponse {
   uploadContentCheck: boolean;
   runCancellation: boolean;
   credits: boolean;
+  passwordReset: boolean;
 }
 
 export interface BalanceResponse {
@@ -1187,6 +1218,65 @@ export const sendCode = async (
   });
 };
 
+export type resetPasswordResponse200 = {
+  data: PasswordResetResponse;
+  status: 200;
+};
+
+export type resetPasswordResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type resetPasswordResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type resetPasswordResponseSuccess = resetPasswordResponse200 & {
+  headers: Headers;
+};
+export type resetPasswordResponseError = (resetPasswordResponse422 | resetPasswordResponse429) & {
+  headers: Headers;
+};
+
+export type resetPasswordResponse = resetPasswordResponseSuccess | resetPasswordResponseError;
+
+export const getResetPasswordUrl = () => {
+  return `/api/v1/auth/reset-password`;
+};
+
+export const resetPassword = async (
+  resetPasswordRequest: ResetPasswordRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetPasswordResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<resetPasswordResponse>(getResetPasswordUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(resetPasswordRequest),
+  });
+};
+
 export type resendConfirmationResponse202 = {
   data: ConfirmationSentResponse;
   status: 202;
@@ -1434,6 +1524,60 @@ export const login = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginRequest),
+  });
+};
+
+export type forgotPasswordResponse202 = {
+  data: ResetRequestedResponse;
+  status: 202;
+};
+
+export type forgotPasswordResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type forgotPasswordResponseSuccess = forgotPasswordResponse202 & {
+  headers: Headers;
+};
+export type forgotPasswordResponseError = forgotPasswordResponse429 & {
+  headers: Headers;
+};
+
+export type forgotPasswordResponse = forgotPasswordResponseSuccess | forgotPasswordResponseError;
+
+export const getForgotPasswordUrl = () => {
+  return `/api/v1/auth/forgot-password`;
+};
+
+export const forgotPassword = async (
+  forgotPasswordRequest: ForgotPasswordRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<forgotPasswordResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<forgotPasswordResponse>(getForgotPasswordUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(forgotPasswordRequest),
   });
 };
 

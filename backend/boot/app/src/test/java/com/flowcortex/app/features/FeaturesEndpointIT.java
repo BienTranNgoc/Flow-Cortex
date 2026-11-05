@@ -21,7 +21,7 @@ import org.springframework.test.context.TestPropertySource;
 class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
     record FeaturesView(Boolean emailConfirmation, Boolean phoneVerification, Boolean uploadContentCheck,
-            Boolean runCancellation, Boolean credits) {
+            Boolean runCancellation, Boolean credits, Boolean passwordReset) {
     }
 
     @Autowired
@@ -32,7 +32,24 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
         ResponseEntity<FeaturesView> response = restTemplate.getForEntity("/api/v1/features", FeaturesView.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEqualTo(new FeaturesView(false, false, true, false, false));
+        assertThat(response.getBody()).isEqualTo(new FeaturesView(false, false, true, false, false, false));
+    }
+
+    @Nested
+    @TestPropertySource(properties = "flowcortex.auth.password-reset.enabled=true")
+    class WithPasswordResetOn {
+
+        @Autowired
+        private TestRestTemplate nestedRestTemplate;
+
+        @Test
+        void thePasswordResetSwitchReadsTrue() {
+            ResponseEntity<FeaturesView> response =
+                    nestedRestTemplate.getForEntity("/api/v1/features", FeaturesView.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(response.getBody()).isEqualTo(new FeaturesView(false, false, true, false, false, true));
+        }
     }
 
     @Nested
@@ -48,7 +65,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
                     nestedRestTemplate.getForEntity("/api/v1/features", FeaturesView.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody()).isEqualTo(new FeaturesView(false, false, true, false, true));
+            assertThat(response.getBody()).isEqualTo(new FeaturesView(false, false, true, false, true, false));
         }
     }
 }

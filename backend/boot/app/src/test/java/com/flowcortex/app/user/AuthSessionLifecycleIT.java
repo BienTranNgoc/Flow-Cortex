@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.application.AuthRetentionJob;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,6 +26,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Password login, refresh rotation, logout and their failure paths over real HTTP against the
@@ -44,6 +46,7 @@ class AuthSessionLifecycleIT extends AbstractUserModuleIT {
     private static final int MAX_ACTIVE_FAMILIES = 10;
     private static final int LOGIN_FAILURES_PER_IP = 20;
     private static final AtomicInteger NEXT_CLIENT = new AtomicInteger(1);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -153,6 +156,8 @@ class AuthSessionLifecycleIT extends AbstractUserModuleIT {
         assertThat(rightWhileLocked.getStatusCode()).isEqualTo(HttpStatus.LOCKED);
         assertThat(rightWhileLocked.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(rightWhileLocked.getBody()).isEqualTo(wrongWhileLocked.getBody()).contains("lockedUntil");
+        String lockedUntil = JSON.readTree(rightWhileLocked.getBody()).path("lockedUntil").asString();
+        assertThat(Instant.parse(lockedUntil)).isAfter(Instant.now());
         assertThat(userRow(m.email())).isEqualTo(locked);
         assertThat(auditCount("LOGIN_FAILED_BAD_CREDENTIALS", m.email())).isEqualTo(5);
         assertThat(auditCount("LOGIN_FAILED_ACCOUNT_LOCKED", m.email())).isEqualTo(2);

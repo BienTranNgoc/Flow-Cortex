@@ -206,8 +206,26 @@ flowcortex:
     email-confirmation:
       enabled: ${FLOWCORTEX_AUTH_EMAIL_CONFIRMATION_ENABLED:false}
       unconfirmed-account-retention: ${FLOWCORTEX_AUTH_UNCONFIRMED_ACCOUNT_RETENTION:72h}
+    # Forgot password: off answers 503 on both reset endpoints. On needs app.public-url and
+    # spring.mail.host, or startup fails. A reset link works once, for `validity`. Each client IP
+    # and each email (trimmed, lower-cased) gets `capacity` requests per `period`, refilled
+    # gradually; over it answers 429 with Retry-After. `submit-per-ip` limits new-password
+    # submissions per client IP the same way. Limits are per backend instance.
+    password-reset:
+      enabled: ${FLOWCORTEX_AUTH_PASSWORD_RESET_ENABLED:false}
+      validity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_VALIDITY:1h}
+      per-ip:
+        capacity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_PER_IP_CAPACITY:5}
+        period: ${FLOWCORTEX_AUTH_PASSWORD_RESET_PER_IP_PERIOD:1h}
+      per-email:
+        capacity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_PER_EMAIL_CAPACITY:3}
+        period: ${FLOWCORTEX_AUTH_PASSWORD_RESET_PER_EMAIL_PERIOD:1h}
+      submit-per-ip:
+        capacity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_CAPACITY:10}
+        period: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_PERIOD:1h}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
-    # `audit-events`, and refresh-token rows that expired or were revoked, every `interval`.
+    # `audit-events`, refresh-token rows that expired or were revoked, and reset-link rows that
+    # were used or expired, every `interval`.
     retention:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}

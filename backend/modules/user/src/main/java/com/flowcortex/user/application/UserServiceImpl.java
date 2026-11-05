@@ -9,6 +9,7 @@ import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
+import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.util.List;
 import java.util.UUID;
@@ -32,13 +33,16 @@ class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final ApplicationEventPublisher events;
+    private final EmailConfirmationService emailLinks;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService, ApplicationEventPublisher events) {
+            RefreshTokenService refreshTokenService, ApplicationEventPublisher events,
+            EmailConfirmationService emailLinks) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
         this.events = events;
+        this.emailLinks = emailLinks;
     }
 
     @Override
@@ -91,6 +95,10 @@ class UserServiceImpl implements UserService {
             requireNotSelfLockout(role, status);
         }
         if (email != null && !email.isBlank()) {
+            if (!email.equalsIgnoreCase(user.getEmail())) {
+                // A link mailed to the old address must not reset or confirm the account any more.
+                emailLinks.retireOpenLinks(user.getId());
+            }
             user.changeEmail(email);
         }
         if (name != null && !name.isBlank()) {
@@ -104,8 +112,10 @@ class UserServiceImpl implements UserService {
             boolean reactivated = user.getStatus() != UserStatus.ACTIVE && newStatus == UserStatus.ACTIVE;
             user.changeStatus(newStatus);
             if (newStatus == UserStatus.SUSPENDED) {
-                // Refresh tokens would otherwise keep minting access tokens for a suspended account.
+                // Refresh tokens would otherwise keep minting access tokens for a suspended account,
+                // and its emailed links would work again once it is reactivated.
                 refreshTokenService.revokeAllFor(id);
+                emailLinks.retireOpenLinks(id);
             }
             // An account confirmed while suspended was never activated; listeners tolerate a repeat.
             if (reactivated && user.isEmailConfirmed()) {

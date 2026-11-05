@@ -13,8 +13,8 @@ class Bucket4jRegistrationRateLimiterTest {
 
     private final Bucket4jRegistrationRateLimiter limiter = new Bucket4jRegistrationRateLimiter(
             new RegistrationProperties(null,
-                    new RegistrationProperties.Limit(3, Duration.ofHours(1)),
-                    new RegistrationProperties.Limit(2, Duration.ofHours(1))));
+                    new RateLimit(3, Duration.ofHours(1)),
+                    new RateLimit(2, Duration.ofHours(1))));
 
     @Test
     void theFourthAttemptFromOneIpIsRefusedWhileAnotherIpIsNot() {

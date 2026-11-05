@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocaleConfig;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthSession;
@@ -36,6 +37,7 @@ import java.time.Clock;
 import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.emailconfirm.RegistrationConflictException;
+import com.flowcortex.user.passwordreset.PasswordResetService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -54,6 +56,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -63,7 +66,7 @@ class AuthServiceImplTest {
     private static final String RAW_PASSWORD = "correct horse battery staple";
 
     private static final String OWNER_EMAIL = "owner@example.com";
-    private static final RegistrationProperties.Limit HOURLY = new RegistrationProperties.Limit(5, Duration.ofHours(1));
+    private static final RateLimit HOURLY = new RateLimit(5, Duration.ofHours(1));
 
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-10-29T00:00:00Z"), ZoneOffset.UTC);
     private static final Instant NOW = Instant.now(FIXED_CLOCK);
@@ -93,7 +96,9 @@ class AuthServiceImplTest {
                 new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
                 new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
-                        Duration.ofHours(72), Duration.ofMinutes(30), 500));
+                        Duration.ofHours(72), Duration.ofMinutes(30), 500),
+                mock(PasswordResetRateLimiter.class), mock(PasswordResetService.class),
+                mock(PasswordResetSubmitLimiter.class));
     }
 
     private AppUser unconfirmedMember(String email) {
@@ -932,6 +937,32 @@ class AuthServiceImplTest {
 
         assertThatThrownBy(() -> service.updateOwnProfile(id, "New Name"))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void aResetWithATokenThatMatchesNoOpenLinkIsRefusedWithoutHashingThePassword() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        PasswordResetService resets = mock(PasswordResetService.class);
+        when(resets.isOpenResetLink("unknown-token")).thenReturn(false);
+        when(resets.reset(any(), any()))
+                .thenThrow(new UnprocessableEntityException(new LocalizedMessage("auth.resetLinkInvalid"), "RESET_LINK_INVALID"));
+
+        assertThatThrownBy(() -> resetService(encoder, resets).resetPassword("unknown-token", RAW_PASSWORD,
+                "127.0.0.1", "ua"))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("RESET_LINK_INVALID"));
+        verifyNoInteractions(encoder);
+        verifyNoInteractions(audit);
+    }
+
+    private AuthServiceImpl resetService(PasswordEncoder encoder, PasswordResetService resets) {
+        return new AuthServiceImpl(repository, encoder, refreshTokenService, loginAttempts, loginRateLimiter,
+                registrationRateLimiter, googleOAuthClient, audit,
+                new RegistrationProperties(OWNER_EMAIL, HOURLY, HOURLY), FIXED_CLOCK,
+                events, mock(PlatformTransactionManager.class), emailConfirmation,
+                new EmailConfirmationProperties(false, Duration.ofHours(24), "no-reply@flow-cortex.dev",
+                        Duration.ofHours(72), Duration.ofMinutes(30), 500),
+                mock(PasswordResetRateLimiter.class), resets, mock(PasswordResetSubmitLimiter.class));
     }
 
     private static String english(MessageSourceResolvable message) {
