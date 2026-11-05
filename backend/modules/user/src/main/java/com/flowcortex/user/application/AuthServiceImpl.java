@@ -20,6 +20,8 @@ import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.emailconfirm.EmailNotConfirmedException;
 import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.passwordreset.PasswordResetService;
+import com.flowcortex.user.passwordreset.ResetRequestPolicy;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -88,13 +90,18 @@ class AuthServiceImpl implements AuthService {
     private final TransactionTemplate transaction;
     private final EmailConfirmationService emailConfirmation;
     private final EmailConfirmationProperties emailConfirmationProperties;
+    private final PasswordResetRateLimiter passwordResetRateLimiter;
+    private final PasswordResetService passwordResetService;
+    private final PasswordResetSubmitLimiter passwordResetSubmitLimiter;
 
     AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokenService, LoginAttemptRecorder loginAttempts,
             LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
             GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, RegistrationProperties registration,
             Clock clock, ApplicationEventPublisher events, PlatformTransactionManager transactionManager,
-            EmailConfirmationService emailConfirmation, EmailConfirmationProperties emailConfirmationProperties) {
+            EmailConfirmationService emailConfirmation, EmailConfirmationProperties emailConfirmationProperties,
+            PasswordResetRateLimiter passwordResetRateLimiter, PasswordResetService passwordResetService,
+            PasswordResetSubmitLimiter passwordResetSubmitLimiter) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -109,6 +116,9 @@ class AuthServiceImpl implements AuthService {
         this.transaction = new TransactionTemplate(transactionManager);
         this.emailConfirmation = emailConfirmation;
         this.emailConfirmationProperties = emailConfirmationProperties;
+        this.passwordResetRateLimiter = passwordResetRateLimiter;
+        this.passwordResetService = passwordResetService;
+        this.passwordResetSubmitLimiter = passwordResetSubmitLimiter;
     }
 
     @Override
@@ -295,6 +305,34 @@ class AuthServiceImpl implements AuthService {
             throw ex;
         }
         emailConfirmation.resend(email);
+    }
+
+    @Override
+    public void requestPasswordReset(String rawEmail, String ip, String userAgent) {
+        String email = normalizeEmail(rawEmail);
+        passwordResetRateLimiter.acquire(ip, email);
+        if (passwordResetService.request(email) instanceof ResetRequestPolicy.ResetLink link) {
+            audit.write(AuthEventType.PASSWORD_RESET_REQUESTED, link.userId(), ip, truncate(userAgent),
+                    AuthEventType.userMetadata(link.userId()));
+        }
+    }
+
+    /**
+     * Not transactional: a refused link must roll back the service's own transaction, which a
+     * surrounding one would turn into an UnexpectedRollbackException. BCrypt runs outside the row lock,
+     * and only for a token that is still an open reset link.
+     */
+    @Override
+    public String resetPassword(String rawToken, String rawPassword, String ip, String userAgent) {
+        passwordResetSubmitLimiter.acquire(ip);
+        if (!passwordResetService.isOpenResetLink(rawToken)) {
+            throw PasswordResetService.linkInvalid();
+        }
+        String passwordHash = passwordEncoder.encode(rawPassword);
+        PasswordResetService.CompletedReset reset = passwordResetService.reset(rawToken, passwordHash);
+        audit.write(AuthEventType.PASSWORD_RESET_COMPLETED, reset.userId(), ip, truncate(userAgent),
+                AuthEventType.userMetadata(reset.userId()));
+        return reset.email();
     }
 
     @Override

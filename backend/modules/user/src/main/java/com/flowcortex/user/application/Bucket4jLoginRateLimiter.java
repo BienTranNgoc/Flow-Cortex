@@ -21,10 +21,10 @@ class Bucket4jLoginRateLimiter implements LoginRateLimiter {
 
     private static final Logger LOG = LoggerFactory.getLogger(Bucket4jLoginRateLimiter.class);
 
-    /** Same bound and reasoning as {@link Bucket4jRegistrationRateLimiter}. */
+    /** Same bound and reasoning as {@link PerIpAndEmailBuckets}. */
     private static final long MAX_TRACKED_KEYS = 100_000;
 
-    private final RegistrationProperties.Limit limit;
+    private final RateLimit limit;
     private final Cache<String, Bucket> buckets;
 
     Bucket4jLoginRateLimiter(LoginThrottleProperties properties) {

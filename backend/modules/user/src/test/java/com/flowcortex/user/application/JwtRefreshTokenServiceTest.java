@@ -252,7 +252,7 @@ class JwtRefreshTokenServiceTest {
         UUID familyId = UUID.randomUUID();
         String raw = "raw-input-token";
         RefreshToken stored = token(user, familyId, NOW, NOW.plusSeconds(3600));
-        when(refreshTokenRepository.findByTokenHash(RefreshTokenHasher.hash(raw))).thenReturn(Optional.of(stored));
+        when(refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(raw))).thenReturn(Optional.of(stored));
 
         Optional<UUID> owner = service.endSession(raw);
 

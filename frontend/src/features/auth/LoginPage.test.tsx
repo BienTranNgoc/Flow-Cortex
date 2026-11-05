@@ -1,9 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, type Location } from 'react-router-dom';
 import { setToken } from '@flow-cortex/api-client';
-import { stubApi, type FakeReply } from '../../test/fakeApi';
+import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { LoginPage } from './LoginPage';
 
 const PERSISTENT_KEY = 'flowcortex.auth.token';
@@ -13,7 +13,7 @@ function renderLogin(state: unknown, search = '') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[{ pathname: '/login', search, state }]}>
         <Routes>
@@ -24,6 +24,7 @@ function renderLogin(state: unknown, search = '') {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...result, queryClient };
 }
 
 async function signIn({ remember }: { remember: boolean }) {
@@ -54,17 +55,141 @@ describe('LoginPage', () => {
     vi.unstubAllEnvs();
   });
 
-  it('hides "Forgot password?" until VITE_PASSWORD_RESET_ENABLED is true', () => {
-    const { unmount } = renderLogin(null);
-    expect(screen.queryByRole('link', { name: 'Forgot password?' })).not.toBeInTheDocument();
-    unmount();
+  describe('password reset', () => {
+    const FEATURES = {
+      emailConfirmation: false,
+      phoneVerification: false,
+      uploadContentCheck: false,
+      runCancellation: false,
+      credits: false,
+    };
 
-    vi.stubEnv('VITE_PASSWORD_RESET_ENABLED', 'true');
-    renderLogin(null);
-    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
-      'href',
-      '/forgot-password',
-    );
+    function featuresWith(passwordReset: boolean): Record<string, FakeReply> {
+      return {
+        'GET /api/v1/features': { status: 200, body: { ...FEATURES, passwordReset } },
+      };
+    }
+
+    it('links "Forgot password?" to /forgot-password while the backend offers reset', async () => {
+      stubApi(featuresWith(true));
+      renderLogin(null);
+
+      expect(await screen.findByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+        'href',
+        '/forgot-password',
+      );
+    });
+
+    it('keeps "Forgot password?" as disabled text, not a link, while reset is switched off', async () => {
+      stubApi(featuresWith(false));
+      const { queryClient } = renderLogin(null);
+      await settled(queryClient);
+
+      expect(screen.queryByRole('link', { name: 'Forgot password?' })).not.toBeInTheDocument();
+      expect(screen.getByText('Forgot password?')).toHaveClass('forgot-password-link--disabled');
+    });
+
+    it('shows the notice it was sent with and prefills the email over the remembered one', () => {
+      window.localStorage.setItem('flowcortex.auth.rememberedEmail', 'someone@else.dev');
+      const notice =
+        'Password updated. Sign in with your new password. We signed you out on every device. A device that was already open may stay signed in for up to 15 minutes.';
+
+      renderLogin({ notice, email: 'an@example.com' });
+
+      expect(screen.getByRole('status')).toHaveTextContent(notice);
+      expect(screen.getByLabelText('Email')).toHaveValue('an@example.com');
+    });
+
+    const NOTICE =
+      'Password updated. Sign in with your new password. We signed you out on every device. A device that was already open may stay signed in for up to 15 minutes.';
+
+    function renderWithNotice(state: unknown) {
+      let current: Location | undefined;
+      function LocationProbe() {
+        current = useLocation();
+        return null;
+      }
+      const result = renderRoute(
+        '/login',
+        { pathname: '/login', state },
+        <>
+          <LoginPage />
+          <LocationProbe />
+        </>,
+      );
+      return { ...result, location: () => current };
+    }
+
+    it('drops the notice on a reload of the page and keeps the prefilled email', async () => {
+      stubApi(featuresWith(true));
+      const first = renderWithNotice({ notice: NOTICE, email: 'an@example.com' });
+      expect(screen.getByRole('status')).toHaveTextContent(NOTICE);
+      await waitFor(() => expect(first.location()?.state).not.toHaveProperty('notice'));
+      const stateAfterFirstVisit = first.location()?.state;
+      first.unmount();
+
+      renderWithNotice(stateAfterFirstVisit);
+
+      expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Email')).toHaveValue('an@example.com');
+    });
+
+    it('drops the notice after a failed sign-in and keeps the prefilled email', async () => {
+      stubApi({
+        ...featuresWith(true),
+        'POST /api/v1/auth/login': {
+          status: 401,
+          body: { status: 401, detail: 'Invalid email or password' },
+        },
+      });
+      const user = userEvent.setup();
+      renderWithNotice({ notice: NOTICE, email: 'an@example.com' });
+      expect(screen.getByRole('status')).toHaveTextContent(NOTICE);
+
+      await user.type(screen.getByLabelText('Password'), 'wrong-one');
+      await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
+
+      expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
+      expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Email')).toHaveValue('an@example.com');
+    });
+
+    async function signInLocked(passwordReset: boolean) {
+      const lockedUntil = new Date(2026, 9, 19, 14, 35).toISOString();
+      stubApi({
+        ...featuresWith(passwordReset),
+        'POST /api/v1/auth/login': {
+          status: 423,
+          body: { status: 423, detail: 'Account is temporarily locked', lockedUntil },
+        },
+      });
+      const user = userEvent.setup();
+      const { queryClient } = renderLogin(null);
+      await settled(queryClient);
+      await user.type(screen.getByLabelText('Email'), 'an@example.com');
+      await user.type(screen.getByLabelText('Password'), 'wrong-one');
+      await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
+      return screen.findByRole('alert');
+    }
+
+    it('tells a locked account when to retry and links the reset while it is offered', async () => {
+      const alert = await signInLocked(true);
+
+      expect(alert).toHaveTextContent(
+        'Too many attempts. Try again at 14:35, or reset your password.',
+      );
+      expect(within(alert).getByRole('link', { name: 'reset your password' })).toHaveAttribute(
+        'href',
+        '/forgot-password',
+      );
+    });
+
+    it('tells a locked account when to retry without a reset link while reset is off', async () => {
+      const alert = await signInLocked(false);
+
+      expect(alert).toHaveTextContent(/^Too many attempts\. Try again at 14:35\.$/);
+      expect(within(alert).queryByRole('link')).not.toBeInTheDocument();
+    });
   });
 
   it('offers an account without a password a set-password link by email', () => {
