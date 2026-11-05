@@ -20,10 +20,9 @@ import type {
   SetPasswordRequest,
 } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
-import { formatDateTime } from '../../lib/format';
-import type { Locale } from '../../lib/i18n';
 
 export { signOut as logout, useAuthToken, useSessionReady } from '@flow-cortex/api-client';
+export { accountLockedMessage } from '@flow-cortex/i18n';
 
 /**
  * The signed-in user's own record. Disabled while signed out — there's
@@ -184,30 +183,6 @@ export function failureMessage(
   if (!mutation.error) return undefined;
   const detail = mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
   return detail || t(fallbackKey);
-}
-
-const LOCK_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'short', timeStyle: 'short' };
-
-/**
- * In Vietnamese, the account-locked sentence with the lock end in vi-VN form;
- * otherwise nothing, so English keeps the server `detail`.
- */
-export function accountLockedMessage(
-  error: unknown,
-  t: TFunction,
-  locale: Locale,
-): string | undefined {
-  if (locale !== 'vi' || !(error instanceof ApiError)) return undefined;
-  const problem = error.problem ?? {};
-  if (typeof problem.type !== 'string' || !problem.type.endsWith('account-locked')) {
-    return undefined;
-  }
-  if (typeof problem.lockedUntil !== 'string') return undefined;
-  const lockedUntil = new Date(problem.lockedUntil);
-  if (Number.isNaN(lockedUntil.getTime())) return undefined;
-  return t('auth.login.accountLocked', {
-    time: formatDateTime(lockedUntil, 'vi', LOCK_TIME_FORMAT),
-  });
 }
 
 export type SubmitDataState = 'idle' | 'pending' | 'success';

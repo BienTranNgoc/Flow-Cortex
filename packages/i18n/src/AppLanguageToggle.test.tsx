@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { AppLanguageToggle } from './AppLanguageToggle';
-import i18n from './i18n';
+import { createAppI18n } from './createAppI18n';
+import { translations } from './test/translations';
+
+const { i18n } = createAppI18n(translations);
 
 describe('AppLanguageToggle', () => {
   afterEach(async () => {
