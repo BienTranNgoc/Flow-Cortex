@@ -1,3 +1,4 @@
+import '@fontsource-variable/google-sans-flex';
 import { setLocaleProvider } from '@flow-cortex/api-client';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

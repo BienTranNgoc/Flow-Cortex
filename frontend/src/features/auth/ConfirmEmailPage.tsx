@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AuthLink } from './AuthLink';
+import { useAuthPose } from './authPose';
+import { nodiPeekState } from './nodiPeekState';
 import { resendEmailSchema } from './registerSchema';
 import {
   CONFIRMATION_LINK_INVALID,
@@ -20,10 +22,16 @@ interface ResendConfirmationProps {
   action?: string;
   /** Translated, shown once sent; it never says whether the address has an account. */
   sentMessage?: string;
+  autoFocus?: boolean;
 }
 
 /** "Resend confirmation email" with its sending, sent and refused states. */
-export function ResendConfirmation({ email, action, sentMessage }: ResendConfirmationProps) {
+export function ResendConfirmation({
+  email,
+  action,
+  sentMessage,
+  autoFocus = false,
+}: ResendConfirmationProps) {
   const { t } = useTranslation();
   const resend = useResendConfirmationMutation();
   const [typedEmail, setTypedEmail] = useState('');
@@ -50,36 +58,47 @@ export function ResendConfirmation({ email, action, sentMessage }: ResendConfirm
       className="auth-form"
     >
       {email === undefined && (
-        <div className="field">
-          <label htmlFor="resend-email">{t('auth.confirm.resend.emailLabel')}</label>
-          <input
-            id="resend-email"
-            type="email"
-            autoComplete="email"
-            value={typedEmail}
-            onChange={(event) => setTypedEmail(event.target.value)}
-            aria-invalid={emailErrorKey ? 'true' : 'false'}
-            aria-describedby={emailErrorKey ? 'resend-email-error' : undefined}
-          />
+        <div className="auth-field">
+          <label htmlFor="resend-email" className="auth-label">
+            {t('auth.confirm.resend.emailLabel')}
+          </label>
+          <div className="auth-control">
+            <input
+              id="resend-email"
+              type="email"
+              className="auth-input"
+              autoComplete="email"
+              value={typedEmail}
+              onChange={(event) => setTypedEmail(event.target.value)}
+              aria-invalid={emailErrorKey ? 'true' : 'false'}
+              aria-describedby={emailErrorKey ? 'resend-email-error' : undefined}
+            />
+          </div>
           {emailErrorKey && (
-            <p id="resend-email-error" role="alert">
+            <p id="resend-email-error" role="alert" className="auth-error">
               {t(emailErrorKey)}
             </p>
           )}
         </div>
       )}
-      <button type="submit" disabled={resend.isPending}>
+      <button
+        type="submit"
+        className="auth-btn auth-btn--secondary"
+        disabled={resend.isPending}
+        aria-busy={resend.isPending}
+        autoFocus={autoFocus}
+      >
         {resend.isPending
           ? t('auth.confirm.resend.sending')
           : (action ?? t('auth.confirm.resend.submit'))}
       </button>
       {resend.isSuccess && (
-        <p role="status" className="auth-subtitle">
+        <p role="status" className="auth-status">
           {sentMessage ?? t('auth.confirm.resend.sent')}
         </p>
       )}
       {refusal && (
-        <p role="alert" className="form-error">
+        <p role="alert" className="auth-alert">
           {refusal}
         </p>
       )}
@@ -123,46 +142,57 @@ export function ConfirmEmailPage() {
   const linkInvalid =
     !token || (confirm.isError && problemCodeFrom(confirm.error) === CONFIRMATION_LINK_INVALID);
   const otherFailure = linkInvalid ? undefined : failureMessage(confirm, t, 'auth.confirm.failed');
+  useAuthPose(
+    nodiPeekState({
+      focused: null,
+      pending: confirm.isPending,
+      failed: linkInvalid || confirm.isError,
+      succeeded: confirm.isSuccess,
+    }),
+  );
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
+    <>
+      <h1 className="auth-title" tabIndex={-1}>
+        {t('auth.confirm.title')}
+      </h1>
 
-      <section className="auth-card">
-        <p className="eyebrow">{t('auth.confirm.eyebrow')}</p>
-        <h1 className="auth-card__title">{t('auth.confirm.title')}</h1>
+      {linkInvalid && (
+        <>
+          <div role="alert" className="auth-alert">
+            <p>{t('auth.confirm.linkInvalid')}</p>
+            <p>{t('auth.confirm.enterEmail')}</p>
+          </div>
+          <ResendConfirmation />
+        </>
+      )}
 
-        {linkInvalid && (
-          <>
-            <p role="alert" className="form-error">
-              {t('auth.confirm.linkInvalid')}
-            </p>
-            <p className="auth-subtitle">{t('auth.confirm.enterEmail')}</p>
-            <ResendConfirmation />
-          </>
-        )}
-
-        {otherFailure && (
-          <>
-            <p role="alert" className="form-error">
-              {otherFailure}
-            </p>
-            <button type="button" disabled={confirm.isPending} onClick={spend}>
-              {t('auth.confirm.tryAgain')}
-            </button>
-          </>
-        )}
-
-        {!linkInvalid && !otherFailure && (
-          <p role="status" className="auth-subtitle">
-            {t('auth.confirm.confirming')}
+      {otherFailure && (
+        <>
+          <p role="alert" className="auth-alert">
+            {otherFailure}
           </p>
-        )}
+          <button
+            type="button"
+            className="auth-btn auth-btn--secondary"
+            disabled={confirm.isPending}
+            aria-busy={confirm.isPending}
+            onClick={spend}
+          >
+            {t('auth.confirm.tryAgain')}
+          </button>
+        </>
+      )}
 
-        <p className="auth-footer">
-          <Link to="/login">{t('auth.confirm.backToSignIn')}</Link>
+      {!linkInvalid && !otherFailure && (
+        <p role="status" className="auth-status">
+          {t('auth.confirm.confirming')}
         </p>
-      </section>
-    </div>
+      )}
+
+      <p className="auth-footnote">
+        <AuthLink to="/login">{t('auth.confirm.backToSignIn')}</AuthLink>
+      </p>
+    </>
   );
 }
