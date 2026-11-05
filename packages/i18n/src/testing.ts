@@ -23,7 +23,7 @@ export function flattenLocale(tree: LocaleTree, prefix = ''): Map<string, string
 export function localeAreas(files: LocaleFiles): string[] {
   return [
     ...new Set(Object.keys(files).map((path) => path.replace(/^\.\/[^/]+\/(.+)\.json$/, '$1'))),
-  ].sort();
+  ].sort((a, b) => a.localeCompare(b));
 }
 
 function areaFile(files: LocaleFiles, locale: string, area: string): Map<string, string> {
@@ -41,7 +41,9 @@ export function describeLocaleParity(files: LocaleFiles, i18n: I18n): void {
     });
 
     it('registers every area file in the i18n resources', () => {
-      const registered = Object.keys(i18n.options.resources?.en?.translation ?? {}).sort();
+      const registered = Object.keys(i18n.options.resources?.en?.translation ?? {}).sort((a, b) =>
+        a.localeCompare(b),
+      );
 
       expect(registered).toEqual(areas);
     });
