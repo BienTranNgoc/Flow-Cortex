@@ -139,6 +139,11 @@
   overflow-x: auto;
 }
 
+.wf-list__table-wrap:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .wf-list__table {
   width: 100%;
   border-collapse: collapse;

@@ -1,6 +1,7 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
 import { WorkflowsListPage } from './WorkflowsListPage';
 
@@ -121,6 +122,7 @@ describe('WorkflowsListPage', () => {
 
     // Table header columns from the spec.
     const table = await screen.findByRole('region', { name: /workflows table/i });
+    expect(table).toHaveAttribute('tabindex', '0');
     expect(withinTable(table, 'Name')).toBeInTheDocument();
     expect(withinTable(table, 'Status')).toBeInTheDocument();
     expect(withinTable(table, 'Owner')).toBeInTheDocument();
@@ -220,6 +222,31 @@ describe('WorkflowsListPage', () => {
     expect(within(scope).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByText('Douyin Video Repurpose')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'List layout' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('renders the heading, the table label and every column header', async () => {
+      stubApi({
+        'GET /api/v1/auth/me': { status: 200, body: ME },
+        'GET /api/v1/workflows': { status: 200, body: [DOUYIN, ECHO] },
+        'GET /api/v1/capabilities': capabilities(true),
+      });
+      renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+      expect(await screen.findByRole('heading', { name: 'Quy trình' })).toBeInTheDocument();
+      const table = await screen.findByRole('region', { name: 'Bảng quy trình' });
+      for (const column of ['Tên', 'Trạng thái', 'Chủ sở hữu', 'Số bước', 'Thao tác']) {
+        expect(withinTable(table, column)).toBeInTheDocument();
+      }
+      expect(screen.getByText('Đang hiển thị 2 trên 2 quy trình')).toBeInTheDocument();
+    });
   });
 });
 

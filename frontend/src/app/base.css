@@ -472,7 +472,7 @@ a {
   }
 }
 
-/* An auto-margin flex item shrinks to its content, so a wide table would set the page width. */
+/* An auto-margin flex item sizes to its content, so without width: 100% the column grows to a wide table's min-content width and widens the page. */
 .app-content {
   width: 100%;
   max-width: 1180px;

@@ -2,6 +2,7 @@ import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
+import i18n from '../../lib/i18n';
 import { renderRoute, stubApi, type Handler, type RecordedCall } from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
 import { WorkflowDetailPage } from './WorkflowDetailPage';
@@ -207,5 +208,29 @@ describe('ProductVideoStartForm', () => {
     expect(
       await screen.findByText('Product video is currently disabled'),
     ).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels every field and names the picked image', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      expect(await screen.findByRole('form', { name: 'Bắt đầu lượt chạy video sản phẩm' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Tên sản phẩm *')).toBeInTheDocument();
+      expect(screen.getByLabelText('Mô tả *')).toBeInTheDocument();
+      const picker = screen.getByLabelText('Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *');
+
+      await user.upload(picker, [image('front.png')]);
+
+      expect(screen.getByText('Đã chọn 1 ảnh: front.png')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Bắt đầu lượt chạy' })).toBeInTheDocument();
+    });
   });
 });
