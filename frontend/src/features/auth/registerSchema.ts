@@ -54,4 +54,11 @@ export const setPasswordSchema = z
 
 export type SetPasswordFormValues = z.infer<typeof setPasswordSchema>;
 
+/** The registration password rules, for the new password chosen from an emailed reset link. */
+export const resetPasswordSchema = z
+  .object({ password, confirmPassword })
+  .refine((values) => values.password === values.confirmPassword, passwordsMatch);
+
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
 export const resendEmailSchema = z.string().trim().email('Enter a valid email address');

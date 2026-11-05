@@ -1,7 +1,8 @@
 package com.flowcortex.user.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -30,8 +31,18 @@ class AuthRetentionJobTest {
         job.purge();
 
         ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
-        verify(jdbc).update(anyString(), params.capture());
+        verify(jdbc).update(startsWith("DELETE FROM auth_event "), params.capture());
         assertThat(params.getValue().getValue("cutoff")).isEqualTo(Timestamp.from(NOW.minus(Duration.ofDays(90))));
         verify(refreshTokens).deleteExpiredAndRevokedBefore(NOW);
+    }
+
+    @Test
+    void purgeDeletesOnlyResetLinksThatWereUsedOrExpiredBeforeTheRun() {
+        job.purge();
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(eq("DELETE FROM email_confirmation_token WHERE purpose = 'PASSWORD_RESET'"
+                + " AND (used_at < :now OR expires_at < :now)"), params.capture());
+        assertThat(params.getValue().getValue("now")).isEqualTo(Timestamp.from(NOW));
     }
 }

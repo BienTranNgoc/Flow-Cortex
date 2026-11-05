@@ -45,8 +45,8 @@ public class JwtRefreshTokenService implements RefreshTokenService {
 
         revokeOldestBeyondCap(user.getId(), now);
 
-        String raw = RefreshTokenHasher.generateRawToken();
-        RefreshToken row = new RefreshToken(UUID.randomUUID(), user.getId(), RefreshTokenHasher.hash(raw),
+        String raw = OpaqueTokens.generateRawToken();
+        RefreshToken row = new RefreshToken(UUID.randomUUID(), user.getId(), OpaqueTokens.hash(raw),
                 UUID.randomUUID(), now, expiresAt, rememberMe, ip, truncate(userAgent));
         refreshTokenRepository.save(row);
         return session(user, raw, expiresAt, rememberMe);
@@ -55,7 +55,7 @@ public class JwtRefreshTokenService implements RefreshTokenService {
     @Override
     @Transactional
     public RotationResult rotate(String rawToken, String ip, String userAgent) {
-        Optional<RefreshToken> found = refreshTokenRepository.findByTokenHash(RefreshTokenHasher.hash(rawToken));
+        Optional<RefreshToken> found = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(rawToken));
         if (found.isEmpty()) {
             return rejected(RotationResult.Reason.UNKNOWN_TOKEN, null);
         }
@@ -79,9 +79,9 @@ public class JwtRefreshTokenService implements RefreshTokenService {
         }
         AppUser user = owner.get();
 
-        String newRaw = RefreshTokenHasher.generateRawToken();
+        String newRaw = OpaqueTokens.generateRawToken();
         UUID newId = UUID.randomUUID();
-        refreshTokenRepository.save(new RefreshToken(newId, user.getId(), RefreshTokenHasher.hash(newRaw),
+        refreshTokenRepository.save(new RefreshToken(newId, user.getId(), OpaqueTokens.hash(newRaw),
                 existing.getFamilyId(), now, existing.getExpiresAt(), existing.isRememberMe(), ip,
                 truncate(userAgent)));
 
@@ -97,7 +97,7 @@ public class JwtRefreshTokenService implements RefreshTokenService {
     @Override
     @Transactional
     public Optional<UUID> endSession(String rawToken) {
-        Optional<RefreshToken> found = refreshTokenRepository.findByTokenHash(RefreshTokenHasher.hash(rawToken));
+        Optional<RefreshToken> found = refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(rawToken));
         found.ifPresent(token -> refreshTokenRepository.revokeFamily(token.getFamilyId(), Instant.now(clock)));
         return found.map(RefreshToken::getUserId);
     }

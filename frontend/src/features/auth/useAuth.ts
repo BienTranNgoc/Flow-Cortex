@@ -3,11 +3,13 @@ import {
   ApiError,
   authHeaders,
   confirmEmail as confirmEmailRequest,
+  forgotPassword as forgotPasswordRequest,
   login as loginRequest,
   me as meRequest,
   openPasswordLink as openPasswordLinkRequest,
   register as registerRequest,
   resendConfirmation as resendConfirmationRequest,
+  resetPassword as resetPasswordRequest,
   setPassword as setPasswordRequest,
   setToken,
   unwrap,
@@ -16,7 +18,9 @@ import {
 import type {
   ConfirmEmailResponse,
   LoginRequest,
+  PasswordResetResponse,
   RegisterRequest,
+  ResetPasswordRequest,
   SetPasswordRequest,
 } from '@flow-cortex/api-client';
 
@@ -130,15 +134,64 @@ export function useResendConfirmationMutation() {
   });
 }
 
+/** Answered 202 whatever the email belongs to, so success says nothing about the account. */
+export function useForgotPasswordMutation() {
+  return useMutation({
+    mutationFn: (email: string) => unwrap(forgotPasswordRequest({ email })),
+  });
+}
+
+/** Spends an emailed reset link; resolves to the account's email and signs nobody in. */
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationFn: async (input: ResetPasswordRequest) => {
+      // unwrap throws on the 422 arm of the generated union, so only the 200 body reaches here.
+      const { email } = (await unwrap(resetPasswordRequest(input))) as PasswordResetResponse;
+      // The reset revoked every session, so a token this browser still holds is already dead.
+      setToken(null);
+      return email;
+    },
+  });
+}
+
 export const EMAIL_NOT_CONFIRMED = 'EMAIL_NOT_CONFIRMED';
 export const CONFIRMATION_LINK_INVALID = 'CONFIRMATION_LINK_INVALID';
 export const PASSWORD_LINK_INVALID = 'PASSWORD_LINK_INVALID';
 export const PASSWORD_SETUP_TOKEN_INVALID = 'PASSWORD_SETUP_TOKEN_INVALID';
+export const RESET_LINK_INVALID = 'RESET_LINK_INVALID';
+
+function problemMemberFrom(error: unknown, name: string): unknown {
+  const problem = error instanceof ApiError ? error.problem : undefined;
+  return problem && name in problem ? (problem as Record<string, unknown>)[name] : undefined;
+}
 
 /** The problem's `code` extension member, when the error is an API refusal that carries one. */
 export function problemCodeFrom(error: unknown): unknown {
-  const problem = error instanceof ApiError ? error.problem : undefined;
-  return problem && 'code' in problem ? problem.code : undefined;
+  return problemMemberFrom(error, 'code');
+}
+
+/** A 429's `retryAfterSeconds` member; the client cannot read the `Retry-After` header. */
+export function retryAfterSecondsFrom(error: unknown): number | undefined {
+  const seconds = problemMemberFrom(error, 'retryAfterSeconds');
+  return typeof seconds === 'number' && seconds > 0 ? seconds : undefined;
+}
+
+/** The wait a 429 with `retryAfterSeconds` asks for, in whole minutes; undefined for any other error. */
+export function resetWaitMessage(error: unknown): string | undefined {
+  const seconds = retryAfterSecondsFrom(error);
+  if (!(error instanceof ApiError) || error.status !== 429 || seconds === undefined) {
+    return undefined;
+  }
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return `Too many reset requests. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+}
+
+/** A 423's `lockedUntil` instant, when it is present and parses. */
+export function lockedUntilFrom(error: unknown): Date | undefined {
+  if (!(error instanceof ApiError) || error.status !== 423) return undefined;
+  const until = problemMemberFrom(error, 'lockedUntil');
+  const date = typeof until === 'string' ? new Date(until) : undefined;
+  return date && !Number.isNaN(date.getTime()) ? date : undefined;
 }
 
 /** Field name to message from a 400/409 problem's `errors`; empty for any other error. */
