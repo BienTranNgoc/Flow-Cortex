@@ -1,0 +1,275 @@
+.request-type-filter {
+  margin-bottom: 0.75rem;
+}
+
+.request-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 56rem;
+}
+
+.request-summary,
+.request-section {
+  padding: 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: 10px;
+  background: var(--admin-paper-3);
+}
+
+.request-summary h2,
+.request-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+
+.request-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.request-facts dt {
+  color: var(--admin-ink-4);
+  font-size: 0.85rem;
+}
+
+.request-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.request-closed-reason,
+.request-muted,
+.request-outcome {
+  color: var(--admin-ink-4);
+  font-size: 0.875rem;
+}
+
+.request-muted {
+  margin: 0 0 0.75rem;
+}
+
+.request-outcome {
+  margin-left: 0.5rem;
+  font-style: italic;
+}
+
+.request-status-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.request-status-form .cortex-admin-field {
+  margin-bottom: 0;
+}
+
+.request-feedback:focus-visible {
+  outline-offset: 4px;
+}
+
+.request-failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.request-failure p {
+  margin: 0;
+}
+
+.request-announcement {
+  margin: 0.5rem 0 0;
+  color: var(--admin-ink-4);
+}
+
+.request-announcement:empty {
+  margin: 0;
+}
+
+.request-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-message {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--admin-paper-2);
+}
+
+.request-message--admin {
+  border-left-color: var(--admin-primary);
+}
+
+.request-message--assistant {
+  border-left-color: var(--admin-accent);
+}
+
+.request-message-meta {
+  margin: 0 0 0.25rem;
+  color: var(--admin-ink-4);
+  font-size: 0.85rem;
+}
+
+.request-message-meta strong {
+  color: var(--admin-ink);
+}
+
+/* Messages are plain text: line breaks are kept, nothing is parsed as markup. */
+.request-message-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.request-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-images a {
+  display: block;
+  border-radius: 6px;
+}
+
+.request-images img {
+  display: block;
+  width: 8rem;
+  height: 8rem;
+  object-fit: cover;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: 6px;
+  background: var(--admin-paper);
+}
+
+.request-reply-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.request-reply-body {
+  max-width: none;
+}
+
+.request-reply-body textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: 6px;
+  background: var(--admin-paper);
+  color: var(--admin-ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.request-reply-body textarea[aria-invalid='true'] {
+  border-color: var(--admin-red);
+}
+
+.request-reply-fields:disabled textarea,
+.request-reply-fields:disabled input {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.request-reply-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  border: 0;
+}
+
+.request-reply-status legend {
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.request-reply-status label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.request-reply-status input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--admin-primary);
+}
+
+.request-refused,
+.request-files {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-files li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.request-actions .request-announcement {
+  margin: 0;
+}
+
+.request-message-markdown {
+  overflow-wrap: anywhere;
+}
+
+.request-message-markdown p {
+  margin: 0 0 0.5rem;
+}
+
+.request-message-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.request-message-markdown a {
+  color: var(--admin-primary);
+}
+
+.request-message-markdown pre {
+  overflow-x: auto;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--admin-paper);
+}

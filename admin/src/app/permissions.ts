@@ -11,6 +11,7 @@ export const ACTIONS = [
   'voice.view',
   'health.view',
   'users.manage',
+  'support.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];

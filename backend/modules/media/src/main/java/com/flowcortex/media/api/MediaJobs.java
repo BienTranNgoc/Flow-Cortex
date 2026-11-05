@@ -74,6 +74,24 @@ public interface MediaJobs {
     void bindRunInputs(UUID runId, List<MediaAssetInput> copies);
 
     /**
+     * Keeps owner-verified image uploads as attachments at {@code <keyPrefix>/1..N} of the media bucket. Each
+     * copy is tagged pending and sniffed (content check on); all are re-tagged kept only once every copy passed,
+     * and a refused copy expires by the media bucket's lifecycle rule. Call it outside any transaction.
+     * @throws UploadRejectedException on field {@code uploadIds} if an upload is not an image, is larger than
+     *         {@code maxBytes} (checked before any copy), vanished, or its copy's content is not an image
+     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/}, or there are not 1-10 inputs
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes);
+
+    /**
+     * Re-tags kept attachments pending again, so the media bucket's lifecycle rule expires them: for copies whose
+     * request or message was never saved. Tries every object, then rethrows the first failure.
+     * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
+     */
+    void releaseAttachments(List<StoredAttachment> attachments);
+
+    /**
      * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after
      * winning the workflow completion CAS and inside the same transaction.
      */

@@ -26,6 +26,7 @@ describe('RequireAdminApp', () => {
       },
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
+      'GET /api/v1/admin/support/requests/open-count': { status: 200, body: { count: 0 } },
     });
     window.history.pushState({}, '', '/runs');
     render(<App />);
@@ -113,6 +114,7 @@ describe('RequireAdminApp', () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
+      'GET /api/v1/admin/support/requests/open-count': { status: 200, body: { count: 0 } },
     });
     setToken('admin-token-signout', true);
     window.history.pushState({}, '', '/runs');

@@ -8,6 +8,8 @@ const ALL_OFF: FeaturesResponse = {
   runCancellation: false,
   credits: false,
   passwordReset: false,
+  supportWidget: false,
+  supportAssistant: false,
 };
 
 /** The `/features` query itself, for a page that must tell "still loading" from "switched off". */

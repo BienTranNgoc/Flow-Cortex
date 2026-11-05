@@ -49,13 +49,15 @@
       "comingSoon": "Coming soon",
       "disabledTitle": "{{label}} — {{tag}}",
       "unavailable": "unavailable",
+      "withOpenCount": "{{label}}, {{count}} open requests",
       "systemStatus": "All systems normal",
       "groups": {
         "overview": "Overview",
         "workflowOps": "Workflow Ops",
         "creditsBilling": "Credits & Billing",
         "administration": "Administration",
-        "system": "System"
+        "system": "System",
+        "support": "Support"
       },
       "items": {
         "dashboard": "Dashboard",
@@ -70,7 +72,11 @@
         "auditLog": "Audit Log",
         "mediaJobs": "Media Jobs",
         "voiceQuota": "Voice Quota",
-        "health": "Health"
+        "health": "Health",
+        "supportArticles": "Guide articles",
+        "supportGroups": "Topics",
+        "supportRequests": "Requests",
+        "supportSettings": "Assistant settings"
       }
     },
     "noAccess": {

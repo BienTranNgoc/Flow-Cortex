@@ -1,6 +1,24 @@
 import { ACTIONS, can } from './permissions';
 
 describe('can', () => {
+  it('lists every action the console guards', () => {
+    expect(ACTIONS).toEqual([
+      'console.enter',
+      'runs.view',
+      'mediaJobs.view',
+      'workflows.view',
+      'approvals.view',
+      'credits.view',
+      'providers.view',
+      'features.toggle',
+      'audit.view',
+      'voice.view',
+      'health.view',
+      'users.manage',
+      'support.manage',
+    ]);
+  });
+
   it.each(ACTIONS)('lets an ADMIN %s', (action) => {
     expect(can('ADMIN', action)).toBe(true);
   });

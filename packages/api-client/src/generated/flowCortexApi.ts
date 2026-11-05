@@ -80,6 +80,211 @@ export interface MeResponse {
   passwordSetupRequired?: boolean;
 }
 
+export interface AdminSupportSettingsUpdate {
+  assistantEnabled: boolean;
+}
+
+export interface AdminSupportSettings {
+  assistantEnabled: boolean;
+  updatedBy?: string;
+  updatedAt: string;
+  envEnabled: boolean;
+  ceilingReachedToday: boolean;
+  /** @minimum 1 */
+  dailyCeiling: number;
+}
+
+export type AdminSupportRequestStatusChangeStatus =
+  (typeof AdminSupportRequestStatusChangeStatus)[keyof typeof AdminSupportRequestStatusChangeStatus];
+
+export const AdminSupportRequestStatusChangeStatus = {
+  in_progress: 'in_progress',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export interface AdminSupportRequestStatusChange {
+  status: AdminSupportRequestStatusChangeStatus;
+}
+
+export type AdminSupportRequestDetailType =
+  (typeof AdminSupportRequestDetailType)[keyof typeof AdminSupportRequestDetailType];
+
+export const AdminSupportRequestDetailType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type AdminSupportRequestDetailStatus =
+  (typeof AdminSupportRequestDetailStatus)[keyof typeof AdminSupportRequestDetailStatus];
+
+export const AdminSupportRequestDetailStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type AdminSupportRequestDetailClosedReason =
+  (typeof AdminSupportRequestDetailClosedReason)[keyof typeof AdminSupportRequestDetailClosedReason];
+
+export const AdminSupportRequestDetailClosedReason = {
+  cancelled: 'cancelled',
+  confirmed: 'confirmed',
+  auto: 'auto',
+  admin: 'admin',
+} as const;
+
+export type AdminSupportRequestDetailAllowedStatusesItem =
+  (typeof AdminSupportRequestDetailAllowedStatusesItem)[keyof typeof AdminSupportRequestDetailAllowedStatusesItem];
+
+export const AdminSupportRequestDetailAllowedStatusesItem = {
+  in_progress: 'in_progress',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export interface SupportRequester {
+  id: string;
+  email?: string;
+  deleted: boolean;
+}
+
+export type SupportRequestMessageAuthorKind =
+  (typeof SupportRequestMessageAuthorKind)[keyof typeof SupportRequestMessageAuthorKind];
+
+export const SupportRequestMessageAuthorKind = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export interface SupportRequestAttachment {
+  position: number;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  expiresAt: string;
+}
+
+export interface SupportRequestMessage {
+  id: string;
+  authorKind: SupportRequestMessageAuthorKind;
+  body: string;
+  createdAt: string;
+  attachments: SupportRequestAttachment[];
+}
+
+export type SupportConversationMessageRole =
+  (typeof SupportConversationMessageRole)[keyof typeof SupportConversationMessageRole];
+
+export const SupportConversationMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export type SupportConversationMessageOutcome =
+  (typeof SupportConversationMessageOutcome)[keyof typeof SupportConversationMessageOutcome];
+
+export const SupportConversationMessageOutcome = {
+  answered: 'answered',
+  no_answer: 'no_answer',
+  blocked: 'blocked',
+} as const;
+
+export interface SupportConversationMessage {
+  role: SupportConversationMessageRole;
+  text: string;
+  outcome?: SupportConversationMessageOutcome;
+  createdAt: string;
+}
+
+export interface AdminSupportRequestDetail {
+  number: number;
+  type: AdminSupportRequestDetailType;
+  subject: string;
+  status: AdminSupportRequestDetailStatus;
+  closedReason?: AdminSupportRequestDetailClosedReason;
+  memberUnread: boolean;
+  createdAt: string;
+  lastActivityAt: string;
+  resolvedAt?: string;
+  requester: SupportRequester;
+  messages: SupportRequestMessage[];
+  conversation?: SupportConversationMessage[];
+  conversationExpired: boolean;
+  allowedStatuses: AdminSupportRequestDetailAllowedStatusesItem[];
+}
+
+export interface AdminSupportKbGroupRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  name: string;
+}
+
+export interface AdminSupportKbGroup {
+  id: string;
+  name: string;
+  position: number;
+  articleCount: number;
+}
+
+export interface AdminSupportKbGroupOrder {
+  /** @minItems 1 */
+  ids: string[];
+}
+
+export interface AdminSupportKbArticleRequest {
+  groupId: string;
+  /**
+   * @minLength 0
+   * @maxLength 80
+   * @pattern ^[a-z0-9]+(-[a-z0-9]+)*$
+   */
+  slug: string;
+  /**
+   * @minLength 0
+   * @maxLength 150
+   */
+  title: string;
+  /**
+   * @minLength 0
+   * @maxLength 20000
+   */
+  body: string;
+  /**
+   * @minimum 1
+   * @maximum 3
+   */
+  featuredPosition?: number;
+}
+
+export type AdminSupportKbArticleStatus =
+  (typeof AdminSupportKbArticleStatus)[keyof typeof AdminSupportKbArticleStatus];
+
+export const AdminSupportKbArticleStatus = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
+} as const;
+
+export interface AdminSupportKbArticle {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+  status: AdminSupportKbArticleStatus;
+  groupId: string;
+  featuredPosition?: number;
+  publishedAt?: string;
+  updatedAt: string;
+}
+
 export interface StartRunRequest {
   /**
    * @minLength 0
@@ -179,6 +384,142 @@ export interface UploadResponse {
   headers: UploadResponseHeaders;
   expiresAt: string;
   maxBytes: number;
+}
+
+export interface SupportUploadRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  fileName: string;
+  size: number;
+}
+
+export type SupportUploadGrantHeaders = { [key: string]: string };
+
+export interface SupportUploadGrant {
+  uploadId: string;
+  url: string;
+  method: string;
+  headers: SupportUploadGrantHeaders;
+  expiresAt: string;
+  maxBytes: number;
+}
+
+export type SupportRequestCreateType =
+  (typeof SupportRequestCreateType)[keyof typeof SupportRequestCreateType];
+
+export const SupportRequestCreateType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export interface SupportRequestCreate {
+  type: SupportRequestCreateType;
+  subject: string;
+  description: string;
+  /** @maxItems 3 */
+  uploadIds?: string[];
+  aiConversationId?: string;
+}
+
+export type SupportRequestDetailType =
+  (typeof SupportRequestDetailType)[keyof typeof SupportRequestDetailType];
+
+export const SupportRequestDetailType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type SupportRequestDetailStatus =
+  (typeof SupportRequestDetailStatus)[keyof typeof SupportRequestDetailStatus];
+
+export const SupportRequestDetailStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type SupportRequestDetailClosedReason =
+  (typeof SupportRequestDetailClosedReason)[keyof typeof SupportRequestDetailClosedReason];
+
+export const SupportRequestDetailClosedReason = {
+  cancelled: 'cancelled',
+  confirmed: 'confirmed',
+  auto: 'auto',
+  admin: 'admin',
+} as const;
+
+export interface SupportRequestDetail {
+  number: number;
+  type: SupportRequestDetailType;
+  subject: string;
+  status: SupportRequestDetailStatus;
+  closedReason?: SupportRequestDetailClosedReason;
+  memberUnread: boolean;
+  createdAt: string;
+  lastActivityAt: string;
+  resolvedAt?: string;
+  messages: SupportRequestMessage[];
+}
+
+export interface SupportRequestReply {
+  body: string;
+  /** @maxItems 3 */
+  uploadIds?: string[];
+}
+
+export interface SupportAssistantQuestion {
+  conversationId?: string;
+  /** @maxLength 1000 */
+  question: string;
+}
+
+export interface SupportAssistantQuota {
+  remaining: number;
+  resetsAt: string;
+}
+
+export type SupportAssistantReplyMessageRole =
+  (typeof SupportAssistantReplyMessageRole)[keyof typeof SupportAssistantReplyMessageRole];
+
+export const SupportAssistantReplyMessageRole = {
+  assistant: 'assistant',
+} as const;
+
+export type SupportAssistantReplyMessageOutcome =
+  (typeof SupportAssistantReplyMessageOutcome)[keyof typeof SupportAssistantReplyMessageOutcome];
+
+export const SupportAssistantReplyMessageOutcome = {
+  answered: 'answered',
+  no_answer: 'no_answer',
+  blocked: 'blocked',
+} as const;
+
+export interface SupportAssistantSource {
+  slug: string;
+  title: string;
+}
+
+export interface SupportAssistantReplyMessage {
+  role: SupportAssistantReplyMessageRole;
+  text: string;
+  outcome: SupportAssistantReplyMessageOutcome;
+  sources: SupportAssistantSource[];
+}
+
+export interface SupportAssistantReply {
+  conversationId: string;
+  message: SupportAssistantReplyMessage;
+  quota: SupportAssistantQuota;
 }
 
 export interface CreateScriptRevisionRequest {
@@ -382,6 +723,21 @@ export interface ResetRequestedResponse {
   status: string;
 }
 
+export type AdminSupportRequestReplyStatus =
+  (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
+
+export const AdminSupportRequestReplyStatus = {
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+} as const;
+
+export interface AdminSupportRequestReply {
+  body: string;
+  /** @maxItems 3 */
+  uploadIds?: string[];
+  status: AdminSupportRequestReplyStatus;
+}
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -408,6 +764,111 @@ export interface WorkflowResponse {
   estimatedCredits?: number;
 }
 
+export interface SupportSettings {
+  contactEmail?: string;
+  assistantAvailable: boolean;
+}
+
+export type SupportRequestSummaryType =
+  (typeof SupportRequestSummaryType)[keyof typeof SupportRequestSummaryType];
+
+export const SupportRequestSummaryType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type SupportRequestSummaryStatus =
+  (typeof SupportRequestSummaryStatus)[keyof typeof SupportRequestSummaryStatus];
+
+export const SupportRequestSummaryStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export interface SupportRequestSummary {
+  number: number;
+  type: SupportRequestSummaryType;
+  subject: string;
+  status: SupportRequestSummaryStatus;
+  memberUnread: boolean;
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+export interface SupportCount {
+  count: number;
+}
+
+export interface SupportKbSearchHit {
+  slug: string;
+  title: string;
+  groupName: string;
+}
+
+export interface SupportKbArticleSummary {
+  slug: string;
+  title: string;
+}
+
+export interface SupportKbGroup {
+  id: string;
+  name: string;
+  position: number;
+  articles: SupportKbArticleSummary[];
+}
+
+export interface SupportKbFeaturedArticle {
+  slug: string;
+  title: string;
+  position: number;
+}
+
+export interface SupportKbArticle {
+  slug: string;
+  title: string;
+  body: string;
+  groupId: string;
+  groupName: string;
+  publishedAt: string;
+  updatedAt: string;
+}
+
+export type SupportAssistantHistoryMessageRole =
+  (typeof SupportAssistantHistoryMessageRole)[keyof typeof SupportAssistantHistoryMessageRole];
+
+export const SupportAssistantHistoryMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export type SupportAssistantHistoryMessageOutcome =
+  (typeof SupportAssistantHistoryMessageOutcome)[keyof typeof SupportAssistantHistoryMessageOutcome];
+
+export const SupportAssistantHistoryMessageOutcome = {
+  answered: 'answered',
+  no_answer: 'no_answer',
+  blocked: 'blocked',
+} as const;
+
+export interface SupportAssistantHistoryMessage {
+  role: SupportAssistantHistoryMessageRole;
+  text: string;
+  outcome?: SupportAssistantHistoryMessageOutcome;
+  sources: SupportAssistantSource[];
+  createdAt: string;
+}
+
+export interface SupportAssistantConversation {
+  conversationId: string;
+  messages: SupportAssistantHistoryMessage[];
+}
+
 export interface OutputUrlResponse {
   url: string;
   expiresAt: string;
@@ -427,6 +888,8 @@ export interface FeaturesResponse {
   runCancellation: boolean;
   credits: boolean;
   passwordReset: boolean;
+  supportWidget: boolean;
+  supportAssistant: boolean;
 }
 
 export interface BalanceResponse {
@@ -437,6 +900,71 @@ export interface CapabilitiesResponse {
   mediaEnabled?: boolean;
   productVideoEnabled?: boolean;
   productVideoWorkflowId?: string;
+}
+
+export type AdminSupportRequestSummaryType =
+  (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
+
+export const AdminSupportRequestSummaryType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type AdminSupportRequestSummaryStatus =
+  (typeof AdminSupportRequestSummaryStatus)[keyof typeof AdminSupportRequestSummaryStatus];
+
+export const AdminSupportRequestSummaryStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export interface AdminSupportRequestSummary {
+  number: number;
+  type: AdminSupportRequestSummaryType;
+  subject: string;
+  status: AdminSupportRequestSummaryStatus;
+  requester: SupportRequester;
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+export interface AdminSupportRequestPage {
+  items: AdminSupportRequestSummary[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type AdminSupportKbArticleSummaryStatus =
+  (typeof AdminSupportKbArticleSummaryStatus)[keyof typeof AdminSupportKbArticleSummaryStatus];
+
+export const AdminSupportKbArticleSummaryStatus = {
+  draft: 'draft',
+  published: 'published',
+  archived: 'archived',
+} as const;
+
+export interface AdminSupportKbArticleSummary {
+  id: string;
+  slug: string;
+  title: string;
+  status: AdminSupportKbArticleSummaryStatus;
+  groupId: string;
+  groupName: string;
+  featuredPosition?: number;
+  publishedAt?: string;
+  updatedAt: string;
+}
+
+export interface AdminSupportKbArticleList {
+  items: AdminSupportKbArticleSummary[];
+  publishedFeaturedCount: number;
 }
 
 export interface SmsOutboxEntryResponse {
@@ -490,6 +1018,14 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export type SearchSupportKbParams = {
+  /**
+   * @minLength 2
+   * @maxLength 200
+   */
+  q: string;
+};
+
 export type CallbackParams = {
   code?: string;
   state?: string;
@@ -500,6 +1036,38 @@ export type AuthorizeParams = {
   remember_me?: boolean;
   return_to?: string;
 };
+
+export type ListAdminSupportRequestsParams = {
+  status?: ListAdminSupportRequestsStatus;
+  type?: ListAdminSupportRequestsType;
+  /**
+   * @minimum 0
+   * @maximum 10000
+   */
+  page?: number;
+};
+
+export type ListAdminSupportRequestsStatus =
+  (typeof ListAdminSupportRequestsStatus)[keyof typeof ListAdminSupportRequestsStatus];
+
+export const ListAdminSupportRequestsStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type ListAdminSupportRequestsType =
+  (typeof ListAdminSupportRequestsType)[keyof typeof ListAdminSupportRequestsType];
+
+export const ListAdminSupportRequestsType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
 
 export type ListAdminSmsOutboxParams = {
   /**
@@ -762,6 +1330,428 @@ export const updateProfile = async (
   });
 };
 
+export type getAdminSupportSettingsResponse200 = {
+  data: AdminSupportSettings;
+  status: 200;
+};
+
+export type getAdminSupportSettingsResponseSuccess = getAdminSupportSettingsResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportSettingsResponse = getAdminSupportSettingsResponseSuccess;
+
+export const getGetAdminSupportSettingsUrl = () => {
+  return `/api/v1/admin/support/settings`;
+};
+
+export const getAdminSupportSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportSettingsResponse> => {
+  return customFetch<getAdminSupportSettingsResponse>(getGetAdminSupportSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateAdminSupportSettingsResponse200 = {
+  data: AdminSupportSettings;
+  status: 200;
+};
+
+export type updateAdminSupportSettingsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminSupportSettingsResponseSuccess = updateAdminSupportSettingsResponse200 & {
+  headers: Headers;
+};
+export type updateAdminSupportSettingsResponseError = updateAdminSupportSettingsResponse400 & {
+  headers: Headers;
+};
+
+export type updateAdminSupportSettingsResponse =
+  updateAdminSupportSettingsResponseSuccess | updateAdminSupportSettingsResponseError;
+
+export const getUpdateAdminSupportSettingsUrl = () => {
+  return `/api/v1/admin/support/settings`;
+};
+
+export const updateAdminSupportSettings = async (
+  adminSupportSettingsUpdate: AdminSupportSettingsUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminSupportSettingsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminSupportSettingsResponse>(getUpdateAdminSupportSettingsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportSettingsUpdate),
+  });
+};
+
+export type setAdminSupportRequestStatusResponse200 = {
+  data: AdminSupportRequestDetail;
+  status: 200;
+};
+
+export type setAdminSupportRequestStatusResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type setAdminSupportRequestStatusResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type setAdminSupportRequestStatusResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type setAdminSupportRequestStatusResponseSuccess =
+  setAdminSupportRequestStatusResponse200 & {
+    headers: Headers;
+  };
+export type setAdminSupportRequestStatusResponseError = (
+  | setAdminSupportRequestStatusResponse400
+  | setAdminSupportRequestStatusResponse404
+  | setAdminSupportRequestStatusResponse409
+) & {
+  headers: Headers;
+};
+
+export type setAdminSupportRequestStatusResponse =
+  setAdminSupportRequestStatusResponseSuccess | setAdminSupportRequestStatusResponseError;
+
+export const getSetAdminSupportRequestStatusUrl = (number: number) => {
+  return `/api/v1/admin/support/requests/${number}/status`;
+};
+
+export const setAdminSupportRequestStatus = async (
+  number: number,
+  adminSupportRequestStatusChange: AdminSupportRequestStatusChange,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setAdminSupportRequestStatusResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setAdminSupportRequestStatusResponse>(
+    getSetAdminSupportRequestStatusUrl(number),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(adminSupportRequestStatusChange),
+    },
+  );
+};
+
+export type renameAdminSupportKbGroupResponse200 = {
+  data: AdminSupportKbGroup;
+  status: 200;
+};
+
+export type renameAdminSupportKbGroupResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameAdminSupportKbGroupResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameAdminSupportKbGroupResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type renameAdminSupportKbGroupResponseSuccess = renameAdminSupportKbGroupResponse200 & {
+  headers: Headers;
+};
+export type renameAdminSupportKbGroupResponseError = (
+  | renameAdminSupportKbGroupResponse400
+  | renameAdminSupportKbGroupResponse404
+  | renameAdminSupportKbGroupResponse409
+) & {
+  headers: Headers;
+};
+
+export type renameAdminSupportKbGroupResponse =
+  renameAdminSupportKbGroupResponseSuccess | renameAdminSupportKbGroupResponseError;
+
+export const getRenameAdminSupportKbGroupUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/groups/${id}`;
+};
+
+export const renameAdminSupportKbGroup = async (
+  id: string,
+  adminSupportKbGroupRequest: AdminSupportKbGroupRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameAdminSupportKbGroupResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameAdminSupportKbGroupResponse>(getRenameAdminSupportKbGroupUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportKbGroupRequest),
+  });
+};
+
+export type deleteAdminSupportKbGroupResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminSupportKbGroupResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminSupportKbGroupResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminSupportKbGroupResponseSuccess = deleteAdminSupportKbGroupResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminSupportKbGroupResponseError = (
+  deleteAdminSupportKbGroupResponse404 | deleteAdminSupportKbGroupResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminSupportKbGroupResponse =
+  deleteAdminSupportKbGroupResponseSuccess | deleteAdminSupportKbGroupResponseError;
+
+export const getDeleteAdminSupportKbGroupUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/groups/${id}`;
+};
+
+export const deleteAdminSupportKbGroup = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminSupportKbGroupResponse> => {
+  return customFetch<deleteAdminSupportKbGroupResponse>(getDeleteAdminSupportKbGroupUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type reorderAdminSupportKbGroupsResponse200 = {
+  data: AdminSupportKbGroup[];
+  status: 200;
+};
+
+export type reorderAdminSupportKbGroupsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminSupportKbGroupsResponseSuccess = reorderAdminSupportKbGroupsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminSupportKbGroupsResponseError = reorderAdminSupportKbGroupsResponse400 & {
+  headers: Headers;
+};
+
+export type reorderAdminSupportKbGroupsResponse =
+  reorderAdminSupportKbGroupsResponseSuccess | reorderAdminSupportKbGroupsResponseError;
+
+export const getReorderAdminSupportKbGroupsUrl = () => {
+  return `/api/v1/admin/support/kb/groups/order`;
+};
+
+export const reorderAdminSupportKbGroups = async (
+  adminSupportKbGroupOrder: AdminSupportKbGroupOrder,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminSupportKbGroupsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminSupportKbGroupsResponse>(getReorderAdminSupportKbGroupsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportKbGroupOrder),
+  });
+};
+
+export type getAdminSupportKbArticleResponse200 = {
+  data: AdminSupportKbArticle;
+  status: 200;
+};
+
+export type getAdminSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminSupportKbArticleResponseSuccess = getAdminSupportKbArticleResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportKbArticleResponseError = getAdminSupportKbArticleResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminSupportKbArticleResponse =
+  getAdminSupportKbArticleResponseSuccess | getAdminSupportKbArticleResponseError;
+
+export const getGetAdminSupportKbArticleUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/articles/${id}`;
+};
+
+export const getAdminSupportKbArticle = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportKbArticleResponse> => {
+  return customFetch<getAdminSupportKbArticleResponse>(getGetAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateAdminSupportKbArticleResponse200 = {
+  data: AdminSupportKbArticle;
+  status: 200;
+};
+
+export type updateAdminSupportKbArticleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminSupportKbArticleResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminSupportKbArticleResponseSuccess = updateAdminSupportKbArticleResponse200 & {
+  headers: Headers;
+};
+export type updateAdminSupportKbArticleResponseError = (
+  | updateAdminSupportKbArticleResponse400
+  | updateAdminSupportKbArticleResponse404
+  | updateAdminSupportKbArticleResponse409
+) & {
+  headers: Headers;
+};
+
+export type updateAdminSupportKbArticleResponse =
+  updateAdminSupportKbArticleResponseSuccess | updateAdminSupportKbArticleResponseError;
+
+export const getUpdateAdminSupportKbArticleUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/articles/${id}`;
+};
+
+export const updateAdminSupportKbArticle = async (
+  id: string,
+  adminSupportKbArticleRequest: AdminSupportKbArticleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminSupportKbArticleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminSupportKbArticleResponse>(getUpdateAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportKbArticleRequest),
+  });
+};
+
 export type startRunResponse200 = {
   data: RunResponse;
   status: 200;
@@ -916,6 +1906,492 @@ export const requestUpload = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
+  });
+};
+
+export type requestSupportUploadResponse201 = {
+  data: SupportUploadGrant;
+  status: 201;
+};
+
+export type requestSupportUploadResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestSupportUploadResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type requestSupportUploadResponseSuccess = requestSupportUploadResponse201 & {
+  headers: Headers;
+};
+export type requestSupportUploadResponseError = (
+  requestSupportUploadResponse400 | requestSupportUploadResponse503
+) & {
+  headers: Headers;
+};
+
+export type requestSupportUploadResponse =
+  requestSupportUploadResponseSuccess | requestSupportUploadResponseError;
+
+export const getRequestSupportUploadUrl = () => {
+  return `/api/v1/support/uploads`;
+};
+
+export const requestSupportUpload = async (
+  supportUploadRequest: SupportUploadRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestSupportUploadResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestSupportUploadResponse>(getRequestSupportUploadUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportUploadRequest),
+  });
+};
+
+export type listSupportRequestsResponse200 = {
+  data: SupportRequestSummary[];
+  status: 200;
+};
+
+export type listSupportRequestsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listSupportRequestsResponseSuccess = listSupportRequestsResponse200 & {
+  headers: Headers;
+};
+export type listSupportRequestsResponseError = listSupportRequestsResponse503 & {
+  headers: Headers;
+};
+
+export type listSupportRequestsResponse =
+  listSupportRequestsResponseSuccess | listSupportRequestsResponseError;
+
+export const getListSupportRequestsUrl = () => {
+  return `/api/v1/support/requests`;
+};
+
+export const listSupportRequests = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listSupportRequestsResponse> => {
+  return customFetch<listSupportRequestsResponse>(getListSupportRequestsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createSupportRequestResponse201 = {
+  data: SupportRequestDetail;
+  status: 201;
+};
+
+export type createSupportRequestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type createSupportRequestResponseSuccess = createSupportRequestResponse201 & {
+  headers: Headers;
+};
+export type createSupportRequestResponseError = (
+  | createSupportRequestResponse400
+  | createSupportRequestResponse409
+  | createSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type createSupportRequestResponse =
+  createSupportRequestResponseSuccess | createSupportRequestResponseError;
+
+export const getCreateSupportRequestUrl = () => {
+  return `/api/v1/support/requests`;
+};
+
+export const createSupportRequest = async (
+  supportRequestCreate: SupportRequestCreate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createSupportRequestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createSupportRequestResponse>(getCreateSupportRequestUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportRequestCreate),
+  });
+};
+
+export type replyToSupportRequestResponse201 = {
+  data: SupportRequestDetail;
+  status: 201;
+};
+
+export type replyToSupportRequestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replyToSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replyToSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type replyToSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type replyToSupportRequestResponseSuccess = replyToSupportRequestResponse201 & {
+  headers: Headers;
+};
+export type replyToSupportRequestResponseError = (
+  | replyToSupportRequestResponse400
+  | replyToSupportRequestResponse404
+  | replyToSupportRequestResponse409
+  | replyToSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type replyToSupportRequestResponse =
+  replyToSupportRequestResponseSuccess | replyToSupportRequestResponseError;
+
+export const getReplyToSupportRequestUrl = (number: number) => {
+  return `/api/v1/support/requests/${number}/messages`;
+};
+
+export const replyToSupportRequest = async (
+  number: number,
+  supportRequestReply: SupportRequestReply,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replyToSupportRequestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replyToSupportRequestResponse>(getReplyToSupportRequestUrl(number), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportRequestReply),
+  });
+};
+
+export type confirmSupportRequestResponse200 = {
+  data: SupportRequestDetail;
+  status: 200;
+};
+
+export type confirmSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type confirmSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type confirmSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type confirmSupportRequestResponseSuccess = confirmSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type confirmSupportRequestResponseError = (
+  | confirmSupportRequestResponse404
+  | confirmSupportRequestResponse409
+  | confirmSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type confirmSupportRequestResponse =
+  confirmSupportRequestResponseSuccess | confirmSupportRequestResponseError;
+
+export const getConfirmSupportRequestUrl = (number: number) => {
+  return `/api/v1/support/requests/${number}/confirm`;
+};
+
+export const confirmSupportRequest = async (
+  number: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<confirmSupportRequestResponse> => {
+  return customFetch<confirmSupportRequestResponse>(getConfirmSupportRequestUrl(number), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type cancelSupportRequestResponse200 = {
+  data: SupportRequestDetail;
+  status: 200;
+};
+
+export type cancelSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type cancelSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type cancelSupportRequestResponseSuccess = cancelSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type cancelSupportRequestResponseError = (
+  | cancelSupportRequestResponse404
+  | cancelSupportRequestResponse409
+  | cancelSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type cancelSupportRequestResponse =
+  cancelSupportRequestResponseSuccess | cancelSupportRequestResponseError;
+
+export const getCancelSupportRequestUrl = (number: number) => {
+  return `/api/v1/support/requests/${number}/cancel`;
+};
+
+export const cancelSupportRequest = async (
+  number: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelSupportRequestResponse> => {
+  return customFetch<cancelSupportRequestResponse>(getCancelSupportRequestUrl(number), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type askSupportAssistantResponse200 = {
+  data: SupportAssistantReply;
+  status: 200;
+};
+
+export type askSupportAssistantResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type askSupportAssistantResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type askSupportAssistantResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type askSupportAssistantResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type askSupportAssistantResponseSuccess = askSupportAssistantResponse200 & {
+  headers: Headers;
+};
+export type askSupportAssistantResponseError = (
+  | askSupportAssistantResponse400
+  | askSupportAssistantResponse404
+  | askSupportAssistantResponse429
+  | askSupportAssistantResponse503
+) & {
+  headers: Headers;
+};
+
+export type askSupportAssistantResponse =
+  askSupportAssistantResponseSuccess | askSupportAssistantResponseError;
+
+export const getAskSupportAssistantUrl = () => {
+  return `/api/v1/support/assistant/messages`;
+};
+
+export const askSupportAssistant = async (
+  supportAssistantQuestion: SupportAssistantQuestion,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<askSupportAssistantResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<askSupportAssistantResponse>(getAskSupportAssistantUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportAssistantQuestion),
+  });
+};
+
+export type askSupportAssistantAsGuestResponse200 = {
+  data: SupportAssistantReply;
+  status: 200;
+};
+
+export type askSupportAssistantAsGuestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type askSupportAssistantAsGuestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type askSupportAssistantAsGuestResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type askSupportAssistantAsGuestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type askSupportAssistantAsGuestResponseSuccess = askSupportAssistantAsGuestResponse200 & {
+  headers: Headers;
+};
+export type askSupportAssistantAsGuestResponseError = (
+  | askSupportAssistantAsGuestResponse400
+  | askSupportAssistantAsGuestResponse404
+  | askSupportAssistantAsGuestResponse429
+  | askSupportAssistantAsGuestResponse503
+) & {
+  headers: Headers;
+};
+
+export type askSupportAssistantAsGuestResponse =
+  askSupportAssistantAsGuestResponseSuccess | askSupportAssistantAsGuestResponseError;
+
+export const getAskSupportAssistantAsGuestUrl = () => {
+  return `/api/v1/support/assistant/guest/messages`;
+};
+
+export const askSupportAssistantAsGuest = async (
+  supportAssistantQuestion: SupportAssistantQuestion,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<askSupportAssistantAsGuestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<askSupportAssistantAsGuestResponse>(getAskSupportAssistantAsGuestUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(supportAssistantQuestion),
   });
 };
 
@@ -1635,6 +3111,329 @@ export const confirmEmail = async (
   });
 };
 
+export type replyToAdminSupportRequestResponse201 = {
+  data: AdminSupportRequestDetail;
+  status: 201;
+};
+
+export type replyToAdminSupportRequestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replyToAdminSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replyToAdminSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type replyToAdminSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type replyToAdminSupportRequestResponseSuccess = replyToAdminSupportRequestResponse201 & {
+  headers: Headers;
+};
+export type replyToAdminSupportRequestResponseError = (
+  | replyToAdminSupportRequestResponse400
+  | replyToAdminSupportRequestResponse404
+  | replyToAdminSupportRequestResponse409
+  | replyToAdminSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type replyToAdminSupportRequestResponse =
+  replyToAdminSupportRequestResponseSuccess | replyToAdminSupportRequestResponseError;
+
+export const getReplyToAdminSupportRequestUrl = (number: number) => {
+  return `/api/v1/admin/support/requests/${number}/messages`;
+};
+
+export const replyToAdminSupportRequest = async (
+  number: number,
+  adminSupportRequestReply: AdminSupportRequestReply,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replyToAdminSupportRequestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replyToAdminSupportRequestResponse>(getReplyToAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportRequestReply),
+  });
+};
+
+export type listAdminSupportKbGroupsResponse200 = {
+  data: AdminSupportKbGroup[];
+  status: 200;
+};
+
+export type listAdminSupportKbGroupsResponseSuccess = listAdminSupportKbGroupsResponse200 & {
+  headers: Headers;
+};
+export type listAdminSupportKbGroupsResponse = listAdminSupportKbGroupsResponseSuccess;
+
+export const getListAdminSupportKbGroupsUrl = () => {
+  return `/api/v1/admin/support/kb/groups`;
+};
+
+export const listAdminSupportKbGroups = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSupportKbGroupsResponse> => {
+  return customFetch<listAdminSupportKbGroupsResponse>(getListAdminSupportKbGroupsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createAdminSupportKbGroupResponse201 = {
+  data: AdminSupportKbGroup;
+  status: 201;
+};
+
+export type createAdminSupportKbGroupResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminSupportKbGroupResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminSupportKbGroupResponseSuccess = createAdminSupportKbGroupResponse201 & {
+  headers: Headers;
+};
+export type createAdminSupportKbGroupResponseError = (
+  createAdminSupportKbGroupResponse400 | createAdminSupportKbGroupResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminSupportKbGroupResponse =
+  createAdminSupportKbGroupResponseSuccess | createAdminSupportKbGroupResponseError;
+
+export const getCreateAdminSupportKbGroupUrl = () => {
+  return `/api/v1/admin/support/kb/groups`;
+};
+
+export const createAdminSupportKbGroup = async (
+  adminSupportKbGroupRequest: AdminSupportKbGroupRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminSupportKbGroupResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminSupportKbGroupResponse>(getCreateAdminSupportKbGroupUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportKbGroupRequest),
+  });
+};
+
+export type listAdminSupportKbArticlesResponse200 = {
+  data: AdminSupportKbArticleList;
+  status: 200;
+};
+
+export type listAdminSupportKbArticlesResponseSuccess = listAdminSupportKbArticlesResponse200 & {
+  headers: Headers;
+};
+export type listAdminSupportKbArticlesResponse = listAdminSupportKbArticlesResponseSuccess;
+
+export const getListAdminSupportKbArticlesUrl = () => {
+  return `/api/v1/admin/support/kb/articles`;
+};
+
+export const listAdminSupportKbArticles = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSupportKbArticlesResponse> => {
+  return customFetch<listAdminSupportKbArticlesResponse>(getListAdminSupportKbArticlesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createAdminSupportKbArticleResponse201 = {
+  data: AdminSupportKbArticle;
+  status: 201;
+};
+
+export type createAdminSupportKbArticleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createAdminSupportKbArticleResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminSupportKbArticleResponseSuccess = createAdminSupportKbArticleResponse201 & {
+  headers: Headers;
+};
+export type createAdminSupportKbArticleResponseError = (
+  | createAdminSupportKbArticleResponse400
+  | createAdminSupportKbArticleResponse404
+  | createAdminSupportKbArticleResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminSupportKbArticleResponse =
+  createAdminSupportKbArticleResponseSuccess | createAdminSupportKbArticleResponseError;
+
+export const getCreateAdminSupportKbArticleUrl = () => {
+  return `/api/v1/admin/support/kb/articles`;
+};
+
+export const createAdminSupportKbArticle = async (
+  adminSupportKbArticleRequest: AdminSupportKbArticleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminSupportKbArticleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminSupportKbArticleResponse>(getCreateAdminSupportKbArticleUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportKbArticleRequest),
+  });
+};
+
+export type publishAdminSupportKbArticleResponse200 = {
+  data: AdminSupportKbArticle;
+  status: 200;
+};
+
+export type publishAdminSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type publishAdminSupportKbArticleResponseSuccess =
+  publishAdminSupportKbArticleResponse200 & {
+    headers: Headers;
+  };
+export type publishAdminSupportKbArticleResponseError = publishAdminSupportKbArticleResponse404 & {
+  headers: Headers;
+};
+
+export type publishAdminSupportKbArticleResponse =
+  publishAdminSupportKbArticleResponseSuccess | publishAdminSupportKbArticleResponseError;
+
+export const getPublishAdminSupportKbArticleUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/articles/${id}/publish`;
+};
+
+export const publishAdminSupportKbArticle = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<publishAdminSupportKbArticleResponse> => {
+  return customFetch<publishAdminSupportKbArticleResponse>(getPublishAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type archiveAdminSupportKbArticleResponse200 = {
+  data: AdminSupportKbArticle;
+  status: 200;
+};
+
+export type archiveAdminSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type archiveAdminSupportKbArticleResponseSuccess =
+  archiveAdminSupportKbArticleResponse200 & {
+    headers: Headers;
+  };
+export type archiveAdminSupportKbArticleResponseError = archiveAdminSupportKbArticleResponse404 & {
+  headers: Headers;
+};
+
+export type archiveAdminSupportKbArticleResponse =
+  archiveAdminSupportKbArticleResponseSuccess | archiveAdminSupportKbArticleResponseError;
+
+export const getArchiveAdminSupportKbArticleUrl = (id: string) => {
+  return `/api/v1/admin/support/kb/articles/${id}/archive`;
+};
+
+export const archiveAdminSupportKbArticle = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<archiveAdminSupportKbArticleResponse> => {
+  return customFetch<archiveAdminSupportKbArticleResponse>(getArchiveAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -1680,6 +3479,370 @@ export const getWorkflow = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type getSupportSettingsResponse200 = {
+  data: SupportSettings;
+  status: 200;
+};
+
+export type getSupportSettingsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getSupportSettingsResponseSuccess = getSupportSettingsResponse200 & {
+  headers: Headers;
+};
+export type getSupportSettingsResponseError = getSupportSettingsResponse503 & {
+  headers: Headers;
+};
+
+export type getSupportSettingsResponse =
+  getSupportSettingsResponseSuccess | getSupportSettingsResponseError;
+
+export const getGetSupportSettingsUrl = () => {
+  return `/api/v1/support/settings`;
+};
+
+export const getSupportSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getSupportSettingsResponse> => {
+  return customFetch<getSupportSettingsResponse>(getGetSupportSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getSupportRequestResponse200 = {
+  data: SupportRequestDetail;
+  status: 200;
+};
+
+export type getSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getSupportRequestResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getSupportRequestResponseSuccess = getSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type getSupportRequestResponseError = (
+  getSupportRequestResponse404 | getSupportRequestResponse503
+) & {
+  headers: Headers;
+};
+
+export type getSupportRequestResponse =
+  getSupportRequestResponseSuccess | getSupportRequestResponseError;
+
+export const getGetSupportRequestUrl = (number: number) => {
+  return `/api/v1/support/requests/${number}`;
+};
+
+export const getSupportRequest = async (
+  number: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getSupportRequestResponse> => {
+  return customFetch<getSupportRequestResponse>(getGetSupportRequestUrl(number), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type countUnreadSupportRequestsResponse200 = {
+  data: SupportCount;
+  status: 200;
+};
+
+export type countUnreadSupportRequestsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type countUnreadSupportRequestsResponseSuccess = countUnreadSupportRequestsResponse200 & {
+  headers: Headers;
+};
+export type countUnreadSupportRequestsResponseError = countUnreadSupportRequestsResponse503 & {
+  headers: Headers;
+};
+
+export type countUnreadSupportRequestsResponse =
+  countUnreadSupportRequestsResponseSuccess | countUnreadSupportRequestsResponseError;
+
+export const getCountUnreadSupportRequestsUrl = () => {
+  return `/api/v1/support/requests/unread-count`;
+};
+
+export const countUnreadSupportRequests = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<countUnreadSupportRequestsResponse> => {
+  return customFetch<countUnreadSupportRequestsResponse>(getCountUnreadSupportRequestsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type searchSupportKbResponse200 = {
+  data: SupportKbSearchHit[];
+  status: 200;
+};
+
+export type searchSupportKbResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type searchSupportKbResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type searchSupportKbResponseSuccess = searchSupportKbResponse200 & {
+  headers: Headers;
+};
+export type searchSupportKbResponseError = (
+  searchSupportKbResponse400 | searchSupportKbResponse503
+) & {
+  headers: Headers;
+};
+
+export type searchSupportKbResponse = searchSupportKbResponseSuccess | searchSupportKbResponseError;
+
+export const getSearchSupportKbUrl = (params: SearchSupportKbParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/support/kb/search?${stringifiedParams}`
+    : `/api/v1/support/kb/search`;
+};
+
+export const searchSupportKb = async (
+  params: SearchSupportKbParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<searchSupportKbResponse> => {
+  return customFetch<searchSupportKbResponse>(getSearchSupportKbUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listSupportKbGroupsResponse200 = {
+  data: SupportKbGroup[];
+  status: 200;
+};
+
+export type listSupportKbGroupsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listSupportKbGroupsResponseSuccess = listSupportKbGroupsResponse200 & {
+  headers: Headers;
+};
+export type listSupportKbGroupsResponseError = listSupportKbGroupsResponse503 & {
+  headers: Headers;
+};
+
+export type listSupportKbGroupsResponse =
+  listSupportKbGroupsResponseSuccess | listSupportKbGroupsResponseError;
+
+export const getListSupportKbGroupsUrl = () => {
+  return `/api/v1/support/kb/groups`;
+};
+
+export const listSupportKbGroups = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listSupportKbGroupsResponse> => {
+  return customFetch<listSupportKbGroupsResponse>(getListSupportKbGroupsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listSupportKbFeaturedResponse200 = {
+  data: SupportKbFeaturedArticle[];
+  status: 200;
+};
+
+export type listSupportKbFeaturedResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listSupportKbFeaturedResponseSuccess = listSupportKbFeaturedResponse200 & {
+  headers: Headers;
+};
+export type listSupportKbFeaturedResponseError = listSupportKbFeaturedResponse503 & {
+  headers: Headers;
+};
+
+export type listSupportKbFeaturedResponse =
+  listSupportKbFeaturedResponseSuccess | listSupportKbFeaturedResponseError;
+
+export const getListSupportKbFeaturedUrl = () => {
+  return `/api/v1/support/kb/featured`;
+};
+
+export const listSupportKbFeatured = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listSupportKbFeaturedResponse> => {
+  return customFetch<listSupportKbFeaturedResponse>(getListSupportKbFeaturedUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getSupportKbArticleResponse200 = {
+  data: SupportKbArticle;
+  status: 200;
+};
+
+export type getSupportKbArticleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getSupportKbArticleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getSupportKbArticleResponseSuccess = getSupportKbArticleResponse200 & {
+  headers: Headers;
+};
+export type getSupportKbArticleResponseError = (
+  getSupportKbArticleResponse404 | getSupportKbArticleResponse503
+) & {
+  headers: Headers;
+};
+
+export type getSupportKbArticleResponse =
+  getSupportKbArticleResponseSuccess | getSupportKbArticleResponseError;
+
+export const getGetSupportKbArticleUrl = (slug: string) => {
+  return `/api/v1/support/kb/articles/${slug}`;
+};
+
+export const getSupportKbArticle = async (
+  slug: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getSupportKbArticleResponse> => {
+  return customFetch<getSupportKbArticleResponse>(getGetSupportKbArticleUrl(slug), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getSupportAssistantGuestLatestConversationResponse200 = {
+  data: SupportAssistantConversation;
+  status: 200;
+};
+
+export type getSupportAssistantGuestLatestConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getSupportAssistantGuestLatestConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getSupportAssistantGuestLatestConversationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getSupportAssistantGuestLatestConversationResponseSuccess =
+  getSupportAssistantGuestLatestConversationResponse200 & {
+    headers: Headers;
+  };
+export type getSupportAssistantGuestLatestConversationResponseError = (
+  | getSupportAssistantGuestLatestConversationResponse400
+  | getSupportAssistantGuestLatestConversationResponse404
+  | getSupportAssistantGuestLatestConversationResponse503
+) & {
+  headers: Headers;
+};
+
+export type getSupportAssistantGuestLatestConversationResponse =
+  | getSupportAssistantGuestLatestConversationResponseSuccess
+  | getSupportAssistantGuestLatestConversationResponseError;
+
+export const getGetSupportAssistantGuestLatestConversationUrl = () => {
+  return `/api/v1/support/assistant/guest/conversations/latest`;
+};
+
+export const getSupportAssistantGuestLatestConversation = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getSupportAssistantGuestLatestConversationResponse> => {
+  return customFetch<getSupportAssistantGuestLatestConversationResponse>(
+    getGetSupportAssistantGuestLatestConversationUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type getSupportAssistantLatestConversationResponse200 = {
+  data: SupportAssistantConversation;
+  status: 200;
+};
+
+export type getSupportAssistantLatestConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getSupportAssistantLatestConversationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getSupportAssistantLatestConversationResponseSuccess =
+  getSupportAssistantLatestConversationResponse200 & {
+    headers: Headers;
+  };
+export type getSupportAssistantLatestConversationResponseError = (
+  | getSupportAssistantLatestConversationResponse404
+  | getSupportAssistantLatestConversationResponse503
+) & {
+  headers: Headers;
+};
+
+export type getSupportAssistantLatestConversationResponse =
+  | getSupportAssistantLatestConversationResponseSuccess
+  | getSupportAssistantLatestConversationResponseError;
+
+export const getGetSupportAssistantLatestConversationUrl = () => {
+  return `/api/v1/support/assistant/conversations/latest`;
+};
+
+export const getSupportAssistantLatestConversation = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getSupportAssistantLatestConversationResponse> => {
+  return customFetch<getSupportAssistantLatestConversationResponse>(
+    getGetSupportAssistantLatestConversationUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type getReviewTasksResponse200 = {
@@ -1966,6 +4129,109 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminSupportRequestsResponse200 = {
+  data: AdminSupportRequestPage;
+  status: 200;
+};
+
+export type listAdminSupportRequestsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listAdminSupportRequestsResponseSuccess = listAdminSupportRequestsResponse200 & {
+  headers: Headers;
+};
+export type listAdminSupportRequestsResponseError = listAdminSupportRequestsResponse400 & {
+  headers: Headers;
+};
+
+export type listAdminSupportRequestsResponse =
+  listAdminSupportRequestsResponseSuccess | listAdminSupportRequestsResponseError;
+
+export const getListAdminSupportRequestsUrl = (params?: ListAdminSupportRequestsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests?${stringifiedParams}`
+    : `/api/v1/admin/support/requests`;
+};
+
+export const listAdminSupportRequests = async (
+  params?: ListAdminSupportRequestsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSupportRequestsResponse> => {
+  return customFetch<listAdminSupportRequestsResponse>(getListAdminSupportRequestsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminSupportRequestResponse200 = {
+  data: AdminSupportRequestDetail;
+  status: 200;
+};
+
+export type getAdminSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminSupportRequestResponseSuccess = getAdminSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportRequestResponseError = getAdminSupportRequestResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminSupportRequestResponse =
+  getAdminSupportRequestResponseSuccess | getAdminSupportRequestResponseError;
+
+export const getGetAdminSupportRequestUrl = (number: number) => {
+  return `/api/v1/admin/support/requests/${number}`;
+};
+
+export const getAdminSupportRequest = async (
+  number: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportRequestResponse> => {
+  return customFetch<getAdminSupportRequestResponse>(getGetAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type countOpenSupportRequestsResponse200 = {
+  data: SupportCount;
+  status: 200;
+};
+
+export type countOpenSupportRequestsResponseSuccess = countOpenSupportRequestsResponse200 & {
+  headers: Headers;
+};
+export type countOpenSupportRequestsResponse = countOpenSupportRequestsResponseSuccess;
+
+export const getCountOpenSupportRequestsUrl = () => {
+  return `/api/v1/admin/support/requests/open-count`;
+};
+
+export const countOpenSupportRequests = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<countOpenSupportRequestsResponse> => {
+  return customFetch<countOpenSupportRequestsResponse>(getCountOpenSupportRequestsUrl(), {
     ...options,
     method: 'GET',
   });

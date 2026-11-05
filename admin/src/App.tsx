@@ -14,6 +14,12 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
+import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
+import { ArticlesPage } from './features/support/kb/ArticlesPage';
+import { TopicGroupsPage } from './features/support/kb/TopicGroupsPage';
+import { RequestDetailPage } from './features/support/requests/RequestDetailPage';
+import { RequestsInboxPage } from './features/support/requests/RequestsInboxPage';
+import { SupportSettingsPage } from './features/support/settings/SupportSettingsPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
 
@@ -23,7 +29,18 @@ const PAGES: Record<string, ReactElement> = {
   '/users': <UsersPage />,
   '/sms-outbox': <SmsOutboxPage />,
   '/media-jobs': <MediaJobsPage />,
+  '/support/articles': <ArticlesPage />,
+  '/support/groups': <TopicGroupsPage />,
+  '/support/requests': <RequestsInboxPage />,
+  '/support/settings': <SupportSettingsPage />,
 };
+
+/** Pages under a sidebar entry, routable only where that entry is. */
+const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
+  { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
+  { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
+  { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },
+];
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */
 function AdminRoutes() {
@@ -37,8 +54,10 @@ function AdminRoutes() {
         {items.map((item) => (
           <Route key={item.path} path={item.path} element={PAGES[item.path]} />
         ))}
-        {items.some((item) => item.path === '/users') && (
-          <Route path="/users/:userId" element={<UserDetailPage />} />
+        {CHILD_PAGES.filter((child) => items.some((item) => item.path === child.parent)).map(
+          (child) => (
+            <Route key={child.path} path={child.path} element={child.element} />
+          ),
         )}
         <Route
           path="*"

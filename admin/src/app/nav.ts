@@ -2,19 +2,26 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   AudioWaveform,
+  BookOpen,
   Boxes,
   ClipboardList,
   Coins,
   Cpu,
+  Headset,
   LayoutDashboard,
+  Layers,
   ListChecks,
   MessageSquare,
   Play,
   Settings2,
   ShieldCheck,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import { can, type Action } from './permissions';
+
+/** A live count the sidebar shows beside an entry. */
+export type NavBadge = 'openSupportRequests';
 
 /** `label` and `tag` are i18n keys; the sidebar translates them. */
 export interface NavItem {
@@ -24,6 +31,7 @@ export interface NavItem {
   action: Action;
   disabled?: boolean;
   tag?: string;
+  badge?: NavBadge;
 }
 
 export interface NavGroup {
@@ -146,6 +154,37 @@ export const NAV: NavGroup[] = [
         action: 'health.view',
         disabled: true,
         tag: COMING_SOON,
+      },
+    ],
+  },
+  {
+    id: 'support',
+    label: 'common.shell.nav.groups.support',
+    items: [
+      {
+        label: 'common.shell.nav.items.supportArticles',
+        path: '/support/articles',
+        icon: BookOpen,
+        action: 'support.manage',
+      },
+      {
+        label: 'common.shell.nav.items.supportGroups',
+        path: '/support/groups',
+        icon: Layers,
+        action: 'support.manage',
+      },
+      {
+        label: 'common.shell.nav.items.supportRequests',
+        path: '/support/requests',
+        icon: Headset,
+        action: 'support.manage',
+        badge: 'openSupportRequests',
+      },
+      {
+        label: 'common.shell.nav.items.supportSettings',
+        path: '/support/settings',
+        icon: Sparkles,
+        action: 'support.manage',
       },
     ],
   },

@@ -23,6 +23,8 @@ interface AdminListProps<T> {
   /** The filter option's text for a status code; the option value stays the code. */
   statusLabel: (status: string) => string;
   status: string;
+  /** A filter the list cannot see (not the status one) is active: an empty result reads as filtered. */
+  filtered?: boolean;
   onStatusChange: (status: string) => void;
   onPageChange: (page: number) => void;
   children: (items: T[]) => ReactNode;
@@ -39,6 +41,7 @@ export function AdminList<T>({
   statuses,
   statusLabel,
   status,
+  filtered = false,
   onStatusChange,
   onPageChange,
   children,
@@ -68,6 +71,8 @@ export function AdminList<T>({
         </button>
       </>
     );
+  } else if (filtered) {
+    empty = <p>{t('common.shell.list.noMatch', { noun })}</p>;
   } else {
     empty = <p>{t('common.shell.list.empty', { noun })}</p>;
   }
