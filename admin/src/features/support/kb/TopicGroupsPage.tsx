@@ -29,7 +29,7 @@ function groupProblem(error: unknown, t: TFunction): string {
   switch (supportProblemCode(error)) {
     case 'group-not-empty': {
       const count = error instanceof ApiError ? error.problem?.articleCount : undefined;
-      return t('support.problems.group-not-empty', { n: count ?? 1 });
+      return t('support.problems.group-not-empty', { count: count ?? 1 });
     }
     case 'group-name-taken':
       return t('support.problems.group-name-taken');
@@ -246,7 +246,7 @@ function GroupRow({
       <div className="support-group-name">
         <strong>{group.name}</strong>
         <span className="cortex-admin-table-job-message">
-          {t('support.groups.articleCount', { n: group.articleCount })}
+          {t('support.groups.articleCount', { count: group.articleCount })}
         </span>
       </div>
       <form

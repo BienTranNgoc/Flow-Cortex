@@ -84,7 +84,8 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
   const uploaded = useUploadedIds();
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // A client check keeps its key so a language switch re-renders it; a server message stays as sent.
+  const [error, setError] = useState<{ key: string } | { text: string } | null>(null);
   const [failed, setFailed] = useState<{ error: unknown } | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -96,7 +97,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
     if (busyRef.current) return;
     const length = textLength(body);
     if (length < 1 || length > 5000) {
-      setError(t('support.requests.replyLength'));
+      setError({ key: 'support.requests.replyLength' });
       inputRef.current?.focus();
       return;
     }
@@ -113,7 +114,8 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
       inputRef.current?.focus();
     } catch (caught) {
       setFailed({ error: caught });
-      setError(failureOf(caught, t).fields.body ?? null);
+      const text = failureOf(caught, t).fields.body;
+      setError(text ? { text } : null);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -142,7 +144,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
         />
         {error && (
           <p id={`${bodyId}-error`} className="support-field__error">
-            {error}
+            {'key' in error ? t(error.key) : error.text}
           </p>
         )}
       </div>

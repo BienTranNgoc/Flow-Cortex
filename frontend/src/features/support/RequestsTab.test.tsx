@@ -290,6 +290,22 @@ describe('RequestsTab', () => {
     });
   });
 
+  it('re-renders an empty-reply error when the language is switched', async () => {
+    stubApi(api({ [`GET ${REQUESTS}/12`]: { status: 200, body: detail() } }));
+    const { user, panel } = await openRequests('request-12');
+
+    await within(panel()).findByText('Waiting for you');
+    await user.click(within(panel()).getByRole('button', { name: 'Send reply' }));
+    expect(within(panel()).getByText('The message must be 1–5000 characters')).toBeInTheDocument();
+
+    await i18n.changeLanguage('vi');
+    try {
+      expect(await within(panel()).findByText('Nội dung cần 1–5000 ký tự')).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('replaces the reply box of a closed request with "This request is closed" and "Create a new request"', async () => {
     stubApi(
       api({

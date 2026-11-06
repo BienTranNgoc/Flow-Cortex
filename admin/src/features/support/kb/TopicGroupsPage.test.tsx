@@ -34,7 +34,7 @@ describe('TopicGroupsPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete Credit' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The topic still has 1 articles — move them to another topic first',
+      'The topic still has 1 article — move it to another topic first',
     );
     expect(screen.getByText('Credit')).toBeInTheDocument();
   });
