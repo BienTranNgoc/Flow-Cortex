@@ -31,7 +31,8 @@ describe('ProfilePage', () => {
 
     renderProfile();
 
-    expect(await screen.findByText('SUSPENDED')).toBeInTheDocument();
+    expect(await screen.findByText('Suspended')).toBeInTheDocument();
+    expect(screen.queryByText('MEMBER')).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Account statistics' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request deletion' })).not.toBeInTheDocument();
   });

@@ -21,7 +21,8 @@
     "stepFallback": "Step {{order}}",
     "etaSeconds": "~{{value}}s",
     "etaMinutes": "~{{value}}m",
-    "steps": "{{n}} steps",
+    "steps_one": "{{n}} step",
+    "steps_other": "{{n}} steps",
     "launch": "Launch"
   },
   "thumb": {
@@ -35,7 +36,8 @@
     "audio": "Audio",
     "demo": "Demos",
     "production": "Production",
-    "count": "{{n}} workflows"
+    "count_one": "{{n}} workflow",
+    "count_other": "{{n}} workflows"
   },
   "search": {
     "label": "Search workflows",

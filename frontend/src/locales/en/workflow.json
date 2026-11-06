@@ -204,12 +204,13 @@
       "actions": "Actions"
     },
     "untitled": "Untitled workflow",
-    "stepOne": "{{n}} step",
-    "stepOther": "{{n}} steps",
+    "stepCount_one": "{{n}} step",
+    "stepCount_other": "{{n}} steps",
     "rowActions": "Row actions",
     "runTitle": "Run workflow",
     "runNamed": "Run {{name}}",
-    "showing": "Showing {{shown}} of {{total}} workflows"
+    "showing_one": "Showing {{shown}} of {{total}} workflow",
+    "showing_other": "Showing {{shown}} of {{total}} workflows"
   },
   "owner": {
     "you": "You",

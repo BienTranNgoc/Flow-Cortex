@@ -59,7 +59,7 @@ export function WorkflowCard({ workflow }: Readonly<WorkflowCardProps>) {
         <footer className="workflow-card__foot">
           <span className="workflow-card__meta">{etaLabel(meta.etaSeconds, t)}</span>
           <span className="workflow-card__meta-sep" aria-hidden="true" />
-          <span className="workflow-card__meta">{t('dashboard.card.steps', { n: stepCount })}</span>
+          <span className="workflow-card__meta">{t('dashboard.card.steps', { count: stepCount, n: stepCount })}</span>
           <span className="workflow-card__cta" aria-hidden="true">
             {t('dashboard.card.launch')}
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="presentation">

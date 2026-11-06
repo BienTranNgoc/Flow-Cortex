@@ -45,7 +45,7 @@ export function FilterBar({ value, onChange, counts }: Readonly<FilterBarProps>)
               {formatNumber(count, locale)}
             </span>
             <span className="visually-hidden">
-              {t('dashboard.filter.count', { n: formatNumber(count, locale) })}
+              {t('dashboard.filter.count', { count, n: formatNumber(count, locale) })}
             </span>
           </button>
         );
