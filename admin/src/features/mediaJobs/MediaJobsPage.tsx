@@ -36,7 +36,8 @@ export function MediaJobsPage() {
       <h1>{t('mediaJobs.title')}</h1>
       <AdminList
         query={query}
-        noun={t('mediaJobs.noun')}
+        nounKey="mediaJobs.noun"
+        tableLabelKey="mediaJobs.tableLabel"
         statuses={STATUSES}
         statusLabel={(code) => jobStatusLabel(t, code)}
         status={status}

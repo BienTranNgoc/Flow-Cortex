@@ -10,6 +10,7 @@ import { usePageTitle } from '../../app/usePageTitle';
 import { PageHeading } from '../../app/PageHeading';
 import { MetricCard } from '../../app/MetricCard';
 import { EmptyState } from '../../app/EmptyState';
+import { TableRegion } from '../../app/TableRegion';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
@@ -200,6 +201,7 @@ export function UsersPage() {
             {usersQuery.data && (
               <p>
                 {t('users.directory.count', {
+                  count: users.length,
                   visible: formatNumber(visibleUsers.length, locale),
                   total: formatNumber(users.length, locale),
                 })}
@@ -284,7 +286,7 @@ export function UsersPage() {
           />
         )}
         {visibleUsers.length > 0 && (
-          <div className="cortex-admin-table-wrapper">
+          <TableRegion label={t('users.directory.tableLabel')}>
             <table className="cortex-admin-table">
               <thead>
                 <tr>
@@ -302,7 +304,7 @@ export function UsersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         )}
       </section>
     </div>

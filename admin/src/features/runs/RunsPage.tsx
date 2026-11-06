@@ -41,7 +41,8 @@ export function RunsPage() {
       <div className="cortex-admin-panel">
         <AdminList
           query={query}
-          noun={t('runs.noun')}
+          nounKey="runs.noun"
+          tableLabelKey="runs.tableLabel"
           statuses={STATUSES}
           statusLabel={(code) => runStatusLabel(t, code)}
           status={status}

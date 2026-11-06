@@ -10,9 +10,9 @@
     "CREATOR": "Creator"
   },
   "role": {
-    "MEMBER": "MEMBER",
-    "ADMIN": "ADMIN",
-    "CREATOR": "CREATOR"
+    "MEMBER": "Member",
+    "ADMIN": "Admin",
+    "CREATOR": "Creator"
   },
   "status": {
     "ACTIVE": "Active",
@@ -38,8 +38,10 @@
   },
   "directory": {
     "label": "User directory",
+    "tableLabel": "Users table",
     "title": "All users",
-    "count": "Showing {{visible}} of {{total}} accounts",
+    "count_one": "Showing {{visible}} of {{total}} account",
+    "count_other": "Showing {{visible}} of {{total}} accounts",
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "search": "Search",

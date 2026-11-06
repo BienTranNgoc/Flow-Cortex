@@ -2,7 +2,9 @@
   "title": "Lượt chạy",
   "eyebrow": "Vận hành quy trình",
   "description": "Mọi lượt chạy quy trình trên toàn nền tảng. Dùng bộ lọc để thu hẹp theo trạng thái.",
-  "noun": "lượt chạy",
+  "noun_one": "lượt chạy",
+  "noun_other": "lượt chạy",
+  "tableLabel": "Bảng lượt chạy",
   "deletedUser": "(người dùng đã bị xóa)",
   "columns": {
     "workflow": "Quy trình",
