@@ -2,8 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AuthLink } from './AuthLink';
 import { PasswordResetGate, RequestResetForm } from './RequestResetForm';
 import { resetPasswordSchema, type ResetPasswordFormValues } from './registerSchema';
 import {
@@ -63,32 +63,30 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
+    <>
+      <p className="auth-eyebrow">{t('auth.reset.eyebrow')}</p>
+      <h1 className="auth-title" tabIndex={-1}>
+        {t('auth.reset.password.title')}
+      </h1>
 
-      <section className="auth-card">
-        <p className="eyebrow">{t('auth.reset.eyebrow')}</p>
-        <h1 className="auth-card__title">{t('auth.reset.password.title')}</h1>
+      <PasswordResetGate>
+        {linkInvalid ? (
+          <>
+            <p ref={linkInvalidMessage} tabIndex={-1} role="alert" className="auth-alert">
+              {t('auth.reset.password.linkInvalid')}
+            </p>
+            <p className="auth-subtitle">{t('auth.reset.password.newLinkIntro')}</p>
+            <RequestResetForm action={t('auth.reset.password.newLinkSubmit')} />
+          </>
+        ) : (
+          <ResetPasswordForm key={token} token={token} onLinkInvalid={onLinkInvalid} />
+        )}
+      </PasswordResetGate>
 
-        <PasswordResetGate>
-          {linkInvalid ? (
-            <>
-              <p ref={linkInvalidMessage} tabIndex={-1} role="alert" className="form-error">
-                {t('auth.reset.password.linkInvalid')}
-              </p>
-              <p className="auth-subtitle">{t('auth.reset.password.newLinkIntro')}</p>
-              <RequestResetForm action={t('auth.reset.password.newLinkSubmit')} />
-            </>
-          ) : (
-            <ResetPasswordForm key={token} token={token} onLinkInvalid={onLinkInvalid} />
-          )}
-        </PasswordResetGate>
-
-        <p className="auth-footer">
-          <Link to="/login">{t('auth.reset.backToSignIn')}</Link>
-        </p>
-      </section>
-    </div>
+      <p className="auth-footnote">
+        <AuthLink to="/login">{t('auth.reset.backToSignIn')}</AuthLink>
+      </p>
+    </>
   );
 }
 
@@ -147,31 +145,31 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
     <>
       <p className="auth-subtitle">{t('auth.reset.password.intro')}</p>
 
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        aria-label={t('auth.reset.password.formLabel')}
-        className="auth-form"
-      >
-        {FIELDS.map(({ name, labelKey }, index) => {
+      <form onSubmit={onSubmit} noValidate aria-label={t('auth.reset.password.formLabel')}>
+        {FIELDS.map(({ name, labelKey }) => {
           const id = `reset-password-${name}`;
           const error = errors[name];
           // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
           const message =
             error?.message && (error.type === 'server' ? error.message : t(error.message));
           return (
-            <div className="field" key={name} style={{ '--i': index } as React.CSSProperties}>
-              <label htmlFor={id}>{t(labelKey)}</label>
-              <input
-                id={id}
-                type="password"
-                autoComplete="new-password"
-                aria-invalid={message ? 'true' : 'false'}
-                aria-describedby={message ? `${id}-error` : undefined}
-                {...register(name)}
-              />
+            <div className="auth-field" key={name}>
+              <label htmlFor={id} className="auth-label">
+                {t(labelKey)}
+              </label>
+              <div className="auth-control">
+                <input
+                  id={id}
+                  type="password"
+                  className="auth-input"
+                  autoComplete="new-password"
+                  aria-invalid={message ? 'true' : 'false'}
+                  aria-describedby={message ? `${id}-error` : undefined}
+                  {...register(name)}
+                />
+              </div>
               {message && (
-                <p id={`${id}-error`} role="alert">
+                <p id={`${id}-error`} role="alert" className="auth-error">
                   {message}
                 </p>
               )}
@@ -179,11 +177,17 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
           );
         })}
         {serverError && (
-          <p role="alert" className="form-error">
+          <p role="alert" className="auth-alert">
             {serverError}
           </p>
         )}
-        <button className="primary-button" type="submit" disabled={reset.isPending}>
+        <button
+          className="auth-btn auth-btn--primary"
+          type="submit"
+          disabled={reset.isPending}
+          aria-busy={reset.isPending}
+        >
+          {reset.isPending && <span className="auth-spinner" aria-hidden="true" />}
           {reset.isPending ? t('auth.reset.password.saving') : t('auth.reset.password.submit')}
         </button>
       </form>

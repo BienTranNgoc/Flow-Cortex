@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { AuthLink } from './AuthLink';
 import { ResendConfirmation } from './ConfirmEmailPage';
 import { setPasswordSchema, type SetPasswordFormValues } from './registerSchema';
 import {
@@ -109,7 +109,7 @@ export function SetPasswordPage() {
   let content;
   if (linkToken && !openLink.isError) {
     content = (
-      <p role="status" className="auth-subtitle">
+      <p role="status" className="auth-status">
         {t('auth.setPassword.opening')}
       </p>
     );
@@ -128,15 +128,13 @@ export function SetPasswordPage() {
   }
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
-
-      <section className="auth-card">
-        <p className="eyebrow">{t('auth.setPassword.eyebrow')}</p>
-        <h1 className="auth-card__title">{t('auth.setPassword.title')}</h1>
-        {content}
-      </section>
-    </div>
+    <>
+      <p className="auth-eyebrow">{t('auth.setPassword.eyebrow')}</p>
+      <h1 className="auth-title" tabIndex={-1}>
+        {t('auth.setPassword.title')}
+      </h1>
+      {content}
+    </>
   );
 }
 
@@ -200,12 +198,7 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
     <>
       <p className="auth-subtitle">{t('auth.setPassword.intro')}</p>
 
-      <form
-        onSubmit={onSubmit}
-        noValidate
-        aria-label={t('auth.setPassword.formLabel')}
-        className="auth-form"
-      >
+      <form onSubmit={onSubmit} noValidate aria-label={t('auth.setPassword.formLabel')}>
         {FIELDS.map(({ name, labelKey, type, autoComplete }) => {
           const id = `set-password-${name}`;
           const error = errors[name];
@@ -213,18 +206,23 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
           const message =
             error?.message && (error.type === 'server' ? error.message : t(error.message));
           return (
-            <div className="field" key={name}>
-              <label htmlFor={id}>{t(labelKey)}</label>
-              <input
-                id={id}
-                type={type}
-                autoComplete={autoComplete}
-                aria-invalid={message ? 'true' : 'false'}
-                aria-describedby={message ? `${id}-error` : undefined}
-                {...register(name)}
-              />
+            <div className="auth-field" key={name}>
+              <label htmlFor={id} className="auth-label">
+                {t(labelKey)}
+              </label>
+              <div className="auth-control">
+                <input
+                  id={id}
+                  type={type}
+                  className="auth-input"
+                  autoComplete={autoComplete}
+                  aria-invalid={message ? 'true' : 'false'}
+                  aria-describedby={message ? `${id}-error` : undefined}
+                  {...register(name)}
+                />
+              </div>
               {message && (
-                <p id={`${id}-error`} role="alert">
+                <p id={`${id}-error`} role="alert" className="auth-error">
                   {message}
                 </p>
               )}
@@ -232,18 +230,26 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
           );
         })}
         {serverError && (
-          <p role="alert" className="form-error">
+          <p role="alert" className="auth-alert">
             {serverError}
           </p>
         )}
-        <button className="primary-button" type="submit" disabled={setPassword.isPending}>
+        <button
+          className="auth-btn auth-btn--primary"
+          type="submit"
+          disabled={setPassword.isPending}
+          aria-busy={setPassword.isPending}
+        >
+          {setPassword.isPending && <span className="auth-spinner" aria-hidden="true" />}
           {setPassword.isPending ? t('auth.setPassword.submitting') : t('auth.setPassword.submit')}
         </button>
       </form>
 
       {serverError && (
-        <p className="auth-footer">
-          <Link to="/">{t('auth.setPassword.goToWorkspace')}</Link>
+        <p className="auth-footnote">
+          <Link to="/" className="auth-link">
+            {t('auth.setPassword.goToWorkspace')}
+          </Link>
         </p>
       )}
     </>
@@ -273,7 +279,7 @@ function EmailMeALink({ notice, signedIn }: EmailMeALinkProps) {
   return (
     <>
       {notice && (
-        <p role="alert" className="form-error">
+        <p role="alert" className="auth-alert">
           {notice}
         </p>
       )}
@@ -287,19 +293,21 @@ function EmailMeALink({ notice, signedIn }: EmailMeALinkProps) {
           sentMessage={t('auth.setPassword.linkSent')}
         />
       )}
-      <p className="auth-footer">
+      <p className="auth-footnote">
         {signedIn ? (
           canSkip ? (
-            <Link to="/">{t('auth.setPassword.goToWorkspace')}</Link>
+            <Link to="/" className="auth-link">
+              {t('auth.setPassword.goToWorkspace')}
+            </Link>
           ) : (
             !waitingForMe && (
-              <Link to="/login" onClick={onSignOut}>
+              <Link to="/login" className="auth-link" onClick={onSignOut}>
                 {t('auth.setPassword.signOut')}
               </Link>
             )
           )
         ) : (
-          <Link to="/login">{t('auth.setPassword.backToSignIn')}</Link>
+          <AuthLink to="/login">{t('auth.setPassword.backToSignIn')}</AuthLink>
         )}
       </p>
     </>

@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link, Navigate } from 'react-router-dom';
-import { BrandPanel } from '../../app/BrandPanel';
+import { Navigate } from 'react-router-dom';
 import { OAuthButton } from '../../app/OAuthButton';
+import { AuthLink } from './AuthLink';
+import { useAuthPose } from './authPose';
 import { ResendConfirmation } from './ConfirmEmailPage';
+import { nodiPeekState, type NodiPeekInput } from './nodiPeekState';
 import { googleAuthorizeUrl } from './oauth';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
@@ -17,6 +19,7 @@ import {
 } from './useAuth';
 
 type FieldName = keyof RegisterFormValues;
+type Focused = NodiPeekInput['focused'];
 
 /** Server-side field names the form can show a refusal at. */
 const SERVER_FIELDS: readonly FieldName[] = [
@@ -29,33 +32,56 @@ const SERVER_FIELDS: readonly FieldName[] = [
 
 interface FieldProps {
   name: FieldName;
-  label: string;
-  index: number;
   type?: 'text' | 'email' | 'password';
   autoComplete: string;
+  /** Which way the card mascot turns while this field has focus. */
+  focusAs?: Focused;
+  onFocused: (focused: Focused) => void;
+  onEdited: () => void;
   register: UseFormRegister<RegisterFormValues>;
   errors: FieldErrors<RegisterFormValues>;
 }
 
-function Field({ name, label, index, type = 'text', autoComplete, register, errors }: FieldProps) {
+function Field({
+  name,
+  type = 'text',
+  autoComplete,
+  focusAs = null,
+  onFocused,
+  onEdited,
+  register,
+  errors,
+}: FieldProps) {
   const { t } = useTranslation();
   const id = `register-${name}`;
   const error = errors[name];
   // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
   const message = error?.message && (error.type === 'server' ? error.message : t(error.message));
+  const field = register(name, { onChange: onEdited });
   return (
-    <div className="field" style={{ '--i': index } as CSSProperties}>
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type={type}
-        autoComplete={autoComplete}
-        aria-invalid={message ? 'true' : 'false'}
-        aria-describedby={message ? `${id}-error` : undefined}
-        {...register(name)}
-      />
+    <div className="auth-field">
+      <label htmlFor={id} className="auth-label">
+        {t(`auth.register.${name}Label`)}
+      </label>
+      <div className="auth-control">
+        <input
+          id={id}
+          type={type}
+          className="auth-input"
+          autoComplete={autoComplete}
+          placeholder={t(`auth.register.${name}Placeholder`)}
+          aria-invalid={message ? 'true' : 'false'}
+          aria-describedby={message ? `${id}-error` : undefined}
+          {...field}
+          onFocus={() => onFocused(focusAs)}
+          onBlur={(event) => {
+            onFocused(null);
+            return field.onBlur(event);
+          }}
+        />
+      </div>
       {message && (
-        <p id={`${id}-error`} role="alert">
+        <p id={`${id}-error`} role="alert" className="auth-error">
           {message}
         </p>
       )}
@@ -68,6 +94,8 @@ export function RegisterPage() {
   const token = useAuthToken();
   const registerMutation = useRegisterMutation();
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [focused, setFocused] = useState<Focused>(null);
+  const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
   const {
     register,
     handleSubmit,
@@ -84,12 +112,22 @@ export function RegisterPage() {
       confirmPassword: '',
     },
   });
+  const isPending = registerMutation.isPending;
+  useAuthPose(
+    nodiPeekState({
+      focused,
+      pending: isPending,
+      failed: registerMutation.isError && !editedSinceSubmit,
+      succeeded: registerMutation.isSuccess,
+    }),
+  );
 
   if (token) {
     return <Navigate to="/" replace />;
   }
 
   const onSubmit = handleSubmit(({ confirmPassword: _confirmPassword, username, ...values }) => {
+    setEditedSinceSubmit(false);
     registerMutation.mutate(username ? { ...values, username } : values, {
       onSuccess: (outcome) => {
         if (outcome === 'confirmation_sent') {
@@ -112,39 +150,38 @@ export function RegisterPage() {
 
   if (sentTo !== null) {
     return (
-      <div className="auth-page">
-        <BrandPanel />
-
-        <section className="auth-card">
-          <p className="eyebrow">{t('auth.register.eyebrow')}</p>
-          <div role="status">
-            <h1 className="auth-card__title">{t('auth.register.sent.title')}</h1>
-            <p className="auth-subtitle">
-              <Trans
-                i18nKey="auth.register.sent.body"
-                values={{ email: sentTo }}
-                components={{ strong: <strong /> }}
-              />
-            </p>
-          </div>
-          <ResendConfirmation email={sentTo} />
-          <p className="auth-footer">
-            {t('auth.register.sent.alreadyConfirmed')}{' '}
-            <Link to="/login">{t('auth.register.signIn')}</Link>
-          </p>
-        </section>
-      </div>
+      <>
+        <h1 className="auth-title" tabIndex={-1}>
+          {t('auth.register.sent.title')}
+        </h1>
+        <p className="auth-status" role="status">
+          <Trans
+            i18nKey="auth.register.sent.body"
+            values={{ email: sentTo }}
+            components={{ strong: <strong /> }}
+          />
+        </p>
+        <ResendConfirmation email={sentTo} />
+        <p className="auth-footnote">
+          {t('auth.register.sent.alreadyConfirmed')}{' '}
+          <AuthLink to="/login">{t('auth.register.signIn')}</AuthLink>
+        </p>
+      </>
     );
   }
 
-  // A refusal shown at its field is not repeated under the form.
+  // A refusal shown at its field is not repeated above the form.
   const refusedFields = fieldErrorsFrom(registerMutation.error);
   const serverError = SERVER_FIELDS.some((field) => refusedFields[field])
     ? undefined
-    : failureMessage(registerMutation, t);
-  const isPending = registerMutation.isPending;
+    : failureMessage(registerMutation, t, 'auth.register.retryLater');
   const dataState = submitState(registerMutation.isSuccess, isPending);
-  const fieldProps = { register, errors };
+  const fieldProps = {
+    register,
+    errors,
+    onFocused: setFocused,
+    onEdited: () => setEditedSinceSubmit(true),
+  };
 
   const buttonLabel = (() => {
     if (registerMutation.isSuccess) return t('auth.register.succeeded');
@@ -153,91 +190,62 @@ export function RegisterPage() {
   })();
 
   return (
-    <div className="auth-page">
-      <BrandPanel />
+    <>
+      <h1 className="auth-title" tabIndex={-1}>
+        {t('auth.register.title')}{' '}
+        <span className="auth-title__accent">{t('auth.register.titleAccent')}</span>
+      </h1>
+      <p className="auth-subtitle">{t('auth.register.subtitle')}</p>
 
-      <section className="auth-card auth-card--surface">
-        <h1 className="auth-card__title">{t('auth.register.title')}</h1>
-        <p className="auth-subtitle">{t('auth.register.subtitle')}</p>
-
-        <div className="oauth-row">
-          <OAuthButton
-            provider="google"
-            label={t('auth.register.google')}
-            href={googleAuthorizeUrl(true, '/')}
-          />
-        </div>
-
-        <form
-          onSubmit={onSubmit}
-          noValidate
-          aria-label={t('auth.register.formLabel')}
-          className="auth-form"
-        >
-          <Field
-            name="firstName"
-            label={t('auth.register.firstNameLabel')}
-            index={0}
-            autoComplete="given-name"
-            {...fieldProps}
-          />
-          <Field
-            name="lastName"
-            label={t('auth.register.lastNameLabel')}
-            index={1}
-            autoComplete="family-name"
-            {...fieldProps}
-          />
-          <Field
-            name="email"
-            label={t('auth.register.emailLabel')}
-            index={2}
-            type="email"
-            autoComplete="email"
-            {...fieldProps}
-          />
-          <Field
-            name="username"
-            label={t('auth.register.usernameLabel')}
-            index={3}
-            autoComplete="username"
-            {...fieldProps}
-          />
-          <Field
-            name="password"
-            label={t('auth.register.passwordLabel')}
-            index={4}
-            type="password"
-            autoComplete="new-password"
-            {...fieldProps}
-          />
-          <Field
-            name="confirmPassword"
-            label={t('auth.register.confirmPasswordLabel')}
-            index={5}
-            type="password"
-            autoComplete="new-password"
-            {...fieldProps}
-          />
-          {serverError && (
-            <p role="alert" className="form-error">
-              {serverError}
-            </p>
-          )}
-          <button
-            className="primary-button"
-            type="submit"
-            data-state={dataState}
-            disabled={isPending}
-          >
-            {buttonLabel}
-          </button>
-        </form>
-
-        <p className="auth-footer">
-          {t('auth.register.haveAccount')} <Link to="/login">{t('auth.register.signIn')}</Link>
+      {serverError && (
+        <p id="register-alert" role="alert" className="auth-alert">
+          {serverError}
         </p>
-      </section>
-    </div>
+      )}
+
+      <form onSubmit={onSubmit} noValidate aria-label={t('auth.register.formLabel')}>
+        <Field name="firstName" autoComplete="given-name" {...fieldProps} />
+        <Field name="lastName" autoComplete="family-name" {...fieldProps} />
+        <Field name="email" type="email" autoComplete="email" focusAs="email" {...fieldProps} />
+        <Field name="username" autoComplete="username" {...fieldProps} />
+        <Field
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          focusAs="password"
+          {...fieldProps}
+        />
+        <Field
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          focusAs="password"
+          {...fieldProps}
+        />
+        <button
+          className="auth-btn auth-btn--primary"
+          type="submit"
+          data-state={dataState}
+          disabled={isPending}
+          aria-busy={isPending}
+        >
+          {isPending && <span className="auth-spinner" aria-hidden="true" />}
+          {buttonLabel}
+        </button>
+      </form>
+
+      <hr className="auth-divider" />
+      <OAuthButton
+        provider="google"
+        label={t('auth.register.google')}
+        href={googleAuthorizeUrl(true, '/')}
+        className="auth-btn auth-btn--google"
+      />
+
+      <p className="auth-footnote">
+        {t('auth.register.haveAccount')}{' '}
+        <AuthLink to="/login">{t('auth.register.signIn')}</AuthLink>
+      </p>
+    </>
   );
 }
