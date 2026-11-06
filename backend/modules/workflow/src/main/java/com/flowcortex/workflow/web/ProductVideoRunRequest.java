@@ -17,7 +17,7 @@ record ProductVideoRunRequest(
         @Size(max = 500) String cta,
         @Size(max = 200) String price,
         @Size(max = 500) String promotion,
-        @NotNull @Size(min = 1, max = 10) List<@NotNull UUID> uploadIds,
+        @NotNull @Size(min = 1, max = 1) List<@NotNull UUID> uploadIds,
         @NotNull @Valid VideoConfig video,
         Boolean acknowledgeCost) {
 

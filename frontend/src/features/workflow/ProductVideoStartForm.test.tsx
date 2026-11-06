@@ -120,6 +120,28 @@ describe('ProductVideoStartForm', () => {
     expect(sent(calls)).toEqual([]);
   });
 
+  it('starts the run once the blank field is filled after a refusal', async () => {
+    const user = userEvent.setup();
+    const calls = renderForm();
+
+    await user.upload(await screen.findByLabelText(/Product image/), [image('front.png')]);
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+    expect(await screen.findByText('Product name is required.')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
+    expect(screen.queryByText('Product name is required.')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+    act(() => FakeXhr.instances[0]!.respond(200));
+    expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
+    expect(sent(calls).map((call) => call.path)).toEqual([
+      '/api/v1/uploads',
+      '/api/v1/product-videos/runs',
+    ]);
+  });
+
   it('rejects an .avi on pick and Start sends nothing', async () => {
     const user = userEvent.setup();
     const calls = renderForm();

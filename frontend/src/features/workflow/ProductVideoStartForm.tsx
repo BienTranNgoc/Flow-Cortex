@@ -101,6 +101,11 @@ export function ProductVideoStartForm({
     setImageError(asCheck(firstImageProblem(picked)));
   };
 
+  const onTextChange = (name: TextFieldName, value: string) => {
+    setText((current) => ({ ...current, [name]: value }));
+    setBlankFieldKey(null);
+  };
+
   const showFailure = (error: unknown) => {
     if (error instanceof MultiUploadError && error.stage === 'upload') {
       setFailure({ kind: 'upload' });
@@ -191,9 +196,7 @@ export function ProductVideoStartForm({
       setBlankFieldKey(blank.labelKey);
       return;
     }
-    if (blankFieldKey) {
-      return;
-    }
+    setBlankFieldKey(null);
     const listProblem = firstImageProblem(files);
     if (listProblem) {
       setImageError(asCheck(listProblem));
@@ -219,9 +222,7 @@ export function ProductVideoStartForm({
               value={text[field.name]}
               maxLength={field.maxLength}
               required={field.required}
-              onChange={(event) =>
-                setText((current) => ({ ...current, [field.name]: event.target.value }))
-              }
+              onChange={(event) => onTextChange(field.name, event.target.value)}
             />
           ) : (
             <input
@@ -230,9 +231,7 @@ export function ProductVideoStartForm({
               value={text[field.name]}
               maxLength={field.maxLength}
               required={field.required}
-              onChange={(event) =>
-                setText((current) => ({ ...current, [field.name]: event.target.value }))
-              }
+              onChange={(event) => onTextChange(field.name, event.target.value)}
             />
           )}
         </div>
