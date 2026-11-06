@@ -293,6 +293,20 @@ class RequestServiceTest {
     }
 
     @Test
+    void anAdminReplyWithoutAStatusIsAValidationErrorOnStatus() {
+        UUID id = UUID.randomUUID();
+        when(requests.findByNumber(5)).thenReturn(Optional.of(row(id, 5, RequestStatus.NEW)));
+
+        assertThatThrownBy(() -> service.adminReply(admin, 5, "Xin chào", List.of(), null, Optional.empty()))
+                .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.code()).isEqualTo("validation-failed");
+                    assertThat(e.fieldErrors()).containsOnlyKeys("status");
+                });
+        verify(outbox, never()).insert(any(), any(), any(), any());
+    }
+
+    @Test
     void anAdminSeesTheRequesterTheLinkedConversationAndTheStatusesTheTableAllows() {
         UUID id = UUID.randomUUID();
         UUID conversation = UUID.randomUUID();

@@ -166,7 +166,7 @@ describe('ArticleEditorPage', () => {
     );
   });
 
-  it('renders protocol-relative links as text, images as their alt text, and opens relative links in a new tab', async () => {
+  it('renders protocol-relative links (// and /\\) as text, images as their alt text, and opens relative links in a new tab', async () => {
     stubApi({ 'GET /api/v1/admin/support/kb/groups': GROUPS });
     const user = userEvent.setup();
     renderEditor('/support/articles/new');
@@ -178,11 +178,8 @@ describe('ArticleEditorPage', () => {
 
     const preview = screen.getByRole('region', { name: 'Preview' });
     expect(within(preview).queryByRole('link', { name: 'a' })).not.toBeInTheDocument();
-    // The parser percent-encodes the backslash, so the link stays on this host.
-    expect(within(preview).getByRole('link', { name: 'b' })).toHaveAttribute(
-      'href',
-      '/%5Cevil.com',
-    );
+    // The same renderer as the member app: `/\host` reaches another host, so it is text there too.
+    expect(within(preview).queryByRole('link', { name: 'b' })).not.toBeInTheDocument();
     const relative = within(preview).getByRole('link', { name: 'c' });
     expect(relative).toHaveAttribute('href', '/settings');
     expect(relative).toHaveAttribute('target', '_blank');

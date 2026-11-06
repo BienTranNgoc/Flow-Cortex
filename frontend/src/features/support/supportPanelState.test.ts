@@ -44,4 +44,13 @@ describe('supportPanelReducer', () => {
   ])('drops the prefill on %s', (_case, action) => {
     expect(supportPanelReducer(withPrefill(), action).prefill).toBeNull();
   });
+
+  it('returns to the closed default state on reset, dropping the tab, request and prefill', () => {
+    const state = supportPanelReducer(withPrefill(), { type: 'selectRequest', request: 12 });
+
+    expect(supportPanelReducer({ ...state, question: 'Hỏi gì đó' }, { type: 'reset' })).toEqual(
+      CLOSED_PANEL,
+    );
+    expect(supportPanelReducer(withPrefill(), { type: 'reset' })).toEqual(CLOSED_PANEL);
+  });
 });

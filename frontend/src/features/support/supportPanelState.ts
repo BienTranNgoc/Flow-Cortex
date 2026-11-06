@@ -69,6 +69,7 @@ export const CLOSED_PANEL: SupportPanelState = {
 export type SupportPanelAction =
   | { type: 'open'; target?: HelpTarget }
   | { type: 'close' }
+  | { type: 'reset' }
   | { type: 'selectTab'; tab: SupportTab }
   | { type: 'openArticle'; slug: string }
   | { type: 'closeArticle' }
@@ -94,6 +95,8 @@ export function supportPanelReducer(
       };
     case 'close':
       return { ...state, open: false };
+    case 'reset':
+      return CLOSED_PANEL;
     case 'selectTab':
       return { ...state, tab: action.tab, article: null, request: null };
     case 'openArticle':

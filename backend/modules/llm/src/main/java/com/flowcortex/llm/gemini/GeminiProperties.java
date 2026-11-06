@@ -6,10 +6,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Gemini API settings. A blank {@code apiKey} still lets the app start; every call then fails as
- * {@code UPSTREAM} and logs a config error. {@code readTimeout} bounds the wait for the whole answer.
+ * {@code UPSTREAM} and logs a config error. {@code readTimeout} applies to each socket read;
+ * {@code answerTimeout} bounds one whole answer.
  */
 @ConfigurationProperties("flowcortex.llm.gemini")
-public record GeminiProperties(String apiKey, URI baseUrl, Duration connectTimeout, Duration readTimeout) {
+public record GeminiProperties(String apiKey, URI baseUrl, Duration connectTimeout, Duration readTimeout,
+        Duration answerTimeout) {
 
     public GeminiProperties {
         if (baseUrl == null) {
@@ -20,6 +22,9 @@ public record GeminiProperties(String apiKey, URI baseUrl, Duration connectTimeo
         }
         if (readTimeout == null) {
             readTimeout = Duration.ofSeconds(20);
+        }
+        if (answerTimeout == null) {
+            answerTimeout = Duration.ofSeconds(20);
         }
     }
 

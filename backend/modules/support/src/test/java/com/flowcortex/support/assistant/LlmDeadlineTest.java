@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmTimeouts;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
@@ -34,6 +35,20 @@ class LlmDeadlineTest {
             assertThat(result).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.TIMEOUT));
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5));
             assertThat(interrupted.await(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void theDeadlineIsTheConfiguredAnswerTimeout() {
+        try (LlmDeadline deadline = new LlmDeadline(request -> {
+            try {
+                Thread.sleep(Duration.ofSeconds(30));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new LlmJsonResult.Blocked("SAFETY");
+        }, (LlmTimeouts) () -> Duration.ofMillis(100))) {
+            assertThat(deadline.call(REQUEST)).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.TIMEOUT));
         }
     }
 

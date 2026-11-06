@@ -217,7 +217,7 @@ class RequestService {
             Optional<String> key) {
         RequestRow row = byNumber(number);
         String text = requireBody(body);
-        RequestEvent event = ADMIN_REPLY_TARGETS.get(targetStatus);
+        RequestEvent event = targetStatus == null ? null : ADMIN_REPLY_TARGETS.get(targetStatus);
         if (event == null) {
             requireValid(Map.of("status", new LocalizedMessage("support.request.error.replyStatus")));
         }

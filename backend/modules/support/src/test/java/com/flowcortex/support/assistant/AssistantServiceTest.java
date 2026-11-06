@@ -45,6 +45,7 @@ class AssistantServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-19T08:20:00Z");
     private static final Asker MEMBER = new Asker.Member(UUID.randomUUID());
+    private static final Asker.Guest GUEST = new Asker.Guest("session-hash", "network-hash");
     private static final String QUESTION = "Làm sao nạp credit?";
     private static final ScoredArticle NAP = new ScoredArticle("nap-credit", "Nạp credit", "Vào Hồ sơ", "Credit", 4);
     private static final ScoredArticle GOI = new ScoredArticle("goi-credit", "Gói credit", "Mua gói", "Credit", 2);
@@ -192,30 +193,120 @@ class AssistantServiceTest {
     }
 
     @Test
-    void anAnswerKeepsNoLinkOrUrlOnlyTheirText() {
-        answer("{\"answered\":true,\"answer\":\"Xem [Nạp credit](/help/nap-credit), [mục khác](/help/xoa) và "
-                + "[trang ngoài](https://evil.example/x?a=(1)) hoặc https://evil.example/y. "
-                + "Ảnh ![logo](https://cdn.x/l.png) <https://evil.example/z> www.evil.example.\\n"
-                + "[ref]: https://evil.example/r\",\"citedSlugs\":[\"nap-credit\"]}");
+    void anAnswerIsStoredAndReturnedWithoutLinksOrImages() {
+        answer("{\"answered\":true,\"answer\":\"Xem [Nạp credit](/help/nap-credit), [mục khác]( mailto:a@evil.example) "
+                + "và ![logo](https://cdn.x/l.png).\\n\\n[ref]: https://evil.example/r\","
+                + "\"citedSlugs\":[\"nap-credit\"]}");
 
         AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().text())
-                .isEqualTo("Xem Nạp credit, mục khác và trang ngoài hoặc . Ảnh logo  .")
-                .doesNotContain("http", "www.", "](", "evil");
+                .isEqualTo("Xem Nạp credit, mục khác và logo.")
+                .doesNotContain("](", "evil", "mailto", "cdn.x");
         ArgumentCaptor<StoredMessage> stored = ArgumentCaptor.forClass(StoredMessage.class);
         verify(conversations).append(eq(MEMBER), eq(null), any(), stored.capture());
         assertThat(stored.getValue().text()).isEqualTo(reply.message().text());
     }
 
     @Test
-    void anAnswerThatWasOnlyALinkIsANoAnswer() {
-        answer("{\"answered\":true,\"answer\":\"https://evil.example/only\",\"citedSlugs\":[\"nap-credit\"]}");
+    void anAnswerThatWasOnlyAnImageIsANoAnswer() {
+        answer("{\"answered\":true,\"answer\":\"![](https://evil.example/only.png)\",\"citedSlugs\":[\"nap-credit\"]}");
 
         AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.message().text()).isEqualTo(AssistantService.NO_ANSWER);
+    }
+
+    @Test
+    void aGuestQuestionIsHeldToTheNetworkMinuteCapBeforeAnyRetrievalOrWrite() {
+        doThrow(QuotaService.exhausted(NOW)).when(minuteLimiter).acquireNetwork(GUEST.networkKey());
+
+        assertThatThrownBy(() -> service.ask(GUEST, null, QUESTION, Locale.ENGLISH))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.code()).isEqualTo("assistant-quota"));
+
+        verifyNoInteractions(retriever, llm, conversations);
+        verify(minuteLimiter, never()).acquire(anyString());
+        assertThat(meters.counter(AssistantTelemetry.OUTCOME_COUNTER, "outcome", "quota").count()).isEqualTo(1);
+    }
+
+    @Test
+    void aMemberIsNotHeldToANetworkCap() {
+        answer("{\"answered\":true,\"answer\":\"Vào Hồ sơ.\",\"citedSlugs\":[\"nap-credit\"]}");
+
+        service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
+
+        verify(minuteLimiter, never()).acquireNetwork(anyString());
+    }
+
+    @Test
+    void aGuestQuestionNoArticleMatchesStillCountsAgainstTheGuestQuotas() {
+        when(retriever.retrieve(anyString())).thenReturn(List.of());
+        QuotaService.Charge guestCharge = new QuotaService.Charge(LocalDate.of(2026, 10, 19),
+                List.of(GUEST.subjectKey(), GUEST.networkKey()), 9);
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge);
+        when(conversations.append(eq(GUEST), any(), any(), any())).thenReturn(conversationId);
+
+        AssistantReply reply = service.ask(GUEST, null, QUESTION, Locale.ENGLISH);
+
+        assertThat(reply.message().outcome()).isEqualTo("no_answer");
+        assertThat(reply.quota().remaining()).isEqualTo(9);
+        verify(quotas).chargeAskerOnly(GUEST);
+        verify(quotas, never()).charge(any());
+        verifyNoInteractions(llm);
+    }
+
+    @Test
+    void aGuestOutOfQuotaIsRefusedEvenWhenNoArticleMatches() {
+        when(retriever.retrieve(anyString())).thenReturn(List.of());
+        when(quotas.chargeAskerOnly(GUEST)).thenThrow(QuotaService.exhausted(NOW));
+
+        assertThatThrownBy(() -> service.ask(GUEST, null, QUESTION, Locale.ENGLISH))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.code()).isEqualTo("assistant-quota"));
+
+        verify(conversations, never()).append(any(), any(), any(), any());
+    }
+
+    @Test
+    void aFailureWritingAChargedGuestNoAnswerRefundsIt() {
+        when(retriever.retrieve(anyString())).thenReturn(List.of());
+        QuotaService.Charge guestCharge = new QuotaService.Charge(LocalDate.of(2026, 10, 19),
+                List.of(GUEST.subjectKey(), GUEST.networkKey()), 9);
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge);
+        when(conversations.append(eq(GUEST), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> service.ask(GUEST, null, QUESTION, Locale.ENGLISH))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        verify(quotas).refund(guestCharge);
+    }
+
+    @Test
+    void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
+        MinuteLimiter real = new MinuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
+        SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
+                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+        AssistantService limited = new AssistantService(assistantSwitch, properties, conversations, quotas, real,
+                retriever, llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
+        GuestKeys keys = new GuestKeys(properties, "support-hash-secret-for-unit-tests-0123456789");
+        when(retriever.retrieve(anyString())).thenReturn(List.of());
+        when(quotas.chargeAskerOnly(any())).thenReturn(new QuotaService.Charge(LocalDate.of(2026, 10, 19), List.of(), 9));
+        when(conversations.append(any(), any(), any(), any())).thenReturn(conversationId);
+
+        for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
+            limited.ask(keys.guest(UUID.randomUUID().toString(), "198.51.100.7"), null, QUESTION, Locale.ENGLISH);
+        }
+
+        assertThatThrownBy(() -> limited.ask(keys.guest(UUID.randomUUID().toString(), "198.51.100.7"), null, QUESTION,
+                Locale.ENGLISH))
+                .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(e.code()).isEqualTo("assistant-quota");
+                });
+        verify(retriever, times(MinuteLimiter.PER_MINUTE)).retrieve(anyString());
     }
 
     @Test

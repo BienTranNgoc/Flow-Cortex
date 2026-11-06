@@ -186,6 +186,34 @@ describe('SupportPanel', () => {
   });
 });
 
+describe('tab change from inside a tab body', () => {
+  it('moves focus to the shown tab panel, so Escape still closes the panel', async () => {
+    setToken('member', true);
+    stubApi(homeApi());
+    renderWidget('/workflows');
+    const { user, panel } = await openPanel();
+
+    await user.click(
+      within(panel).getByRole('button', { name: "Why am I told I don't have enough credit?" }),
+    );
+
+    expect(within(panel).getByRole('tabpanel')).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps focus on the tab while the tab list is used', async () => {
+    setToken('member', true);
+    stubApi(homeApi());
+    renderWidget('/workflows');
+    const { user, panel } = await openPanel();
+
+    await user.click(within(panel).getByRole('tab', { name: 'Guides' }));
+
+    expect(within(panel).getByRole('tab', { name: 'Guides' })).toHaveFocus();
+  });
+});
+
 describe('small screens', () => {
   function screenIsSmall(small: boolean) {
     vi.stubGlobal(

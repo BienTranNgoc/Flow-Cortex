@@ -81,6 +81,7 @@ export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
   const tabRefs = useRef<Partial<Record<SupportTab, HTMLButtonElement | null>>>({});
   const hadArticle = useRef(state.article !== null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const fullScreen = useFullScreen();
   const unread = useUnreadCount() > 0;
   const Body = BODIES[active];
@@ -98,7 +99,17 @@ export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
     hadArticle.current = state.article !== null;
   }, [state.article, active]);
 
-  const onTabKey = (event: KeyboardEvent<HTMLDivElement>) => {
+  // A tab switched from inside a body unmounts the control that had focus, leaving it on <body>
+  // where Escape no longer reaches the panel; the tab list keeps its own focus.
+  const shownTab = useRef(active);
+  useEffect(() => {
+    if (shownTab.current === active) return;
+    shownTab.current = active;
+    const focused = document.activeElement;
+    if (!focused || focused === document.body) bodyRef.current?.focus();
+  }, [active]);
+
+  const onTabKey =(event: KeyboardEvent<HTMLDivElement>) => {
     const next = NEXT_KEYS[event.key];
     if (!next) return;
     event.preventDefault();
@@ -168,9 +179,11 @@ export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
         ))}
       </div>
       <div
+        ref={bodyRef}
         id={`${tabIdBase}-panel`}
         className="support-panel__body"
         role="tabpanel"
+        tabIndex={-1}
         aria-labelledby={`${tabIdBase}-${active}`}
       >
         {state.article ? <ArticleView key={state.article} slug={state.article} /> : <Body />}

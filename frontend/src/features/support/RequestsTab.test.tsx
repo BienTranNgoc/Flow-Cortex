@@ -306,6 +306,19 @@ describe('RequestsTab', () => {
     }
   });
 
+  it('counts a trailing no-break space in a reply as the server does, refusing 5000 characters plus one', async () => {
+    const calls = stubApi(api({ [`GET ${REQUESTS}/12`]: { status: 200, body: detail() } }));
+    const { user, panel } = await openRequests('request-12');
+    await within(panel()).findByText('Waiting for you');
+
+    await user.click(within(panel()).getByLabelText('Reply'));
+    await user.paste('a'.repeat(5000) + ' ');
+    await user.click(within(panel()).getByRole('button', { name: 'Send reply' }));
+
+    expect(within(panel()).getByText('The message must be 1–5000 characters')).toBeInTheDocument();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   it('replaces the reply box of a closed request with "This request is closed" and "Create a new request"', async () => {
     stubApi(
       api({
@@ -473,6 +486,45 @@ describe('RequestsTab', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(reads()).toBe(2);
+  });
+
+  it('keeps the thread and the typed reply when a background read fails, with a retry line', async () => {
+    const attachment = {
+      position: 1,
+      contentType: 'image/png',
+      sizeBytes: 1000,
+      url: 'http://minio.test/get/expired',
+      expiresAt: '2026-10-19T09:00:00Z',
+    };
+    const message = { ...detail().messages[0]!, attachments: [attachment] };
+    let reads = 0;
+    stubApi(
+      api({
+        [`GET ${REQUESTS}/12`]: () => {
+          reads += 1;
+          return reads === 2
+            ? { status: 500, body: { status: 500, detail: 'boom' } }
+            : { status: 200, body: detail({ messages: [message] }) };
+        },
+      }),
+    );
+    const { user, panel } = await openRequests('request-12');
+    await user.type(await within(panel()).findByLabelText('Reply'), 'Đang gõ dở');
+
+    fireEvent.error(within(panel()).getByRole('img', { name: 'Attached image 1' }));
+
+    const line = await within(panel()).findByText(/Couldn't refresh/);
+    expect(within(panel()).getByLabelText('Reply')).toHaveValue('Đang gõ dở');
+    expect(within(panel()).getByText('Tôi nạp credit nhưng số dư không đổi.')).toBeInTheDocument();
+
+    await user.click(
+      within(line.closest('[role="alert"]') as HTMLElement).getByRole('button', {
+        name: 'Try again',
+      }),
+    );
+
+    await waitFor(() => expect(within(panel()).queryByText(/Couldn't refresh/)).toBeNull());
+    expect(within(panel()).getByLabelText('Reply')).toHaveValue('Đang gõ dở');
   });
 
   it('marks the help button while a reply is unread and clears it once the request is opened', async () => {

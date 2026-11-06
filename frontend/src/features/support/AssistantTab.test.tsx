@@ -284,6 +284,48 @@ describe('AssistantTab', () => {
     });
   });
 
+  it('drops the conversation link, keeps the text and says so when the server refuses the link', async () => {
+    setToken('member', true);
+    let created = 0;
+    const calls = api({
+      [MEMBER_ASK]: reply('answered', 'Kiểm tra lịch sử lượt chạy.'),
+      'POST /api/v1/support/requests': () => {
+        created += 1;
+        return created === 1
+          ? problem(400, 'validation-failed', {
+              errors: { aiConversationId: 'support.request.error.conversation' },
+            })
+          : { status: 201, body: CREATED };
+      },
+      'GET /api/v1/support/requests/13': { status: 200, body: CREATED },
+    });
+    const { user } = renderTab();
+
+    await ask(user, 'workflow bị lỗi mất credit');
+    const log = screen.getByRole('log');
+    await within(log).findByText('Kiểm tra lịch sử lượt chạy.');
+    await user.click(
+      within(log).getByRole('button', { name: 'Still not solved? Send a support request' }),
+    );
+    expect(await screen.findByText('Includes your conversation with the assistant')).toBeVisible();
+    await user.selectOptions(screen.getByLabelText('Request type'), 'Credit');
+    await user.type(screen.getByLabelText('Subject'), 'Cần hỗ trợ thêm');
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+
+    expect(await screen.findByText(/couldn't be attached/)).toBeInTheDocument();
+    expect(screen.queryByText('Includes your conversation with the assistant')).toBeNull();
+    expect(screen.getByLabelText('Description')).toHaveValue('workflow bị lỗi mất credit');
+
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    await waitFor(() => expect(created).toBe(2));
+
+    const bodies = calls
+      .filter((call) => call.method === 'POST' && call.path === '/api/v1/support/requests')
+      .map((call) => call.body);
+    expect(bodies[0]).toHaveProperty('aiConversationId', 'c-1');
+    expect(bodies[1]).not.toHaveProperty('aiConversationId');
+  });
+
   it('says "asking a bit fast" when the per-minute cap lifts within the next minutes', async () => {
     setToken('member', true);
     const soon = new Date(Date.now() + 20_000).toISOString();
@@ -430,6 +472,69 @@ describe('AssistantTab', () => {
       { question: 'Hỏi tiếp', conversationId: 'c-old' },
       { question: 'Câu mới' },
     ]);
+  });
+
+  it('discards a reply that arrives after "New conversation" and starts a new server conversation', async () => {
+    setToken('member', true);
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let asked = 0;
+    const calls = api({
+      [MEMBER_LATEST]: {
+        status: 200,
+        body: {
+          conversationId: 'c-old',
+          messages: [
+            { role: 'user', text: 'Hôm qua hỏi', sources: [], createdAt: '2026-10-22T03:00:00Z' },
+          ],
+        },
+      },
+      [MEMBER_ASK]: async () => {
+        asked += 1;
+        if (asked > 1) return reply('answered', 'Trả lời câu mới', [], 'c-new');
+        await gate;
+        return reply('answered', 'Trả lời muộn', [], 'c-old');
+      },
+    });
+    const { user } = renderTab();
+
+    await ask(user, 'Hỏi tiếp');
+    await user.click(await screen.findByRole('button', { name: 'New conversation' }));
+    release();
+    await waitFor(() => expect(asked).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(screen.queryByText('Trả lời muộn')).toBeNull();
+    expect(screen.queryByText('Hôm qua hỏi')).toBeNull();
+    expect(screen.getByText(/Ask a question and the assistant/)).toBeInTheDocument();
+
+    await ask(user, 'Câu mới');
+    expect(await screen.findByText('Trả lời câu mới')).toBeInTheDocument();
+    expect(sentQuestions(calls, MEMBER_ASK)).toEqual([
+      { question: 'Hỏi tiếp', conversationId: 'c-old' },
+      { question: 'Câu mới' },
+    ]);
+  });
+
+  it('renders an assistant answer without any link or image', async () => {
+    setToken('member', true);
+    api({
+      [MEMBER_ASK]: reply(
+        'answered',
+        'Xem [Liên hệ]( mailto:x@evil.example) và [Gửi](/profile) ![Ảnh](https://t.example/p.png)',
+        [],
+      ),
+    });
+    const { user } = renderTab();
+
+    await ask(user, 'Cần giúp');
+
+    const log = screen.getByRole('log');
+    expect(await within(log).findByText(/Xem Liên hệ và Gửi/)).toBeInTheDocument();
+    expect(within(log).queryAllByRole('link')).toEqual([]);
+    expect(log.querySelector('a, img')).toBeNull();
   });
 
   it('shows the notice and a link to Guides when the assistant switch is off', async () => {
@@ -588,5 +693,26 @@ describe('AssistantTab', () => {
     await user.paste('b');
     expect(screen.getByText('1001/1000')).toBeInTheDocument();
     expect(send).toBeDisabled();
+  });
+
+  it('counts a trailing no-break space or U+FEFF as the server does, and a plain trailing space not', async () => {
+    setToken('member', true);
+    api({});
+    const { user } = renderTab();
+
+    const input = await screen.findByRole('textbox', { name: 'Your question' });
+    await waitFor(() => expect(input).toBeEnabled());
+    await user.click(input);
+    await user.paste('a'.repeat(1000) + ' ');
+    expect(screen.getByText('1000/1000')).toBeInTheDocument();
+
+    await user.clear(input);
+    await user.paste('a'.repeat(1000) + ' ');
+    expect(screen.getByText('1001/1000')).toBeInTheDocument();
+
+    await user.clear(input);
+    await user.paste('a'.repeat(1000) + '﻿');
+    expect(screen.getByText('1001/1000')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
   });
 });

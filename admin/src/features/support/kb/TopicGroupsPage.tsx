@@ -65,8 +65,10 @@ export function TopicGroupsPage() {
     : [];
   const buttonId = (groupId: string, offset: -1 | 1) =>
     `${listId}-${groupId}-${offset < 0 ? 'up' : 'down'}`;
+  const deleteId = (groupId: string) => `${listId}-${groupId}-delete`;
+  const headingId = `${listId}-heading`;
 
-  // Moving a row re-inserts it in the list, which drops focus from the button that moved it.
+  // Moving a row re-inserts it, and deleting one removes it, which drops focus from its button.
   useEffect(() => {
     if (pendingFocus.current) {
       document.getElementById(pendingFocus.current)?.focus();
@@ -126,7 +128,9 @@ export function TopicGroupsPage() {
       <div className="cortex-admin-page-heading">
         <div>
           <p className="cortex-admin-eyebrow">{t('support.groups.eyebrow')}</p>
-          <h1>{t('support.groups.title')}</h1>
+          <h1 id={headingId} tabIndex={-1}>
+            {t('support.groups.title')}
+          </h1>
           <p className="cortex-admin-page-description">{t('support.groups.description')}</p>
         </div>
       </div>
@@ -180,6 +184,7 @@ export function TopicGroupsPage() {
               busy={busy}
               upId={buttonId(group.id, -1)}
               downId={buttonId(group.id, 1)}
+              deleteId={deleteId(group.id)}
               onMove={(offset) => move(index, offset)}
               onRename={(name) => {
                 if (busy) return;
@@ -195,8 +200,12 @@ export function TopicGroupsPage() {
               onDelete={() => {
                 if (busy) return;
                 started();
+                const neighbour = groups[index + 1] ?? groups[index - 1];
                 remove.mutate(group.id, {
-                  onSuccess: () => setAnnouncement(t('support.groups.deleted', { name: group.name })),
+                  onSuccess: () => {
+                    pendingFocus.current = neighbour ? deleteId(neighbour.id) : headingId;
+                    setAnnouncement(t('support.groups.deleted', { name: group.name }));
+                  },
                   onError,
                 });
               }}
@@ -215,6 +224,7 @@ function GroupRow({
   busy,
   upId,
   downId,
+  deleteId,
   onMove,
   onRename,
   onDelete,
@@ -225,6 +235,7 @@ function GroupRow({
   busy: boolean;
   upId: string;
   downId: string;
+  deleteId: string;
   onMove: (offset: -1 | 1) => void;
   onRename: (name: string) => void;
   onDelete: () => void;
@@ -308,6 +319,7 @@ function GroupRow({
           {t('support.groups.down')}
         </button>
         <button
+          id={deleteId}
           type="button"
           className="cortex-admin-btn cortex-admin-btn--danger"
           aria-label={t('support.groups.remove', { name: group.name })}

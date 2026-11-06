@@ -21,8 +21,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.commonmark.node.AbstractVisitor;
+import org.commonmark.node.HtmlBlock;
+import org.commonmark.node.HtmlInline;
+import org.commonmark.node.Image;
+import org.commonmark.node.Link;
+import org.commonmark.node.LinkReferenceDefinition;
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.markdown.MarkdownRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -47,13 +55,8 @@ class AssistantService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Logger LOG = LoggerFactory.getLogger(AssistantService.class);
 
-    private static final String TARGET = "\\((?:[^()\\s]|\\([^()]*\\))*(?:\\s+\"[^\"]*\")?\\)";
-    private static final Pattern IMAGE = Pattern.compile("!\\[([^\\]]*)\\]" + TARGET);
-    private static final Pattern LINK = Pattern.compile("\\[([^\\]]*)\\]" + TARGET);
-    private static final Pattern LINK_DEFINITION = Pattern.compile("(?m)^ {0,3}\\[[^\\]]+\\]:[ \\t]*\\S+.*$");
-    private static final Pattern AUTOLINK = Pattern.compile("<[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^<>\\s]*>");
-    private static final Pattern BARE_URL =
-            Pattern.compile("(?i)(?:https?://|ftp://|www\\.)[^\\s<>]*[^\\s<>.,;:!?'\")\\]]");
+    private static final Parser MARKDOWN = Parser.builder().build();
+    private static final MarkdownRenderer MARKDOWN_OUT = MarkdownRenderer.builder().build();
 
     private final AssistantSwitch assistantSwitch;
     private final String model;
@@ -139,21 +142,17 @@ class AssistantService {
             throw e;
         }
         String question = validQuestion(rawQuestion);
+        if (asker instanceof Asker.Guest guest) {
+            limitPerMinute(() -> minuteLimiter.acquireNetwork(guest.networkKey()), question, started);
+        }
         if (conversationId != null && !conversations.owns(asker, conversationId)) {
             throw conversationNotFound();
         }
-        try {
-            minuteLimiter.acquire(asker.subjectKey());
-        } catch (SupportProblemException e) {
-            telemetry.record("quota", 0, length(question), started);
-            throw e;
-        }
+        limitPerMinute(() -> minuteLimiter.acquire(asker.subjectKey()), question, started);
         Instant askedAt = clock.instant();
         List<ScoredArticle> articles = retriever.retrieve(question);
         if (articles.isEmpty()) {
-            QuotaService.Remaining left = quotas.peek(asker);
-            return reply(asker, conversationId, question, askedAt, new Answer("no_answer", NO_ANSWER, List.of()),
-                    new QuotaView(left.remaining(), left.resetsAt()), started);
+            return noArticleReply(asker, conversationId, question, askedAt, started);
         }
         QuotaService.Charge charge;
         try {
@@ -164,6 +163,43 @@ class AssistantService {
         }
         try {
             return answerCharged(asker, conversationId, question, askedAt, articles, locale, charge, started);
+        } catch (RuntimeException e) {
+            refund(charge, e);
+            throw e;
+        }
+    }
+
+    private void limitPerMinute(Runnable acquire, String question, long started) {
+        try {
+            acquire.run();
+        } catch (SupportProblemException e) {
+            telemetry.record("quota", 0, length(question), started);
+            throw e;
+        }
+    }
+
+    /**
+     * No article matched, so no provider call. A guest still spends from the guest quotas (the write and
+     * the retrieval are what an abuser would repeat for free); a member is not charged.
+     */
+    private AssistantReply noArticleReply(Asker asker, UUID conversationId, String question, Instant askedAt,
+            long started) {
+        Answer none = new Answer("no_answer", NO_ANSWER, List.of());
+        if (!(asker instanceof Asker.Guest)) {
+            QuotaService.Remaining left = quotas.peek(asker);
+            return reply(asker, conversationId, question, askedAt, none,
+                    new QuotaView(left.remaining(), left.resetsAt()), started);
+        }
+        QuotaService.Charge charge;
+        try {
+            charge = quotas.chargeAskerOnly(asker);
+        } catch (SupportProblemException e) {
+            telemetry.record("quota", 0, length(question), started);
+            throw e;
+        }
+        try {
+            return reply(asker, conversationId, question, askedAt, none,
+                    new QuotaView(charge.remaining(), QuotaService.resetsAt(charge.day())), started);
         } catch (RuntimeException e) {
             refund(charge, e);
             throw e;
@@ -221,15 +257,65 @@ class AssistantService {
     }
 
     /**
-     * The answer with every Markdown link and image reduced to its text and every URL dropped: the
-     * provider could otherwise point outside the retrieved articles, which reach the reader as sources.
+     * The answer with every Markdown link and image reduced to its text, reference definitions and raw
+     * HTML removed: the provider could otherwise point outside the retrieved articles, which reach the
+     * reader as sources. Works on the parsed document, because no pattern matches the CommonMark link
+     * grammar (nested parentheses, titles, destinations on the next line, reference-style links).
      */
     static String withoutLinks(String text) {
-        String plain = IMAGE.matcher(text).replaceAll("$1");
-        plain = LINK.matcher(plain).replaceAll("$1");
-        plain = LINK_DEFINITION.matcher(plain).replaceAll("");
-        plain = AUTOLINK.matcher(plain).replaceAll("");
-        return BARE_URL.matcher(plain).replaceAll("").strip();
+        Node document = MARKDOWN.parse(text);
+        LinkFlattener flattener = new LinkFlattener();
+        document.accept(flattener);
+        return flattener.changed ? MARKDOWN_OUT.render(document).strip() : text.strip();
+    }
+
+    /**
+     * Replaces each link and image by its children (the visible text or alt text) and drops the rest.
+     * An answer it leaves alone is kept byte for byte, so the Markdown writer only ever escapes text
+     * of an answer that had markup to remove.
+     */
+    private static final class LinkFlattener extends AbstractVisitor {
+
+        private boolean changed;
+
+        @Override
+        public void visit(Link link) {
+            flatten(link);
+        }
+
+        @Override
+        public void visit(Image image) {
+            flatten(image);
+        }
+
+        @Override
+        public void visit(LinkReferenceDefinition definition) {
+            drop(definition);
+        }
+
+        @Override
+        public void visit(HtmlInline html) {
+            drop(html);
+        }
+
+        @Override
+        public void visit(HtmlBlock html) {
+            drop(html);
+        }
+
+        private void drop(Node node) {
+            changed = true;
+            node.unlink();
+        }
+
+        private void flatten(Node node) {
+            changed = true;
+            visitChildren(node);
+            for (Node child = node.getFirstChild(); child != null; child = node.getFirstChild()) {
+                node.insertBefore(child);
+            }
+            node.unlink();
+        }
     }
 
     /** The provider's result as an answer, or empty when it gave none and the question is refunded. */

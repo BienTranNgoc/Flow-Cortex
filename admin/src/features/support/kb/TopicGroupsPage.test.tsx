@@ -39,6 +39,56 @@ describe('TopicGroupsPage', () => {
     expect(screen.getByText('Credit')).toBeInTheDocument();
   });
 
+  describe('focus after deleting a topic', () => {
+    const FIRST = { id: 'g1', name: 'Tài khoản', position: 1, articleCount: 0 };
+    const SECOND = { id: 'g2', name: 'Credit', position: 2, articleCount: 0 };
+
+    /** Renders the page; the groups read answers `after` once the delete went through. */
+    function renderWithDelete(id: string, before: unknown[], after: unknown[]) {
+      let deleted = false;
+      stubApi({
+        'GET /api/v1/admin/support/kb/groups': () => ({
+          status: 200,
+          body: deleted ? after : before,
+        }),
+        [`DELETE /api/v1/admin/support/kb/groups/${id}`]: () => {
+          deleted = true;
+          return { status: 204 };
+        },
+      });
+      renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
+      return userEvent.setup();
+    }
+
+    it("moves focus to the next row's Delete button", async () => {
+      const user = renderWithDelete('g1', [FIRST, SECOND], [SECOND]);
+
+      await user.click(await screen.findByRole('button', { name: 'Delete Tài khoản' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Delete Credit' })).toHaveFocus(),
+      );
+    });
+
+    it("moves focus to the previous row's Delete button when the last row is deleted", async () => {
+      const user = renderWithDelete('g2', [FIRST, SECOND], [FIRST]);
+
+      await user.click(await screen.findByRole('button', { name: 'Delete Credit' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Delete Tài khoản' })).toHaveFocus(),
+      );
+    });
+
+    it('moves focus to the page heading when the last topic is deleted', async () => {
+      const user = renderWithDelete('g1', [FIRST], []);
+
+      await user.click(await screen.findByRole('button', { name: 'Delete Tài khoản' }));
+
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Topics' })).toHaveFocus());
+    });
+  });
+
   it('reorders by sending every group in the new order', async () => {
     const calls = stubApi({
       'GET /api/v1/admin/support/kb/groups': GROUPS,

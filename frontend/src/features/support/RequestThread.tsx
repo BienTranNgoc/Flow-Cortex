@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } fr
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
-import { LoadFailed } from './GuidesTab';
+import { LoadFailed, RefreshFailed } from './GuidesTab';
 import { AttachmentPicker, FailureNotice, SuspendedNotice } from './RequestForm';
 import { useSupportPanel } from './supportPanelState';
 import {
@@ -290,7 +290,13 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
       </p>
     );
   }
-  if (detail.isError) {
+  // A failed background read keeps the thread, and the reply being typed, on screen; only an
+  // answer that says the request is out of reach replaces it.
+  const request = detail.data;
+  const outOfReach =
+    detail.isError &&
+    (isSuspended(detail.error) || supportProblemCode(detail.error) === 'request-not-found');
+  if (detail.isError && (request === undefined || outOfReach)) {
     if (isSuspended(detail.error)) return <SuspendedNotice />;
     if (supportProblemCode(detail.error) === 'request-not-found') {
       return (
@@ -301,8 +307,8 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
     }
     return <LoadFailed error={detail.error} onRetry={() => void detail.refetch()} />;
   }
+  if (request === undefined) return null;
 
-  const request = detail.data;
   // Attachment URLs are presigned and expire, so a broken image asks for fresh ones.
   const onImageFailed = () => {
     if (Date.now() - lastImageRetry.current < IMAGE_RETRY_MS) return;
@@ -312,6 +318,7 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
 
   return (
     <div className="support-request">
+      {detail.isError && <RefreshFailed onRetry={() => void detail.refetch()} />}
       <p ref={statusRef} className="support-request__meta" tabIndex={-1}>
         <StatusChip status={request.status} />
         <span>{t(`support.requests.types.${request.type}`)}</span>

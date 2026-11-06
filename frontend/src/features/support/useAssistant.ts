@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   askSupportAssistant,
@@ -11,17 +11,18 @@ import {
   type SupportAssistantQuestion,
   type SupportAssistantReply,
 } from '@flow-cortex/api-client';
+import { strippedLength } from '@flow-cortex/ui-kit';
 import { useFeatures } from '../../app/useFeatures';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { supportSessionId } from './supportSession';
 import { supportProblemCode, unwrapSupport, useSupportSettings } from './useSupportKb';
 
-/** Matches the backend, which counts code points of the trimmed question. */
+/** Matches the backend, which counts code points of the stripped question. */
 export const MAX_QUESTION_LENGTH = 1000;
 
 export function questionLength(text: string): number {
-  return [...text.trim()].length;
+  return strippedLength(text);
 }
 
 export type AssistantAvailability = 'checking' | 'on' | 'off';
@@ -57,6 +58,11 @@ async function readLatest(member: boolean): Promise<SupportAssistantConversation
   }
 }
 
+// Counts "New conversation" presses: a reply to a question asked before one belongs to a
+// conversation the member has left and must not be written back.
+const generations = new WeakMap<QueryClient, number>();
+const generationOf = (client: QueryClient) => generations.get(client) ?? 0;
+
 /**
  * The actor's latest conversation, or `null` when there is none (or it expired). Kept in the
  * query cache for the session: every answer is appended there, so the tab can remount.
@@ -68,7 +74,10 @@ export function useAssistantConversation(member: boolean) {
     queryFn: () => readLatest(member),
     staleTime: Infinity,
   });
-  const startOver = () => queryClient.setQueryData(latestKey(member), null);
+  const startOver = () => {
+    generations.set(queryClient, generationOf(queryClient) + 1);
+    queryClient.setQueryData(latestKey(member), null);
+  };
   return { query, startOver };
 }
 
@@ -106,7 +115,9 @@ export function useAskAssistant(member: boolean) {
         return { reply: await send(member, question, null), question, restarted: true };
       }
     },
-    onSuccess: ({ reply, question, restarted }) => {
+    onMutate: () => ({ generation: generationOf(queryClient) }),
+    onSuccess: ({ reply, question, restarted }, _input, context) => {
+      if (context?.generation !== generationOf(queryClient)) return;
       const now = new Date().toISOString();
       const exchange: SupportAssistantHistoryMessage[] = [
         { role: 'user', text: question, sources: [], createdAt: now },

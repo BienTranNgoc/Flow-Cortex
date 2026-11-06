@@ -172,6 +172,11 @@ body.support-widget-on {
   padding: 1rem 1.25rem 1.25rem;
 }
 
+/* Focus lands here only to keep Escape working; nothing in it is operable. */
+.support-panel__body:focus {
+  outline: none;
+}
+
 .support-home,
 .support-guides {
   display: flex;

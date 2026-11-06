@@ -1,10 +1,10 @@
 import type { SupportAssistantHistoryMessage } from '@flow-cortex/api-client';
+import { Markdown } from '@flow-cortex/ui-kit';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { LoadFailed } from './GuidesTab';
 import { ContactLine } from './HomeTab';
-import { Markdown } from './Markdown';
 import { SuspendedNotice } from './RequestForm';
 import { problemMessage } from './supportProblems';
 import { useSupportPanel, type RequestPrefill } from './supportPanelState';
@@ -87,7 +87,7 @@ function AssistantMessage({
     <li className="assistant-message assistant-message--assistant">
       <Speaker name={t('support.assistant.assistantName')} />
       {outcome === 'answered' ? (
-        <Markdown>{message.text}</Markdown>
+        <Markdown mode="answer">{message.text}</Markdown>
       ) : (
         <p className="assistant-message__fixed">
           {outcome === 'blocked' ? t('support.assistant.blocked') : t('support.assistant.noAnswer')}

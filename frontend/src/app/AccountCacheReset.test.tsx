@@ -64,6 +64,61 @@ describe('AccountCacheReset', () => {
     expect(queryClient.getQueryData(KEY)).toEqual({ conversationId: 'c-a', messages: [] });
   });
 
+  it("starts member B's help panel closed on Home, not on member A's half-filed request", async () => {
+    stubApi({
+      'GET /api/v1/support/settings': { status: 200, body: { assistantAvailable: true } },
+      'GET /api/v1/support/kb/featured': { status: 200, body: [] },
+    });
+    setToken(jwt('a'), true);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/workflows']}>
+          <SupportWidget />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Send a support request' }),
+    );
+    expect(screen.getByText('New request')).toBeInTheDocument();
+
+    act(() => setToken(null));
+    act(() => setToken(jwt('b'), true));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    const panel = screen.getByRole('dialog');
+    expect(within(panel).getByRole('tab', { name: 'Home' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(within(panel).queryByText('New request')).toBeNull();
+  });
+
+  it('keeps the help panel open when a refresh rotates the same account token', async () => {
+    stubApi({
+      'GET /api/v1/support/settings': { status: 200, body: { assistantAvailable: true } },
+      'GET /api/v1/support/kb/featured': { status: 200, body: [] },
+    });
+    setToken(jwt('a', 1), true);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/workflows']}>
+          <SupportWidget />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Help' }));
+
+    act(() => setToken(jwt('a', 2), true));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it("never shows member A's conversation to member B signing in on the same tab", async () => {
     let latest: { status: number; body: unknown } = {
       status: 404,
@@ -116,12 +171,20 @@ describe('AccountCacheReset', () => {
     act(() => setToken(null));
     act(() => setToken(jwt('b'), true));
 
+    // The panel starts over for the new account: closed, so open it and go back to the Assistant.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Help Center' })).getByRole('tab', {
+        name: 'Assistant',
+      }),
+    );
     await waitFor(() =>
       expect(
         calls.filter((call) => call.path.endsWith('/conversations/latest')).length,
       ).toBeGreaterThan(readsBefore),
     );
-    await within(panel).findByText(/Ask a question/);
+    await screen.findByText(/Ask a question/);
     expect(screen.queryByText('Trả lời riêng cho A')).toBeNull();
     expect(screen.queryByText('Câu hỏi của A')).toBeNull();
   });

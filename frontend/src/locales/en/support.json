@@ -17,6 +17,7 @@
     "loading": "Loading…",
     "retry": "Try again",
     "loadFailed": "Couldn't load the content. Please try again.",
+    "refreshFailed": "Couldn't refresh this content. What you see below may be out of date.",
     "back": "Back"
   },
   "contact": {
@@ -133,6 +134,7 @@
     "notFound": "Request not found",
     "suspended": "Your account is suspended",
     "conversationLinked": "Includes your conversation with the assistant",
+    "conversationUnlinked": "The assistant conversation couldn't be attached. Send again to file the request without it.",
     "unread": "New reply",
     "you": "You",
     "supportTeam": "Nodi support"

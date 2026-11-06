@@ -1,6 +1,7 @@
 import { useAuthToken } from '@flow-cortex/api-client';
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { useAccountLeft } from '../../app/AccountCacheReset';
 import { SupportLauncher } from './SupportLauncher';
 import { SupportPanel } from './SupportPanel';
 import {
@@ -77,6 +78,9 @@ export function SupportWidget() {
     if (wasOpen.current && !state.open) launcherRef.current?.focus();
     wasOpen.current = state.open;
   }, [state.open]);
+
+  // The previous account's tab, request number and prefilled conversation must not reach the next.
+  useAccountLeft(() => dispatch({ type: 'reset' }));
 
   const close = useCallback(() => dispatch({ type: 'close' }), []);
 

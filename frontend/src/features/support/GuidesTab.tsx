@@ -1,7 +1,7 @@
 import { ApiError } from '@flow-cortex/api-client';
+import { Markdown } from '@flow-cortex/ui-kit';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Markdown } from './Markdown';
 import { problemMessage } from './supportProblems';
 import { useSupportPanel } from './supportPanelState';
 import {
@@ -32,6 +32,19 @@ export function LoadFailed({ error, onRetry }: Readonly<{ error: unknown; onRetr
   return (
     <div className="support-state" role="alert">
       <p>{message}</p>
+      <button type="button" className="support-button" onClick={onRetry}>
+        {t('support.common.retry')}
+      </button>
+    </div>
+  );
+}
+
+/** A failed re-read of content already on screen: says so and offers a retry without replacing it. */
+export function RefreshFailed({ onRetry }: Readonly<{ onRetry: () => void }>) {
+  const { t } = useTranslation();
+  return (
+    <div className="support-state" role="alert">
+      <p>{t('support.common.refreshFailed')}</p>
       <button type="button" className="support-button" onClick={onRetry}>
         {t('support.common.retry')}
       </button>

@@ -11,6 +11,7 @@ import {
   type SupportRequestDetail,
   type SupportRequestReply,
 } from '@flow-cortex/api-client';
+import { strippedLength } from '@flow-cortex/ui-kit';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 import { UploadFailedError } from '../workflow/uploadFile';
@@ -35,9 +36,9 @@ export const ALLOWED_ACTIONS: Record<RequestStatus, { reply: boolean; cancel: bo
   closed: { reply: false, cancel: false, confirm: false },
 };
 
-/** Length in code points after trimming, the way the server counts. */
+/** Length in code points after stripping, the way the server counts. */
 export function textLength(value: string): number {
-  return [...value.trim()].length;
+  return strippedLength(value);
 }
 
 export function isSuspended(error: unknown): boolean {

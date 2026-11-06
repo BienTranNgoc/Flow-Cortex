@@ -16,21 +16,27 @@ function accountOf(token: string | null): string | null {
 }
 
 /**
- * Empties the query cache when the signed-in account changes (sign-out, or another account's
- * token), so no screen shows data fetched for the previous account. A refresh that rotates the
- * token of the same account keeps it.
+ * Calls `onLeave` when the signed-in account changes after one was signed in (sign-out, or
+ * another account's token). Signing in from a guest session and a refresh that rotates the token
+ * of the same account do not count.
  */
-export function AccountCacheReset() {
-  const queryClient = useQueryClient();
+export function useAccountLeft(onLeave: () => void) {
   const account = accountOf(useAuthToken());
   const previous = useRef(account);
+  const latest = useRef(onLeave);
+  latest.current = onLeave;
 
   useEffect(() => {
     if (previous.current === account) return;
     const hadAccount = previous.current !== null;
     previous.current = account;
-    if (hadAccount) queryClient.clear();
-  }, [account, queryClient]);
+    if (hadAccount) latest.current();
+  }, [account]);
+}
 
+/** Empties the query cache when the account is left, so no screen shows the previous account's data. */
+export function AccountCacheReset() {
+  const queryClient = useQueryClient();
+  useAccountLeft(() => queryClient.clear());
   return null;
 }

@@ -317,13 +317,15 @@ flowcortex:
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
   # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
-  # and logs a config error. read-timeout bounds the wait for one whole answer.
+  # and logs a config error. read-timeout applies to each socket read; answer-timeout bounds one
+  # whole answer.
   llm:
     gemini:
       api-key: ${GEMINI_API_KEY:}
       base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
       connect-timeout: ${GEMINI_CONNECT_TIMEOUT:5s}
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
+      answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
   support:

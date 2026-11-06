@@ -159,8 +159,10 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [failed, setFailed] = useState<{ error: unknown } | null>(null);
+  const [linkDropped, setLinkDropped] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const linkedConversation = linkDropped ? undefined : prefill?.aiConversationId;
   const ids = { type: useId(), subject: useId(), description: useId() };
   const fieldRefs = {
     type: useRef<HTMLSelectElement>(null),
@@ -193,13 +195,20 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
         subject: subject.trim(),
         description: description.trim(),
         ...(uploadIds.length > 0 ? { uploadIds } : {}),
-        ...(prefill?.aiConversationId ? { aiConversationId: prefill.aiConversationId } : {}),
+        ...(linkedConversation ? { aiConversationId: linkedConversation } : {}),
       };
       const created = await create.mutateAsync({ body, key: submitKey.current() });
       dispatch({ type: 'selectRequest', request: created.number });
     } catch (error) {
       const { fields } = failureOf(error, t);
-      setFailed({ error });
+      const linkRefused = fields.aiConversationId !== undefined;
+      if (linkRefused) {
+        // The next submit has a different body, so it needs a new idempotency key.
+        setLinkDropped(true);
+        submitKey.reset();
+      }
+      const onlyLinkRefused = linkRefused && Object.keys(fields).length === 1;
+      setFailed(onlyLinkRefused ? null : { error });
       setErrors({ type: fields.type, subject: fields.subject, description: fields.description });
     } finally {
       busyRef.current = false;
@@ -281,7 +290,12 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
           </p>
         )}
       </div>
-      {prefill?.aiConversationId && <p className="support-contact">{t('support.requests.conversationLinked')}</p>}
+      {linkedConversation && <p className="support-contact">{t('support.requests.conversationLinked')}</p>}
+      {linkDropped && (
+        <p className="support-contact" role="status">
+          {t('support.requests.conversationUnlinked')}
+        </p>
+      )}
       <AttachmentPicker files={files} onChange={edited(setFiles)} disabled={busy} />
       {failed && (
         <FailureNotice

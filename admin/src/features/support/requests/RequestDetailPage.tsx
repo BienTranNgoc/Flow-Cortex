@@ -7,13 +7,14 @@ import {
   type SupportConversationMessage,
   type SupportRequestMessage,
 } from '@flow-cortex/api-client';
+import { javaStrip, Markdown } from '@flow-cortex/ui-kit';
 import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { usePageTitle } from '../../../app/usePageTitle';
-import { Markdown } from '../Markdown';
 import { supportProblemCode } from '../unwrapSupport';
+import '../markdown.css';
 import { ATTACHMENT_ACCEPT, UploadFailedError, addAttachments } from './attachments';
 import './requests.css';
 import { RequestTime } from './RequestTime';
@@ -252,7 +253,9 @@ function ConversationMessage({ message }: Readonly<{ message: SupportConversatio
       </p>
       {message.role === 'assistant' ? (
         <div className="request-message-markdown">
-          <Markdown>{message.text}</Markdown>
+          <Markdown mode="answer" firstHeadingLevel={3}>
+            {message.text}
+          </Markdown>
         </div>
       ) : (
         <p className="request-message-body">{message.text}</p>
@@ -458,7 +461,7 @@ function ReplyForm({
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (busyRef.current || blocked) return;
-    const text = body.trim();
+    const text = javaStrip(body);
     const length = [...text].length;
     if (length < 1 || length > MAX_REPLY_LENGTH) {
       setFieldError(REPLY_LENGTH_KEY);

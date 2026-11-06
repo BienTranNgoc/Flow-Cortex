@@ -29,6 +29,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -74,6 +75,10 @@ class AssistantIT extends AbstractPostgresBootTest {
     private static final String NO_ANSWER = "Mình chưa có câu trả lời cho câu hỏi này";
     private static final String REFUSAL = "Mình không thể trả lời câu hỏi này";
     private static final String CREDIT_QUESTION = "Làm sao nạp credit?";
+    private static final AtomicInteger NETWORKS = new AtomicInteger();
+
+    /** Each case asks from its own address, so the per-network minute cap never carries over between cases. */
+    private static volatile String network = "198.51.100.1";
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -144,6 +149,7 @@ class AssistantIT extends AbstractPostgresBootTest {
 
     @BeforeEach
     void emptyAssistant() {
+        network = "198.51.100." + (1 + NETWORKS.getAndIncrement() % 250);
         jdbcTemplate.update("DELETE FROM support_ai_conversation");
         jdbcTemplate.update("DELETE FROM support_quota_usage");
         jdbcTemplate.update("DELETE FROM support_article");
@@ -273,6 +279,37 @@ class AssistantIT extends AbstractPostgresBootTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count FROM support_quota_usage WHERE subject_key LIKE 'guest-ip:%'", Integer.class))
                 .isEqualTo(41);
+    }
+
+    @Test
+    void aGuestQuestionNoArticleMatchesStillSpendsTheGuestQuotasButNotTheCeiling() {
+        ResponseEntity<Reply> response = guestAsk(UUID.randomUUID().toString(), null, "Đổi ngôn ngữ ở đâu?");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().message().outcome()).isEqualTo("no_answer");
+        assertThat(response.getBody().quota().remaining()).isEqualTo(9);
+        assertThat(fakeLlm.requests).isEmpty();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT count FROM support_quota_usage WHERE subject_key LIKE 'guest-%'", Integer.class))
+                .containsExactly(1, 1);
+        assertThat(count("global")).isZero();
+    }
+
+    @Test
+    void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
+        for (int i = 0; i < 10; i++) {
+            assertThat(guestAsk(UUID.randomUUID().toString(), null, "Đổi ngôn ngữ ở đâu?").getStatusCode())
+                    .isEqualTo(HttpStatus.OK);
+        }
+        int conversations = jdbcTemplate.queryForObject("SELECT count(*) FROM support_ai_conversation",
+                Integer.class);
+
+        ResponseEntity<Problem> response = guestAskForProblem(UUID.randomUUID().toString(), "Đổi ngôn ngữ ở đâu?");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getBody().type()).isEqualTo(PROBLEMS.resolve("assistant-quota"));
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_ai_conversation", Integer.class))
+                .isEqualTo(conversations);
     }
 
     @Test
@@ -773,9 +810,11 @@ class AssistantIT extends AbstractPostgresBootTest {
         return headers;
     }
 
+    /** The guest's browser session on the current case's network (loopback is a trusted proxy, so the header applies). */
     private static HttpHeaders session(String session) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Support-Session", session);
+        headers.set("X-Forwarded-For", network);
         return headers;
     }
 

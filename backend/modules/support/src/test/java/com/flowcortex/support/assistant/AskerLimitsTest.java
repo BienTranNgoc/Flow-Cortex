@@ -33,6 +33,46 @@ class AskerLimitsTest {
     }
 
     @Test
+    void networkAndSessionBucketsAreSeparateAndTheNetworkOneRefusesTheEleventhQuestion() {
+        Instant now = Instant.parse("2026-10-19T08:20:00Z");
+        MinuteLimiter limiter = new MinuteLimiter(Clock.fixed(now, ZoneOffset.UTC));
+        for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
+            limiter.acquireNetwork("guest-ip:a");
+        }
+
+        assertThatThrownBy(() -> limiter.acquireNetwork("guest-ip:a"))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.code()).isEqualTo("assistant-quota"));
+        limiter.acquireNetwork("guest-ip:b");
+        limiter.acquire("guest-ip:a");
+    }
+
+    @Test
+    void aFloodOfSessionKeysDoesNotResetANetworkBucket() {
+        MinuteLimiter limiter = new MinuteLimiter(Clock.fixed(Instant.parse("2026-10-19T08:20:00Z"), ZoneOffset.UTC));
+        for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
+            limiter.acquireNetwork("guest-ip:a");
+        }
+        for (int i = 0; i < 150_000; i++) {
+            limiter.acquire("guest-session:" + i);
+        }
+
+        assertThatThrownBy(() -> limiter.acquireNetwork("guest-ip:a")).isInstanceOf(SupportProblemException.class);
+    }
+
+    @Test
+    void anIpv6NetworkIsKeyedOnItsSixtyFourBitPrefix() {
+        GuestKeys keys = new GuestKeys(properties(true), SECRET);
+        String network = keys.guest("s", "2001:db8:1:2:aaaa:bbbb:cccc:dddd").networkHash();
+
+        assertThat(keys.guest("t", "2001:db8:1:2:1111:2222:3333:4444").networkHash()).isEqualTo(network);
+        assertThat(keys.guest("t", "2001:0db8:0001:0002::1").networkHash()).isEqualTo(network);
+        assertThat(keys.guest("t", "2001:db8:1:3::1").networkHash()).isNotEqualTo(network);
+        assertThat(keys.guest("t", "::ffff:203.0.113.9").networkHash())
+                .isEqualTo(keys.guest("t", "203.0.113.9").networkHash());
+    }
+
+    @Test
     void aDayEndsAtMidnightInVietnam() {
         assertThat(QuotaService.resetsAt(LocalDate.of(2026, 10, 19))).isEqualTo(Instant.parse("2026-10-19T17:00:00Z"));
     }

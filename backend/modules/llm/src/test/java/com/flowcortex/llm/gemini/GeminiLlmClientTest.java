@@ -47,7 +47,7 @@ class GeminiLlmClientTest {
 
     private static GeminiProperties properties(String apiKey) {
         return new GeminiProperties(apiKey, URI.create("https://llm.test/v1beta"), Duration.ofSeconds(5),
-                Duration.ofSeconds(20));
+                Duration.ofSeconds(20), Duration.ofSeconds(20));
     }
 
     private static LlmJsonRequest request() {

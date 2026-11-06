@@ -3,6 +3,7 @@ package com.flowcortex.support.assistant;
 import com.flowcortex.llm.api.LlmClient;
 import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmTimeouts;
 import io.micrometer.context.ContextExecutorService;
 import io.micrometer.context.ContextSnapshotFactory;
 import java.time.Duration;
@@ -26,8 +27,6 @@ import org.springframework.stereotype.Component;
 @Component
 class LlmDeadline implements AutoCloseable {
 
-    static final Duration TOTAL = Duration.ofSeconds(20);
-
     private static final Logger LOG = LoggerFactory.getLogger(LlmDeadline.class);
 
     private final LlmClient client;
@@ -36,8 +35,8 @@ class LlmDeadline implements AutoCloseable {
             Executors.newVirtualThreadPerTaskExecutor(), ContextSnapshotFactory.builder().build());
 
     @Autowired
-    LlmDeadline(LlmClient client) {
-        this(client, TOTAL);
+    LlmDeadline(LlmClient client, LlmTimeouts timeouts) {
+        this(client, timeouts.answer());
     }
 
     LlmDeadline(LlmClient client, Duration deadline) {

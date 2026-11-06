@@ -66,10 +66,22 @@ class QuotaService {
      * when the ceiling is used up and 429 {@code assistant-quota} when one of the asker's quotas is.
      */
     Charge charge(Asker asker) {
+        return charge(asker, true);
+    }
+
+    /**
+     * Charges only the asker's own subjects, for a question that reaches no provider and so leaves the
+     * global ceiling (a count of provider calls) alone. Refuses with 429 like {@link #charge}.
+     */
+    Charge chargeAskerOnly(Asker asker) {
+        return charge(asker, false);
+    }
+
+    private Charge charge(Asker asker, boolean globalCeiling) {
         LocalDate day = today();
         List<Subject> subjects = subjects(asker);
         Integer remaining = transactions.execute(status -> {
-            if (increment(GLOBAL, day, limits.dailyCeiling()) == null) {
+            if (globalCeiling && increment(GLOBAL, day, limits.dailyCeiling()) == null) {
                 throw paused(day);
             }
             int least = Integer.MAX_VALUE;
@@ -83,7 +95,9 @@ class QuotaService {
             return least;
         });
         List<String> keys = new ArrayList<>();
-        keys.add(GLOBAL);
+        if (globalCeiling) {
+            keys.add(GLOBAL);
+        }
         subjects.forEach(subject -> keys.add(subject.key()));
         return new Charge(day, keys, remaining == null ? 0 : remaining);
     }

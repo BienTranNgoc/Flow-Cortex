@@ -237,6 +237,41 @@ describe('RequestDetailPage', () => {
     expect(screen.getByText('Chữ **đậm** ở đây?')).toBeInTheDocument();
   });
 
+  it('shows a stored assistant answer without any link or image', async () => {
+    stubApi({
+      [`GET ${DETAIL_PATH}`]: {
+        status: 200,
+        body: detail({
+          conversation: [
+            {
+              role: 'assistant',
+              text: 'Xem [Liên hệ]( mailto:x@evil.example) và [Gửi](/profile) ![Ảnh](https://t.example/p.png)',
+              outcome: 'answered',
+              createdAt: '2026-11-04T02:50:05Z',
+            },
+          ],
+        }),
+      },
+    });
+    renderDetail();
+
+    const answer = await screen.findByText(/Xem Liên hệ và Gửi/);
+    expect(answer.closest('.request-message-markdown')?.querySelector('a, img')).toBeNull();
+  });
+
+  it('counts a trailing no-break space in a reply as the server does', async () => {
+    const calls = stubApi({ [`GET ${DETAIL_PATH}`]: { status: 200, body: detail() } });
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(await screen.findByRole('textbox', { name: 'Reply' }));
+    await user.paste('a'.repeat(5000) + ' ');
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
+
+    expect(await screen.findByText('Reply must be 1–5000 characters')).toBeInTheDocument();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   it('says images cannot be sent while the upload grant is switched off', async () => {
     stubApi({
       [`GET ${DETAIL_PATH}`]: { status: 200, body: detail() },

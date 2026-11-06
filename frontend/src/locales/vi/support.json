@@ -17,6 +17,7 @@
     "loading": "Đang tải…",
     "retry": "Thử lại",
     "loadFailed": "Không tải được nội dung. Bạn thử lại nhé.",
+    "refreshFailed": "Không làm mới được nội dung. Nội dung bên dưới có thể đã cũ.",
     "back": "Quay lại"
   },
   "contact": {
@@ -133,6 +134,7 @@
     "notFound": "Không tìm thấy yêu cầu",
     "suspended": "Tài khoản của bạn đang bị tạm khoá",
     "conversationLinked": "Kèm hội thoại với trợ lý",
+    "conversationUnlinked": "Không đính kèm được cuộc trò chuyện với trợ lý. Bạn gửi lại để gửi yêu cầu không kèm cuộc trò chuyện.",
     "unread": "Có phản hồi mới",
     "you": "Bạn",
     "supportTeam": "Nodi hỗ trợ"

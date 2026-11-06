@@ -5,14 +5,15 @@ import {
   type AdminSupportKbArticleRequest,
   type AdminSupportKbGroup,
 } from '@flow-cortex/api-client';
+import { Markdown } from '@flow-cortex/ui-kit';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useForm, type FieldPath } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { usePageTitle } from '../../../app/usePageTitle';
-import { Markdown } from '../Markdown';
 import { supportProblemCode } from '../unwrapSupport';
+import '../markdown.css';
 import './kb.css';
 import {
   useArticleQuery,
@@ -467,7 +468,9 @@ function Preview({ body }: Readonly<{ body: string }>) {
     <section className="support-preview" aria-labelledby={headingId}>
       <h2 id={headingId}>{t('support.editor.previewHeading')}</h2>
       {body.trim() ? (
-        <Markdown>{body}</Markdown>
+        <Markdown firstHeadingLevel={3} linksInNewTab>
+          {body}
+        </Markdown>
       ) : (
         <p className="support-hint">{t('support.editor.previewEmpty')}</p>
       )}

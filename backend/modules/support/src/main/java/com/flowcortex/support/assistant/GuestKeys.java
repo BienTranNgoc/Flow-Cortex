@@ -1,6 +1,9 @@
 package com.flowcortex.support.assistant;
 
 import com.flowcortex.support.config.SupportProperties;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.HexFormat;
@@ -45,7 +48,28 @@ class GuestKeys {
     }
 
     Asker.Guest guest(String session, String networkAddress) {
-        return new Asker.Guest(hash(session), hash(networkAddress));
+        return new Asker.Guest(hash(session), hash(network(networkAddress)));
+    }
+
+    /**
+     * The network a remote address belongs to: an IPv4 address as is, an IPv6 address as its /64
+     * prefix (one subscriber holds a whole /64, so a per-address key would be free to rotate). An
+     * unparseable value is kept as it came; it is the server's view of the peer, never a client header.
+     */
+    static String network(String remoteAddress) {
+        if (remoteAddress == null || remoteAddress.indexOf(':') < 0) {
+            return remoteAddress;
+        }
+        try {
+            // Only an IPv6 literal reaches here (it holds a colon), so this never resolves a name.
+            InetAddress address = InetAddress.getByName(remoteAddress);
+            if (address instanceof Inet6Address) {
+                return HexFormat.of().formatHex(address.getAddress(), 0, 8) + "/64";
+            }
+            return address.getHostAddress();
+        } catch (UnknownHostException e) {
+            return remoteAddress;
+        }
     }
 
     private String hash(String value) {
