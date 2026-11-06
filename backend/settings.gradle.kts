@@ -9,6 +9,8 @@ include(
     ":modules:workflow",
     ":modules:media",
     ":modules:credit",
+    ":modules:llm",
+    ":modules:support",
     ":shared:web",
     ":shared:security",
 )

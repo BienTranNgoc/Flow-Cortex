@@ -112,6 +112,246 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/support/settings:
+    get:
+      tags:
+      - admin-support-settings-controller
+      operationId: getAdminSupportSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportSettings"
+    put:
+      tags:
+      - admin-support-settings-controller
+      operationId: updateAdminSupportSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportSettingsUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportSettings"
+        "400":
+          description: validation-failed (errors.assistantEnabled)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}/status:
+    put:
+      tags:
+      - admin-request-controller
+      operationId: setAdminSupportRequestStatus
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestStatusChange"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: validation-failed (errors.status)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "transition-not-allowed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/groups/{id}:
+    put:
+      tags:
+      - admin-kb-controller
+      operationId: renameAdminSupportKbGroup
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportKbGroupRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbGroup"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: group-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: group-name-taken
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-kb-controller
+      operationId: deleteAdminSupportKbGroup
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: group-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: group-not-empty (articleCount)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/groups/order:
+    put:
+      tags:
+      - admin-kb-controller
+      operationId: reorderAdminSupportKbGroups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportKbGroupOrder"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminSupportKbGroup"
+        "400":
+          description: "validation-failed (errors), group-order-mismatch"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/articles/{id}:
+    get:
+      tags:
+      - admin-kb-controller
+      operationId: getAdminSupportKbArticle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticle"
+        "404":
+          description: article-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-kb-controller
+      operationId: updateAdminSupportKbArticle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportKbArticleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticle"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: "article-not-found, group-not-found"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "slug-taken, featured-full, featured-position-taken"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -186,6 +426,323 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+  /api/v1/support/uploads:
+    post:
+      tags:
+      - request-controller
+      operationId: requestSupportUpload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportUploadRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportUploadGrant"
+        "400":
+          description: "validation-failed (errors), attachment-rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: "support-disabled, attachments-unavailable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/requests:
+    get:
+      tags:
+      - request-controller
+      operationId: listSupportRequests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportRequestSummary"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - request-controller
+      operationId: createSupportRequest
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportRequestCreate"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportRequestDetail"
+        "400":
+          description: "validation-failed (errors), attachment-rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: idempotency-key-reused
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: "support-disabled, attachments-unavailable (uploadIds sent)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/requests/{number}/messages:
+    post:
+      tags:
+      - request-controller
+      operationId: replyToSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportRequestReply"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportRequestDetail"
+        "400":
+          description: "validation-failed (errors), attachment-rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed, idempotency-key-reused"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: "support-disabled, attachments-unavailable (uploadIds sent)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/requests/{number}/confirm:
+    post:
+      tags:
+      - request-controller
+      operationId: confirmSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportRequestDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, transition-not-allowed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/requests/{number}/cancel:
+    post:
+      tags:
+      - request-controller
+      operationId: cancelSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportRequestDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, transition-not-allowed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/assistant/messages:
+    post:
+      tags:
+      - assistant-controller
+      operationId: askSupportAssistant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportAssistantQuestion"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportAssistantReply"
+        "400":
+          description: "validation-failed, question-too-long"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: assistant-quota (retryAt)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: "support-disabled, assistant-disabled, assistant-paused (retryAt),\
+            \ assistant-unavailable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/assistant/guest/messages:
+    post:
+      tags:
+      - assistant-controller
+      operationId: askSupportAssistantAsGuest
+      parameters:
+      - name: X-Support-Session
+        in: header
+        description: Version 4 UUID the browser keeps for the guest
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupportAssistantQuestion"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportAssistantReply"
+        "400":
+          description: "validation-failed (also for a missing or invalid X-Support-Session),\
+            \ question-too-long"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: assistant-quota (retryAt)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: "support-disabled, assistant-disabled, assistant-paused (retryAt),\
+            \ assistant-unavailable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/runs/{id}/cancel:
     post:
       tags:
@@ -544,6 +1101,202 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/admin/support/requests/{number}/messages:
+    post:
+      tags:
+      - admin-request-controller
+      operationId: replyToAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestReply"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: "validation-failed (errors), attachment-rejected"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed, requester-deleted,\
+            \ idempotency-key-reused"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: attachments-unavailable (uploadIds sent)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/groups:
+    get:
+      tags:
+      - admin-kb-controller
+      operationId: listAdminSupportKbGroups
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminSupportKbGroup"
+    post:
+      tags:
+      - admin-kb-controller
+      operationId: createAdminSupportKbGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportKbGroupRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbGroup"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: group-name-taken
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/articles:
+    get:
+      tags:
+      - admin-kb-controller
+      operationId: listAdminSupportKbArticles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticleList"
+    post:
+      tags:
+      - admin-kb-controller
+      operationId: createAdminSupportKbArticle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportKbArticleRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticle"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: group-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "slug-taken, featured-full, featured-position-taken"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/articles/{id}/publish:
+    post:
+      tags:
+      - admin-kb-controller
+      operationId: publishAdminSupportKbArticle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticle"
+        "404":
+          description: article-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/kb/articles/{id}/archive:
+    post:
+      tags:
+      - admin-kb-controller
+      operationId: archiveAdminSupportKbArticle
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportKbArticle"
+        "404":
+          description: article-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -577,6 +1330,245 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/support/settings:
+    get:
+      tags:
+      - support-settings-controller
+      operationId: getSupportSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportSettings"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/requests/{number}:
+    get:
+      tags:
+      - request-controller
+      operationId: getSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportRequestDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/requests/unread-count:
+    get:
+      tags:
+      - request-controller
+      operationId: countUnreadSupportRequests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportCount"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/support/kb/search:
+    get:
+      tags:
+      - kb-controller
+      operationId: searchSupportKb
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 200
+          minLength: 2
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportKbSearchHit"
+        "400":
+          description: validation-failed (errors.q)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/kb/groups:
+    get:
+      tags:
+      - kb-controller
+      operationId: listSupportKbGroups
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportKbGroup"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/kb/featured:
+    get:
+      tags:
+      - kb-controller
+      operationId: listSupportKbFeatured
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupportKbFeaturedArticle"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/kb/articles/{slug}:
+    get:
+      tags:
+      - kb-controller
+      operationId: getSupportKbArticle
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportKbArticle"
+        "404":
+          description: article-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/assistant/guest/conversations/latest:
+    get:
+      tags:
+      - assistant-controller
+      operationId: getSupportAssistantGuestLatestConversation
+      parameters:
+      - name: X-Support-Session
+        in: header
+        description: Version 4 UUID the browser keeps for the guest
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportAssistantConversation"
+        "400":
+          description: validation-failed (missing or invalid X-Support-Session)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/support/assistant/conversations/latest:
+    get:
+      tags:
+      - assistant-controller
+      operationId: getSupportAssistantLatestConversation
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportAssistantConversation"
+        "404":
+          description: conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: support-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/runs/{runId}/review-tasks:
     get:
       tags:
@@ -769,6 +1761,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/support/requests:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: listAdminSupportRequests
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 10000
+          minimum: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestPage"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.page)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/open-count:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: countOpenSupportRequests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportCount"
   /api/v1/admin/sms-outbox:
     get:
       tags:
@@ -995,6 +2074,312 @@ components:
           type: boolean
         passwordSetupRequired:
           type: boolean
+    AdminSupportSettingsUpdate:
+      type: object
+      properties:
+        assistantEnabled:
+          type: boolean
+      required:
+      - assistantEnabled
+    AdminSupportSettings:
+      type: object
+      properties:
+        assistantEnabled:
+          type: boolean
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        envEnabled:
+          type: boolean
+        ceilingReachedToday:
+          type: boolean
+        dailyCeiling:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - assistantEnabled
+      - ceilingReachedToday
+      - dailyCeiling
+      - envEnabled
+      - updatedAt
+    AdminSupportRequestStatusChange:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - in_progress
+          - resolved
+          - closed
+      required:
+      - status
+    AdminSupportRequestDetail:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+        subject:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+        closedReason:
+          type: string
+          enum:
+          - cancelled
+          - confirmed
+          - auto
+          - admin
+        memberUnread:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        requester:
+          $ref: "#/components/schemas/SupportRequester"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportRequestMessage"
+        conversation:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportConversationMessage"
+        conversationExpired:
+          type: boolean
+        allowedStatuses:
+          type: array
+          items:
+            type: string
+            enum:
+            - in_progress
+            - resolved
+            - closed
+      required:
+      - allowedStatuses
+      - conversationExpired
+      - createdAt
+      - lastActivityAt
+      - memberUnread
+      - messages
+      - number
+      - requester
+      - status
+      - subject
+      - type
+    SupportConversationMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+        text:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - answered
+          - no_answer
+          - blocked
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - role
+      - text
+    SupportRequestAttachment:
+      type: object
+      properties:
+        position:
+          type: integer
+          format: int32
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - contentType
+      - expiresAt
+      - position
+      - sizeBytes
+      - url
+    SupportRequestMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        authorKind:
+          type: string
+          enum:
+          - member
+          - admin
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportRequestAttachment"
+      required:
+      - attachments
+      - authorKind
+      - body
+      - createdAt
+      - id
+    SupportRequester:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        deleted:
+          type: boolean
+      required:
+      - deleted
+      - id
+    AdminSupportKbGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          minLength: 0
+      required:
+      - name
+    AdminSupportKbGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+          format: int32
+        articleCount:
+          type: integer
+          format: int64
+      required:
+      - articleCount
+      - id
+      - name
+      - position
+    AdminSupportKbGroupOrder:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+      required:
+      - ids
+    AdminSupportKbArticleRequest:
+      type: object
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          maxLength: 80
+          minLength: 0
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+        title:
+          type: string
+          maxLength: 150
+          minLength: 0
+        body:
+          type: string
+          maxLength: 20000
+          minLength: 0
+        featuredPosition:
+          type: integer
+          format: int32
+          maximum: 3
+          minimum: 1
+      required:
+      - body
+      - groupId
+      - slug
+      - title
+    AdminSupportKbArticle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+          - archived
+        groupId:
+          type: string
+          format: uuid
+        featuredPosition:
+          type: integer
+          format: int32
+        publishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - body
+      - groupId
+      - id
+      - slug
+      - status
+      - title
+      - updatedAt
     StartRunRequest:
       type: object
       properties:
@@ -1176,6 +2561,213 @@ components:
       - method
       - uploadId
       - url
+    SupportUploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    SupportUploadGrant:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+      required:
+      - expiresAt
+      - headers
+      - maxBytes
+      - method
+      - uploadId
+      - url
+    SupportRequestCreate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+        subject:
+          type: string
+        description:
+          type: string
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 3
+        aiConversationId:
+          type: string
+          format: uuid
+      required:
+      - description
+      - subject
+      - type
+    SupportRequestDetail:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+        subject:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+        closedReason:
+          type: string
+          enum:
+          - cancelled
+          - confirmed
+          - auto
+          - admin
+        memberUnread:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportRequestMessage"
+      required:
+      - createdAt
+      - lastActivityAt
+      - memberUnread
+      - messages
+      - number
+      - status
+      - subject
+      - type
+    SupportRequestReply:
+      type: object
+      properties:
+        body:
+          type: string
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 3
+      required:
+      - body
+    SupportAssistantQuestion:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        question:
+          type: string
+          maxLength: 1000
+      required:
+      - question
+    SupportAssistantQuota:
+      type: object
+      properties:
+        remaining:
+          type: integer
+          format: int32
+        resetsAt:
+          type: string
+          format: date-time
+      required:
+      - remaining
+      - resetsAt
+    SupportAssistantReply:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        message:
+          $ref: "#/components/schemas/SupportAssistantReplyMessage"
+        quota:
+          $ref: "#/components/schemas/SupportAssistantQuota"
+      required:
+      - conversationId
+      - message
+      - quota
+    SupportAssistantReplyMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - assistant
+        text:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - answered
+          - no_answer
+          - blocked
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssistantSource"
+      required:
+      - outcome
+      - role
+      - sources
+      - text
+    SupportAssistantSource:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+      required:
+      - slug
+      - title
     CreateScriptRevisionRequest:
       type: object
       properties:
@@ -1486,6 +3078,25 @@ components:
           type: string
       required:
       - status
+    AdminSupportRequestReply:
+      type: object
+      properties:
+        body:
+          type: string
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 3
+        status:
+          type: string
+          enum:
+          - waiting_member
+          - resolved
+      required:
+      - body
+      - status
     WorkflowResponse:
       type: object
       properties:
@@ -1529,6 +3140,189 @@ components:
           - remote
       required:
       - mode
+    SupportSettings:
+      type: object
+      properties:
+        contactEmail:
+          type: string
+        assistantAvailable:
+          type: boolean
+      required:
+      - assistantAvailable
+    SupportRequestSummary:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+        subject:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+        memberUnread:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - lastActivityAt
+      - memberUnread
+      - number
+      - status
+      - subject
+      - type
+    SupportCount:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+    SupportKbSearchHit:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        groupName:
+          type: string
+      required:
+      - groupName
+      - slug
+      - title
+    SupportKbArticleSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+      required:
+      - slug
+      - title
+    SupportKbGroup:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+          format: int32
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportKbArticleSummary"
+      required:
+      - articles
+      - id
+      - name
+      - position
+    SupportKbFeaturedArticle:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        position:
+          type: integer
+          format: int32
+      required:
+      - position
+      - slug
+      - title
+    SupportKbArticle:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - body
+      - groupId
+      - groupName
+      - publishedAt
+      - slug
+      - title
+      - updatedAt
+    SupportAssistantConversation:
+      type: object
+      properties:
+        conversationId:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssistantHistoryMessage"
+      required:
+      - conversationId
+      - messages
+    SupportAssistantHistoryMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+        text:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - answered
+          - no_answer
+          - blocked
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssistantSource"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - role
+      - sources
+      - text
     OutputUrlResponse:
       type: object
       properties:
@@ -1566,12 +3360,18 @@ components:
           type: boolean
         passwordReset:
           type: boolean
+        supportWidget:
+          type: boolean
+        supportAssistant:
+          type: boolean
       required:
       - credits
       - emailConfirmation
       - passwordReset
       - phoneVerification
       - runCancellation
+      - supportAssistant
+      - supportWidget
       - uploadContentCheck
     BalanceResponse:
       type: object
@@ -1589,6 +3389,118 @@ components:
         productVideoWorkflowId:
           type: string
           format: uuid
+    AdminSupportRequestPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSupportRequestSummary"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    AdminSupportRequestSummary:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+        subject:
+          type: string
+        status:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+        requester:
+          $ref: "#/components/schemas/SupportRequester"
+        createdAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - lastActivityAt
+      - number
+      - requester
+      - status
+      - subject
+      - type
+    AdminSupportKbArticleList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSupportKbArticleSummary"
+        publishedFeaturedCount:
+          type: integer
+          format: int64
+      required:
+      - items
+      - publishedFeaturedCount
+    AdminSupportKbArticleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+          - archived
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        featuredPosition:
+          type: integer
+          format: int32
+        publishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - groupId
+      - groupName
+      - id
+      - slug
+      - status
+      - title
+      - updatedAt
     SmsOutboxEntryResponse:
       type: object
       properties:

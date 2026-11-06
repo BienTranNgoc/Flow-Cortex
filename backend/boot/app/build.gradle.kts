@@ -22,6 +22,8 @@ dependencies {
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
+    implementation(project(":modules:llm"))
+    implementation(project(":modules:support"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

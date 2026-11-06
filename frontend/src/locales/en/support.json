@@ -1,0 +1,158 @@
+{
+  "launcher": {
+    "label": "Help",
+    "unread": "New reply"
+  },
+  "panel": {
+    "title": "Help Center",
+    "close": "Close"
+  },
+  "tabs": {
+    "home": "Home",
+    "assistant": "Assistant",
+    "guides": "Guides",
+    "requests": "Requests"
+  },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Try again",
+    "loadFailed": "Couldn't load the content. Please try again.",
+    "refreshFailed": "Couldn't refresh this content. What you see below may be out of date.",
+    "back": "Back"
+  },
+  "contact": {
+    "lead": "Need help from a person?",
+    "sendTo": "Email {{email}}"
+  },
+  "home": {
+    "greeting": "Hi! How can Nodi help you?",
+    "startHeading": "Get started",
+    "suggestedHeading": "Suggested questions",
+    "suggestedQuestions": {
+      "credit": "Why am I told I don't have enough credit?",
+      "firstRun": "How do I run my first workflow?",
+      "runFailed": "Why did my run fail?"
+    },
+    "newRequest": "Send a support request"
+  },
+  "article": {
+    "notPublished": "This article is no longer published",
+    "backToGuides": "Back to Guides",
+    "backToHome": "Back to Home"
+  },
+  "guides": {
+    "searchLabel": "Search guides",
+    "searchPlaceholder": "e.g. credit",
+    "resultsHeading": "Search results",
+    "empty": "No guides yet",
+    "noMatch": "No matching guides found",
+    "askAssistant": "Ask the assistant"
+  },
+  "assistant": {
+    "intro": "Ask a question and the assistant will answer from Nodi's guides.",
+    "logLabel": "Conversation with the assistant",
+    "you": "You",
+    "assistantName": "Assistant",
+    "inputLabel": "Your question",
+    "inputPlaceholder": "Type your question…",
+    "send": "Send",
+    "counter": "{{length}}/{{max}}",
+    "typing": "The assistant is replying…",
+    "sendFailed": "Couldn't send your question. Please try again.",
+    "tooFast": "You're asking a bit fast, try again after {{resumeAt}}.",
+    "sources": "Sources",
+    "noAnswer": "I don't have an answer to this question yet",
+    "blocked": "I can't answer this question",
+    "escalate": "Still not solved? Send a support request",
+    "newRequest": "Send a support request",
+    "signIn": "Sign in",
+    "register": "Create account",
+    "signInForMore": "Sign in for more questions",
+    "newConversation": "New conversation",
+    "unavailableNotice": "The assistant is temporarily unavailable",
+    "toGuides": "View Guides",
+    "toSignIn": "Sign in",
+    "retry": "Try again"
+  },
+  "requests": {
+    "selected": "Request #{{number}}",
+    "newRequest": "New request",
+    "listHeading": "Your requests",
+    "empty": "You haven't sent any requests yet",
+    "create": "Send a support request",
+    "createAnother": "Create a new request",
+    "submit": "Send request",
+    "sending": "Sending…",
+    "submitFailed": "Couldn't send. Please try again.",
+    "reload": "Reload",
+    "backToList": "Back to requests",
+    "typeLabel": "Request type",
+    "typePlaceholder": "Choose a request type",
+    "typeRequired": "Choose a request type",
+    "types": {
+      "account": "Account",
+      "credit": "Credit",
+      "workflow": "Workflow/Run",
+      "technical": "Technical issue",
+      "other": "Other"
+    },
+    "statuses": {
+      "new": "New",
+      "in_progress": "In progress",
+      "waiting_member": "Waiting for you",
+      "resolved": "Resolved",
+      "closed": "Closed"
+    },
+    "closedReasons": {
+      "cancelled": "You cancelled the request",
+      "confirmed": "You confirmed it's done",
+      "auto": "Closed automatically after 7 days without a reply",
+      "admin": "Nodi support closed the request"
+    },
+    "subjectLabel": "Subject",
+    "subjectLength": "Subject must be 5–120 characters",
+    "descriptionLabel": "Description",
+    "descriptionLength": "Description must be 10–5000 characters",
+    "attachLabel": "Attach images (up to 3)",
+    "attachRemove": "Remove image {{name}}",
+    "attachType": "Only PNG, JPG or WebP images are accepted",
+    "attachSize": "Images can be at most 5 MB",
+    "attachEmpty": "The image is empty — choose another one",
+    "attachNameLength": "File names can be at most 255 characters",
+    "attachCount": "At most 3 images per message",
+    "attachUploadFailed": "Couldn't upload the image. Please try again.",
+    "attachmentAlt": "Attached image {{position}}",
+    "replyLabel": "Reply",
+    "replyLength": "The message must be 1–5000 characters",
+    "replySend": "Send reply",
+    "closedNotice": "This request is closed",
+    "confirmResolved": "Done, close the request",
+    "cancel": "Cancel request",
+    "cancelQuestion": "Cancel this request? You won't be able to reply after cancelling.",
+    "cancelYes": "Yes, cancel the request",
+    "cancelNo": "No",
+    "notFound": "Request not found",
+    "suspended": "Your account is suspended",
+    "conversationLinked": "Includes your conversation with the assistant",
+    "conversationUnlinked": "The assistant conversation couldn't be attached. Send again to file the request without it.",
+    "unread": "New reply",
+    "you": "You",
+    "supportTeam": "Nodi support"
+  },
+  "problems": {
+    "support-disabled": "The Help Center is temporarily unavailable",
+    "article-not-found": "This article is no longer published",
+    "assistant-quota": "You've used all your questions for today. You can ask again after {{resumeAt}}.",
+    "assistant-paused": "The assistant is temporarily unavailable",
+    "assistant-disabled": "The assistant is temporarily unavailable",
+    "assistant-unavailable": "The assistant is busy, please try again in a few minutes",
+    "question-too-long": "Questions can be at most 1000 characters",
+    "attachment-rejected": "The file is not a valid image",
+    "attachments-unavailable": "Images can't be sent right now — you can send the request without images",
+    "request-not-found": "Request not found",
+    "request-closed": "The request is closed",
+    "transition-not-allowed": "The request can't move to this status",
+    "request-state-changed": "The request was just updated — reload to see it",
+    "idempotency-key-reused": "This request was already sent — reload to see it"
+  }
+}

@@ -40,6 +40,9 @@ export function useMeQuery() {
     queryFn: () => unwrap(meRequest(authHeaders())),
     enabled: Boolean(token),
     retry: false,
+    // A failed /me with no data turns pending again on each new observer; PasswordSetupGate
+    // remounts the page on pending, so retrying on mount would refetch forever.
+    retryOnMount: false,
   });
 }
 

@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { Route } from 'react-router-dom';
+import { Route, useLocation } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { RequireAuth } from './RequireAuth';
@@ -51,4 +51,24 @@ describe('RequireAuth', () => {
     expect(await screen.findByText('Login page')).toBeInTheDocument();
     expect(calls).toHaveLength(1);
   });
+
+  it('remembers the query string of the requested page, so a help link survives sign-in', async () => {
+    stubApi({
+      'POST /api/v1/auth/refresh': { status: 401, body: { status: 401, detail: 'no session' } },
+    });
+
+    renderRoute(
+      '/private',
+      '/private?help=request-12',
+      guarded,
+      <Route path="/login" element={<ReturnTo />} />,
+    );
+
+    expect(await screen.findByText('/private?help=request-12')).toBeInTheDocument();
+  });
 });
+
+function ReturnTo() {
+  const state = useLocation().state as { from?: string } | null;
+  return <p>{state?.from}</p>;
+}

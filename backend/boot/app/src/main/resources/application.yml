@@ -316,6 +316,34 @@ flowcortex:
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
+  # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
+  # and logs a config error. read-timeout applies to each socket read; answer-timeout bounds one
+  # whole answer.
+  llm:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      connect-timeout: ${GEMINI_CONNECT_TIMEOUT:5s}
+      read-timeout: ${GEMINI_READ_TIMEOUT:20s}
+      answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
+  # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
+  # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
+  support:
+    enabled: ${FLOWCORTEX_SUPPORT_ENABLED:false}
+    # Shown to guests and suspended members; empty shows no contact line.
+    contact-email: ${FLOWCORTEX_SUPPORT_CONTACT_EMAIL:}
+    assistant:
+      enabled: ${FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED:false}
+      model: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:gemini-3.5-flash-lite}
+      # HMAC key for guest session ids and network addresses; at least 32 bytes while the assistant is on.
+      hash-secret: ${FLOWCORTEX_SUPPORT_HASH_SECRET:}
+      # Questions per day over everyone; reaching it pauses the assistant until 00:00 Asia/Ho_Chi_Minh.
+      daily-ceiling: ${FLOWCORTEX_SUPPORT_ASSISTANT_DAILY_CEILING:2000}
+      member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
+      guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
+      guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
+    mail:
+      from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store

@@ -11,6 +11,8 @@ const ALL_OFF = {
   runCancellation: false,
   credits: false,
   passwordReset: false,
+  supportWidget: false,
+  supportAssistant: false,
 };
 
 function setup() {

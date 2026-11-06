@@ -1,0 +1,376 @@
+package com.flowcortex.support.assistant;
+
+import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.support.assistant.ConversationStore.StoredConversation;
+import com.flowcortex.support.assistant.ConversationStore.StoredMessage;
+import com.flowcortex.support.config.AssistantSwitch;
+import com.flowcortex.support.config.SupportProperties;
+import com.flowcortex.support.kb.KnowledgeBaseService.ScoredArticle;
+import com.flowcortex.support.web.SupportProblemException;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.commonmark.node.AbstractVisitor;
+import org.commonmark.node.HtmlBlock;
+import org.commonmark.node.HtmlInline;
+import org.commonmark.node.Image;
+import org.commonmark.node.Link;
+import org.commonmark.node.LinkReferenceDefinition;
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.markdown.MarkdownRenderer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * Answers a question from the published articles retrieved for it. The provider is called only when
+ * the assistant is on, the question is valid, articles matched and every quota had room; a question
+ * the provider could not answer is refunded.
+ */
+@Service
+class AssistantService {
+
+    static final int MAX_QUESTION_CHARS = 1000;
+    /** Stored as the reply text; the member app shows these two outcomes from its own copy instead. */
+    static final String NO_ANSWER = "Mình chưa có câu trả lời cho câu hỏi này";
+    static final String REFUSAL = "Mình không thể trả lời câu hỏi này";
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final Logger LOG = LoggerFactory.getLogger(AssistantService.class);
+
+    private static final Parser MARKDOWN = Parser.builder().build();
+    private static final MarkdownRenderer MARKDOWN_OUT = MarkdownRenderer.builder().build();
+
+    private final AssistantSwitch assistantSwitch;
+    private final String model;
+    private final ConversationStore conversations;
+    private final QuotaService quotas;
+    private final MinuteLimiter minuteLimiter;
+    private final Retriever retriever;
+    private final LlmDeadline llm;
+    private final AssistantTelemetry telemetry;
+    private final Clock clock;
+
+    AssistantService(AssistantSwitch assistantSwitch, SupportProperties properties, ConversationStore conversations,
+            QuotaService quotas, MinuteLimiter minuteLimiter, Retriever retriever, LlmDeadline llm,
+            AssistantTelemetry telemetry, Clock clock) {
+        this.assistantSwitch = assistantSwitch;
+        this.model = properties.assistant().model();
+        this.conversations = conversations;
+        this.quotas = quotas;
+        this.minuteLimiter = minuteLimiter;
+        this.retriever = retriever;
+        this.llm = llm;
+        this.telemetry = telemetry;
+        this.clock = clock;
+    }
+
+    @Schema(name = "SupportAssistantSource")
+    record Source(
+            @Schema(requiredMode = RequiredMode.REQUIRED) String slug,
+            @Schema(requiredMode = RequiredMode.REQUIRED) String title) {
+    }
+
+    @Schema(name = "SupportAssistantReplyMessage")
+    record ReplyMessage(
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = "assistant") String role,
+            @Schema(requiredMode = RequiredMode.REQUIRED) String text,
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"answered", "no_answer", "blocked"})
+            String outcome,
+            @Schema(requiredMode = RequiredMode.REQUIRED) List<Source> sources) {
+    }
+
+    @Schema(name = "SupportAssistantQuota")
+    record QuotaView(
+            @Schema(requiredMode = RequiredMode.REQUIRED) int remaining,
+            @Schema(requiredMode = RequiredMode.REQUIRED) Instant resetsAt) {
+    }
+
+    @Schema(name = "SupportAssistantReply")
+    record AssistantReply(
+            @Schema(requiredMode = RequiredMode.REQUIRED) UUID conversationId,
+            @Schema(requiredMode = RequiredMode.REQUIRED) ReplyMessage message,
+            @Schema(requiredMode = RequiredMode.REQUIRED) QuotaView quota) {
+    }
+
+    @Schema(name = "SupportAssistantHistoryMessage")
+    record HistoryMessage(
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"user", "assistant"}) String role,
+            @Schema(requiredMode = RequiredMode.REQUIRED) String text,
+            @Schema(allowableValues = {"answered", "no_answer", "blocked"}) String outcome,
+            @Schema(requiredMode = RequiredMode.REQUIRED) List<Source> sources,
+            @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt) {
+    }
+
+    @Schema(name = "SupportAssistantConversation")
+    record ConversationView(
+            @Schema(requiredMode = RequiredMode.REQUIRED) UUID conversationId,
+            @Schema(requiredMode = RequiredMode.REQUIRED) List<HistoryMessage> messages) {
+    }
+
+    record Answer(String outcome, String text, List<ScoredArticle> sources) {
+    }
+
+    AssistantReply ask(Asker asker, UUID conversationId, String rawQuestion, Locale locale) {
+        long started = System.nanoTime();
+        if (!assistantSwitch.available()) {
+            telemetry.record("disabled", 0, 0, started);
+            throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-disabled",
+                    new LocalizedMessage("support.assistant.disabled"));
+        }
+        try {
+            quotas.refuseWhenPaused();
+        } catch (SupportProblemException e) {
+            telemetry.record("paused", 0, 0, started);
+            throw e;
+        }
+        String question = validQuestion(rawQuestion);
+        if (asker instanceof Asker.Guest guest) {
+            limitPerMinute(() -> minuteLimiter.acquireNetwork(guest.networkKey()), question, started);
+        }
+        if (conversationId != null && !conversations.owns(asker, conversationId)) {
+            throw conversationNotFound();
+        }
+        limitPerMinute(() -> minuteLimiter.acquire(asker.subjectKey()), question, started);
+        Instant askedAt = clock.instant();
+        List<ScoredArticle> articles = retriever.retrieve(question);
+        if (articles.isEmpty()) {
+            return noArticleReply(asker, conversationId, question, askedAt, started);
+        }
+        QuotaService.Charge charge;
+        try {
+            charge = quotas.charge(asker);
+        } catch (SupportProblemException e) {
+            telemetry.record("assistant-paused".equals(e.code()) ? "paused" : "quota", 0, length(question), started);
+            throw e;
+        }
+        try {
+            return answerCharged(asker, conversationId, question, askedAt, articles, locale, charge, started);
+        } catch (RuntimeException e) {
+            refund(charge, e);
+            throw e;
+        }
+    }
+
+    private void limitPerMinute(Runnable acquire, String question, long started) {
+        try {
+            acquire.run();
+        } catch (SupportProblemException e) {
+            telemetry.record("quota", 0, length(question), started);
+            throw e;
+        }
+    }
+
+    /**
+     * No article matched, so no provider call. A guest still spends from the guest quotas (the write and
+     * the retrieval are what an abuser would repeat for free); a member is not charged.
+     */
+    private AssistantReply noArticleReply(Asker asker, UUID conversationId, String question, Instant askedAt,
+            long started) {
+        Answer none = new Answer("no_answer", NO_ANSWER, List.of());
+        if (!(asker instanceof Asker.Guest)) {
+            QuotaService.Remaining left = quotas.peek(asker);
+            return reply(asker, conversationId, question, askedAt, none,
+                    new QuotaView(left.remaining(), left.resetsAt()), started);
+        }
+        QuotaService.Charge charge;
+        try {
+            charge = quotas.chargeAskerOnly(asker);
+        } catch (SupportProblemException e) {
+            telemetry.record("quota", 0, length(question), started);
+            throw e;
+        }
+        try {
+            return reply(asker, conversationId, question, askedAt, none,
+                    new QuotaView(charge.remaining(), QuotaService.resetsAt(charge.day())), started);
+        } catch (RuntimeException e) {
+            refund(charge, e);
+            throw e;
+        }
+    }
+
+    private AssistantReply answerCharged(Asker asker, UUID conversationId, String question, Instant askedAt,
+            List<ScoredArticle> articles, Locale locale, QuotaService.Charge charge, long started) {
+        LlmJsonResult result = llm.call(PromptBuilder.request(model, question, articles, locale));
+        Optional<Answer> answer = answer(result, articles);
+        telemetry.provider(model, result, answer.map(a -> a.sources().size()).orElse(0));
+        if (answer.isEmpty()) {
+            telemetry.record("unavailable", 0, length(question), started);
+            throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-unavailable",
+                    new LocalizedMessage("support.assistant.unavailable"));
+        }
+        return reply(asker, conversationId, question, askedAt, answer.get(),
+                new QuotaView(charge.remaining(), QuotaService.resetsAt(charge.day())), started);
+    }
+
+    private void refund(QuotaService.Charge charge, RuntimeException cause) {
+        try {
+            quotas.refund(charge);
+        } catch (RuntimeException e) {
+            LOG.error("support.assistant.refund outcome=failed error={}", e.getClass().getName());
+            cause.addSuppressed(e);
+        }
+    }
+
+    Optional<ConversationView> latest(Asker asker) {
+        return conversations.latest(asker).map(this::view);
+    }
+
+    static SupportProblemException conversationNotFound() {
+        return new SupportProblemException(HttpStatus.NOT_FOUND, "conversation-not-found",
+                new LocalizedMessage("support.assistant.conversationNotFound"));
+    }
+
+    private static String validQuestion(String rawQuestion) {
+        String question = rawQuestion == null ? "" : rawQuestion.strip();
+        if (question.isEmpty()) {
+            throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
+                    new LocalizedMessage("support.assistant.questionRequired", MAX_QUESTION_CHARS));
+        }
+        if (length(question) > MAX_QUESTION_CHARS) {
+            throw new SupportProblemException(HttpStatus.BAD_REQUEST, "question-too-long",
+                    new LocalizedMessage("support.assistant.questionTooLong", MAX_QUESTION_CHARS));
+        }
+        return question;
+    }
+
+    /** Characters as a person counts them, so an emoji is one, not two UTF-16 units. */
+    private static int length(String question) {
+        return question.codePointCount(0, question.length());
+    }
+
+    /**
+     * The answer with every Markdown link and image reduced to its text, reference definitions and raw
+     * HTML removed: the provider could otherwise point outside the retrieved articles, which reach the
+     * reader as sources. Works on the parsed document, because no pattern matches the CommonMark link
+     * grammar (nested parentheses, titles, destinations on the next line, reference-style links).
+     */
+    static String withoutLinks(String text) {
+        Node document = MARKDOWN.parse(text);
+        LinkFlattener flattener = new LinkFlattener();
+        document.accept(flattener);
+        return flattener.changed ? MARKDOWN_OUT.render(document).strip() : text.strip();
+    }
+
+    /**
+     * Replaces each link and image by its children (the visible text or alt text) and drops the rest.
+     * An answer it leaves alone is kept byte for byte, so the Markdown writer only ever escapes text
+     * of an answer that had markup to remove.
+     */
+    private static final class LinkFlattener extends AbstractVisitor {
+
+        private boolean changed;
+
+        @Override
+        public void visit(Link link) {
+            flatten(link);
+        }
+
+        @Override
+        public void visit(Image image) {
+            flatten(image);
+        }
+
+        @Override
+        public void visit(LinkReferenceDefinition definition) {
+            drop(definition);
+        }
+
+        @Override
+        public void visit(HtmlInline html) {
+            drop(html);
+        }
+
+        @Override
+        public void visit(HtmlBlock html) {
+            drop(html);
+        }
+
+        private void drop(Node node) {
+            changed = true;
+            node.unlink();
+        }
+
+        private void flatten(Node node) {
+            changed = true;
+            visitChildren(node);
+            for (Node child = node.getFirstChild(); child != null; child = node.getFirstChild()) {
+                node.insertBefore(child);
+            }
+            node.unlink();
+        }
+    }
+
+    /** The provider's result as an answer, or empty when it gave none and the question is refunded. */
+    static Optional<Answer> answer(LlmJsonResult result, List<ScoredArticle> retrieved) {
+        return switch (result) {
+            case LlmJsonResult.Blocked blocked -> Optional.of(new Answer("blocked", REFUSAL, List.of()));
+            case LlmJsonResult.Failed failed -> Optional.empty();
+            case LlmJsonResult.Answered answered -> parse(answered.json(), retrieved);
+        };
+    }
+
+    private static Optional<Answer> parse(String json, List<ScoredArticle> retrieved) {
+        JsonNode root;
+        try {
+            root = JSON.readTree(json);
+        } catch (JacksonException e) {
+            return Optional.empty();
+        }
+        String text = root.path("answer").isString() ? withoutLinks(root.path("answer").asString()) : "";
+        if (!root.path("answered").asBoolean(false) || text.isEmpty()) {
+            return Optional.of(new Answer("no_answer", NO_ANSWER, List.of()));
+        }
+        Map<String, ScoredArticle> bySlug = retrieved.stream()
+                .collect(Collectors.toMap(ScoredArticle::slug, Function.identity(), (first, second) -> first));
+        Set<String> cited = new LinkedHashSet<>();
+        JsonNode slugs = root.path("citedSlugs");
+        for (int i = 0; i < slugs.size(); i++) {
+            if (slugs.get(i).isString() && bySlug.containsKey(slugs.get(i).asString())) {
+                cited.add(slugs.get(i).asString());
+            }
+        }
+        return Optional.of(new Answer("answered", text, cited.stream().map(bySlug::get).toList()));
+    }
+
+    private AssistantReply reply(Asker asker, UUID conversationId, String question, Instant askedAt, Answer answer,
+            QuotaView quota, long started) {
+        List<String> slugs = answer.sources().stream().map(ScoredArticle::slug).toList();
+        UUID id = conversations.append(asker, conversationId,
+                new StoredMessage("user", question, null, List.of(), askedAt),
+                new StoredMessage("assistant", answer.text(), answer.outcome(), slugs, clock.instant()));
+        telemetry.record(answer.outcome(), slugs.size(), length(question), started);
+        List<Source> sources = answer.sources().stream().map(a -> new Source(a.slug(), a.title())).toList();
+        return new AssistantReply(id, new ReplyMessage("assistant", answer.text(), answer.outcome(), sources), quota);
+    }
+
+    private ConversationView view(StoredConversation conversation) {
+        Set<String> slugs = new HashSet<>();
+        conversation.messages().forEach(message -> slugs.addAll(message.citedSlugs()));
+        Map<String, String> titles = conversations.publishedTitles(slugs);
+        List<HistoryMessage> messages = conversation.messages().stream()
+                .map(message -> new HistoryMessage(message.role(), message.text(), message.outcome(),
+                        message.citedSlugs().stream().filter(titles::containsKey)
+                                .map(slug -> new Source(slug, titles.get(slug))).toList(),
+                        message.createdAt()))
+                .toList();
+        return new ConversationView(conversation.id(), messages);
+    }
+}

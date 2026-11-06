@@ -26,9 +26,11 @@ public class FeaturesController {
             @Value("${flowcortex.media.upload.content-check.enabled:true}") boolean uploadContentCheck,
             @Value("${flowcortex.workflow.cancel.enabled:false}") boolean runCancellation,
             @Value("${flowcortex.credits.enabled:false}") boolean credits,
-            @Value("${flowcortex.auth.password-reset.enabled:false}") boolean passwordReset) {
+            @Value("${flowcortex.auth.password-reset.enabled:false}") boolean passwordReset,
+            @Value("${flowcortex.support.enabled:false}") boolean supportWidget,
+            @Value("${flowcortex.support.assistant.enabled:false}") boolean supportAssistant) {
         this.features = new FeaturesResponse(emailConfirmation, phoneVerification, uploadContentCheck,
-                runCancellation, credits, passwordReset);
+                runCancellation, credits, passwordReset, supportWidget, supportAssistant);
     }
 
     @SecurityRequirements
@@ -43,6 +45,8 @@ public class FeaturesController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean uploadContentCheck,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean runCancellation,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean credits,
-            @Schema(requiredMode = RequiredMode.REQUIRED) boolean passwordReset) {
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean passwordReset,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean supportWidget,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean supportAssistant) {
     }
 }

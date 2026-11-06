@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { Menu, PanelRight, PanelLeft, X } from 'lucide-react';
-import { NAV } from './nav';
+import { useOpenCount } from '../features/support/useOpenCount';
+import { NAV, type NavBadge } from './nav';
 import { can } from './permissions';
 
 /**
@@ -18,6 +19,9 @@ export function Sidebar({
   const { t } = useTranslation();
   const widthClass = collapsed ? ' cortex-admin-nav--collapsed' : '';
   const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
+  const badges: Record<NavBadge, number | undefined> = {
+    openSupportRequests: useOpenCount(can(role, 'support.manage')).data,
+  };
 
   return (
     <nav
@@ -72,6 +76,8 @@ export function Sidebar({
                 {items.map((item) => {
                   const Icon = item.icon;
                   const label = t(item.label);
+                  const count = item.badge ? badges[item.badge] : undefined;
+                  const showCount = count !== undefined && count > 0;
                   if (item.disabled) {
                     const tag = t(item.tag ?? 'common.shell.nav.comingSoon');
                     return (
@@ -105,11 +111,19 @@ export function Sidebar({
                         }
                         onClick={() => setOpenMobile(false)}
                         title={label}
+                        aria-label={
+                          showCount ? t('common.shell.nav.withOpenCount', { label, count }) : undefined
+                        }
                       >
                         <span className="cortex-admin-nav__item-icon" aria-hidden="true">
                           <Icon size={18} />
                         </span>
                         <span className="cortex-admin-nav__item-label">{label}</span>
+                        {showCount && (
+                          <span className="cortex-admin-nav__item-badge" aria-hidden="true">
+                            {count}
+                          </span>
+                        )}
                       </NavLink>
                     </li>
                   );
