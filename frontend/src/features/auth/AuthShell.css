@@ -605,6 +605,18 @@
   text-decoration: underline;
 }
 
+.auth-link.forgot-password-link--disabled,
+.auth-link.forgot-password-link--disabled:hover {
+  color: var(--auth-ink-3);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.auth-alert a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .auth-btn {
   display: inline-flex;
   align-items: center;

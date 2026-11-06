@@ -25,9 +25,10 @@ public class FeaturesController {
             @Value("${flowcortex.phone-verification.enabled:false}") boolean phoneVerification,
             @Value("${flowcortex.media.upload.content-check.enabled:true}") boolean uploadContentCheck,
             @Value("${flowcortex.workflow.cancel.enabled:false}") boolean runCancellation,
-            @Value("${flowcortex.credits.enabled:false}") boolean credits) {
+            @Value("${flowcortex.credits.enabled:false}") boolean credits,
+            @Value("${flowcortex.auth.password-reset.enabled:false}") boolean passwordReset) {
         this.features = new FeaturesResponse(emailConfirmation, phoneVerification, uploadContentCheck,
-                runCancellation, credits);
+                runCancellation, credits, passwordReset);
     }
 
     @SecurityRequirements
@@ -41,6 +42,7 @@ public class FeaturesController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean phoneVerification,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean uploadContentCheck,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean runCancellation,
-            @Schema(requiredMode = RequiredMode.REQUIRED) boolean credits) {
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean credits,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean passwordReset) {
     }
 }

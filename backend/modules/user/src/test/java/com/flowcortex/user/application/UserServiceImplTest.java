@@ -16,7 +16,9 @@ import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
+import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -35,8 +37,9 @@ class UserServiceImplTest {
     private final AppUserRepository repository = mock(AppUserRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -131,6 +134,26 @@ class UserServiceImplTest {
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
         verify(refreshTokenService, never()).revokeAllFor(any());
+    }
+
+    @Test
+    void anEmailChangeRetiresTheAccountsOpenEmailedLinks() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser member = ownedMember(ownerId, UserStatus.ACTIVE);
+
+        service.updateUser(ownerId, member.getId(), "new@example.com", null, null, null);
+
+        verify(emailLinks).retireOpenLinks(member.getId());
+    }
+
+    @Test
+    void theSameEmailInAnotherCaseKeepsTheOpenEmailedLinks() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser member = ownedMember(ownerId, UserStatus.ACTIVE);
+
+        service.updateUser(ownerId, member.getId(), member.getEmail().toUpperCase(Locale.ROOT), null, null, null);
+
+        verify(emailLinks, never()).retireOpenLinks(any());
     }
 
     @Test

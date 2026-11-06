@@ -7,5 +7,7 @@ public enum EmailLinkPurpose {
     /** An emailed link that signs in a confirmed account without a password, so it can set one. */
     PASSWORD_LINK,
     /** Handed to the browser that may set the account's first password; never emailed. */
-    PASSWORD_SETUP
+    PASSWORD_SETUP,
+    /** An emailed link that lets an account with a password choose a new one. */
+    PASSWORD_RESET
 }

@@ -2,20 +2,15 @@ package com.flowcortex.user.emailconfirm;
 
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.RequestLocale;
+import com.flowcortex.user.application.OpaqueTokens;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.data.domain.Example;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -36,8 +32,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Issues, mails and spends the account's one-time tokens ({@link EmailLinkPurpose}): confirmation
- * links, set-password links and password-setup tokens. A token carries 32 random bytes; only their
- * SHA-256 hex is stored, and neither the token nor a link is ever logged.
+ * links, set-password links, password-setup tokens and reset links. A token carries 32 random bytes;
+ * only their SHA-256 hex is stored, and neither the token nor a link is ever logged.
  *
  * <p>Mail is handed to the app's task executor after the surrounding transaction commits, so a
  * rolled-back request sends nothing and no request waits on SMTP — an address with an account answers
@@ -51,9 +47,11 @@ public class EmailConfirmationService {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmailConfirmationService.class);
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
-    private static final Base64.Encoder URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
+    /** Why a link is reissued; the confirmation mail's wording depends on it. */
+    public enum LinkRequest {
+        RESEND,
+        PASSWORD_RESET
+    }
 
     private final EmailConfirmationTokenRepository tokens;
     private final AppUserRepository users;
@@ -85,7 +83,7 @@ public class EmailConfirmationService {
         this.clock = clock;
         this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
         this.sendFailures = Counter.builder("email.confirmation.send_failed")
-                .description("Account mails (confirmation, set-password link, password notice) the SMTP server"
+                .description("Account mails (confirmation, set-password and reset links, notices) the SMTP server"
                         + " did not accept, or the send queue had no room for")
                 .register(meters);
         this.messages = messages;
@@ -102,7 +100,7 @@ public class EmailConfirmationService {
     /** Joins the caller's transaction, so the link is stored only if the account it confirms commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void issue(UUID userId, String email) {
-        mailConfirmationLink(userId, email);
+        mailConfirmationLink(userId, email, LinkRequest.RESEND);
     }
 
     /** Retires the account's open links and issues a new one, in the caller's transaction. */
@@ -110,7 +108,7 @@ public class EmailConfirmationService {
     public void reissue(UUID userId, String email) {
         int retired = retireOpenLinks(userId);
         LOG.info("email_confirmation outcome=reissue userId={} retiredLinks={}", userId, retired);
-        mailConfirmationLink(userId, email);
+        mailConfirmationLink(userId, email, LinkRequest.RESEND);
     }
 
     /** Earlier mails and setup tokens of every purpose stop working; joins the caller's transaction. */
@@ -161,7 +159,7 @@ public class EmailConfirmationService {
      * the same account locks in that order too, so none of them deadlocks against this spend.
      */
     private Optional<AppUser> spendLink(String rawToken, EmailLinkPurpose purpose, Instant now) {
-        String tokenHash = sha256(rawToken);
+        String tokenHash = OpaqueTokens.hash(rawToken);
         Optional<AppUser> account = tokens.findUserIdByTokenHash(tokenHash, purpose)
                 .flatMap(users::findByIdForUpdate);
         if (account.isEmpty() || tokens.consume(tokenHash, purpose, account.get().getId(), now) == 0) {
@@ -182,7 +180,7 @@ public class EmailConfirmationService {
     /** True when this call spent an open setup token of this account. Joins the caller's transaction. */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean spendPasswordSetupToken(UUID userId, String rawToken) {
-        return tokens.consume(sha256(rawToken), EmailLinkPurpose.PASSWORD_SETUP, userId, Instant.now(clock)) == 1;
+        return tokens.consume(OpaqueTokens.hash(rawToken), EmailLinkPurpose.PASSWORD_SETUP, userId, Instant.now(clock)) == 1;
     }
 
     /** Tells the account's address that a password was set, after the caller's transaction commits. */
@@ -208,22 +206,34 @@ public class EmailConfirmationService {
             LOG.info("email_confirmation outcome=resend_skipped reason={}", skipped);
             return;
         }
-        AppUser user = found.get();
-        int retired = retireOpenLinks(user.getId());
-        if (user.isEmailConfirmed()) {
-            LOG.info("email_confirmation outcome=password_link userId={} retiredLinks={}", user.getId(), retired);
-            mailPasswordLink(user.getId(), user.getEmail());
+        reissueLinkFor(found.get(), LinkRequest.RESEND);
+    }
+
+    /**
+     * Retires the account's open links, then mails a confirmation link when unconfirmed or a set-password
+     * link when confirmed. The caller holds the account's row lock and has checked it is ACTIVE and needs one.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void reissueLinkFor(AppUser locked, LinkRequest request) {
+        int retired = retireOpenLinks(locked.getId());
+        if (locked.isEmailConfirmed()) {
+            LOG.info("email_confirmation outcome=password_link userId={} retiredLinks={}", locked.getId(), retired);
+            mailPasswordLink(locked.getId(), locked.getEmail());
         } else {
-            LOG.info("email_confirmation outcome=resend userId={} retiredLinks={}", user.getId(), retired);
-            mailConfirmationLink(user.getId(), user.getEmail());
+            LOG.info("email_confirmation outcome=resend userId={} retiredLinks={}", locked.getId(), retired);
+            mailConfirmationLink(locked.getId(), locked.getEmail(), request);
         }
     }
 
-    private void mailConfirmationLink(UUID userId, String email) {
+    private void mailConfirmationLink(UUID userId, String email, LinkRequest request) {
         String rawToken = store(userId, EmailLinkPurpose.EMAIL_CONFIRM, properties.validity());
-        mailAfterCommit(userId, email, new LocalizedMessage("email.confirm.subject"),
-                new LocalizedMessage("email.confirm.body", publicUrl + "/confirm-email?token=" + rawToken,
-                        properties.validity().toHours()), "sent");
+        // Asked for by a reset, so "ignore this email" would be wrong advice.
+        String link = publicUrl + "/confirm-email?token=" + rawToken;
+        long hours = properties.validity().toHours();
+        LocalizedMessage body = request == LinkRequest.PASSWORD_RESET
+                ? new LocalizedMessage("email.confirmReset.body", link, hours)
+                : new LocalizedMessage("email.confirm.body", link, hours);
+        mailAfterCommit(userId, email, new LocalizedMessage("email.confirm.subject"), body, "sent");
     }
 
     private void mailPasswordLink(UUID userId, String email) {
@@ -233,10 +243,70 @@ public class EmailConfirmationService {
                         properties.passwordSetupValidity().toMinutes()), "password_link_sent");
     }
 
+    /**
+     * Retires the account's open links and mails a reset link valid for {@code validity}. The token is
+     * in the URL fragment, so no server or proxy log on the way records it. Joins the caller's transaction.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void mailPasswordReset(AppUser locked, Duration validity) {
+        int retired = retireOpenLinks(locked.getId());
+        LOG.info("email_confirmation outcome=password_reset_link userId={} retiredLinks={}", locked.getId(), retired);
+        String rawToken = store(locked.getId(), EmailLinkPurpose.PASSWORD_RESET, validity);
+        mailAfterCommit(locked.getId(), locked.getEmail(), new LocalizedMessage("email.passwordReset.subject"),
+                new LocalizedMessage("email.passwordReset.body", publicUrl + "/reset-password#token=" + rawToken,
+                        inWholeUnits(validity)), "password_reset_sent");
+    }
+
+    /** "1 hour", "2 hours" when the validity is whole hours, otherwise "90 minutes", in the request's language. */
+    private String inWholeUnits(Duration validity) {
+        long minutes = validity.toMinutes();
+        LocalizedMessage duration = minutes >= 60 && minutes % 60 == 0
+                ? new LocalizedMessage("email.duration.hours", minutes / 60)
+                : new LocalizedMessage("email.duration.minutes", minutes);
+        return messages.getMessage(duration, requestLocale.current());
+    }
+
+    /** Tells an account without a password that it signs in with Google, after the caller's transaction commits. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void mailGoogleSignInNotice(AppUser account) {
+        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.googleSignIn.subject"),
+                new LocalizedMessage("email.googleSignIn.body", publicUrl + "/login"), "google_notice_sent");
+    }
+
+    /**
+     * Whether the token is a reset link that is neither used nor expired, read without locking or
+     * spending anything; superseded links count as used. Joins the caller's transaction.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean isOpenPasswordReset(String rawToken) {
+        Instant now = Instant.now(clock);
+        EmailConfirmationToken probe = new EmailConfirmationToken(null, null, EmailLinkPurpose.PASSWORD_RESET,
+                OpaqueTokens.hash(rawToken), null, null);
+        return tokens.findOne(Example.of(probe))
+                .filter(token -> token.getUsedAt() == null && token.getExpiresAt().isAfter(now))
+                .isPresent();
+    }
+
+    /**
+     * Spends a reset link and returns its account, whose row the caller's transaction now holds locked.
+     * Empty when the link is unknown, used, superseded, expired, or its account is gone.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<AppUser> spendPasswordReset(String rawToken) {
+        return spendLink(rawToken, EmailLinkPurpose.PASSWORD_RESET, Instant.now(clock));
+    }
+
+    /** Tells the account's address its password was changed, after the caller's transaction commits. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void mailPasswordChangedNotice(AppUser account) {
+        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.passwordChanged.subject"),
+                new LocalizedMessage("email.passwordChanged.body", publicUrl + "/login"), "password_changed_notice");
+    }
+
     private String store(UUID userId, EmailLinkPurpose purpose, Duration validity) {
         Instant now = Instant.now(clock);
-        String rawToken = newRawToken();
-        tokens.save(new EmailConfirmationToken(UUID.randomUUID(), userId, purpose, sha256(rawToken), now,
+        String rawToken = OpaqueTokens.generateRawToken();
+        tokens.save(new EmailConfirmationToken(UUID.randomUUID(), userId, purpose, OpaqueTokens.hash(rawToken), now,
                 now.plus(validity)));
         return rawToken;
     }
@@ -257,7 +327,8 @@ public class EmailConfirmationService {
                     mailExecutor.execute(() -> send(userId, email, subject, body, sentOutcome));
                 } catch (TaskRejectedException ex) {
                     sendFailures.increment();
-                    LOG.warn("email_confirmation outcome=send_rejected userId={} reason=queue_full", userId);
+                    LOG.warn("email_confirmation outcome=send_rejected userId={} mail={} reason=queue_full", userId,
+                            sentOutcome);
                 }
             }
         });
@@ -275,22 +346,8 @@ public class EmailConfirmationService {
         } catch (RuntimeException ex) {
             sendFailures.increment();
             // Only the class name: a send exception can carry the failed message, link included.
-            LOG.warn("email_confirmation outcome=send_failed userId={} error={}", userId, ex.getClass().getName());
-        }
-    }
-
-    private static String newRawToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return URL_ENCODER.encodeToString(bytes);
-    }
-
-    private static String sha256(String rawToken) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(rawToken.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 not available", ex);
+            LOG.warn("email_confirmation outcome=send_failed userId={} mail={} error={}", userId, sentOutcome,
+                    ex.getClass().getName());
         }
     }
 }

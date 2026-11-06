@@ -37,7 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code /api/v1/auth}: password login, rate-limited self-registration with its email
- * confirmation ({@code confirm-email}, {@code resend-confirmation}), Google OAuth callback
+ * confirmation ({@code confirm-email}, {@code resend-confirmation}), password reset by emailed
+ * link ({@code forgot-password}, {@code reset-password}), Google OAuth callback
  * (authorize lives in {@link OAuthController}), refresh, logout, the caller's own profile
  * ({@code me}), and self-service name update
  * ({@code profile}). Email/role/status are admin-mediated only.
@@ -141,6 +142,36 @@ class AuthController {
         return ResponseEntity.accepted().body(ConfirmationSentResponse.SENT);
     }
 
+    /** Always 202 for a valid email, whatever account it belongs to; 503 while password reset is off. */
+    @SecurityRequirements
+    @ApiResponse(responseCode = "202")
+    @ApiResponse(responseCode = "429", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<ResetRequestedResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest servletRequest) {
+        authService.requestPasswordReset(request.email(), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.accepted().body(ResetRequestedResponse.REQUESTED);
+    }
+
+    /** Sets the new password from an emailed reset link; opens no session. 503 while password reset is off. */
+    @SecurityRequirements
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "429", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<PasswordResetResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest servletRequest) {
+        String email = authService.resetPassword(request.token(), request.password(), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        return ResponseEntity.ok(new PasswordResetResponse(PasswordResetResponse.RESET, email));
+    }
+
     @SecurityRequirements
     @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "401", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
@@ -222,6 +253,28 @@ class AuthController {
 
     record ConfirmationSentResponse(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status) {
         static final ConfirmationSentResponse SENT = new ConfirmationSentResponse("confirmation_sent");
+    }
+
+    /** The address is trimmed before it is validated, so a pasted " an@example.com " is accepted. */
+    record ForgotPasswordRequest(@NotBlank @jakarta.validation.constraints.Email @Size(max = 254) String email) {
+        ForgotPasswordRequest {
+            email = email == null ? null : email.strip();
+        }
+    }
+
+    record ResetRequestedResponse(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status) {
+        static final ResetRequestedResponse REQUESTED = new ResetRequestedResponse("reset_requested");
+    }
+
+    record ResetPasswordRequest(
+            @NotBlank @Size(max = 128) String token,
+            @NotBlank @Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password) {
+    }
+
+    record PasswordResetResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String email) {
+        static final String RESET = "password_reset";
     }
 
     record ProfileUpdateRequest(@NotBlank String name) {

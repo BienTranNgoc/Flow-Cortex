@@ -14,6 +14,7 @@ COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY admin/package.json ./admin/
 COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/i18n/package.json ./packages/i18n/
 COPY packages/ui-kit/package.json ./packages/ui-kit/
 RUN npm ci --ignore-scripts
 

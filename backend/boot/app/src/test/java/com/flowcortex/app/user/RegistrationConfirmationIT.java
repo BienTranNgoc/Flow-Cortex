@@ -2,32 +2,20 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.app.user.CapturingMailSender.CapturedMail;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.emailconfirm.UnconfirmedAccountPurgeJob;
 import com.flowcortex.user.infrastructure.AppUserRepository;
-import jakarta.mail.Address;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
@@ -53,8 +41,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -171,7 +157,7 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     /** Registers and returns the raw token from the one link mailed to the (lower-cased) address. */
     private String registerAndReadToken(String email) {
         assertThat(register(valid(email), StatusView.class).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        return mail.lastTokenFor(email.toLowerCase(Locale.ROOT));
+        return mail.lastTokenFor(email.toLowerCase(Locale.ROOT), LINK);
     }
 
     @Test
@@ -411,7 +397,7 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
                 .containsEntry("name", "Binh Le").containsEntry("username", username);
         assertThat(row.get("password_hash")).isNotEqualTo(firstHash);
         assertThat(mail.sentTo(email)).hasSize(2);
-        String second = mail.lastTokenFor(email);
+        String second = mail.lastTokenFor(email, LINK);
 
         assertLinkInvalid(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(first), ProblemView.class));
         assertThat(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(second), String.class).getStatusCode())
@@ -572,7 +558,7 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
         assertThat(unknown.getBody()).isEqualTo(known.getBody());
         assertThat(mail.sentTo(unknownEmail)).isEmpty();
         assertThat(mail.sentTo(email)).hasSize(2);
-        String second = mail.lastTokenFor(email);
+        String second = mail.lastTokenFor(email, LINK);
         assertThat(second).isNotEqualTo(first);
 
         assertLinkInvalid(postFrom("/api/v1/auth/confirm-email", new ConfirmRequest(first), ProblemView.class));
@@ -761,113 +747,6 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
             Thread.sleep(2000);
             assertThat(nestedJdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ?"
                     + " AND kind = 'grant'", Long.class, userId)).as("no grant while suspended").isZero();
-        }
-    }
-
-    record CapturedMail(List<String> to, String subject, String body) {
-    }
-
-    /**
-     * Records every message instead of opening an SMTP connection. While held, a send blocks until
-     * released or for five seconds, whichever comes first.
-     */
-    static class CapturingMailSender extends JavaMailSenderImpl {
-
-        private final List<CapturedMail> sent = new CopyOnWriteArrayList<>();
-
-        private final ObjectProvider<ThreadPoolTaskExecutor> executor;
-
-        private volatile CountDownLatch held = new CountDownLatch(0);
-
-        CapturingMailSender(ObjectProvider<ThreadPoolTaskExecutor> executor) {
-            this.executor = executor;
-        }
-
-        void hold() {
-            held = new CountDownLatch(1);
-        }
-
-        void release() {
-            held.countDown();
-        }
-
-        @Override
-        protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) throws MailException {
-            try {
-                held.await(5, TimeUnit.SECONDS);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-            }
-            for (MimeMessage message : mimeMessages) {
-                try {
-                    Address[] recipients = message.getAllRecipients();
-                    sent.add(new CapturedMail(Arrays.stream(recipients).map(Address::toString).toList(),
-                            message.getSubject(), String.valueOf(message.getContent())));
-                } catch (MessagingException | IOException ex) {
-                    throw new IllegalStateException("Could not read a captured message", ex);
-                }
-            }
-        }
-
-        /** Every mail to the address once the app's task executor, which sends account mail, has drained. */
-        List<CapturedMail> sentTo(String address) {
-            awaitQueuedSends();
-            return sentSoFar(address);
-        }
-
-        List<CapturedMail> sentSoFar(String address) {
-            return sent.stream().filter(message -> message.to().contains(address)).toList();
-        }
-
-        /** Two idle polls in a row: a worker between taking a task and starting it reads as idle once. */
-        private void awaitQueuedSends() {
-            ThreadPoolExecutor pool = executor.getObject().getThreadPoolExecutor();
-            Instant deadline = Instant.now().plusSeconds(10);
-            int idlePolls = 0;
-            while (idlePolls < 2 && Instant.now().isBefore(deadline)) {
-                idlePolls = pool.getActiveCount() == 0 && pool.getQueue().isEmpty() ? idlePolls + 1 : 0;
-                try {
-                    Thread.sleep(20);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-        }
-
-        String lastTokenFor(String address) {
-            List<CapturedMail> messages = sentTo(address);
-            assertThat(messages).as("mail to %s", address).isNotEmpty();
-            return tokenIn(messages.getLast().body());
-        }
-    }
-
-    /** System time plus an offset a test can move; every reader of the app's Clock sees it. */
-    static class MovableClock extends Clock {
-
-        private final AtomicReference<Duration> offset = new AtomicReference<>(Duration.ZERO);
-
-        void advance(Duration by) {
-            offset.updateAndGet(current -> current.plus(by));
-        }
-
-        void reset() {
-            offset.set(Duration.ZERO);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            throw new UnsupportedOperationException("fixed to UTC");
-        }
-
-        @Override
-        public Instant instant() {
-            return Instant.now().plus(offset.get());
         }
     }
 

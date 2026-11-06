@@ -479,7 +479,9 @@ a {
   }
 }
 
+/* An auto-margin flex item sizes to its content, so without width: 100% the column grows to a wide table's min-content width and widens the page. */
 .app-content {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: 1.5rem;

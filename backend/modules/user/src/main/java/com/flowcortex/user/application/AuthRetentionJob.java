@@ -13,10 +13,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Keeps the two ever-growing auth tables bounded: audit rows (which hold IPs and user agents)
- * older than the configured retention, and refresh-token rows that expired or were revoked. A
- * live, rotated-out token row stays until its session expires, because presenting it again is how
- * a stolen token is detected. Runs in every instance; the deletes are idempotent.
+ * Keeps the ever-growing auth tables bounded: audit rows (which hold IPs and user agents) older
+ * than the configured retention, reset-link rows that were used or expired, and refresh-token rows
+ * that expired or were revoked. A live, rotated-out refresh-token row stays until its session
+ * expires, because presenting it again is how a stolen token is detected. Runs in every instance;
+ * the deletes are idempotent.
  */
 @Component
 public class AuthRetentionJob {
@@ -43,6 +44,9 @@ public class AuthRetentionJob {
         int events = jdbc.update("DELETE FROM auth_event WHERE occurred_at < :cutoff",
                 new MapSqlParameterSource("cutoff", Timestamp.from(now.minus(properties.auditEvents()))));
         int tokens = refreshTokenRepository.deleteExpiredAndRevokedBefore(now);
-        LOG.info("Auth retention: deleted {} audit events and {} refresh tokens", events, tokens);
+        int resetLinks = jdbc.update("DELETE FROM email_confirmation_token WHERE purpose = 'PASSWORD_RESET'"
+                + " AND (used_at < :now OR expires_at < :now)", new MapSqlParameterSource("now", Timestamp.from(now)));
+        LOG.info("Auth retention: deleted {} audit events, {} refresh tokens and {} reset links", events, tokens,
+                resetLinks);
     }
 }

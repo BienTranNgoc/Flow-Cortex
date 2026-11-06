@@ -65,6 +65,27 @@ public interface AuthService {
     void resendConfirmation(String email, String ip, String userAgent);
 
     /**
+     * Mails what the email's account needs after commit: a reset link to a confirmed account with a
+     * password, the "resend confirmation" link to an unconfirmed or password-less one, a Google sign-in
+     * notice to a Google-only one, nothing to an unknown or suspended one. Returns normally either way.
+     * @throws com.flowcortex.user.application.PasswordResetRateLimitedException (429 with Retry-After)
+     *         when the client IP or the email is over its reset-request limit
+     */
+    void requestPasswordReset(String email, String ip, String userAgent);
+
+    /**
+     * Spends a reset link and sets the new password; every session and every other emailed link of the
+     * account ends, any lockout is cleared and the address is told. Issues no session. Returns the
+     * account's email.
+     * @throws com.flowcortex.shared.web.UnprocessableEntityException code {@code RESET_LINK_INVALID} when
+     *         the link is unknown, used, superseded, expired, or its account is gone or no longer active
+     *         (an unknown link is refused before the password is hashed)
+     * @throws com.flowcortex.user.application.PasswordResetRateLimitedException (429 with Retry-After)
+     *         when the client IP is over its new-password submission limit
+     */
+    String resetPassword(String rawToken, String rawPassword, String ip, String userAgent);
+
+    /**
      * Verifies the email/password pair and returns an {@link AuthSession}. The password is checked
      * before the account's state is revealed: a wrong password is always the same 401, whatever
      * the account (unknown, suspended or locked).

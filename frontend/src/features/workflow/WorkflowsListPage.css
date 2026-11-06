@@ -136,7 +136,12 @@
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--paper-2) 60%, transparent);
-  overflow: hidden;
+  overflow-x: auto;
+}
+
+.wf-list__table-wrap:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .wf-list__table {

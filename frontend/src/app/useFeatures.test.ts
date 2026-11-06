@@ -10,6 +10,7 @@ const ALL_OFF = {
   uploadContentCheck: false,
   runCancellation: false,
   credits: false,
+  passwordReset: false,
 };
 
 function setup() {

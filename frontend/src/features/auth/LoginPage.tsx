@@ -2,10 +2,11 @@ import { ApiError } from '@flow-cortex/api-client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { oauthEnabled, passwordResetEnabled } from '../../app/featureFlags';
+import { Trans, useTranslation } from 'react-i18next';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { oauthEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
+import { useFeatures } from '../../app/useFeatures';
 import { activeLocale } from '../../lib/i18n';
 import { AuthLink } from './AuthLink';
 import { useAuthPose } from './authPose';
@@ -19,6 +20,7 @@ import {
   EMAIL_NOT_CONFIRMED,
   failureMessage,
   getRememberedEmail,
+  lockedUntilFrom,
   problemCodeFrom,
   setRememberedEmail,
   submitState,
@@ -60,6 +62,18 @@ const eyeOffIcon = (
   </svg>
 );
 
+/** Router state other pages hand to sign-in: where to return, or a notice and the email to fill in. */
+interface LoginState {
+  from?: string;
+  notice?: string;
+  email?: string;
+}
+
+function localTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /** Only a 401 means the email or password is wrong; any other refusal is not the visitor's typo. */
 function isWrongCredentials(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
@@ -69,7 +83,9 @@ export function LoginPage() {
   const { t } = useTranslation();
   const token = useAuthToken();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { passwordReset } = useFeatures();
   const loginMutation = useLoginMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
@@ -77,6 +93,7 @@ export function LoginPage() {
   const [focused, setFocused] = useState<'email' | 'password' | null>(null);
   const [passwordShown, setPasswordShown] = useState(false);
   const [shake, setShake] = useState(false);
+  const state = location.state as LoginState | null;
   const {
     register,
     handleSubmit,
@@ -85,9 +102,20 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: getRememberedEmail(), password: '', rememberMe: true },
+    defaultValues: { email: state?.email ?? getRememberedEmail(), password: '', rememberMe: true },
   });
-  const returnTo = (location.state as { from?: string } | null)?.from ?? '/';
+  const returnTo = state?.from ?? '/';
+  const [notice, setNotice] = useState(state?.notice);
+
+  // The browser restores history state on reload, so the notice leaves it once shown; the email stays.
+  useEffect(() => {
+    if (state?.notice === undefined) return;
+    const { notice: _shown, ...kept } = state;
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: kept },
+    );
+  }, [state, location.pathname, location.search, navigate]);
 
   const { error: loginError } = loginMutation;
   useEffect(() => {
@@ -119,6 +147,7 @@ export function LoginPage() {
         setSubmitSucceeded(true);
       },
       onError: (error) => {
+        setNotice(undefined);
         setShake(isWrongCredentials(error));
       },
     });
@@ -126,14 +155,43 @@ export function LoginPage() {
 
   // The Google message describes the redirect that opened the page, not any later attempt.
   const oauthError = submittedOnce ? null : searchParams.get('oauth_error');
-  const alertMessage = (() => {
+  const lockedUntil = otherFailure ? lockedUntilFrom(loginMutation.error) : undefined;
+  const lockedText = otherFailure
+    ? accountLockedMessage(loginMutation.error, t, activeLocale())
+    : undefined;
+  const resetLink = <Link to="/forgot-password" />;
+  const alertBody = (() => {
     if (notConfirmed) return t('auth.login.emailNotConfirmed');
     if (wrongCredentials) return failureMessage(loginMutation, t, 'auth.login.failedFallback');
     if (otherFailure) {
-      return (
-        accountLockedMessage(loginMutation.error, t, activeLocale()) ??
-        failureMessage(loginMutation, t, 'auth.login.retryLater')
-      );
+      if (lockedUntil) {
+        if (lockedText) {
+          return (
+            <>
+              {lockedText}
+              {passwordReset && (
+                <>
+                  {' '}
+                  <Trans
+                    i18nKey="auth.login.lockedResetOffer"
+                    components={{ reset: resetLink }}
+                  />
+                </>
+              )}
+            </>
+          );
+        }
+        return passwordReset ? (
+          <Trans
+            i18nKey="auth.login.lockedWithReset"
+            values={{ time: localTime(lockedUntil) }}
+            components={{ reset: resetLink }}
+          />
+        ) : (
+          t('auth.login.locked', { time: localTime(lockedUntil) })
+        );
+      }
+      return lockedText ?? failureMessage(loginMutation, t, 'auth.login.retryLater');
     }
     return oauthError ? t(oauthErrorKey(oauthError)) : undefined;
   })();
@@ -165,9 +223,15 @@ export function LoginPage() {
       </h1>
       <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
 
-      {alertMessage && (
+      {notice && (
+        <p role="status" className="auth-status">
+          {notice}
+        </p>
+      )}
+
+      {alertBody && (
         <div id="login-alert" role="alert" className="auth-alert">
-          <p>{alertMessage}</p>
+          <p>{alertBody}</p>
           {wrongCredentials && (
             <p>
               {t('auth.login.newHere')}{' '}
@@ -261,10 +325,17 @@ export function LoginPage() {
             <input id="login-remember" type="checkbox" {...register('rememberMe')} />
             <span>{t('auth.login.rememberMe')}</span>
           </label>
-          {passwordResetEnabled() && (
-            <Link to="/forgot-password" className="auth-link">
+          {passwordReset ? (
+            <Link to="/forgot-password" className="auth-link forgot-password-link">
               {t('auth.login.forgotPassword')}
             </Link>
+          ) : (
+            <span
+              className="auth-link forgot-password-link forgot-password-link--disabled"
+              title={t('auth.login.forgotPasswordDisabled')}
+            >
+              {t('auth.login.forgotPassword')}
+            </span>
           )}
         </div>
         <button

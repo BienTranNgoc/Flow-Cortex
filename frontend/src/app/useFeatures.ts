@@ -7,7 +7,17 @@ const ALL_OFF: FeaturesResponse = {
   uploadContentCheck: false,
   runCancellation: false,
   credits: false,
+  passwordReset: false,
 };
+
+/** The `/features` query itself, for a page that must tell "still loading" from "switched off". */
+export function useFeaturesQuery() {
+  return useQuery({
+    queryKey: ['features'],
+    queryFn: () => unwrap(features()),
+    staleTime: Infinity,
+  });
+}
 
 /**
  * The backend's feature switches, fetched once per session (they change only on a backend
@@ -15,10 +25,5 @@ const ALL_OFF: FeaturesResponse = {
  * offers an action the backend may refuse.
  */
 export function useFeatures(): FeaturesResponse {
-  const { data } = useQuery({
-    queryKey: ['features'],
-    queryFn: () => unwrap(features()),
-    staleTime: Infinity,
-  });
-  return data ?? ALL_OFF;
+  return useFeaturesQuery().data ?? ALL_OFF;
 }
