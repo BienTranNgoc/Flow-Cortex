@@ -51,4 +51,16 @@ describe('RequireAuth', () => {
     expect(await screen.findByText('Login page')).toBeInTheDocument();
     expect(calls).toHaveLength(1);
   });
+
+  // Last on purpose: the never-settling refresh keeps the one-shot session attempt in flight.
+  it('shows the session check in a flat status region while the refresh is pending', () => {
+    stubApi({ 'POST /api/v1/auth/refresh': () => new Promise<never>(() => {}) });
+
+    renderRoute('/private', '/private', guarded, loginRoute);
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Checking your session…');
+    expect(status).toHaveClass('session-status');
+    expect(screen.queryByText('Private page')).not.toBeInTheDocument();
+  });
 });

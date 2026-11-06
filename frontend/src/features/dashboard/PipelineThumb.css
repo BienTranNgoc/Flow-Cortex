@@ -42,9 +42,9 @@
 }
 
 .pipeline-thumb__chip--normal {
-  color: var(--tone-cyan-text);
-  background: var(--tone-cyan-bg);
-  border-color: var(--tone-cyan-line);
+  color: var(--ink-2);
+  background: var(--paper-2);
+  border-color: var(--line-2);
 }
 
 .pipeline-thumb__chip--checkpoint {

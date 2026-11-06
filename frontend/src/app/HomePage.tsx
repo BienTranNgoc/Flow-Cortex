@@ -1,4 +1,5 @@
-import { Trans, useTranslation } from 'react-i18next';
+import { ArrowRight } from '@phosphor-icons/react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
@@ -6,6 +7,9 @@ import { FilterBar } from '../features/dashboard/FilterBar';
 import { SearchBar } from '../features/dashboard/SearchBar';
 import { useDashboardWorkflows } from '../features/dashboard/useDashboardWorkflows';
 import { WorkflowCard } from '../features/dashboard/WorkflowCard';
+import { PageHeading } from './PageHeading';
+import { Skeleton } from './Skeleton';
+import { StatusBlock } from './StatusBlock';
 import './HomePage.css';
 
 const STAGES = [
@@ -15,6 +19,8 @@ const STAGES = [
   { order: 4, title: 'common.home.stages.export.title', body: 'common.home.stages.export.body' },
 ] as const;
 
+const PLACEHOLDER_CARDS = 4;
+
 export function HomePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
@@ -23,51 +29,38 @@ export function HomePage() {
   const dashboard = useDashboardWorkflows(workflows);
   const { filtered, counts, query, setQuery, category, setCategory, reset } = dashboard;
   const hasWorkflows = workflows.length > 0;
+  const workflowsReady = !workflowsQuery.isLoading && !workflowsQuery.isError;
 
   if (meQuery.isLoading) return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   if (meQuery.isError) {
     return (
-      <main className="launchpad">
-        <p role="alert" className="form-error">
-          {t('common.home.loadProfileError')}{' '}
-          <button type="button" onClick={() => void meQuery.refetch()}>
-            {t('common.home.retry')}
-          </button>
-        </p>
-      </main>
+      <div className="launchpad">
+        <StatusBlock
+          kind="error"
+          message={t('common.home.loadProfileError')}
+          action={{ label: t('common.state.retry'), onClick: () => void meQuery.refetch() }}
+        />
+      </div>
     );
   }
   if (!meQuery.data) {
     return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   }
 
+  const name = meQuery.data.name?.trim();
+  const greeting = name ? t('common.home.greeting', { name }) : t('common.home.greetingNoName');
+
   return (
-    <main className="launchpad">
-      <section className="launchpad-hero" aria-labelledby="launchpad-hero-title">
-        <div className="launchpad-hero__glow" aria-hidden="true">
-          <span className="launchpad-hero__glow-a" />
-          <span className="launchpad-hero__glow-b" />
-        </div>
-        <div className="launchpad-hero__badge">
-          <span className="launchpad-hero__pulse" aria-hidden="true" />
-          <span className="launchpad-hero__bolt" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
-              <path d="M13 2L4 14h6l-1 8 9-12h-6z" />
-            </svg>
-          </span>
-          <span>{t('common.home.eyebrow')}</span>
-        </div>
-        <h1 id="launchpad-hero-title" className="launchpad-hero__title">
-          <Trans
-            i18nKey="common.home.headline"
-            components={{
-              strong: <span className="launchpad-hero__title-strong" />,
-              accent: <span className="launchpad-hero__title-accent" />,
-            }}
-          />
-        </h1>
-        <p className="launchpad-hero__lede">{t('common.home.lede')}</p>
-      </section>
+    <div className="launchpad">
+      <PageHeading
+        title={greeting}
+        lede={t('common.home.lede')}
+        actions={
+          <Link to="/workflows" className="cortex-btn cortex-btn--primary">
+            {t('common.home.start')}
+          </Link>
+        }
+      />
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
         <header className="launchpad-cards__head">
@@ -77,9 +70,7 @@ export function HomePage() {
           {hasWorkflows && (
             <Link to="/workflows" className="launchpad-cards__see-all">
               {t('common.home.viewAll')}
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
+              <ArrowRight size={14} weight="bold" aria-hidden="true" />
             </Link>
           )}
         </header>
@@ -93,32 +84,36 @@ export function HomePage() {
           </div>
         )}
 
-        {workflowsQuery.isLoading && <output>{t('common.home.loadingWorkflows')}</output>}
         {workflowsQuery.isError && (
-          <p role="alert" className="form-error">
-            {t('common.home.loadWorkflowsError')}{' '}
-            <button type="button" onClick={() => void workflowsQuery.refetch()}>
-              {t('common.home.retry')}
-            </button>
-          </p>
+          <StatusBlock
+            kind="error"
+            message={t('common.home.loadWorkflowsError')}
+            action={{ label: t('common.state.retry'), onClick: () => void workflowsQuery.refetch() }}
+          />
         )}
-        {hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && filtered.length === 0 && (
-          <div className="launchpad-cards__empty">
-            <p role="status">{t('common.home.noMatch')}</p>
-            <button type="button" onClick={reset}>
-              {t('common.home.clearFilters')}
-            </button>
-          </div>
+        {workflowsReady && hasWorkflows && filtered.length === 0 && (
+          <StatusBlock
+            kind="empty"
+            message={t('common.state.noMatch')}
+            action={{ label: t('common.state.clearFilters'), onClick: reset }}
+          />
         )}
-        {!hasWorkflows && !workflowsQuery.isLoading && !workflowsQuery.isError && (
-          <p>{t('common.home.empty')}</p>
+        {workflowsReady && !hasWorkflows && (
+          <StatusBlock
+            kind="empty"
+            message={t('common.state.empty')}
+            action={{ label: t('common.home.readGuide'), to: '/docs/guides' }}
+          />
         )}
 
-        {filtered.length > 0 && (
-          <div className="workflow-grid">
-            {filtered.map((workflow) => (
-              <WorkflowCard key={workflow.id ?? workflow.name} workflow={workflow} />
-            ))}
+        {(workflowsQuery.isLoading || filtered.length > 0) && (
+          <div className="workflow-grid-region">
+            <div className="workflow-grid" aria-busy={workflowsQuery.isLoading || undefined}>
+              {workflowsQuery.isLoading && <Skeleton shape="card" count={PLACEHOLDER_CARDS} />}
+              {filtered.map((workflow) => (
+                <WorkflowCard key={workflow.id ?? workflow.name} workflow={workflow} />
+              ))}
+            </div>
           </div>
         )}
       </section>
@@ -137,13 +132,6 @@ export function HomePage() {
           ))}
         </ol>
       </section>
-
-      <section className="launchpad-footer">
-        <p>
-          {t('common.home.welcome', { name: meQuery.data.name })} ·{' '}
-          <Link to="/profile">{t('common.home.manageProfile')}</Link>
-        </p>
-      </section>
-    </main>
+    </div>
   );
 }

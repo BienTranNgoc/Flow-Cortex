@@ -7,6 +7,11 @@ import prettier from 'eslint-config-prettier';
 import i18next from 'eslint-plugin-i18next';
 import i18nextDefaults from 'eslint-plugin-i18next/lib/options/defaults.js';
 
+const inlineStyleTargets = [
+  'Literal[value=/gradient\\(|blur\\(|backdrop/]',
+  'TemplateElement[value.raw=/gradient\\(|blur\\(|backdrop/]',
+];
+
 export default tseslint.config(
   {
     ignores: ['dist', 'coverage'],
@@ -35,6 +40,20 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': [
         'warn',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['src/**/*.{test,spec}.tsx', 'src/test/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...inlineStyleTargets.map((target) => ({
+          selector: `JSXAttribute[name.name='style'] ${target}`,
+          message:
+            'Inline styles must not carry a gradient, blur or backdrop; use a stylesheet rule.',
+        })),
       ],
     },
   },

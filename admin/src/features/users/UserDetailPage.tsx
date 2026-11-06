@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from '@phosphor-icons/react';
 import { PageHeading } from '../../app/PageHeading';
 import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';

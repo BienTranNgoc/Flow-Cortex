@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
+import { SessionStatus } from '../../app/SessionStatus';
 import { useAuthToken, useSessionReady } from './useAuth';
 
 /**
@@ -16,7 +17,7 @@ export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
   const location = useLocation();
 
   if (!sessionReady) {
-    return <output>{t('auth.session.checking')}</output>;
+    return <SessionStatus>{t('auth.session.checking')}</SessionStatus>;
   }
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

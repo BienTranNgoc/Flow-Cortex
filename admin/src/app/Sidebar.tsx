@@ -1,63 +1,95 @@
-import { useState } from 'react';
+import { NodiMark } from '@flow-cortex/ui-kit';
+import { SidebarSimple, X } from '@phosphor-icons/react';
+import { useEffect, useRef, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { Menu, PanelRight, PanelLeft, X } from 'lucide-react';
-import { NAV } from './nav';
+import { NODI_WORDMARK } from './brand';
+import { NAV, type NavGroup } from './nav';
 import { can } from './permissions';
+import { useIsDesktop } from './useIsDesktop';
+
+interface SidebarProps {
+  readonly role: string | undefined;
+  readonly collapsed: boolean;
+  readonly onToggle: () => void;
+  readonly drawerOpen?: boolean;
+  readonly onDrawerClose?: () => void;
+  readonly nav?: readonly NavGroup[];
+}
+
+const noop = () => {};
+
+/** The rail list scrolls and so clips children; the tooltip is fixed and takes its y from its entry. */
+function placeTip(event: SyntheticEvent<HTMLElement>) {
+  const entry = event.currentTarget;
+  const tip = entry.querySelector<HTMLElement>('.cortex-admin-nav__tip');
+  if (!tip) return;
+  const rect = entry.getBoundingClientRect();
+  tip.style.top = `${rect.top + rect.height / 2}px`;
+}
 
 /**
  * Navigation drawn from `NAV`: permitted entries link, disabled ones stay visible but inert.
- * `collapsed` switches between the full width and the icon-only rail.
+ * From 1024px it is an `<aside>` that is the full width or the icon-only rail (`collapsed`);
+ * below that it is a modal `<dialog>` drawer driven by `drawerOpen`.
  */
 export function Sidebar({
   role,
   collapsed,
   onToggle,
-}: Readonly<{ role: string | undefined; collapsed: boolean; onToggle: () => void }>) {
-  const [openMobile, setOpenMobile] = useState(false);
+  drawerOpen = false,
+  onDrawerClose = noop,
+  nav = NAV,
+}: SidebarProps) {
   const { t } = useTranslation();
-  const widthClass = collapsed ? ' cortex-admin-nav--collapsed' : '';
+  const isDesktop = useIsDesktop();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const rail = isDesktop && collapsed;
   const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
 
-  return (
-    <nav
-      aria-label={t('common.shell.nav.label')}
-      className={`cortex-admin-nav${widthClass}`}
-    >
-      <div className="cortex-admin-nav__header" aria-hidden="true" />
-      <button
-        type="button"
-        className="cortex-admin-nav__collapse-toggle"
-        aria-pressed={collapsed}
-        aria-label={collapseLabel}
-        title={collapseLabel}
-        onClick={onToggle}
-      >
-        {collapsed ? (
-          <PanelLeft aria-hidden="true" size={14} />
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (drawerOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!drawerOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [drawerOpen, isDesktop]);
+
+  const closeDrawer = () => dialogRef.current?.close();
+
+  const content = (
+    <>
+      <div className="cortex-admin-nav__top">
+        <div className="cortex-admin-nav__brand">
+          <NodiMark size={28} />
+          <span className="cortex-admin-nav__brand-name">{NODI_WORDMARK}</span>
+          <span className="cortex-admin-nav__brand-label">{t('common.shell.brandAdmin')}</span>
+        </div>
+        {isDesktop ? (
+          <button
+            type="button"
+            className="cortex-admin-nav__collapse-toggle"
+            aria-pressed={collapsed}
+            aria-label={collapseLabel}
+            onClick={onToggle}
+          >
+            <SidebarSimple aria-hidden="true" size={20} />
+          </button>
         ) : (
-          <PanelRight aria-hidden="true" size={14} />
+          <button
+            type="button"
+            className="cortex-admin-nav__collapse-toggle"
+            aria-label={t('common.shell.nav.closeMenu')}
+            onClick={closeDrawer}
+          >
+            <X aria-hidden="true" size={20} />
+          </button>
         )}
-      </button>
-      <button
-        type="button"
-        className="cortex-admin-nav__toggle"
-        aria-expanded={openMobile}
-        aria-controls="cortex-admin-nav-groups"
-        onClick={() => setOpenMobile((value) => !value)}
-      >
-        {openMobile ? <X aria-hidden="true" size={16} /> : <Menu aria-hidden="true" size={16} />}
-        <span>{openMobile ? t('common.shell.nav.hideMenu') : t('common.shell.nav.menu')}</span>
-      </button>
-      <div
-        id="cortex-admin-nav-groups"
-        className={
-          openMobile
-            ? 'cortex-admin-nav__groups is-open'
-            : 'cortex-admin-nav__groups'
-        }
-      >
-        {NAV.map((group) => {
+      </div>
+      <nav aria-label={t('common.shell.nav.label')} className="cortex-admin-nav__groups">
+        {nav.map((group) => {
           const items = group.items.filter((item) => can(role, item.action));
           if (items.length === 0) {
             return null;
@@ -80,36 +112,54 @@ export function Sidebar({
                           className="cortex-admin-nav__item"
                           aria-disabled="true"
                           data-tag={tag}
-                          title={t('common.shell.nav.disabledTitle', { label, tag })}
+                          onMouseEnter={placeTip}
                         >
                           <span className="cortex-admin-nav__item-icon" aria-hidden="true">
-                            <Icon size={18} />
+                            <Icon size={20} />
                           </span>
                           <span className="cortex-admin-nav__item-label">{label}</span>
                           <span className="cortex-admin-nav__item-tag">{tag}</span>
                           <span className="cortex-admin-nav__visually-hidden">
                             {t('common.shell.nav.unavailable')}
                           </span>
+                          <span
+                            className="cortex-admin-nav__tip"
+                            aria-hidden="true"
+                            data-tip={t('common.shell.nav.disabledTitle', { label, tag })}
+                          />
                         </span>
                       </li>
                     );
                   }
+                  const count = item.badge ?? 0;
+                  const name = count > 0 ? t('common.shell.nav.withCount', { label, count }) : label;
                   return (
                     <li key={item.path}>
                       <NavLink
                         to={item.path}
                         className={({ isActive }) =>
-                          isActive
-                            ? 'cortex-admin-nav__item is-active'
-                            : 'cortex-admin-nav__item'
+                          isActive ? 'cortex-admin-nav__item is-active' : 'cortex-admin-nav__item'
                         }
-                        onClick={() => setOpenMobile(false)}
-                        title={label}
+                        aria-label={count > 0 ? name : undefined}
+                        onClick={closeDrawer}
+                        onMouseEnter={placeTip}
+                        onFocus={placeTip}
                       >
-                        <span className="cortex-admin-nav__item-icon" aria-hidden="true">
-                          <Icon size={18} />
-                        </span>
-                        <span className="cortex-admin-nav__item-label">{label}</span>
+                        {({ isActive }) => (
+                          <>
+                            <span className="cortex-admin-nav__item-icon" aria-hidden="true">
+                              <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
+                              {count > 0 && <span className="cortex-admin-nav__dot" />}
+                            </span>
+                            <span className="cortex-admin-nav__item-label">{label}</span>
+                            {count > 0 && (
+                              <span className="cortex-admin-nav__badge" aria-hidden="true">
+                                {count}
+                              </span>
+                            )}
+                            <span className="cortex-admin-nav__tip" aria-hidden="true" data-tip={name} />
+                          </>
+                        )}
                       </NavLink>
                     </li>
                   );
@@ -118,15 +168,34 @@ export function Sidebar({
             </div>
           );
         })}
-      </div>
+      </nav>
       <div className="cortex-admin-nav__footer">
         <span className="cortex-admin-nav__status" aria-hidden="true">
           <span className="cortex-admin-nav__status-dot" />
         </span>
-        {!collapsed && (
-          <span className="cortex-admin-nav__status-text">{t('common.shell.nav.systemStatus')}</span>
-        )}
+        <span className="cortex-admin-nav__status-text">{t('common.shell.nav.systemStatus')}</span>
       </div>
-    </nav>
+    </>
+  );
+
+  if (isDesktop) {
+    return (
+      <aside className={rail ? 'cortex-admin-nav cortex-admin-nav--collapsed' : 'cortex-admin-nav'}>
+        {content}
+      </aside>
+    );
+  }
+  return (
+    <dialog
+      ref={dialogRef}
+      className="cortex-admin-nav cortex-admin-nav--drawer"
+      aria-label={t('common.shell.nav.label')}
+      onClose={onDrawerClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeDrawer();
+      }}
+    >
+      {content}
+    </dialog>
   );
 }

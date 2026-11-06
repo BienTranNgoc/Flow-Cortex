@@ -1,29 +1,7 @@
 /* ProfilePage — two-column layout: identity card + edit form */
 
 .profile-page {
-  padding: 2.5rem 0 1rem;
   position: relative;
-}
-
-.profile-page__header {
-  margin: 0 0 2rem;
-  max-width: 640px;
-}
-
-.profile-page__header h1 {
-  margin: 0.6rem 0 0.6rem;
-  font-size: clamp(1.7rem, 3.6vw, 2.4rem);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.profile-page__subtitle {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  max-width: 56ch;
 }
 
 .profile-grid {
@@ -34,27 +12,13 @@
 }
 
 .profile-card {
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--paper-3) 95%, transparent),
-    color-mix(in srgb, var(--input-bg) 85%, transparent)
-  );
+  background: var(--paper-2);
   border: 1px solid var(--line-soft);
   border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 20px 60px color-mix(in srgb, var(--shadow-color) 40%, transparent);
+  box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-}
-
-.profile-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal-glow) 40%, transparent), transparent);
 }
 
 /* ----- Identity card (left) -------------------------------------------- */
@@ -75,30 +39,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--teal) 0%, var(--accent) 50%, var(--indigo) 100%);
-  color: var(--primary-foreground);
+  background: var(--primary-soft);
+  color: var(--primary);
   font-weight: 800;
   font-size: 2rem;
   letter-spacing: -0.02em;
   margin-bottom: 1.1rem;
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--paper) 90%, transparent),
-    0 0 0 5px color-mix(in srgb, var(--teal-glow) 30%, transparent),
-    0 12px 30px color-mix(in srgb, var(--teal) 25%, transparent);
-}
-
-.profile-avatar__pulse {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--teal-glow) 35%, transparent);
-  animation: avatar-pulse 3s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes avatar-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.08); opacity: 0; }
 }
 
 .profile-identity__text h2 {
@@ -121,12 +67,8 @@
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.75rem;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--cta-from) 15%, transparent),
-    color-mix(in srgb, var(--cta-to) 18%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--teal-glow) 30%, transparent);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
   border-radius: 999px;
   color: var(--teal-bright);
   font-size: 0.72rem;
@@ -158,10 +100,6 @@
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.01em;
-  background: linear-gradient(135deg, var(--teal), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .profile-stats__label {
@@ -220,7 +158,7 @@
 .profile-card__divider {
   border: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--line-soft), transparent);
+  background: var(--line-soft);
   margin: 2rem 0;
 }
 
@@ -261,7 +199,6 @@
   height: 8px;
   border-radius: 50%;
   background: var(--green-bright);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--green-bright) 60%, transparent);
 }
 
 .profile-danger {
@@ -308,7 +245,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .profile-avatar__pulse,
   .profile-saved {
     animation: none;
   }

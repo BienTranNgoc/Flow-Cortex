@@ -3,6 +3,9 @@ import { useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { WorkflowResponse } from '@flow-cortex/api-client';
+import { PageHeading } from '../../app/PageHeading';
+import { Skeleton } from '../../app/Skeleton';
+import { StatusBlock } from '../../app/StatusBlock';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useMeQuery } from '../auth/useAuth';
@@ -91,19 +94,17 @@ export function WorkflowsListPage() {
   const locale = activeLocale();
 
   return (
-    <main className="wf-list">
-      <header className="wf-list__header">
-        <div>
-          <h1 className="wf-list__title">{t('workflow.list.heading')}</h1>
-          <p className="wf-list__welcome">
-            <Trans
-              i18nKey="workflow.list.welcomeBack"
-              values={{ name: firstName }}
-              components={{ strong: <strong /> }}
-            />
-          </p>
-        </div>
-      </header>
+    <div className="wf-list">
+      <PageHeading
+        title={t('workflow.list.heading')}
+        lede={
+          <Trans
+            i18nKey="workflow.list.welcomeBack"
+            values={{ name: firstName }}
+            components={{ strong: <strong /> }}
+          />
+        }
+      />
 
       <div className="wf-list__toolbar">
         <label className="wf-list__search" aria-label={t('workflow.list.searchLabel')}>
@@ -197,14 +198,46 @@ export function WorkflowsListPage() {
         </fieldset>
       </div>
 
-      {showLoading && <output className="wf-list__status">{t('workflow.list.loading')}</output>}
-      {workflowsQuery.isError && !showLoading && (
-        <p role="alert" className="wf-list__status wf-list__status--error">
-          {t('workflow.list.loadError')}
-        </p>
+      <div className="wf-list__results" aria-busy={showLoading}>
+      {showLoading && (
+        <>
+          <output className="visually-hidden">{t('workflow.list.loading')}</output>
+          {layout === 'list' ? (
+            <Skeleton shape="row" count={5} />
+          ) : (
+            <div className="wf-list__grid" aria-hidden="true">
+              <Skeleton shape="card" count={3} />
+            </div>
+          )}
+        </>
       )}
-      {filtered && filtered.length === 0 && !showLoading && (
-        <p className="wf-list__status">{t('workflow.list.noMatch')}</p>
+      {workflowsQuery.isError && !showLoading && (
+        <StatusBlock
+          kind="error"
+          message={t('workflow.list.loadError')}
+          action={{ label: t('common.state.retry'), onClick: () => void workflowsQuery.refetch() }}
+        />
+      )}
+      {filtered && filtered.length === 0 && !showLoading && !workflowsQuery.isError && (
+        total === 0 ? (
+          <StatusBlock
+            kind="empty"
+            message={t('common.state.empty')}
+            action={{ label: t('common.home.readGuide'), to: '/docs/guides' }}
+          />
+        ) : (
+          <StatusBlock
+            kind="empty"
+            message={t('common.state.noMatch')}
+            action={{
+              label: t('common.state.clearFilters'),
+              onClick: () => {
+                setQuery('');
+                setScope('all');
+              },
+            }}
+          />
+        )
       )}
 
       {filtered && filtered.length > 0 && (
@@ -233,7 +266,7 @@ export function WorkflowsListPage() {
                     const label = safeName(workflow, t);
                     return (
                       <tr key={workflow.id}>
-                        <td>
+                        <td data-label={t('workflow.list.column.name')}>
                           <div className="wf-list__name">
                             <span className="wf-list__icon" aria-hidden="true">
                               <WorkflowIcon icon={iconForWorkflow(label)} size={18} />
@@ -245,17 +278,19 @@ export function WorkflowsListPage() {
                             </div>
                           </div>
                         </td>
-                        <td>
+                        <td data-label={t('workflow.list.column.status')}>
                           <span className={`wf-list__status-pill wf-list__status-pill--${status.tone}`}>
                             <span className="wf-list__status-dot" aria-hidden="true" />
                             {status.label}
                           </span>
                         </td>
-                        <td>
+                        <td data-label={t('workflow.list.column.owner')}>
                           <OwnerCell workflow={workflow} />
                         </td>
-                        <td className="wf-list__muted">{stepCount(steps.length, t)}</td>
-                        <td>
+                        <td className="wf-list__muted" data-label={t('workflow.list.column.steps')}>
+                          {stepCount(steps.length, t)}
+                        </td>
+                        <td data-label={t('workflow.list.column.actions')}>
                           <div className="wf-list__actions" aria-label={t('workflow.list.rowActions')}>
                             <Link
                               to={`/workflows/${workflow.id}`}
@@ -336,6 +371,7 @@ export function WorkflowsListPage() {
           </footer>
         </>
       )}
-    </main>
+      </div>
+    </div>
   );
 }

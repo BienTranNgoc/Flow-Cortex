@@ -4,15 +4,36 @@ import { readFileSync } from 'node:fs';
 const tokensPath = './tokens.css';
 const css = readFileSync(new URL(tokensPath, import.meta.url), 'utf8');
 
-const opener = /(?:^|\n):root\s*\{/.exec(css);
-if (!opener) throw new Error(':root block not found in tokens.css');
-const root = css.slice(opener.index + opener[0].length, css.indexOf('\n}', opener.index));
+function block(openerPattern: RegExp, label: string): string {
+  const opener = openerPattern.exec(css);
+  if (!opener) throw new Error(`${label} block not found in tokens.css`);
+  return css.slice(opener.index + opener[0].length, css.indexOf('\n}', opener.index));
+}
 
-function token(name: string): string {
-  const value = new RegExp(`(?:^|\\s)--${name}:\\s*([^;]+);`).exec(root)?.[1]?.trim();
+const root = block(/(?:^|\n):root\s*\{/, ':root');
+const darkRoot = block(/(?:^|\n):root\[data-theme='dark'\]\s*\{/, 'dark');
+
+const schemes = ['light', 'dark'] as const;
+type Scheme = (typeof schemes)[number];
+
+/** Declared value; the dark scheme falls back to the light block, as the cascade does. */
+function raw(name: string, scheme: Scheme): string {
+  const pattern = new RegExp(`(?:^|\\s)--${name}:\\s*([^;]+);`);
+  const value =
+    (scheme === 'dark' ? pattern.exec(darkRoot)?.[1] : undefined) ?? pattern.exec(root)?.[1];
   if (!value) throw new Error(`token --${name} not declared`);
+  return value.trim();
+}
+
+function token(name: string, scheme: Scheme): string {
+  const value = raw(name, scheme);
   const alias = /^var\(--([\w-]+)\)$/.exec(value)?.[1];
-  return alias ? token(alias) : value;
+  return alias ? token(alias, scheme) : value;
+}
+
+/** Hex colour stops of a gradient token, in declaration order. */
+function stops(name: string, scheme: Scheme): string[] {
+  return raw(name, scheme).match(/#[0-9a-fA-F]{6}\b/g) ?? [];
 }
 
 function relativeLuminance(hex: string): number {
@@ -30,42 +51,41 @@ function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-const surfaces = ['paper', 'paper-2', 'paper-3', 'input-bg', 'btn-bg', 'card-from', 'card-to'];
+const surfaces = [
+  'paper',
+  'paper-2',
+  'paper-3',
+  'input-bg',
+  'btn-bg',
+  'chrome-hover',
+  'chrome-active',
+];
 
 const textPairs: [string, string][] = [
   ...surfaces.map((s): [string, string] => ['ink', s]),
-  ...['paper', 'paper-2', 'paper-3', 'input-bg', 'card-from', 'card-to'].map(
+  ...['paper', 'paper-2', 'paper-3', 'input-bg', 'chrome-hover', 'chrome-active'].map(
     (s): [string, string] => ['ink-3', s],
   ),
-  ...['paper', 'paper-3', 'card-from', 'card-to'].map((s): [string, string] => ['primary', s]),
-  ...['paper', 'paper-3', 'card-from', 'card-to', 'btn-bg'].map((s): [string, string] => [
-    'red',
-    s,
-  ]),
+  ...['paper', 'paper-3'].map((s): [string, string] => ['primary', s]),
+  ['primary', 'chrome-active'],
+  ...['paper', 'paper-3', 'btn-bg'].map((s): [string, string] => ['red', s]),
   ['accent', 'paper'],
   ['input-placeholder', 'input-bg'],
   ['input-text', 'input-bg'],
-  ['primary-foreground', 'cta-from'],
-  ['primary-foreground', 'cta-to'],
+  ['primary-foreground', 'primary'],
+  ['primary-foreground', 'primary-hover'],
+  ['paper', 'ink'],
   ['ink-3', 'line'],
   ['primary', 'primary-soft'],
   ['warning', 'warning-soft'],
   ['green', 'green-soft'],
   ['red', 'red-soft'],
-  ['accent', 'accent-soft'],
   ...['paper', 'paper-3', 'input-bg'].map((s): [string, string] => ['ink-2', s]),
   ['ink-4', 'paper'],
   ['ink-4', 'paper-3'],
   ['accent', 'paper-3'],
-  ['nav-ink', 'header-bg'],
-  ['ink', 'header-bg'],
-  ['ink', 'footer-bg'],
-  ['ink-3', 'footer-bg'],
-  ['teal', 'footer-bg'],
   ['teal-bright', 'paper-2'],
   ['teal-bright', 'paper-3'],
-  ['ink-disabled', 'disabled-from'],
-  ['ink-disabled', 'disabled-to'],
   ['primary-foreground', 'green-bright'],
   ['green-bright', 'paper-3'],
   ['green-vivid', 'paper'],
@@ -77,14 +97,12 @@ const textPairs: [string, string][] = [
   ['tone-amber-text', 'tone-amber-bg'],
   ['green-bright', 'tone-green-bg'],
   ['tone-rose-text', 'tone-rose-bg'],
-  ['primary-foreground', 'tone-cyan-from'],
-  ['tone-amber-on', 'tone-amber-from'],
-  ['tone-amber-on', 'tone-amber-to'],
+  ['auth-progress-on', 'auth-progress-from'],
+  ['auth-progress-on', 'auth-progress-to'],
   ['auth-ink', 'auth-card'],
   ['auth-ink-3', 'auth-card'],
   ['auth-accent', 'auth-card'],
   ['auth-on-ocean', 'auth-google'],
-  ['auth-on-ocean', 'auth-ocean-mid'],
   ['auth-ink-4', 'auth-field'],
 ];
 
@@ -115,13 +133,10 @@ const compositeBorderPairs: [string, number, string][] = [
   ['red-strong', 55, 'auth-card'],
 ];
 
-const borderPairs: [string, string][] = [
-  'input-bg',
-  'paper',
-  'paper-3',
-  'card-from',
-  'card-to',
-].map((s) => ['input-border', s]);
+const borderPairs: [string, string][] = ['input-bg', 'paper', 'paper-2', 'paper-3'].map((s) => [
+  'input-border',
+  s,
+]);
 borderPairs.push(
   ['edge', 'paper-2'],
   ['edge', 'paper-3'],
@@ -132,28 +147,40 @@ borderPairs.push(
   ['auth-field-border', 'auth-card'],
 );
 
-describe('token contrast', () => {
+describe.each(schemes)('token contrast, %s scheme', (scheme) => {
   it.each(textPairs)('text --%s on --%s is at least 4.5:1', (text, background) => {
-    expect(contrastRatio(token(text), token(background))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(token(text, scheme), token(background, scheme))).toBeGreaterThanOrEqual(
+      4.5,
+    );
+  });
+
+  it('text --primary-foreground on every --auth-gradient-cta stop is at least 4.5:1', () => {
+    const gradientStops = stops('auth-gradient-cta', scheme);
+    expect(gradientStops.length).toBeGreaterThanOrEqual(2);
+    for (const stop of gradientStops) {
+      expect(contrastRatio(token('primary-foreground', scheme), stop)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it.each(compositeTextPairs)(
     'text --%s on --%s at %d%% over --%s is at least 4.5:1',
     (text, overlay, pct, base) => {
-      const background = mix(token(overlay), token(base), pct);
-      expect(contrastRatio(token(text), background)).toBeGreaterThanOrEqual(4.5);
+      const background = mix(token(overlay, scheme), token(base, scheme), pct);
+      expect(contrastRatio(token(text, scheme), background)).toBeGreaterThanOrEqual(4.5);
     },
   );
 
   it.each(borderPairs)('border --%s on --%s is at least 3:1', (border, background) => {
-    expect(contrastRatio(token(border), token(background))).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(token(border, scheme), token(background, scheme))).toBeGreaterThanOrEqual(
+      3,
+    );
   });
 
   it.each(compositeBorderPairs)(
     'border --%s at %d%% over --auth-ink on --%s is at least 3:1',
     (border, pct, background) => {
-      const edge = mix(token(border), token('auth-ink'), pct);
-      expect(contrastRatio(edge, token(background))).toBeGreaterThanOrEqual(3);
+      const edge = mix(token(border, scheme), token('auth-ink', scheme), pct);
+      expect(contrastRatio(edge, token(background, scheme))).toBeGreaterThanOrEqual(3);
     },
   );
 });

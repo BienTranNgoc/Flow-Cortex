@@ -1,0 +1,10 @@
+.session-status {
+  display: grid;
+  place-items: center;
+  min-height: 100svh;
+  padding: 1rem;
+  background: var(--paper);
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  text-align: center;
+}

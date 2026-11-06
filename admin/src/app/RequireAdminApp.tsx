@@ -4,6 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthToken, useMeQuery, useSessionReady } from '../features/auth/useAuth';
 import { NoAccessPage } from './NoAccessPage';
 import { can } from './permissions';
+import { SessionStatus } from './SessionStatus';
 
 /**
  * Entry guard of the whole console: no token → `/login` (remembering the page), a role without
@@ -17,13 +18,13 @@ export function RequireAdminApp({ children }: Readonly<{ children: ReactNode }>)
   const { t } = useTranslation();
 
   if (!sessionReady) {
-    return <output>{t('common.shell.session.checkingSession')}</output>;
+    return <SessionStatus>{t('common.shell.session.checkingSession')}</SessionStatus>;
   }
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   if (meQuery.isPending) {
-    return <output>{t('common.shell.session.checkingAccount')}</output>;
+    return <SessionStatus>{t('common.shell.session.checkingAccount')}</SessionStatus>;
   }
   if (meQuery.isError) {
     return (

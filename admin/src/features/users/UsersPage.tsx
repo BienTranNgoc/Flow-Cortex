@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
-import { Plus, RefreshCw } from 'lucide-react';
+import { ArrowsClockwise, Plus } from '@phosphor-icons/react';
 import { UserRow } from './UserRow';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { usePageTitle } from '../../app/usePageTitle';
@@ -81,7 +81,7 @@ export function UsersPage() {
               onClick={() => usersQuery.refetch()}
               disabled={usersQuery.isFetching}
             >
-              <RefreshCw size={16} aria-hidden="true" />
+              <ArrowsClockwise size={16} aria-hidden="true" />
               <span>
                 {usersQuery.isFetching
                   ? t('users.directory.refreshing')

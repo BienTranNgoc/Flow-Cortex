@@ -1,9 +1,8 @@
-/* HomePage — hero + dashboard controls + cards + 4-stage explainer.
-   Dashboard-only tokens come from styles/tokens.css (`--card-*`, `--hero-*`). */
+/* HomePage — greeting + dashboard controls + cards + 4-stage explainer. */
 
 .launchpad {
-  padding: 2.5rem 0 0;
-  position: relative;
+  max-width: var(--content-max);
+  margin: 0 auto;
 }
 
 .dashboard-loading {
@@ -11,156 +10,6 @@
   padding: 3rem 0;
   text-align: center;
   color: var(--ink-3);
-}
-
-/* ===== Hero ============================================================= */
-
-.launchpad-hero {
-  position: relative;
-  text-align: center;
-  max-width: 760px;
-  margin: 0 auto 2.5rem;
-  padding: 1rem 0 1.5rem;
-  isolation: isolate;
-}
-
-.launchpad-hero__glow {
-  position: absolute;
-  inset: -2vmax -8vmax auto;
-  height: 32vmax;
-  pointer-events: none;
-  z-index: -1;
-  filter: blur(2px);
-}
-
-.launchpad-hero__glow-a,
-.launchpad-hero__glow-b {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.6;
-  will-change: transform;
-}
-
-.launchpad-hero__glow-a {
-  top: 0;
-  left: 18%;
-  width: 28vmax;
-  height: 28vmax;
-  background: radial-gradient(circle, var(--hero-glow-indigo) 0%, transparent 70%);
-  animation: hero-glow-a 22s ease-in-out infinite;
-}
-
-.launchpad-hero__glow-b {
-  top: 4vmax;
-  right: 12%;
-  width: 24vmax;
-  height: 24vmax;
-  background: radial-gradient(circle, var(--hero-glow-cyan) 0%, transparent 70%);
-  animation: hero-glow-b 28s ease-in-out infinite;
-}
-
-@keyframes hero-glow-a {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(4%, -3%) scale(1.05);
-  }
-}
-
-@keyframes hero-glow-b {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(-3%, 4%) scale(1.08);
-  }
-}
-
-.launchpad-hero__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.85rem;
-  border: 1px solid var(--hero-eyebrow-border);
-  border-radius: var(--radius-full);
-  background: var(--hero-eyebrow-bg);
-  color: var(--hero-eyebrow-fg);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  margin: 0 0 1.2rem;
-  position: relative;
-}
-
-.launchpad-hero__pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--hero-eyebrow-pulse);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--hero-eyebrow-pulse) 55%, transparent);
-  animation: hero-pulse 1.6s ease-out infinite;
-}
-
-.launchpad-hero__bolt {
-  display: inline-flex;
-  color: var(--hero-eyebrow-fg);
-}
-
-@keyframes hero-pulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hero-eyebrow-pulse) 55%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 8px color-mix(in srgb, var(--hero-eyebrow-pulse) 0%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--hero-eyebrow-pulse) 0%, transparent);
-  }
-}
-
-.launchpad-hero__title {
-  margin: 0 0 0.85rem;
-  font-size: clamp(2.1rem, 6vw, 4.2rem);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-weight: 800;
-}
-
-.launchpad-hero__title-strong {
-  background: linear-gradient(
-    90deg,
-    var(--hero-headline-from) 0%,
-    var(--hero-headline-via) 50%,
-    var(--hero-headline-to) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.launchpad-hero__title-accent {
-  background: linear-gradient(
-    100deg,
-    var(--hero-accent-from) 0%,
-    var(--hero-accent-via) 50%,
-    var(--hero-accent-to) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.launchpad-hero__lede {
-  margin: 0 auto;
-  max-width: 56ch;
-  color: var(--ink-3);
-  font-size: clamp(0.98rem, 1.2vw, 1.08rem);
-  line-height: 1.55;
 }
 
 /* ===== Cards section =================================================== */
@@ -191,6 +40,7 @@
   font-size: 0.85rem;
   color: var(--ink-2);
   text-decoration: none;
+  min-height: var(--control-h);
   padding: 0.35rem 0.7rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--card-edge);
@@ -200,7 +50,7 @@
 
 .launchpad-cards__see-all:hover {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--teal-glow) 40%, transparent);
+  border-color: var(--primary);
 }
 
 .launchpad-cards__controls {
@@ -209,12 +59,6 @@
   align-items: center;
   gap: 0.85rem;
   margin: 0 0 1.25rem;
-  padding: 0.85rem;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--input-bg) 35%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .launchpad-cards__search {
@@ -222,39 +66,40 @@
   min-width: 0;
 }
 
-.launchpad-cards__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 1.5rem;
-  border: 1px dashed var(--card-edge);
-  border-radius: var(--radius-md);
-  color: var(--ink-3);
-  margin: 0 0 1.5rem;
-}
-
-.launchpad-cards__empty p {
-  margin: 0;
-}
-
 /* ===== Grid ============================================================= */
+
+.workflow-grid-region {
+  container-type: inline-size;
+}
 
 .workflow-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
 }
 
-/* ===== Stages (kept from the original) ================================= */
+@container (min-width: 600px) {
+  .workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 960px) {
+  .workflow-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 1360px) {
+  .workflow-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ===== Stages =========================================================== */
 
 .launchpad-stages {
   margin: 0 0 2.5rem;
-  padding: clamp(1.2rem, 4vw, 2rem);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--card-surface) 0%, var(--card-surface-2) 100%);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink-5) 4%, transparent) inset;
 }
 
 .launchpad-stages h2 {
@@ -274,9 +119,9 @@
 
 .launchpad-stage {
   padding: 0.85rem;
-  border: 1px solid var(--line-subtle);
+  border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+  background: var(--paper-2);
 }
 
 .launchpad-stage h3 {
@@ -299,33 +144,13 @@
   min-width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 800;
   font-size: 0.85rem;
 }
 
-.launchpad-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 1.25rem;
-  color: var(--ink-4);
-  font-size: 0.9rem;
-}
-
-.launchpad-footer a {
-  color: var(--accent);
-}
-
 /* ===== Responsive ======================================================= */
-
-@media (max-width: 1024px) {
-  .workflow-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
 
 @media (max-width: 900px) {
   .launchpad-stages-list {
@@ -334,14 +159,6 @@
 }
 
 @media (max-width: 680px) {
-  .launchpad {
-    padding: 1.5rem 0;
-  }
-
-  .workflow-grid {
-    grid-template-columns: 1fr;
-  }
-
   .launchpad-stages-list {
     grid-template-columns: 1fr;
   }
@@ -349,20 +166,5 @@
   .launchpad-cards__controls {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .launchpad-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-/* ===== Reduced motion =================================================== */
-
-@media (prefers-reduced-motion: reduce) {
-  .launchpad-hero__glow-a,
-  .launchpad-hero__glow-b,
-  .launchpad-hero__pulse {
-    animation: none !important;
   }
 }

@@ -194,7 +194,6 @@
     },
     "loading": "Đang tải danh sách quy trình…",
     "loadError": "Không tải được danh sách quy trình.",
-    "noMatch": "Không có quy trình nào khớp với bộ lọc hiện tại.",
     "tableLabel": "Bảng quy trình",
     "column": {
       "name": "Tên",

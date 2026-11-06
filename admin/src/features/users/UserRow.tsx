@@ -145,16 +145,18 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
         )}
       </td>
       <td data-label={t('users.columns.actions')}>
-        <Link className="cortex-admin-link" to={`/users/${id}`}>
-          {t('users.row.view')}
-        </Link>
-        <button
-          type="button"
-          className="cortex-admin-btn cortex-admin-btn--sm"
-          onClick={() => setEditing(true)}
-        >
-          {t('users.row.edit')}
-        </button>
+        <div className="cortex-admin-row-actions">
+          <Link className="cortex-admin-link" to={`/users/${id}`}>
+            {t('users.row.view')}
+          </Link>
+          <button
+            type="button"
+            className="cortex-admin-btn cortex-admin-btn--sm"
+            onClick={() => setEditing(true)}
+          >
+            {t('users.row.edit')}
+          </button>
+        </div>
       </td>
     </tr>
   );

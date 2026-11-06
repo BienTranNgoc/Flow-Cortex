@@ -1,2 +1,2 @@
-/** Product name; a brand, so it is never translated. */
-export const BRAND_NAME = 'FlowCortex';
+/** The sidebar wordmark; a brand, so it is never translated. */
+export const NODI_WORDMARK = 'nodi';

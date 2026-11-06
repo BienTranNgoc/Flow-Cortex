@@ -1,29 +1,8 @@
 .runs-page {
   max-width: 980px;
-  margin: 0 auto;
-  padding: 1.75rem 1rem 3rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-}
-
-.runs-page__header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.runs-page__header h1 {
-  margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  letter-spacing: -0.01em;
-}
-
-.runs-page__subtitle {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 0.95rem;
-  max-width: 56ch;
 }
 
 .runs-page__controls {
@@ -69,7 +48,7 @@
 .runs-page__filter.is-active {
   background: var(--nav-active-bg);
   color: var(--nav-active-fg);
-  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  border-color: var(--primary);
 }
 
 .runs-page__list {
@@ -88,13 +67,13 @@
   padding: 0.95rem 1.05rem;
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--paper-2) 70%, transparent);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 4%, transparent);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
   transition: border-color var(--dur-quick) var(--ease-standard);
 }
 
 .runs-page__row:hover {
-  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  border-color: var(--primary);
 }
 
 .runs-page__row-main {
@@ -171,23 +150,12 @@
 }
 
 .runs-page__pill--running {
-  background: color-mix(in srgb, var(--teal) 22%, transparent);
+  background: var(--primary-soft);
   color: var(--teal-bright);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--teal) 35%, transparent),
-    0 0 12px color-mix(in srgb, var(--teal) 20%, transparent);
-  animation: runs-page-running-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes runs-page-running-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--teal) 35%, transparent),
-    0 0 12px color-mix(in srgb, var(--teal) 18%, transparent); }
-  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--teal) 50%, transparent),
-    0 0 22px color-mix(in srgb, var(--teal) 30%, transparent); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .runs-page__pill-spinner,
-  .runs-page__pill--running {
+  .runs-page__pill-spinner {
     animation: none;
   }
 }
@@ -254,7 +222,7 @@
 
 .runs-page__copy:hover {
   color: var(--teal);
-  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  border-color: var(--primary);
 }
 
 .runs-page__trigger {
@@ -272,18 +240,15 @@
 }
 
 .runs-page__trigger-dot[data-trigger='manual'] {
-  background: var(--teal);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--teal) 50%, transparent);
+  background: var(--primary);
 }
 
 .runs-page__trigger-dot[data-trigger='webhook'] {
-  background: var(--accent);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  background: var(--ink-5);
 }
 
 .runs-page__trigger-dot[data-trigger='schedule'] {
-  background: var(--indigo);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--indigo) 50%, transparent);
+  background: var(--tone-blue-text);
 }
 
 .runs-page__row-actions {
@@ -299,13 +264,13 @@
   align-items: center;
   gap: 0.4rem;
   color: var(--teal);
-  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  border-color: var(--primary);
 }
 
 .runs-page__retry:hover {
   color: var(--teal-bright);
-  background: color-mix(in srgb, var(--teal-glow) 12%, transparent);
-  border-color: color-mix(in srgb, var(--teal-glow) 55%, transparent);
+  background: var(--primary-soft);
+  border-color: var(--primary);
 }
 
 .runs-page__pill--success {
@@ -319,8 +284,8 @@
 }
 
 .runs-page__pill--waiting {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent);
+  background: var(--pill-warning-bg);
+  color: var(--pill-warning-fg);
 }
 
 .runs-page__empty {

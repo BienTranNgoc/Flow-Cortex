@@ -1,3 +1,4 @@
+import { ArrowRight } from '@phosphor-icons/react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -6,7 +7,7 @@ import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { iconForWorkflow } from './workflowIconKey';
 import { WorkflowIcon } from './WorkflowIcon';
-import { metaFor, stepsFor } from './workflowMeta';
+import { metaFor, stepsFor, type WorkflowMeta } from './workflowMeta';
 import { PipelineThumb } from './PipelineThumb';
 import './WorkflowCard.css';
 
@@ -27,6 +28,13 @@ const TONE_TO_CLASS: Record<'ready' | 'experimental' | 'attention', string> = {
   attention: 'workflow-card__status--attention',
 };
 
+const CATEGORY_TONE: Record<WorkflowMeta['category'], string> = {
+  video: 'blue',
+  audio: 'violet',
+  demo: 'amber',
+  production: 'cyan',
+};
+
 export function WorkflowCard({ workflow }: Readonly<WorkflowCardProps>) {
   const { t } = useTranslation();
   const meta = metaFor(workflow, t);
@@ -39,34 +47,32 @@ export function WorkflowCard({ workflow }: Readonly<WorkflowCardProps>) {
   return (
     <article className="workflow-card" tabIndex={-1}>
       <Link to={linkTo} className="workflow-card__link" aria-label={workflow.name ? t('dashboard.card.open', { name: workflow.name }) : t('dashboard.card.openUnnamed')}>
-        <header className="workflow-card__head">
+        <div className="workflow-card__media" data-tone={CATEGORY_TONE[meta.category]}>
           <span className="workflow-card__icon" aria-hidden="true">
             <WorkflowIcon icon={iconKey} size={20} />
           </span>
-          <div className="workflow-card__head-text">
-            <h3 className="workflow-card__title">{title}</h3>
-            {workflow.isShared && <p className="workflow-card__sub">{t('dashboard.card.sharedWithAll')}</p>}
-          </div>
-          <span className={`workflow-card__status ${TONE_TO_CLASS[meta.statusTone]}`}>
-            {meta.statusLabel}
-          </span>
-        </header>
+          <PipelineThumb steps={steps} />
+        </div>
 
-        <PipelineThumb steps={steps} />
+        <div className="workflow-card__body">
+          <h3 className="workflow-card__title">{title}</h3>
+          <p className="workflow-card__description">{meta.description}</p>
+          <ul className="workflow-card__chips">
+            <li className={`workflow-card__chip workflow-card__status ${TONE_TO_CLASS[meta.statusTone]}`}>
+              {meta.statusLabel}
+            </li>
+            {workflow.isShared && (
+              <li className="workflow-card__chip">{t('dashboard.card.sharedWithAll')}</li>
+            )}
+            <li className="workflow-card__chip">{etaLabel(meta.etaSeconds, t)}</li>
+            <li className="workflow-card__chip">{t('dashboard.card.steps', { n: stepCount })}</li>
+          </ul>
+        </div>
 
-        <p className="workflow-card__description">{meta.description}</p>
-
-        <footer className="workflow-card__foot">
-          <span className="workflow-card__meta">{etaLabel(meta.etaSeconds, t)}</span>
-          <span className="workflow-card__meta-sep" aria-hidden="true" />
-          <span className="workflow-card__meta">{t('dashboard.card.steps', { n: stepCount })}</span>
-          <span className="workflow-card__cta" aria-hidden="true">
-            {t('dashboard.card.launch')}
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" role="presentation">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </span>
-        </footer>
+        <span className="workflow-card__cta" aria-hidden="true">
+          {t('dashboard.card.launch')}
+          <ArrowRight size={14} weight="bold" />
+        </span>
       </Link>
     </article>
   );

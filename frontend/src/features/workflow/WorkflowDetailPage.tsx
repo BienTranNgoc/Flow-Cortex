@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { ApiError, type StartRunRequest, type WorkflowStepResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
+import { PageHeading } from '../../app/PageHeading';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
@@ -180,8 +181,8 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   }
 
   return (
-    <main>
-      <h1>{workflow?.name ?? t('workflow.detail.heading')}</h1>
+    <div>
+      <PageHeading title={workflow?.name ?? t('workflow.detail.heading')} />
       {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
       {workflowQuery.isError && <p role="alert">{t('workflow.detail.loadError')}</p>}
       {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
@@ -217,6 +218,6 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           })}
         </p>
       )}
-    </main>
+    </div>
   );
 }
