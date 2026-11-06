@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import './styles/tokens.css';
 import './app/base.css';
-import { AppShell } from './app/AppShell';
 import { DocsPage } from './app/DocsPage';
 import { demoPagesEnabled } from './app/featureFlags';
 import { HomePage } from './app/HomePage';
@@ -12,6 +11,7 @@ import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { RunsPage } from './app/RunsPage';
+import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
@@ -25,7 +25,7 @@ import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
 
-/** The page area inside the layout; keyed by path so navigating away from a failed page clears it. */
+/** A route's page area; keyed by path so navigating away from a failed page clears it. */
 function ContainedOutlet() {
   const { pathname } = useLocation();
   const { t } = useTranslation();
@@ -48,13 +48,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route
-            element={
-              <AppShell>
-                <Outlet />
-              </AppShell>
-            }
-          >
+          <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />

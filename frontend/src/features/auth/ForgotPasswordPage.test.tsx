@@ -1,8 +1,11 @@
-import { screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type Handler } from '../../test/fakeApi';
+import { AuthLayout } from './AuthLayout';
 import { ForgotPasswordPage } from './ForgotPasswordPage';
 
 const FEATURES = {
@@ -33,6 +36,26 @@ async function submit(user: ReturnType<typeof userEvent.setup>, email: string) {
 describe('ForgotPasswordPage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('opens inside the auth shell, with the banner stage, the card mascot and one level-1 heading', async () => {
+    stubApi({ 'GET /api/v1/features': { status: 200, body: FEATURES } });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/forgot-password']}>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
+    expect(document.querySelector('.auth-shell__stage')).not.toBeNull();
+    expect(document.querySelector('.auth-card svg.nodi-peek')).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Reset your password');
   });
 
   it('refuses a malformed email at its field without sending anything', async () => {

@@ -1,9 +1,11 @@
-import { screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, useLocation, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type Handler } from '../../test/fakeApi';
+import { AuthLayout } from './AuthLayout';
 import { ResetPasswordPage } from './ResetPasswordPage';
 
 const FEATURES = {
@@ -69,6 +71,26 @@ async function choose(user: ReturnType<typeof userEvent.setup>, password: string
 describe('ResetPasswordPage', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('opens inside the auth shell, with the banner stage, the card mascot and one level-1 heading', async () => {
+    stubApi({ 'GET /api/v1/features': { status: 200, body: FEATURES } });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/reset-password#token=abc']}>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText('New password')).toBeInTheDocument();
+    expect(document.querySelector('.auth-shell__stage')).not.toBeNull();
+    expect(document.querySelector('.auth-card svg.nodi-peek')).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Choose a new password');
   });
 
   it('refuses a password under 8 characters at its field', async () => {

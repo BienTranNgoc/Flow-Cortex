@@ -62,34 +62,45 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
       aria-label={t('auth.reset.request.formLabel')}
       className="auth-form"
     >
-      <div className="field">
-        <label htmlFor="reset-request-email">{t('auth.reset.request.emailLabel')}</label>
-        <input
-          id="reset-request-email"
-          ref={emailInput}
-          type="email"
-          autoComplete="email"
-          value={typedEmail}
-          onChange={(event) => setTypedEmail(event.target.value)}
-          aria-invalid={emailError ? 'true' : 'false'}
-          aria-describedby={emailError ? 'reset-request-email-error' : undefined}
-        />
+      <div className="auth-field">
+        <label htmlFor="reset-request-email" className="auth-label">
+          {t('auth.reset.request.emailLabel')}
+        </label>
+        <div className="auth-control">
+          <input
+            id="reset-request-email"
+            ref={emailInput}
+            type="email"
+            className="auth-input"
+            autoComplete="email"
+            value={typedEmail}
+            onChange={(event) => setTypedEmail(event.target.value)}
+            aria-invalid={emailError ? 'true' : 'false'}
+            aria-describedby={emailError ? 'reset-request-email-error' : undefined}
+          />
+        </div>
         {emailError && (
-          <p id="reset-request-email-error" role="alert">
+          <p id="reset-request-email-error" role="alert" className="auth-error">
             {emailError}
           </p>
         )}
       </div>
-      <button className="primary-button" type="submit" disabled={forgot.isPending}>
+      <button
+        className="auth-btn auth-btn--primary"
+        type="submit"
+        disabled={forgot.isPending}
+        aria-busy={forgot.isPending}
+      >
+        {forgot.isPending && <span className="auth-spinner" aria-hidden="true" />}
         {forgot.isPending ? t('auth.reset.request.sending') : action}
       </button>
       {forgot.isSuccess && (
-        <p role="status" className="auth-subtitle">
+        <p role="status" className="auth-status">
           {t('auth.reset.request.sent', { email: forgot.variables })}
         </p>
       )}
       {refusal && (
-        <p role="alert" className="form-error">
+        <p role="alert" className="auth-alert">
           {refusal}
         </p>
       )}

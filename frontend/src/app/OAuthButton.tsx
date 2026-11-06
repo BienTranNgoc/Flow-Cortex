@@ -10,6 +10,7 @@ export interface OAuthButtonProps {
   readonly label: string;
   readonly href?: string;
   readonly onSelect?: (provider: OAuthButtonProps['provider']) => void;
+  readonly className?: string;
 }
 
 const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {
@@ -53,11 +54,19 @@ const ICONS: Record<OAuthButtonProps['provider'], React.ReactNode> = {
   ),
 };
 
-export function OAuthButton({ provider, label, href, onSelect }: OAuthButtonProps) {
+export function OAuthButton({
+  provider,
+  label,
+  href,
+  onSelect,
+  className: extraClassName,
+}: OAuthButtonProps) {
   if (!oauthEnabled()) {
     return null;
   }
-  const className = `oauth-button oauth-button--${provider}`;
+  const className = [`oauth-button oauth-button--${provider}`, extraClassName]
+    .filter(Boolean)
+    .join(' ');
   const content = (
     <>
       <span className="oauth-button__icon" aria-hidden="true">

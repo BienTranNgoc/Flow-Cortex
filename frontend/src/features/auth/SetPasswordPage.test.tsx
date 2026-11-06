@@ -1,9 +1,11 @@
-import { screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
 import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
+import { AuthLayout } from './AuthLayout';
 import { SetPasswordPage } from './SetPasswordPage';
 
 const ME_REQUIRED = {
@@ -268,6 +270,28 @@ describe('SetPasswordPage', () => {
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
   });
 
+  it('opens inside the auth shell, with the banner stage, the card mascot and one level-1 heading', async () => {
+    setToken('jwt-confirmed', false);
+    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ME_REQUIRED } });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={[withSetupToken]}>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/set-password" element={<SetPasswordPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText('New password')).toBeInTheDocument();
+    expect(document.querySelector('.auth-shell__stage')).not.toBeNull();
+    expect(document.querySelector('.auth-card svg.nodi-peek')).not.toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Choose your password');
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -290,8 +314,8 @@ describe('SetPasswordPage', () => {
       await user.type(screen.getByLabelText('Xác nhận mật khẩu'), 'other');
       await user.click(screen.getByRole('button', { name: 'Lưu mật khẩu' }));
 
-      expect(await screen.findByText('Mật khẩu phải có ít nhất 8 ký tự')).toBeInTheDocument();
-      expect(screen.getByText('Mật khẩu xác nhận không khớp, hãy nhập lại')).toBeInTheDocument();
+      expect(await screen.findByText('Mật khẩu cần ít nhất 8 ký tự')).toBeInTheDocument();
+      expect(screen.getByText('Mật khẩu nhập lại không khớp')).toBeInTheDocument();
       expect(calls.filter((call) => call.method === 'PUT')).toEqual([]);
     });
 
