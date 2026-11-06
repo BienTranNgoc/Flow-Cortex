@@ -1,0 +1,222 @@
+{
+  "stepError": {
+    "input_rejected": "Không dùng được tệp vừa tải lên. Hãy tải tệp lên lại.",
+    "probe_failed": "Không đọc được tệp này dưới dạng âm thanh hoặc video. Hãy tải lên một tệp video hoặc âm thanh (ví dụ .mp4).",
+    "lease_expired": "Bộ xử lý media đã ngừng phản hồi. Hãy thử chạy lại.",
+    "queue_timeout": "Bộ xử lý media quá bận nên không bắt đầu kịp. Hãy thử chạy lại.",
+    "run_timeout": "Tệp này xử lý quá lâu nên đã bị dừng. Hãy thử một tệp ngắn hơn.",
+    "media_disabled": "Bộ xử lý media hiện đang tắt.",
+    "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
+    "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
+    "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
+    "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
+    "noMessage": "Bước này đã dừng do gặp lỗi."
+  },
+  "step": {
+    "state": {
+      "pending": "Chờ xử lý",
+      "waiting": "Đang chờ",
+      "running": "Đang chạy",
+      "completed": "Hoàn tất",
+      "error": "Lỗi",
+      "skipped": "Đã bỏ qua",
+      "needsYou": "Cần bạn xử lý"
+    },
+    "label": {
+      "probe": "Kiểm tra tệp",
+      "extract_audio": "Tách âm thanh gốc",
+      "review": "Bước duyệt"
+    },
+    "fallback": "Bước {{order}}",
+    "progress": "Tiến độ bước {{order}}",
+    "waitingToStart": "Đang chờ bắt đầu…",
+    "timing": {
+      "timeTaken": "Thời gian thực hiện",
+      "startTime": "Thời điểm bắt đầu",
+      "finishTime": "Thời điểm kết thúc",
+      "duration": "Thời lượng:",
+      "started": "Bắt đầu:",
+      "finished": "Kết thúc:"
+    }
+  },
+  "output": {
+    "field": {
+      "duration": "Thời lượng",
+      "dimensions": "Kích thước",
+      "videoCodec": "Codec video",
+      "audioCodec": "Codec âm thanh"
+    },
+    "showRaw": "Xem dữ liệu gốc",
+    "hideRaw": "Ẩn dữ liệu gốc"
+  },
+  "pipeline": {
+    "region": "Các bước",
+    "hint": "Chọn một bước để xem kết quả.",
+    "retried": "Đã thử lại {{n}} lần",
+    "notConfigured": "Chưa cấu hình"
+  },
+  "run": {
+    "heading": {
+      "pending": "Lượt chạy đang chờ",
+      "running": "Lượt chạy đang diễn ra",
+      "waitingApproval": "Đang chờ bạn duyệt",
+      "completed": "Lượt chạy đã hoàn tất",
+      "error": "Lượt chạy bị lỗi",
+      "cancelling": "Đang dừng…",
+      "cancelled": "Lượt chạy đã bị hủy"
+    },
+    "headingOther": "Lượt chạy: {{status}}",
+    "back": "Quay lại quy trình",
+    "noRun": "Chưa chọn lượt chạy.",
+    "loading": "Đang tải lượt chạy…",
+    "loadError": "Không tải được lượt chạy này."
+  },
+  "file": "Tệp: {{name}}",
+  "download": {
+    "summary": "Tải bản tóm tắt (.txt)",
+    "technical": "Tải chi tiết kỹ thuật (tệp JSON)",
+    "gettingFile": "Đang lấy tệp…",
+    "linkError": "Không lấy được liên kết tải xuống",
+    "extractedAudio": "Tải âm thanh đã tách (WAV)",
+    "named": "Tải {{name}}",
+    "adVideo": "Video quảng cáo ({{name}})",
+    "cannotPlay": "Trình duyệt của bạn không phát được video này.",
+    "playFailed": "Không phát được video. Hãy tải video xuống.",
+    "hideVideo": "Ẩn video",
+    "loadingVideo": "Đang tải video…",
+    "watchVideo": "Xem video"
+  },
+  "approval": {
+    "region": "Duyệt trước khi lượt chạy tiếp tục",
+    "contentLabel": "Nội dung cần duyệt",
+    "approve": "Duyệt",
+    "approving": "Đang duyệt…",
+    "reject": "Từ chối",
+    "rejecting": "Đang từ chối…",
+    "approveFailed": "Không duyệt được bước này",
+    "rejectFailed": "Không từ chối được bước này",
+    "scriptMovedOn": "Kịch bản này đã thay đổi ở một tab khác. Hãy tải lại trang để xem bản sửa mới nhất.",
+    "contentEmpty": "Nội dung không được để trống",
+    "loadingScript": "Đang tải kịch bản…",
+    "scriptLoadError": "Không tải được các bản sửa của kịch bản.",
+    "loadingTask": "Đang tải bước cần duyệt…",
+    "taskLoadError": "Không tải được bước cần duyệt."
+  },
+  "script": {
+    "label": "Kịch bản cần duyệt",
+    "tooLong": "Kịch bản này có thể dài hơn video 10 giây. Hãy giữ khoảng {{max}} từ — lời đọc dài hơn 10 giây sẽ làm dừng lượt chạy.",
+    "save": "Lưu bản sửa",
+    "saving": "Đang lưu…",
+    "unsaved": "Có thay đổi chưa lưu — hãy lưu bản sửa trước khi duyệt.",
+    "saveFailed": "Không lưu được bản sửa này",
+    "leaveConfirm": "Bạn có thay đổi kịch bản chưa lưu. Rời khỏi trang này?",
+    "history": "Các bản sửa kịch bản",
+    "revision": "Bản sửa {{number}}",
+    "approved": "Đã duyệt"
+  },
+  "start": {
+    "formLabel": "Bắt đầu lượt chạy",
+    "button": "Bắt đầu lượt chạy",
+    "starting": "Đang bắt đầu…",
+    "uploadingPercent": "Đang tải lên… {{percent}} %",
+    "failed": "Không bắt đầu được lượt chạy.",
+    "executionDisabled": "Việc chạy quy trình hiện đang tạm tắt.",
+    "nextActionLater": "Hãy thử lại sau, hoặc quay lại danh sách quy trình.",
+    "nextAction": "Hãy thử lại, hoặc quay lại danh sách quy trình.",
+    "inputLabel": "Dữ liệu đầu vào (không bắt buộc)",
+    "mediaFile": "Tệp media",
+    "uploadProgress": "Tiến độ tải lên",
+    "uploadUnfinished": "Tải lên chưa hoàn tất. Hãy thử lại.",
+    "retry": "Thử lại"
+  },
+  "productVideo": {
+    "formLabel": "Bắt đầu lượt chạy video sản phẩm",
+    "preparing": "Đang chuẩn bị…",
+    "uploading": "Đang tải lên {{index}} / {{total}}…",
+    "field": {
+      "productName": "Tên sản phẩm",
+      "description": "Mô tả"
+    },
+    "required": "{{field}} là bắt buộc.",
+    "image": "Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *",
+    "imageSelected": "Đã chọn 1 ảnh: {{name}}",
+    "uploadingImage": "Đang tải lên ảnh {{index}}",
+    "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại."
+  },
+  "validation": {
+    "noFile": "Hãy chọn một tệp video hoặc âm thanh để tải lên",
+    "kindSize": "Tệp loại này tối đa {{max}} MB. Định dạng được chấp nhận: {{formats}}.",
+    "fileType": "Chưa kiểm tra được loại tệp này. Hãy dùng .mp4, .mov, .webm, .mkv, .m4a, .mp3 hoặc .wav.",
+    "imageType": "Hãy dùng .jpg, .jpeg, .png hoặc .webp.",
+    "noImage": "Hãy thêm ít nhất một ảnh sản phẩm",
+    "tooManyImages": "Tối đa 1 ảnh cho mỗi lượt chạy.",
+    "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ"
+  },
+  "stop": {
+    "open": "Dừng quy trình",
+    "title": "Dừng quy trình này?",
+    "text": "Bước hiện tại sẽ chạy xong, sau đó lượt chạy dừng lại. Các bước còn lại sẽ không chạy và không bị tính phí. Kết quả của các bước đã xong vẫn được giữ lại.",
+    "keep": "Tiếp tục chạy",
+    "confirm": "Dừng",
+    "stopping": "Đang dừng…",
+    "failed": "Không dừng được lượt chạy. Hãy thử lại."
+  },
+  "incomplete": {
+    "summary": "Quy trình này chưa chạy được.",
+    "summaryStep": "Quy trình này chưa chạy được: bước {{order}} chưa được cấu hình đầy đủ.",
+    "line": "Bước {{order}}: {{reason}}",
+    "lineNamed": "Bước {{order}} · {{name}}: {{reason}}"
+  },
+  "detail": {
+    "noWorkflow": "Chưa chọn quy trình.",
+    "heading": "Quy trình",
+    "shared": "Được chia sẻ với mọi thành viên.",
+    "loadError": "Không tải được quy trình này. Hãy thử lại hoặc chọn quy trình khác.",
+    "loading": "Đang tải quy trình…"
+  },
+  "list": {
+    "heading": "Quy trình",
+    "welcomeBack": "Chào mừng trở lại, <strong>{{name}}</strong>. Quản lý các quy trình của bạn.",
+    "nameFallback": "bạn",
+    "searchLabel": "Tìm quy trình",
+    "searchPlaceholder": "Tìm quy trình...",
+    "scope": {
+      "legend": "Phạm vi",
+      "prefix": "Phạm vi:",
+      "all": "Tất cả",
+      "shared": "Được chia sẻ",
+      "mine": "Của tôi"
+    },
+    "layout": {
+      "legend": "Bố cục",
+      "grid": "Bố cục lưới",
+      "list": "Bố cục danh sách"
+    },
+    "loading": "Đang tải danh sách quy trình…",
+    "loadError": "Không tải được danh sách quy trình.",
+    "noMatch": "Không có quy trình nào khớp với bộ lọc hiện tại.",
+    "tableLabel": "Bảng quy trình",
+    "column": {
+      "name": "Tên",
+      "status": "Trạng thái",
+      "owner": "Chủ sở hữu",
+      "steps": "Số bước",
+      "actions": "Thao tác"
+    },
+    "untitled": "Quy trình chưa đặt tên",
+    "stepOne": "{{n}} bước",
+    "stepOther": "{{n}} bước",
+    "rowActions": "Thao tác trên dòng",
+    "runTitle": "Chạy quy trình",
+    "runNamed": "Chạy {{name}}",
+    "showing": "Đang hiển thị {{shown}} trên {{total}} quy trình"
+  },
+  "owner": {
+    "you": "Bạn",
+    "sharedTeam": "Nhóm dùng chung",
+    "ownedByYou": "Do bạn sở hữu",
+    "sharedWorkflow": "Quy trình được chia sẻ",
+    "mine": "Của tôi",
+    "shared": "Được chia sẻ"
+  }
+}

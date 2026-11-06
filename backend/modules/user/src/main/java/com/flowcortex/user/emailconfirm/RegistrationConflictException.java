@@ -1,6 +1,7 @@
 package com.flowcortex.user.emailconfirm;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 
 /**
  * A registration value another account already holds: 409 whose {@code errors} names the field
@@ -10,17 +11,17 @@ public class RegistrationConflictException extends ConflictException {
 
     private final String field;
 
-    private RegistrationConflictException(String field, String message) {
-        super(message);
+    private RegistrationConflictException(String field, LocalizedMessage detail) {
+        super(detail);
         this.field = field;
     }
 
     public static RegistrationConflictException emailTaken() {
-        return new RegistrationConflictException("email", "An account with this email already exists");
+        return new RegistrationConflictException("email", new LocalizedMessage("auth.register.emailTaken"));
     }
 
     public static RegistrationConflictException usernameTaken() {
-        return new RegistrationConflictException("username", "This username is taken");
+        return new RegistrationConflictException("username", new LocalizedMessage("auth.register.usernameTaken"));
     }
 
     public String getField() {

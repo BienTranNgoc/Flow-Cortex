@@ -30,10 +30,10 @@ export const IMAGE: UploadKind = {
 };
 const MEDIA_KINDS: readonly UploadKind[] = [VIDEO, AUDIO];
 
-/** The server's `errors.size` sentence for `kind`, word for word. */
-function sizeSentence(kind: UploadKind): string {
-  const formats = kind.extensions.map((extension) => `.${extension}`).join(', ');
-  return `Files of this type must be at most ${kind.maxBytes / MEGABYTE} MB. Accepted: ${formats}.`;
+/** A translation key with its values, so a problem already on screen follows a language switch. */
+export interface FileProblem {
+  messageKey: string;
+  values?: Record<string, string | number>;
 }
 
 /** Lower-case extension of `fileName` without the dot, or `''` when it has none. */
@@ -42,27 +42,29 @@ export function extensionOf(fileName: string): string {
   return dot < 0 ? '' : fileName.slice(dot + 1).toLowerCase();
 }
 
-/** The kind's sentence when `file` is empty or over the kind's cap; exactly the cap is accepted. */
-export function sizeProblem(file: File, kind: UploadKind): string | null {
-  return file.size < 1 || file.size > kind.maxBytes ? sizeSentence(kind) : null;
+/**
+ * The server's `errors.size` sentence for `kind` (word for word in English) when `file` is empty
+ * or over the kind's cap; exactly the cap is accepted.
+ */
+export function sizeProblem(file: File, kind: UploadKind): FileProblem | null {
+  if (file.size >= 1 && file.size <= kind.maxBytes) {
+    return null;
+  }
+  const formats = kind.extensions.map((extension) => `.${extension}`).join(', ');
+  return {
+    messageKey: 'workflow.validation.kindSize',
+    values: { max: kind.maxBytes / MEGABYTE, formats },
+  };
 }
 
-export interface FileProblem {
-  message: string;
-}
-
-export const NO_FILE: FileProblem = { message: 'Choose a video or audio file to upload' };
+export const NO_FILE: FileProblem = { messageKey: 'workflow.validation.noFile' };
 
 /** Why a picked file cannot be checked, or `null` when it may be uploaded. */
 export function mediaFileProblem(file: File): FileProblem | null {
   const extension = extensionOf(file.name);
   const kind = MEDIA_KINDS.find((candidate) => candidate.extensions.includes(extension));
   if (!kind) {
-    return {
-      message:
-        "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
-    };
+    return { messageKey: 'workflow.validation.fileType' };
   }
-  const tooLarge = sizeProblem(file, kind);
-  return tooLarge ? { message: tooLarge } : null;
+  return sizeProblem(file, kind);
 }

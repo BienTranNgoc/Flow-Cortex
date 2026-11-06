@@ -1,0 +1,107 @@
+{
+  "errorView": {
+    "title": "Đã xảy ra lỗi",
+    "message": "Không thể hiển thị trang này. Hãy tải lại để thử lần nữa.",
+    "reload": "Tải lại"
+  },
+  "errors": {
+    "requestFailed": "Không thực hiện được yêu cầu. Hãy thử lại."
+  },
+  "language": {
+    "groupLabel": "Ngôn ngữ",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "theme": {
+    "switchToLight": "Chuyển sang giao diện sáng",
+    "switchToDark": "Chuyển sang giao diện tối",
+    "light": "Sáng",
+    "dark": "Tối"
+  },
+  "header": {
+    "title": "Quản trị Flow-Cortex",
+    "homeLink": "Trang chủ quản trị FlowCortex",
+    "console": "Trang quản trị"
+  },
+  "account": {
+    "fallbackName": "Tài khoản",
+    "trigger": "{{name}}, menu tài khoản",
+    "menu": "Menu tài khoản",
+    "details": "Thông tin tài khoản",
+    "signOut": "Đăng xuất",
+    "dialogTitle": "Tài khoản",
+    "copyEmail": "Sao chép email vào bộ nhớ tạm",
+    "copyEmailShort": "Sao chép email",
+    "close": "Đóng hộp thoại tài khoản",
+    "dangerZone": "Vùng nguy hiểm",
+    "delete": "Xóa tài khoản",
+    "deleteDisabled": "Không áp dụng cho quản trị viên",
+    "deleteHint": "Không thể xóa tài khoản quản trị trong hộp thoại này. Hãy dùng nhà cung cấp định danh."
+  },
+  "shell": {
+    "noPage": "Tài khoản này không có trang nào để truy cập.",
+    "nav": {
+      "label": "Điều hướng quản trị",
+      "menu": "Menu",
+      "hideMenu": "Ẩn menu",
+      "expand": "Mở rộng thanh bên",
+      "collapse": "Thu gọn thanh bên",
+      "comingSoon": "Sắp ra mắt",
+      "disabledTitle": "{{label}} — {{tag}}",
+      "unavailable": "không khả dụng",
+      "systemStatus": "Hệ thống ổn định",
+      "groups": {
+        "overview": "Tổng quan",
+        "workflowOps": "Vận hành quy trình",
+        "creditsBilling": "Credit & thanh toán",
+        "administration": "Quản trị",
+        "system": "Hệ thống"
+      },
+      "items": {
+        "dashboard": "Tổng quan",
+        "workflows": "Quy trình & mẫu",
+        "runs": "Lượt chạy",
+        "approvals": "Hàng chờ duyệt",
+        "credits": "Credit & ví",
+        "providers": "Nhà cung cấp mô hình",
+        "users": "Người dùng",
+        "smsOutbox": "Hộp thư đi SMS",
+        "features": "Công tắc tính năng",
+        "auditLog": "Nhật ký kiểm toán",
+        "mediaJobs": "Tác vụ media",
+        "voiceQuota": "Hạn mức giọng nói",
+        "health": "Tình trạng hệ thống"
+      }
+    },
+    "noAccess": {
+      "title": "Không có quyền truy cập",
+      "messageWithEmail": "<account>{{email}}</account> không có vai trò ADMIN nên không thể dùng trang quản trị.",
+      "message": "Tài khoản này không có vai trò ADMIN nên không thể dùng trang quản trị.",
+      "signOut": "Đăng xuất"
+    },
+    "session": {
+      "checkingSession": "Đang kiểm tra phiên đăng nhập…",
+      "checkingAccount": "Đang kiểm tra tài khoản…",
+      "accountError": "Không thể kiểm tra tài khoản của bạn.",
+      "retry": "Thử lại"
+    },
+    "list": {
+      "emptyPage": "Không có {{noun}} nào trên trang này.",
+      "backToFirstPage": "Về trang đầu",
+      "noMatch": "Không có {{noun}} nào khớp với bộ lọc này",
+      "clearFilter": "Xóa bộ lọc",
+      "empty": "Chưa có {{noun}} nào.",
+      "status": "Trạng thái",
+      "allStatuses": "Tất cả trạng thái",
+      "refresh": "Làm mới",
+      "disabled": "Trang quản trị đang tạm tắt",
+      "loadError": "Không tải được {{noun}}.",
+      "retry": "Thử lại",
+      "loading": "Đang tải {{noun}}…",
+      "stale": "Đang hiển thị kết quả đã tải trước khi xảy ra lỗi này.",
+      "previousPage": "Trang trước",
+      "pager": "Trang {{page}}/{{pages}} · {{total}} {{noun}}",
+      "nextPage": "Trang sau"
+    }
+  }
+}

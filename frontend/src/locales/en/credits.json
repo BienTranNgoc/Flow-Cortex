@@ -1,0 +1,7 @@
+{
+  "notEnough": "Not enough credits: you have {{balance}}, this run needs {{required}} (short {{shortfall}}).",
+  "runAnyway": "Run anyway",
+  "estimatedCost": "Estimated cost: {{amount}} credits",
+  "chargedSoFarOne": "Charged for this run so far: {{amount}} credit",
+  "chargedSoFarOther": "Charged for this run so far: {{amount}} credits"
+}

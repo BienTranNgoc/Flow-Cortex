@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowService;
@@ -47,7 +48,7 @@ class WorkflowServiceImpl implements WorkflowService {
     @Transactional(readOnly = true)
     public WorkflowView getVisibleWorkflow(UUID currentUserId, UUID workflowId) {
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
-                .orElseThrow(() -> new NotFoundException("Workflow not found: " + workflowId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
         return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote);
     }
 

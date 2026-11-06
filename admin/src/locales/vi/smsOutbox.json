@@ -1,0 +1,13 @@
+{
+  "title": "Hộp thư đi SMS",
+  "eyebrow": "Quản trị",
+  "description": "Mã dùng một lần mà bộ gửi SMS dùng khi phát triển đã lưu lại thay vì gửi đi.",
+  "loading": "Đang tải tin nhắn SMS…",
+  "loadError": "Không tải được tin nhắn SMS.",
+  "empty": "Chưa có tin nhắn SMS nào.",
+  "columns": {
+    "number": "Số điện thoại",
+    "text": "Nội dung",
+    "sent": "Gửi lúc"
+  }
+}

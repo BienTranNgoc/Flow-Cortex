@@ -1,5 +1,6 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { ArrowLeft } from 'lucide-react';
@@ -7,29 +8,31 @@ import { PageHeading } from '../../app/PageHeading';
 import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
+import { roleLabel, statusLabel } from './enumLabels';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
 const userRoleSchema = z.enum(['ADMIN', 'MEMBER', 'CREATOR']);
 
 export function UserDetailPage() {
-  usePageTitle('User details');
+  const { t } = useTranslation();
+  usePageTitle(t('users.detail.title'));
   const { userId = '' } = useParams();
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
   const updateMutation = useUpdateUserMutation();
   const [role, setRole] = useState('');
-  const [roleError, setRoleError] = useState('');
+  const [roleErrorKey, setRoleErrorKey] = useState('');
 
   if (!parsedId.success) {
     return (
       <div>
-        <h1>User not found</h1>
+        <h1>{t('users.detail.notFound')}</h1>
         <p className="cortex-admin-error" role="alert">
-          The user ID is not valid.
+          {t('users.detail.invalidId')}
         </p>
         <Link className="cortex-admin-link" to="/users">
-          Back to users
+          {t('users.detail.backToUsers')}
         </Link>
       </div>
     );
@@ -38,8 +41,8 @@ export function UserDetailPage() {
   if (userQuery.isLoading) {
     return (
       <div>
-        <h1>User details</h1>
-        <output className="cortex-admin-loading">Loading user…</output>
+        <h1>{t('users.detail.title')}</h1>
+        <output className="cortex-admin-loading">{t('users.detail.loading')}</output>
       </div>
     );
   }
@@ -47,14 +50,14 @@ export function UserDetailPage() {
   if (userQuery.isError || !userQuery.data) {
     return (
       <div>
-        <h1>User details</h1>
+        <h1>{t('users.detail.title')}</h1>
         <div className="cortex-admin-error">
-          <p role="alert">Could not load this user.</p>
+          <p role="alert">{t('users.detail.loadError')}</p>
           <button type="button" className="cortex-admin-btn" onClick={() => userQuery.refetch()}>
-            Retry
+            {t('users.detail.retry')}
           </button>
           <Link className="cortex-admin-link" to="/users">
-            Back to users
+            {t('users.detail.backToUsers')}
           </Link>
         </div>
       </div>
@@ -69,21 +72,21 @@ export function UserDetailPage() {
   const saveRole = () => {
     const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
-      setRoleError('Select a valid role.');
+      setRoleErrorKey('users.detail.invalidRole');
       return;
     }
-    setRoleError('');
+    setRoleErrorKey('');
     updateMutation.mutate({ id: parsedId.data, changes: { role: parsedRole.data } });
   };
 
   return (
     <div>
       <Link className="cortex-admin-back-link" to="/users">
-        <ArrowLeft size={16} aria-hidden="true" /> All users
+        <ArrowLeft size={16} aria-hidden="true" /> {t('users.detail.allUsers')}
       </Link>
       <PageHeading
-        eyebrow="User account"
-        title={user.name || user.email || 'User'}
+        eyebrow={t('users.detail.eyebrow')}
+        title={user.name || user.email || t('users.detail.userFallback')}
         description={user.email}
         actions={
           <span
@@ -93,7 +96,7 @@ export function UserDetailPage() {
                 : 'cortex-admin-pill cortex-admin-pill--warning'
             }
           >
-            {user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+            {statusLabel(t, user.status)}
           </span>
         }
       />
@@ -102,8 +105,8 @@ export function UserDetailPage() {
         <section className="cortex-admin-panel">
           <header className="cortex-admin-section-heading">
             <div>
-              <h2>Account information</h2>
-              <p>Identity and access details.</p>
+              <h2>{t('users.detail.accountInfo')}</h2>
+              <p>{t('users.detail.accountInfoHint')}</p>
             </div>
           </header>
           <div className="cortex-admin-user-cell">
@@ -121,36 +124,36 @@ export function UserDetailPage() {
           <hr className="cortex-admin-divider" />
           <dl className="cortex-admin-meta-list">
             <div>
-              <dt>User ID</dt>
+              <dt>{t('users.detail.userId')}</dt>
               <dd>
                 <code className="cortex-admin-table-job-id">{user.id}</code>
               </dd>
             </div>
             <div>
-              <dt>Email</dt>
+              <dt>{t('users.detail.email')}</dt>
               <dd>{user.email}</dd>
             </div>
             <div>
-              <dt>Role</dt>
-              <dd>{user.role}</dd>
+              <dt>{t('users.detail.role')}</dt>
+              <dd>{roleLabel(t, user.role)}</dd>
             </div>
             <div>
-              <dt>Status</dt>
+              <dt>{t('users.detail.status')}</dt>
               <dd>
                 <StatusPill
                   tone={user.status === 'ACTIVE' ? 'success' : 'warning'}
-                  label={user.status === 'SUSPENDED' ? 'Suspended' : 'Active'}
+                  label={statusLabel(t, user.status)}
                 />
               </dd>
             </div>
             <div>
-              <dt>Registered</dt>
+              <dt>{t('users.detail.registered')}</dt>
               <dd>
                 <Timestamp value={user.createdAt} />
               </dd>
             </div>
             <div>
-              <dt>Last updated</dt>
+              <dt>{t('users.detail.lastUpdated')}</dt>
               <dd>
                 <Timestamp value={user.updatedAt} />
               </dd>
@@ -161,23 +164,23 @@ export function UserDetailPage() {
         <section className="cortex-admin-panel">
           <header className="cortex-admin-section-heading">
             <div>
-              <h2>Access management</h2>
-              <p>Changes are recorded without deleting account history.</p>
+              <h2>{t('users.detail.access')}</h2>
+              <p>{t('users.detail.accessHint')}</p>
             </div>
           </header>
           <div className="cortex-admin-field">
-            <label htmlFor="user-role">Role</label>
+            <label htmlFor="user-role">{t('users.detail.role')}</label>
             <select
               id="user-role"
               value={role || user.role || 'MEMBER'}
               onChange={(event) => {
                 setRole(event.target.value);
-                setRoleError('');
+                setRoleErrorKey('');
               }}
             >
-              <option value="MEMBER">Member</option>
-              <option value="ADMIN">Admin</option>
-              <option value="CREATOR">Creator</option>
+              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
+              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
             </select>
           </div>
           <button
@@ -186,9 +189,13 @@ export function UserDetailPage() {
             onClick={saveRole}
             disabled={updateMutation.isPending || (role || user.role) === user.role}
           >
-            {updateMutation.isPending ? 'Saving…' : 'Save role'}
+            {updateMutation.isPending ? t('users.detail.saving') : t('users.detail.saveRole')}
           </button>
-          {roleError && <p className="cortex-admin-form-error" role="alert">{roleError}</p>}
+          {roleErrorKey && (
+            <p className="cortex-admin-form-error" role="alert">
+              {t(roleErrorKey)}
+            </p>
+          )}
           <hr className="cortex-admin-divider" />
           <button
             type="button"
@@ -202,11 +209,15 @@ export function UserDetailPage() {
             }
             disabled={updateMutation.isPending}
           >
-            {nextStatus === 'SUSPENDED' ? 'Suspend account' : 'Reactivate account'}
+            {nextStatus === 'SUSPENDED' ? t('users.detail.suspend') : t('users.detail.reactivate')}
           </button>
-          {updateError && <p className="cortex-admin-form-error" role="alert">{updateError.detail}</p>}
+          {updateError && (
+            <p className="cortex-admin-form-error" role="alert">
+              {updateError.detail}
+            </p>
+          )}
           {updateMutation.isSuccess && (
-            <p className="cortex-admin-form-success">Account updated.</p>
+            <p className="cortex-admin-form-success">{t('users.detail.updated')}</p>
           )}
         </section>
       </div>

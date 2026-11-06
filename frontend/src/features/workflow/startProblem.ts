@@ -1,4 +1,6 @@
 import { ApiError, type ProblemDetail } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
+import i18n, { activeLocale, type Locale } from '../../lib/i18n';
 import { formatCredits } from '../credits/formatCredits';
 
 export interface IncompleteStep {
@@ -28,7 +30,12 @@ export type StartProblem =
   | NotEnoughCredits
   | { kind: 'alert'; message: string };
 
-type Reader = (problem: ProblemDetail, status: number) => StartProblem | null;
+type Reader = (
+  problem: ProblemDetail,
+  status: number,
+  t: TFunction,
+  locale: Locale,
+) => StartProblem | null;
 
 /** Fields the server names when it refuses the picked file(s), read in this order. */
 const FILE_FIELDS = ['uploadIds', 'uploadId', 'size', 'fileName'] as const;
@@ -38,7 +45,7 @@ function problemCode(problem: ProblemDetail): unknown {
   return 'code' in problem ? problem.code : undefined;
 }
 
-const readIncomplete: Reader = (problem, status) => {
+const readIncomplete: Reader = (problem, status, t) => {
   if (status !== 422 || problemCode(problem) !== 'WORKFLOW_INCOMPLETE') {
     return null;
   }
@@ -52,8 +59,8 @@ const readIncomplete: Reader = (problem, status) => {
   const summary =
     problem.detail ??
     (firstOrder === null
-      ? "This workflow can't run yet."
-      : `This workflow can't run yet: step ${firstOrder} is not fully configured.`);
+      ? t('workflow.incomplete.summary')
+      : t('workflow.incomplete.summaryStep', { order: firstOrder }));
   return { kind: 'incomplete', summary, firstOrder, steps };
 };
 
@@ -67,7 +74,7 @@ function amount(problem: ProblemDetail, name: 'balance' | 'required' | 'shortfal
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-const readNotEnoughCredits: Reader = (problem, status) => {
+const readNotEnoughCredits: Reader = (problem, status, t, locale) => {
   if (status !== 402 || problemCode(problem) !== 'INSUFFICIENT_CREDITS') {
     return null;
   }
@@ -79,9 +86,11 @@ const readNotEnoughCredits: Reader = (problem, status) => {
   }
   return {
     kind: 'credits',
-    message:
-      `Not enough credits: you have ${formatCredits(balance)}, this run needs ` +
-      `${formatCredits(required)} (short ${formatCredits(shortfall)}).`,
+    message: t('credits.notEnough', {
+      balance: formatCredits(balance, locale),
+      required: formatCredits(required, locale),
+      shortfall: formatCredits(shortfall, locale),
+    }),
     canRunAnyway: balance > 0,
   };
 };
@@ -91,17 +100,23 @@ const READERS: readonly Reader[] = [readIncomplete, readNotEnoughCredits, readFi
 
 /**
  * Maps an error from `/uploads` or a run start to what the form shows. Anything no reader
- * recognises becomes an alert with the server's detail, else `fallback`.
+ * recognises becomes an alert with the server's detail, else `fallback`. Server text is returned
+ * as received; only the sentences written here follow `t` and `locale`.
  */
-export function startProblem(error: unknown, fallback = 'Could not start the run.'): StartProblem {
+export function startProblem(
+  error: unknown,
+  fallback?: string,
+  t: TFunction = i18n.t,
+  locale: Locale = activeLocale(),
+): StartProblem {
   const problem = error instanceof ApiError ? error.problem : undefined;
   if (error instanceof ApiError && problem) {
     for (const read of READERS) {
-      const shown = read(problem, error.status);
+      const shown = read(problem, error.status, t, locale);
       if (shown) {
         return shown;
       }
     }
   }
-  return { kind: 'alert', message: problem?.detail ?? fallback };
+  return { kind: 'alert', message: problem?.detail ?? fallback ?? t('workflow.start.failed') };
 }

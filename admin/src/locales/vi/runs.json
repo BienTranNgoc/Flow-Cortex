@@ -1,0 +1,23 @@
+{
+  "title": "Lượt chạy",
+  "eyebrow": "Vận hành quy trình",
+  "description": "Mọi lượt chạy quy trình trên toàn nền tảng. Dùng bộ lọc để thu hẹp theo trạng thái.",
+  "noun": "lượt chạy",
+  "deletedUser": "(người dùng đã bị xóa)",
+  "columns": {
+    "workflow": "Quy trình",
+    "owner": "Chủ sở hữu",
+    "status": "Trạng thái",
+    "started": "Bắt đầu",
+    "finished": "Kết thúc",
+    "error": "Lỗi"
+  },
+  "status": {
+    "running": "Đang chạy",
+    "waiting_approval": "Chờ duyệt",
+    "completed": "Hoàn tất",
+    "error": "Lỗi",
+    "cancelling": "Đang dừng",
+    "cancelled": "Đã hủy"
+  }
+}

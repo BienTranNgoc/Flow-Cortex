@@ -1,25 +1,25 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { PasswordResetGate, RequestResetForm } from './RequestResetForm';
 
 export function ForgotPasswordPage() {
+  const { t } = useTranslation();
   return (
     <div className="auth-page">
       <BrandPanel />
 
       <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · RESET PASSWORD</p>
-        <h1 className="auth-card__title">Reset your password</h1>
+        <p className="eyebrow">{t('auth.reset.eyebrow')}</p>
+        <h1 className="auth-card__title">{t('auth.reset.forgot.title')}</h1>
 
         <PasswordResetGate>
-          <p className="auth-subtitle">
-            Enter the email you sign in with and we will send you a link to choose a new password.
-          </p>
-          <RequestResetForm action="Send reset link" />
+          <p className="auth-subtitle">{t('auth.reset.forgot.intro')}</p>
+          <RequestResetForm action={t('auth.reset.forgot.submit')} />
         </PasswordResetGate>
 
         <p className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">{t('auth.reset.backToSignIn')}</Link>
         </p>
       </section>
     </div>

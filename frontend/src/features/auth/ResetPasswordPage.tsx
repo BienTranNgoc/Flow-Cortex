@@ -1,27 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { PasswordResetGate, RequestResetForm } from './RequestResetForm';
 import { resetPasswordSchema, type ResetPasswordFormValues } from './registerSchema';
 import {
   RESET_LINK_INVALID,
-  detailFrom,
+  failureMessage,
   fieldErrorsFrom,
   problemCodeFrom,
   resetWaitMessage,
   useResetPasswordMutation,
 } from './useAuth';
 
-const LINK_INVALID_MESSAGE = 'This reset link is no longer valid';
-
-const PASSWORD_CHANGED_NOTICE =
-  'Password updated. Sign in with your new password. We signed you out on every device. A device that was already open may stay signed in for up to 15 minutes.';
-
-const FIELDS: readonly { name: keyof ResetPasswordFormValues; label: string }[] = [
-  { name: 'password', label: 'New password' },
-  { name: 'confirmPassword', label: 'Confirm password' },
+const FIELDS: readonly { name: keyof ResetPasswordFormValues; labelKey: string }[] = [
+  { name: 'password', labelKey: 'auth.reset.password.passwordLabel' },
+  { name: 'confirmPassword', labelKey: 'auth.reset.password.confirmPasswordLabel' },
 ];
 
 function tokenFrom(hash: string): string {
@@ -33,6 +29,7 @@ function tokenFrom(hash: string): string {
  * server or access log sees it, and the page drops it from the address bar once read.
  */
 export function ResetPasswordPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [token, setToken] = useState(() => tokenFrom(location.hash));
@@ -70,17 +67,17 @@ export function ResetPasswordPage() {
       <BrandPanel />
 
       <section className="auth-card">
-        <p className="eyebrow">CREATOR ACCESS · RESET PASSWORD</p>
-        <h1 className="auth-card__title">Choose a new password</h1>
+        <p className="eyebrow">{t('auth.reset.eyebrow')}</p>
+        <h1 className="auth-card__title">{t('auth.reset.password.title')}</h1>
 
         <PasswordResetGate>
           {linkInvalid ? (
             <>
               <p ref={linkInvalidMessage} tabIndex={-1} role="alert" className="form-error">
-                {LINK_INVALID_MESSAGE}
+                {t('auth.reset.password.linkInvalid')}
               </p>
-              <p className="auth-subtitle">Enter your email and we will send you a new link.</p>
-              <RequestResetForm action="Send a new link" />
+              <p className="auth-subtitle">{t('auth.reset.password.newLinkIntro')}</p>
+              <RequestResetForm action={t('auth.reset.password.newLinkSubmit')} />
             </>
           ) : (
             <ResetPasswordForm key={token} token={token} onLinkInvalid={onLinkInvalid} />
@@ -88,7 +85,7 @@ export function ResetPasswordPage() {
         </PasswordResetGate>
 
         <p className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">{t('auth.reset.backToSignIn')}</Link>
         </p>
       </section>
     </div>
@@ -101,6 +98,7 @@ interface ResetPasswordFormProps {
 }
 
 function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const reset = useResetPasswordMutation();
   const {
@@ -118,7 +116,10 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
       { token, password },
       {
         onSuccess: (email) =>
-          navigate('/login', { replace: true, state: { notice: PASSWORD_CHANGED_NOTICE, email } }),
+          navigate('/login', {
+            replace: true,
+            state: { notice: t('auth.reset.password.changedNotice'), email },
+          }),
         onError: (error) => {
           const refused = fieldErrorsFrom(error);
           if (problemCodeFrom(error) === RESET_LINK_INVALID || refused.token) {
@@ -139,22 +140,28 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
 
   const serverError =
     reset.isError && !fieldErrorsFrom(reset.error).password
-      ? (resetWaitMessage(reset.error) ??
-        detailFrom(reset) ??
-        'Could not set your password. Please try again.')
+      ? (resetWaitMessage(reset.error, t) ?? failureMessage(reset, t, 'auth.reset.password.failed'))
       : null;
 
   return (
     <>
-      <p className="auth-subtitle">Choose the password you will sign in with from now on.</p>
+      <p className="auth-subtitle">{t('auth.reset.password.intro')}</p>
 
-      <form onSubmit={onSubmit} noValidate aria-label="Set a new password" className="auth-form">
-        {FIELDS.map(({ name, label }, index) => {
+      <form
+        onSubmit={onSubmit}
+        noValidate
+        aria-label={t('auth.reset.password.formLabel')}
+        className="auth-form"
+      >
+        {FIELDS.map(({ name, labelKey }, index) => {
           const id = `reset-password-${name}`;
-          const message = errors[name]?.message;
+          const error = errors[name];
+          // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
+          const message =
+            error?.message && (error.type === 'server' ? error.message : t(error.message));
           return (
             <div className="field" key={name} style={{ '--i': index } as React.CSSProperties}>
-              <label htmlFor={id}>{label}</label>
+              <label htmlFor={id}>{t(labelKey)}</label>
               <input
                 id={id}
                 type="password"
@@ -177,7 +184,7 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
           </p>
         )}
         <button className="primary-button" type="submit" disabled={reset.isPending}>
-          {reset.isPending ? 'Saving…' : 'Set new password'}
+          {reset.isPending ? t('auth.reset.password.saving') : t('auth.reset.password.submit')}
         </button>
       </form>
     </>

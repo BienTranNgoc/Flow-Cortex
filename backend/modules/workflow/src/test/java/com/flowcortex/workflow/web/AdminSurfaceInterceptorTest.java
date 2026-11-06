@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import static com.flowcortex.workflow.EnglishBundle.english;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -24,7 +25,7 @@ class AdminSurfaceInterceptorTest {
         assertThatThrownBy(() -> new AdminSurfaceInterceptor(false).preHandle(request, response, new Object()))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-                    assertThat(e.getReason()).isEqualTo("Admin console is currently disabled");
+                    assertThat(english(e)).isEqualTo("Admin console is currently disabled");
                 });
     }
 }

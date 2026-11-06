@@ -5,7 +5,7 @@ export interface DemoRun {
   readonly status: 'success' | 'failure' | 'waiting' | 'running';
   readonly startedAt: string;
   readonly finishedAt?: string;
-  readonly errorMessage?: string;
+  readonly errorMessageKey?: string;
   readonly etaSeconds: number;
   readonly trigger: 'manual' | 'webhook' | 'schedule';
   readonly runHash: string;
@@ -20,11 +20,11 @@ interface MakeArgs {
   readonly startedMinutesAgo: number;
   readonly trigger: DemoRun['trigger'];
   readonly expectedDurationSec: number;
-  readonly errorMessage?: string;
+  readonly errorMessageKey?: string;
 }
 
 const make = (args: MakeArgs): DemoRun => {
-  const { id, workflowId, workflowName, status, startedMinutesAgo, trigger, expectedDurationSec, errorMessage } = args;
+  const { id, workflowId, workflowName, status, startedMinutesAgo, trigger, expectedDurationSec, errorMessageKey } = args;
   const started = new Date(Date.now() - startedMinutesAgo * 60_000);
   const finished = status === 'running' || status === 'waiting'
     ? undefined
@@ -37,7 +37,7 @@ const make = (args: MakeArgs): DemoRun => {
     status,
     startedAt: started.toISOString(),
     ...(finished ? { finishedAt: finished } : {}),
-    ...(errorMessage ? { errorMessage } : {}),
+    ...(errorMessageKey ? { errorMessageKey } : {}),
     etaSeconds: expectedDurationSec,
     trigger,
     runHash,
@@ -47,7 +47,7 @@ const make = (args: MakeArgs): DemoRun => {
 
 export const DEMO_RUNS: readonly DemoRun[] = [
   make({ id: 'run-echo-1', workflowId: 'wf-echo', workflowName: 'Echo Demo', status: 'success', startedMinutesAgo: 5, trigger: 'manual', expectedDurationSec: 32 }),
-  make({ id: 'run-fail-1', workflowId: 'wf-fail', workflowName: 'Deliberate Failure', status: 'failure', startedMinutesAgo: 12, trigger: 'schedule', expectedDurationSec: 18, errorMessage: 'Step "throw" failed: deliberate failure for testing.' }),
+  make({ id: 'run-fail-1', workflowId: 'wf-fail', workflowName: 'Deliberate Failure', status: 'failure', startedMinutesAgo: 12, trigger: 'schedule', expectedDurationSec: 18, errorMessageKey: 'common.runs.demoFailure' }),
   make({ id: 'run-product-1', workflowId: 'wf-product-video', workflowName: 'Product Video', status: 'running', startedMinutesAgo: 2, trigger: 'webhook', expectedDurationSec: 180 }),
   make({ id: 'run-tiktok-1', workflowId: 'wf-douyin', workflowName: 'Repurpose for Douyin', status: 'waiting', startedMinutesAgo: 8, trigger: 'manual', expectedDurationSec: 90 }),
   make({ id: 'run-probe-1', workflowId: 'wf-probe', workflowName: 'Probe a Video', status: 'success', startedMinutesAgo: 24, trigger: 'webhook', expectedDurationSec: 22 }),

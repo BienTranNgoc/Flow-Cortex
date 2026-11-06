@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.domain;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -14,7 +15,7 @@ import java.util.UUID;
 public class ReviewTask {
 
     /** The refusal every losing or late decision on a task answers with. */
-    public static final String NOT_WAITING_FOR_REVIEW = "This step is no longer waiting for review";
+    public static final LocalizedMessage NOT_WAITING_FOR_REVIEW = new LocalizedMessage("reviewTask.notWaitingForReview");
 
     @Id
     private UUID id;
@@ -139,7 +140,7 @@ public class ReviewTask {
         requirePending();
         requireVersion(expectedVersion);
         if (currentRevisionId == null || !currentRevisionId.equals(revisionId)) {
-            throw new ConflictException("Only the current script revision can be approved");
+            throw new ConflictException(new LocalizedMessage("reviewTask.notCurrentRevision"));
         }
         this.status = ReviewTaskStatus.APPROVED;
         this.reviewedBy = reviewerId;
@@ -171,8 +172,7 @@ public class ReviewTask {
     private void requireVersion(long expectedVersion) {
         long actual = version == null ? 0L : version;
         if (actual != expectedVersion) {
-            throw new ConflictException("ReviewTask " + id + " changed; expected version "
-                    + expectedVersion + " but was " + actual);
+            throw new ConflictException(new LocalizedMessage("reviewTask.versionChanged", id, expectedVersion, actual));
         }
     }
 }

@@ -12,6 +12,7 @@ import type { LoginRequest } from '@flow-cortex/api-client';
 import { queryClient } from '../../app/queryClient';
 
 export { useAuthToken, useSessionReady } from '@flow-cortex/api-client';
+export { accountLockedMessage } from '@flow-cortex/i18n';
 
 /** The signed-in user's own record; disabled while signed out. */
 export function useMeQuery() {

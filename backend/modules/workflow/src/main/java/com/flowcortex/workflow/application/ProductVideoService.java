@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
@@ -30,7 +32,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 /** Starts the seeded Product Video workflow with an immutable product/asset snapshot. */
 @Service
@@ -76,14 +77,14 @@ public class ProductVideoService {
 
     public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost) {
         if (!enabled || !workflowEnabled) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Product Video is currently disabled");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    new LocalizedMessage("workflow.productVideo.disabled"));
         }
         if (!mediaJobs.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Media engine is currently disabled");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
         Workflow workflow = workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)
-                .orElseThrow(() -> new NotFoundException("Product Video workflow is not installed"));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);

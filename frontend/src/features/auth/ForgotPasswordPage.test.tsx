@@ -1,5 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type Handler } from '../../test/fakeApi';
 import { ForgotPasswordPage } from './ForgotPasswordPage';
 
@@ -122,5 +124,32 @@ describe('ForgotPasswordPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('words the request form and its answer in Vietnamese', async () => {
+      const { user } = renderPage({
+        [FORGOT]: { status: 202, body: { status: 'reset_requested' } },
+      });
+
+      await user.type(
+        await screen.findByLabelText(viAuth.reset.request.emailLabel),
+        'an@example.com',
+      );
+      await user.click(screen.getByRole('button', { name: viAuth.reset.forgot.submit }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        viAuth.reset.request.sent.replace('{{email}}', 'an@example.com'),
+      );
+      expect(screen.getByRole('heading', { name: viAuth.reset.forgot.title })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: viAuth.reset.backToSignIn })).toBeInTheDocument();
+    });
   });
 });

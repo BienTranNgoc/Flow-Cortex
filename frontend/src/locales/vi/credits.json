@@ -1,0 +1,7 @@
+{
+  "notEnough": "Không đủ Credit: bạn có {{balance}}, lượt chạy này cần {{required}} (còn thiếu {{shortfall}}).",
+  "runAnyway": "Vẫn chạy",
+  "estimatedCost": "Chi phí ước tính: {{amount}} Credit",
+  "chargedSoFarOne": "Đã tính cho lượt chạy này: {{amount}} Credit",
+  "chargedSoFarOther": "Đã tính cho lượt chạy này: {{amount}} Credit"
+}

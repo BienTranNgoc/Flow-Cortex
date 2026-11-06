@@ -1,5 +1,7 @@
 package com.flowcortex.user.emailconfirm;
 
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.user.application.OpaqueTokens;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
@@ -9,12 +11,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Example;
@@ -43,18 +47,6 @@ public class EmailConfirmationService {
 
     private static final Logger LOG = LoggerFactory.getLogger(EmailConfirmationService.class);
 
-    static final String SUBJECT = "Confirm your Flow-Cortex email";
-
-    static final String PASSWORD_LINK_SUBJECT = "Set your Flow-Cortex password";
-
-    static final String PASSWORD_SET_SUBJECT = "Your Flow-Cortex password was set";
-
-    static final String PASSWORD_RESET_SUBJECT = "Reset your Flow-Cortex password";
-
-    static final String GOOGLE_SIGN_IN_SUBJECT = "Your Flow-Cortex account signs in with Google";
-
-    static final String PASSWORD_CHANGED_SUBJECT = "Your Flow-Cortex password was changed";
-
     /** Why a link is reissued; the confirmation mail's wording depends on it. */
     public enum LinkRequest {
         RESEND,
@@ -69,13 +61,15 @@ public class EmailConfirmationService {
     private final Clock clock;
     private final String publicUrl;
     private final Counter sendFailures;
+    private final MessageSource messages;
+    private final RequestLocale requestLocale;
 
     /** Fails startup when confirmation is on and a link could not be built or mailed. */
     EmailConfirmationService(EmailConfirmationTokenRepository tokens, AppUserRepository users,
             JavaMailSender mailSender, @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor,
             EmailConfirmationProperties properties, Clock clock,
             @Value("${flowcortex.app.public-url:}") String publicUrl, @Value("${spring.mail.host:}") String mailHost,
-            MeterRegistry meters) {
+            MeterRegistry meters, MessageSource messages, RequestLocale requestLocale) {
         if (properties.enabled()) {
             requireSet(publicUrl, "flowcortex.app.public-url (FLOWCORTEX_APP_PUBLIC_URL), the member app origin"
                     + " the confirmation link opens");
@@ -92,6 +86,8 @@ public class EmailConfirmationService {
                 .description("Account mails (confirmation, set-password and reset links, notices) the SMTP server"
                         + " did not accept, or the send queue had no room for")
                 .register(meters);
+        this.messages = messages;
+        this.requestLocale = requestLocale;
     }
 
     private static void requireSet(String value, String what) {
@@ -190,10 +186,8 @@ public class EmailConfirmationService {
     /** Tells the account's address that a password was set, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailPasswordSetNotice(UUID userId, String email) {
-        mailAfterCommit(userId, email, PASSWORD_SET_SUBJECT, "Hello,\n\n"
-                + "A password was just set for your Flow-Cortex account, and every other signed-in session"
-                + " was ended.\n\n"
-                + "If this was not you, contact support right away.\n", "password_set_notice");
+        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordSet.subject"),
+                new LocalizedMessage("email.passwordSet.body"), "password_set_notice");
     }
 
     /**
@@ -233,28 +227,20 @@ public class EmailConfirmationService {
 
     private void mailConfirmationLink(UUID userId, String email, LinkRequest request) {
         String rawToken = store(userId, EmailLinkPurpose.EMAIL_CONFIRM, properties.validity());
-        long hours = properties.validity().toHours();
-        String link = publicUrl + "/confirm-email?token=" + rawToken + "\n\n";
-        String validity = "The link works for " + hours + (hours == 1 ? " hour" : " hours") + " and only once.";
         // Asked for by a reset, so "ignore this email" would be wrong advice.
-        String body = request == LinkRequest.PASSWORD_RESET
-                ? "You asked to reset your Flow-Cortex password. This address has an account that was never"
-                        + " confirmed — confirm it, then choose your own password and name.\n\n"
-                        + link + validity + "\n"
-                : "Hello,\n\n"
-                        + "Confirm your email to finish creating your Flow-Cortex account:\n\n"
-                        + link + validity + " If you did not create an account, you can ignore this email.\n";
-        mailAfterCommit(userId, email, SUBJECT, body, "sent");
+        String link = publicUrl + "/confirm-email?token=" + rawToken;
+        long hours = properties.validity().toHours();
+        LocalizedMessage body = request == LinkRequest.PASSWORD_RESET
+                ? new LocalizedMessage("email.confirmReset.body", link, hours)
+                : new LocalizedMessage("email.confirm.body", link, hours);
+        mailAfterCommit(userId, email, new LocalizedMessage("email.confirm.subject"), body, "sent");
     }
 
     private void mailPasswordLink(UUID userId, String email) {
         String rawToken = store(userId, EmailLinkPurpose.PASSWORD_LINK, properties.passwordSetupValidity());
-        long minutes = properties.passwordSetupValidity().toMinutes();
-        mailAfterCommit(userId, email, PASSWORD_LINK_SUBJECT, "Hello,\n\n"
-                + "Your Flow-Cortex account has no password yet. Open this link to sign in and choose one:\n\n"
-                + publicUrl + "/set-password?token=" + rawToken + "\n\n"
-                + "The link works for " + minutes + (minutes == 1 ? " minute" : " minutes") + " and only once. "
-                + "If you did not ask for it, you can ignore this email.\n", "password_link_sent");
+        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordLink.subject"),
+                new LocalizedMessage("email.passwordLink.body", publicUrl + "/set-password?token=" + rawToken,
+                        properties.passwordSetupValidity().toMinutes()), "password_link_sent");
     }
 
     /**
@@ -266,33 +252,25 @@ public class EmailConfirmationService {
         int retired = retireOpenLinks(locked.getId());
         LOG.info("email_confirmation outcome=password_reset_link userId={} retiredLinks={}", locked.getId(), retired);
         String rawToken = store(locked.getId(), EmailLinkPurpose.PASSWORD_RESET, validity);
-        mailAfterCommit(locked.getId(), locked.getEmail(), PASSWORD_RESET_SUBJECT, "Hello,\n\n"
-                + "Someone asked to reset the password of your Flow-Cortex account. Open this link to choose"
-                + " a new one:\n\n"
-                + publicUrl + "/reset-password#token=" + rawToken + "\n\n"
-                + "The link works for " + inWholeUnits(validity) + " and only once. "
-                + "If you did not ask for it, you can ignore this email; your password stays as it is.\n",
-                "password_reset_sent");
+        mailAfterCommit(locked.getId(), locked.getEmail(), new LocalizedMessage("email.passwordReset.subject"),
+                new LocalizedMessage("email.passwordReset.body", publicUrl + "/reset-password#token=" + rawToken,
+                        inWholeUnits(validity)), "password_reset_sent");
     }
 
-    /** "1 hour", "2 hours" when the validity is whole hours, otherwise "90 minutes". */
-    private static String inWholeUnits(Duration validity) {
+    /** "1 hour", "2 hours" when the validity is whole hours, otherwise "90 minutes", in the request's language. */
+    private String inWholeUnits(Duration validity) {
         long minutes = validity.toMinutes();
-        if (minutes >= 60 && minutes % 60 == 0) {
-            long hours = minutes / 60;
-            return hours + (hours == 1 ? " hour" : " hours");
-        }
-        return minutes + (minutes == 1 ? " minute" : " minutes");
+        LocalizedMessage duration = minutes >= 60 && minutes % 60 == 0
+                ? new LocalizedMessage("email.duration.hours", minutes / 60)
+                : new LocalizedMessage("email.duration.minutes", minutes);
+        return messages.getMessage(duration, requestLocale.current());
     }
 
     /** Tells an account without a password that it signs in with Google, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailGoogleSignInNotice(AppUser account) {
-        mailAfterCommit(account.getId(), account.getEmail(), GOOGLE_SIGN_IN_SUBJECT, "Hello,\n\n"
-                + "Someone asked to reset the password of your Flow-Cortex account. Your account has no"
-                + " password: it signs in with Google. Open the sign-in page and continue with Google:\n\n"
-                + publicUrl + "/login\n\n"
-                + "If you did not ask for this, you can ignore this email.\n", "google_notice_sent");
+        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.googleSignIn.subject"),
+                new LocalizedMessage("email.googleSignIn.body", publicUrl + "/login"), "google_notice_sent");
     }
 
     /**
@@ -321,12 +299,8 @@ public class EmailConfirmationService {
     /** Tells the account's address its password was changed, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailPasswordChangedNotice(AppUser account) {
-        mailAfterCommit(account.getId(), account.getEmail(), PASSWORD_CHANGED_SUBJECT, "Hello,\n\n"
-                + "The password of your Flow-Cortex account was just changed.\n\n"
-                + "We signed you out on every device. A device that was already open may stay signed in for"
-                + " up to 15 minutes.\n\n"
-                + "If this wasn't you, reset your password again from the sign-in page:\n\n"
-                + publicUrl + "/login\n", "password_changed_notice");
+        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.passwordChanged.subject"),
+                new LocalizedMessage("email.passwordChanged.body", publicUrl + "/login"), "password_changed_notice");
     }
 
     private String store(UUID userId, EmailLinkPurpose purpose, Duration validity) {
@@ -337,7 +311,15 @@ public class EmailConfirmationService {
         return rawToken;
     }
 
-    private void mailAfterCommit(UUID userId, String email, String subject, String body, String sentOutcome) {
+    /**
+     * The text is resolved here, on the request's thread: the mail executor runs after the request has
+     * ended, when its language can no longer be read.
+     */
+    private void mailAfterCommit(UUID userId, String email, LocalizedMessage subjectKey, LocalizedMessage bodyKey,
+            String sentOutcome) {
+        Locale locale = requestLocale.current();
+        String subject = messages.getMessage(subjectKey, locale);
+        String body = messages.getMessage(bodyKey, locale);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

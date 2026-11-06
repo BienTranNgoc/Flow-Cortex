@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError, authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
+import { authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { accountStatsEnabled } from '../../app/featureFlags';
 import { useFeatures } from '../../app/useFeatures';
-import { formatCredits } from '../credits/formatCredits';
+import { formatNumber } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { useBalance } from '../credits/useBalance';
+import { roleLabel, statusLabel } from './enumLabels';
 import { PhoneVerification } from './PhoneVerification';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
-import { useMeQuery } from './useAuth';
+import { failureMessage, useMeQuery } from './useAuth';
 import './ProfilePage.css';
 
 function initialsFrom(name: string | null | undefined, email: string | null | undefined): string {
@@ -22,6 +25,7 @@ function initialsFrom(name: string | null | undefined, email: string | null | un
 
 /** Fix my own display name; email/role/status are not self-service. */
 export function ProfilePage() {
+  const { t } = useTranslation();
   const meQuery = useMeQuery();
   const { phoneVerification } = useFeatures();
   const credits = useBalance();
@@ -46,18 +50,18 @@ export function ProfilePage() {
   if (meQuery.isLoading) {
     return (
       <main className="profile-page">
-        <output>Loading…</output>
+        <output>{t('auth.profile.loading')}</output>
       </main>
     );
   }
   if (meQuery.isError) {
     return (
       <main className="profile-page">
-        <h1>Profile</h1>
+        <h1>{t('auth.profile.title')}</h1>
         <p role="alert" className="form-error">
-          Could not load your profile.{' '}
+          {t('auth.profile.loadError')}{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
-            Retry
+            {t('auth.profile.retry')}
           </button>
         </p>
       </main>
@@ -66,7 +70,7 @@ export function ProfilePage() {
   if (!meQuery.data) {
     return (
       <main className="profile-page">
-        <output>Loading…</output>
+        <output>{t('auth.profile.loading')}</output>
       </main>
     );
   }
@@ -76,55 +80,61 @@ export function ProfilePage() {
   const initials = initialsFrom(me.name, me.email);
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));
   const onCancel = () => reset({ name: me.name ?? '' });
-  const serverError =
-    updateMutation.error instanceof ApiError ? updateMutation.error.problem?.detail : undefined;
+  const serverError = failureMessage(updateMutation, t);
 
   return (
     <main className="profile-page">
       <header className="profile-page__header">
-        <p className="eyebrow">MY PROFILE</p>
-        <h1>Your account, your way</h1>
-        <p className="profile-page__subtitle">
-          Manage how you appear across FlowCortex. Email and role are managed by your admin.
-        </p>
+        <p className="eyebrow">{t('auth.profile.eyebrow')}</p>
+        <h1>{t('auth.profile.headline')}</h1>
+        <p className="profile-page__subtitle">{t('auth.profile.subtitle')}</p>
       </header>
 
       <div className="profile-grid">
         {/* Left card — identity */}
-        <aside className="profile-card profile-card--identity" aria-label="Profile summary">
+        <aside
+          className="profile-card profile-card--identity"
+          aria-label={t('auth.profile.summaryLabel')}
+        >
           <div className="profile-avatar" aria-hidden="true">
             <span>{initials}</span>
             <span className="profile-avatar__pulse" />
           </div>
 
           <div className="profile-identity__text">
-            <h2>{me.name?.trim() || 'Unnamed user'}</h2>
+            <h2>{me.name?.trim() || t('auth.profile.unnamed')}</h2>
             <p className="profile-identity__email">{me.email}</p>
-            <span className="profile-role-pill">{me.role}</span>
+            <span className="profile-role-pill">{roleLabel(t, me.role)}</span>
           </div>
 
           {(showAccountStats || credits !== undefined) && (
-            <ul className="profile-stats" aria-label="Account statistics">
+            <ul className="profile-stats" aria-label={t('auth.profile.statsLabel')}>
               {showAccountStats && (
                 <>
                   <li>
-                    <span className="profile-stats__value">1,248</span>
-                    <span className="profile-stats__label">XP</span>
+                    <span className="profile-stats__value">
+                      {formatNumber(1248, activeLocale())}
+                    </span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.xp')}</span>
                   </li>
                   <li>
-                    <span className="profile-stats__value">14d</span>
-                    <span className="profile-stats__label">Streak</span>
+                    <span className="profile-stats__value">
+                      {t('auth.profile.stats.streakValue', { days: 14 })}
+                    </span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.streak')}</span>
                   </li>
                   <li>
                     <span className="profile-stats__value">#42</span>
-                    <span className="profile-stats__label">Rank</span>
+                    <span className="profile-stats__label">{t('auth.profile.stats.rank')}</span>
                   </li>
                 </>
               )}
               {credits !== undefined && (
                 <li>
-                  <span className="profile-stats__value">{formatCredits(credits)}</span>
-                  <span className="profile-stats__label">Credits</span>
+                  <span className="profile-stats__value">
+                    {formatNumber(credits, activeLocale())}
+                  </span>
+                  <span className="profile-stats__label">{t('auth.profile.stats.credits')}</span>
                 </li>
               )}
             </ul>
@@ -132,24 +142,25 @@ export function ProfilePage() {
         </aside>
 
         {/* Right card — edit form + identity facts */}
-        <section className="profile-card profile-card--form" aria-label="Edit profile">
-          <h2 className="profile-card__title">Edit display name</h2>
-          <p className="profile-card__hint">
-            This is the name teammates see when you collaborate on a workflow.
-          </p>
+        <section
+          className="profile-card profile-card--form"
+          aria-label={t('auth.profile.editLabel')}
+        >
+          <h2 className="profile-card__title">{t('auth.profile.editTitle')}</h2>
+          <p className="profile-card__hint">{t('auth.profile.editHint')}</p>
 
           <form onSubmit={onSubmit} noValidate>
             <div className="field">
-              <label htmlFor="profile-name">Display name</label>
+              <label htmlFor="profile-name">{t('auth.profile.nameLabel')}</label>
               <input
                 id="profile-name"
                 {...register('name')}
                 aria-invalid={Boolean(errors.name) || undefined}
-                placeholder="How should we call you?"
+                placeholder={t('auth.profile.namePlaceholder')}
               />
-              {errors.name && (
+              {errors.name?.message && (
                 <p role="alert" className="form-error">
-                  {errors.name.message}
+                  {t(errors.name.message)}
                 </p>
               )}
             </div>
@@ -161,7 +172,7 @@ export function ProfilePage() {
             )}
             {updateMutation.isSuccess && (
               <p className="profile-saved" role="status">
-                ✓ Saved
+                {t('auth.profile.saved')}
               </p>
             )}
 
@@ -172,35 +183,35 @@ export function ProfilePage() {
                 onClick={onCancel}
                 disabled={updateMutation.isPending}
               >
-                Cancel
+                {t('auth.profile.cancel')}
               </button>
               <button
                 type="submit"
                 className="cortex-btn cortex-btn--primary"
                 disabled={updateMutation.isPending}
               >
-                {updateMutation.isPending ? 'Saving…' : 'Save changes'}
+                {updateMutation.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
               </button>
             </div>
           </form>
 
           <hr className="profile-card__divider" />
 
-          <h2 className="profile-card__title">Identity</h2>
+          <h2 className="profile-card__title">{t('auth.profile.identityTitle')}</h2>
           <dl className="profile-facts">
             <div>
-              <dt>Email</dt>
+              <dt>{t('auth.profile.emailLabel')}</dt>
               <dd>{me.email}</dd>
             </div>
             <div>
-              <dt>Role</dt>
-              <dd>{me.role}</dd>
+              <dt>{t('auth.profile.roleLabel')}</dt>
+              <dd>{roleLabel(t, me.role)}</dd>
             </div>
             <div>
-              <dt>Status</dt>
+              <dt>{t('auth.profile.statusLabel')}</dt>
               <dd>
                 {me.status === 'ACTIVE' && <span className="profile-status-dot" aria-hidden="true" />}
-                {me.status || '—'}
+                {statusLabel(t, me.status) || '—'}
               </dd>
             </div>
           </dl>
@@ -218,11 +229,11 @@ export function ProfilePage() {
 
               <div className="profile-danger">
                 <div>
-                  <h3>Delete account</h3>
-                  <p>Permanently remove your account and all associated data.</p>
+                  <h3>{t('auth.profile.deleteTitle')}</h3>
+                  <p>{t('auth.profile.deleteHint')}</p>
                 </div>
                 <button type="button" className="cortex-btn cortex-btn--danger" disabled>
-                  Request deletion
+                  {t('auth.profile.deleteRequest')}
                 </button>
               </div>
             </>

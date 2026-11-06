@@ -9,6 +9,8 @@ export interface ProblemDetail {
   detail?: string;
   /** Present on a 400 Bean Validation failure — field name -> message. */
   errors?: Record<string, string>;
+  /** Present on a 423 account-locked problem — the ISO-8601 instant the lock ends. */
+  lockedUntil?: string;
 }
 
 /** Thrown by {@link unwrap} for any non-2xx response. */

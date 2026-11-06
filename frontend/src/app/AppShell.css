@@ -12,6 +12,13 @@
   isolation: isolate;
 }
 
+.public-shell__language {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  z-index: 2;
+}
+
 /* ----- Layer 3: Aurora background --------------------------------------- */
 
 .aurora-bg {
@@ -541,6 +548,14 @@
 /* ----- Responsive ------------------------------------------------------- */
 
 @media (max-width: 900px) {
+  /* The single-column card starts at the top edge, so the toggle takes its own row instead of covering it. */
+  .public-shell__language {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.75rem 1rem 0;
+  }
+
   .auth-page {
     grid-template-columns: 1fr;
     min-height: auto;

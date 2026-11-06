@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-/** Mirrors `UsersController.CreateUserRequest`. */
+/** Mirrors `UsersController.CreateUserRequest`. Messages are i18n keys the form translates. */
 export const createUserSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email'),
+  email: z.string().min(1, 'users.validation.emailRequired').email('users.validation.emailInvalid'),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(72, 'Password must be at most 72 characters'),
-  name: z.string().min(1, 'Name is required'),
+    .min(8, 'users.validation.passwordMin')
+    .max(72, 'users.validation.passwordMax'),
+  name: z.string().min(1, 'users.validation.nameRequired'),
   role: z.enum(['ADMIN', 'MEMBER']),
 });
 
@@ -20,8 +20,8 @@ export type CreateUserFormValues = z.infer<typeof createUserSchema>;
  * view.
  */
 export const editUserSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email'),
-  name: z.string().min(1, 'Name is required'),
+  email: z.string().min(1, 'users.validation.emailRequired').email('users.validation.emailInvalid'),
+  name: z.string().min(1, 'users.validation.nameRequired'),
   role: z.enum(['ADMIN', 'MEMBER', 'CREATOR']),
   status: z.enum(['ACTIVE', 'SUSPENDED']),
 });

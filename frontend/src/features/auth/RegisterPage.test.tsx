@@ -1,6 +1,10 @@
 import { fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
+import { AppShell } from '../../app/AppShell';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
 import { RegisterPage } from './RegisterPage';
 
@@ -226,5 +230,97 @@ describe('RegisterPage', () => {
 
     expect(screen.queryByRole('link', { name: 'Terms of Service' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Privacy Policy' })).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+      window.localStorage.clear();
+    });
+
+    it('switches to English without losing the typed name and remembers the choice', async () => {
+      const user = userEvent.setup();
+      renderRoute(
+        '/register',
+        '/register',
+        <AppShell>
+          <RegisterPage />
+        </AppShell>,
+      );
+
+      await user.type(screen.getByLabelText(viAuth.register.firstNameLabel), 'An');
+      await user.click(screen.getByRole('button', { name: 'EN English' }));
+
+      expect(screen.getByLabelText('First name')).toHaveValue('An');
+      expect(screen.getByLabelText('Username (optional)')).toBeInTheDocument();
+      expect(screen.getByRole('form', { name: 'Create account' })).toBeInTheDocument();
+      expect(window.localStorage.getItem('flow-cortex.locale')).toBe('en');
+    });
+
+    it('shows the generic retry message in Vietnamese when the request never reaches the server', async () => {
+      stubApi({
+        'POST /api/v1/auth/register': () => {
+          throw new TypeError('Failed to fetch');
+        },
+      });
+      renderRoute('/register', '/register', <RegisterPage />);
+
+      fireEvent.change(screen.getByLabelText(viAuth.register.firstNameLabel), {
+        target: { value: 'New' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.lastNameLabel), {
+        target: { value: 'Creator' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.emailLabel), {
+        target: { value: 'new.creator@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.passwordLabel), {
+        target: { value: 'register-password-1' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.confirmPasswordLabel), {
+        target: { value: 'register-password-1' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: viAuth.register.submit }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Không thực hiện được yêu cầu. Hãy thử lại.',
+      );
+    });
+
+    it('says to check the inbox in Vietnamese on 202', async () => {
+      stubApi({
+        'POST /api/v1/auth/register': { status: 202, body: { status: 'confirmation_sent' } },
+      });
+      renderRegister();
+
+      fireEvent.change(screen.getByLabelText(viAuth.register.firstNameLabel), {
+        target: { value: 'An' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.lastNameLabel), {
+        target: { value: 'Tran' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.emailLabel), {
+        target: { value: 'an@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.passwordLabel), {
+        target: { value: 'Secret123' },
+      });
+      fireEvent.change(screen.getByLabelText(viAuth.register.confirmPasswordLabel), {
+        target: { value: 'Secret123' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: viAuth.register.submit }));
+
+      expect(await screen.findByText(viAuth.register.sent.title)).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Chúng tôi đã gửi liên kết xác nhận đến an@example.com. Hãy mở liên kết trong vòng 24 giờ để kích hoạt tài khoản; liên kết sẽ đăng nhập cho bạn và mời bạn chọn mật khẩu.',
+      );
+      expect(screen.getByText('an@example.com').tagName).toBe('STRONG');
+      expect(
+        screen.getByRole('button', { name: viAuth.confirm.resend.submit }),
+      ).toBeInTheDocument();
+    });
   });
 });

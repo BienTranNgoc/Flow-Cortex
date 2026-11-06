@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
@@ -40,6 +41,6 @@ class CurrentUserResolver {
 
     private CurrentUser current(Jwt jwt) {
         UUID id = UUID.fromString(jwt.getSubject());
-        return userDirectory.findById(id).orElseThrow(() -> new NotFoundException("Current user not found: " + id));
+        return userDirectory.findById(id).orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.current.notFound", id)));
     }
 }

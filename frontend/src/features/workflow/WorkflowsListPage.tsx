@@ -1,6 +1,10 @@
+import type { TFunction } from 'i18next';
 import { useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { WorkflowResponse } from '@flow-cortex/api-client';
+import { formatNumber } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { useMeQuery } from '../auth/useAuth';
 import { iconForWorkflow } from '../dashboard/workflowIconKey';
 import { metaFor, type StatusTone } from '../dashboard/workflowMeta';
@@ -26,23 +30,30 @@ const PILL_TONE: Record<StatusTone, PillTone> = {
 type ScopeFilter = 'all' | 'shared' | 'mine';
 type LayoutMode = 'grid' | 'list';
 
-const SCOPES: ReadonlyArray<{ id: ScopeFilter; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'shared', label: 'Shared' },
-  { id: 'mine', label: 'Mine' },
+const SCOPES: ReadonlyArray<{ id: ScopeFilter; labelKey: string }> = [
+  { id: 'all', labelKey: 'workflow.list.scope.all' },
+  { id: 'shared', labelKey: 'workflow.list.scope.shared' },
+  { id: 'mine', labelKey: 'workflow.list.scope.mine' },
 ];
 
-function statusFromMeta(workflow: WorkflowResponse): RowStatus {
-  const { statusLabel, statusTone } = metaFor(workflow);
+function statusFromMeta(workflow: WorkflowResponse, t: TFunction): RowStatus {
+  const { statusLabel, statusTone } = metaFor(workflow, t);
   return { label: statusLabel, tone: PILL_TONE[statusTone] };
 }
 
-function safeName(workflow: WorkflowResponse): string {
-  return workflow.name ?? 'Untitled workflow';
+function safeName(workflow: WorkflowResponse, t: TFunction): string {
+  return workflow.name ?? t('workflow.list.untitled');
+}
+
+function stepCount(count: number, t: TFunction): string {
+  return t(count === 1 ? 'workflow.list.stepOne' : 'workflow.list.stepOther', {
+    n: formatNumber(count, activeLocale()),
+  });
 }
 
 /** `/workflows` — search and scope the visible workflows, then open one to run it. */
 export function WorkflowsListPage() {
+  const { t } = useTranslation();
   const workflowsQuery = useWorkflowsQuery();
   const meQuery = useMeQuery();
   const capabilitiesQuery = useCapabilitiesQuery();
@@ -68,29 +79,34 @@ export function WorkflowsListPage() {
       if (scope === 'shared' && !workflow.isShared) return false;
       if (scope === 'mine' && workflow.isShared) return false;
       if (q === '') return true;
-      return safeName(workflow).toLowerCase().includes(q);
+      return safeName(workflow, t).toLowerCase().includes(q);
     });
-  }, [visible, query, scope]);
+  }, [visible, query, scope, t]);
 
   const total = visible?.length ?? 0;
   const showLoading =
     workflowsQuery.isLoading || (capabilitiesQuery.isPending && !workflowsQuery.isError);
 
-  const firstName = meQuery.data?.name?.split(' ')[0] ?? 'there';
+  const firstName = meQuery.data?.name?.split(' ')[0] ?? t('workflow.list.nameFallback');
+  const locale = activeLocale();
 
   return (
     <main className="wf-list">
       <header className="wf-list__header">
         <div>
-          <h1 className="wf-list__title">Workflows</h1>
+          <h1 className="wf-list__title">{t('workflow.list.heading')}</h1>
           <p className="wf-list__welcome">
-            Welcome back, <strong>{firstName}</strong>. Manage your pipelines.
+            <Trans
+              i18nKey="workflow.list.welcomeBack"
+              values={{ name: firstName }}
+              components={{ strong: <strong /> }}
+            />
           </p>
         </div>
       </header>
 
       <div className="wf-list__toolbar">
-        <label className="wf-list__search" aria-label="Search workflows">
+        <label className="wf-list__search" aria-label={t('workflow.list.searchLabel')}>
           <svg
             viewBox="0 0 24 24"
             width="16"
@@ -107,15 +123,15 @@ export function WorkflowsListPage() {
           </svg>
           <input
             type="search"
-            placeholder="Search workflows..."
+            placeholder={t('workflow.list.searchPlaceholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
 
         <fieldset className="wf-list__scope">
-          <legend className="visually-hidden">Scope</legend>
-          <span aria-hidden="true">Scope:</span>
+          <legend className="visually-hidden">{t('workflow.list.scope.legend')}</legend>
+          <span aria-hidden="true">{t('workflow.list.scope.prefix')}</span>
           {SCOPES.map((s) => (
             <button
               key={s.id}
@@ -124,19 +140,19 @@ export function WorkflowsListPage() {
               className={`wf-list__scope-btn${scope === s.id ? ' is-active' : ''}`}
               onClick={() => setScope(s.id)}
             >
-              {s.label}
+              {t(s.labelKey)}
             </button>
           ))}
         </fieldset>
 
         <fieldset className="wf-list__layout">
-          <legend className="visually-hidden">Layout</legend>
+          <legend className="visually-hidden">{t('workflow.list.layout.legend')}</legend>
           <button
             type="button"
             aria-pressed={layout === 'grid'}
             className={`wf-list__layout-btn${layout === 'grid' ? ' is-active' : ''}`}
             onClick={() => setLayout('grid')}
-            aria-label="Grid layout"
+            aria-label={t('workflow.list.layout.grid')}
           >
             <svg
               viewBox="0 0 24 24"
@@ -160,7 +176,7 @@ export function WorkflowsListPage() {
             aria-pressed={layout === 'list'}
             className={`wf-list__layout-btn${layout === 'list' ? ' is-active' : ''}`}
             onClick={() => setLayout('list')}
-            aria-label="List layout"
+            aria-label={t('workflow.list.layout.list')}
           >
             <svg
               viewBox="0 0 24 24"
@@ -181,35 +197,40 @@ export function WorkflowsListPage() {
         </fieldset>
       </div>
 
-      {showLoading && <output className="wf-list__status">Loading workflows…</output>}
+      {showLoading && <output className="wf-list__status">{t('workflow.list.loading')}</output>}
       {workflowsQuery.isError && !showLoading && (
         <p role="alert" className="wf-list__status wf-list__status--error">
-          Could not load workflows.
+          {t('workflow.list.loadError')}
         </p>
       )}
       {filtered && filtered.length === 0 && !showLoading && (
-        <p className="wf-list__status">No workflows match the current filter.</p>
+        <p className="wf-list__status">{t('workflow.list.noMatch')}</p>
       )}
 
       {filtered && filtered.length > 0 && (
         <>
           {layout === 'list' ? (
-            <div className="wf-list__table-wrap" role="region" aria-label="Workflows table">
+            <div
+              className="wf-list__table-wrap"
+              role="region"
+              aria-label={t('workflow.list.tableLabel')}
+              tabIndex={0}
+            >
               <table className="wf-list__table">
                 <thead>
                   <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Owner</th>
-                    <th scope="col">Steps</th>
-                    <th scope="col" className="wf-list__actions-col">Actions</th>
+                    <th scope="col">{t('workflow.list.column.name')}</th>
+                    <th scope="col">{t('workflow.list.column.status')}</th>
+                    <th scope="col">{t('workflow.list.column.owner')}</th>
+                    <th scope="col">{t('workflow.list.column.steps')}</th>
+                    <th scope="col" className="wf-list__actions-col">{t('workflow.list.column.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((workflow) => {
-                    const status = statusFromMeta(workflow);
+                    const status = statusFromMeta(workflow, t);
                     const steps = workflow.steps ?? [];
-                    const label = safeName(workflow);
+                    const label = safeName(workflow, t);
                     return (
                       <tr key={workflow.id}>
                         <td>
@@ -233,16 +254,14 @@ export function WorkflowsListPage() {
                         <td>
                           <OwnerCell workflow={workflow} />
                         </td>
-                        <td className="wf-list__muted">
-                          {steps.length} {steps.length === 1 ? 'step' : 'steps'}
-                        </td>
+                        <td className="wf-list__muted">{stepCount(steps.length, t)}</td>
                         <td>
-                          <div className="wf-list__actions" aria-label="Row actions">
+                          <div className="wf-list__actions" aria-label={t('workflow.list.rowActions')}>
                             <Link
                               to={`/workflows/${workflow.id}`}
                               className="cortex-btn cortex-btn--icon wf-list__run-btn"
-                              title="Run workflow"
-                              aria-label={`Run ${label}`}
+                              title={t('workflow.list.runTitle')}
+                              aria-label={t('workflow.list.runNamed', { name: label })}
                             >
                               <svg
                                 viewBox="0 0 24 24"
@@ -265,9 +284,9 @@ export function WorkflowsListPage() {
           ) : (
             <ul className="wf-list__grid">
               {filtered.map((workflow) => {
-                const status = statusFromMeta(workflow);
+                const status = statusFromMeta(workflow, t);
                 const steps = workflow.steps ?? [];
-                const label = safeName(workflow);
+                const label = safeName(workflow, t);
                 return (
                   <li key={workflow.id} className="wf-list__grid-card">
                     <div className="wf-list__name">
@@ -285,18 +304,16 @@ export function WorkflowsListPage() {
                     <OwnerCell workflow={workflow} />
                     <dl className="wf-list__grid-meta">
                       <div>
-                        <dt>Steps</dt>
-                        <dd>
-                          {steps.length} {steps.length === 1 ? 'step' : 'steps'}
-                        </dd>
+                        <dt>{t('workflow.list.column.steps')}</dt>
+                        <dd>{stepCount(steps.length, t)}</dd>
                       </div>
                     </dl>
                     <div className="wf-list__actions">
                       <Link
                         to={`/workflows/${workflow.id}`}
                         className="cortex-btn cortex-btn--icon wf-list__run-btn"
-                        title="Run workflow"
-                        aria-label={`Run ${label}`}
+                        title={t('workflow.list.runTitle')}
+                        aria-label={t('workflow.list.runNamed', { name: label })}
                       >
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
                           <path d="M8 5v14l11-7z" />
@@ -310,7 +327,12 @@ export function WorkflowsListPage() {
           )}
 
           <footer className="wf-list__footer">
-            <span>Showing {filtered.length} of {total} workflows</span>
+            <span>
+              {t('workflow.list.showing', {
+                shown: formatNumber(filtered.length, locale),
+                total: formatNumber(total, locale),
+              })}
+            </span>
           </footer>
         </>
       )}

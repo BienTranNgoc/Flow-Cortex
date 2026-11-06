@@ -1,5 +1,5 @@
 import type { UploadRequest, UploadResponse } from '@flow-cortex/api-client';
-import { extensionOf, IMAGE, sizeProblem } from './startRunSchema';
+import { extensionOf, IMAGE, sizeProblem, type FileProblem } from './startRunSchema';
 
 export interface MultiUploadDeps {
   requestUpload: (body: UploadRequest) => Promise<UploadResponse>;
@@ -19,25 +19,20 @@ export type MultiUploadPhase =
 const MIN_IMAGES = 1;
 const MAX_IMAGES = 1;
 
-export interface ImageProblem {
-  message: string;
-}
+export type ImageProblem = FileProblem;
 
 /** Why a picked image cannot be checked, or `null` when it may be uploaded. */
 export function imageFileProblem(file: File): ImageProblem | null {
   if (!IMAGE.extensions.includes(extensionOf(file.name))) {
-    return { message: 'Use .jpg, .jpeg, .png or .webp.' };
+    return { messageKey: 'workflow.validation.imageType' };
   }
-  const tooLarge = sizeProblem(file, IMAGE);
-  return tooLarge ? { message: tooLarge } : null;
+  return sizeProblem(file, IMAGE);
 }
 
-export const EMPTY_IMAGE_LIST: ImageProblem = {
-  message: 'Add at least one product image',
-};
+export const EMPTY_IMAGE_LIST: ImageProblem = { messageKey: 'workflow.validation.noImage' };
 
 export const TOO_MANY_IMAGES: ImageProblem = {
-  message: 'At most 1 image per run.',
+  messageKey: 'workflow.validation.tooManyImages',
 };
 
 /** Walks `files`; returns the first ImageProblem found or null. */

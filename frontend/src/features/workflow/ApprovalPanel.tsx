@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
 import {
@@ -17,6 +19,7 @@ interface ReviewFormProps {
 }
 
 function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>) {
+  const { t } = useTranslation();
   const original = originalPayload ?? '';
   const scripted = Boolean(task.currentRevisionId);
   const [draft, setDraft] = useState(original);
@@ -27,7 +30,7 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
   const busy = approve.isPending || reject.isPending;
   const approveBlocked = busy || scriptApprovalBlocked;
   const serverFieldError = scripted ? undefined : payloadFieldError(approve.error);
-  const contentError = blankDraft ? "Content can't be empty" : serverFieldError;
+  const contentError = blankDraft ? t('workflow.approval.contentEmpty') : serverFieldError;
 
   // Busy rather than disabled, so focus stays on the button while the decision is sent.
   const onApprove = () => {
@@ -51,7 +54,7 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
   };
 
   return (
-    <section className="approval-panel" aria-label="Review before the run continues">
+    <section className="approval-panel" aria-label={t('workflow.approval.region')}>
       {scripted ? (
         <ScriptReview
           task={task}
@@ -60,7 +63,7 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
         />
       ) : (
         <div className="field">
-          <label htmlFor="approval-payload">Content to approve</label>
+          <label htmlFor="approval-payload">{t('workflow.approval.contentLabel')}</label>
           <textarea
             id="approval-payload"
             rows={6}
@@ -87,20 +90,20 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
           aria-disabled={approveBlocked}
           aria-busy={approve.isPending}
         >
-          {approve.isPending ? 'Approving…' : 'Approve'}
+          {approve.isPending ? t('workflow.approval.approving') : t('workflow.approval.approve')}
         </button>
         <button type="button" onClick={onReject} aria-disabled={busy} aria-busy={reject.isPending}>
-          {reject.isPending ? 'Rejecting…' : 'Reject'}
+          {reject.isPending ? t('workflow.approval.rejecting') : t('workflow.approval.reject')}
         </button>
       </div>
       {approve.isError && !serverFieldError && (
         <p role="alert" className="approval-error">
-          {approveError(approve.error, scripted)}
+          {approveError(approve.error, scripted, t)}
         </p>
       )}
       {reject.isError && (
         <p role="alert" className="approval-error">
-          {refusalReason(reject.error) ?? 'Could not reject this step'}
+          {refusalReason(reject.error) ?? t('workflow.approval.rejectFailed')}
         </p>
       )}
     </section>
@@ -111,11 +114,11 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
  * A 409 on a script checkpoint means the revision moved on, so the reviewer is told to reload
  * rather than shown the server's generic conflict sentence.
  */
-function approveError(error: unknown, scripted: boolean): string {
+function approveError(error: unknown, scripted: boolean, t: TFunction): string {
   if (scripted && isLostRace(error)) {
-    return 'This script moved on in another tab. Reload the page to see the latest revision.';
+    return t('workflow.approval.scriptMovedOn');
   }
-  return refusalReason(error) ?? 'Could not approve this step';
+  return refusalReason(error) ?? t('workflow.approval.approveFailed');
 }
 
 /**
@@ -145,12 +148,13 @@ function ScriptReview({
   runId: string;
   onApprovalBlockedChange: (blocked: boolean) => void;
 }>) {
+  const { t } = useTranslation();
   const revisions = useRevisionsQuery(task.id);
   if (revisions.isLoading) {
-    return <output>Loading the script…</output>;
+    return <output>{t('workflow.approval.loadingScript')}</output>;
   }
   if (revisions.isError) {
-    return <p role="alert">Could not load the script revisions.</p>;
+    return <p role="alert">{t('workflow.approval.scriptLoadError')}</p>;
   }
   const list: ScriptRevisionResponse[] = revisions.data ?? [];
   return (
@@ -165,13 +169,14 @@ function ScriptReview({
 
 /** The pending review of a paused run: the content can be edited before it is approved. */
 export function ApprovalPanel({ runId }: Readonly<{ runId: string }>) {
+  const { t } = useTranslation();
   const tasksQuery = useReviewTasksQuery(runId);
 
   if (tasksQuery.isLoading) {
-    return <output>Loading the step to review…</output>;
+    return <output>{t('workflow.approval.loadingTask')}</output>;
   }
   if (tasksQuery.isError) {
-    return <p role="alert">Could not load the step to review.</p>;
+    return <p role="alert">{t('workflow.approval.taskLoadError')}</p>;
   }
   const task = tasksQuery.data?.find((candidate) => candidate.status === 'pending');
   if (!task?.id) {

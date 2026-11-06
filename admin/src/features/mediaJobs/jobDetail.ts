@@ -1,12 +1,18 @@
 import type { MediaJobResponse } from '@flow-cortex/api-client';
 
-export interface JobDetail {
-  text: string;
-  /** The engine's own words under an error code, for operators. */
-  message?: string;
-  /** True when the reaper is about to close this step. */
-  marker: boolean;
-}
+/** `text` is shown as received; `labelKey` is an i18n key the page translates. */
+export type JobDetail =
+  | {
+      text: string;
+      /** The engine's own words under an error code, for operators. */
+      message?: string;
+      marker: false;
+    }
+  | {
+      labelKey: string;
+      /** True when the reaper is about to close this step. */
+      marker: boolean;
+    };
 
 // The API sends null for a deadline an older row never had.
 const passed = (deadline: string | null | undefined, now: number) =>
@@ -29,20 +35,23 @@ export function jobDetail(job: MediaJobResponse, now: number): JobDetail {
   }
   if (!job.pickedUpAt) {
     return passed(job.queueDeadline, now)
-      ? { text: 'queue timeout pending', marker: true }
-      : { text: 'waiting', marker: false };
+      ? { labelKey: 'mediaJobs.detail.queueTimeoutPending', marker: true }
+      : { labelKey: 'mediaJobs.detail.waiting', marker: false };
   }
   const leasePassed = passed(job.leaseUntil, now);
   const runPassed = passed(job.runDeadline, now);
   if (leasePassed && runPassed) {
     const runFirst = Date.parse(job.runDeadline as string) < Date.parse(job.leaseUntil as string);
-    return { text: runFirst ? 'run timeout pending' : 'lease expired', marker: true };
+    return {
+      labelKey: runFirst ? 'mediaJobs.detail.runTimeoutPending' : 'mediaJobs.detail.leaseExpired',
+      marker: true,
+    };
   }
   if (leasePassed) {
-    return { text: 'lease expired', marker: true };
+    return { labelKey: 'mediaJobs.detail.leaseExpired', marker: true };
   }
   if (runPassed) {
-    return { text: 'run timeout pending', marker: true };
+    return { labelKey: 'mediaJobs.detail.runTimeoutPending', marker: true };
   }
-  return { text: 'running', marker: false };
+  return { labelKey: 'mediaJobs.detail.running', marker: false };
 }

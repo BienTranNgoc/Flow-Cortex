@@ -1,5 +1,7 @@
 import { ApiError, type RunResponse } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
@@ -10,7 +12,7 @@ import {
   choiceTakenBack,
   needsYouStep,
   selectedStep,
-  STATE_WORDS,
+  stateWord,
   stepKey,
   stepLabel,
   stepState,
@@ -19,20 +21,28 @@ import {
 import { NO_MESSAGE } from './stepErrorMessages';
 import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
-const RUN_HEADINGS: Record<string, string> = {
-  running: 'Run in progress',
-  waiting_approval: 'Waiting for your approval',
-  cancelling: 'Stopping…',
-  cancelled: 'Run cancelled',
+const RUN_HEADING_KEYS: Record<string, string> = {
+  pending: 'workflow.run.heading.pending',
+  running: 'workflow.run.heading.running',
+  waiting_approval: 'workflow.run.heading.waitingApproval',
+  completed: 'workflow.run.heading.completed',
+  error: 'workflow.run.heading.error',
+  cancelling: 'workflow.run.heading.cancelling',
+  cancelled: 'workflow.run.heading.cancelled',
 };
+
+function runHeading(status: string | undefined, t: TFunction): string {
+  const key = RUN_HEADING_KEYS[status ?? ''];
+  return key ? t(key) : t('workflow.run.headingOther', { status });
+}
 
 const STOPPABLE: ReadonlySet<string> = new Set(['running', 'waiting_approval']);
 
 /** A refusal keeps the server's own sentence; a broken request or a server fault gets ours. */
-function stopProblem(error: unknown): string {
+function stopProblem(error: unknown, t: TFunction): string {
   const refusal =
     error instanceof ApiError && error.status < 500 ? error.problem?.detail : undefined;
-  return refusal ?? "Couldn't stop the run. Try again.";
+  return refusal ?? t('workflow.stop.failed');
 }
 
 interface StopControlProps {
@@ -43,6 +53,7 @@ interface StopControlProps {
 
 /** "Stop workflow", its confirmation, and what a failed stop says. Mounted only on a stoppable run. */
 function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlProps>) {
+  const { t } = useTranslation();
   const { runCancellation } = useFeatures();
   const cancel = useCancelRunMutation(runId);
   const [open, setOpen] = useState(false);
@@ -77,11 +88,11 @@ function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlP
   return (
     <div className="run-stop">
       <button type="button" className="run-stop-button" aria-haspopup="dialog" onClick={onOpen}>
-        Stop workflow
+        {t('workflow.stop.open')}
       </button>
       {cancel.isError && (
         <p role="alert" className="run-stop-error">
-          {stopProblem(cancel.error)}
+          {stopProblem(cancel.error, t)}
         </p>
       )}
       <StopRunDialog
@@ -122,6 +133,7 @@ interface RunViewProps {
 }
 
 function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
+  const { t } = useTranslation();
   const panelId = useId();
   const panelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -153,7 +165,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
 
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
-    selected && selectedState ? `${stepLabel(selected)}, ${STATE_WORDS[selectedState]}` : '';
+    selected && selectedState ? `${stepLabel(selected, t)}, ${stateWord(selectedState, t)}` : '';
 
   const selectedKey = selected && stepKey(selected);
   const [announced, setAnnounced] = useState('');
@@ -188,7 +200,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   return (
     <main>
       <h1 ref={headingRef} tabIndex={-1}>
-        {RUN_HEADINGS[run.status ?? ''] ?? `Run ${run.status}`}
+        {runHeading(run.status, t)}
       </h1>
       {STOPPABLE.has(run.status ?? '') && (
         <StopControl
@@ -202,15 +214,19 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       </div>
       {failedWithoutStep && (
         <p role="alert" className="run-step-error">
-          {NO_MESSAGE}
+          {t(NO_MESSAGE)}
         </p>
       )}
-      {fileName && <p className="run-file">File: {fileName}</p>}
+      {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
       {selected && (
         <div className="run-layout">
           <div className="run-layout-pipeline">
             <Pipeline
-              steps={steps.map((step) => ({ id: stepKey(step), name: stepLabel(step), run: step }))}
+              steps={steps.map((step) => ({
+                id: stepKey(step),
+                name: stepLabel(step, t),
+                run: step,
+              }))}
               runStatus={run.status}
               selectedId={stepKey(selected)}
               onSelect={onSelect}
@@ -232,7 +248,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       )}
       {backTo && (
         <Link className="run-back-link action-link" to={`/workflows/${backTo}`}>
-          Back to workflow
+          {t('workflow.run.back')}
         </Link>
       )}
     </main>
@@ -247,15 +263,16 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
 export function RunProgressPage() {
   const { workflowId, runId } = useParams<{ workflowId: string; runId: string }>();
   const runQuery = useRunQuery(runId);
+  const { t } = useTranslation();
 
   if (!runId) {
-    return <p role="alert">No run selected.</p>;
+    return <p role="alert">{t('workflow.run.noRun')}</p>;
   }
   if (runQuery.isLoading) {
-    return <output>Loading run…</output>;
+    return <output>{t('workflow.run.loading')}</output>;
   }
   if (runQuery.isError || !runQuery.data) {
-    return <p role="alert">Could not load this run.</p>;
+    return <p role="alert">{t('workflow.run.loadError')}</p>;
   }
   return <RunView run={runQuery.data} runId={runId} workflowId={workflowId} />;
 }

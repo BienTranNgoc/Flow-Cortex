@@ -7,7 +7,15 @@ package com.flowcortex.shared.web;
  */
 public class ConflictException extends RuntimeException {
 
-    public ConflictException(String message) {
-        super(message);
+    private final LocalizedMessage detail;
+
+    public ConflictException(LocalizedMessage detail) {
+        super(detail.toString());
+        this.detail = detail;
+    }
+
+    /** The bundle key for the problem detail. */
+    public LocalizedMessage getDetail() {
+        return detail;
     }
 }

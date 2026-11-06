@@ -1,6 +1,8 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, useLocation, useNavigate } from 'react-router-dom';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
 import { renderRoute, stubApi, type Handler } from '../../test/fakeApi';
 import { ResetPasswordPage } from './ResetPasswordPage';
 
@@ -268,5 +270,38 @@ describe('ResetPasswordPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
     expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('words the form, its field refusal and the sign-in notice in Vietnamese', async () => {
+      const { user } = renderPage({
+        [RESET]: { status: 200, body: { email: 'an@example.com' } },
+      });
+
+      const password = await screen.findByLabelText(viAuth.reset.password.passwordLabel);
+      await user.type(password, 'short');
+      await user.click(screen.getByRole('button', { name: viAuth.reset.password.submit }));
+      expect(await screen.findByText(viAuth.validation.passwordTooShort)).toBeInTheDocument();
+
+      await user.clear(password);
+      await user.type(password, 'a-long-password');
+      await user.type(
+        screen.getByLabelText(viAuth.reset.password.confirmPasswordLabel),
+        'a-long-password',
+      );
+      await user.click(screen.getByRole('button', { name: viAuth.reset.password.submit }));
+
+      expect(JSON.parse((await screen.findByTestId('login-state')).textContent ?? '')).toEqual({
+        notice: viAuth.reset.password.changedNotice,
+        email: 'an@example.com',
+      });
+    });
   });
 });

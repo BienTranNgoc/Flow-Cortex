@@ -1,17 +1,18 @@
 package com.flowcortex.user.application;
 
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import java.time.Duration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /** 429 Problem Detail with a {@code Retry-After} header in whole seconds (at least 1). */
-public class RegistrationRateLimitedException extends ResponseStatusException {
+public class RegistrationRateLimitedException extends LocalizedStatusException {
 
     private final long retryAfterSeconds;
 
     public RegistrationRateLimitedException(Duration retryAfter) {
-        super(HttpStatus.TOO_MANY_REQUESTS, "Too many registration attempts; try again later");
+        super(HttpStatus.TOO_MANY_REQUESTS, new LocalizedMessage("auth.rateLimited.register"));
         long nanos = retryAfter.toNanos();
         this.retryAfterSeconds = Math.max(1, (nanos + 999_999_999L) / 1_000_000_000L);
     }

@@ -1,0 +1,55 @@
+{
+  "status": {
+    "ready": "Sẵn sàng",
+    "reviewRequired": "Cần duyệt",
+    "failureDemo": "Demo: thất bại"
+  },
+  "description": {
+    "echo": "Thử một quy trình hai bước đơn giản chỉ trả lại dữ liệu bạn nhập. Rất hợp để tìm hiểu cách lượt chạy hoạt động.",
+    "failure": "Chạy một quy trình cố ý thất bại để bạn xem lỗi hiển thị và được báo cáo ra sao.",
+    "repurpose": "Biến một video dài thành clip ngắn có kích thước phù hợp với mạng xã hội.",
+    "productVideo": "Tạo video sản phẩm trọn gói: kịch bản, giọng đọc và bản kết xuất cuối.",
+    "probe": "Tải lên một tệp media và nhận báo cáo kỹ thuật nhanh (thời lượng, dung lượng, codec).",
+    "extractAudio": "Tách rãnh âm thanh khỏi video và lưu thành một tệp riêng.",
+    "default": "Chạy quy trình này với dữ liệu của riêng bạn và tải kết quả xuống khi hoàn tất."
+  },
+  "card": {
+    "open": "Mở {{name}}",
+    "openUnnamed": "Mở quy trình",
+    "untitled": "Quy trình chưa đặt tên",
+    "sharedWithAll": "Được chia sẻ với mọi thành viên",
+    "stepFallback": "Bước {{order}}",
+    "etaSeconds": "~{{value}} giây",
+    "etaMinutes": "~{{value}} phút",
+    "steps": "{{n}} bước",
+    "launch": "Khởi chạy"
+  },
+  "thumb": {
+    "empty": "Chưa cấu hình bước nào.",
+    "label": "Các bước của quy trình"
+  },
+  "filter": {
+    "legend": "Lọc quy trình theo danh mục",
+    "all": "Tất cả",
+    "video": "Video",
+    "audio": "Âm thanh",
+    "demo": "Demo",
+    "production": "Sản xuất",
+    "count": "{{n}} quy trình"
+  },
+  "search": {
+    "label": "Tìm quy trình",
+    "placeholder": "Tìm quy trình…",
+    "clear": "Xóa nội dung tìm kiếm"
+  },
+  "icon": {
+    "video": "Video",
+    "tiktok": "Video mạng xã hội",
+    "terminal": "Dòng lệnh",
+    "alert": "Cảnh báo",
+    "cart": "Giỏ hàng",
+    "audio": "Âm thanh",
+    "image": "Hình ảnh",
+    "spark": "Tia sáng"
+  }
+}

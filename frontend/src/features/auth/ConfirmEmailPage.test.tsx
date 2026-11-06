@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, useLocation } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
+import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { ConfirmEmailPage } from './ConfirmEmailPage';
 
@@ -148,5 +149,45 @@ describe('ConfirmEmailPage', () => {
 
     expect(await screen.findByText('Home')).toBeInTheDocument();
     expect(getToken()).toBe('jwt-c2');
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('explains an unusable link, validates the address and words a failed resend in Vietnamese', async () => {
+      stubApi({
+        'POST /api/v1/auth/resend-confirmation': () => {
+          throw new TypeError('Failed to fetch');
+        },
+      });
+      const user = userEvent.setup();
+
+      renderConfirm('');
+
+      expect(
+        await screen.findByRole('heading', { name: 'Xác nhận email của bạn' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Liên kết xác nhận này không còn hiệu lực')).toHaveAttribute(
+        'role',
+        'alert',
+      );
+      await user.type(screen.getByLabelText('Email'), 'an.example.com');
+      await user.click(screen.getByRole('button', { name: 'Gửi lại email xác nhận' }));
+      expect(await screen.findByText('Hãy nhập địa chỉ email hợp lệ')).toBeInTheDocument();
+
+      await user.clear(screen.getByLabelText('Email'));
+      await user.type(screen.getByLabelText('Email'), 'an@example.com');
+      await user.click(screen.getByRole('button', { name: 'Gửi lại email xác nhận' }));
+
+      expect(await screen.findByText('Không gửi được liên kết mới. Hãy thử lại.')).toHaveAttribute(
+        'role',
+        'alert',
+      );
+    });
   });
 });

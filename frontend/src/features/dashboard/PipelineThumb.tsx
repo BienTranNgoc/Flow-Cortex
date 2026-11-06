@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { StepView } from './workflowMeta';
 import './PipelineThumb.css';
 
@@ -10,11 +11,12 @@ interface PipelineThumbProps {
  * no interaction, no status; just enough to glance at the flow.
  */
 export function PipelineThumb({ steps }: Readonly<PipelineThumbProps>) {
+  const { t } = useTranslation();
   if (steps.length === 0) {
-    return <p className="pipeline-thumb__empty">No steps configured.</p>;
+    return <p className="pipeline-thumb__empty">{t('dashboard.thumb.empty')}</p>;
   }
   return (
-    <ol className="pipeline-thumb" aria-label="Workflow steps">
+    <ol className="pipeline-thumb" aria-label={t('dashboard.thumb.label')}>
       {steps.map((step, index) => {
         const next = steps[index + 1];
         const isCheckpoint = step.kind === 'checkpoint';

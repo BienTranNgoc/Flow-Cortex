@@ -1,5 +1,6 @@
 package com.flowcortex.user.passwordreset;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.application.RefreshTokenService;
 import com.flowcortex.user.domain.AppUser;
@@ -32,7 +33,7 @@ public class PasswordResetService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PasswordResetService.class);
 
-    static final String LINK_INVALID_DETAIL = "This reset link is no longer valid";
+    static final LocalizedMessage LINK_INVALID_DETAIL = new LocalizedMessage("auth.resetLinkInvalid");
 
     static final String LINK_INVALID_CODE = "RESET_LINK_INVALID";
 

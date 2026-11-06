@@ -1,5 +1,7 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
+import i18n from '../../lib/i18n';
+import viDashboard from '../../locales/vi/dashboard.json';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { DashboardPage } from './DashboardPage';
 
@@ -69,5 +71,36 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('Recent failures')).toBeInTheDocument();
     expect(screen.queryByText('private provider message')).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('renders the heading, metric cards, status pills and empty state in Vietnamese', async () => {
+      stubApi({
+        'GET /api/v1/users': { status: 200, body: [] },
+        [RUNS_PATH]: { status: 200, body: { items: [], page: 0, size: 20, total: 1200 } },
+      });
+      renderRoute('/dashboard', '/dashboard', <DashboardPage />);
+
+      expect(await screen.findByText(viDashboard.failures.empty)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(viDashboard.title);
+      expect(screen.getByText(viDashboard.eyebrow)).toBeInTheDocument();
+      expect(screen.getByText(viDashboard.failures.emptyHint)).toBeInTheDocument();
+      expect(screen.getByText(viDashboard.metrics.totalRuns)).toBeInTheDocument();
+      expect(screen.getByText(viDashboard.metrics.newUsersHint)).toBeInTheDocument();
+      expect(screen.getByText(viDashboard.runStatus.failed)).toBeInTheDocument();
+      expect(screen.getAllByText('1.200').length).toBeGreaterThan(0);
+      expect(screen.getByRole('link', { name: viDashboard.runStatus.viewRuns })).toHaveAttribute(
+        'href',
+        '/runs',
+      );
+      expect(screen.getByRole('button', { name: viDashboard.refresh })).toBeInTheDocument();
+    });
   });
 });

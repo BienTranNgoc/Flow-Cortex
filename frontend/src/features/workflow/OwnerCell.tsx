@@ -1,11 +1,12 @@
 import type { WorkflowResponse } from '@flow-cortex/api-client';
+import { useTranslation } from 'react-i18next';
 
 interface OwnerCellProps {
   readonly workflow: WorkflowResponse;
 }
 
 function initialsFor(name: string): string {
-  const parts = name.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const parts = name.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
@@ -22,8 +23,9 @@ function paletteFor(seed: string): readonly [string, string] {
 
 /** The API reports only whether a workflow is shared, not who owns it: a personal workflow is "You", a shared one "Shared team". */
 export function OwnerCell({ workflow }: Readonly<OwnerCellProps>) {
+  const { t } = useTranslation();
   const mine = !workflow.isShared;
-  const displayName = mine ? 'You' : 'Shared team';
+  const displayName = t(mine ? 'workflow.owner.you' : 'workflow.owner.sharedTeam');
   const [from, to] = paletteFor(workflow.id ?? workflow.name ?? 'wf');
 
   return (
@@ -39,9 +41,9 @@ export function OwnerCell({ workflow }: Readonly<OwnerCellProps>) {
         {displayName}
         <span
           className={`wf-list__owner-tag${mine ? ' wf-list__owner-tag--mine' : ''}`}
-          aria-label={mine ? 'Owned by you' : 'Shared workflow'}
+          aria-label={t(mine ? 'workflow.owner.ownedByYou' : 'workflow.owner.sharedWorkflow')}
         >
-          {mine ? 'Mine' : 'Shared'}
+          {t(mine ? 'workflow.owner.mine' : 'workflow.owner.shared')}
         </span>
       </span>
     </div>

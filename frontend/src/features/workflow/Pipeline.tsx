@@ -1,6 +1,9 @@
 import type { RunStepResponse } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+import { activeLocale } from '../../lib/i18n';
 import './Pipeline.css';
-import { edgeState, STATE_WORDS, stepDuration, stepNameId, stepState, type StepState } from './stepDisplay';
+import { edgeState, stateWord, stepDuration, stepNameId, stepState, type StepState } from './stepDisplay';
 import { outputFields, parseReport } from './stepOutputFields';
 import { StatusGlyph, TypeGlyph } from './stepGlyphs';
 
@@ -27,13 +30,13 @@ interface PipelineProps {
 const CURRENT_STATES: ReadonlySet<StepState> = new Set(['waiting', 'running', 'needs-you']);
 
 /** "Retried N×" for a redelivered job, else the first labelled field of a completed step. */
-function metaLine(step: RunStepResponse): string {
+function metaLine(step: RunStepResponse, t: TFunction): string {
   const deliveries = step.deliveryCount ?? 0;
   if (deliveries >= 1) {
-    return `Retried ${deliveries}×`;
+    return t('workflow.pipeline.retried', { n: deliveries });
   }
   const report = step.status === 'completed' && step.output ? parseReport(step.output) : null;
-  const first = report ? outputFields(report)[0] : undefined;
+  const first = report ? outputFields(report, t, activeLocale())[0] : undefined;
   return first ? `${first.label}: ${first.value}` : '';
 }
 
@@ -48,7 +51,8 @@ interface NodeProps {
 }
 
 function Node({ step, order, state, selected, panelId, onSelect, problem }: Readonly<NodeProps>) {
-  const duration = step.run ? stepDuration(step.run) : null;
+  const { t } = useTranslation();
+  const duration = step.run ? stepDuration(step.run, t, activeLocale()) : null;
   const content = (
     <>
       <span className="pipeline-order">{order}</span>
@@ -61,17 +65,17 @@ function Node({ step, order, state, selected, panelId, onSelect, problem }: Read
       {state && (
         <span className="run-step-status" data-state={state}>
           <StatusGlyph state={state} />
-          {STATE_WORDS[state]}
+          {stateWord(state, t)}
         </span>
       )}
       {problem && (
         <span className="run-step-status" data-state="error">
           <StatusGlyph state="error" />
-          Not configured
+          {t('workflow.pipeline.notConfigured')}
         </span>
       )}
       {duration && (
-        <span className="pipeline-duration" title="Time taken">
+        <span className="pipeline-duration" title={t('workflow.step.timing.timeTaken')}>
           <svg
             className="pipeline-clock-icon"
             width="12"
@@ -90,7 +94,7 @@ function Node({ step, order, state, selected, panelId, onSelect, problem }: Read
           {duration}
         </span>
       )}
-      {step.run && <span className="pipeline-meta">{metaLine(step.run)}</span>}
+      {step.run && <span className="pipeline-meta">{metaLine(step.run, t)}</span>}
     </>
   );
 
@@ -146,11 +150,12 @@ export function Pipeline({
   panelId,
   problemOrder,
 }: Readonly<PipelineProps>) {
+  const { t } = useTranslation();
   const runSteps = steps.flatMap((step) => (step.run ? [step.run] : []));
   const layout = steps.length > 4 ? 'stack' : 'row';
 
   return (
-    <section className="pipeline" aria-label="Steps" data-layout={layout}>
+    <section className="pipeline" aria-label={t('workflow.pipeline.region')} data-layout={layout}>
       <ol className="pipeline-list">
         {steps.map((step, index) => {
           const next = steps[index + 1];
@@ -171,7 +176,7 @@ export function Pipeline({
         })}
       </ol>
       {onSelect && steps.length > 1 && (
-        <p className="pipeline-hint">Select a step to see its result.</p>
+        <p className="pipeline-hint">{t('workflow.pipeline.hint')}</p>
       )}
     </section>
   );

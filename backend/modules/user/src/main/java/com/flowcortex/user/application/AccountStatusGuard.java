@@ -1,6 +1,7 @@
 package com.flowcortex.user.application;
 
 import com.flowcortex.shared.web.AccountLockedException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
 import java.time.Instant;
@@ -29,7 +30,7 @@ final class AccountStatusGuard {
     static void requireNotLocked(AppUser user, Instant now) {
         if (isLocked(user, now)) {
             Instant lockedUntil = user.getLockedUntil();
-            throw new AccountLockedException("Account is locked until " + lockedUntil, lockedUntil);
+            throw new AccountLockedException(new LocalizedMessage("auth.accountLocked", lockedUntil), lockedUntil);
         }
     }
 

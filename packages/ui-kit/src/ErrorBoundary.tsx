@@ -1,8 +1,16 @@
 import { Component, type ReactNode } from 'react';
 import { reportClientError } from './reportClientError';
 
+export interface ErrorBoundaryLabels {
+  title: string;
+  message: string;
+  reload: string;
+}
+
 interface ErrorBoundaryProps {
   children: ReactNode;
+  /** Required so a missing translation is a type error, never an English fallback. */
+  labels: ErrorBoundaryLabels;
   /** Defaults to reloading the page. */
   onReload?: () => void;
 }
@@ -12,7 +20,7 @@ interface ErrorBoundaryState {
 }
 
 /**
- * Contains a render failure of its children: shows a recoverable error view with "Reload" in their
+ * Contains a render failure of its children: shows a recoverable error view with a reload action in their
  * place, so the surrounding shell keeps working, and reports the failure once.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -30,13 +38,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.failed) {
       return this.props.children;
     }
+    const { labels } = this.props;
     const reload = this.props.onReload ?? (() => window.location.reload());
     return (
       <section className="error-view">
-        <h1>Something went wrong</h1>
-        <p role="alert">This page could not be shown. Reload it to try again.</p>
+        <h1>{labels.title}</h1>
+        <p role="alert">{labels.message}</p>
         <button type="button" onClick={reload}>
-          Reload
+          {labels.reload}
         </button>
       </section>
     );

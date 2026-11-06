@@ -23,8 +23,10 @@ import type {
   ResetPasswordRequest,
   SetPasswordRequest,
 } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 
 export { signOut as logout, useAuthToken, useSessionReady } from '@flow-cortex/api-client';
+export { accountLockedMessage } from '@flow-cortex/i18n';
 
 /**
  * The signed-in user's own record. Disabled while signed out — there's
@@ -177,13 +179,12 @@ export function retryAfterSecondsFrom(error: unknown): number | undefined {
 }
 
 /** The wait a 429 with `retryAfterSeconds` asks for, in whole minutes; undefined for any other error. */
-export function resetWaitMessage(error: unknown): string | undefined {
+export function resetWaitMessage(error: unknown, t: TFunction): string | undefined {
   const seconds = retryAfterSecondsFrom(error);
   if (!(error instanceof ApiError) || error.status !== 429 || seconds === undefined) {
     return undefined;
   }
-  const minutes = Math.max(1, Math.ceil(seconds / 60));
-  return `Too many reset requests. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+  return t('auth.reset.waitMinutes', { count: Math.max(1, Math.ceil(seconds / 60)) });
 }
 
 /** A 423's `lockedUntil` instant, when it is present and parses. */
@@ -225,8 +226,15 @@ export function clearRememberedEmail(): void {
   }
 }
 
-export function detailFrom(mutation: { readonly error: unknown }): string | undefined {
-  return mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
+/** The server's `detail` for a failed request, else the `fallbackKey` message; nothing before a failure. */
+export function failureMessage(
+  mutation: { readonly error: unknown },
+  t: TFunction,
+  fallbackKey = 'common.errors.requestFailed',
+): string | undefined {
+  if (!mutation.error) return undefined;
+  const detail = mutation.error instanceof ApiError ? mutation.error.problem?.detail : undefined;
+  return detail || t(fallbackKey);
 }
 
 export type SubmitDataState = 'idle' | 'pending' | 'success';

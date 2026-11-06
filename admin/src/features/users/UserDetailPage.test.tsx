@@ -1,6 +1,8 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../lib/i18n';
+import viUsers from '../../locales/vi/users.json';
 import { renderRoute, stubApi } from '../../test/fakeApi';
 import { UserDetailPage } from './UserDetailPage';
 
@@ -52,5 +54,45 @@ describe('UserDetailPage', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('The user ID is not valid.');
     expect(calls).toHaveLength(0);
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the page heading, status pills and account panels in Vietnamese', async () => {
+      stubApi({
+        [USER_PATH]: {
+          status: 200,
+          body: {
+            id: USER_ID,
+            email: 'member@example.com',
+            name: 'Member',
+            role: 'MEMBER',
+            status: 'SUSPENDED',
+            createdAt: '2026-10-01T10:00:00Z',
+            updatedAt: '2026-10-02T10:00:00Z',
+          },
+        },
+      });
+      renderRoute('/users/:userId', `/users/${USER_ID}`, <UserDetailPage />);
+
+      expect(await screen.findByRole('heading', { name: 'Member' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: viUsers.detail.allUsers })).toHaveAttribute(
+        'href',
+        '/users',
+      );
+      expect(screen.getByText(viUsers.detail.eyebrow)).toBeInTheDocument();
+      expect(screen.getAllByText(viUsers.status.SUSPENDED)).toHaveLength(2);
+      expect(screen.getByText(viUsers.detail.accountInfoHint)).toBeInTheDocument();
+      expect(
+        screen.getByText(viUsers.detail.role, { selector: 'dt' }).nextElementSibling,
+      ).toHaveTextContent(viUsers.role.MEMBER);
+      expect(screen.getByRole('button', { name: viUsers.detail.reactivate })).toBeInTheDocument();
+    });
   });
 });

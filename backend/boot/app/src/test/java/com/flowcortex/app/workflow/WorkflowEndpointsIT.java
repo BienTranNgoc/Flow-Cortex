@@ -14,6 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -99,6 +102,27 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
+    }
+
+    @Test
+    void anUnknownWorkflowWithoutAnAcceptLanguageKeepsTodaysEnglishDetail() {
+        UserView user = newUser("http-unknown-workflow-english");
+        String token = loginAs(user);
+        UUID unknown = UUID.randomUUID();
+
+        ResponseEntity<String> response = get("/api/v1/workflows/" + unknown, token, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).contains("\"detail\":\"Workflow not found: " + unknown + "\"");
+
+        HttpHeaders french = new HttpHeaders();
+        french.setBearerAuth(token);
+        french.set(HttpHeaders.ACCEPT_LANGUAGE, "fr-FR");
+        ResponseEntity<String> frenchResponse = restTemplate.exchange("/api/v1/workflows/" + unknown, HttpMethod.GET,
+                new HttpEntity<>(french), String.class);
+
+        assertThat(frenchResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(frenchResponse.getBody()).contains("\"detail\":\"Workflow not found: " + unknown + "\"");
     }
 
     @Test

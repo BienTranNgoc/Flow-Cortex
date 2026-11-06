@@ -1,8 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
-import { formatCredits } from '../features/credits/formatCredits';
 import { useBalance } from '../features/credits/useBalance';
 import { FlowCortexLogo, ThemeToggle } from '@flow-cortex/ui-kit';
+import { AppLanguageToggle } from '../lib/AppLanguageToggle';
+import { formatNumber } from '../lib/format';
+import { activeLocale } from '../lib/i18n';
 import { useTheme } from './useTheme';
 import { DocsMenu } from './DocsMenu';
 import { primaryNavItems } from './navItems';
@@ -13,6 +16,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
 export function Header() {
+  const { t } = useTranslation();
   const meQuery = useMeQuery();
   const credits = useBalance();
   const displayName = meQuery.data?.name;
@@ -22,13 +26,13 @@ export function Header() {
   return (
     <header className="cortex-header">
       <div className="cortex-header__inner">
-        <Link to="/" className="cortex-header__brand" aria-label="FlowCortex home">
+        <Link to="/" className="cortex-header__brand" aria-label={t('common.nav.homeLink')}>
           <FlowCortexLogo size={34} />
           <span className="cortex-header__brand-name">FlowCortex</span>
         </Link>
 
-        <nav className="cortex-header__nav" aria-label="Main navigation">
-          {primaryNavItems().map((item) => (
+        <nav className="cortex-header__nav" aria-label={t('common.nav.label')}>
+          {primaryNavItems(t).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -54,10 +58,23 @@ export function Header() {
               >
                 <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
               </svg>
-              <span>{formatCredits(credits)} credits</span>
+              <span>
+                {t('common.nav.credits', { amount: formatNumber(credits, activeLocale()) })}
+              </span>
             </span>
           )}
-          <ThemeToggle theme={theme} onToggle={toggle} compact />
+          <AppLanguageToggle />
+          <ThemeToggle
+            theme={theme}
+            onToggle={toggle}
+            compact
+            labels={{
+              switchToLight: t('common.theme.switchToLight'),
+              switchToDark: t('common.theme.switchToDark'),
+              light: t('common.theme.light'),
+              dark: t('common.theme.dark'),
+            }}
+          />
           <UserMenu name={displayName} email={email} />
         </div>
       </div>

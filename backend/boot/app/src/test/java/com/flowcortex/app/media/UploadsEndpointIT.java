@@ -7,20 +7,29 @@ import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -95,6 +104,30 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
             assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
             assertThat(response.getBody()).contains("\"size\":\"" + SIZE_SENTENCE + "\"").doesNotContain("X-Amz-");
         }
+    }
+
+    @Test
+    void anOversizeFileAskedForInVietnameseIsRefusedWithTheVietnameseSizeSentence() throws IOException {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(loginAs(newUser("uploads-size-vi")));
+        headers.set(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+
+        ResponseEntity<byte[]> response = restTemplate.exchange("/api/v1/uploads", HttpMethod.POST,
+                new HttpEntity<>(new UploadRequestView("clip.mp4", 600L * 1024 * 1024), headers), byte[].class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        String expected = new MessageFormat(vietnameseBundle().getProperty("upload.sizeMegabytes"),
+                Locale.forLanguageTag("vi")).format(new Object[] {500L, ".mp4, .mov, .webm, .mkv"});
+        assertThat(new String(response.getBody(), StandardCharsets.UTF_8))
+                .contains("\"size\":\"" + expected + "\"");
+    }
+
+    private static Properties vietnameseBundle() throws IOException {
+        Properties bundle = new Properties();
+        try (InputStream in = UploadsEndpointIT.class.getResourceAsStream("/i18n/messages_vi.properties")) {
+            bundle.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        return bundle;
     }
 
     @Test

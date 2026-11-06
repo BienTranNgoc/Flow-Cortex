@@ -2,6 +2,9 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { setToken, signOut } from '@flow-cortex/api-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '../lib/format';
+import { activeLocale } from '../lib/i18n';
 import { accountStatsEnabled, demoPagesEnabled } from './featureFlags';
 import './UserMenu.css';
 
@@ -9,6 +12,11 @@ interface UserMenuProps {
   readonly name: string | string[] | null | undefined;
   readonly email: string | null | undefined;
 }
+
+// Placeholder quota figures shown only behind the demo account-stats flag.
+const DEMO_GPU_MINUTES_USED = 120;
+const DEMO_GPU_MINUTES_TOTAL = 240;
+const DEMO_TOKEN_BALANCE = 84_500;
 
 function initialsFrom(name: string | string[] | null | undefined, email: string | null | undefined): string {
   const source = (typeof name === 'string' ? name : '').trim() || (email ?? '');
@@ -20,6 +28,8 @@ function initialsFrom(name: string | string[] | null | undefined, email: string 
 
 /** Round-avatar trigger in the top-right header that opens account / quota / sign-out. */
 export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
+  const { t } = useTranslation();
+  const locale = activeLocale();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +83,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
         className="cortex-user-menu__trigger"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={email ? `Open account menu for ${email}` : 'Open account menu'}
+        aria-label={email ? t('common.userMenu.openFor', { email }) : t('common.userMenu.open')}
         onClick={() => setOpen((prev) => !prev)}
       >
         <span className="cortex-user-menu__avatar" aria-hidden="true">
@@ -96,20 +106,27 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
           </div>
 
           {showStats && (
-            <div className="cortex-user-menu__quota" aria-label="Resource quotas">
+            <div className="cortex-user-menu__quota" aria-label={t('common.userMenu.quotas')}>
               <div className="cortex-user-menu__quota-row">
-                <span>GPU minutes</span>
-                <span className="cortex-user-menu__quota-value">120 / 240</span>
+                <span>{t('common.userMenu.gpuMinutes')}</span>
+                <span className="cortex-user-menu__quota-value">
+                  {t('common.userMenu.quotaUsage', {
+                    used: formatNumber(DEMO_GPU_MINUTES_USED, locale),
+                    total: formatNumber(DEMO_GPU_MINUTES_TOTAL, locale),
+                  })}
+                </span>
               </div>
               <div className="cortex-user-menu__quota-row">
-                <span>Token balance</span>
-                <span className="cortex-user-menu__quota-value">84,500</span>
+                <span>{t('common.userMenu.tokenBalance')}</span>
+                <span className="cortex-user-menu__quota-value">
+                  {formatNumber(DEMO_TOKEN_BALANCE, locale)}
+                </span>
               </div>
             </div>
           )}
 
           <Link to="/profile" className="cortex-user-menu__item" onClick={() => setOpen(false)}>
-            <span>Account settings</span>
+            <span>{t('common.userMenu.accountSettings')}</span>
           </Link>
           {demoPagesEnabled() && (
             <Link
@@ -117,11 +134,11 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
               className="cortex-user-menu__item"
               onClick={() => setOpen(false)}
             >
-              <span>Connected services</span>
+              <span>{t('common.userMenu.connectedServices')}</span>
             </Link>
           )}
           <Link to="/docs" className="cortex-user-menu__item" onClick={() => setOpen(false)}>
-            <span>Help &amp; docs</span>
+            <span>{t('common.userMenu.helpDocs')}</span>
           </Link>
 
           <div className="cortex-user-menu__divider" aria-hidden="true" />
@@ -132,7 +149,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
             onClick={onSignOut}
             disabled={signingOut}
           >
-            {signingOut ? 'Signing out…' : 'Sign out'}
+            {signingOut ? t('common.userMenu.signingOut') : t('common.nav.signOut')}
           </button>
         </div>
       )}

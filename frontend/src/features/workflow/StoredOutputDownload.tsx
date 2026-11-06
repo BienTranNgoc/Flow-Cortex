@@ -1,5 +1,7 @@
 import type { RunStepOutputResponse } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { openInCurrentTab } from './browser';
 import { useOutputUrlMutation } from './useWorkflows';
 
@@ -9,11 +11,11 @@ interface StoredOutputDownloadProps {
   output: RunStepOutputResponse;
 }
 
-function label(output: RunStepOutputResponse): string {
+function label(output: RunStepOutputResponse, t: TFunction): string {
   if (output.mime === 'audio/wav') {
-    return 'Download extracted audio (WAV)';
+    return t('workflow.download.extractedAudio');
   }
-  return `Download ${output.name}`;
+  return t('workflow.download.named', { name: output.name });
 }
 
 export function StoredOutputDownload({
@@ -21,6 +23,7 @@ export function StoredOutputDownload({
   stepOrder,
   output,
 }: Readonly<StoredOutputDownloadProps>) {
+  const { t } = useTranslation();
   const outputUrl = useOutputUrlMutation(runId, stepOrder, output.name);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
@@ -109,7 +112,7 @@ export function StoredOutputDownload({
               <line x1="17" y1="17" x2="22" y2="17" />
               <line x1="17" y1="7" x2="22" y2="7" />
             </svg>
-            <span>Ad video ({output.name})</span>
+            <span>{t('workflow.download.adVideo', { name: output.name })}</span>
           </div>
         </div>
 
@@ -123,13 +126,13 @@ export function StoredOutputDownload({
               src={videoUrl}
               onError={retryVideo}
             >
-              Your browser cannot play this video.
+              {t('workflow.download.cannotPlay')}
             </video>
           </div>
         )}
         {showVideo && videoFailed && (
           <p role="alert" className="run-step-download-error">
-            Could not play the video. Download it instead.
+            {t('workflow.download.playFailed')}
           </p>
         )}
 
@@ -156,10 +159,10 @@ export function StoredOutputDownload({
             </svg>
             <span>
               {showVideo
-                ? 'Hide video'
+                ? t('workflow.download.hideVideo')
                 : outputUrl.isPending
-                  ? 'Loading the video…'
-                  : 'Watch video'}
+                  ? t('workflow.download.loadingVideo')
+                  : t('workflow.download.watchVideo')}
             </span>
           </button>
 
@@ -185,13 +188,15 @@ export function StoredOutputDownload({
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span>{outputUrl.isPending ? 'Getting the file…' : label(output)}</span>
+            <span>
+              {outputUrl.isPending ? t('workflow.download.gettingFile') : label(output, t)}
+            </span>
           </button>
         </div>
 
         {outputUrl.isError && (
           <p role="alert" className="run-step-download-error">
-            Could not get download link
+            {t('workflow.download.linkError')}
           </p>
         )}
       </div>
@@ -206,11 +211,11 @@ export function StoredOutputDownload({
         aria-disabled={outputUrl.isPending}
         aria-busy={outputUrl.isPending}
       >
-        {outputUrl.isPending ? 'Getting the file…' : label(output)}
+        {outputUrl.isPending ? t('workflow.download.gettingFile') : label(output, t)}
       </button>
       {outputUrl.isError && (
         <p role="alert" className="run-step-download-error">
-          Could not get download link
+          {t('workflow.download.linkError')}
         </p>
       )}
     </div>

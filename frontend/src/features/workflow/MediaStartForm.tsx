@@ -1,7 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { StartRunRequest } from '@flow-cortex/api-client';
 import { useTransitionNavigate } from '../../app/useTransitionNavigate';
+import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { invalidateBalance } from '../credits/useBalance';
 import { startProblem, type IncompleteWorkflow } from './startProblem';
@@ -10,18 +13,22 @@ import { createStartWithUpload, StartStageError, type StartPhase } from './start
 import { uploadFile } from './uploadFile';
 import { useCreateUploadMutation, useStartRunMutation } from './useWorkflows';
 
-const NEXT_ACTION = 'Try again later, or go back to the Workflows list.';
-
 type Failure =
   | { kind: 'upload' }
   | { kind: 'alert'; message: string }
   | { kind: 'credits'; message: string; resend: StartRunRequest | null };
 
-function startButtonLabel(phase: StartPhase | null): string {
+/** A check made here (translated at render) or a field message the server wrote (shown as received). */
+type FieldProblem = { kind: 'check'; problem: FileProblem } | { kind: 'server'; message: string };
+
+const asCheck = (problem: FileProblem | null): FieldProblem | null =>
+  problem ? { kind: 'check', problem } : null;
+
+function startButtonLabel(phase: StartPhase | null, t: TFunction): string {
   if (phase?.kind === 'uploading') {
-    return `Uploading… ${phase.percent} %`;
+    return t('workflow.start.uploadingPercent', { percent: phase.percent });
   }
-  return phase?.kind === 'starting' ? 'Starting…' : 'Start run';
+  return phase?.kind === 'starting' ? t('workflow.start.starting') : t('workflow.start.button');
 }
 
 /**
@@ -39,6 +46,7 @@ export function MediaStartForm({
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
 }>) {
+  const { t } = useTranslation();
   const { go } = useTransitionNavigate();
   const queryClient = useQueryClient();
   const createUpload = useCreateUploadMutation();
@@ -53,7 +61,7 @@ export function MediaStartForm({
     [createUpload.mutateAsync, startRun.mutateAsync],
   );
   const [file, setFile] = useState<File | null>(null);
-  const [fieldProblem, setFieldProblem] = useState<FileProblem | null>(null);
+  const [fieldProblem, setFieldProblem] = useState<FieldProblem | null>(null);
   const [phase, setPhase] = useState<StartPhase | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
 
@@ -73,7 +81,7 @@ export function MediaStartForm({
     const picked = event.target.files?.[0] ?? null;
     setFile(picked);
     setFailure(null);
-    setFieldProblem(picked ? mediaFileProblem(picked) : null);
+    setFieldProblem(picked ? asCheck(mediaFileProblem(picked)) : null);
   };
 
   const showFailure = (error: unknown) => {
@@ -82,9 +90,9 @@ export function MediaStartForm({
       return;
     }
     const stageError = error instanceof StartStageError ? error : null;
-    const problem = startProblem(stageError ? stageError.cause : error);
+    const problem = startProblem(stageError ? stageError.cause : error, undefined, t, activeLocale());
     if (problem.kind === 'field') {
-      setFieldProblem({ message: problem.message });
+      setFieldProblem({ kind: 'server', message: problem.message });
     } else if (problem.kind === 'incomplete') {
       onIncomplete(problem);
     } else if (problem.kind === 'credits') {
@@ -137,7 +145,7 @@ export function MediaStartForm({
       return;
     }
     if (!file) {
-      setFieldProblem(NO_FILE);
+      setFieldProblem(asCheck(NO_FILE));
       return;
     }
     if (mediaFileProblem(file)) {
@@ -149,9 +157,14 @@ export function MediaStartForm({
   const resend = failure?.kind === 'credits' ? failure.resend : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Start run" className="media-start-form">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-label={t('workflow.start.formLabel')}
+      className="media-start-form"
+    >
       <div className="field">
-        <label htmlFor="run-file">Media file</label>
+        <label htmlFor="run-file">{t('workflow.start.mediaFile')}</label>
         <input
           id="run-file"
           type="file"
@@ -162,7 +175,11 @@ export function MediaStartForm({
         />
         {fieldProblem && (
           <div id="run-file-problem" className="field-error" role="alert">
-            <p>{fieldProblem.message}</p>
+            <p>
+              {fieldProblem.kind === 'server'
+                ? fieldProblem.message
+                : t(fieldProblem.problem.messageKey, fieldProblem.problem.values ?? {})}
+            </p>
           </div>
         )}
       </div>
@@ -171,21 +188,21 @@ export function MediaStartForm({
           className="upload-progress"
           max={100}
           value={phase.kind === 'uploading' ? phase.percent : 100}
-          aria-label="Upload progress"
+          aria-label={t('workflow.start.uploadProgress')}
         />
       )}
       {failure?.kind === 'upload' && (
         <div role="alert">
-          <p>The upload didn&apos;t finish. Try again.</p>
+          <p>{t('workflow.start.uploadUnfinished')}</p>
           <button type="button" onClick={() => file && void run(file)}>
-            Retry
+            {t('workflow.start.retry')}
           </button>
         </div>
       )}
       {failure?.kind === 'alert' && (
         <div role="alert">
           <p>{failure.message}</p>
-          <p>{NEXT_ACTION}</p>
+          <p>{t('workflow.start.nextActionLater')}</p>
         </div>
       )}
       {failure?.kind === 'credits' && (
@@ -196,7 +213,7 @@ export function MediaStartForm({
         />
       )}
       <button type="submit" aria-busy={phase !== null} disabled={disabled}>
-        {startButtonLabel(phase)}
+        {startButtonLabel(phase, t)}
       </button>
     </form>
   );

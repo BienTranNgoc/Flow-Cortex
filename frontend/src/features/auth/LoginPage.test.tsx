@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation, type Location } from 'react-router-dom';
 import { setToken } from '@flow-cortex/api-client';
+import { AppShell } from '../../app/AppShell';
+import i18n from '../../lib/i18n';
+import viAuth from '../../locales/vi/auth.json';
+import viCommon from '../../locales/vi/common.json';
 import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { LoginPage } from './LoginPage';
 
@@ -381,6 +385,188 @@ describe('LoginPage', () => {
       renderLogin(null);
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    function renderLoginInShell() {
+      return renderRoute(
+        '/login',
+        '/login',
+        <AppShell>
+          <LoginPage />
+        </AppShell>,
+      );
+    }
+
+    it('shows the email-required message in Vietnamese and follows a switch to English', async () => {
+      const user = userEvent.setup();
+      renderLoginInShell();
+
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+
+      expect(await screen.findByText(viAuth.validation.emailRequired)).toHaveAttribute(
+        'role',
+        'alert',
+      );
+
+      await user.click(screen.getByRole('button', { name: 'EN English' }));
+
+      expect(screen.getByText('Email is required')).toHaveAttribute('role', 'alert');
+    });
+
+    it('keeps a server error in the language it arrived in until the next submit', async () => {
+      const replies: FakeReply[] = [
+        { status: 401, body: { status: 401, detail: 'Email hoặc mật khẩu không đúng' } },
+        { status: 401, body: { status: 401, detail: 'Invalid email or password' } },
+      ];
+      stubApi({ 'POST /api/v1/auth/login': () => replies.shift() ?? { status: 500 } });
+      const user = userEvent.setup();
+      renderLoginInShell();
+
+      await user.type(screen.getByLabelText(viAuth.login.emailLabel), 'member1@flowcortex.dev');
+      await user.type(screen.getByLabelText(viAuth.login.passwordLabel), 'wrong-password');
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Email hoặc mật khẩu không đúng');
+
+      await user.click(screen.getByRole('button', { name: 'EN English' }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Email hoặc mật khẩu không đúng');
+
+      await user.click(screen.getByRole('button', { name: 'Sign in to Studio →' }));
+
+      expect(await screen.findByText('Invalid email or password')).toHaveAttribute('role', 'alert');
+      expect(screen.queryByText('Email hoặc mật khẩu không đúng')).not.toBeInTheDocument();
+    });
+
+    it('names the lock end in vi-VN form when the account is locked', async () => {
+      const lockedUntil = '2026-01-01T10:15:30Z';
+      stubApi({
+        'POST /api/v1/auth/login': {
+          status: 423,
+          body: {
+            type: 'https://flow-cortex.dev/problems/account-locked',
+            status: 423,
+            detail: `Tài khoản đang tạm khóa đến ${lockedUntil}. Hãy đăng nhập lại sau thời điểm đó.`,
+            lockedUntil,
+          },
+        },
+      });
+      const time = new Intl.DateTimeFormat('vi-VN', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }).format(new Date(lockedUntil));
+      const user = userEvent.setup();
+      renderLoginInShell();
+
+      await user.type(screen.getByLabelText(viAuth.login.emailLabel), 'member1@flowcortex.dev');
+      await user.type(screen.getByLabelText(viAuth.login.passwordLabel), 'secret');
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(`Tài khoản đang tạm khóa đến ${time}. Hãy thử lại sau.`);
+      expect(alert).not.toHaveTextContent(lockedUntil);
+    });
+
+    async function signInLockedInVietnamese(passwordReset: boolean) {
+      const lockedUntil = '2026-01-01T10:15:30Z';
+      stubApi({
+        'GET /api/v1/features': {
+          status: 200,
+          body: {
+            emailConfirmation: false,
+            phoneVerification: false,
+            uploadContentCheck: false,
+            runCancellation: false,
+            credits: false,
+            passwordReset,
+          },
+        },
+        'POST /api/v1/auth/login': {
+          status: 423,
+          body: {
+            type: 'https://flow-cortex.dev/problems/account-locked',
+            status: 423,
+            detail: 'Account is temporarily locked',
+            lockedUntil,
+          },
+        },
+      });
+      const user = userEvent.setup();
+      renderLoginInShell();
+      if (passwordReset) {
+        await screen.findByRole('link', { name: viAuth.login.forgotPassword });
+      }
+      await user.type(screen.getByLabelText(viAuth.login.emailLabel), 'member1@flowcortex.dev');
+      await user.type(screen.getByLabelText(viAuth.login.passwordLabel), 'secret');
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+      return screen.findByRole('alert');
+    }
+
+    it('offers the reset after the Vietnamese lock sentence while reset is on', async () => {
+      const alert = await signInLockedInVietnamese(true);
+
+      expect(alert).toHaveTextContent(/^Tài khoản đang tạm khóa đến .+\. Hãy thử lại sau\. /);
+      expect(alert).toHaveTextContent('Bạn cũng có thể đặt lại mật khẩu.');
+      expect(within(alert).getByRole('link', { name: 'đặt lại mật khẩu' })).toHaveAttribute(
+        'href',
+        '/forgot-password',
+      );
+    });
+
+    it('shows the Vietnamese lock sentence without a reset link while reset is off', async () => {
+      const alert = await signInLockedInVietnamese(false);
+
+      expect(alert).toHaveTextContent(/^Tài khoản đang tạm khóa đến .+\. Hãy thử lại sau\.$/);
+      expect(within(alert).queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('links the Vietnamese "Quên mật khẩu?" to /forgot-password while reset is offered', async () => {
+      stubApi({
+        'GET /api/v1/features': {
+          status: 200,
+          body: {
+            emailConfirmation: false,
+            phoneVerification: false,
+            uploadContentCheck: false,
+            runCancellation: false,
+            credits: false,
+            passwordReset: true,
+          },
+        },
+      });
+      renderLoginInShell();
+
+      expect(
+        await screen.findByRole('link', { name: viAuth.login.forgotPassword }),
+      ).toHaveAttribute('href', '/forgot-password');
+    });
+
+    it.each<[string, () => FakeReply]>([
+      [
+        'the request never reaches the server',
+        () => {
+          throw new TypeError('Failed to fetch');
+        },
+      ],
+      ['the problem body has no detail', () => ({ status: 500, body: { status: 500 } })],
+    ])('shows the generic retry message in Vietnamese when %s', async (_case, reply) => {
+      stubApi({ 'POST /api/v1/auth/login': reply });
+      const user = userEvent.setup();
+      renderLoginInShell();
+
+      await user.type(screen.getByLabelText(viAuth.login.emailLabel), 'member1@flowcortex.dev');
+      await user.type(screen.getByLabelText(viAuth.login.passwordLabel), 'secret');
+      await user.click(screen.getByRole('button', { name: viAuth.login.submit }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(viCommon.errors.requestFailed);
     });
   });
 });

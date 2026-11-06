@@ -14,3 +14,14 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 }
+
+tasks.withType<Test> {
+    // MessageBundleParityTest reads every module's main sources for the message codes they name.
+    // Declared as an input too, or a source-only edit would be served from the build cache.
+    systemProperty("flowcortex.backend.dir", rootProject.projectDir.absolutePath)
+    inputs.files(
+        fileTree(rootProject.projectDir) {
+            include("modules/*/src/main/java/**/*.java", "shared/*/src/main/java/**/*.java")
+        },
+    ).withPropertyName("backendMainSources").withPathSensitivity(PathSensitivity.RELATIVE)
+}

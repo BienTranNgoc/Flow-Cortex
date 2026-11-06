@@ -1,6 +1,8 @@
 package com.flowcortex.workflow.application;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.RunStatus;
@@ -55,7 +57,7 @@ public class RunCancellation {
     @Transactional
     public RunView cancelRun(UUID currentUserId, UUID runId) {
         if (!enabled) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "This feature is turned off");
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
         if (workflowRunRepository.requestCancel(runId, currentUserId) == 1) {
             int skipped = runStepRepository.skipPending(runId);
@@ -65,10 +67,10 @@ public class RunCancellation {
             return currentView(currentUserId, runId);
         }
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
-                .orElseThrow(() -> new NotFoundException("Workflow run not found: " + runId));
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.ERROR) {
             LOG.info("Run cancel: outcome=already_finished runId={} status={}", runId, run.getStatus());
-            throw new ConflictException("This run has already finished");
+            throw new ConflictException(new LocalizedMessage("workflow.run.alreadyFinished"));
         }
         LOG.info("Run cancel: outcome=already_stopping runId={} status={}", runId, run.getStatus());
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),

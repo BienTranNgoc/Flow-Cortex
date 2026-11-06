@@ -1,17 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BrandPanel } from '../../app/BrandPanel';
 import { OAuthButton } from '../../app/OAuthButton';
 import { useFeatures } from '../../app/useFeatures';
 import { ResendConfirmation } from './ConfirmEmailPage';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { googleAuthorizeUrl, oauthErrorMessage } from './oauth';
+import { googleAuthorizeUrl, oauthErrorKey } from './oauth';
+import { activeLocale } from '../../lib/i18n';
 import {
+  accountLockedMessage,
   clearRememberedEmail,
-  detailFrom,
   EMAIL_NOT_CONFIRMED,
+  failureMessage,
   getRememberedEmail,
   lockedUntilFrom,
   problemCodeFrom,
@@ -34,6 +37,7 @@ function localTime(date: Date): string {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const token = useAuthToken();
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,16 +92,19 @@ export function LoginPage() {
   const oauthError = searchParams.get('oauth_error');
   const notConfirmed = problemCodeFrom(loginMutation.error) === EMAIL_NOT_CONFIRMED;
   const lockedUntil = lockedUntilFrom(loginMutation.error);
+  const lockedText = accountLockedMessage(loginMutation.error, t, activeLocale());
   const serverError = notConfirmed
-    ? 'Confirm your email before signing in'
-    : (detailFrom(loginMutation) ?? (oauthError ? oauthErrorMessage(oauthError) : undefined));
+    ? t('auth.login.emailNotConfirmed')
+    : (lockedText ??
+      failureMessage(loginMutation, t) ??
+      (oauthError ? t(oauthErrorKey(oauthError)) : undefined));
   const isPending = loginMutation.isPending;
   const dataState = submitState(submitSucceeded, isPending);
 
   const buttonLabel = (() => {
-    if (submitSucceeded) return '✓ Signed in';
-    if (isPending) return 'Signing in…';
-    return 'Sign in to Studio →';
+    if (submitSucceeded) return t('auth.login.succeeded');
+    if (isPending) return t('auth.login.submitting');
+    return t('auth.login.submit');
   })();
 
   return (
@@ -105,8 +112,8 @@ export function LoginPage() {
       <BrandPanel />
 
       <section className="auth-card auth-card--surface">
-        <h1 className="auth-card__title">Sign in</h1>
-        <p className="auth-subtitle">Access your creator workspace and run media pipelines.</p>
+        <h1 className="auth-card__title">{t('auth.login.title')}</h1>
+        <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
         {notice && (
           <p role="status" className="auth-subtitle">
             {notice}
@@ -116,14 +123,19 @@ export function LoginPage() {
         <div className="oauth-row">
           <OAuthButton
             provider="google"
-            label="Continue with Google"
+            label={t('auth.login.google')}
             href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
           />
         </div>
 
-        <form onSubmit={onSubmit} noValidate aria-label="Sign in" className="auth-form">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          aria-label={t('auth.login.formLabel')}
+          className="auth-form"
+        >
           <div className="field" style={{ '--i': 0 } as React.CSSProperties}>
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t('auth.login.emailLabel')}</label>
             <input
               id="login-email"
               type="email"
@@ -131,10 +143,10 @@ export function LoginPage() {
               aria-invalid={errors.email ? 'true' : 'false'}
               {...register('email')}
             />
-            {errors.email && <p role="alert">{errors.email.message}</p>}
+            {errors.email?.message && <p role="alert">{t(errors.email.message)}</p>}
           </div>
           <div className="field" style={{ '--i': 1 } as React.CSSProperties}>
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t('auth.login.passwordLabel')}</label>
             <div className="field__password">
               <input
                 id="login-password"
@@ -147,7 +159,9 @@ export function LoginPage() {
               <button
                 type="button"
                 className="field__password-toggle"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={
+                  showPassword ? t('auth.login.hidePassword') : t('auth.login.showPassword')
+                }
                 aria-pressed={showPassword}
                 onClick={() => setShowPassword((value) => !value)}
               >
@@ -179,35 +193,49 @@ export function LoginPage() {
                 </svg>
               </button>
             </div>
-            {errors.password && <p role="alert">{errors.password.message}</p>}
+            {errors.password?.message && <p role="alert">{t(errors.password.message)}</p>}
           </div>
           <div className="login-meta-row">
             <label className="remember-row" htmlFor="login-remember">
               <input id="login-remember" type="checkbox" {...register('rememberMe')} />
-              <span>Remember me</span>
+              <span>{t('auth.login.rememberMe')}</span>
             </label>
             {passwordReset ? (
               <Link to="/forgot-password" className="forgot-password-link">
-                Forgot password?
+                {t('auth.login.forgotPassword')}
               </Link>
             ) : (
               <span
                 className="forgot-password-link forgot-password-link--disabled"
-                title="Forgot password flow is not yet enabled"
+                title={t('auth.login.forgotPasswordDisabled')}
               >
-                Forgot password?
+                {t('auth.login.forgotPassword')}
               </span>
             )}
           </div>
           {lockedUntil ? (
             <p role="alert" className="form-error">
-              Too many attempts. Try again at {localTime(lockedUntil)}
-              {passwordReset ? (
+              {lockedText ? (
                 <>
-                  , or <Link to="/forgot-password">reset your password</Link>.
+                  {lockedText}
+                  {passwordReset && (
+                    <>
+                      {' '}
+                      <Trans
+                        i18nKey="auth.login.lockedResetOffer"
+                        components={{ reset: <Link to="/forgot-password" /> }}
+                      />
+                    </>
+                  )}
                 </>
+              ) : passwordReset ? (
+                <Trans
+                  i18nKey="auth.login.lockedWithReset"
+                  values={{ time: localTime(lockedUntil) }}
+                  components={{ reset: <Link to="/forgot-password" /> }}
+                />
               ) : (
-                '.'
+                t('auth.login.locked', { time: localTime(lockedUntil) })
               )}
             </p>
           ) : (
@@ -232,10 +260,10 @@ export function LoginPage() {
         )}
 
         <p className="auth-footer">
-          No password yet? <Link to="/set-password">Email me a link</Link>
+          {t('auth.login.noPassword')} <Link to="/set-password">{t('auth.login.emailMeLink')}</Link>
         </p>
         <p className="auth-footer">
-          New to FlowCortex? <Link to="/register">Create a free account</Link>
+          {t('auth.login.newHere')} <Link to="/register">{t('auth.login.createAccount')}</Link>
         </p>
       </section>
     </div>

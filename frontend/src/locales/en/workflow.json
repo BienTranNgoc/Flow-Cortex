@@ -1,0 +1,222 @@
+{
+  "stepError": {
+    "input_rejected": "We couldn't use that uploaded file. Upload it again.",
+    "probe_failed": "We couldn't read that file as audio or video. Upload a video or audio file (for example .mp4).",
+    "lease_expired": "The media engine stopped responding. Try running again.",
+    "queue_timeout": "The media engine was too busy to start this in time. Try running again.",
+    "run_timeout": "This file took too long to process and was stopped. Try a shorter file.",
+    "media_disabled": "The media engine is switched off right now.",
+    "contract_violation": "The media engine rejected this job. Try again later.",
+    "speech_too_long": "The approved script is too long for the 10-second video. Start a new run with a shorter script.",
+    "APPROVAL_REJECTED": "You rejected this content, so the run stopped.",
+    "reapedInline": "This step stopped before it finished. Try running again.",
+    "noMessage": "This step stopped with an error."
+  },
+  "step": {
+    "state": {
+      "pending": "Pending",
+      "waiting": "Waiting",
+      "running": "Running",
+      "completed": "Completed",
+      "error": "Error",
+      "skipped": "Skipped",
+      "needsYou": "Needs you"
+    },
+    "label": {
+      "probe": "Inspect the file",
+      "extract_audio": "Extract source audio",
+      "review": "Review"
+    },
+    "fallback": "Step {{order}}",
+    "progress": "Step {{order}} progress",
+    "waitingToStart": "Waiting to start…",
+    "timing": {
+      "timeTaken": "Time taken",
+      "startTime": "Start time",
+      "finishTime": "Finish time",
+      "duration": "Duration:",
+      "started": "Started:",
+      "finished": "Finished:"
+    }
+  },
+  "output": {
+    "field": {
+      "duration": "Duration",
+      "dimensions": "Dimensions",
+      "videoCodec": "Video codec",
+      "audioCodec": "Audio codec"
+    },
+    "showRaw": "Show raw",
+    "hideRaw": "Hide raw"
+  },
+  "pipeline": {
+    "region": "Steps",
+    "hint": "Select a step to see its result.",
+    "retried": "Retried {{n}}×",
+    "notConfigured": "Not configured"
+  },
+  "run": {
+    "heading": {
+      "pending": "Run pending",
+      "running": "Run in progress",
+      "waitingApproval": "Waiting for your approval",
+      "completed": "Run completed",
+      "error": "Run error",
+      "cancelling": "Stopping…",
+      "cancelled": "Run cancelled"
+    },
+    "headingOther": "Run {{status}}",
+    "back": "Back to workflow",
+    "noRun": "No run selected.",
+    "loading": "Loading run…",
+    "loadError": "Could not load this run."
+  },
+  "file": "File: {{name}}",
+  "download": {
+    "summary": "Download summary (.txt)",
+    "technical": "Download technical details (JSON file)",
+    "gettingFile": "Getting the file…",
+    "linkError": "Could not get download link",
+    "extractedAudio": "Download extracted audio (WAV)",
+    "named": "Download {{name}}",
+    "adVideo": "Ad video ({{name}})",
+    "cannotPlay": "Your browser cannot play this video.",
+    "playFailed": "Could not play the video. Download it instead.",
+    "hideVideo": "Hide video",
+    "loadingVideo": "Loading the video…",
+    "watchVideo": "Watch video"
+  },
+  "approval": {
+    "region": "Review before the run continues",
+    "contentLabel": "Content to approve",
+    "approve": "Approve",
+    "approving": "Approving…",
+    "reject": "Reject",
+    "rejecting": "Rejecting…",
+    "approveFailed": "Could not approve this step",
+    "rejectFailed": "Could not reject this step",
+    "scriptMovedOn": "This script moved on in another tab. Reload the page to see the latest revision.",
+    "contentEmpty": "Content can't be empty",
+    "loadingScript": "Loading the script…",
+    "scriptLoadError": "Could not load the script revisions.",
+    "loadingTask": "Loading the step to review…",
+    "taskLoadError": "Could not load the step to review."
+  },
+  "script": {
+    "label": "Script to approve",
+    "tooLong": "This script is likely longer than the 10-second video. Keep it to about {{max}} words — a voice-over longer than 10 seconds stops the run.",
+    "save": "Save revision",
+    "saving": "Saving…",
+    "unsaved": "Unsaved changes — save a revision before approving.",
+    "saveFailed": "Could not save this revision",
+    "leaveConfirm": "You have unsaved script changes. Leave this page?",
+    "history": "Script revisions",
+    "revision": "Revision {{number}}",
+    "approved": "Approved"
+  },
+  "start": {
+    "formLabel": "Start run",
+    "button": "Start run",
+    "starting": "Starting…",
+    "uploadingPercent": "Uploading… {{percent}} %",
+    "failed": "Could not start the run.",
+    "executionDisabled": "Workflow execution is currently disabled.",
+    "nextActionLater": "Try again later, or go back to the Workflows list.",
+    "nextAction": "Try again, or go back to the Workflows list.",
+    "inputLabel": "Input (optional)",
+    "mediaFile": "Media file",
+    "uploadProgress": "Upload progress",
+    "uploadUnfinished": "The upload didn't finish. Try again.",
+    "retry": "Retry"
+  },
+  "productVideo": {
+    "formLabel": "Start a product video run",
+    "preparing": "Preparing…",
+    "uploading": "Uploading {{index}} / {{total}}…",
+    "field": {
+      "productName": "Product name",
+      "description": "Description"
+    },
+    "required": "{{field}} is required.",
+    "image": "Product image (JPG/PNG/WebP, ≤ 10 MB) *",
+    "imageSelected": "1 image selected: {{name}}",
+    "uploadingImage": "Uploading image {{index}}",
+    "uploadsUnfinished": "One of the uploads didn't finish. Try again."
+  },
+  "validation": {
+    "noFile": "Choose a video or audio file to upload",
+    "kindSize": "Files of this type must be at most {{max}} MB. Accepted: {{formats}}.",
+    "fileType": "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
+    "imageType": "Use .jpg, .jpeg, .png or .webp.",
+    "noImage": "Add at least one product image",
+    "tooManyImages": "At most 1 image per run.",
+    "creatorLink": "Paste a valid TikTok or Douyin link"
+  },
+  "stop": {
+    "open": "Stop workflow",
+    "title": "Stop this workflow?",
+    "text": "The current step will finish, then the run stops. Remaining steps won't run and won't be charged. Results of finished steps are kept.",
+    "keep": "Keep running",
+    "confirm": "Stop",
+    "stopping": "Stopping…",
+    "failed": "Couldn't stop the run. Try again."
+  },
+  "incomplete": {
+    "summary": "This workflow can't run yet.",
+    "summaryStep": "This workflow can't run yet: step {{order}} is not fully configured.",
+    "line": "Step {{order}}: {{reason}}",
+    "lineNamed": "Step {{order}} · {{name}}: {{reason}}"
+  },
+  "detail": {
+    "noWorkflow": "No workflow selected.",
+    "heading": "Workflow",
+    "shared": "Shared with every member.",
+    "loadError": "Could not load this workflow. Try again, or pick another one.",
+    "loading": "Loading workflow…"
+  },
+  "list": {
+    "heading": "Workflows",
+    "welcomeBack": "Welcome back, <strong>{{name}}</strong>. Manage your pipelines.",
+    "nameFallback": "there",
+    "searchLabel": "Search workflows",
+    "searchPlaceholder": "Search workflows...",
+    "scope": {
+      "legend": "Scope",
+      "prefix": "Scope:",
+      "all": "All",
+      "shared": "Shared",
+      "mine": "Mine"
+    },
+    "layout": {
+      "legend": "Layout",
+      "grid": "Grid layout",
+      "list": "List layout"
+    },
+    "loading": "Loading workflows…",
+    "loadError": "Could not load workflows.",
+    "noMatch": "No workflows match the current filter.",
+    "tableLabel": "Workflows table",
+    "column": {
+      "name": "Name",
+      "status": "Status",
+      "owner": "Owner",
+      "steps": "Steps",
+      "actions": "Actions"
+    },
+    "untitled": "Untitled workflow",
+    "stepOne": "{{n}} step",
+    "stepOther": "{{n}} steps",
+    "rowActions": "Row actions",
+    "runTitle": "Run workflow",
+    "runNamed": "Run {{name}}",
+    "showing": "Showing {{shown}} of {{total}} workflows"
+  },
+  "owner": {
+    "you": "You",
+    "sharedTeam": "Shared team",
+    "ownedByYou": "Owned by you",
+    "sharedWorkflow": "Shared workflow",
+    "mine": "Mine",
+    "shared": "Shared"
+  }
+}

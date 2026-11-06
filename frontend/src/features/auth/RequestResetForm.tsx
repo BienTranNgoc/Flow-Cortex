@@ -1,15 +1,21 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { useFeaturesQuery } from '../../app/useFeatures';
 import { resendEmailSchema } from './registerSchema';
 import {
-  detailFrom,
+  failureMessage,
   fieldErrorsFrom,
   resetWaitMessage,
   useForgotPasswordMutation,
 } from './useAuth';
 
-function refusalMessage(error: unknown, detail: string | undefined): string {
-  return resetWaitMessage(error) ?? detail ?? 'Could not send a reset link. Please try again.';
+function refusalMessage(forgot: { readonly error: unknown }, t: TFunction): string {
+  return (
+    resetWaitMessage(forgot.error, t) ??
+    failureMessage(forgot, t, 'auth.reset.request.failed') ??
+    ''
+  );
 }
 
 interface RequestResetFormProps {
@@ -18,6 +24,7 @@ interface RequestResetFormProps {
 
 /** Asks for a reset link; the answer repeats the typed address and never says whether it has an account. */
 export function RequestResetForm({ action }: RequestResetFormProps) {
+  const { t } = useTranslation();
   const forgot = useForgotPasswordMutation();
   const [typedEmail, setTypedEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -33,7 +40,7 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
     const parsed = resendEmailSchema.safeParse(typedEmail);
     if (!parsed.success) {
       forgot.reset();
-      refuseEmail(parsed.error.issues[0]?.message ?? 'Enter a valid email address');
+      refuseEmail(t(parsed.error.issues[0]?.message ?? 'auth.validation.emailInvalid'));
       return;
     }
     setEmailError(null);
@@ -46,14 +53,17 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
   };
 
   const refusal =
-    forgot.isError && !fieldErrorsFrom(forgot.error).email
-      ? refusalMessage(forgot.error, detailFrom(forgot))
-      : null;
+    forgot.isError && !fieldErrorsFrom(forgot.error).email ? refusalMessage(forgot, t) : null;
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-label="Request a reset link" className="auth-form">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      aria-label={t('auth.reset.request.formLabel')}
+      className="auth-form"
+    >
       <div className="field">
-        <label htmlFor="reset-request-email">Email</label>
+        <label htmlFor="reset-request-email">{t('auth.reset.request.emailLabel')}</label>
         <input
           id="reset-request-email"
           ref={emailInput}
@@ -71,12 +81,11 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
         )}
       </div>
       <button className="primary-button" type="submit" disabled={forgot.isPending}>
-        {forgot.isPending ? 'Sending…' : action}
+        {forgot.isPending ? t('auth.reset.request.sending') : action}
       </button>
       {forgot.isSuccess && (
         <p role="status" className="auth-subtitle">
-          If an account exists for {forgot.variables}, we sent a reset link. Didn&apos;t get it?
-          Check spam or try again.
+          {t('auth.reset.request.sent', { email: forgot.variables })}
         </p>
       )}
       {refusal && (
@@ -90,16 +99,17 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
 
 /** Renders `children` only while the backend offers password reset; `/features` failing counts as off. */
 export function PasswordResetGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const features = useFeaturesQuery();
   if (features.isPending) {
     return (
       <p role="status" className="auth-subtitle">
-        Loading…
+        {t('auth.reset.gate.loading')}
       </p>
     );
   }
   if (!features.data?.passwordReset) {
-    return <p className="auth-subtitle">Password reset is not available right now</p>;
+    return <p className="auth-subtitle">{t('auth.reset.gate.unavailable')}</p>;
   }
   return <>{children}</>;
 }

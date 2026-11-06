@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthToken, useSessionReady } from './useAuth';
 
@@ -9,12 +10,13 @@ import { useAuthToken, useSessionReady } from './useAuth';
  * component re-renders whenever the token store changes.
  */
 export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
+  const { t } = useTranslation();
   const token = useAuthToken();
   const sessionReady = useSessionReady();
   const location = useLocation();
 
   if (!sessionReady) {
-    return <output>Checking your session…</output>;
+    return <output>{t('auth.session.checking')}</output>;
   }
   if (!token) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
