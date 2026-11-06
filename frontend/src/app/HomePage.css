@@ -33,6 +33,12 @@
   filter: blur(2px);
 }
 
+@media (max-width: 820px) {
+  .launchpad-hero__glow {
+    inset: -2vmax max(-8vmax, -1.5rem) auto;
+  }
+}
+
 .launchpad-hero__glow-a,
 .launchpad-hero__glow-b {
   position: absolute;
