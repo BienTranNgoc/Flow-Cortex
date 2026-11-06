@@ -91,12 +91,48 @@ describe('UsersPage', () => {
     );
   });
 
+  it('shows the role and status badges as labels, not codes', async () => {
+    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+    renderRoute('/users', '/users', <UsersPage />);
+    const row = (await screen.findByText(ALICE.email)).closest('tr') as HTMLElement;
+
+    expect(within(row).getByText('Member')).toHaveClass('cortex-admin-pill');
+    expect(within(row).getByText('Active')).toHaveClass('cortex-admin-pill');
+  });
+
+  it('says "account" for one account and "accounts" for several', async () => {
+    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+    const single = renderRoute('/users', '/users', <UsersPage />);
+    expect(await screen.findByText('Showing 1 of 1 account')).toBeInTheDocument();
+    single.unmount();
+
+    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE, BOB] } });
+    renderRoute('/users', '/users', <UsersPage />);
+    expect(await screen.findByText('Showing 2 of 2 accounts')).toBeInTheDocument();
+  });
+
+  it('wraps the table in a focusable scroll region named for the list', async () => {
+    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+    renderRoute('/users', '/users', <UsersPage />);
+
+    const region = await screen.findByRole('region', { name: 'Users table' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(within(region).getByRole('table')).toBeInTheDocument();
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
     });
     afterEach(async () => {
       await i18n.changeLanguage('en');
+    });
+
+    it('names the table region in Vietnamese', async () => {
+      stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+      renderRoute('/users', '/users', <UsersPage />);
+
+      expect(await screen.findByRole('region', { name: viUsers.directory.tableLabel })).toBeInTheDocument();
     });
 
     it('shows the Vietnamese heading and the join date in vi-VN conventions', async () => {

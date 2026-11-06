@@ -2,7 +2,9 @@
   "title": "Runs",
   "eyebrow": "Workflow Ops",
   "description": "Every workflow execution across the platform. Use filters to narrow by status.",
-  "noun": "runs",
+  "noun_one": "run",
+  "noun_other": "runs",
+  "tableLabel": "Runs table",
   "deletedUser": "(deleted user)",
   "columns": {
     "workflow": "Workflow",
@@ -13,11 +15,11 @@
     "error": "Error"
   },
   "status": {
-    "running": "running",
-    "waiting_approval": "waiting_approval",
-    "completed": "completed",
-    "error": "error",
-    "cancelling": "cancelling",
-    "cancelled": "cancelled"
+    "running": "Running",
+    "waiting_approval": "Waiting for approval",
+    "completed": "Completed",
+    "error": "Error",
+    "cancelling": "Cancelling",
+    "cancelled": "Cancelled"
   }
 }

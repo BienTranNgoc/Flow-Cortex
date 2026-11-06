@@ -2,6 +2,7 @@ import { ApiError } from '@flow-cortex/api-client';
 import { useTranslation } from 'react-i18next';
 import { Timestamp } from '../../app/AdminList';
 import { PageHeading } from '../../app/PageHeading';
+import { TableRegion } from '../../app/TableRegion';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useSmsOutbox } from './useSmsOutbox';
 
@@ -47,7 +48,7 @@ export function SmsOutboxPage() {
         {data && error && <p className="cortex-admin-stale">{t('common.shell.list.stale')}</p>}
         {data?.length === 0 && <div className="cortex-admin-empty">{t('smsOutbox.empty')}</div>}
         {data && data.length > 0 && (
-          <div className="cortex-admin-table-wrapper" aria-busy={query.isFetching}>
+          <TableRegion label={t('smsOutbox.tableLabel')} busy={query.isFetching}>
             <table className="cortex-admin-table">
               <thead>
                 <tr>
@@ -68,7 +69,7 @@ export function SmsOutboxPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableRegion>
         )}
       </div>
     </div>

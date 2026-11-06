@@ -4,6 +4,7 @@ import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, formatNumber } from '../lib/format';
 import { activeLocale } from '../lib/i18n';
+import { TableRegion } from './TableRegion';
 
 export interface Page<T> {
   items: T[];
@@ -14,8 +15,10 @@ export interface Page<T> {
 
 interface AdminListProps<T> {
   query: UseQueryResult<Page<T>>;
-  /** Already translated, plural, lower case: "runs", "media jobs". */
-  noun: string;
+  /** Key of a lower-case noun with `_one`/`_other` forms, resolved with the row count: "run" / "runs". */
+  nounKey: string;
+  /** Key of the translated accessible name for the table region. */
+  tableLabelKey: string;
   statuses: readonly string[];
   /** The filter option's text for a status code; the option value stays the code. */
   statusLabel: (status: string) => string;
@@ -31,7 +34,8 @@ interface AdminListProps<T> {
  */
 export function AdminList<T>({
   query,
-  noun,
+  nounKey,
+  tableLabelKey,
   statuses,
   statusLabel,
   status,
@@ -43,6 +47,7 @@ export function AdminList<T>({
   const { data, error } = query;
   const disabled = error instanceof ApiError && error.status === 503;
   const filterId = useId();
+  const noun = t(nounKey, { count: 0 });
 
   let empty: ReactNode;
   if (data && data.page > 0) {
@@ -103,12 +108,12 @@ export function AdminList<T>({
       {data && error && <p className="cortex-admin-stale">{t('common.shell.list.stale')}</p>}
       {data?.items.length === 0 && <div className="cortex-admin-empty">{empty}</div>}
       {data && data.items.length > 0 && (
-        <div className="cortex-admin-table-wrapper" aria-busy={query.isPlaceholderData}>
+        <TableRegion label={t(tableLabelKey)} busy={query.isPlaceholderData}>
           {children(data.items)}
-        </div>
+        </TableRegion>
       )}
       {data && (data.items.length > 0 || data.page > 0) && (
-        <Pager page={data.page} size={data.size} total={data.total} noun={noun} onPageChange={onPageChange} />
+        <Pager page={data.page} size={data.size} total={data.total} nounKey={nounKey} onPageChange={onPageChange} />
       )}
     </>
   );
@@ -118,9 +123,9 @@ function Pager({
   page,
   size,
   total,
-  noun,
+  nounKey,
   onPageChange,
-}: Readonly<{ page: number; size: number; total: number; noun: string; onPageChange: (page: number) => void }>) {
+}: Readonly<{ page: number; size: number; total: number; nounKey: string; onPageChange: (page: number) => void }>) {
   const { t } = useTranslation();
   const locale = activeLocale();
   // A page past the end (rows removed since the last page was read) still counts as a page.
@@ -144,7 +149,7 @@ function Pager({
           page: formatNumber(page + 1, locale),
           pages: formatNumber(pages, locale),
           total: formatNumber(total, locale),
-          noun,
+          noun: t(nounKey, { count: total }),
         })}
       </span>
       <button

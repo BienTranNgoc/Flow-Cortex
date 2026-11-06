@@ -5,6 +5,7 @@
   "loading": "Loading SMS messages…",
   "loadError": "Could not load SMS messages.",
   "empty": "No SMS messages yet.",
+  "tableLabel": "SMS outbox table",
   "columns": {
     "number": "Number",
     "text": "Text",

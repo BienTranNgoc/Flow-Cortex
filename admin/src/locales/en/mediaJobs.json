@@ -1,6 +1,8 @@
 {
   "title": "Media jobs",
-  "noun": "media jobs",
+  "noun_one": "media job",
+  "noun_other": "media jobs",
+  "tableLabel": "Media jobs table",
   "columns": {
     "jobId": "Job id",
     "run": "Run",
@@ -23,9 +25,9 @@
     "running": "running"
   },
   "status": {
-    "pending": "pending",
-    "running": "running",
-    "completed": "completed",
-    "error": "error"
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Completed",
+    "error": "Error"
   }
 }

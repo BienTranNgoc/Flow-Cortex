@@ -66,6 +66,9 @@ describe('RunsPage', () => {
     renderRoute('/runs', '/runs', <RunsPage />);
 
     const table = await screen.findByRole('table');
+    const region = screen.getByRole('region', { name: 'Runs table' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(region).toContainElement(table);
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('ffmpeg exited with status 1');
@@ -100,6 +103,17 @@ describe('RunsPage', () => {
     expect(await screen.findByText('Page 2 of 3 · 45 runs')).toBeInTheDocument();
     expect(calls.at(-1)?.query.get('page')).toBe('1');
     expect(screen.getByRole('button', { name: 'Previous page' })).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('says "run" for a single row and "runs" for several', async () => {
+    stubApi({ [RUNS_PATH]: page([run()], 1) });
+    const single = renderRoute('/runs', '/runs', <RunsPage />);
+    expect(await screen.findByText('Page 1 of 1 · 1 run')).toBeInTheDocument();
+    single.unmount();
+
+    stubApi({ [RUNS_PATH]: page([run(), run({ id: 'run-2' })], 2) });
+    renderRoute('/runs', '/runs', <RunsPage />);
+    expect(await screen.findByText('Page 1 of 1 · 2 runs')).toBeInTheDocument();
   });
 
   it('marks the previous rows as busy while the next page loads', async () => {
@@ -205,9 +219,10 @@ describe('RunsPage', () => {
     expect(screen.getByText('Showing the results loaded before this error.')).toBeInTheDocument();
   });
 
-  it('shows status codes as sent in English, an unknown one included', async () => {
+  it('labels every status in English and shows an unknown code as sent', async () => {
     stubApi({
       [RUNS_PATH]: page([
+        run({ id: 'run-3', status: 'waiting_approval' }),
         run({ id: 'run-2', status: 'running' }),
         run({ id: 'run-1', status: 'paused' }),
       ]),
@@ -217,8 +232,9 @@ describe('RunsPage', () => {
       .getAllByRole('row')
       .slice(1);
 
-    expect(within(rows[0] as HTMLElement).getByText('running')).toBeInTheDocument();
-    expect(within(rows[1] as HTMLElement).getByText('paused')).toBeInTheDocument();
+    expect(within(rows[0] as HTMLElement).getByText('Waiting for approval')).toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText('Running')).toBeInTheDocument();
+    expect(within(rows[2] as HTMLElement).getByText('paused')).toBeInTheDocument();
   });
 
   describe('in Vietnamese', () => {

@@ -5,6 +5,7 @@
   "loading": "Đang tải tin nhắn SMS…",
   "loadError": "Không tải được tin nhắn SMS.",
   "empty": "Chưa có tin nhắn SMS nào.",
+  "tableLabel": "Bảng hộp thư đi SMS",
   "columns": {
     "number": "Số điện thoại",
     "text": "Nội dung",

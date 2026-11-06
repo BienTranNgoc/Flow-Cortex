@@ -204,12 +204,13 @@
       "actions": "Thao tác"
     },
     "untitled": "Quy trình chưa đặt tên",
-    "stepOne": "{{n}} bước",
-    "stepOther": "{{n}} bước",
+    "stepCount_one": "{{n}} bước",
+    "stepCount_other": "{{n}} bước",
     "rowActions": "Thao tác trên dòng",
     "runTitle": "Chạy quy trình",
     "runNamed": "Chạy {{name}}",
-    "showing": "Đang hiển thị {{shown}} trên {{total}} quy trình"
+    "showing_one": "Đang hiển thị {{shown}} trên {{total}} quy trình",
+    "showing_other": "Đang hiển thị {{shown}} trên {{total}} quy trình"
   },
   "owner": {
     "you": "Bạn",

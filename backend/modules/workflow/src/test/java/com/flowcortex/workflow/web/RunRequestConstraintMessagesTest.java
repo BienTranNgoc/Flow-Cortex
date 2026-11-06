@@ -63,6 +63,15 @@ class RunRequestConstraintMessagesTest {
                         "price, promotion, and cta must be omitted or contain text"));
     }
 
+    @Test
+    void aProductVideoRunRequestTakesExactlyOneImage() {
+        ProductVideoRunRequest request = new ProductVideoRunRequest("Lamp", "A desk lamp", null, null, null,
+                List.of(UUID.randomUUID(), UUID.randomUUID()), new ProductVideoRunRequest.VideoConfig("9:16"), null);
+
+        assertThat(englishErrors(request))
+                .containsOnly(Map.entry("uploadIds", "Product Video takes exactly one product image"));
+    }
+
     /** Binds under the object name Spring MVC gives a {@code @RequestBody} of the same type. */
     private static Map<String, String> englishErrors(Object request) {
         BeanPropertyBindingResult result = new BeanPropertyBindingResult(request, Conventions.getVariableName(request));

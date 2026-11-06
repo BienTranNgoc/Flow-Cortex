@@ -723,6 +723,26 @@ a {
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.cortex-admin-nav__item[aria-disabled='true'] {
+  flex-wrap: wrap;
+  row-gap: 0.1rem;
+}
+
+.cortex-admin-nav__item[aria-disabled='true'] .cortex-admin-nav__item-label {
+  flex-basis: 0;
+  white-space: normal;
+}
+
+.cortex-admin-nav__item[aria-disabled='true'] .cortex-admin-nav__item-tag {
+  flex-basis: 100%;
+  padding-left: 2.1rem;
+}
+
+.cortex-admin-nav__list > li {
+  min-width: 0;
 }
 
 .cortex-admin-nav__visually-hidden {
@@ -1249,6 +1269,11 @@ a {
   background: var(--admin-card-surface);
 }
 
+.cortex-admin-table-wrapper:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
 .cortex-admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -1489,7 +1514,7 @@ a {
 
 .cortex-admin-filters {
   display: grid;
-  grid-template-columns: minmax(15rem, 2fr) repeat(2, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -2014,6 +2039,26 @@ a {
   .cortex-admin-table-job-id {
     max-width: 14ch;
     font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cortex-admin-header__inner {
+    gap: 0.5rem;
+  }
+
+  .cortex-admin-header__brand-name,
+  .cortex-admin-user-menu__name,
+  .cortex-admin-user-menu__chevron {
+    display: none;
+  }
+
+  .cortex-admin-header__actions {
+    gap: 0.4rem;
+  }
+
+  .cortex-admin-user-menu__trigger {
+    padding: 0.2rem;
   }
 }
 

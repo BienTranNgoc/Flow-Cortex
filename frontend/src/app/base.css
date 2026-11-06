@@ -622,6 +622,7 @@ a:focus-visible {
 }
 
 .primary-button:not(:disabled) {
+  background-image: linear-gradient(100deg, var(--cta-from), var(--cta-to), var(--cta-from));
   background-size: 200% 100%;
   animation: btn-shimmer 3.2s linear infinite;
   box-shadow: 0 10px 30px color-mix(in srgb, var(--cta-from) 18%, transparent);
