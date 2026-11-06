@@ -45,7 +45,7 @@ export const supportCopy = {
   },
   guides: {
     searchLabel: 'Tìm bài hướng dẫn',
-    searchPlaceholder: 'Ví dụ: nạp credit',
+    searchPlaceholder: 'Ví dụ: thiếu credit',
     resultsHeading: 'Kết quả tìm kiếm',
     empty: 'Chưa có bài hướng dẫn nào',
     noMatch: 'Không tìm thấy bài phù hợp',
