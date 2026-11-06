@@ -7,11 +7,11 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AssistantTab } from './AssistantTab';
 import { ArticleView, GuidesTab } from './GuidesTab';
 import { HomeTab } from './HomeTab';
 import { RequestsTab } from './RequestsTab';
-import { supportCopy } from './supportCopy';
 import { tabsFor, useSupportPanel, type SupportTab } from './supportPanelState';
 import { useUnreadCount } from './useUnread';
 
@@ -72,6 +72,7 @@ interface SupportPanelProps {
 
 /** The help dialog: title, close, the actor's tabs (roving tabindex) and the selected body. */
 export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
+  const { t } = useTranslation();
   const { state, dispatch, member } = useSupportPanel();
   const tabs = tabsFor(member);
   const active = tabs.includes(state.tab) ? state.tab : 'home';
@@ -120,12 +121,12 @@ export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
     >
       <div className="support-panel__header">
         <h2 id={titleId} className="support-panel__title">
-          {supportCopy.panel.title}
+          {t('support.panel.title')}
         </h2>
         <button
           type="button"
           className="support-panel__close"
-          aria-label={supportCopy.panel.close}
+          aria-label={t('support.panel.close')}
           onClick={onClose}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -154,12 +155,12 @@ export function SupportPanel({ id, onClose }: Readonly<SupportPanelProps>) {
             tabIndex={tab === active ? 0 : -1}
             aria-label={
               tab === 'requests' && unread
-                ? `${supportCopy.tabs.requests}. ${supportCopy.requests.unread}`
+                ? `${t('support.tabs.requests')}. ${t('support.requests.unread')}`
                 : undefined
             }
             onClick={() => dispatch({ type: 'selectTab', tab })}
           >
-            {supportCopy.tabs[tab]}
+            {t(`support.tabs.${tab}`)}
             {tab === 'requests' && unread && (
               <span className="support-unread-dot" aria-hidden="true" />
             )}

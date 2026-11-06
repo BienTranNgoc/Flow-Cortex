@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.AssistantService.AssistantReply;
 import com.flowcortex.support.assistant.AssistantService.ConversationView;
 import com.flowcortex.support.assistant.AssistantService.Source;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -75,7 +77,7 @@ class AssistantServiceTest {
     void anAnswerKeepsOnlyCitedArticlesThatWereRetrieved() {
         answer("{\"answered\":true,\"answer\":\"Vào Hồ sơ.\",\"citedSlugs\":[\"goi-credit\",\"xoa\",\"goi-credit\"]}");
 
-        AssistantReply reply = service.ask(MEMBER, null, "  " + QUESTION + " ");
+        AssistantReply reply = service.ask(MEMBER, null, "  " + QUESTION + " ", Locale.ENGLISH);
 
         assertThat(reply.conversationId()).isEqualTo(conversationId);
         assertThat(reply.message().outcome()).isEqualTo("answered");
@@ -95,7 +97,7 @@ class AssistantServiceTest {
     void theProviderSayingTheArticlesDoNotAnswerIsANoAnswer() {
         answer("{\"answered\":false,\"answer\":\"\",\"citedSlugs\":[\"nap-credit\"]}");
 
-        AssistantReply reply = service.ask(MEMBER, null, QUESTION);
+        AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.message().text()).isEqualTo(AssistantService.NO_ANSWER);
@@ -107,7 +109,7 @@ class AssistantServiceTest {
     void aBlockedAnswerIsTheRefusalAndStaysCounted() {
         when(llm.call(any())).thenReturn(new LlmJsonResult.Blocked("SAFETY"));
 
-        AssistantReply reply = service.ask(MEMBER, null, QUESTION);
+        AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().outcome()).isEqualTo("blocked");
         assertThat(reply.message().text()).isEqualTo(AssistantService.REFUSAL);
@@ -120,7 +122,7 @@ class AssistantServiceTest {
                 new LlmJsonResult.Answered("not json", "m", 1, 1));
 
         for (int i = 0; i < 2; i++) {
-            assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION))
+            assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH))
                     .isInstanceOfSatisfying(SupportProblemException.class,
                             e -> assertThat(e.code()).isEqualTo("assistant-unavailable"));
         }
@@ -136,7 +138,7 @@ class AssistantServiceTest {
         when(retriever.retrieve(anyString())).thenReturn(List.of());
         when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(50, Instant.parse("2026-10-19T17:00:00Z")));
 
-        AssistantReply reply = service.ask(MEMBER, null, QUESTION);
+        AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.quota().remaining()).isEqualTo(50);
@@ -148,7 +150,7 @@ class AssistantServiceTest {
     void theAssistantSwitchedOffRefusesBeforeAnythingElse() {
         when(assistantSwitch.available()).thenReturn(false);
 
-        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("assistant-disabled"));
         verifyNoInteractions(retriever, quotas, llm, minuteLimiter);
@@ -156,13 +158,13 @@ class AssistantServiceTest {
 
     @Test
     void anEmptyOrTooLongQuestionIsRefused() {
-        assertThatThrownBy(() -> service.ask(MEMBER, null, "   "))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, "   ", Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("validation-failed"));
-        assertThatThrownBy(() -> service.ask(MEMBER, null, null))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, null, Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("validation-failed"));
-        assertThatThrownBy(() -> service.ask(MEMBER, null, "a".repeat(1001)))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, "a".repeat(1001), Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("question-too-long"));
         verifyNoInteractions(retriever, llm);
@@ -173,7 +175,7 @@ class AssistantServiceTest {
         UUID foreign = UUID.randomUUID();
         when(conversations.owns(MEMBER, foreign)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.ask(MEMBER, foreign, QUESTION))
+        assertThatThrownBy(() -> service.ask(MEMBER, foreign, QUESTION, Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("conversation-not-found"));
         verifyNoInteractions(retriever, llm);
@@ -183,7 +185,7 @@ class AssistantServiceTest {
     void aRefusedChargeIsCountedByItsKind() {
         when(quotas.charge(MEMBER)).thenThrow(QuotaService.exhausted(NOW));
 
-        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION)).isInstanceOf(SupportProblemException.class);
+        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH)).isInstanceOf(SupportProblemException.class);
 
         assertThat(meters.counter(AssistantTelemetry.OUTCOME_COUNTER, "outcome", "quota").count()).isEqualTo(1);
         verifyNoInteractions(llm);
@@ -196,7 +198,7 @@ class AssistantServiceTest {
                 + "Ảnh ![logo](https://cdn.x/l.png) <https://evil.example/z> www.evil.example.\\n"
                 + "[ref]: https://evil.example/r\",\"citedSlugs\":[\"nap-credit\"]}");
 
-        AssistantReply reply = service.ask(MEMBER, null, QUESTION);
+        AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().text())
                 .isEqualTo("Xem Nạp credit, mục khác và trang ngoài hoặc . Ảnh logo  .")
@@ -210,7 +212,7 @@ class AssistantServiceTest {
     void anAnswerThatWasOnlyALinkIsANoAnswer() {
         answer("{\"answered\":true,\"answer\":\"https://evil.example/only\",\"citedSlugs\":[\"nap-credit\"]}");
 
-        AssistantReply reply = service.ask(MEMBER, null, QUESTION);
+        AssistantReply reply = service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
 
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.message().text()).isEqualTo(AssistantService.NO_ANSWER);
@@ -219,10 +221,11 @@ class AssistantServiceTest {
     @Test
     void aPausedAssistantRefusesEvenAQuestionNoArticleMatches() {
         when(retriever.retrieve(anyString())).thenReturn(List.of());
-        doThrow(new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-paused", "paused"))
+        doThrow(new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-paused",
+                new LocalizedMessage("support.assistant.paused")))
                 .when(quotas).refuseWhenPaused();
 
-        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("assistant-paused"));
         verifyNoInteractions(retriever, llm, conversations);
@@ -235,7 +238,7 @@ class AssistantServiceTest {
         when(conversations.append(eq(MEMBER), any(), any(), any()))
                 .thenThrow(new DataAccessResourceFailureException("db down"));
 
-        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION))
+        assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH))
                 .isInstanceOf(DataAccessResourceFailureException.class);
 
         verify(quotas).refund(charge);
@@ -246,8 +249,8 @@ class AssistantServiceTest {
         answer("{\"answered\":true,\"answer\":\"Vào Hồ sơ.\",\"citedSlugs\":[\"nap-credit\"]}");
         String emoji = "😀";
 
-        assertThat(service.ask(MEMBER, null, emoji.repeat(1000)).message().outcome()).isEqualTo("answered");
-        assertThatThrownBy(() -> service.ask(MEMBER, null, emoji.repeat(1001)))
+        assertThat(service.ask(MEMBER, null, emoji.repeat(1000), Locale.ENGLISH).message().outcome()).isEqualTo("answered");
+        assertThatThrownBy(() -> service.ask(MEMBER, null, emoji.repeat(1001), Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class,
                         e -> assertThat(e.code()).isEqualTo("question-too-long"));
     }

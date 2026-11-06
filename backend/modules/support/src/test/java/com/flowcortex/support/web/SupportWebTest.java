@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.support.config.AssistantSwitch;
 import com.flowcortex.support.config.SupportProperties;
@@ -18,10 +19,13 @@ import com.flowcortex.user.api.UserDirectory;
 import jakarta.servlet.FilterChain;
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +34,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.LocaleResolver;
 
 class SupportWebTest {
 
@@ -79,9 +84,12 @@ class SupportWebTest {
 
     @Test
     void aRefusalRendersAsItsProblemType() {
-        ProblemDetail detail = new SupportProblemHandler().problem(
-                new SupportProblemException(HttpStatus.CONFLICT, "group-not-empty", "held").with("articleCount", 2L));
+        ProblemDetail detail = handler(Locale.ENGLISH).problem(
+                new SupportProblemException(HttpStatus.CONFLICT, "group-not-empty",
+                        new LocalizedMessage("support.kb.groupNotEmpty", 2L)).with("articleCount", 2L),
+                new MockHttpServletRequest());
 
+        assertThat(detail.getDetail()).isEqualTo("The topic group still holds 2 article(s)");
         assertThat(detail.getStatus()).isEqualTo(409);
         assertThat(detail.getType()).isEqualTo(URI.create("https://flow-cortex.dev/problems/group-not-empty"));
         assertThat(detail.getProperties()).containsEntry("articleCount", 2L);
@@ -126,6 +134,32 @@ class SupportWebTest {
 
     private SupportSwitchFilter filter(boolean enabled, boolean assistantEnabled) {
         return new SupportSwitchFilter(properties(enabled, assistantEnabled, null), resolver);
+    }
+
+    @Test
+    void theDetailAndEveryFieldErrorFollowTheRequestLanguage() {
+        SupportProblemException refusal = new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
+                new LocalizedMessage("problem.validationFailed"))
+                .withFieldErrors(Map.of("subject", new LocalizedMessage("support.request.error.subject")));
+
+        ProblemDetail vietnamese = handler(Locale.of("vi")).problem(refusal, new MockHttpServletRequest());
+        ProblemDetail english = handler(Locale.ENGLISH).problem(refusal, new MockHttpServletRequest());
+
+        assertThat(vietnamese.getProperties()).containsEntry("errors", Map.of("subject", "Tiêu đề cần 5–120 ký tự"));
+        assertThat(english.getProperties())
+                .containsEntry("errors", Map.of("subject", "The subject needs 5–120 characters"));
+        assertThat(vietnamese.getDetail()).startsWith("Yêu cầu chưa hợp lệ");
+        assertThat(english.getDetail()).isEqualTo("Request validation failed");
+    }
+
+    private static SupportProblemHandler handler(Locale locale) {
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("i18n/messages");
+        messages.setDefaultEncoding("UTF-8");
+        messages.setFallbackToSystemLocale(false);
+        LocaleResolver localeResolver = mock(LocaleResolver.class);
+        when(localeResolver.resolveLocale(any())).thenReturn(locale);
+        return new SupportProblemHandler(messages, localeResolver);
     }
 
     private String refusalCode() {

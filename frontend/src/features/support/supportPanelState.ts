@@ -41,11 +41,11 @@ export interface SupportPanelState {
   tab: SupportTab;
   /** Slug of the article shown over the tab body, if any. */
   article: string | null;
-  /** Request number the Yêu cầu tab shows. */
+  /** Request number the Requests tab shows. */
   request: number | null;
-  /** True when the Yêu cầu tab should open its new-request form. */
+  /** True when the Requests tab should open its new-request form. */
   newRequest: boolean;
-  /** Question the Trợ lý tab should send once, then clear. */
+  /** Question the Assistant tab should send once, then clear. */
   question: string | null;
   /** What the new-request form starts with when opened from an assistant reply. */
   prefill: RequestPrefill | null;
@@ -95,7 +95,7 @@ export function supportPanelReducer(
     case 'close':
       return { ...state, open: false };
     case 'selectTab':
-      return { ...state, tab: action.tab, article: null };
+      return { ...state, tab: action.tab, article: null, request: null };
     case 'openArticle':
       return { ...state, article: action.slug };
     case 'closeArticle':

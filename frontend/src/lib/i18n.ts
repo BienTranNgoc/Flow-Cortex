@@ -3,11 +3,13 @@ import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
 import enCredits from '../locales/en/credits.json';
 import enDashboard from '../locales/en/dashboard.json';
+import enSupport from '../locales/en/support.json';
 import enWorkflow from '../locales/en/workflow.json';
 import viAuth from '../locales/vi/auth.json';
 import viCommon from '../locales/vi/common.json';
 import viCredits from '../locales/vi/credits.json';
 import viDashboard from '../locales/vi/dashboard.json';
+import viSupport from '../locales/vi/support.json';
 import viWorkflow from '../locales/vi/workflow.json';
 
 export type { Locale } from '@flow-cortex/i18n';
@@ -19,6 +21,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     workflow: viWorkflow,
     credits: viCredits,
     dashboard: viDashboard,
+    support: viSupport,
   },
   en: {
     common: enCommon,
@@ -26,6 +29,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     workflow: enWorkflow,
     credits: enCredits,
     dashboard: enDashboard,
+    support: enSupport,
   },
 });
 

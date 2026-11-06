@@ -94,7 +94,7 @@ class SupportAttachmentsMediaOffIT extends AbstractPostgresBootTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody().type()).isEqualTo(UNAVAILABLE);
         assertThat(response.getBody().detail())
-                .isEqualTo("Tạm thời chưa nhận ảnh đính kèm, bạn vẫn gửi được nội dung.");
+                .isEqualTo("Attachments are unavailable right now, you can still send your message.");
     }
 
     private String login(String email) {

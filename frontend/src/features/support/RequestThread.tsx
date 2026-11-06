@@ -1,8 +1,10 @@
 import { type SupportRequestDetail, type SupportRequestMessage } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { LoadFailed } from './GuidesTab';
 import { AttachmentPicker, FailureNotice, SuspendedNotice } from './RequestForm';
-import { supportCopy } from './supportCopy';
 import { useSupportPanel } from './supportPanelState';
 import {
   ALLOWED_ACTIONS,
@@ -19,25 +21,39 @@ import {
 } from './useRequests';
 import { supportProblemCode } from './useSupportKb';
 
-const copy = supportCopy.requests;
-const timeFormat = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+const MESSAGE_TIME: Intl.DateTimeFormatOptions = {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  hourCycle: 'h23',
+  timeZone: 'Asia/Ho_Chi_Minh',
+};
 /** One broken image reads the request again at most this often, so an object that never loads cannot loop. */
 const IMAGE_RETRY_MS = 60_000;
 
 export function StatusChip({ status }: Readonly<{ status: RequestStatus }>) {
-  return <span className={`support-chip support-chip--${status}`}>{copy.statuses[status]}</span>;
+  const { t } = useTranslation();
+  return (
+    <span className={`support-chip support-chip--${status}`}>
+      {t(`support.requests.statuses.${status}`)}
+    </span>
+  );
 }
 
 function Message({
   message,
   onImageFailed,
 }: Readonly<{ message: SupportRequestMessage; onImageFailed: () => void }>) {
+  const { t } = useTranslation();
   const fromMember = message.authorKind === 'member';
   return (
     <li className={`support-message support-message--${message.authorKind}`}>
       <p className="support-message__meta">
-        <span className="support-message__author">{fromMember ? copy.you : copy.supportTeam}</span>{' '}
-        <time dateTime={message.createdAt}>{timeFormat.format(new Date(message.createdAt))}</time>
+        <span className="support-message__author">
+          {fromMember ? t('support.requests.you') : t('support.requests.supportTeam')}
+        </span>{' '}
+        <time dateTime={message.createdAt}>
+          {formatDateTime(message.createdAt, activeLocale(), MESSAGE_TIME)}
+        </time>
       </p>
       <p className="support-message__body">{message.body}</p>
       {message.attachments.length > 0 && (
@@ -47,7 +63,7 @@ function Message({
               <a href={attachment.url} target="_blank" rel="noopener noreferrer">
                 <img
                   src={attachment.url}
-                  alt={copy.attachmentAlt(attachment.position)}
+                  alt={t('support.requests.attachmentAlt', { position: attachment.position })}
                   loading="lazy"
                   onError={onImageFailed}
                 />
@@ -61,6 +77,7 @@ function Message({
 }
 
 function ReplyForm({ number }: Readonly<{ number: number }>) {
+  const { t } = useTranslation();
   const reply = useReply(number);
   const reload = useReloadRequest(number);
   const submitKey = useSubmitKey();
@@ -79,7 +96,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
     if (busyRef.current) return;
     const length = textLength(body);
     if (length < 1 || length > 5000) {
-      setError(copy.replyLength);
+      setError(t('support.requests.replyLength'));
       inputRef.current?.focus();
       return;
     }
@@ -96,7 +113,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
       inputRef.current?.focus();
     } catch (caught) {
       setFailed({ error: caught });
-      setError(failureOf(caught).fields.body ?? null);
+      setError(failureOf(caught, t).fields.body ?? null);
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -107,7 +124,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
     <form className="support-request-form" noValidate onSubmit={onSubmit}>
       <div className="support-field">
         <label className="support-field__label" htmlFor={bodyId}>
-          {copy.replyLabel}
+          {t('support.requests.replyLabel')}
         </label>
         <textarea
           id={bodyId}
@@ -151,7 +168,7 @@ function ReplyForm({ number }: Readonly<{ number: number }>) {
         className="support-button support-button--primary"
         aria-disabled={busy || undefined}
       >
-        {busy ? copy.sending : copy.replySend}
+        {busy ? t('support.requests.sending') : t('support.requests.replySend')}
       </button>
     </form>
   );
@@ -161,6 +178,7 @@ function Actions({
   request,
   afterwards,
 }: Readonly<{ request: SupportRequestDetail; afterwards: RefObject<HTMLElement> }>) {
+  const { t } = useTranslation();
   const action = useRequestAction(request.number);
   const reload = useReloadRequest(request.number);
   const [askingCancel, setAskingCancel] = useState(false);
@@ -190,7 +208,7 @@ function Actions({
           aria-disabled={action.isPending || undefined}
           onClick={() => run('confirm')}
         >
-          {copy.confirmResolved}
+          {t('support.requests.confirmResolved')}
         </button>
       )}
       {allowed.cancel && !askingCancel && (
@@ -201,19 +219,19 @@ function Actions({
           aria-disabled={action.isPending || undefined}
           onClick={() => setAskingCancel(true)}
         >
-          {copy.cancel}
+          {t('support.requests.cancel')}
         </button>
       )}
       {allowed.cancel && askingCancel && (
-        <div className="support-state" role="group" aria-label={copy.cancel}>
-          <p>{copy.cancelQuestion}</p>
+        <div className="support-state" role="group" aria-label={t('support.requests.cancel')}>
+          <p>{t('support.requests.cancelQuestion')}</p>
           <button
             type="button"
             className="support-button"
             aria-disabled={action.isPending || undefined}
             onClick={() => run('cancel')}
           >
-            {copy.cancelYes}
+            {t('support.requests.cancelYes')}
           </button>
           <button
             ref={keepRef}
@@ -221,7 +239,7 @@ function Actions({
             className="support-button"
             onClick={() => setAskingCancel(false)}
           >
-            {copy.cancelNo}
+            {t('support.requests.cancelNo')}
           </button>
         </div>
       )}
@@ -239,17 +257,18 @@ function Actions({
 }
 
 function ClosedNotice({ request }: Readonly<{ request: SupportRequestDetail }>) {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   return (
     <div className="support-state">
-      <p>{copy.closedNotice}</p>
-      {request.closedReason && <p>{copy.closedReasons[request.closedReason]}</p>}
+      <p>{t('support.requests.closedNotice')}</p>
+      {request.closedReason && <p>{t(`support.requests.closedReasons.${request.closedReason}`)}</p>}
       <button
         type="button"
         className="support-button support-button--primary"
         onClick={() => dispatch({ type: 'startRequest' })}
       >
-        {copy.createAnother}
+        {t('support.requests.createAnother')}
       </button>
     </div>
   );
@@ -257,6 +276,7 @@ function ClosedNotice({ request }: Readonly<{ request: SupportRequestDetail }>) 
 
 /** One request: status, the thread with its images, and the actions its status allows. */
 export function RequestThread({ number }: Readonly<{ number: number }>) {
+  const { t } = useTranslation();
   const detail = useRequestDetail(number);
   const lastImageRetry = useRef(0);
   const statusRef = useRef<HTMLParagraphElement>(null);
@@ -264,7 +284,7 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
   if (detail.isPending) {
     return (
       <p className="support-state" role="status">
-        {supportCopy.common.loading}
+        {t('support.common.loading')}
       </p>
     );
   }
@@ -273,7 +293,7 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
     if (supportProblemCode(detail.error) === 'request-not-found') {
       return (
         <p className="support-state" role="alert">
-          {copy.notFound}
+          {t('support.requests.notFound')}
         </p>
       );
     }
@@ -292,7 +312,7 @@ export function RequestThread({ number }: Readonly<{ number: number }>) {
     <div className="support-request">
       <p ref={statusRef} className="support-request__meta" tabIndex={-1}>
         <StatusChip status={request.status} />
-        <span>{copy.types[request.type]}</span>
+        <span>{t(`support.requests.types.${request.type}`)}</span>
       </p>
       <p className="support-request__subject">{request.subject}</p>
       <ol className="support-thread">

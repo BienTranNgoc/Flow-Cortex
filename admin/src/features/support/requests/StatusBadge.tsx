@@ -1,5 +1,5 @@
 import type { AdminSupportRequestSummaryStatus } from '@flow-cortex/api-client';
-import { supportCopy } from '../supportCopy';
+import { useTranslation } from 'react-i18next';
 
 const TONE: Record<AdminSupportRequestSummaryStatus, string> = {
   new: 'warning',
@@ -9,11 +9,12 @@ const TONE: Record<AdminSupportRequestSummaryStatus, string> = {
   closed: 'muted',
 };
 
-/** Mới and Đang xử lý wait on an admin, so they share the warning tone of the open count. */
+/** `new` and `in_progress` wait on an admin, so they share the warning tone of the open count. */
 export function StatusBadge({ status }: Readonly<{ status: AdminSupportRequestSummaryStatus }>) {
+  const { t } = useTranslation();
   return (
     <span className={`status-badge cortex-admin-pill cortex-admin-pill--${TONE[status]}`}>
-      {supportCopy.requests.status[status]}
+      {t(`support.requests.status.${status}`)}
     </span>
   );
 }
@@ -21,10 +22,11 @@ export function StatusBadge({ status }: Readonly<{ status: AdminSupportRequestSu
 export function RequesterLabel({
   requester,
 }: Readonly<{ requester: { email?: string; deleted: boolean } }>) {
+  const { t } = useTranslation();
   if (requester.deleted || !requester.email) {
     return (
       <span className="status-badge cortex-admin-pill cortex-admin-pill--error">
-        {supportCopy.requests.requesterDeleted}
+        {t('support.requests.requesterDeleted')}
       </span>
     );
   }

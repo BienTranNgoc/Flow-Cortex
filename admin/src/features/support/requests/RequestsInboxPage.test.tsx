@@ -1,6 +1,7 @@
 import { setToken, type AdminSupportRequestSummary } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../../lib/i18n';
 import { renderRoute, stubApi } from '../../../test/fakeApi';
 import { RequestsInboxPage } from './RequestsInboxPage';
 
@@ -56,10 +57,10 @@ describe('RequestsInboxPage', () => {
     const link = await screen.findByRole('link', { name: 'Không nhận được credit' });
     expect(link).toHaveAttribute('href', '/support/requests/12');
     const deletedRow = screen.getByRole('link', { name: 'Xoá tài khoản' }).closest('tr')!;
-    expect(within(deletedRow).getByText('Chờ bạn phản hồi')).toBeInTheDocument();
-    expect(within(deletedRow).getByText('Tài khoản')).toBeInTheDocument();
-    expect(within(deletedRow).getByText('Tài khoản đã bị xoá')).toBeInTheDocument();
-    expect(screen.getByText('Trang 1/1 · 2 yêu cầu')).toBeInTheDocument();
+    expect(within(deletedRow).getByText('Waiting for member')).toBeInTheDocument();
+    expect(within(deletedRow).getByText('Account')).toBeInTheDocument();
+    expect(within(deletedRow).getByText('Account deleted')).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 1 · 2 requests')).toBeInTheDocument();
   });
 
   it('filters by status and type, back on the first page each time', async () => {
@@ -73,18 +74,18 @@ describe('RequestsInboxPage', () => {
     renderInbox();
 
     await screen.findByRole('link', { name: 'Không nhận được credit' });
-    await user.click(screen.getByRole('button', { name: 'Trang sau' }));
+    await user.click(screen.getByRole('button', { name: 'Next page' }));
     await waitFor(() => expect(calls.at(-1)?.query.get('page')).toBe('1'));
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Trạng thái' }), 'in_progress');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'in_progress');
     await waitFor(() => expect(calls.at(-1)?.query.get('status')).toBe('in_progress'));
     expect(calls.at(-1)?.query.get('page')).toBe('0');
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Loại' }), 'technical');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Type' }), 'technical');
     await waitFor(() => expect(calls.at(-1)?.query.get('type')).toBe('technical'));
     expect(calls.at(-1)?.query.get('status')).toBe('in_progress');
     expect(calls.at(-1)?.query.get('page')).toBe('0');
-    expect(screen.getByRole('option', { name: 'Đang xử lý' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'In progress' })).toBeInTheDocument();
   });
 
   it('says a type-only filter matched nothing and offers to clear it', async () => {
@@ -101,13 +102,46 @@ describe('RequestsInboxPage', () => {
     renderInbox();
 
     await screen.findByRole('link', { name: 'Không nhận được credit' });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Loại' }), 'other');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Type' }), 'other');
 
-    expect(await screen.findByText('Không có yêu cầu nào khớp bộ lọc')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Bỏ lọc loại' }));
+    expect(await screen.findByText('No requests match this filter')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear type filter' }));
 
     expect(await screen.findByRole('link', { name: 'Không nhận được credit' })).toBeInTheDocument();
     expect(calls.at(-1)?.query.has('type')).toBe(false);
-    expect(screen.getByRole('combobox', { name: 'Loại' })).toHaveFocus();
+    expect(screen.getByRole('combobox', { name: 'Type' })).toHaveFocus();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the filters, columns, statuses and dates in Vietnamese', async () => {
+      stubApi({
+        [LIST_PATH]: {
+          status: 200,
+          body: {
+            items: [summary({ status: 'waiting_member', requester: { id: 'm9', deleted: true } })],
+            page: 0,
+            size: 20,
+            total: 1,
+          },
+        },
+      });
+      renderInbox();
+
+      const row = (await screen.findByRole('link', { name: 'Không nhận được credit' })).closest(
+        'tr',
+      )!;
+      expect(within(row).getByText('Chờ bạn phản hồi')).toBeInTheDocument();
+      expect(within(row).getByText('Tài khoản đã bị xoá')).toBeInTheDocument();
+      expect(within(row).getByText('10:00 04/11/2026')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: 'Loại' })).toBeInTheDocument();
+      expect(screen.getByText('Trang 1/1 · 1 yêu cầu')).toBeInTheDocument();
+    });
   });
 });

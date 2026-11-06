@@ -4,7 +4,7 @@ import { unwrapSupport } from './unwrapSupport';
 
 export const OPEN_COUNT_POLL_MS = 60_000;
 
-/** Requests in Mới and Đang xử lý, refreshed every minute while the console is open. */
+/** Requests in new and in-progress, refreshed every minute while the console is open. */
 export function useOpenCount(enabled: boolean) {
   return useQuery({
     queryKey: ['admin', 'support', 'requests', 'open-count'],

@@ -6,6 +6,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.StoredAttachment;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadRejectedException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.web.SupportProblemException;
 import java.util.List;
 import java.util.Locale;
@@ -44,15 +45,15 @@ class AttachmentService {
         int dot = fileName.lastIndexOf('.');
         String extension = dot < 0 ? "" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
         if (!EXTENSIONS.containsKey(extension)) {
-            throw rejected("Chỉ nhận ảnh PNG, JPG hoặc WebP");
+            throw rejected(new LocalizedMessage("support.attachment.typeNotAllowed"));
         }
         if (size < 1 || size > MAX_BYTES) {
-            throw rejected("Ảnh tối đa 5 MB");
+            throw rejected(new LocalizedMessage("support.attachment.tooLarge"));
         }
         try {
             return mediaJobs.prepareUpload(ownerId, fileName, size);
         } catch (UploadRejectedException e) {
-            throw rejected("Chỉ nhận ảnh PNG, JPG hoặc WebP");
+            throw rejected(new LocalizedMessage("support.attachment.typeNotAllowed"));
         }
     }
 
@@ -60,10 +61,10 @@ class AttachmentService {
     static List<UUID> checkCount(List<UUID> uploadIds) {
         List<UUID> ids = uploadIds == null ? List.of() : uploadIds;
         if (ids.size() > MAX_PER_MESSAGE) {
-            throw rejected("Tối đa 3 ảnh cho mỗi tin nhắn");
+            throw rejected(new LocalizedMessage("support.attachment.tooMany"));
         }
         if (ids.stream().anyMatch(java.util.Objects::isNull) || ids.stream().distinct().count() != ids.size()) {
-            throw rejected("Mỗi ảnh chỉ đính kèm một lần");
+            throw rejected(new LocalizedMessage("support.attachment.duplicate"));
         }
         return ids;
     }
@@ -82,7 +83,7 @@ class AttachmentService {
             return mediaJobs.keepAttachments("support/" + requestId + "/" + messageId, inputs, MAX_BYTES);
         } catch (UploadRejectedException e) {
             LOG.info("support.attachment outcome=rejected field={}", e.field());
-            throw rejected("Tệp không phải ảnh hợp lệ");
+            throw rejected(new LocalizedMessage("support.attachment.notImage"));
         }
     }
 
@@ -111,11 +112,11 @@ class AttachmentService {
     private void requireMediaOn() {
         if (!mediaJobs.isEnabled()) {
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "attachments-unavailable",
-                    "Tạm thời chưa nhận ảnh đính kèm, bạn vẫn gửi được nội dung.");
+                    new LocalizedMessage("support.attachment.unavailable"));
         }
     }
 
-    private static SupportProblemException rejected(String detail) {
+    private static SupportProblemException rejected(LocalizedMessage detail) {
         return new SupportProblemException(HttpStatus.BAD_REQUEST, REJECTED, detail);
     }
 }

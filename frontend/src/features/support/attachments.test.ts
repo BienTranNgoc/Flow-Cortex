@@ -26,7 +26,10 @@ describe('addAttachments', () => {
     );
 
     expect(result.files).toEqual([]);
-    expect(result.refused).toEqual(['Chỉ nhận ảnh PNG, JPG hoặc WebP', 'Ảnh tối đa 5 MB']);
+    expect(result.refused).toEqual([
+      'Only PNG, JPG or WebP images are accepted',
+      'Images can be at most 5 MB',
+    ]);
   });
 
   it('refuses an empty image and a file name over 255 characters, each with its reason', () => {
@@ -36,7 +39,10 @@ describe('addAttachments', () => {
     );
 
     expect(result.files).toEqual([]);
-    expect(result.refused).toEqual(['Ảnh trống — hãy chọn ảnh khác', 'Tên tệp tối đa 255 ký tự']);
+    expect(result.refused).toEqual([
+      'The image is empty — choose another one',
+      'File names can be at most 255 characters',
+    ]);
   });
 
   it('accepts a file name of exactly 255 characters', () => {
@@ -51,7 +57,7 @@ describe('addAttachments', () => {
     );
 
     expect(result.files).toEqual([exact]);
-    expect(result.refused).toEqual(['Chỉ nhận ảnh PNG, JPG hoặc WebP']);
+    expect(result.refused).toEqual(['Only PNG, JPG or WebP images are accepted']);
   });
 
   it('refuses the fourth image of a message and keeps the first three', () => {
@@ -64,7 +70,7 @@ describe('addAttachments', () => {
     const result = addAttachments(three, [file('d.png', 'image/png')]);
 
     expect(result.files).toEqual(three);
-    expect(result.refused).toEqual(['Tối đa 3 ảnh mỗi tin nhắn']);
+    expect(result.refused).toEqual(['At most 3 images per message']);
   });
 });
 

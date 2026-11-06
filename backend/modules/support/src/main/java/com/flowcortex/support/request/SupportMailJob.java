@@ -7,11 +7,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.MessageSource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,6 +31,8 @@ public class SupportMailJob {
     /** Longer than any send takes, so the next tick never picks up a row still being sent. */
     static final Duration CLAIM_LEASE = Duration.ofMinutes(10);
 
+    /** A request filed in any language other than English is mailed in Vietnamese. */
+    private static final Locale VIETNAMESE = Locale.of("vi");
     private static final Logger LOG = LoggerFactory.getLogger(SupportMailJob.class);
     private static final int BATCH = 50;
 
@@ -36,11 +40,13 @@ public class SupportMailJob {
     private final UserDirectory users;
     private final ObjectProvider<JavaMailSender> mailSender;
     private final SupportProperties properties;
+    private final MessageSource messages;
     private final String publicUrl;
     private final Clock clock;
 
     SupportMailJob(MailOutboxRepository outbox, UserDirectory users, ObjectProvider<JavaMailSender> mailSender,
-            SupportProperties properties, @Value("${flowcortex.app.public-url:}") String publicUrl, Clock clock) {
+            SupportProperties properties, MessageSource messages,
+            @Value("${flowcortex.app.public-url:}") String publicUrl, Clock clock) {
         if (properties.enabled() && (publicUrl == null || publicUrl.isBlank())) {
             throw new IllegalStateException("flowcortex.support.enabled is true but flowcortex.app.public-url "
                     + "(FLOWCORTEX_APP_PUBLIC_URL), the member app origin the reply mail links to, is not set");
@@ -49,6 +55,7 @@ public class SupportMailJob {
         this.users = users;
         this.mailSender = mailSender;
         this.properties = properties;
+        this.messages = messages;
         this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
         this.clock = clock;
     }
@@ -75,7 +82,7 @@ public class SupportMailJob {
             if (sender == null) {
                 throw new IllegalStateException("No mail sender is configured");
             }
-            sender.send(message(email, row.requestNumber()));
+            sender.send(message(email, row));
             outbox.markSent(row.id(), attempt, Instant.now(clock));
             LOG.info("support.reply.mail outcome=sent attempt={} request={}", attempt, row.requestNumber());
         } catch (RuntimeException e) {
@@ -94,15 +101,15 @@ public class SupportMailJob {
         }
     }
 
-    private SimpleMailMessage message(String email, long number) {
+    private SimpleMailMessage message(String email, OutboxRow row) {
+        Locale locale = "en".equals(row.locale()) ? Locale.ENGLISH : VIETNAMESE;
+        long number = row.requestNumber();
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(properties.mail().from());
         message.setTo(email);
-        message.setSubject("Nodi: yêu cầu hỗ trợ #" + number + " có phản hồi mới");
-        message.setText("Xin chào,\n\n"
-                + "Bộ phận hỗ trợ Nodi vừa trả lời yêu cầu #" + number + " của bạn. Mở liên kết sau để xem:\n\n"
-                + publicUrl + "/?help=request-" + number + "\n\n"
-                + "Email này được gửi tự động, vui lòng không trả lời.\n");
+        message.setSubject(messages.getMessage("support.mail.subject", new Object[] {number}, locale));
+        message.setText(messages.getMessage("support.mail.body",
+                new Object[] {number, publicUrl + "/?help=request-" + number}, locale));
         return message;
     }
 }

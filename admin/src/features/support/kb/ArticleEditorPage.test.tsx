@@ -2,6 +2,7 @@ import { setToken, type AdminSupportKbArticle } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
+import i18n from '../../../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../../../test/fakeApi';
 import { ArticleEditorPage } from './ArticleEditorPage';
 
@@ -46,7 +47,7 @@ afterEach(() => {
 });
 
 describe('ArticleEditorPage', () => {
-  it('shows "Đường dẫn này đã được dùng" on the slug field when the save answers 409 slug-taken', async () => {
+  it('shows "This slug is already in use" on the slug field when the save answers 409 slug-taken', async () => {
     const calls = stubApi({
       'GET /api/v1/admin/support/kb/groups': GROUPS,
       'POST /api/v1/admin/support/kb/articles': conflict('slug-taken'),
@@ -54,15 +55,15 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/new');
 
-    await user.type(await screen.findByLabelText('Tiêu đề'), 'Nạp credit');
-    await user.type(screen.getByLabelText('Đường dẫn'), 'nap-credit');
-    await user.selectOptions(screen.getByLabelText('Chủ đề'), 'g2');
-    await user.type(screen.getByLabelText('Nội dung (Markdown)'), 'Vào trang Credit.');
-    await user.click(screen.getByRole('button', { name: 'Tạo bài' }));
+    await user.type(await screen.findByLabelText('Title'), 'Nạp credit');
+    await user.type(screen.getByLabelText('Slug'), 'nap-credit');
+    await user.selectOptions(screen.getByLabelText('Topic'), 'g2');
+    await user.type(screen.getByLabelText('Content (Markdown)'), 'Vào trang Credit.');
+    await user.click(screen.getByRole('button', { name: 'Create article' }));
 
-    const slug = screen.getByLabelText('Đường dẫn');
+    const slug = screen.getByLabelText('Slug');
     await waitFor(() => expect(slug).toHaveAttribute('aria-invalid', 'true'));
-    expect(slug).toHaveAccessibleDescription(/Đường dẫn này đã được dùng/);
+    expect(slug).toHaveAccessibleDescription(/This slug is already in use/);
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
       title: 'Nạp credit',
       slug: 'nap-credit',
@@ -72,9 +73,9 @@ describe('ArticleEditorPage', () => {
   });
 
   it.each([
-    ['draft', ['Công bố', 'Lưu trữ'], ['Công bố lại']],
-    ['published', ['Lưu trữ'], ['Công bố', 'Công bố lại']],
-    ['archived', ['Công bố lại'], ['Công bố', 'Lưu trữ']],
+    ['draft', ['Publish', 'Archive'], ['Republish']],
+    ['published', ['Archive'], ['Publish', 'Republish']],
+    ['archived', ['Republish'], ['Publish', 'Archive']],
   ] as const)('offers the status actions of a %s article', async (status, shown, hidden) => {
     stubApi({
       'GET /api/v1/admin/support/kb/groups': GROUPS,
@@ -103,16 +104,16 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    await user.click(await screen.findByRole('button', { name: 'Công bố' }));
+    await user.click(await screen.findByRole('button', { name: 'Publish' }));
 
-    expect(await screen.findByText('Trạng thái: Đã công bố')).toBeInTheDocument();
+    expect(await screen.findByText('Status: Published')).toBeInTheDocument();
     expect(calls.some((call) => call.path === '/api/v1/admin/support/kb/articles/a1/publish')).toBe(
       true,
     );
-    expect(screen.queryByRole('button', { name: 'Công bố' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
   });
 
-  it('saves a "Bắt đầu" position and shows the featured-full message when three are taken', async () => {
+  it('saves a "Get started" position and shows the featured-full message when three are taken', async () => {
     const calls = stubApi({
       'GET /api/v1/admin/support/kb/groups': GROUPS,
       'GET /api/v1/admin/support/kb/articles/a1': { status: 200, body: article() },
@@ -121,17 +122,24 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    const position = await screen.findByLabelText('Vị trí Bắt đầu');
+    const position = await screen.findByLabelText('Get started position');
     expect(
       within(position)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Không phải bài Bắt đầu', 'Bắt đầu 1', 'Bắt đầu 2', 'Bắt đầu 3']);
+    ).toEqual([
+      'Not a Get started article',
+      'Get started 1',
+      'Get started 2',
+      'Get started 3',
+    ]);
     await user.selectOptions(position, '1');
-    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(position).toHaveAttribute('aria-invalid', 'true'));
-    expect(position).toHaveAccessibleDescription('Tối đa 3 bài Bắt đầu — bỏ chọn một bài trước');
+    expect(position).toHaveAccessibleDescription(
+      'At most 3 Get started articles — clear one first',
+    );
     expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({
       featuredPosition: 1,
     });
@@ -142,12 +150,12 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/new');
 
-    await user.click(await screen.findByLabelText('Nội dung (Markdown)'));
+    await user.click(await screen.findByLabelText('Content (Markdown)'));
     await user.paste(
       '# Tiêu đề\n\n<img src=x onerror=alert(1)> [x](javascript:alert(1)) [web](https://nodi.vn)',
     );
 
-    const preview = screen.getByRole('region', { name: 'Xem trước' });
+    const preview = screen.getByRole('region', { name: 'Preview' });
     expect(within(preview).getByRole('heading', { name: 'Tiêu đề' })).toBeInTheDocument();
     expect(preview).toHaveTextContent('<img src=x onerror=alert(1)>');
     expect(preview.querySelector('img')).toBeNull();
@@ -163,12 +171,12 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/new');
 
-    await user.click(await screen.findByLabelText('Nội dung (Markdown)'));
+    await user.click(await screen.findByLabelText('Content (Markdown)'));
     await user.paste(
       '[a](//evil.com) [b](/\\evil.com) [c](/settings) ![Ảnh chụp](https://cdn.example/x.png)',
     );
 
-    const preview = screen.getByRole('region', { name: 'Xem trước' });
+    const preview = screen.getByRole('region', { name: 'Preview' });
     expect(within(preview).queryByRole('link', { name: 'a' })).not.toBeInTheDocument();
     // The parser percent-encodes the backslash, so the link stays on this host.
     expect(within(preview).getByRole('link', { name: 'b' })).toHaveAttribute(
@@ -183,7 +191,7 @@ describe('ArticleEditorPage', () => {
     expect(preview).toHaveTextContent('Ảnh chụp');
   });
 
-  it('archives a "Bắt đầu" article, clears its position and saves without one', async () => {
+  it('archives a "Get started" article, clears its position and saves without one', async () => {
     const calls = stubApi({
       'GET /api/v1/admin/support/kb/groups': GROUPS,
       'GET /api/v1/admin/support/kb/articles/a1': {
@@ -202,14 +210,18 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    expect(await screen.findByLabelText('Vị trí Bắt đầu')).toHaveDisplayValue('Bắt đầu 2');
-    await user.click(screen.getByRole('button', { name: 'Lưu trữ' }));
+    expect(await screen.findByLabelText('Get started position')).toHaveDisplayValue(
+      'Get started 2',
+    );
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
 
-    expect(await screen.findByText('Trạng thái: Đã lưu trữ')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Đã lưu trữ');
-    expect(screen.getByLabelText('Vị trí Bắt đầu')).toHaveDisplayValue('Không phải bài Bắt đầu');
-    await user.type(screen.getByLabelText('Tiêu đề'), ' cũ');
-    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+    expect(await screen.findByText('Status: Archived')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Archived');
+    expect(screen.getByLabelText('Get started position')).toHaveDisplayValue(
+      'Not a Get started article',
+    );
+    await user.type(screen.getByLabelText('Title'), ' cũ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
     expect(calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty(
@@ -226,13 +238,15 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     const { queryClient } = renderEditor('/support/articles/a1');
 
-    const body = await screen.findByLabelText('Nội dung (Markdown)');
+    const body = await screen.findByLabelText('Content (Markdown)');
     await user.type(body, ' Thêm một dòng.');
     current = article({ status: 'archived' });
     await queryClient.invalidateQueries();
 
-    expect(await screen.findByText('Trạng thái: Đã lưu trữ')).toBeInTheDocument();
-    expect(screen.getByLabelText('Vị trí Bắt đầu')).toHaveDisplayValue('Không phải bài Bắt đầu');
+    expect(await screen.findByText('Status: Archived')).toBeInTheDocument();
+    expect(screen.getByLabelText('Get started position')).toHaveDisplayValue(
+      'Not a Get started article',
+    );
     expect(body).toHaveValue('Vào **Tài khoản** để đổi. Thêm một dòng.');
   });
 
@@ -245,13 +259,13 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     const { queryClient } = renderEditor('/support/articles/new');
 
-    await user.type(await screen.findByLabelText('Tiêu đề'), 'Nạp credit');
+    await user.type(await screen.findByLabelText('Title'), 'Nạp credit');
     failing = true;
     await queryClient.invalidateQueries();
     await settled(queryClient);
 
-    expect(screen.getByLabelText('Tiêu đề')).toHaveValue('Nạp credit');
-    expect(screen.queryByText('Không tải được dữ liệu.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('Nạp credit');
+    expect(screen.queryByText('Could not load the data.')).not.toBeInTheDocument();
   });
 
   it('maps a validation problem that carries only type and errors onto its field', async () => {
@@ -270,11 +284,11 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    await user.click(await screen.findByRole('button', { name: 'Lưu' }));
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
 
-    const title = screen.getByLabelText('Tiêu đề');
+    const title = screen.getByLabelText('Title');
     await waitFor(() => expect(title).toHaveAttribute('aria-invalid', 'true'));
-    expect(title).toHaveAccessibleDescription('Tiêu đề cần 1–150 ký tự');
+    expect(title).toHaveAccessibleDescription('Title must be 1–150 characters');
   });
 
   it('says the article is gone when the save answers 404 article-not-found', async () => {
@@ -289,9 +303,9 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    await user.click(await screen.findByRole('button', { name: 'Lưu' }));
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bài viết này không còn tồn tại.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This article no longer exists.');
   });
 
   it('marks the group field and reloads the groups when the save answers 404 group-not-found', async () => {
@@ -306,15 +320,43 @@ describe('ArticleEditorPage', () => {
     const user = userEvent.setup();
     renderEditor('/support/articles/a1');
 
-    await user.click(await screen.findByRole('button', { name: 'Lưu' }));
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
 
-    const group = screen.getByLabelText('Chủ đề');
+    const group = screen.getByLabelText('Topic');
     await waitFor(() => expect(group).toHaveAttribute('aria-invalid', 'true'));
-    expect(group).toHaveAccessibleDescription('Chọn một chủ đề');
+    expect(group).toHaveAccessibleDescription('Choose a topic');
     await waitFor(() =>
       expect(calls.filter((call) => call.path === '/api/v1/admin/support/kb/groups')).toHaveLength(
         2,
       ),
     );
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the form, status and validation message in Vietnamese', async () => {
+      stubApi({
+        'GET /api/v1/admin/support/kb/groups': GROUPS,
+        'GET /api/v1/admin/support/kb/articles/a1': { status: 200, body: article() },
+      });
+      const user = userEvent.setup();
+      renderEditor('/support/articles/a1');
+
+      expect(await screen.findByLabelText('Vị trí Bắt đầu')).toBeInTheDocument();
+      expect(screen.getByText('Trạng thái: Nháp')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Công bố' })).toBeInTheDocument();
+      await user.clear(screen.getByLabelText('Tiêu đề'));
+      await user.click(screen.getByRole('button', { name: 'Lưu' }));
+
+      expect(screen.getByLabelText('Tiêu đề')).toHaveAccessibleDescription(
+        'Tiêu đề cần 1–150 ký tự',
+      );
+    });
   });
 });

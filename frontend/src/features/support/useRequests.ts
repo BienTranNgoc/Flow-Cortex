@@ -15,7 +15,9 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { useMemo, useRef } from 'react';
 import { UploadFailedError } from '../workflow/uploadFile';
 import { uploadAttachments } from './attachments';
-import { supportCopy } from './supportCopy';
+import type { TFunction } from 'i18next';
+import i18n from '../../lib/i18n';
+import { problemMessage } from './supportProblems';
 import { DETAIL_KEY, LIST_KEY, UNREAD_KEY } from './useUnread';
 import { supportProblemCode, unwrapSupport } from './useSupportKb';
 import { newUuidV4 } from './uuid';
@@ -50,30 +52,25 @@ export interface Failure {
   fields: Record<string, string>;
 }
 
-function problemMessage(code: string | undefined): string | undefined {
-  const value: unknown = code ? (supportCopy.problems as Record<string, unknown>)[code] : undefined;
-  return typeof value === 'string' ? value : undefined;
-}
-
 /** The message for a failed submit or action; the server's own text only for a refused attachment. */
-export function failureOf(error: unknown): Failure {
+export function failureOf(error: unknown, t: TFunction = i18n.t): Failure {
   if (error instanceof UploadFailedError) {
-    return { message: supportCopy.requests.attachUploadFailed, reload: false, fields: {} };
+    return { message: t('support.requests.attachUploadFailed'), reload: false, fields: {} };
   }
   const code = supportProblemCode(error);
   const problem = error instanceof ApiError ? error.problem : undefined;
   if (code === 'attachment-rejected') {
     return {
-      message: problem?.detail ?? supportCopy.problems['attachment-rejected'],
+      message: problem?.detail ?? t('support.problems.attachment-rejected'),
       reload: false,
       fields: {},
     };
   }
   if (code === 'validation-failed') {
-    return { message: supportCopy.requests.submitFailed, reload: false, fields: problem?.errors ?? {} };
+    return { message: t('support.requests.submitFailed'), reload: false, fields: problem?.errors ?? {} };
   }
   return {
-    message: problemMessage(code) ?? supportCopy.requests.submitFailed,
+    message: problemMessage(code, {}, t) ?? t('support.requests.submitFailed'),
     reload: code === 'request-state-changed' || code === 'idempotency-key-reused',
     fields: {},
   };

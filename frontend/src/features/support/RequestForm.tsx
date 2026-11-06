@@ -1,7 +1,7 @@
 import { SupportRequestCreateType, type SupportRequestCreate } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { addAttachments, ATTACHMENT_ACCEPT } from './attachments';
-import { supportCopy } from './supportCopy';
 import { useSupportPanel, type RequestPrefill } from './supportPanelState';
 import { ContactLine } from './HomeTab';
 import {
@@ -13,10 +13,10 @@ import {
   useUploadedIds,
 } from './useRequests';
 
-const copy = supportCopy.requests;
 const TYPES = Object.values(SupportRequestCreateType);
 
 function Preview({ file, onRemove, disabled }: Readonly<{ file: File; onRemove: () => void; disabled: boolean }>) {
+  const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     const created = URL.createObjectURL(file);
@@ -30,7 +30,7 @@ function Preview({ file, onRemove, disabled }: Readonly<{ file: File; onRemove: 
       <button
         type="button"
         className="support-button"
-        aria-label={copy.attachRemove(file.name)}
+        aria-label={t('support.requests.attachRemove', { name: file.name })}
         disabled={disabled}
         onClick={onRemove}
       >
@@ -48,11 +48,12 @@ export function AttachmentPicker({
   onChange,
   disabled,
 }: Readonly<{ files: File[]; onChange: (files: File[]) => void; disabled: boolean }>) {
+  const { t } = useTranslation();
   const inputId = useId();
   const [refused, setRefused] = useState<string[]>([]);
 
   const onPick = (event: ChangeEvent<HTMLInputElement>) => {
-    const result = addAttachments(files, [...(event.target.files ?? [])]);
+    const result = addAttachments(files, [...(event.target.files ?? [])], t);
     event.target.value = '';
     setRefused(result.refused);
     if (result.files.length !== files.length) onChange(result.files);
@@ -61,7 +62,7 @@ export function AttachmentPicker({
   return (
     <div className="support-field">
       <label className="support-field__label" htmlFor={inputId}>
-        {copy.attachLabel}
+        {t('support.requests.attachLabel')}
       </label>
       <input
         id={inputId}
@@ -100,9 +101,10 @@ export function AttachmentPicker({
 
 /** The 403 answer for a suspended member, followed by the contact line when one is configured. */
 export function SuspendedNotice() {
+  const { t } = useTranslation();
   return (
     <div className="support-state" role="alert">
-      <p>{copy.suspended}</p>
+      <p>{t('support.requests.suspended')}</p>
       <ContactLine />
     </div>
   );
@@ -110,14 +112,15 @@ export function SuspendedNotice() {
 
 /** A failed submit or action, with a reload when the request changed elsewhere. */
 export function FailureNotice({ error, onReload }: Readonly<{ error: unknown; onReload?: () => void }>) {
+  const { t } = useTranslation();
   if (isSuspended(error)) return <SuspendedNotice />;
-  const failure = failureOf(error);
+  const failure = failureOf(error, t);
   return (
     <div className="support-state" role="alert">
       <p>{failure.message}</p>
       {failure.reload && onReload && (
         <button type="button" className="support-button" onClick={onReload}>
-          {copy.reload}
+          {t('support.requests.reload')}
         </button>
       )}
     </div>
@@ -130,18 +133,22 @@ interface FormErrors {
   description?: string | undefined;
 }
 
+/** Holds locale keys, translated at render so a language switch re-renders them. */
 function validate(type: string, subject: string, description: string): FormErrors {
   const errors: FormErrors = {};
-  if (!type) errors.type = copy.typeRequired;
+  if (!type) errors.type = 'support.requests.typeRequired';
   const subjectLength = textLength(subject);
-  if (subjectLength < 5 || subjectLength > 120) errors.subject = copy.subjectLength;
+  if (subjectLength < 5 || subjectLength > 120) errors.subject = 'support.requests.subjectLength';
   const descriptionLength = textLength(description);
-  if (descriptionLength < 10 || descriptionLength > 5000) errors.description = copy.descriptionLength;
+  if (descriptionLength < 10 || descriptionLength > 5000) {
+    errors.description = 'support.requests.descriptionLength';
+  }
   return errors;
 }
 
 /** The new-request form; on success the tab shows the created request. */
 export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | null }>) {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   const create = useCreateRequest();
   const submitKey = useSubmitKey();
@@ -191,7 +198,7 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
       const created = await create.mutateAsync({ body, key: submitKey.current() });
       dispatch({ type: 'selectRequest', request: created.number });
     } catch (error) {
-      const { fields } = failureOf(error);
+      const { fields } = failureOf(error, t);
       setFailed({ error });
       setErrors({ type: fields.type, subject: fields.subject, description: fields.description });
     } finally {
@@ -206,7 +213,7 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
     <form className="support-request-form" noValidate onSubmit={onSubmit}>
       <div className="support-field">
         <label className="support-field__label" htmlFor={ids.type}>
-          {copy.typeLabel}
+          {t('support.requests.typeLabel')}
         </label>
         <select
           id={ids.type}
@@ -219,23 +226,23 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
           onChange={(event) => edited(setType)(event.target.value)}
         >
           <option value="" disabled>
-            {copy.typePlaceholder}
+            {t('support.requests.typePlaceholder')}
           </option>
           {TYPES.map((value) => (
             <option key={value} value={value}>
-              {copy.types[value]}
+              {t(`support.requests.types.${value}`)}
             </option>
           ))}
         </select>
         {errors.type && (
           <p id={errorId('type')} className="support-field__error">
-            {errors.type}
+            {t(errors.type)}
           </p>
         )}
       </div>
       <div className="support-field">
         <label className="support-field__label" htmlFor={ids.subject}>
-          {copy.subjectLabel}
+          {t('support.requests.subjectLabel')}
         </label>
         <input
           id={ids.subject}
@@ -249,13 +256,13 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
         />
         {errors.subject && (
           <p id={errorId('subject')} className="support-field__error">
-            {errors.subject}
+            {t(errors.subject)}
           </p>
         )}
       </div>
       <div className="support-field">
         <label className="support-field__label" htmlFor={ids.description}>
-          {copy.descriptionLabel}
+          {t('support.requests.descriptionLabel')}
         </label>
         <textarea
           id={ids.description}
@@ -270,11 +277,11 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
         />
         {errors.description && (
           <p id={errorId('description')} className="support-field__error">
-            {errors.description}
+            {t(errors.description)}
           </p>
         )}
       </div>
-      {prefill?.aiConversationId && <p className="support-contact">{copy.conversationLinked}</p>}
+      {prefill?.aiConversationId && <p className="support-contact">{t('support.requests.conversationLinked')}</p>}
       <AttachmentPicker files={files} onChange={edited(setFiles)} disabled={busy} />
       {failed && (
         <FailureNotice
@@ -283,7 +290,7 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
         />
       )}
       <button type="submit" className="support-button support-button--primary" disabled={busy}>
-        {busy ? copy.sending : copy.submit}
+        {busy ? t('support.requests.sending') : t('support.requests.submit')}
       </button>
     </form>
   );

@@ -70,9 +70,9 @@ class AttachmentServiceTest {
 
     @Test
     void aPdfOrAnImageOverFiveMegabytesIsRefusedBeforeAnythingIsSigned() {
-        assertRejected(() -> service.grant(owner, "hoa-don.pdf", 2048), "Chỉ nhận ảnh PNG, JPG hoặc WebP");
-        assertRejected(() -> service.grant(owner, "anh", 2048), "Chỉ nhận ảnh PNG, JPG hoặc WebP");
-        assertRejected(() -> service.grant(owner, "anh.jpg", 5L * 1024 * 1024 + 1), "Ảnh tối đa 5 MB");
+        assertRejected(() -> service.grant(owner, "hoa-don.pdf", 2048), "support.attachment.typeNotAllowed");
+        assertRejected(() -> service.grant(owner, "anh", 2048), "support.attachment.typeNotAllowed");
+        assertRejected(() -> service.grant(owner, "anh.jpg", 5L * 1024 * 1024 + 1), "support.attachment.tooLarge");
         verify(mediaJobs, never()).prepareUpload(any(), anyString(), anyLong());
     }
 
@@ -90,8 +90,8 @@ class AttachmentServiceTest {
         UUID id = UUID.randomUUID();
 
         assertRejected(() -> AttachmentService.checkCount(List.of(UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), UUID.randomUUID())), "Tối đa 3 ảnh cho mỗi tin nhắn");
-        assertRejected(() -> AttachmentService.checkCount(List.of(id, id)), "Mỗi ảnh chỉ đính kèm một lần");
+                UUID.randomUUID(), UUID.randomUUID())), "support.attachment.tooMany");
+        assertRejected(() -> AttachmentService.checkCount(List.of(id, id)), "support.attachment.duplicate");
         assertThat(AttachmentService.checkCount(null)).isEmpty();
     }
 
@@ -109,7 +109,8 @@ class AttachmentServiceTest {
                 .thenThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.notAnImage")));
 
         assertThat(service.keep(owner, request, message, List.of(upload))).containsExactly(kept);
-        assertRejected(() -> service.keep(owner, request, message, List.of(upload)), "Tệp không phải ảnh hợp lệ");
+        assertRejected(() -> service.keep(owner, request, message, List.of(upload)),
+                "support.attachment.notImage");
         assertThat(service.keep(owner, request, message, List.of())).isEmpty();
     }
 
@@ -128,10 +129,10 @@ class AttachmentServiceTest {
         });
     }
 
-    private static void assertRejected(Runnable call, String detail) {
+    private static void assertRejected(Runnable call, String detailKey) {
         assertThatThrownBy(call::run).isInstanceOfSatisfying(SupportProblemException.class, e -> {
             assertThat(e.code()).isEqualTo("attachment-rejected");
-            assertThat(e.getMessage()).isEqualTo(detail);
+            assertThat(e.detail().code()).isEqualTo(detailKey);
         });
     }
 }

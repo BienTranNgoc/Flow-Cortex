@@ -21,7 +21,8 @@ class MailOutboxRepository {
         this.jdbc = jdbc;
     }
 
-    record OutboxRow(UUID id, UUID recipientUserId, long requestNumber, int attempts) {
+    /** @param locale the language the member filed the request in */
+    record OutboxRow(UUID id, UUID recipientUserId, long requestNumber, String locale, int attempts) {
     }
 
     void insert(UUID requestId, UUID messageId, UUID recipientUserId, Instant now) {
@@ -52,10 +53,11 @@ class MailOutboxRepository {
         if (claimed == 0) {
             return Optional.empty();
         }
-        return jdbc.query("SELECT o.id, o.recipient_user_id, o.attempts, r.number FROM support_mail_outbox o "
-                + "JOIN support_request r ON r.id = o.request_id WHERE o.id = :id", new MapSqlParameterSource("id", id),
+        return jdbc.query("SELECT o.id, o.recipient_user_id, o.attempts, r.number, r.locale "
+                + "FROM support_mail_outbox o JOIN support_request r ON r.id = o.request_id WHERE o.id = :id",
+                new MapSqlParameterSource("id", id),
                 (rs, n) -> new OutboxRow(rs.getObject("id", UUID.class), rs.getObject("recipient_user_id", UUID.class),
-                        rs.getLong("number"), rs.getInt("attempts"))).stream().findFirst();
+                        rs.getLong("number"), rs.getString("locale"), rs.getInt("attempts"))).stream().findFirst();
     }
 
     void markSent(UUID id, int attempts, Instant now) {

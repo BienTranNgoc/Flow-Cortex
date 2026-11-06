@@ -2,6 +2,7 @@ package com.flowcortex.support.request;
 
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
 import com.flowcortex.support.request.RequestRepository.RequestRow;
@@ -24,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -86,22 +88,23 @@ class RequestService {
     record NewRequest(String type, String subject, String description, List<UUID> uploadIds, UUID aiConversationId) {
     }
 
-    Detail create(UUID memberId, NewRequest input, Optional<String> key) {
+    /** @param locale the member's language, kept on the request so the reply mail goes out in it */
+    Detail create(UUID memberId, NewRequest input, Optional<String> key, Locale locale) {
         String type = input.type() == null ? "" : input.type().trim();
         String subject = trimmed(input.subject());
         String description = trimmed(input.description());
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
         if (!TYPES.contains(type)) {
-            errors.put("type", "Chọn loại yêu cầu");
+            errors.put("type", new LocalizedMessage("support.request.error.type"));
         }
         if (!lengthBetween(subject, 5, 120)) {
-            errors.put("subject", "Tiêu đề cần 5–120 ký tự");
+            errors.put("subject", new LocalizedMessage("support.request.error.subject"));
         }
         if (!lengthBetween(description, 10, 5000)) {
-            errors.put("description", "Mô tả cần 10–5000 ký tự");
+            errors.put("description", new LocalizedMessage("support.request.error.description"));
         }
         if (input.aiConversationId() != null && !requests.ownsConversation(input.aiConversationId(), memberId)) {
-            errors.put("aiConversationId", "Không tìm thấy cuộc trò chuyện");
+            errors.put("aiConversationId", new LocalizedMessage("support.request.error.conversation"));
         }
         requireValid(errors);
         List<UUID> uploadIds = AttachmentService.checkCount(input.uploadIds());
@@ -119,7 +122,8 @@ class RequestService {
             if (claimed.isPresent()) {
                 return claimed;
             }
-            long number = requests.insertRequest(requestId, memberId, type, subject, input.aiConversationId(), at);
+            long number = requests.insertRequest(requestId, memberId, type, subject, input.aiConversationId(),
+                    locale.getLanguage(), at);
             requests.insertMessage(messageId, requestId, "member", memberId, description, at);
             requests.insertAttachments(messageId, kept, at);
             LOG.info("support.request outcome=created request={} type={} attachments={}", number, type, kept.size());
@@ -185,15 +189,15 @@ class RequestService {
     AdminPage page(String status, String type, int page) {
         String statusFilter = blankToNull(status);
         String typeFilter = blankToNull(type);
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
         if (statusFilter != null && RequestStatus.parse(statusFilter).isEmpty()) {
-            errors.put("status", "Unknown status");
+            errors.put("status", new LocalizedMessage("support.request.error.statusUnknown"));
         }
         if (typeFilter != null && !TYPES.contains(typeFilter)) {
-            errors.put("type", "Unknown type");
+            errors.put("type", new LocalizedMessage("support.request.error.typeUnknown"));
         }
         if (page < 0 || page > MAX_PAGE) {
-            errors.put("page", "Must be between 0 and " + MAX_PAGE);
+            errors.put("page", new LocalizedMessage("support.request.error.page", MAX_PAGE));
         }
         requireValid(errors);
         List<RequestRow> rows = requests.page(statusFilter, typeFilter, page * PAGE_SIZE, PAGE_SIZE);
@@ -215,11 +219,12 @@ class RequestService {
         String text = requireBody(body);
         RequestEvent event = ADMIN_REPLY_TARGETS.get(targetStatus);
         if (event == null) {
-            requireValid(Map.of("status", "Chọn Chờ bạn phản hồi hoặc Đã giải quyết"));
+            requireValid(Map.of("status", new LocalizedMessage("support.request.error.replyStatus")));
         }
         List<UUID> ids = AttachmentService.checkCount(uploadIds);
         if (!users.findEmailsByIds(List.of(row.requesterId())).containsKey(row.requesterId())) {
-            throw refusal(row, "requester-deleted", "The member who filed request #" + row.number() + " was deleted");
+            throw refusal(row, "requester-deleted",
+                    new LocalizedMessage("support.request.requesterDeleted", row.number()));
         }
         Instant now = Instant.now(clock);
         Optional<UUID> earlier = key.flatMap(k -> idempotency.find(adminId, k, REPLY, row.id(), now));
@@ -250,7 +255,7 @@ class RequestService {
         RequestRow row = byNumber(number);
         RequestEvent event = targetStatus == null ? null : ADMIN_STATUS_TARGETS.get(targetStatus);
         if (event == null) {
-            requireValid(Map.of("status", "Chọn Đang xử lý, Đã giải quyết hoặc Đã đóng"));
+            requireValid(Map.of("status", new LocalizedMessage("support.request.error.status")));
         }
         return adminView(change(row, event, "status_changed"));
     }
@@ -305,8 +310,8 @@ class RequestService {
     private Move allowed(RequestRow row, RequestEvent event) {
         Transition transition = RequestStateMachine.next(row.status(), event);
         if (transition instanceof Refusal refusal) {
-            throw refusal(row, refusal.code(), "Request #" + row.number() + " cannot go from "
-                    + row.status().value() + " on " + event);
+            throw refusal(row, refusal.code(), new LocalizedMessage("support.request.cannotTransition",
+                    row.number(), row.status().value(), event));
         }
         return (Move) transition;
     }
@@ -314,11 +319,13 @@ class RequestService {
     /** The status read earlier may have changed since: then this change lost and the caller must reload. */
     private void requireMoved(RequestRow row, Move move, Boolean memberUnread, Instant now) {
         if (!requests.move(row.id(), row.status(), move.target(), move.closedReason(), memberUnread, now)) {
-            throw refusal(row, "request-state-changed", "Request #" + row.number() + " changed meanwhile");
+            throw refusal(row, "request-state-changed",
+                    new LocalizedMessage("support.request.changedMeanwhile", row.number()));
         }
     }
 
-    private static SupportProblemException refusal(RequestRow row, String code, String detail) {
+    private static SupportProblemException refusal(RequestRow row, String code,
+            LocalizedMessage detail) {
         LOG.info("support.request outcome=refused request={} code={}", row.number(), code);
         return new SupportProblemException(HttpStatus.CONFLICT, code, detail);
     }
@@ -344,7 +351,7 @@ class RequestService {
 
     private static SupportProblemException notFound(long number) {
         return new SupportProblemException(HttpStatus.NOT_FOUND, "request-not-found",
-                "Request #" + number + " not found");
+                new LocalizedMessage("support.request.notFound", number));
     }
 
     private Detail memberDetail(RequestRow row) {
@@ -390,15 +397,15 @@ class RequestService {
     private static String requireBody(String body) {
         String text = trimmed(body);
         if (!lengthBetween(text, 1, 5000)) {
-            requireValid(Map.of("body", "Nội dung cần 1–5000 ký tự"));
+            requireValid(Map.of("body", new LocalizedMessage("support.request.error.body")));
         }
         return text;
     }
 
-    private static void requireValid(Map<String, String> errors) {
+    private static void requireValid(Map<String, LocalizedMessage> errors) {
         if (!errors.isEmpty()) {
-            throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed", "Request validation failed")
-                    .with("errors", errors);
+            throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
+                    new LocalizedMessage("problem.validationFailed")).withFieldErrors(errors);
         }
     }
 

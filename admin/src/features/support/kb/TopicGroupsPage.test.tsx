@@ -1,6 +1,7 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../../lib/i18n';
 import { renderRoute, stubApi, type FakeReply } from '../../../test/fakeApi';
 import { TopicGroupsPage } from './TopicGroupsPage';
 
@@ -30,10 +31,10 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Xoá Credit' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete Credit' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Nhóm còn 1 bài viết — chuyển bài sang nhóm khác trước',
+      'The topic still has 1 articles — move them to another topic first',
     );
     expect(screen.getByText('Credit')).toBeInTheDocument();
   });
@@ -52,7 +53,7 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Đưa Credit lên' }));
+    await user.click(await screen.findByRole('button', { name: 'Move Credit up' }));
 
     await waitFor(() =>
       expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ ids: ['g2', 'g1'] }),
@@ -62,8 +63,8 @@ describe('TopicGroupsPage', () => {
         screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent),
       ).toEqual(['Credit', 'Tài khoản']),
     );
-    expect(screen.getByRole('button', { name: 'Đưa Credit lên' })).toHaveFocus();
-    expect(screen.getByRole('status')).toHaveTextContent('Đã chuyển Credit lên vị trí 1');
+    expect(screen.getByRole('button', { name: 'Move Credit up' })).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Moved Credit up to position 1');
   });
 
   it('renames a group', async () => {
@@ -90,14 +91,14 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    const input = await screen.findByLabelText('Tên mới cho Credit');
+    const input = await screen.findByLabelText('New name for Credit');
     await user.clear(input);
     await user.type(input, 'Thanh toán');
-    await user.click(within(input.closest('li')!).getByRole('button', { name: 'Đổi tên' }));
+    await user.click(within(input.closest('li')!).getByRole('button', { name: 'Rename' }));
 
     expect(await screen.findByText('Thanh toán', { selector: 'strong' })).toBeInTheDocument();
     expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ name: 'Thanh toán' });
-    expect(screen.getByRole('status')).toHaveTextContent('Đã đổi tên thành Thanh toán');
+    expect(screen.getByRole('status')).toHaveTextContent('Renamed to Thanh toán');
   });
 
   it('says why a blank rename is not sent', async () => {
@@ -105,12 +106,12 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    const input = await screen.findByLabelText('Tên mới cho Credit');
+    const input = await screen.findByLabelText('New name for Credit');
     await user.clear(input);
     await user.type(input, '   ');
-    await user.click(within(input.closest('li')!).getByRole('button', { name: 'Đổi tên' }));
+    await user.click(within(input.closest('li')!).getByRole('button', { name: 'Rename' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Tên chủ đề cần 1–60 ký tự');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Topic name must be 1–60 characters');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(calls.some((call) => call.method === 'PUT')).toBe(false);
   });
@@ -120,11 +121,11 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Thêm chủ đề' }));
+    await user.click(await screen.findByRole('button', { name: 'Add topic' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Tên chủ đề cần 1–60 ký tự');
-    expect(screen.getByLabelText('Tên chủ đề mới')).toHaveAccessibleDescription(
-      'Tên chủ đề cần 1–60 ký tự',
+    expect(await screen.findByRole('alert')).toHaveTextContent('Topic name must be 1–60 characters');
+    expect(screen.getByLabelText('New topic name')).toHaveAccessibleDescription(
+      'Topic name must be 1–60 characters',
     );
     expect(calls.some((call) => call.method === 'POST')).toBe(false);
   });
@@ -140,10 +141,10 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    await user.type(await screen.findByLabelText('Tên chủ đề mới'), 'Credit');
-    await user.click(screen.getByRole('button', { name: 'Thêm chủ đề' }));
+    await user.type(await screen.findByLabelText('New topic name'), 'Credit');
+    await user.click(screen.getByRole('button', { name: 'Add topic' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Đã có chủ đề tên này');
+    expect(await screen.findByRole('alert')).toHaveTextContent('A topic with this name already exists');
   });
 
   it('reloads the groups when the order no longer matches', async () => {
@@ -157,15 +158,43 @@ describe('TopicGroupsPage', () => {
     const user = userEvent.setup();
     renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Đưa Credit lên' }));
+    await user.click(await screen.findByRole('button', { name: 'Move Credit up' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Danh sách chủ đề vừa thay đổi — đã tải lại thứ tự mới nhất',
+      'The topic list just changed — the latest order was reloaded',
     );
     await waitFor(() =>
       expect(
         calls.filter((call) => call.method === 'GET' && call.path.endsWith('/groups')),
       ).toHaveLength(2),
     );
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the controls and the article count message in Vietnamese', async () => {
+      stubApi({
+        'GET /api/v1/admin/support/kb/groups': GROUPS,
+        'DELETE /api/v1/admin/support/kb/groups/g2': {
+          status: 409,
+          body: { status: 409, code: 'group-not-empty', articleCount: 1, detail: 'still holds 1' },
+        },
+      });
+      const user = userEvent.setup();
+      renderRoute('/support/groups', '/support/groups', <TopicGroupsPage />);
+
+      expect(await screen.findByRole('button', { name: 'Thêm chủ đề' })).toBeInTheDocument();
+      await user.click(await screen.findByRole('button', { name: 'Xoá Credit' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Nhóm còn 1 bài viết — chuyển bài sang nhóm khác trước',
+      );
+    });
   });
 });

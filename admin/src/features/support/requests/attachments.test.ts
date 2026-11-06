@@ -21,9 +21,9 @@ describe('reply attachments', () => {
 
     expect(files.map((file) => file.name)).toEqual(['a.png', 'b.jpg', 'e.webp']);
     expect(refused).toEqual([
-      'Chỉ nhận ảnh PNG, JPG hoặc WebP',
-      'Ảnh tối đa 5 MB',
-      'Tối đa 3 ảnh mỗi tin nhắn',
+      'support.requests.attachType',
+      'support.requests.attachSize',
+      'support.requests.attachCount',
     ]);
   });
 
@@ -40,7 +40,7 @@ describe('reply attachments', () => {
     );
 
     expect(files.map((file) => file.name.length)).toEqual([255]);
-    expect(refused).toEqual(['Ảnh trống — hãy chọn ảnh khác', 'Tên tệp tối đa 255 ký tự']);
+    expect(refused).toEqual(['support.requests.attachEmpty', 'support.requests.attachNameLength']);
   });
 
   it('asks a grant and PUTs each file in order, returning the upload ids', async () => {

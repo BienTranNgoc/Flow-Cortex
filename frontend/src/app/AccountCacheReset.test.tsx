@@ -102,13 +102,13 @@ describe('AccountCacheReset', () => {
       </QueryClientProvider>,
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Trợ giúp' }));
-    const panel = screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' });
-    await user.click(within(panel).getByRole('tab', { name: 'Trợ lý' }));
-    const input = await within(panel).findByRole('textbox', { name: 'Câu hỏi của bạn' });
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    const panel = screen.getByRole('dialog', { name: 'Help Center' });
+    await user.click(within(panel).getByRole('tab', { name: 'Assistant' }));
+    const input = await within(panel).findByRole('textbox', { name: 'Your question' });
     await waitFor(() => expect(input).toBeEnabled());
     await user.type(input, 'Câu hỏi của A');
-    await user.click(within(panel).getByRole('button', { name: 'Gửi' }));
+    await user.click(within(panel).getByRole('button', { name: 'Send' }));
     expect(await within(panel).findByText('Trả lời riêng cho A')).toBeInTheDocument();
 
     latest = { status: 404, body: { status: 404, code: 'conversation-not-found' } };
@@ -121,7 +121,7 @@ describe('AccountCacheReset', () => {
         calls.filter((call) => call.path.endsWith('/conversations/latest')).length,
       ).toBeGreaterThan(readsBefore),
     );
-    await within(panel).findByText(/Hãy đặt câu hỏi/);
+    await within(panel).findByText(/Ask a question/);
     expect(screen.queryByText('Trả lời riêng cho A')).toBeNull();
     expect(screen.queryByText('Câu hỏi của A')).toBeNull();
   });

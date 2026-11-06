@@ -58,8 +58,10 @@ export default tseslint.config(
           'jsx-attributes': { include: ['aria-label', 'placeholder', 'title', 'alt'] },
           // The rule replaces an option's default list rather than extending it.
           words: { exclude: [...i18nextDefaults.words.exclude, /^[\p{P}\p{S}]+$/u] },
-          // react-hook-form field names
-          callees: { exclude: [...i18nextDefaults.callees.exclude, 'register'] },
+          // react-hook-form field names, and the article editor helpers keyed by them
+          callees: {
+            exclude: [...i18nextDefaults.callees.exclude, 'register', 'fieldProps', 'fieldError'],
+          },
         },
       ],
     },

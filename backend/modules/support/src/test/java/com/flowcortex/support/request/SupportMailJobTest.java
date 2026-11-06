@@ -28,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -45,7 +46,8 @@ class SupportMailJobTest {
     private final SupportProperties properties = new SupportProperties(true, null,
             new SupportProperties.Assistant(false, "m", 2000, 50, 10, 100),
             new SupportProperties.Mail("no-reply@flow-cortex.dev"));
-    private final SupportMailJob job = new SupportMailJob(outbox, users, senders, properties,
+    private final ResourceBundleMessageSource messages = bundle();
+    private final SupportMailJob job = new SupportMailJob(outbox, users, senders, properties, messages,
             "http://localhost:5173/", Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID row = UUID.randomUUID();
     private final UUID member = UUID.randomUUID();
@@ -60,10 +62,28 @@ class SupportMailJobTest {
         ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(sender).send(mail.capture());
         assertThat(mail.getValue().getTo()).containsExactly("m@example.com");
-        assertThat(mail.getValue().getText()).contains("http://localhost:5173/?help=request-12");
+        assertThat(mail.getValue().getSubject()).isEqualTo("Nodi: yêu cầu hỗ trợ #12 có phản hồi mới");
+        assertThat(mail.getValue().getText()).isEqualTo("Xin chào,\n\n"
+                + "Bộ phận hỗ trợ Nodi vừa trả lời yêu cầu #12 của bạn. Mở liên kết sau để xem:\n\n"
+                + "http://localhost:5173/?help=request-12\n\n"
+                + "Email này được gửi tự động, vui lòng không trả lời.\n");
         verify(outbox).markSent(row, 1, NOW);
         assertThat(output.getOut()).contains("support.reply.mail outcome=sent attempt=1 request=12")
                 .doesNotContain("m@example.com");
+    }
+
+    @Test
+    void aRequestFiledInEnglishIsMailedInEnglish() {
+        due("en", 0);
+        when(senders.getIfAvailable()).thenReturn(sender);
+
+        job.sendDue();
+
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(sender).send(mail.capture());
+        assertThat(mail.getValue().getSubject()).isEqualTo("Nodi: your support request #12 has a new reply");
+        assertThat(mail.getValue().getText()).startsWith("Hello,")
+                .contains("http://localhost:5173/?help=request-12");
     }
 
     @Test
@@ -85,7 +105,7 @@ class SupportMailJobTest {
     @Test
     void aDeletedRecipientClosesTheRowWithoutMail() {
         when(outbox.due(NOW, 50)).thenReturn(List.of(row));
-        when(outbox.claim(eq(row), eq(NOW), any())).thenReturn(Optional.of(new OutboxRow(row, member, 12, 0)));
+        when(outbox.claim(eq(row), eq(NOW), any())).thenReturn(Optional.of(new OutboxRow(row, member, 12, "vi", 0)));
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
 
         job.sendDue();
@@ -110,10 +130,11 @@ class SupportMailJobTest {
                 new SupportProperties.Mail("no-reply@flow-cortex.dev"));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
-        assertThatThrownBy(() -> new SupportMailJob(outbox, users, senders, properties, " ", clock))
+        assertThatThrownBy(() -> new SupportMailJob(outbox, users, senders, properties, messages, " ", clock))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("flowcortex.app.public-url");
-        assertThatCode(() -> new SupportMailJob(outbox, users, senders, off, "", clock)).doesNotThrowAnyException();
+        assertThatCode(() -> new SupportMailJob(outbox, users, senders, off, messages, "", clock))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -126,10 +147,22 @@ class SupportMailJobTest {
         verify(users, never()).findEmailsByIds(any());
     }
 
+    private static ResourceBundleMessageSource bundle() {
+        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+        source.setBasename("i18n/messages");
+        source.setDefaultEncoding("UTF-8");
+        source.setFallbackToSystemLocale(false);
+        return source;
+    }
+
     private void due(int attempts) {
+        due("vi", attempts);
+    }
+
+    private void due(String locale, int attempts) {
         when(outbox.due(NOW, 50)).thenReturn(List.of(row));
         when(outbox.claim(row, NOW, NOW.plus(SupportMailJob.CLAIM_LEASE)))
-                .thenReturn(Optional.of(new OutboxRow(row, member, 12, attempts)));
+                .thenReturn(Optional.of(new OutboxRow(row, member, 12, locale, attempts)));
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
     }
 }

@@ -79,6 +79,8 @@ CREATE TABLE support_request (
     ai_conversation_id  uuid         NULL REFERENCES support_ai_conversation (id) ON DELETE SET NULL,
     -- Stays true after the linked conversation expires, so "expired" can be told from "never linked".
     ai_conversation_linked  boolean  NOT NULL DEFAULT false,
+    -- The language the member filed the request in; the reply mail goes out in it.
+    locale              text         NOT NULL DEFAULT 'vi',
     member_unread       boolean      NOT NULL,
     last_activity_at    timestamptz  NOT NULL,
     resolved_at         timestamptz  NULL,

@@ -1,5 +1,6 @@
 package com.flowcortex.support.assistant;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.AssistantService.AssistantReply;
 import com.flowcortex.support.assistant.AssistantService.ConversationView;
 import com.flowcortex.support.web.SupportCaller;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -69,8 +71,8 @@ class AssistantController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(value = "/messages", produces = MediaType.APPLICATION_JSON_VALUE)
-    AssistantReply ask(@AuthenticationPrincipal Jwt jwt, @RequestBody AskRequest body) {
-        return assistant.ask(member(jwt), body.conversationId(), body.question());
+    AssistantReply ask(@AuthenticationPrincipal Jwt jwt, @RequestBody AskRequest body, Locale locale) {
+        return assistant.ask(member(jwt), body.conversationId(), body.question(), locale);
     }
 
     @Operation(operationId = "getSupportAssistantLatestConversation")
@@ -108,8 +110,8 @@ class AssistantController {
             @Parameter(required = true, description = "Version 4 UUID the browser keeps for the guest",
                     schema = @Schema(format = "uuid"))
             @RequestHeader(name = SESSION_HEADER, required = false) String session,
-            HttpServletRequest request, @RequestBody AskRequest body) {
-        return assistant.ask(guest(session, request), body.conversationId(), body.question());
+            HttpServletRequest request, @RequestBody AskRequest body, Locale locale) {
+        return assistant.ask(guest(session, request), body.conversationId(), body.question(), locale);
     }
 
     @SecurityRequirements
@@ -159,6 +161,6 @@ class AssistantController {
             }
         }
         throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
-                SESSION_HEADER + " must be a version 4 UUID");
+                new LocalizedMessage("support.session.invalid", SESSION_HEADER));
     }
 }

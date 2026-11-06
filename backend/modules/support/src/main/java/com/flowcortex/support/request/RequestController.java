@@ -14,12 +14,15 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -42,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 class RequestController {
 
     private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
+    private static final Locale VIETNAMESE = Locale.of("vi");
 
     private final RequestService requests;
     private final AttachmentService attachments;
@@ -111,10 +115,13 @@ class RequestController {
     ResponseEntity<Detail> create(@AuthenticationPrincipal Jwt jwt,
             @Parameter(schema = @Schema(format = "uuid"))
             @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
-            @RequestBody CreateRequest body) {
+            @RequestBody CreateRequest body, Locale locale, HttpServletRequest request) {
         UUID memberId = caller.require(jwt).id();
+        // A client that names no language is mailed in Vietnamese; the response language rule would say English.
+        String language = request.getHeader(HttpHeaders.ACCEPT_LANGUAGE);
+        Locale filedIn = language == null || language.isBlank() ? VIETNAMESE : locale;
         Detail created = requests.create(memberId, new NewRequest(body.type(), body.subject(), body.description(),
-                body.uploadIds(), body.aiConversationId()), IdempotencyGuard.key(idempotencyKey));
+                body.uploadIds(), body.aiConversationId()), IdempotencyGuard.key(idempotencyKey), filedIn);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

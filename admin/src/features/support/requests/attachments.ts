@@ -4,14 +4,19 @@ import {
   type SupportUploadGrant,
   type SupportUploadRequest,
 } from '@flow-cortex/api-client';
-import { supportCopy } from '../supportCopy';
 import { unwrapSupport } from '../unwrapSupport';
 
 export const MAX_ATTACHMENTS = 3;
 export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 export const ATTACHMENT_ACCEPT = 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';
 
-const copy = supportCopy.requests;
+/** Locale key of the reason a file cannot be attached; callers translate it. */
+export type AttachmentProblem =
+  | 'support.requests.attachType'
+  | 'support.requests.attachEmpty'
+  | 'support.requests.attachSize'
+  | 'support.requests.attachNameLength'
+  | 'support.requests.attachCount';
 
 const TYPES_BY_EXTENSION: Record<string, string> = {
   png: 'image/png',
@@ -35,12 +40,12 @@ export class UploadFailedError extends Error {
 const MAX_FILE_NAME_LENGTH = 255;
 
 /** Why `file` cannot be attached, or `null` when it may be uploaded. */
-export function attachmentProblem(file: File): string | null {
+export function attachmentProblem(file: File): AttachmentProblem | null {
   const extension = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
-  if (TYPES_BY_EXTENSION[extension] !== file.type) return copy.attachType;
-  if (file.size < 1) return copy.attachEmpty;
-  if (file.size > MAX_ATTACHMENT_BYTES) return copy.attachSize;
-  if (file.name.length > MAX_FILE_NAME_LENGTH) return copy.attachNameLength;
+  if (TYPES_BY_EXTENSION[extension] !== file.type) return 'support.requests.attachType';
+  if (file.size < 1) return 'support.requests.attachEmpty';
+  if (file.size > MAX_ATTACHMENT_BYTES) return 'support.requests.attachSize';
+  if (file.name.length > MAX_FILE_NAME_LENGTH) return 'support.requests.attachNameLength';
   return null;
 }
 
@@ -48,13 +53,13 @@ export function attachmentProblem(file: File): string | null {
 export function addAttachments(
   current: readonly File[],
   picked: readonly File[],
-): { files: File[]; refused: string[] } {
+): { files: File[]; refused: AttachmentProblem[] } {
   const files = [...current];
-  const refused = new Set<string>();
+  const refused = new Set<AttachmentProblem>();
   for (const file of picked) {
     const problem = attachmentProblem(file);
     if (problem) refused.add(problem);
-    else if (files.length >= MAX_ATTACHMENTS) refused.add(copy.attachCount);
+    else if (files.length >= MAX_ATTACHMENTS) refused.add('support.requests.attachCount');
     else files.push(file);
   }
   return { files, refused: [...refused] };

@@ -28,6 +28,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,12 +56,12 @@ class RequestServiceTest {
         StoredAttachment image = new StoredAttachment("flowcortex-media", "support/r/m/1", "image/png", 819_200L);
         UUID upload = UUID.randomUUID();
         when(attachments.keep(eq(member), any(), any(), eq(List.of(upload)))).thenReturn(List.of(image));
-        when(requests.insertRequest(any(), eq(member), eq("credit"), eq("Không thấy credit"), isNull(), eq(NOW)))
-                .thenReturn(13L);
+        when(requests.insertRequest(any(), eq(member), eq("credit"), eq("Không thấy credit"), isNull(), eq("en"),
+                eq(NOW))).thenReturn(13L);
         when(requests.findById(any())).thenAnswer(call -> Optional.of(row(call.getArgument(0), 13, RequestStatus.NEW)));
 
         Detail detail = service.create(member, new NewRequest("credit", "  Không thấy credit ",
-                "Tôi đã nạp nhưng chưa thấy credit.", List.of(upload), null), Optional.empty());
+                "Tôi đã nạp nhưng chưa thấy credit.", List.of(upload), null), Optional.empty(), Locale.ENGLISH);
 
         assertThat(detail.number()).isEqualTo(13);
         assertThat(detail.status()).isEqualTo("new");
@@ -75,12 +76,11 @@ class RequestServiceTest {
         when(requests.ownsConversation(conversation, member)).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(member, new NewRequest("billing", "abc", "  ngắn  ", List.of(),
-                conversation), Optional.empty()))
+                conversation), Optional.empty(), Locale.ENGLISH))
                 .isInstanceOfSatisfying(SupportProblemException.class, e -> {
                     assertThat(e.code()).isEqualTo("validation-failed");
-                    assertThat(e.properties().get("errors"))
-                            .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                            .containsOnlyKeys("type", "subject", "description", "aiConversationId");
+                    assertThat(e.fieldErrors()).containsOnlyKeys("type", "subject", "description",
+                            "aiConversationId");
                 });
         verifyNoInteractions(attachments);
     }
@@ -90,7 +90,7 @@ class RequestServiceTest {
         List<UUID> four = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
 
         assertProblem(() -> service.create(member, new NewRequest("other", "Bốn ảnh", "Mô tả đủ mười ký tự.", four,
-                null), Optional.empty()), HttpStatus.BAD_REQUEST, "attachment-rejected");
+                null), Optional.empty(), Locale.ENGLISH), HttpStatus.BAD_REQUEST, "attachment-rejected");
     }
 
     @Test
@@ -100,10 +100,10 @@ class RequestServiceTest {
         when(requests.findById(first)).thenReturn(Optional.of(row(first, 7, RequestStatus.NEW)));
 
         Detail detail = service.create(member, new NewRequest("credit", "Không thấy credit", "Bấm gửi hai lần liền.",
-                List.of(), null), Optional.of("key"));
+                List.of(), null), Optional.of("key"), Locale.ENGLISH);
 
         assertThat(detail.number()).isEqualTo(7);
-        verify(requests, never()).insertRequest(any(), any(), any(), any(), any(), any());
+        verify(requests, never()).insertRequest(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -118,10 +118,10 @@ class RequestServiceTest {
         when(requests.findById(winner)).thenReturn(Optional.of(row(winner, 8, RequestStatus.NEW)));
 
         Detail detail = service.create(member, new NewRequest("credit", "Không thấy credit", "Bấm gửi hai lần liền.",
-                List.of(upload), null), Optional.of("key"));
+                List.of(upload), null), Optional.of("key"), Locale.ENGLISH);
 
         assertThat(detail.number()).isEqualTo(8);
-        verify(requests, never()).insertRequest(any(), any(), any(), any(), any(), any());
+        verify(requests, never()).insertRequest(any(), any(), any(), any(), any(), any(), any());
         verify(attachments).release(kept);
     }
 
@@ -131,11 +131,11 @@ class RequestServiceTest {
         List<StoredAttachment> kept = List.of(new StoredAttachment("flowcortex-media", "support/r/m/1", "image/png",
                 40L));
         when(attachments.keep(eq(member), any(), any(), eq(List.of(upload)))).thenReturn(kept);
-        when(requests.insertRequest(any(), any(), any(), any(), any(), any()))
+        when(requests.insertRequest(any(), any(), any(), any(), any(), any(), any()))
                 .thenThrow(new QueryTimeoutException("db down"));
 
         assertThatThrownBy(() -> service.create(member, new NewRequest("credit", "Không thấy credit",
-                "Tôi đã nạp nhưng chưa thấy credit.", List.of(upload), null), Optional.empty()))
+                "Tôi đã nạp nhưng chưa thấy credit.", List.of(upload), null), Optional.empty(), Locale.ENGLISH))
                 .isInstanceOf(QueryTimeoutException.class);
         verify(attachments).release(kept);
     }
@@ -148,7 +148,7 @@ class RequestServiceTest {
         when(requests.findById(any())).thenAnswer(call -> Optional.of(row(call.getArgument(0), 13, RequestStatus.NEW)));
 
         service.create(member, new NewRequest("credit", "Không thấy credit", "Tôi đã nạp nhưng chưa thấy credit.",
-                List.of(upload), null), Optional.empty());
+                List.of(upload), null), Optional.empty(), Locale.ENGLISH);
 
         verify(attachments, never()).release(any());
     }

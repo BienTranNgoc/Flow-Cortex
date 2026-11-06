@@ -1,6 +1,7 @@
 import { setToken, type AdminSupportRequestDetail } from '@flow-cortex/api-client';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../../lib/i18n';
 import { renderRoute, stubApi, type FakeReply } from '../../../test/fakeApi';
 import { RequestDetailPage } from './RequestDetailPage';
 
@@ -89,11 +90,11 @@ describe('RequestDetailPage', () => {
     });
     renderDetail();
 
-    const menu = await screen.findByRole('combobox', { name: 'Đổi trạng thái' });
+    const menu = await screen.findByRole('combobox', { name: 'Change status' });
     const options = within(menu)
       .getAllByRole('option')
       .map((option) => option.textContent);
-    expect(options).toEqual(['Chọn trạng thái mới', 'Đang xử lý', 'Đã đóng']);
+    expect(options).toEqual(['Choose a new status', 'In progress', 'Closed']);
   });
 
   it('starts the status menu on a disabled placeholder and keeps save inert until a target is chosen', async () => {
@@ -101,10 +102,10 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    const menu = await screen.findByRole('combobox', { name: 'Đổi trạng thái' });
-    const save = screen.getByRole('button', { name: 'Lưu trạng thái' });
+    const menu = await screen.findByRole('combobox', { name: 'Change status' });
+    const save = screen.getByRole('button', { name: 'Save status' });
     expect(menu).toHaveValue('');
-    expect(within(menu).getByRole('option', { name: 'Chọn trạng thái mới' })).toBeDisabled();
+    expect(within(menu).getByRole('option', { name: 'Choose a new status' })).toBeDisabled();
     expect(save).toHaveAttribute('aria-disabled', 'true');
 
     await user.click(save);
@@ -112,6 +113,27 @@ describe('RequestDetailPage', () => {
 
     await user.selectOptions(menu, 'resolved');
     expect(save).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('returns the status menu to its placeholder once a change is saved', async () => {
+    const reads = sequence(
+      detail(),
+      detail({ status: 'in_progress', allowedStatuses: ['resolved', 'closed'] }),
+      detail({ status: 'waiting_member', allowedStatuses: ['in_progress', 'resolved', 'closed'] }),
+    );
+    stubApi({
+      [`GET ${DETAIL_PATH}`]: reads.handler,
+      [`PUT ${DETAIL_PATH}/status`]: { status: 200, body: detail({ status: 'in_progress' }) },
+    });
+    const user = userEvent.setup();
+    renderDetail();
+
+    const menu = await screen.findByRole('combobox', { name: 'Change status' });
+    await user.selectOptions(menu, 'in_progress');
+    await user.click(screen.getByRole('button', { name: 'Save status' }));
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Change status' })).toHaveValue(''));
+    expect(screen.getByRole('button', { name: 'Save status' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('hides the status menu and the reply box once nothing is allowed', async () => {
@@ -123,9 +145,9 @@ describe('RequestDetailPage', () => {
     });
     renderDetail();
 
-    expect(await screen.findByText('Quản trị viên đã đóng')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Đổi trạng thái' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Trả lời' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Closed by an admin')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Change status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Reply' })).not.toBeInTheDocument();
   });
 
   it('names both statuses when the server refuses a transition, reading the current one again', async () => {
@@ -140,10 +162,10 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Đổi trạng thái' }), 'in_progress');
-    await user.click(screen.getByRole('button', { name: 'Lưu trạng thái' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Change status' }), 'in_progress');
+    await user.click(screen.getByRole('button', { name: 'Save status' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Không thể chuyển Đã đóng → Đang xử lý');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cannot change from Closed to In progress');
     expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ status: 'in_progress' });
   });
 
@@ -159,14 +181,14 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Đổi trạng thái' }), 'resolved');
-    await user.click(screen.getByRole('button', { name: 'Lưu trạng thái' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Change status' }), 'resolved');
+    await user.click(screen.getByRole('button', { name: 'Save status' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Yêu cầu vừa được cập nhật — tải lại để xem',
+      'The request was just updated — reload to see it',
     );
-    await user.click(screen.getByRole('button', { name: 'Tải lại' }));
-    expect(await screen.findByText('Đã đóng', { selector: '.status-badge' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(await screen.findByText('Closed', { selector: '.status-badge' })).toBeInTheDocument();
   });
 
   it('after a lost race marks the open count stale and keeps focus once the menu closes', async () => {
@@ -182,13 +204,13 @@ describe('RequestDetailPage', () => {
     const { queryClient } = renderDetail();
     queryClient.setQueryData(OPEN_COUNT_KEY, { count: 3 });
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Đổi trạng thái' }), 'in_progress');
-    await user.click(screen.getByRole('button', { name: 'Lưu trạng thái' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Change status' }), 'in_progress');
+    await user.click(screen.getByRole('button', { name: 'Save status' }));
     await screen.findByRole('alert');
     expect(queryClient.getQueryState(OPEN_COUNT_KEY)?.isInvalidated).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: 'Tải lại' }));
-    await screen.findByText('Đã đóng', { selector: '.status-badge' });
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    await screen.findByText('Closed', { selector: '.status-badge' });
     await waitFor(() => expect(document.activeElement).toHaveClass('request-feedback'));
   });
 
@@ -223,15 +245,15 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.type(await screen.findByRole('textbox', { name: 'Trả lời' }), 'Ảnh đính kèm đây.');
+    await user.type(await screen.findByRole('textbox', { name: 'Reply' }), 'Ảnh đính kèm đây.');
     await user.upload(
-      screen.getByLabelText('Đính kèm ảnh (tối đa 3)'),
+      screen.getByLabelText('Attach images (up to 3)'),
       new File(['png'], 'a.png', { type: 'image/png' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Gửi trả lời' }));
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Tạm thời chưa gửi được ảnh — bỏ ảnh để gửi trả lời không kèm ảnh',
+      'Images cannot be sent right now — remove the images to send the reply without them',
     );
   });
 
@@ -247,10 +269,10 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.type(await screen.findByRole('textbox', { name: 'Trả lời' }), 'Đang kiểm tra.');
-    await user.click(screen.getByRole('button', { name: 'Gửi trả lời' }));
-    await screen.findByRole('button', { name: 'Đang gửi…' });
-    const resolved = screen.getByRole('radio', { name: 'Đã giải quyết' });
+    await user.type(await screen.findByRole('textbox', { name: 'Reply' }), 'Đang kiểm tra.');
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
+    await screen.findByRole('button', { name: 'Sending…' });
+    const resolved = screen.getByRole('radio', { name: 'Resolved' });
     expect(resolved).toHaveAttribute('aria-disabled', 'true');
     await user.click(resolved);
 
@@ -259,10 +281,10 @@ describe('RequestDetailPage', () => {
       status: 'waiting_member',
     });
     release({ status: 201, body: detail({ status: 'waiting_member' }) });
-    expect(await screen.findByText('Chờ bạn phản hồi', { selector: '.status-badge' })).toBeInTheDocument();
+    expect(await screen.findByText('Waiting for member', { selector: '.status-badge' })).toBeInTheDocument();
   });
 
-  it('shows the linked conversation, then replies with "Đã giải quyết" and refreshes the open count', async () => {
+  it('shows the linked conversation, then replies with "Resolved" and refreshes the open count', async () => {
     const replied = detail({
       status: 'resolved',
       allowedStatuses: ['in_progress', 'closed'],
@@ -288,11 +310,11 @@ describe('RequestDetailPage', () => {
     expect(await screen.findByText('Nạp credit thế nào?')).toBeInTheDocument();
     expect(screen.getByText('Vẫn chưa thấy credit?')).toBeInTheDocument();
 
-    await user.type(screen.getByRole('textbox', { name: 'Trả lời' }), 'Đã cộng 100 credit.');
-    await user.click(screen.getByRole('radio', { name: 'Đã giải quyết' }));
-    await user.click(screen.getByRole('button', { name: 'Gửi trả lời' }));
+    await user.type(screen.getByRole('textbox', { name: 'Reply' }), 'Đã cộng 100 credit.');
+    await user.click(screen.getByRole('radio', { name: 'Resolved' }));
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
 
-    expect(await screen.findByText('Đã giải quyết', { selector: '.status-badge' })).toBeInTheDocument();
+    expect(await screen.findByText('Resolved', { selector: '.status-badge' })).toBeInTheDocument();
     expect(screen.getByText(/Bạn kiểm tra lại nhé/)).toBeInTheDocument();
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
       body: 'Đã cộng 100 credit.',
@@ -314,18 +336,18 @@ describe('RequestDetailPage', () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.type(await screen.findByRole('textbox', { name: 'Trả lời' }), 'Bạn gửi thêm ảnh nhé.');
-    await user.click(screen.getByRole('button', { name: 'Gửi trả lời' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Chưa gửi được trả lời. Bạn thử lại nhé.');
-    await user.click(screen.getByRole('button', { name: 'Gửi trả lời' }));
+    await user.type(await screen.findByRole('textbox', { name: 'Reply' }), 'Bạn gửi thêm ảnh nhé.');
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not send the reply. Please try again.');
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
 
-    expect(await screen.findByText('Chờ bạn phản hồi', { selector: '.status-badge' })).toBeInTheDocument();
+    expect(await screen.findByText('Waiting for member', { selector: '.status-badge' })).toBeInTheDocument();
     const keys = sentHeaders(`${DETAIL_PATH}/messages`, 'POST').map((h) => h.get('Idempotency-Key'));
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBe(keys[1]);
   });
 
-  it('flags a deleted requester and disables the reply box, still allowing Đã đóng', async () => {
+  it('flags a deleted requester and disables the reply box, still allowing Closed', async () => {
     stubApi({
       [`GET ${DETAIL_PATH}`]: {
         status: 200,
@@ -334,11 +356,13 @@ describe('RequestDetailPage', () => {
     });
     renderDetail();
 
-    expect(await screen.findByText('Tài khoản đã bị xoá')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Trả lời' })).toBeDisabled();
-    expect(screen.getByText('Không thể trả lời vì tài khoản người gửi đã bị xoá.')).toBeInTheDocument();
-    const menu = screen.getByRole('combobox', { name: 'Đổi trạng thái' });
-    expect(within(menu).getByRole('option', { name: 'Đã đóng' })).toBeInTheDocument();
+    expect(await screen.findByText('Account deleted')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Reply' })).toBeDisabled();
+    expect(
+      screen.getByText("You cannot reply because the requester's account was deleted."),
+    ).toBeInTheDocument();
+    const menu = screen.getByRole('combobox', { name: 'Change status' });
+    expect(within(menu).getByRole('option', { name: 'Closed' })).toBeInTheDocument();
   });
 
   it('says the linked conversation expired after 90 days', async () => {
@@ -347,7 +371,7 @@ describe('RequestDetailPage', () => {
     stubApi({ [`GET ${DETAIL_PATH}`]: { status: 200, body: expired } });
     renderDetail();
 
-    expect(await screen.findByText('Hội thoại đã hết hạn lưu (90 ngày)')).toBeInTheDocument();
+    expect(await screen.findByText('The conversation is no longer stored (90 days)')).toBeInTheDocument();
   });
 
   it('reads the request again for fresh links when an attachment fails to load', async () => {
@@ -371,7 +395,7 @@ describe('RequestDetailPage', () => {
     stubApi({ [`GET ${DETAIL_PATH}`]: reads.handler });
     renderDetail();
 
-    fireEvent.error(await screen.findByRole('img', { name: 'Ảnh đính kèm 1' }));
+    fireEvent.error(await screen.findByRole('img', { name: 'Attached image 1' }));
 
     await waitFor(() => expect(reads.count()).toBe(2));
   });
@@ -380,6 +404,35 @@ describe('RequestDetailPage', () => {
     stubApi({ [`GET ${DETAIL_PATH}`]: problem(404, 'request-not-found') });
     renderDetail();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Không tìm thấy yêu cầu này.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This request was not found.');
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the facts, thread, status menu and reply form in Vietnamese', async () => {
+      stubApi({
+        [`GET ${DETAIL_PATH}`]: {
+          status: 200,
+          body: detail({ requester: { id: 'm9', deleted: true } }),
+        },
+      });
+      renderDetail();
+
+      expect(await screen.findByText('Tài khoản đã bị xoá')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Yêu cầu #12' })).toBeInTheDocument();
+      expect(screen.getAllByText('10:00 04/11/2026', { selector: 'dd time' })).toHaveLength(2);
+      expect(screen.getByRole('combobox', { name: 'Đổi trạng thái' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Trả lời' })).toBeDisabled();
+      expect(
+        screen.getByText('Không thể trả lời vì tài khoản người gửi đã bị xoá.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Trợ lý chưa trả lời được')).toBeInTheDocument();
+    });
   });
 });

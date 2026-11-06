@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { supportCopy } from './supportCopy';
+import { useTranslation } from 'react-i18next';
 import './requests.css';
 
 interface SupportLauncherProps {
@@ -63,6 +63,7 @@ function HeadsetMascot() {
 /** The fixed bottom-right help button; its label shows beside the mascot on wide screens. */
 export const SupportLauncher = forwardRef<HTMLButtonElement, SupportLauncherProps>(
   function SupportLauncher({ expanded, unread, controls, onClick }, ref) {
+    const { t } = useTranslation();
     return (
       <button
         ref={ref}
@@ -70,8 +71,8 @@ export const SupportLauncher = forwardRef<HTMLButtonElement, SupportLauncherProp
         className="support-launcher"
         aria-label={
           unread
-            ? `${supportCopy.launcher.label}. ${supportCopy.launcher.unread}`
-            : supportCopy.launcher.label
+            ? `${t('support.launcher.label')}. ${t('support.launcher.unread')}`
+            : t('support.launcher.label')
         }
         aria-expanded={expanded}
         aria-controls={controls}
@@ -80,7 +81,7 @@ export const SupportLauncher = forwardRef<HTMLButtonElement, SupportLauncherProp
         <HeadsetMascot />
         {unread && <span className="support-launcher__dot" aria-hidden="true" />}
         <span className="support-launcher__label" aria-hidden="true">
-          {supportCopy.launcher.label}
+          {t('support.launcher.label')}
         </span>
       </button>
     );

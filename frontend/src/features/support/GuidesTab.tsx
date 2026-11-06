@@ -1,7 +1,8 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Markdown } from './Markdown';
-import { supportCopy } from './supportCopy';
+import { problemMessage } from './supportProblems';
 import { useSupportPanel } from './supportPanelState';
 import {
   searchTerm,
@@ -24,28 +25,31 @@ function useDebounced<T>(value: T, delayMs: number): T {
 
 /** Failed read: the support problem's own message when it has one, else a generic one with retry. */
 export function LoadFailed({ error, onRetry }: Readonly<{ error: unknown; onRetry: () => void }>) {
+  const { t } = useTranslation();
   const code = supportProblemCode(error);
   const message =
-    code === 'support-disabled' ? supportCopy.problems[code] : supportCopy.common.loadFailed;
+    code === 'support-disabled' ? problemMessage(code, {}, t) : t('support.common.loadFailed');
   return (
     <div className="support-state" role="alert">
       <p>{message}</p>
       <button type="button" className="support-button" onClick={onRetry}>
-        {supportCopy.common.retry}
+        {t('support.common.retry')}
       </button>
     </div>
   );
 }
 
 function Loading() {
+  const { t } = useTranslation();
   return (
     <p className="support-state" role="status">
-      {supportCopy.common.loading}
+      {t('support.common.loading')}
     </p>
   );
 }
 
 function AskAssistant({ message }: Readonly<{ message: string }>) {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   return (
     <div className="support-state">
@@ -55,20 +59,21 @@ function AskAssistant({ message }: Readonly<{ message: string }>) {
         className="support-button"
         onClick={() => dispatch({ type: 'selectTab', tab: 'assistant' })}
       >
-        {supportCopy.guides.askAssistant}
+        {t('support.guides.askAssistant')}
       </button>
     </div>
   );
 }
 
 function GroupList() {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   const groups = useKbGroups();
   const baseId = useId();
 
   if (groups.isPending) return <Loading />;
   if (groups.isError) return <LoadFailed error={groups.error} onRetry={() => groups.refetch()} />;
-  if (groups.data.length === 0) return <AskAssistant message={supportCopy.guides.empty} />;
+  if (groups.data.length === 0) return <AskAssistant message={t('support.guides.empty')} />;
 
   return groups.data.map((group) => {
     const headingId = `${baseId}-${group.id}`;
@@ -96,6 +101,7 @@ function GroupList() {
 }
 
 function SearchResults({ term }: Readonly<{ term: string }>) {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   const results = useKbSearch(term);
   const headingId = useId();
@@ -103,12 +109,12 @@ function SearchResults({ term }: Readonly<{ term: string }>) {
   if (results.isPending) return <Loading />;
   if (results.isError)
     return <LoadFailed error={results.error} onRetry={() => results.refetch()} />;
-  if (results.data.length === 0) return <AskAssistant message={supportCopy.guides.noMatch} />;
+  if (results.data.length === 0) return <AskAssistant message={t('support.guides.noMatch')} />;
 
   return (
     <section className="support-section">
       <h3 id={headingId} className="support-section__title">
-        {supportCopy.guides.resultsHeading}
+        {t('support.guides.resultsHeading')}
       </h3>
       <ul className="support-list" aria-labelledby={headingId}>
         {results.data.map((hit) => (
@@ -128,8 +134,9 @@ function SearchResults({ term }: Readonly<{ term: string }>) {
   );
 }
 
-/** Hướng dẫn: published articles by topic group, with keyword search. */
+/** Guides: published articles by topic group, with keyword search. */
 export function GuidesTab() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const liveTerm = searchTerm(query);
   const debouncedTerm = useDebounced(liveTerm, SEARCH_DELAY_MS);
@@ -141,14 +148,14 @@ export function GuidesTab() {
     <div className="support-guides">
       <form className="support-search" role="search" onSubmit={(event) => event.preventDefault()}>
         <label htmlFor={inputId} className="support-search__label">
-          {supportCopy.guides.searchLabel}
+          {t('support.guides.searchLabel')}
         </label>
         <input
           id={inputId}
           type="search"
           className="support-search__input"
           value={query}
-          placeholder={supportCopy.guides.searchPlaceholder}
+          placeholder={t('support.guides.searchPlaceholder')}
           maxLength={200}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -160,6 +167,7 @@ export function GuidesTab() {
 
 /** A published article shown inside the panel, over the tab it was opened from. */
 export function ArticleView({ slug }: Readonly<{ slug: string }>) {
+  const { t } = useTranslation();
   const { dispatch, member } = useSupportPanel();
   const article = useKbArticle(slug);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -181,7 +189,7 @@ export function ArticleView({ slug }: Readonly<{ slug: string }>) {
       className="support-back"
       onClick={() => dispatch({ type: 'closeArticle' })}
     >
-      {supportCopy.common.back}
+      {t('support.common.back')}
     </button>
   );
 
@@ -197,14 +205,14 @@ export function ArticleView({ slug }: Readonly<{ slug: string }>) {
     if (gone) {
       return (
         <div className="support-article support-state">
-          <p role="status">{supportCopy.article.notPublished}</p>
+          <p role="status">{t('support.article.notPublished')}</p>
           <button
             ref={goneRef}
             type="button"
             className="support-button"
             onClick={() => dispatch({ type: 'selectTab', tab: member ? 'guides' : 'home' })}
           >
-            {member ? supportCopy.article.backToGuides : supportCopy.article.backToHome}
+            {member ? t('support.article.backToGuides') : t('support.article.backToHome')}
           </button>
         </div>
       );

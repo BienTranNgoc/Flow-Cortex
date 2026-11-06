@@ -1,6 +1,7 @@
 import { setToken, type AdminSupportSettings } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../../lib/i18n';
 import { renderRoute, settled, stubApi } from '../../../test/fakeApi';
 import { SupportSettingsPage } from './SupportSettingsPage';
 
@@ -41,12 +42,14 @@ describe('SupportSettingsPage', () => {
     const user = userEvent.setup();
     renderSettings();
 
-    const toggle = await screen.findByRole('switch', { name: 'Trợ lý AI' });
+    const toggle = await screen.findByRole('switch', { name: 'AI assistant' });
     expect(toggle).toBeChecked();
-    expect(screen.getByText('Bật bởi admin@nodi.vn lúc 13:00 19/10')).toBeInTheDocument();
+    expect(screen.getByText('Turned on by admin@nodi.vn at 10/19/2026, 13:00')).toBeInTheDocument();
     await user.click(toggle);
 
-    expect(await screen.findByText('Tắt bởi admin@nodi.vn lúc 14:05 19/10')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Turned off by admin@nodi.vn at 10/19/2026, 14:05'),
+    ).toBeInTheDocument();
     expect(toggle).not.toBeChecked();
     expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ assistantEnabled: false });
   });
@@ -55,10 +58,10 @@ describe('SupportSettingsPage', () => {
     stubApi({ [`GET ${SETTINGS_PATH}`]: { status: 200, body: settings({ envEnabled: false }) } });
     renderSettings();
 
-    expect(await screen.findByText('Đang tắt bởi cấu hình máy chủ')).toBeInTheDocument();
-    const toggle = screen.getByRole('switch', { name: 'Trợ lý AI' });
+    expect(await screen.findByText('Turned off by the server configuration')).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'AI assistant' });
     expect(toggle).toBeChecked();
-    expect(toggle).toHaveAccessibleDescription(/Đang tắt bởi cấu hình máy chủ/);
+    expect(toggle).toHaveAccessibleDescription(/Turned off by the server configuration/);
   });
 
   it('keeps focus on the switch and sends one change while the first is saving', async () => {
@@ -69,7 +72,7 @@ describe('SupportSettingsPage', () => {
     const user = userEvent.setup();
     renderSettings();
 
-    const toggle = await screen.findByRole('switch', { name: 'Trợ lý AI' });
+    const toggle = await screen.findByRole('switch', { name: 'AI assistant' });
     await user.click(toggle);
     await user.click(toggle);
 
@@ -85,7 +88,7 @@ describe('SupportSettingsPage', () => {
     renderSettings();
 
     expect(
-      await screen.findByText('Tạm dừng: đã đạt giới hạn 23 câu hôm nay'),
+      await screen.findByText("Paused: today's limit of 23 questions was reached"),
     ).toBeInTheDocument();
   });
 
@@ -96,9 +99,33 @@ describe('SupportSettingsPage', () => {
     stubApi({ [`GET ${SETTINGS_PATH}`]: { status: 200, body: withoutAuthor } });
     const { queryClient } = renderSettings();
 
-    expect(await screen.findByText('Bật lúc 13:00 19/10')).toBeInTheDocument();
+    expect(await screen.findByText('Turned on at 10/19/2026, 13:00')).toBeInTheDocument();
     await settled(queryClient);
-    expect(screen.queryByText(/bởi/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Đang tắt bởi cấu hình máy chủ')).not.toBeInTheDocument();
+    expect(screen.queryByText(/ by /)).not.toBeInTheDocument();
+    expect(screen.queryByText('Turned off by the server configuration')).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the switch and the last change in Vietnamese', async () => {
+      stubApi({
+        [`GET ${SETTINGS_PATH}`]: {
+          status: 200,
+          body: settings({ envEnabled: false, ceilingReachedToday: true, dailyCeiling: 23 }),
+        },
+      });
+      renderSettings();
+
+      expect(await screen.findByRole('switch', { name: 'Trợ lý AI' })).toBeChecked();
+      expect(screen.getByText('Bật bởi admin@nodi.vn lúc 13:00 19/10/2026')).toBeInTheDocument();
+      expect(screen.getByText('Đang tắt bởi cấu hình máy chủ')).toBeInTheDocument();
+      expect(screen.getByText('Tạm dừng: đã đạt giới hạn 23 câu hôm nay')).toBeInTheDocument();
+    });
   });
 });

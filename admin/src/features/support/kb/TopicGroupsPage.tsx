@@ -1,9 +1,10 @@
 import type { AdminSupportKbGroup } from '@flow-cortex/api-client';
 import { ApiError } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { usePageTitle } from '../../../app/usePageTitle';
-import { supportCopy } from '../supportCopy';
 import { supportProblemCode } from '../unwrapSupport';
 import './kb.css';
 import {
@@ -14,7 +15,6 @@ import {
   useReorderGroupsMutation,
 } from './useKnowledgeBase';
 
-const copy = supportCopy.groups;
 const MAX_NAME = 60;
 const groupNameSchema = z.string().trim().min(1).max(MAX_NAME);
 
@@ -25,27 +25,28 @@ function parseName(name: string): string | null {
 }
 
 /** The console message for a refused group write; server text is never shown. */
-function groupProblem(error: unknown): string {
+function groupProblem(error: unknown, t: TFunction): string {
   switch (supportProblemCode(error)) {
     case 'group-not-empty': {
       const count = error instanceof ApiError ? error.problem?.articleCount : undefined;
-      return supportCopy.problems['group-not-empty'](count ?? 1);
+      return t('support.problems.group-not-empty', { n: count ?? 1 });
     }
     case 'group-name-taken':
-      return supportCopy.problems['group-name-taken'];
+      return t('support.problems.group-name-taken');
     case 'group-order-mismatch':
-      return supportCopy.problems['group-order-mismatch'];
+      return t('support.problems.group-order-mismatch');
     case 'group-not-found':
-      return supportCopy.problems['group-not-found'];
+      return t('support.problems.group-not-found');
     case 'validation-failed':
-      return copy.name;
+      return t('support.groups.name');
     default:
-      return supportCopy.common.saveFailed;
+      return t('support.common.saveFailed');
   }
 }
 
 export function TopicGroupsPage() {
-  usePageTitle(copy.title);
+  const { t } = useTranslation();
+  usePageTitle(t('support.groups.title'));
   const groupsQuery = useGroupsQuery();
   const create = useCreateGroupMutation();
   const rename = useRenameGroupMutation();
@@ -77,7 +78,7 @@ export function TopicGroupsPage() {
     setProblem(null);
     setAnnouncement('');
   };
-  const onError = (error: unknown) => setProblem(groupProblem(error));
+  const onError = (error: unknown) => setProblem(groupProblem(error, t));
 
   const onCreate = (event: FormEvent) => {
     event.preventDefault();
@@ -92,7 +93,7 @@ export function TopicGroupsPage() {
     create.mutate(name, {
       onSuccess: () => {
         setNewName('');
-        setAnnouncement(copy.created(name));
+        setAnnouncement(t('support.groups.created', { name }));
       },
       onError,
     });
@@ -110,7 +111,10 @@ export function TopicGroupsPage() {
         pendingFocus.current = buttonId(group.id, offset);
         const position = index + offset + 1;
         setAnnouncement(
-          offset < 0 ? copy.movedUp(group.name, position) : copy.movedDown(group.name, position),
+          t(offset < 0 ? 'support.groups.movedUp' : 'support.groups.movedDown', {
+            name: group.name,
+            position,
+          }),
         );
       },
       onError,
@@ -121,15 +125,15 @@ export function TopicGroupsPage() {
     <main>
       <div className="cortex-admin-page-heading">
         <div>
-          <p className="cortex-admin-eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-          <p className="cortex-admin-page-description">{copy.description}</p>
+          <p className="cortex-admin-eyebrow">{t('support.groups.eyebrow')}</p>
+          <h1>{t('support.groups.title')}</h1>
+          <p className="cortex-admin-page-description">{t('support.groups.description')}</p>
         </div>
       </div>
 
       <form className="support-inline-form" onSubmit={onCreate} noValidate>
         <div className="cortex-admin-field">
-          <label htmlFor={newNameId}>{copy.newLabel}</label>
+          <label htmlFor={newNameId}>{t('support.groups.newLabel')}</label>
           <input
             id={newNameId}
             className="support-input"
@@ -141,12 +145,12 @@ export function TopicGroupsPage() {
           />
           {newNameInvalid && (
             <p id={`${newNameId}-error`} role="alert">
-              {copy.name}
+              {t('support.groups.name')}
             </p>
           )}
         </div>
         <button type="submit" className="cortex-admin-btn cortex-admin-btn--primary" aria-disabled={busy}>
-          {copy.add}
+          {t('support.groups.add')}
         </button>
       </form>
 
@@ -155,18 +159,18 @@ export function TopicGroupsPage() {
         {announcement}
       </p>
 
-      {groupsQuery.isPending && <output>{supportCopy.common.loading}</output>}
+      {groupsQuery.isPending && <output>{t('support.common.loading')}</output>}
       {groupsQuery.isError && !groupsQuery.data && (
         <div className="cortex-admin-error">
-          <p>{supportCopy.common.loadFailed}</p>
+          <p>{t('support.common.loadFailed')}</p>
           <button type="button" className="cortex-admin-btn" onClick={() => groupsQuery.refetch()}>
-            {supportCopy.common.retry}
+            {t('support.common.retry')}
           </button>
         </div>
       )}
-      {groupsQuery.data?.length === 0 && <p className="cortex-admin-empty">{copy.empty}</p>}
+      {groupsQuery.data?.length === 0 && <p className="cortex-admin-empty">{t('support.groups.empty')}</p>}
       {groups.length > 0 && (
-        <ol className="support-group-list" aria-label={copy.listLabel}>
+        <ol className="support-group-list" aria-label={t('support.groups.listLabel')}>
           {groups.map((group, index) => (
             <GroupRow
               key={group.id}
@@ -182,14 +186,17 @@ export function TopicGroupsPage() {
                 started();
                 rename.mutate(
                   { id: group.id, name },
-                  { onSuccess: () => setAnnouncement(copy.renamed(name)), onError },
+                  {
+                    onSuccess: () => setAnnouncement(t('support.groups.renamed', { name })),
+                    onError,
+                  },
                 );
               }}
               onDelete={() => {
                 if (busy) return;
                 started();
                 remove.mutate(group.id, {
-                  onSuccess: () => setAnnouncement(copy.deleted(group.name)),
+                  onSuccess: () => setAnnouncement(t('support.groups.deleted', { name: group.name })),
                   onError,
                 });
               }}
@@ -222,6 +229,7 @@ function GroupRow({
   onRename: (name: string) => void;
   onDelete: () => void;
 }>) {
+  const { t } = useTranslation();
   const [name, setName] = useState(group.name);
   const [invalid, setInvalid] = useState(false);
   const inputId = useId();
@@ -237,7 +245,9 @@ function GroupRow({
     <li className="support-group-row">
       <div className="support-group-name">
         <strong>{group.name}</strong>
-        <span className="cortex-admin-table-job-message">{copy.articleCount(group.articleCount)}</span>
+        <span className="cortex-admin-table-job-message">
+          {t('support.groups.articleCount', { n: group.articleCount })}
+        </span>
       </div>
       <form
         className="support-inline-form"
@@ -255,7 +265,7 @@ function GroupRow({
       >
         <div className="cortex-admin-field">
           <label className="cortex-admin-visually-hidden" htmlFor={inputId}>
-            {copy.nameLabel(group.name)}
+            {t('support.groups.nameLabel', { name: group.name })}
           </label>
           <input
             id={inputId}
@@ -268,12 +278,12 @@ function GroupRow({
           />
           {invalid && (
             <p id={errorId} role="alert">
-              {copy.name}
+              {t('support.groups.name')}
             </p>
           )}
         </div>
         <button type="submit" className="cortex-admin-btn" aria-disabled={busy || unchanged}>
-          {copy.rename}
+          {t('support.groups.rename')}
         </button>
       </form>
       <div className="support-actions">
@@ -281,30 +291,30 @@ function GroupRow({
           id={upId}
           type="button"
           className="cortex-admin-btn"
-          aria-label={copy.moveUp(group.name)}
+          aria-label={t('support.groups.moveUp', { name: group.name })}
           aria-disabled={busy || first}
           onClick={() => !first && onMove(-1)}
         >
-          {copy.up}
+          {t('support.groups.up')}
         </button>
         <button
           id={downId}
           type="button"
           className="cortex-admin-btn"
-          aria-label={copy.moveDown(group.name)}
+          aria-label={t('support.groups.moveDown', { name: group.name })}
           aria-disabled={busy || last}
           onClick={() => !last && onMove(1)}
         >
-          {copy.down}
+          {t('support.groups.down')}
         </button>
         <button
           type="button"
           className="cortex-admin-btn cortex-admin-btn--danger"
-          aria-label={copy.remove(group.name)}
+          aria-label={t('support.groups.remove', { name: group.name })}
           aria-disabled={busy}
           onClick={onDelete}
         >
-          {copy.delete}
+          {t('support.groups.delete')}
         </button>
       </div>
     </li>

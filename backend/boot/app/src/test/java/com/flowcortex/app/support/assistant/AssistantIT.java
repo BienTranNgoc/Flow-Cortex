@@ -186,6 +186,42 @@ class AssistantIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void anEnglishQuestionFindsTheVietnameseArticleAndAsksForAnEnglishAnswer() {
+        fakeLlm.answer = request -> answered("Open Profile > Credit to top up.", "nap-credit");
+        HttpHeaders headers = bearer(memberToken("as-english"));
+        headers.set(HttpHeaders.ACCEPT_LANGUAGE, "en");
+
+        ResponseEntity<Reply> response = restTemplate.exchange("/api/v1/support/assistant/messages", HttpMethod.POST,
+                new HttpEntity<>(new AskRequest(null, "Why am I told I don't have enough credit?"), headers),
+                Reply.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().message().sources()).containsExactly(new Source("nap-credit", "Nạp credit"));
+        LlmJsonRequest sent = fakeLlm.requests.getFirst();
+        assertThat(sent.userText()).contains("[nap-credit]");
+        assertThat(sent.systemInstruction()).contains("tiếng Anh (English)").doesNotContain("Trả lời bằng tiếng Việt");
+    }
+
+    @Test
+    void aProblemDetailIsWrittenInTheRequestLanguage() {
+        UUID conversation = UUID.randomUUID();
+        HttpHeaders vietnamese = bearer(memberToken("as-problem-lang"));
+        vietnamese.set(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+        HttpHeaders english = new HttpHeaders();
+        english.putAll(vietnamese);
+        english.set(HttpHeaders.ACCEPT_LANGUAGE, "en");
+
+        Problem inVietnamese = restTemplate.exchange("/api/v1/support/assistant/messages", HttpMethod.POST,
+                new HttpEntity<>(new AskRequest(conversation, CREDIT_QUESTION), vietnamese), Problem.class).getBody();
+        Problem inEnglish = restTemplate.exchange("/api/v1/support/assistant/messages", HttpMethod.POST,
+                new HttpEntity<>(new AskRequest(conversation, CREDIT_QUESTION), english), Problem.class).getBody();
+
+        assertThat(inVietnamese.type()).isEqualTo(PROBLEMS.resolve("conversation-not-found"));
+        assertThat(inVietnamese.detail()).isEqualTo("Không tìm thấy cuộc trò chuyện này");
+        assertThat(inEnglish.detail()).isEqualTo("No such conversation for this caller");
+    }
+
+    @Test
     void noMatchingArticleAnswersWithoutTheProviderAndIsNotCounted() {
         ResponseEntity<Reply> response = ask(memberToken("as-nomatch"), null, "Đổi ngôn ngữ ở đâu?");
 

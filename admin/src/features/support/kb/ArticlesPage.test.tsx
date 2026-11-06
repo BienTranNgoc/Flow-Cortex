@@ -1,6 +1,7 @@
 import { setToken, type AdminSupportKbArticleSummary } from '@flow-cortex/api-client';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import i18n from '../../../lib/i18n';
 import { renderRoute, settled, stubApi } from '../../../test/fakeApi';
 import { ArticlesPage } from './ArticlesPage';
 
@@ -34,7 +35,7 @@ afterEach(() => {
 });
 
 describe('ArticlesPage', () => {
-  it('warns while fewer than three published "Bắt đầu" articles remain', async () => {
+  it('warns while fewer than three published "Get started" articles remain', async () => {
     stubApi({
       [LIST_PATH]: {
         status: 200,
@@ -49,10 +50,10 @@ describe('ArticlesPage', () => {
     });
     renderArticles();
 
-    expect(await screen.findByText('Chỉ còn 2/3 bài Bắt đầu')).toBeInTheDocument();
+    expect(await screen.findByText('Only 2/3 Get started articles')).toBeInTheDocument();
   });
 
-  it('shows no warning once three published "Bắt đầu" articles exist', async () => {
+  it('shows no warning once three published "Get started" articles exist', async () => {
     stubApi({
       [LIST_PATH]: { status: 200, body: { items: [summary()], publishedFeaturedCount: 3 } },
     });
@@ -60,7 +61,7 @@ describe('ArticlesPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Nạp credit' })).toBeInTheDocument();
     await settled(queryClient);
-    expect(screen.queryByText(/Chỉ còn/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Only \d\/3/)).not.toBeInTheDocument();
   });
 
   it('lists each article with its current group name, status and editor link, filterable by status', async () => {
@@ -86,24 +87,47 @@ describe('ArticlesPage', () => {
     const table = await screen.findByRole('table');
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows[0]).toHaveTextContent('Thanh toán');
-    expect(rows[0]).toHaveTextContent('Đã công bố');
-    expect(rows[0]).toHaveTextContent('Bắt đầu 1');
-    expect(rows[0]).toHaveTextContent('14:00 19/10/2026');
+    expect(rows[0]).toHaveTextContent('Published');
+    expect(rows[0]).toHaveTextContent('Get started 1');
+    expect(rows[0]).toHaveTextContent('10/19/2026, 14:00');
     expect(within(rows[0]!).getByRole('link', { name: 'Nạp credit' })).toHaveAttribute(
       'href',
       '/support/articles/a1',
     );
-    expect(rows[1]).toHaveTextContent('Đã lưu trữ');
+    expect(rows[1]).toHaveTextContent('Archived');
 
-    const filter = screen.getByLabelText('Trạng thái');
+    const filter = screen.getByLabelText('Status');
     expect(
       within(filter)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Tất cả trạng thái', 'Nháp', 'Đã công bố', 'Đã lưu trữ']);
-    expect(screen.getByRole('button', { name: 'Tải lại' })).toBeInTheDocument();
+    ).toEqual(['All statuses', 'Draft', 'Published', 'Archived']);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
     await user.selectOptions(filter, 'archived');
     expect(within(screen.getByRole('table')).getAllByRole('row').slice(1)).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Cách cũ' })).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('shows the warning, statuses and Vietnam-time date in Vietnamese', async () => {
+      stubApi({
+        [LIST_PATH]: { status: 200, body: { items: [summary()], publishedFeaturedCount: 2 } },
+      });
+      renderArticles();
+
+      expect(await screen.findByText('Chỉ còn 2/3 bài Bắt đầu')).toBeInTheDocument();
+      const row = within(screen.getByRole('table')).getAllByRole('row')[1]!;
+      expect(row).toHaveTextContent('Đã công bố');
+      expect(row).toHaveTextContent('Bắt đầu 1');
+      expect(row).toHaveTextContent('14:00 19/10/2026');
+      expect(screen.getByLabelText('Trạng thái')).toBeInTheDocument();
+    });
   });
 });

@@ -59,14 +59,15 @@ class RequestRepository {
     }
 
     /** @return the number the database gave the request */
-    long insertRequest(UUID id, UUID requesterId, String type, String subject, UUID aiConversationId, Instant now) {
+    long insertRequest(UUID id, UUID requesterId, String type, String subject, UUID aiConversationId, String locale,
+            Instant now) {
         Long number = jdbc.queryForObject("INSERT INTO support_request (id, requester_id, type, subject, status, "
-                + "ai_conversation_id, ai_conversation_linked, member_unread, last_activity_at, created_at, "
-                + "updated_at) VALUES (:id, :requester, :type, :subject, 'new', :conversation, :linked, false, :now, "
-                + ":now, :now) RETURNING number", new MapSqlParameterSource()
+                + "ai_conversation_id, ai_conversation_linked, locale, member_unread, last_activity_at, created_at, "
+                + "updated_at) VALUES (:id, :requester, :type, :subject, 'new', :conversation, :linked, :locale, "
+                + "false, :now, :now, :now) RETURNING number", new MapSqlParameterSource()
                 .addValue("id", id).addValue("requester", requesterId).addValue("type", type)
                 .addValue("subject", subject).addValue("conversation", aiConversationId)
-                .addValue("linked", aiConversationId != null)
+                .addValue("linked", aiConversationId != null).addValue("locale", locale)
                 .addValue("now", Timestamp.from(now)), Long.class);
         return number;
     }

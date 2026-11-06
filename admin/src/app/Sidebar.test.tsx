@@ -94,6 +94,13 @@ describe('Sidebar', () => {
     expect(requests).toHaveTextContent('4');
   });
 
+  it('names a single open request in the singular', async () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 1 } } });
+    renderSidebar('ADMIN');
+
+    expect(await screen.findByRole('link', { name: 'Requests, 1 open request' })).toBeInTheDocument();
+  });
+
   it('shows no count on Requests while nothing is open', async () => {
     const calls = stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
     renderSidebar('ADMIN');

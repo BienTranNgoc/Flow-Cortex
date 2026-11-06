@@ -1,22 +1,21 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LoadFailed } from './GuidesTab';
 import { RequestForm, SuspendedNotice } from './RequestForm';
 import { RequestThread, StatusChip } from './RequestThread';
-import { supportCopy } from './supportCopy';
 import { useSupportPanel } from './supportPanelState';
 import { isSuspended, useRequestList } from './useRequests';
 import './requests.css';
 
-const copy = supportCopy.requests;
-
 function RequestList() {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   const list = useRequestList();
 
   if (list.isPending) {
     return (
       <p className="support-state" role="status">
-        {supportCopy.common.loading}
+        {t('support.common.loading')}
       </p>
     );
   }
@@ -32,10 +31,10 @@ function RequestList() {
         className="support-button support-button--primary"
         onClick={() => dispatch({ type: 'startRequest' })}
       >
-        {copy.create}
+        {t('support.requests.create')}
       </button>
       {list.data.length === 0 ? (
-        <p className="support-state">{copy.empty}</p>
+        <p className="support-state">{t('support.requests.empty')}</p>
       ) : (
         <ul className="support-list">
           {list.data.map((request) => (
@@ -49,7 +48,7 @@ function RequestList() {
                   <span className="support-request__row-subject">{request.subject}</span>
                   {request.memberUnread && (
                     <span className="support-unread-dot">
-                      <span className="support-visually-hidden">{copy.unread}</span>
+                      <span className="support-visually-hidden">{t('support.requests.unread')}</span>
                     </span>
                   )}
                 </span>
@@ -66,8 +65,9 @@ function RequestList() {
   );
 }
 
-/** Yêu cầu: the member's list, one request's thread, or the new-request form. */
+/** Requests: the member's list, one request's thread, or the new-request form. */
 export function RequestsTab() {
+  const { t } = useTranslation();
   const { state, dispatch } = useSupportPanel();
   const { request, newRequest } = state;
   const view = request !== null ? `request-${request}` : newRequest ? 'new' : 'list';
@@ -82,7 +82,11 @@ export function RequestsTab() {
   }, [view]);
 
   const title =
-    request !== null ? copy.selected(request) : newRequest ? copy.newRequest : copy.listHeading;
+    request !== null
+      ? t('support.requests.selected', { number: request })
+      : newRequest
+        ? t('support.requests.newRequest')
+        : t('support.requests.listHeading');
 
   return (
     <div className="support-requests">
@@ -92,7 +96,7 @@ export function RequestsTab() {
           className="support-back"
           onClick={() => dispatch({ type: 'selectRequest', request: null })}
         >
-          {copy.backToList}
+          {t('support.requests.backToList')}
         </button>
       )}
       <h3 ref={headingRef} className="support-requests__title" tabIndex={-1}>

@@ -237,7 +237,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
                 Problem.class);
 
         assertProblem(response, HttpStatus.BAD_REQUEST, "attachment-rejected");
-        assertThat(response.getBody().detail()).isEqualTo("Tệp không phải ảnh hợp lệ");
+        assertThat(response.getBody().detail()).isEqualTo("The file is not a valid image");
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_request", Long.class)).isZero();
     }
 
@@ -385,9 +385,31 @@ class SupportRequestIT extends AbstractPostgresBootTest {
 
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_mail_outbox", Long.class)).isEqualTo(1);
         assertThat(mail.sentTo(member.email())).singleElement()
-                .satisfies(body -> assertThat(body).contains("http://localhost:5173/?help=request-" + number));
+                .satisfies(body -> assertThat(body).startsWith("Xin chào,")
+                        .contains("http://localhost:5173/?help=request-" + number));
+        assertThat(jdbcTemplate.queryForObject("SELECT locale FROM support_request WHERE number = ?", String.class,
+                number)).isEqualTo("vi");
         assertThat(exchange(HttpMethod.GET, "/api/v1/support/requests/unread-count", token, null, CountView.class)
                 .getBody().count()).isEqualTo(1);
+    }
+
+    @Test
+    void aRequestFiledInEnglishGetsItsReplyMailInEnglish() {
+        UserView member = member("req-mail-en");
+        HttpHeaders headers = bearer(login(member.email()));
+        headers.set(HttpHeaders.ACCEPT_LANGUAGE, "en");
+        long number = restTemplate.exchange("/api/v1/support/requests", HttpMethod.POST, new HttpEntity<>(
+                new CreateRequest("credit", "Missing credit", "I topped up but no credit arrived.", List.of()),
+                headers), DetailView.class).getBody().number();
+
+        adminReply(number, "Checked.", "waiting_member");
+        mailJob.sendDue();
+
+        assertThat(jdbcTemplate.queryForObject("SELECT locale FROM support_request WHERE number = ?", String.class,
+                number)).isEqualTo("en");
+        assertThat(mail.sentTo(member.email())).singleElement()
+                .satisfies(body -> assertThat(body).startsWith("Hello,")
+                        .contains("http://localhost:5173/?help=request-" + number));
     }
 
     @Test

@@ -4,8 +4,9 @@ import {
   type SupportUploadGrant,
   type SupportUploadRequest,
 } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
+import i18n from '../../lib/i18n';
 import { uploadFile } from '../workflow/uploadFile';
-import { requestsCopy } from './requestsCopy';
 import { unwrapSupport } from './useSupportKb';
 
 export const MAX_ATTACHMENTS = 3;
@@ -23,12 +24,12 @@ const TYPES_BY_EXTENSION: Record<string, string> = {
 const MAX_FILE_NAME_LENGTH = 255;
 
 /** Why `file` cannot be attached, or `null` when it may be uploaded. */
-export function attachmentProblem(file: File): string | null {
+export function attachmentProblem(file: File, t: TFunction = i18n.t): string | null {
   const extension = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
-  if (TYPES_BY_EXTENSION[extension] !== file.type) return requestsCopy.attachType;
-  if (file.size < 1) return requestsCopy.attachEmpty;
-  if (file.size > MAX_ATTACHMENT_BYTES) return requestsCopy.attachSize;
-  if (file.name.length > MAX_FILE_NAME_LENGTH) return requestsCopy.attachNameLength;
+  if (TYPES_BY_EXTENSION[extension] !== file.type) return t('support.requests.attachType');
+  if (file.size < 1) return t('support.requests.attachEmpty');
+  if (file.size > MAX_ATTACHMENT_BYTES) return t('support.requests.attachSize');
+  if (file.name.length > MAX_FILE_NAME_LENGTH) return t('support.requests.attachNameLength');
   return null;
 }
 
@@ -36,13 +37,14 @@ export function attachmentProblem(file: File): string | null {
 export function addAttachments(
   current: readonly File[],
   picked: readonly File[],
+  t: TFunction = i18n.t,
 ): { files: File[]; refused: string[] } {
   const files = [...current];
   const refused = new Set<string>();
   for (const file of picked) {
-    const problem = attachmentProblem(file);
+    const problem = attachmentProblem(file, t);
     if (problem) refused.add(problem);
-    else if (files.length >= MAX_ATTACHMENTS) refused.add(requestsCopy.attachCount);
+    else if (files.length >= MAX_ATTACHMENTS) refused.add(t('support.requests.attachCount'));
     else files.push(file);
   }
   return { files, refused: [...refused] };

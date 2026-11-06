@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useMemo, useReducer } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import i18n from '../../lib/i18n';
 import { stubApi, type FakeReply, type Handler } from '../../test/fakeApi';
 import { AssistantTab } from './AssistantTab';
 import { RequestsTab } from './RequestsTab';
@@ -110,10 +111,10 @@ function renderTab(question: string | null = null) {
 }
 
 async function ask(user: ReturnType<typeof userEvent.setup>, question: string) {
-  const input = await screen.findByRole('textbox', { name: 'Câu hỏi của bạn' });
+  const input = await screen.findByRole('textbox', { name: 'Your question' });
   await waitFor(() => expect(input).toBeEnabled());
   await user.type(input, question);
-  await user.click(screen.getByRole('button', { name: 'Gửi' }));
+  await user.click(screen.getByRole('button', { name: 'Send' }));
 }
 
 const CREATED = {
@@ -137,12 +138,12 @@ async function fileLinkedRequest(
   user: ReturnType<typeof userEvent.setup>,
   calls: { method: string; path: string; body: unknown }[],
 ) {
-  const description = await screen.findByLabelText('Mô tả');
+  const description = await screen.findByLabelText('Description');
   const prefilled = (description as HTMLTextAreaElement).value;
-  await user.selectOptions(screen.getByLabelText('Loại yêu cầu'), 'Credit');
-  await user.type(screen.getByLabelText('Tiêu đề'), 'Cần hỗ trợ thêm');
+  await user.selectOptions(screen.getByLabelText('Request type'), 'Credit');
+  await user.type(screen.getByLabelText('Subject'), 'Cần hỗ trợ thêm');
   await user.type(description, ' Mình đã thử lại.');
-  await user.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }));
+  await user.click(screen.getByRole('button', { name: 'Send request' }));
   await waitFor(() =>
     expect(
       calls.some((call) => call.method === 'POST' && call.path === '/api/v1/support/requests'),
@@ -196,12 +197,12 @@ describe('AssistantTab', () => {
 
     const log = screen.getByRole('log');
     expect(
-      await within(log).findByText('Mình chưa có câu trả lời cho câu hỏi này'),
+      await within(log).findByText("I don't have an answer to this question yet"),
     ).toBeInTheDocument();
     expect(within(log).queryByText('ignored')).toBeNull();
-    expect(within(log).queryByRole('link', { name: 'Đăng nhập' })).toBeNull();
+    expect(within(log).queryByRole('link', { name: 'Sign in' })).toBeNull();
 
-    await user.click(within(log).getByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(within(log).getByRole('button', { name: 'Send a support request' }));
 
     expect(await fileLinkedRequest(user, calls)).toEqual({
       description: 'Hoàn tiền thế nào?',
@@ -216,16 +217,16 @@ describe('AssistantTab', () => {
     await ask(user, 'Hoàn tiền thế nào?');
 
     const log = screen.getByRole('log');
-    await within(log).findByText('Mình chưa có câu trả lời cho câu hỏi này');
-    expect(within(log).getByRole('link', { name: 'Đăng nhập' })).toHaveAttribute('href', '/login');
-    expect(within(log).getByRole('link', { name: 'Tạo tài khoản' })).toHaveAttribute(
+    await within(log).findByText("I don't have an answer to this question yet");
+    expect(within(log).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
+    expect(within(log).getByRole('link', { name: 'Create account' })).toHaveAttribute(
       'href',
       '/register',
     );
     expect(
-      await within(log).findByRole('link', { name: 'Gửi email tới hotro@nodi.vn' }),
+      await within(log).findByRole('link', { name: 'Email hotro@nodi.vn' }),
     ).toHaveAttribute('href', 'mailto:hotro@nodi.vn');
-    expect(within(log).queryByRole('button', { name: /Gửi yêu cầu hỗ trợ/ })).toBeNull();
+    expect(within(log).queryByRole('button', { name: /Send a support request/ })).toBeNull();
 
     const session = window.localStorage.getItem('nodi.support.session');
     expect(session).toMatch(UUID_V4);
@@ -244,9 +245,9 @@ describe('AssistantTab', () => {
     const log = screen.getByRole('log');
     await within(log).findByText('Đặt lại mật khẩu ở trang đăng nhập.');
     expect(
-      await within(log).findByRole('link', { name: 'Gửi email tới hotro@nodi.vn' }),
+      await within(log).findByRole('link', { name: 'Email hotro@nodi.vn' }),
     ).toBeInTheDocument();
-    expect(within(log).queryByRole('button', { name: /Gửi yêu cầu hỗ trợ/ })).toBeNull();
+    expect(within(log).queryByRole('button', { name: /Send a support request/ })).toBeNull();
   });
 
   it('shows no contact line under a guest reply when no contact is configured', async () => {
@@ -256,9 +257,9 @@ describe('AssistantTab', () => {
     await ask(user, 'Hoàn tiền thế nào?');
 
     const log = screen.getByRole('log');
-    await within(log).findByText('Mình chưa có câu trả lời cho câu hỏi này');
-    expect(within(log).queryByText(/Gửi email tới/)).toBeNull();
-    expect(within(log).queryByText('Cần người hỗ trợ?')).toBeNull();
+    await within(log).findByText("I don't have an answer to this question yet");
+    expect(within(log).queryByText(/Email /)).toBeNull();
+    expect(within(log).queryByText('Need help from a person?')).toBeNull();
   });
 
   it('offers "Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ" under a member answer, opening a new request', async () => {
@@ -274,7 +275,7 @@ describe('AssistantTab', () => {
     const log = screen.getByRole('log');
     await within(log).findByText('Kiểm tra lịch sử lượt chạy.');
     await user.click(
-      within(log).getByRole('button', { name: 'Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ' }),
+      within(log).getByRole('button', { name: 'Still not solved? Send a support request' }),
     );
 
     expect(await fileLinkedRequest(user, calls)).toEqual({
@@ -283,7 +284,7 @@ describe('AssistantTab', () => {
     });
   });
 
-  it('says "hỏi hơi nhanh" when the per-minute cap lifts within the next minutes', async () => {
+  it('says "asking a bit fast" when the per-minute cap lifts within the next minutes', async () => {
     setToken('member', true);
     const soon = new Date(Date.now() + 20_000).toISOString();
     api({ [MEMBER_ASK]: problem(429, 'assistant-quota', { retryAt: soon }) });
@@ -292,8 +293,8 @@ describe('AssistantTab', () => {
     await ask(user, 'Câu hỏi thứ mười một trong phút');
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/^Bạn hỏi hơi nhanh, thử lại sau \d{2}:\d{2}\.$/);
-    expect(alert).not.toHaveTextContent('hôm nay');
+    expect(alert).toHaveTextContent(/^You're asking a bit fast, try again after \d{2}:\d{2}\.$/);
+    expect(alert).not.toHaveTextContent('today');
   });
 
   it('shows the unavailable notice and locks the input when the assistant is paused', async () => {
@@ -305,9 +306,9 @@ describe('AssistantTab', () => {
 
     await ask(user, 'Làm sao nạp credit?');
 
-    expect(await screen.findByText('Trợ lý tạm thời không hoạt động')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Gửi' })).toBeDisabled();
+    expect(await screen.findByText('The assistant is temporarily unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
   });
 
   it('tells a guest over quota when questions resume and offers sign-in for more', async () => {
@@ -318,15 +319,15 @@ describe('AssistantTab', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Bạn đã dùng hết lượt hỏi hôm nay. Bạn có thể hỏi tiếp sau 00:00.',
+      "You've used all your questions for today. You can ask again after 00:00.",
     );
-    expect(within(alert).getByRole('link', { name: 'Đăng nhập để có thêm lượt' })).toHaveAttribute(
+    expect(within(alert).getByRole('link', { name: 'Sign in for more questions' })).toHaveAttribute(
       'href',
       '/login',
     );
   });
 
-  it('keeps the question when the assistant is busy and "Thử lại" sends it again', async () => {
+  it('keeps the question when the assistant is busy and "Try again" sends it again', async () => {
     setToken('member', true);
     let attempt = 0;
     const calls = api({
@@ -340,10 +341,10 @@ describe('AssistantTab', () => {
     await ask(user, 'Làm sao nạp credit?');
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Trợ lý đang bận, bạn thử lại sau ít phút nhé');
+    expect(alert).toHaveTextContent('The assistant is busy, please try again in a few minutes');
     expect(within(screen.getByRole('log')).getByText('Làm sao nạp credit?')).toBeInTheDocument();
 
-    await user.click(within(alert).getByRole('button', { name: 'Thử lại' }));
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }));
 
     expect(await within(screen.getByRole('log')).findByText('Đã rõ.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -361,9 +362,9 @@ describe('AssistantTab', () => {
     await ask(user, 'Câu hỏi bị chặn');
 
     const log = screen.getByRole('log');
-    expect(await within(log).findByText('Mình không thể trả lời câu hỏi này')).toBeInTheDocument();
+    expect(await within(log).findByText("I can't answer this question")).toBeInTheDocument();
     expect(within(log).queryByText('provider text')).toBeNull();
-    expect(within(log).getByRole('button', { name: 'Gửi yêu cầu hỗ trợ' })).toBeInTheDocument();
+    expect(within(log).getByRole('button', { name: 'Send a support request' })).toBeInTheDocument();
   });
 
   it('shows the saved conversation with its sources, and an old reply without any', async () => {
@@ -400,7 +401,7 @@ describe('AssistantTab', () => {
     expect(screen.getByText('Bài viết: bai-cu')).toBeInTheDocument();
   });
 
-  it('continues the previous conversation until "Cuộc trò chuyện mới" starts over', async () => {
+  it('continues the previous conversation until "New conversation" starts over', async () => {
     setToken('member', true);
     const calls = api({
       [MEMBER_LATEST]: {
@@ -420,7 +421,7 @@ describe('AssistantTab', () => {
     expect(await screen.findByText('Trả lời mới')).toBeInTheDocument();
     expect(screen.getByText('Hôm qua hỏi')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Cuộc trò chuyện mới' }));
+    await user.click(screen.getByRole('button', { name: 'New conversation' }));
     expect(screen.queryByText('Hôm qua hỏi')).toBeNull();
     await ask(user, 'Câu mới');
 
@@ -431,16 +432,16 @@ describe('AssistantTab', () => {
     ]);
   });
 
-  it('shows the notice and a link to Hướng dẫn when the assistant switch is off', async () => {
+  it('shows the notice and a link to Guides when the assistant switch is off', async () => {
     setToken('member', true);
     const calls = api({ 'GET /api/v1/features': features(false) });
     const { user } = renderTab();
 
-    expect(await screen.findByText('Trợ lý tạm thời không hoạt động')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toBeDisabled();
+    expect(await screen.findByText('The assistant is temporarily unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toBeDisabled();
     expect(sentQuestions(calls, MEMBER_ASK)).toEqual([]);
 
-    await user.click(screen.getByRole('button', { name: 'Xem Hướng dẫn' }));
+    await user.click(screen.getByRole('button', { name: 'View Guides' }));
 
     expect(screen.getByText('Tab: guides')).toBeInTheDocument();
   });
@@ -449,8 +450,8 @@ describe('AssistantTab', () => {
     api({ 'GET /api/v1/features': features(false) });
     renderTab();
 
-    expect(await screen.findByText('Trợ lý tạm thời không hoạt động')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Đăng nhập' })).toHaveAttribute('href', '/login');
+    expect(await screen.findByText('The assistant is temporarily unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
   });
 
   it('sends a handed-over question once, as the first user message', async () => {
@@ -462,7 +463,7 @@ describe('AssistantTab', () => {
     expect(await within(log).findByText('Vào Hồ sơ.')).toBeInTheDocument();
     expect(within(log).getByText('Làm sao nạp credit?')).toBeInTheDocument();
     expect(sentQuestions(calls, MEMBER_ASK)).toEqual([{ question: 'Làm sao nạp credit?' }]);
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue('');
   });
 
   it('still asks as a guest when storage is blocked, keeping one session id', async () => {
@@ -485,18 +486,18 @@ describe('AssistantTab', () => {
     expect(sessions[1]).toBe(sessions[0]);
   });
 
-  it('keeps focus in the question box after sending with the button and after "Thử lại"', async () => {
+  it('keeps focus in the question box after sending with the button and after "Try again"', async () => {
     setToken('member', true);
     let answer: FakeReply = problem(503, 'assistant-unavailable');
     api({ [MEMBER_ASK]: () => answer });
     const { user } = renderTab();
 
     await ask(user, 'Làm sao nạp credit?');
-    const input = screen.getByRole('textbox', { name: 'Câu hỏi của bạn' });
+    const input = screen.getByRole('textbox', { name: 'Your question' });
     expect(input).toHaveFocus();
 
     answer = reply('answered', 'Vào Hồ sơ.');
-    await user.click(await screen.findByRole('button', { name: 'Thử lại' }));
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Vào Hồ sơ.')).toBeInTheDocument();
     expect(input).toHaveFocus();
   });
@@ -510,8 +511,8 @@ describe('AssistantTab', () => {
 
     await ask(user, 'Hỏi nhanh quá');
 
-    expect(await screen.findByText(/Bạn hỏi hơi nhanh/)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toHaveValue('Hỏi nhanh quá');
+    expect(await screen.findByText(/You're asking a bit fast/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue('Hỏi nhanh quá');
     expect(within(screen.getByRole('log')).queryByText('Hỏi nhanh quá')).toBeNull();
   });
 
@@ -522,9 +523,9 @@ describe('AssistantTab', () => {
 
     await ask(user, 'Câu hỏi bị từ chối');
 
-    expect(await screen.findByText('Câu hỏi tối đa 1000 ký tự')).toBeInTheDocument();
+    expect(await screen.findByText('Questions can be at most 1000 characters')).toBeInTheDocument();
     expect(within(screen.getByRole('log')).queryByText('Câu hỏi bị từ chối')).toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toHaveValue(
       'Câu hỏi bị từ chối',
     );
   });
@@ -534,9 +535,9 @@ describe('AssistantTab', () => {
     api({ [MEMBER_LATEST]: problem(403, 'account-suspended') }, 'hotro@nodi.vn');
     renderTab();
 
-    expect(await screen.findByText('Tài khoản của bạn đang bị tạm khoá')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Thử lại' })).toBeNull();
-    expect(screen.getByRole('textbox', { name: 'Câu hỏi của bạn' })).toBeDisabled();
+    expect(await screen.findByText('Your account is suspended')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Your question' })).toBeDisabled();
   });
 
   it('tells a suspended member so when a question is refused, with no retry', async () => {
@@ -546,8 +547,26 @@ describe('AssistantTab', () => {
 
     await ask(user, 'Làm sao nạp credit?');
 
-    expect(await screen.findByText('Tài khoản của bạn đang bị tạm khoá')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Thử lại' })).toBeNull();
+    expect(await screen.findByText('Your account is suspended')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('reads the quota message and the question box in Vietnamese once the language is switched', async () => {
+    await i18n.changeLanguage('vi');
+    try {
+      api({ [GUEST_ASK]: problem(429, 'assistant-quota', { retryAt: '2026-10-23T17:00:00Z' }) });
+      const { user } = renderTab();
+      const input = await screen.findByRole('textbox', { name: 'Câu hỏi của bạn' });
+      await waitFor(() => expect(input).toBeEnabled());
+      await user.type(input, 'Câu hỏi thứ mười một');
+      await user.click(screen.getByRole('button', { name: 'Gửi' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Bạn đã dùng hết lượt hỏi hôm nay. Bạn có thể hỏi tiếp sau 00:00.',
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('counts code points, disabling send when empty or over 1000', async () => {
@@ -555,9 +574,9 @@ describe('AssistantTab', () => {
     api({});
     const { user } = renderTab();
 
-    const input = await screen.findByRole('textbox', { name: 'Câu hỏi của bạn' });
+    const input = await screen.findByRole('textbox', { name: 'Your question' });
     await waitFor(() => expect(input).toBeEnabled());
-    const send = screen.getByRole('button', { name: 'Gửi' });
+    const send = screen.getByRole('button', { name: 'Send' });
     expect(send).toBeDisabled();
     expect(screen.getByText('0/1000')).toBeInTheDocument();
 

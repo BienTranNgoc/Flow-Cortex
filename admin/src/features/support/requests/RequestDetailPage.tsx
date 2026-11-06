@@ -7,11 +7,12 @@ import {
   type SupportConversationMessage,
   type SupportRequestMessage,
 } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { usePageTitle } from '../../../app/usePageTitle';
 import { Markdown } from '../Markdown';
-import { supportCopy } from '../supportCopy';
 import { supportProblemCode } from '../unwrapSupport';
 import { ATTACHMENT_ACCEPT, UploadFailedError, addAttachments } from './attachments';
 import './requests.css';
@@ -25,7 +26,6 @@ import {
   useUploadedIds,
 } from './useAdminRequests';
 
-const copy = supportCopy.requests;
 const REPLY_STATUSES = Object.values(AdminSupportRequestReplyStatus);
 /** One broken image reads the request again at most this often, so an object that never loads cannot loop. */
 const IMAGE_RETRY_MS = 60_000;
@@ -37,8 +37,9 @@ interface Failure {
 }
 
 export function RequestDetailPage() {
+  const { t } = useTranslation();
   const number = Number(useParams().number);
-  const title = copy.detailTitle(number);
+  const title = t('support.requests.detailTitle', { number });
   usePageTitle(title);
   const detail = useRequestDetail(number);
   const lastImageRetry = useRef(0);
@@ -51,20 +52,20 @@ export function RequestDetailPage() {
   if (notFound) {
     content = (
       <p className="cortex-admin-error" role="alert">
-        {copy.notFound}
+        {t('support.requests.notFound')}
       </p>
     );
   } else if (detail.error && !detail.data) {
     content = (
       <div className="cortex-admin-error">
-        <p role="alert">{supportCopy.common.loadFailed}</p>
+        <p role="alert">{t('support.common.loadFailed')}</p>
         <button type="button" className="cortex-admin-btn" onClick={() => void detail.refetch()}>
-          {supportCopy.common.retry}
+          {t('support.common.retry')}
         </button>
       </div>
     );
   } else if (!detail.data) {
-    content = <output>{supportCopy.common.loading}</output>;
+    content = <output>{t('support.common.loading')}</output>;
   } else {
     // Attachment URLs are presigned and expire, so a broken image asks for fresh ones.
     const onImageFailed = () => {
@@ -74,7 +75,7 @@ export function RequestDetailPage() {
     };
     content = (
       <>
-        {detail.error && <p className="cortex-admin-stale">{supportCopy.common.refreshFailed}</p>}
+        {detail.error && <p className="cortex-admin-stale">{t('support.common.refreshFailed')}</p>}
         <RequestView
           request={detail.data}
           refresh={async () => (await detail.refetch()).data}
@@ -87,11 +88,11 @@ export function RequestDetailPage() {
   return (
     <main>
       <Link className="cortex-admin-back-link" to="/support/requests">
-        {copy.backToInbox}
+        {t('support.requests.backToInbox')}
       </Link>
       <div className="cortex-admin-page-heading">
         <div>
-          <p className="cortex-admin-eyebrow">{copy.eyebrow}</p>
+          <p className="cortex-admin-eyebrow">{t('support.requests.eyebrow')}</p>
           <h1>{title}</h1>
         </div>
       </div>
@@ -111,6 +112,7 @@ function RequestView({
   refresh: Refresh;
   onImageFailed: () => void;
 }>) {
+  const { t } = useTranslation();
   const open = request.allowedStatuses.length > 0;
   return (
     <div className="request-detail">
@@ -118,32 +120,34 @@ function RequestView({
         <h2 id="request-subject">{request.subject}</h2>
         <dl className="request-facts">
           <div>
-            <dt>{copy.columns.status}</dt>
+            <dt>{t('support.requests.columns.status')}</dt>
             <dd>
               <StatusBadge status={request.status} />
               {request.closedReason && (
-                <span className="request-closed-reason">{copy.closedReason[request.closedReason]}</span>
+                <span className="request-closed-reason">
+                  {t(`support.requests.closedReason.${request.closedReason}`)}
+                </span>
               )}
             </dd>
           </div>
           <div>
-            <dt>{copy.columns.type}</dt>
-            <dd>{copy.type[request.type]}</dd>
+            <dt>{t('support.requests.columns.type')}</dt>
+            <dd>{t(`support.requests.type.${request.type}`)}</dd>
           </div>
           <div>
-            <dt>{copy.columns.requester}</dt>
+            <dt>{t('support.requests.columns.requester')}</dt>
             <dd>
               <RequesterLabel requester={request.requester} />
             </dd>
           </div>
           <div>
-            <dt>{copy.createdAt}</dt>
+            <dt>{t('support.requests.createdAt')}</dt>
             <dd>
               <RequestTime value={request.createdAt} />
             </dd>
           </div>
           <div>
-            <dt>{copy.columns.activity}</dt>
+            <dt>{t('support.requests.columns.activity')}</dt>
             <dd>
               <RequestTime value={request.lastActivityAt} />
             </dd>
@@ -153,7 +157,7 @@ function RequestView({
       </section>
 
       <section className="request-section" aria-labelledby="request-thread">
-        <h2 id="request-thread">{copy.thread}</h2>
+        <h2 id="request-thread">{t('support.requests.thread')}</h2>
         <ol className="request-thread">
           {request.messages.map((message) => (
             <Message key={message.id} message={message} onImageFailed={onImageFailed} />
@@ -179,21 +183,26 @@ function Message({
   message,
   onImageFailed,
 }: Readonly<{ message: SupportRequestMessage; onImageFailed: () => void }>) {
+  const { t } = useTranslation();
   return (
     <li className={`request-message request-message--${message.authorKind}`}>
       <p className="request-message-meta">
-        <strong>{message.authorKind === 'member' ? copy.member : copy.admin}</strong>{' '}
+        <strong>
+          {message.authorKind === 'member'
+            ? t('support.requests.member')
+            : t('support.requests.admin')}
+        </strong>{' '}
         <RequestTime value={message.createdAt} />
       </p>
       <p className="request-message-body">{message.body}</p>
       {message.attachments.length > 0 && (
-        <ul className="request-images" aria-label={copy.attachments}>
+        <ul className="request-images" aria-label={t('support.requests.attachments')}>
           {message.attachments.map((attachment) => (
             <li key={attachment.position}>
               <a href={attachment.url} target="_blank" rel="noopener noreferrer">
                 <img
                   src={attachment.url}
-                  alt={copy.attachmentAlt(attachment.position)}
+                  alt={t('support.requests.attachmentAlt', { position: attachment.position })}
                   loading="lazy"
                   onError={onImageFailed}
                 />
@@ -208,12 +217,13 @@ function Message({
 
 /** Not linked: nothing. Linked but deleted after 90 days: the expiry note. */
 function Conversation({ request }: Readonly<{ request: AdminSupportRequestDetail }>) {
+  const { t } = useTranslation();
   if (!request.conversationExpired && !request.conversation?.length) return null;
   return (
     <section className="request-section" aria-labelledby="request-conversation">
-      <h2 id="request-conversation">{copy.conversation}</h2>
+      <h2 id="request-conversation">{t('support.requests.conversation')}</h2>
       {request.conversationExpired ? (
-        <p className="request-muted">{copy.conversationExpired}</p>
+        <p className="request-muted">{t('support.requests.conversationExpired')}</p>
       ) : (
         <ol className="request-thread">
           {request.conversation?.map((message, index) => (
@@ -226,14 +236,17 @@ function Conversation({ request }: Readonly<{ request: AdminSupportRequestDetail
 }
 
 function ConversationMessage({ message }: Readonly<{ message: SupportConversationMessage }>) {
+  const { t } = useTranslation();
   const outcome =
     message.outcome === 'no_answer' || message.outcome === 'blocked'
-      ? copy.outcome[message.outcome]
+      ? t(`support.requests.outcome.${message.outcome}`)
       : undefined;
   return (
     <li className={`request-message request-message--${message.role === 'user' ? 'member' : 'assistant'}`}>
       <p className="request-message-meta">
-        <strong>{message.role === 'user' ? copy.member : copy.assistant}</strong>{' '}
+        <strong>
+          {message.role === 'user' ? t('support.requests.member') : t('support.requests.assistant')}
+        </strong>{' '}
         <RequestTime value={message.createdAt} />
         {outcome && <span className="request-outcome">{outcome}</span>}
       </p>
@@ -248,16 +261,16 @@ function ConversationMessage({ message }: Readonly<{ message: SupportConversatio
   );
 }
 
-function statusFailure(code: string | undefined): Failure {
+function statusFailure(code: string | undefined, t: TFunction): Failure {
   switch (code) {
     case 'request-state-changed':
-      return { message: copy.stateChanged, reload: true };
+      return { message: t('support.requests.stateChanged'), reload: true };
     case 'request-closed':
-      return { message: supportCopy.problems['request-closed'], reload: false };
+      return { message: t('support.problems.request-closed'), reload: false };
     case 'request-not-found':
-      return { message: copy.notFound, reload: false };
+      return { message: t('support.requests.notFound'), reload: false };
     default:
-      return { message: copy.statusFailed, reload: false };
+      return { message: t('support.requests.statusFailed'), reload: false };
   }
 }
 
@@ -266,6 +279,7 @@ function StatusMenu({
   request,
   refresh,
 }: Readonly<{ request: AdminSupportRequestDetail; refresh: Refresh }>) {
+  const { t } = useTranslation();
   const change = useSetStatus(request.number);
   const menuId = useId();
   const feedbackRef = useRef<HTMLDivElement>(null);
@@ -285,7 +299,8 @@ function StatusMenu({
     hadMenu.current = allowed.length > 0;
   }, [allowed.length]);
 
-  const label = (status: AdminSupportRequestDetailStatus) => copy.status[status];
+  const label = (status: AdminSupportRequestDetailStatus) =>
+    t(`support.requests.status.${status}`);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -294,19 +309,25 @@ function StatusMenu({
     setFailure(null);
     setAnnouncement('');
     change.mutate(target, {
-      onSuccess: (result) => setAnnouncement(copy.statusChanged(label(result.status))),
+      onSuccess: (result) => {
+        setPicked('');
+        setAnnouncement(t('support.requests.statusChanged', { label: label(result.status) }));
+      },
       onError: async (error) => {
         const code = supportProblemCode(error);
         if (code === 'transition-not-allowed') {
           const current = await refresh();
           setFailure({
-            message: copy.transitionNotAllowed(label(current?.status ?? from), label(target)),
+            message: t('support.requests.transitionNotAllowed', {
+              from: label(current?.status ?? from),
+              to: label(target),
+            }),
             reload: false,
           });
           return;
         }
         if (code === 'request-closed') void refresh();
-        setFailure(statusFailure(code));
+        setFailure(statusFailure(code, t));
       },
     });
   };
@@ -316,7 +337,7 @@ function StatusMenu({
       {allowed.length > 0 && (
         <form className="request-status-form" onSubmit={onSubmit}>
           <div className="cortex-admin-field">
-            <label htmlFor={menuId}>{copy.changeStatus}</label>
+            <label htmlFor={menuId}>{t('support.requests.changeStatus')}</label>
             <select
               id={menuId}
               value={target}
@@ -326,7 +347,7 @@ function StatusMenu({
               }}
             >
               <option value="" disabled>
-                {copy.pickStatus}
+                {t('support.requests.pickStatus')}
               </option>
               {allowed.map((status) => (
                 <option key={status} value={status}>
@@ -340,7 +361,7 @@ function StatusMenu({
             className="cortex-admin-btn"
             aria-disabled={change.isPending || !target}
           >
-            {change.isPending ? supportCopy.common.saving : copy.saveStatus}
+            {change.isPending ? t('support.common.saving') : t('support.requests.saveStatus')}
           </button>
         </form>
       )}
@@ -357,7 +378,7 @@ function StatusMenu({
                   void refresh();
                 }}
               >
-                {copy.reload}
+                {t('support.requests.reload')}
               </button>
             )}
           </div>
@@ -370,33 +391,37 @@ function StatusMenu({
   );
 }
 
-function replyFailure(error: unknown): Failure & { field?: string } {
-  if (error instanceof UploadFailedError) return { message: copy.attachUploadFailed, reload: false };
+const REPLY_LENGTH_KEY = 'support.requests.replyLength';
+
+function replyFailure(error: unknown, t: TFunction): Failure & { field?: string } {
+  if (error instanceof UploadFailedError) {
+    return { message: t('support.requests.attachUploadFailed'), reload: false };
+  }
   const code = supportProblemCode(error);
   switch (code) {
     case 'validation-failed': {
       const fields = error instanceof ApiError ? error.problem?.errors : undefined;
       return fields?.body
-        ? { message: copy.replyFailed, reload: false, field: copy.replyLength }
-        : { message: copy.replyFailed, reload: false };
+        ? { message: t('support.requests.replyFailed'), reload: false, field: REPLY_LENGTH_KEY }
+        : { message: t('support.requests.replyFailed'), reload: false };
     }
     case 'attachment-rejected':
-      return { message: copy.attachRejected, reload: false };
+      return { message: t('support.requests.attachRejected'), reload: false };
     // The upload grant answers support-disabled while the Help Center switch is off; text replies still go through.
     case 'attachments-unavailable':
     case 'support-disabled':
-      return { message: copy.attachUnavailable, reload: false };
+      return { message: t('support.requests.attachUnavailable'), reload: false };
     case 'request-closed':
     case 'requester-deleted':
-      return { message: supportCopy.problems[code], reload: false };
+      return { message: t(`support.problems.${code}`), reload: false };
     case 'request-state-changed':
-      return { message: copy.stateChanged, reload: true };
+      return { message: t('support.requests.stateChanged'), reload: true };
     case 'idempotency-key-reused':
-      return { message: copy.replyReused, reload: true };
+      return { message: t('support.requests.replyReused'), reload: true };
     case 'request-not-found':
-      return { message: copy.notFound, reload: false };
+      return { message: t('support.requests.notFound'), reload: false };
     default:
-      return { message: copy.replyFailed, reload: false };
+      return { message: t('support.requests.replyFailed'), reload: false };
   }
 }
 
@@ -405,6 +430,7 @@ function ReplyForm({
   refresh,
   blocked,
 }: Readonly<{ request: AdminSupportRequestDetail; refresh: Refresh; blocked: boolean }>) {
+  const { t } = useTranslation();
   const reply = useReply(request.number);
   const submitKey = useSubmitKey();
   const uploaded = useUploadedIds();
@@ -435,7 +461,7 @@ function ReplyForm({
     const text = body.trim();
     const length = [...text].length;
     if (length < 1 || length > MAX_REPLY_LENGTH) {
-      setFieldError(copy.replyLength);
+      setFieldError(REPLY_LENGTH_KEY);
       inputRef.current?.focus();
       return;
     }
@@ -454,9 +480,11 @@ function ReplyForm({
       setBody('');
       setFiles([]);
       setRefused([]);
-      setAnnouncement(copy.replied(copy.status[result.status]));
+      setAnnouncement(
+        t('support.requests.replied', { label: t(`support.requests.status.${result.status}`) }),
+      );
     } catch (caught) {
-      const next = replyFailure(caught);
+      const next = replyFailure(caught, t);
       const code = supportProblemCode(caught);
       if (code === 'idempotency-key-reused') submitKey.reset();
       if (code === 'request-closed' || code === 'requester-deleted') void refresh();
@@ -473,16 +501,16 @@ function ReplyForm({
 
   return (
     <section className="request-section" aria-labelledby={`${formId}-heading`}>
-      <h2 id={`${formId}-heading`}>{copy.reply}</h2>
+      <h2 id={`${formId}-heading`}>{t('support.requests.reply')}</h2>
       {blocked && (
         <p id={blockedId} className="request-muted">
-          {copy.replyDisabled}
+          {t('support.requests.replyDisabled')}
         </p>
       )}
       <form className="request-reply" noValidate onSubmit={onSubmit}>
         <fieldset disabled={blocked} className="request-reply-fields">
           <div className="cortex-admin-field request-reply-body">
-            <label htmlFor={bodyId}>{copy.reply}</label>
+            <label htmlFor={bodyId}>{t('support.requests.reply')}</label>
             <textarea
               id={bodyId}
               ref={inputRef}
@@ -502,13 +530,13 @@ function ReplyForm({
             />
             {fieldError && (
               <p id={errorId} role="alert">
-                {fieldError}
+                {t(fieldError)}
               </p>
             )}
           </div>
 
           <fieldset className="request-reply-status">
-            <legend>{copy.replyStatus}</legend>
+            <legend>{t('support.requests.replyStatus')}</legend>
             {REPLY_STATUSES.map((value) => (
               <label key={value}>
                 <input
@@ -523,13 +551,13 @@ function ReplyForm({
                     setStatus(value);
                   }}
                 />
-                {copy.status[value]}
+                {t(`support.requests.status.${value}`)}
               </label>
             ))}
           </fieldset>
 
           <div className="cortex-admin-field">
-            <label htmlFor={fileId}>{copy.attachLabel}</label>
+            <label htmlFor={fileId}>{t('support.requests.attachLabel')}</label>
             <input
               id={fileId}
               type="file"
@@ -548,7 +576,7 @@ function ReplyForm({
             {refused.length > 0 && (
               <ul className="request-refused" role="alert">
                 {refused.map((reason) => (
-                  <li key={reason}>{reason}</li>
+                  <li key={reason}>{t(reason)}</li>
                 ))}
               </ul>
             )}
@@ -560,7 +588,7 @@ function ReplyForm({
                     <button
                       type="button"
                       className="cortex-admin-btn cortex-admin-btn--sm"
-                      aria-label={copy.attachRemove(file.name)}
+                      aria-label={t('support.requests.attachRemove', { name: file.name })}
                       aria-disabled={busy}
                       onClick={() => {
                         if (busyRef.current) return;
@@ -570,7 +598,7 @@ function ReplyForm({
                         document.getElementById(fileId)?.focus();
                       }}
                     >
-                      {copy.attachRemoveShort}
+                      {t('support.requests.attachRemoveShort')}
                     </button>
                   </li>
                 ))}
@@ -591,14 +619,14 @@ function ReplyForm({
                   void refresh();
                 }}
               >
-                {copy.reload}
+                {t('support.requests.reload')}
               </button>
             )}
           </div>
         )}
         <div className="request-actions">
           <button type="submit" className="cortex-admin-btn cortex-admin-btn--primary" aria-disabled={busy || blocked}>
-            {busy ? copy.sending : copy.send}
+            {busy ? t('support.requests.sending') : t('support.requests.send')}
           </button>
           <p role="status" className="request-announcement">
             {announcement}

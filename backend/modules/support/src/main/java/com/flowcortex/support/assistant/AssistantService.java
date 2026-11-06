@@ -1,6 +1,7 @@
 package com.flowcortex.support.assistant;
 
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.ConversationStore.StoredConversation;
 import com.flowcortex.support.assistant.ConversationStore.StoredMessage;
 import com.flowcortex.support.config.AssistantSwitch;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +40,7 @@ import tools.jackson.databind.json.JsonMapper;
 class AssistantService {
 
     static final int MAX_QUESTION_CHARS = 1000;
+    /** Stored as the reply text; the member app shows these two outcomes from its own copy instead. */
     static final String NO_ANSWER = "Mình chưa có câu trả lời cho câu hỏi này";
     static final String REFUSAL = "Mình không thể trả lời câu hỏi này";
 
@@ -122,12 +125,12 @@ class AssistantService {
     record Answer(String outcome, String text, List<ScoredArticle> sources) {
     }
 
-    AssistantReply ask(Asker asker, UUID conversationId, String rawQuestion) {
+    AssistantReply ask(Asker asker, UUID conversationId, String rawQuestion, Locale locale) {
         long started = System.nanoTime();
         if (!assistantSwitch.available()) {
             telemetry.record("disabled", 0, 0, started);
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-disabled",
-                    "The assistant is switched off");
+                    new LocalizedMessage("support.assistant.disabled"));
         }
         try {
             quotas.refuseWhenPaused();
@@ -160,7 +163,7 @@ class AssistantService {
             throw e;
         }
         try {
-            return answerCharged(asker, conversationId, question, askedAt, articles, charge, started);
+            return answerCharged(asker, conversationId, question, askedAt, articles, locale, charge, started);
         } catch (RuntimeException e) {
             refund(charge, e);
             throw e;
@@ -168,14 +171,14 @@ class AssistantService {
     }
 
     private AssistantReply answerCharged(Asker asker, UUID conversationId, String question, Instant askedAt,
-            List<ScoredArticle> articles, QuotaService.Charge charge, long started) {
-        LlmJsonResult result = llm.call(PromptBuilder.request(model, question, articles));
+            List<ScoredArticle> articles, Locale locale, QuotaService.Charge charge, long started) {
+        LlmJsonResult result = llm.call(PromptBuilder.request(model, question, articles, locale));
         Optional<Answer> answer = answer(result, articles);
         telemetry.provider(model, result, answer.map(a -> a.sources().size()).orElse(0));
         if (answer.isEmpty()) {
             telemetry.record("unavailable", 0, length(question), started);
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-unavailable",
-                    "The assistant could not answer right now");
+                    new LocalizedMessage("support.assistant.unavailable"));
         }
         return reply(asker, conversationId, question, askedAt, answer.get(),
                 new QuotaView(charge.remaining(), QuotaService.resetsAt(charge.day())), started);
@@ -196,18 +199,18 @@ class AssistantService {
 
     static SupportProblemException conversationNotFound() {
         return new SupportProblemException(HttpStatus.NOT_FOUND, "conversation-not-found",
-                "No such conversation for this caller");
+                new LocalizedMessage("support.assistant.conversationNotFound"));
     }
 
     private static String validQuestion(String rawQuestion) {
         String question = rawQuestion == null ? "" : rawQuestion.strip();
         if (question.isEmpty()) {
             throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
-                    "A question needs 1-" + MAX_QUESTION_CHARS + " characters");
+                    new LocalizedMessage("support.assistant.questionRequired", MAX_QUESTION_CHARS));
         }
         if (length(question) > MAX_QUESTION_CHARS) {
             throw new SupportProblemException(HttpStatus.BAD_REQUEST, "question-too-long",
-                    "A question holds at most " + MAX_QUESTION_CHARS + " characters");
+                    new LocalizedMessage("support.assistant.questionTooLong", MAX_QUESTION_CHARS));
         }
         return question;
     }

@@ -1,5 +1,6 @@
 package com.flowcortex.support.assistant;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.support.web.SupportProblemException;
 import java.time.Clock;
@@ -123,7 +124,7 @@ class QuotaService {
     private SupportProblemException paused(LocalDate day) {
         warnCeilingOnce(day);
         return new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-paused",
-                "The assistant answered its daily ceiling of questions").with("retryAt", resetsAt(day));
+                new LocalizedMessage("support.assistant.paused")).with("retryAt", resetsAt(day));
     }
 
     LocalDate today() {
@@ -136,7 +137,7 @@ class QuotaService {
 
     static SupportProblemException exhausted(Instant retryAt) {
         return new SupportProblemException(HttpStatus.TOO_MANY_REQUESTS, "assistant-quota",
-                "The question quota is used up").with("retryAt", retryAt);
+                new LocalizedMessage("support.assistant.quota")).with("retryAt", retryAt);
     }
 
     private List<Subject> subjects(Asker asker) {

@@ -1,21 +1,9 @@
-const VIETNAM_TIME = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Ho_Chi_Minh',
-  hour: '2-digit',
-  minute: '2-digit',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hourCycle: 'h23',
-});
+import { useTranslation } from 'react-i18next';
+import { formatVietnamTime } from '../vietnamTime';
 
-/** "HH:mm dd/MM/yyyy" in Vietnam time, whatever the browser's zone. */
+/** A request or article timestamp in Vietnam time, in the active language's date order. */
 export function RequestTime({ value }: Readonly<{ value: string }>) {
-  const parts = Object.fromEntries(
-    VIETNAM_TIME.formatToParts(new Date(value)).map((part) => [part.type, part.value]),
-  );
-  return (
-    <time dateTime={value}>
-      {`${parts.hour}:${parts.minute} ${parts.day}/${parts.month}/${parts.year}`}
-    </time>
-  );
+  // Subscribes the cell to language switches; activeLocale() alone would not re-render it.
+  useTranslation();
+  return <time dateTime={value}>{formatVietnamTime(value)}</time>;
 }

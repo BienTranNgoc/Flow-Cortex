@@ -6,42 +6,29 @@ import {
 } from '@flow-cortex/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { usePageTitle } from '../../../app/usePageTitle';
-import { supportCopy } from '../supportCopy';
 import { unwrapSupport } from '../unwrapSupport';
+import { formatVietnamTime } from '../vietnamTime';
 import './settings.css';
 
-const copy = supportCopy.settings;
 const SETTINGS_KEY = ['admin', 'support', 'settings'] as const;
 
-const CONSOLE_TIME = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Ho_Chi_Minh',
-  hour: '2-digit',
-  minute: '2-digit',
-  day: '2-digit',
-  month: '2-digit',
-  hourCycle: 'h23',
-});
-
-/** "HH:mm dd/MM" in Vietnam time, whatever the browser's zone. */
-function consoleTime(iso: string): string {
-  const parts = Object.fromEntries(
-    CONSOLE_TIME.formatToParts(new Date(iso)).map((part) => [part.type, part.value]),
-  );
-  return `${parts.hour}:${parts.minute} ${parts.day}/${parts.month}`;
-}
-
-function lastChange(settings: AdminSupportSettings): string | null {
+function lastChange(settings: AdminSupportSettings, t: TFunction): string | null {
   if (!settings.updatedAt) return null;
-  const state = settings.assistantEnabled ? copy.on : copy.off;
-  const at = consoleTime(settings.updatedAt);
+  const state = t(
+    settings.assistantEnabled ? 'support.settings.stateOn' : 'support.settings.stateOff',
+  );
+  const at = formatVietnamTime(settings.updatedAt);
   return settings.updatedBy
-    ? copy.changedBy(state, settings.updatedBy, at)
-    : copy.changedAt(state, at);
+    ? t('support.settings.changedBy', { state, email: settings.updatedBy, at })
+    : t('support.settings.changedAt', { state, at });
 }
 
 export function SupportSettingsPage() {
-  usePageTitle(copy.title);
+  const { t } = useTranslation();
+  usePageTitle(t('support.settings.title'));
   const queryClient = useQueryClient();
   const toggleId = useId();
   const changeId = useId();
@@ -58,7 +45,7 @@ export function SupportSettingsPage() {
     onError: () => queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }),
   });
   const settings = settingsQuery.data;
-  const change = settings ? lastChange(settings) : null;
+  const change = settings ? lastChange(settings, t) : null;
   const describedBy = settings
     ? [
         change ? changeId : undefined,
@@ -73,18 +60,18 @@ export function SupportSettingsPage() {
     <main>
       <div className="cortex-admin-page-heading">
         <div>
-          <p className="cortex-admin-eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-          <p className="cortex-admin-page-description">{copy.description}</p>
+          <p className="cortex-admin-eyebrow">{t('support.settings.eyebrow')}</p>
+          <h1>{t('support.settings.title')}</h1>
+          <p className="cortex-admin-page-description">{t('support.settings.description')}</p>
         </div>
       </div>
 
-      {settingsQuery.isPending && <output>{supportCopy.common.loading}</output>}
+      {settingsQuery.isPending && <output>{t('support.common.loading')}</output>}
       {settingsQuery.isError && !settings && (
         <div className="cortex-admin-error">
-          <p>{supportCopy.common.loadFailed}</p>
+          <p>{t('support.common.loadFailed')}</p>
           <button type="button" className="cortex-admin-btn" onClick={() => settingsQuery.refetch()}>
-            {supportCopy.common.retry}
+            {t('support.common.retry')}
           </button>
         </div>
       )}
@@ -102,7 +89,7 @@ export function SupportSettingsPage() {
                 if (!update.isPending) update.mutate(event.target.checked);
               }}
             />
-            <label htmlFor={toggleId}>{copy.toggle}</label>
+            <label htmlFor={toggleId}>{t('support.settings.toggle')}</label>
           </div>
           {change && (
             <p id={changeId} className="support-settings-change">
@@ -111,15 +98,15 @@ export function SupportSettingsPage() {
           )}
           {!settings.envEnabled && (
             <p id={envId} className="cortex-admin-pill cortex-admin-pill--warning">
-              {copy.envDisabled}
+              {t('support.settings.envDisabled')}
             </p>
           )}
           {settings.ceilingReachedToday && (
             <p id={ceilingId} className="cortex-admin-pill cortex-admin-pill--warning">
-              {copy.ceilingReached(settings.dailyCeiling)}
+              {t('support.settings.ceilingReached', { ceiling: settings.dailyCeiling })}
             </p>
           )}
-          {update.isError && <p role="alert">{supportCopy.common.saveFailed}</p>}
+          {update.isError && <p role="alert">{t('support.common.saveFailed')}</p>}
         </section>
       )}
     </main>

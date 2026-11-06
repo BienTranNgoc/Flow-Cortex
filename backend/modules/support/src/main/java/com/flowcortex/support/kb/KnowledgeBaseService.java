@@ -1,5 +1,6 @@
 package com.flowcortex.support.kb;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.web.SupportProblemException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
@@ -254,7 +255,7 @@ public class KnowledgeBaseService {
         Set<UUID> requested = new HashSet<>(orderedIds);
         if (requested.size() != orderedIds.size() || !requested.equals(all.keySet())) {
             throw new SupportProblemException(HttpStatus.BAD_REQUEST, "group-order-mismatch",
-                    "The order must list every topic group exactly once");
+                    new LocalizedMessage("support.kb.groupOrderMismatch"));
         }
         Instant now = Instant.now(clock);
         for (int i = 0; i < orderedIds.size(); i++) {
@@ -354,8 +355,9 @@ public class KnowledgeBaseService {
         }
         if (archived) {
             throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
-                    "An archived article cannot be a start article")
-                    .with("errors", Map.of("featuredPosition", "must be empty for an archived article"));
+                    new LocalizedMessage("support.kb.archivedStart"))
+                    .withFieldErrors(Map.of("featuredPosition",
+                            new LocalizedMessage("support.kb.error.featuredArchived")));
         }
         List<Article> others = articles.findByFeaturedPositionNotNull().stream()
                 .filter(other -> !other.getId().equals(articleId))
@@ -366,7 +368,7 @@ public class KnowledgeBaseService {
         }
         if (taken) {
             throw new SupportProblemException(HttpStatus.CONFLICT, "featured-position-taken",
-                    "Start position " + requested + " is held by another article");
+                    new LocalizedMessage("support.kb.startPositionTaken", requested));
         }
         return requested.shortValue();
     }
@@ -381,7 +383,7 @@ public class KnowledgeBaseService {
             }
             if ("uq_support_article_featured_position".equals(constraint)) {
                 throw new SupportProblemException(HttpStatus.CONFLICT, "featured-position-taken",
-                        "Start position " + article.getFeaturedPosition() + " is held by another article");
+                        new LocalizedMessage("support.kb.startPositionTaken", article.getFeaturedPosition()));
             }
             throw e;
         }
@@ -441,29 +443,31 @@ public class KnowledgeBaseService {
 
     private static SupportProblemException articleNotFound(String ref) {
         return new SupportProblemException(HttpStatus.NOT_FOUND, "article-not-found",
-                "Article not found: " + ref);
+                new LocalizedMessage("support.kb.articleNotFound", ref));
     }
 
     private static SupportProblemException groupNotFound(UUID id) {
-        return new SupportProblemException(HttpStatus.NOT_FOUND, "group-not-found", "No topic group " + id);
+        return new SupportProblemException(HttpStatus.NOT_FOUND, "group-not-found",
+                new LocalizedMessage("support.kb.groupNotFound", id));
     }
 
     private static SupportProblemException groupNotEmpty(long held) {
         return new SupportProblemException(HttpStatus.CONFLICT, "group-not-empty",
-                "The topic group still holds " + held + " article(s)").with("articleCount", held);
+                new LocalizedMessage("support.kb.groupNotEmpty", held)).with("articleCount", held);
     }
 
     private static SupportProblemException groupNameTaken(String name) {
         return new SupportProblemException(HttpStatus.CONFLICT, "group-name-taken",
-                "A topic group named " + name + " already exists");
+                new LocalizedMessage("support.kb.groupNameTaken", name));
     }
 
     private static SupportProblemException slugTaken(String slug) {
-        return new SupportProblemException(HttpStatus.CONFLICT, "slug-taken", "The slug " + slug + " is taken");
+        return new SupportProblemException(HttpStatus.CONFLICT, "slug-taken",
+                new LocalizedMessage("support.kb.slugTaken", slug));
     }
 
     private static SupportProblemException featuredFull() {
         return new SupportProblemException(HttpStatus.CONFLICT, "featured-full",
-                "Three articles already hold a start position");
+                new LocalizedMessage("support.kb.featuredFull"));
     }
 }

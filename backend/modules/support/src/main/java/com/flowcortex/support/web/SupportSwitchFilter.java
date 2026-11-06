@@ -1,5 +1,6 @@
 package com.flowcortex.support.web;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.config.SupportProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -54,17 +55,18 @@ class SupportSwitchFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (!properties.enabled()) {
-            refuse(request, response, "support-disabled", "The Help Center is switched off");
+            refuse(request, response, "support-disabled", new LocalizedMessage("support.disabled"));
             return;
         }
         if (!properties.assistant().enabled() && QUESTION.matches(request)) {
-            refuse(request, response, "assistant-disabled", "The assistant is switched off");
+            refuse(request, response, "assistant-disabled", new LocalizedMessage("support.assistant.disabled"));
             return;
         }
         chain.doFilter(request, response);
     }
 
-    private void refuse(HttpServletRequest request, HttpServletResponse response, String code, String detail) {
+    private void refuse(HttpServletRequest request, HttpServletResponse response, String code,
+            LocalizedMessage detail) {
         exceptionResolver.resolveException(request, response, null,
                 new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, code, detail));
     }

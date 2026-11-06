@@ -12,6 +12,8 @@ import {
   type SupportAssistantReply,
 } from '@flow-cortex/api-client';
 import { useFeatures } from '../../app/useFeatures';
+import { formatDateTime } from '../../lib/format';
+import { activeLocale } from '../../lib/i18n';
 import { supportSessionId } from './supportSession';
 import { supportProblemCode, unwrapSupport, useSupportSettings } from './useSupportKb';
 
@@ -121,13 +123,6 @@ export function useAskAssistant(member: boolean) {
   });
 }
 
-const RESUME_FORMAT = new Intl.DateTimeFormat('vi-VN', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-  timeZone: 'Asia/Ho_Chi_Minh',
-});
-
 const DAY_MS = 86_400_000;
 // Asia/Ho_Chi_Minh is UTC+7 all year.
 const VIETNAM_OFFSET_MS = 7 * 3_600_000;
@@ -147,5 +142,12 @@ export function isMinuteCap(error: unknown): boolean {
 export function resumeTime(error: unknown): string {
   const retryAt = error instanceof ApiError ? error.problem?.retryAt : undefined;
   const at = retryAt ? new Date(retryAt) : null;
-  return at && !Number.isNaN(at.getTime()) ? RESUME_FORMAT.format(at) : '00:00';
+  return at && !Number.isNaN(at.getTime())
+    ? formatDateTime(at, activeLocale(), {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+        timeZone: 'Asia/Ho_Chi_Minh',
+      })
+    : '00:00';
 }

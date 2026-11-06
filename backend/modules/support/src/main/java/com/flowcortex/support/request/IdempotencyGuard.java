@@ -1,5 +1,6 @@
 package com.flowcortex.support.request;
 
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.web.SupportProblemException;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -36,8 +37,9 @@ class IdempotencyGuard {
             return Optional.of(UUID.fromString(header.trim()).toString());
         } catch (IllegalArgumentException e) {
             throw new SupportProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
-                    "Idempotency-Key must be a UUID")
-                    .with("errors", java.util.Map.of("Idempotency-Key", "Must be a UUID"));
+                    new LocalizedMessage("support.idempotency.keyInvalid"))
+                    .withFieldErrors(java.util.Map.of("Idempotency-Key",
+                            new LocalizedMessage("support.idempotency.keyField")));
         }
     }
 
@@ -83,7 +85,8 @@ class IdempotencyGuard {
         UUID resultFor(String expectedKind, UUID expectedTarget) {
             if (!kind.equals(expectedKind) || !Objects.equals(targetId, expectedTarget)) {
                 throw new SupportProblemException(HttpStatus.CONFLICT, "idempotency-key-reused",
-                        "This Idempotency-Key was already used for another " + kind);
+                        "request".equals(kind) ? new LocalizedMessage("support.idempotency.reusedForRequest")
+                                : new LocalizedMessage("support.idempotency.reusedForMessage"));
             }
             return resultId;
         }

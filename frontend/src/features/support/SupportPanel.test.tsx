@@ -6,6 +6,7 @@ import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { App } from '../../App';
 import { queryClient as appQueryClient } from '../../app/queryClient';
+import i18n from '../../lib/i18n';
 import { LoginPage } from '../auth/LoginPage';
 import { RequireAuth } from '../auth/RequireAuth';
 import { stubApi, type Handler } from '../../test/fakeApi';
@@ -58,8 +59,8 @@ function renderWidget(url = '/workflows', page: ReactElement = <p>Trang</p>) {
 
 async function openPanel() {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Trợ giúp' }));
-  return { user, panel: screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' }) };
+  await user.click(screen.getByRole('button', { name: 'Help' }));
+  return { user, panel: screen.getByRole('dialog', { name: 'Help Center' }) };
 }
 
 function SearchProbe() {
@@ -82,7 +83,7 @@ describe('SupportPanel', () => {
     stubApi(homeApi());
     renderWidget('/login');
 
-    const launcher = screen.getByRole('button', { name: 'Trợ giúp' });
+    const launcher = screen.getByRole('button', { name: 'Help' });
     expect(launcher).toHaveAttribute('aria-expanded', 'false');
     const { panel } = await openPanel();
 
@@ -99,7 +100,7 @@ describe('SupportPanel', () => {
     await user.keyboard('{Escape}');
 
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Trợ giúp' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Help' })).toHaveFocus();
   });
 
   it('closes from the close button and keeps the page underneath as it was', async () => {
@@ -109,18 +110,18 @@ describe('SupportPanel', () => {
     await user.type(screen.getByLabelText('Email'), 'an@example.com');
     await openPanel();
 
-    await user.click(screen.getByRole('button', { name: 'Đóng' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByLabelText('Email')).toHaveValue('an@example.com');
   });
 
-  it('offers a guest exactly Trang chủ and Trợ lý', async () => {
+  it('offers a guest exactly Home and Assistant', async () => {
     stubApi(homeApi());
     renderWidget('/login');
     await openPanel();
 
-    expect(tabNames()).toEqual(['Trang chủ', 'Trợ lý']);
+    expect(tabNames()).toEqual(['Home', 'Assistant']);
   });
 
   it('offers a member four tabs and moves focus along them with the right arrow', async () => {
@@ -129,8 +130,8 @@ describe('SupportPanel', () => {
     renderWidget('/workflows');
     const { user } = await openPanel();
 
-    expect(tabNames()).toEqual(['Trang chủ', 'Trợ lý', 'Hướng dẫn', 'Yêu cầu']);
-    const home = screen.getByRole('tab', { name: 'Trang chủ' });
+    expect(tabNames()).toEqual(['Home', 'Assistant', 'Guides', 'Requests']);
+    const home = screen.getByRole('tab', { name: 'Home' });
     expect(home).toHaveAttribute('aria-selected', 'true');
     home.focus();
 
@@ -140,9 +141,9 @@ describe('SupportPanel', () => {
       visited.push(document.activeElement?.textContent ?? '');
     }
 
-    expect(visited).toEqual(['Trợ lý', 'Hướng dẫn', 'Yêu cầu']);
-    expect(screen.getByRole('tab', { name: 'Yêu cầu' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Trang chủ' })).toHaveAttribute('tabindex', '-1');
+    expect(visited).toEqual(['Assistant', 'Guides', 'Requests']);
+    expect(screen.getByRole('tab', { name: 'Requests' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Home' })).toHaveAttribute('tabindex', '-1');
   });
 
   it('leaves the panel open when Escape is pressed in a page field', async () => {
@@ -153,10 +154,10 @@ describe('SupportPanel', () => {
     await user.click(screen.getByLabelText('Ghi chú'));
     await user.keyboard('{Escape}');
 
-    expect(screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Help Center' })).toBeInTheDocument();
   });
 
-  it('marks the Yêu cầu tab while a reply is unread', async () => {
+  it('marks the Requests tab while a reply is unread', async () => {
     setToken('member', true);
     stubApi({
       ...homeApi(),
@@ -165,10 +166,10 @@ describe('SupportPanel', () => {
     });
     renderWidget('/workflows');
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Trợ giúp. Có phản hồi mới' }));
-    const panel = screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' });
+    await user.click(await screen.findByRole('button', { name: 'Help. New reply' }));
+    const panel = screen.getByRole('dialog', { name: 'Help Center' });
 
-    const tab = within(panel).getByRole('tab', { name: 'Yêu cầu. Có phản hồi mới' });
+    const tab = within(panel).getByRole('tab', { name: 'Requests. New reply' });
     expect(tab.querySelector('.support-unread-dot')).not.toBeNull();
   });
 
@@ -207,10 +208,10 @@ describe('small screens', () => {
     expect(panel).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByText('Tạo tài khoản').closest('[inert]')).not.toBeNull();
 
-    await user.click(within(panel).getByRole('button', { name: 'Đóng' }));
+    await user.click(within(panel).getByRole('button', { name: 'Close' }));
 
     expect(screen.getByText('Tạo tài khoản').closest('[inert]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Trợ giúp' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Help' })).toHaveFocus();
   });
 
   it('keeps the desktop panel non-modal', async () => {
@@ -260,10 +261,10 @@ describe('article focus', () => {
     await user.click(await within(panel).findByRole('button', { name: 'Bắt đầu từ đâu?' }));
 
     expect(await within(panel).findByRole('status')).toHaveTextContent(
-      'Bài viết này không còn được công bố',
+      'This article is no longer published',
     );
     await waitFor(() =>
-      expect(within(panel).getByRole('button', { name: 'Về Trang chủ' })).toHaveFocus(),
+      expect(within(panel).getByRole('button', { name: 'Back to Home' })).toHaveFocus(),
     );
   });
 });
@@ -295,7 +296,7 @@ describe('Help Center switch', () => {
 
     await waitFor(() => expect(calls.some((call) => call.path === '/api/v1/features')).toBe(true));
     await waitFor(() => expect(appQueryClient.isFetching()).toBe(0));
-    expect(screen.queryByRole('button', { name: 'Trợ giúp' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Help' })).toBeNull();
     expect(calls.filter((call) => call.path.startsWith('/api/v1/support'))).toEqual([]);
   });
 
@@ -305,7 +306,7 @@ describe('Help Center switch', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Trợ giúp' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Help' })).toBeInTheDocument();
   });
 });
 
@@ -314,7 +315,7 @@ describe('help link', () => {
     ['a guarded page', '/?help=request-12'],
     ['the sign-in page', '/login?help=request-12'],
   ])(
-    'opened signed out on %s survives sign-in and opens request #12 on Yêu cầu',
+    'opened signed out on %s survives sign-in and opens request #12 on Requests',
     async (_page, url) => {
       stubApi({
         'POST /api/v1/auth/refresh': { status: 401, body: { status: 401 } },
@@ -348,12 +349,12 @@ describe('help link', () => {
       await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
 
       expect(await screen.findByText('Bảng điều khiển')).toBeInTheDocument();
-      const panel = await screen.findByRole('dialog', { name: 'Trung tâm trợ giúp' });
-      expect(within(panel).getByRole('tab', { name: 'Yêu cầu' })).toHaveAttribute(
+      const panel = await screen.findByRole('dialog', { name: 'Help Center' });
+      expect(within(panel).getByRole('tab', { name: 'Requests' })).toHaveAttribute(
         'aria-selected',
         'true',
       );
-      expect(within(panel).getByText('Yêu cầu #12')).toBeInTheDocument();
+      expect(within(panel).getByText('Request #12')).toBeInTheDocument();
     },
   );
 
@@ -365,15 +366,15 @@ describe('help link', () => {
     stubApi(homeApi());
     renderWidget('/login?help=article-bat-dau-tu-dau', <SearchProbe />);
 
-    const panel = await screen.findByRole('dialog', { name: 'Trung tâm trợ giúp' });
+    const panel = await screen.findByRole('dialog', { name: 'Help Center' });
     expect(
       await within(panel).findByRole('heading', { name: 'Bắt đầu từ đâu?' }),
     ).toBeInTheDocument();
-    expect(within(panel).getByRole('button', { name: 'Quay lại' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Back' })).toBeInTheDocument();
     expect(screen.getByTestId('search')).toBeEmptyDOMElement();
   });
 
-  it('reads "Bài viết này không còn được công bố" for an archived article link, leading a guest home', async () => {
+  it('reads "This article is no longer published" for an archived article link, leading a guest home', async () => {
     stubApi({
       ...homeApi(),
       'GET /api/v1/support/kb/articles/cach-cu': {
@@ -383,11 +384,11 @@ describe('help link', () => {
     });
     renderWidget('/login?help=article-cach-cu');
 
-    const panel = await screen.findByRole('dialog', { name: 'Trung tâm trợ giúp' });
+    const panel = await screen.findByRole('dialog', { name: 'Help Center' });
     expect(
-      await within(panel).findByText('Bài viết này không còn được công bố'),
+      await within(panel).findByText('This article is no longer published'),
     ).toBeInTheDocument();
-    expect(within(panel).getByRole('button', { name: 'Về Trang chủ' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Back to Home' })).toBeInTheDocument();
   });
 
   it.each(['article-Bad_Slug', 'article-', 'article--x', `article-${'a'.repeat(81)}`])(
@@ -406,8 +407,8 @@ describe('help link', () => {
     stubApi(homeApi());
     renderWidget('/login?help=home');
 
-    const panel = await screen.findByRole('dialog', { name: 'Trung tâm trợ giúp' });
-    expect(within(panel).getByRole('tab', { name: 'Trang chủ' })).toHaveAttribute(
+    const panel = await screen.findByRole('dialog', { name: 'Help Center' });
+    expect(within(panel).getByRole('tab', { name: 'Home' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -415,12 +416,12 @@ describe('help link', () => {
 });
 
 describe('HomeTab', () => {
-  it('lists the three Bắt đầu articles in the admin order and opens one in the panel', async () => {
+  it('lists the three Get started articles in the admin order and opens one in the panel', async () => {
     stubApi(homeApi());
     renderWidget('/login');
     const { user, panel } = await openPanel();
 
-    const start = await within(panel).findByRole('list', { name: 'Bắt đầu' });
+    const start = await within(panel).findByRole('list', { name: 'Get started' });
     expect(
       within(start)
         .getAllByRole('button')
@@ -435,19 +436,23 @@ describe('HomeTab', () => {
     expect(within(panel).getByText('Workflows').tagName).toBe('STRONG');
   });
 
-  it('opens Trợ lý with a suggested question handed over', async () => {
+  it('opens Assistant with a suggested question handed over', async () => {
     setToken('member', true);
     stubApi(homeApi());
     renderWidget('/workflows');
     const { user, panel } = await openPanel();
 
-    await user.click(within(panel).getByRole('button', { name: 'Vì sao tôi bị báo thiếu credit?' }));
+    await user.click(
+      within(panel).getByRole('button', { name: "Why am I told I don't have enough credit?" }),
+    );
 
-    expect(within(panel).getByRole('tab', { name: 'Trợ lý' })).toHaveAttribute(
+    expect(within(panel).getByRole('tab', { name: 'Assistant' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    expect(within(panel).getByText('Vì sao tôi bị báo thiếu credit?')).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Why am I told I don't have enough credit?"),
+    ).toBeInTheDocument();
   });
 
   it('shows the contact line as a mail link when a contact is configured', async () => {
@@ -455,9 +460,9 @@ describe('HomeTab', () => {
     renderWidget('/login');
     const { panel } = await openPanel();
 
-    const link = await within(panel).findByRole('link', { name: 'Gửi email tới hotro@nodi.vn' });
+    const link = await within(panel).findByRole('link', { name: 'Email hotro@nodi.vn' });
     expect(link).toHaveAttribute('href', 'mailto:hotro@nodi.vn');
-    expect(link.closest('p')).toHaveTextContent('Cần người hỗ trợ? Gửi email tới hotro@nodi.vn');
+    expect(link.closest('p')).toHaveTextContent('Need help from a person? Email hotro@nodi.vn');
   });
 
   it.each([
@@ -468,25 +473,25 @@ describe('HomeTab', () => {
     const { queryClient } = renderWidget('/login');
     const { panel } = await openPanel();
 
-    await within(panel).findByRole('list', { name: 'Bắt đầu' });
+    await within(panel).findByRole('list', { name: 'Get started' });
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     expect(calls.some((call) => call.path === '/api/v1/support/settings')).toBe(true);
-    expect(within(panel).queryByText(/Cần người hỗ trợ/)).toBeNull();
+    expect(within(panel).queryByText(/Need help from a person/)).toBeNull();
   });
 
-  it('gives a member the "Gửi yêu cầu hỗ trợ" shortcut to a new request', async () => {
+  it('gives a member the "Send a support request" shortcut to a new request', async () => {
     setToken('member', true);
     stubApi(homeApi());
     renderWidget('/workflows');
     const { user, panel } = await openPanel();
 
-    await user.click(within(panel).getByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(within(panel).getByRole('button', { name: 'Send a support request' }));
 
-    expect(within(panel).getByRole('tab', { name: 'Yêu cầu' })).toHaveAttribute(
+    expect(within(panel).getByRole('tab', { name: 'Requests' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    expect(within(panel).getByText('Yêu cầu mới')).toBeInTheDocument();
+    expect(within(panel).getByText('New request')).toBeInTheDocument();
   });
 
   it('gives a guest no request shortcut', async () => {
@@ -494,7 +499,28 @@ describe('HomeTab', () => {
     renderWidget('/login');
     const { panel } = await openPanel();
 
-    await within(panel).findByRole('list', { name: 'Bắt đầu' });
-    expect(within(panel).queryByRole('button', { name: 'Gửi yêu cầu hỗ trợ' })).toBeNull();
+    await within(panel).findByRole('list', { name: 'Get started' });
+    expect(within(panel).queryByRole('button', { name: 'Send a support request' })).toBeNull();
+  });
+
+  it('reads the panel in Vietnamese once the language is switched', async () => {
+    await i18n.changeLanguage('vi');
+    try {
+      setToken('member', true);
+      stubApi(homeApi());
+      renderWidget('/workflows');
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Trợ giúp' }));
+      const panel = screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' });
+
+      expect(tabNames()).toEqual(['Trang chủ', 'Trợ lý', 'Hướng dẫn', 'Yêu cầu']);
+      expect(await within(panel).findByRole('list', { name: 'Bắt đầu' })).toBeInTheDocument();
+      expect(
+        within(panel).getByRole('button', { name: 'Vì sao tôi bị báo thiếu credit?' }),
+      ).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Gửi yêu cầu hỗ trợ' })).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

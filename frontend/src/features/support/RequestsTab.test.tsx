@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import i18n from '../../lib/i18n';
 import { stubApi, type FakeReply, type Handler } from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
 import { SupportWidget } from './SupportWidget';
@@ -78,23 +79,23 @@ function renderWidget(url: string) {
   );
   return {
     user: userEvent.setup(),
-    panel: () => screen.getByRole('dialog', { name: 'Trung tâm trợ giúp' }),
+    panel: () => screen.getByRole('dialog'),
   };
 }
 
-/** Opens the panel on Yêu cầu through a `?help=` link. */
+/** Opens the panel on Requests through a `?help=` link. */
 async function openRequests(target = 'requests') {
   const rendered = renderWidget(`/workflows?help=${target}`);
-  await screen.findByRole('dialog', { name: 'Trung tâm trợ giúp' });
+  await screen.findByRole('dialog');
   return rendered;
 }
 
 async function fillForm(user: ReturnType<typeof userEvent.setup>, subject: string) {
   const panel = screen.getByRole('dialog');
-  await user.selectOptions(within(panel).getByLabelText('Loại yêu cầu'), 'Credit');
-  await user.type(within(panel).getByLabelText('Tiêu đề'), subject);
+  await user.selectOptions(within(panel).getByLabelText('Request type'), 'Credit');
+  await user.type(within(panel).getByLabelText('Subject'), subject);
   await user.type(
-    within(panel).getByLabelText('Mô tả'),
+    within(panel).getByLabelText('Description'),
     'Tôi nạp 100 credit nhưng số dư vẫn bằng 0.',
   );
 }
@@ -119,7 +120,7 @@ afterEach(() => {
 });
 
 describe('RequestsTab', () => {
-  it('files a request with a PNG and shows #13 in "Mới" with the description and the image', async () => {
+  it('files a request with a PNG and shows #13 in "New" with the description and the image', async () => {
     const created = detail({
       number: 13,
       status: 'new',
@@ -160,21 +161,21 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = await openRequests();
 
-    await user.click(await within(panel()).findByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
     await fillForm(user, 'Không thấy credit');
     const png = new File([new Uint8Array(819_200)], 'man-hinh.png', { type: 'image/png' });
-    await user.upload(within(panel()).getByLabelText('Đính kèm ảnh (tối đa 3)'), png);
+    await user.upload(within(panel()).getByLabelText('Attach images (up to 3)'), png);
     expect(within(panel()).getByRole('img', { name: 'man-hinh.png' })).toBeInTheDocument();
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
 
     expect(
-      await within(panel()).findByRole('heading', { name: 'Yêu cầu #13' }),
+      await within(panel()).findByRole('heading', { name: 'Request #13' }),
     ).toBeInTheDocument();
-    expect(await within(panel()).findByText('Mới')).toBeInTheDocument();
+    expect(await within(panel()).findByText('New')).toBeInTheDocument();
     expect(
       within(panel()).getByText('Tôi nạp 100 credit nhưng số dư vẫn bằng 0.'),
     ).toBeInTheDocument();
-    expect(within(panel()).getByRole('img', { name: 'Ảnh đính kèm 1' })).toHaveAttribute(
+    expect(within(panel()).getByRole('img', { name: 'Attached image 1' })).toHaveAttribute(
       'src',
       'http://minio.test/get/13-1',
     );
@@ -198,11 +199,11 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = await openRequests();
 
-    await user.click(await within(panel()).findByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
 
-    expect(within(panel()).getByLabelText('Mô tả')).toHaveValue('');
+    expect(within(panel()).getByLabelText('Description')).toHaveValue('');
     await fillForm(user, 'Không thấy credit');
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
     await waitFor(() => expect(calls.some((call) => call.method === 'POST')).toBe(true));
     expect(calls.find((call) => call.method === 'POST')?.body).not.toHaveProperty(
       'aiConversationId',
@@ -213,24 +214,41 @@ describe('RequestsTab', () => {
     const calls = stubApi(api({}));
     const { user, panel } = await openRequests();
 
-    await user.click(await within(panel()).findByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
     await fillForm(user, 'abc');
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
 
-    expect(within(panel()).getByText('Tiêu đề cần 5–120 ký tự')).toBeInTheDocument();
-    expect(within(panel()).getByLabelText('Tiêu đề')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(panel()).getByText('Subject must be 5–120 characters')).toBeInTheDocument();
+    expect(within(panel()).getByLabelText('Subject')).toHaveAttribute('aria-invalid', 'true');
     expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
   });
 
-  it('says "Không tìm thấy yêu cầu" for a number that is not the member\'s', async () => {
+  it('re-renders a shown field error when the language is switched', async () => {
+    stubApi(api({}));
+    const { user, panel } = await openRequests();
+
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
+    await fillForm(user, 'abc');
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
+    expect(within(panel()).getByText('Subject must be 5–120 characters')).toBeInTheDocument();
+
+    await i18n.changeLanguage('vi');
+    try {
+      expect(await within(panel()).findByText('Tiêu đề cần 5–120 ký tự')).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('says "Request not found" for a number that is not the member\'s', async () => {
     stubApi(api({ [`GET ${REQUESTS}/14`]: problem(404, 'request-not-found') }));
     const { panel } = await openRequests('request-14');
 
-    expect(within(panel()).getByRole('heading', { name: 'Yêu cầu #14' })).toBeInTheDocument();
-    expect(await within(panel()).findByText('Không tìm thấy yêu cầu')).toBeInTheDocument();
+    expect(within(panel()).getByRole('heading', { name: 'Request #14' })).toBeInTheDocument();
+    expect(await within(panel()).findByText('Request not found')).toBeInTheDocument();
   });
 
-  it('adds a reply to a request waiting for the member, which becomes "Đang xử lý"', async () => {
+  it('adds a reply to a request waiting for the member, which becomes "In progress"', async () => {
     const waiting = detail();
     const answered = detail({
       status: 'in_progress',
@@ -257,22 +275,22 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = await openRequests('request-12');
 
-    expect(await within(panel()).findByText('Chờ bạn phản hồi')).toBeInTheDocument();
-    expect(within(panel()).getByText('Nodi hỗ trợ')).toBeInTheDocument();
-    await user.type(within(panel()).getByLabelText('Trả lời'), 'Đã thử, vẫn lỗi');
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi trả lời' }));
+    expect(await within(panel()).findByText('Waiting for you')).toBeInTheDocument();
+    expect(within(panel()).getByText('Nodi support')).toBeInTheDocument();
+    await user.type(within(panel()).getByLabelText('Reply'), 'Đã thử, vẫn lỗi');
+    await user.click(within(panel()).getByRole('button', { name: 'Send reply' }));
 
-    expect(await within(panel()).findByText('Đang xử lý')).toBeInTheDocument();
+    expect(await within(panel()).findByText('In progress')).toBeInTheDocument();
     expect(within(panel()).getByText('Đã thử, vẫn lỗi')).toBeInTheDocument();
-    expect(within(panel()).getByLabelText('Trả lời')).toHaveValue('');
-    expect(within(panel()).getByLabelText('Trả lời')).toHaveFocus();
+    expect(within(panel()).getByLabelText('Reply')).toHaveValue('');
+    expect(within(panel()).getByLabelText('Reply')).toHaveFocus();
     expect(calls.find((call) => call.path === `${REQUESTS}/12/messages`)?.body).toEqual({
       body: 'Đã thử, vẫn lỗi',
       uploadIds: [],
     });
   });
 
-  it('replaces the reply box of a closed request with "Yêu cầu đã đóng" and "Tạo yêu cầu mới"', async () => {
+  it('replaces the reply box of a closed request with "This request is closed" and "Create a new request"', async () => {
     stubApi(
       api({
         [`GET ${REQUESTS}/9`]: {
@@ -283,15 +301,15 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = await openRequests('request-9');
 
-    expect(await within(panel()).findByText('Yêu cầu đã đóng')).toBeInTheDocument();
-    expect(within(panel()).queryByLabelText('Trả lời')).toBeNull();
-    expect(within(panel()).queryByRole('button', { name: 'Huỷ yêu cầu' })).toBeNull();
-    await user.click(within(panel()).getByRole('button', { name: 'Tạo yêu cầu mới' }));
+    expect(await within(panel()).findByText('This request is closed')).toBeInTheDocument();
+    expect(within(panel()).queryByLabelText('Reply')).toBeNull();
+    expect(within(panel()).queryByRole('button', { name: 'Cancel request' })).toBeNull();
+    await user.click(within(panel()).getByRole('button', { name: 'Create a new request' }));
 
-    expect(within(panel()).getByRole('heading', { name: 'Yêu cầu mới' })).toBeInTheDocument();
+    expect(within(panel()).getByRole('heading', { name: 'New request' })).toBeInTheDocument();
   });
 
-  it('closes a resolved request on "Đã xong, đóng yêu cầu" and removes the reply box', async () => {
+  it('closes a resolved request on "Done, close the request" and removes the reply box', async () => {
     const calls = stubApi(
       api({
         [`GET ${REQUESTS}/12`]: { status: 200, body: detail({ status: 'resolved' }) },
@@ -303,17 +321,17 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = await openRequests('request-12');
 
-    expect(await within(panel()).findByText('Đã giải quyết')).toBeInTheDocument();
-    expect(within(panel()).queryByRole('button', { name: 'Huỷ yêu cầu' })).toBeNull();
-    await user.click(within(panel()).getByRole('button', { name: 'Đã xong, đóng yêu cầu' }));
+    expect(await within(panel()).findByText('Resolved')).toBeInTheDocument();
+    expect(within(panel()).queryByRole('button', { name: 'Cancel request' })).toBeNull();
+    await user.click(within(panel()).getByRole('button', { name: 'Done, close the request' }));
 
-    expect(await within(panel()).findByText('Đã đóng')).toBeInTheDocument();
-    expect(within(panel()).queryByLabelText('Trả lời')).toBeNull();
+    expect(await within(panel()).findByText('Closed')).toBeInTheDocument();
+    expect(within(panel()).queryByLabelText('Reply')).toBeNull();
     expect(calls.filter((call) => call.path === `${REQUESTS}/12/confirm`)).toHaveLength(1);
     await waitFor(() => expect(panel()).toContainElement(document.activeElement as HTMLElement));
   });
 
-  it('asks before cancelling, and "Không" keeps the request open', async () => {
+  it('asks before cancelling, and "No" keeps the request open', async () => {
     const calls = stubApi(
       api({
         [`GET ${REQUESTS}/12`]: { status: 200, body: detail({ status: 'in_progress' }) },
@@ -326,16 +344,16 @@ describe('RequestsTab', () => {
     const { user, panel } = await openRequests('request-12');
     const cancels = () => calls.filter((call) => call.path === `${REQUESTS}/12/cancel`);
 
-    await user.click(await within(panel()).findByRole('button', { name: 'Huỷ yêu cầu' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Cancel request' }));
     expect(cancels()).toEqual([]);
-    await user.click(within(panel()).getByRole('button', { name: 'Không' }));
+    await user.click(within(panel()).getByRole('button', { name: 'No' }));
     expect(cancels()).toEqual([]);
-    expect(within(panel()).getByRole('button', { name: 'Huỷ yêu cầu' })).toHaveFocus();
+    expect(within(panel()).getByRole('button', { name: 'Cancel request' })).toHaveFocus();
 
-    await user.click(within(panel()).getByRole('button', { name: 'Huỷ yêu cầu' }));
-    await user.click(within(panel()).getByRole('button', { name: 'Có, huỷ yêu cầu' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Cancel request' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Yes, cancel the request' }));
 
-    expect(await within(panel()).findByText('Bạn đã huỷ yêu cầu')).toBeInTheDocument();
+    expect(await within(panel()).findByText('You cancelled the request')).toBeInTheDocument();
     expect(cancels()).toHaveLength(1);
     await waitFor(() => expect(panel()).toContainElement(document.activeElement as HTMLElement));
   });
@@ -350,10 +368,10 @@ describe('RequestsTab', () => {
       }),
     );
     const { user, panel } = await openRequests();
-    await user.click(await within(panel()).findByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
     await fillForm(user, 'Không thấy credit');
 
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
 
     await waitFor(() => expect(idempotencyKeys(REQUESTS)).toHaveLength(1));
     expect(idempotencyKeys(REQUESTS)[0]).toMatch(
@@ -371,14 +389,14 @@ describe('RequestsTab', () => {
     const { user, panel } = await openRequests('request-12');
     const reads = () => calls.filter((call) => call.path === `${REQUESTS}/12`).length;
 
-    await user.click(await within(panel()).findByRole('button', { name: 'Huỷ yêu cầu' }));
-    await user.click(within(panel()).getByRole('button', { name: 'Có, huỷ yêu cầu' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Cancel request' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Yes, cancel the request' }));
 
     expect(await within(panel()).findByRole('alert')).toHaveTextContent(
-      'Yêu cầu vừa được cập nhật — tải lại để xem',
+      'The request was just updated — reload to see it',
     );
     const before = reads();
-    await user.click(within(panel()).getByRole('button', { name: 'Tải lại' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Reload' }));
     await waitFor(() => expect(reads()).toBe(before + 1));
   });
 
@@ -396,17 +414,17 @@ describe('RequestsTab', () => {
       }),
     );
     const { user, panel } = await openRequests();
-    await user.click(await within(panel()).findByRole('button', { name: 'Gửi yêu cầu hỗ trợ' }));
+    await user.click(await within(panel()).findByRole('button', { name: 'Send a support request' }));
     await fillForm(user, 'Không thấy credit');
 
-    await user.dblClick(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    await user.dblClick(within(panel()).getByRole('button', { name: 'Send request' }));
     await waitFor(() => expect(idempotencyKeys(REQUESTS)).toHaveLength(1));
     release({ status: 500, body: { status: 500 } });
-    expect(await within(panel()).findByRole('alert')).toHaveTextContent('Chưa gửi được');
-    await user.click(within(panel()).getByRole('button', { name: 'Gửi yêu cầu' }));
+    expect(await within(panel()).findByRole('alert')).toHaveTextContent("Couldn't send");
+    await user.click(within(panel()).getByRole('button', { name: 'Send request' }));
 
     expect(
-      await within(panel()).findByRole('heading', { name: 'Yêu cầu #13' }),
+      await within(panel()).findByRole('heading', { name: 'Request #13' }),
     ).toBeInTheDocument();
     const keys = idempotencyKeys(REQUESTS);
     expect(keys).toHaveLength(2);
@@ -429,13 +447,13 @@ describe('RequestsTab', () => {
       api({ [`GET ${REQUESTS}/12`]: { status: 200, body: detail({ messages: [message] }) } }),
     );
     const { panel } = await openRequests('request-12');
-    const image = await within(panel()).findByRole('img', { name: 'Ảnh đính kèm 1' });
+    const image = await within(panel()).findByRole('img', { name: 'Attached image 1' });
     const reads = () => calls.filter((call) => call.path === `${REQUESTS}/12`).length;
     await waitFor(() => expect(reads()).toBe(1));
 
     fireEvent.error(image);
     await waitFor(() => expect(reads()).toBe(2));
-    fireEvent.error(within(panel()).getByRole('img', { name: 'Ảnh đính kèm 1' }));
+    fireEvent.error(within(panel()).getByRole('img', { name: 'Attached image 1' }));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(reads()).toBe(2);
@@ -469,29 +487,60 @@ describe('RequestsTab', () => {
     );
     const { user, panel } = renderWidget('/workflows');
 
-    const launcher = await screen.findByRole('button', { name: 'Trợ giúp. Có phản hồi mới' });
+    const launcher = await screen.findByRole('button', { name: 'Help. New reply' });
     await user.click(launcher);
-    await user.click(within(panel()).getByRole('tab', { name: 'Yêu cầu. Có phản hồi mới' }));
+    await user.click(within(panel()).getByRole('tab', { name: 'Requests. New reply' }));
     await user.click(await within(panel()).findByRole('button', { name: /Không thấy credit/ }));
 
-    expect(await screen.findByRole('button', { name: 'Trợ giúp' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Help' })).toBeInTheDocument();
+  });
+
+  it('shows message times in Vietnam time with a 24-hour clock in the active language order', async () => {
+    stubApi(api({ [`GET ${REQUESTS}/12`]: { status: 200, body: detail() } }));
+    const { panel } = await openRequests('request-12');
+
+    const times = await within(panel()).findAllByText(/15:00/);
+    expect(times[0]).toHaveTextContent('10/19/26');
+    await i18n.changeLanguage('vi');
+    try {
+      await waitFor(() =>
+        expect(within(panel()).getAllByText(/15:00/)[0]).toHaveTextContent('15:00 19/10/26'),
+      );
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
+  it('reads a request thread in Vietnamese once the language is switched', async () => {
+    await i18n.changeLanguage('vi');
+    try {
+      stubApi(api({ [`GET ${REQUESTS}/12`]: { status: 200, body: detail() } }));
+      const { panel } = await openRequests('request-12');
+
+      expect(await within(panel()).findByText('Chờ bạn phản hồi')).toBeInTheDocument();
+      expect(within(panel()).getByText('Nodi hỗ trợ')).toBeInTheDocument();
+      expect(within(panel()).getByLabelText('Trả lời')).toBeInTheDocument();
+      expect(within(panel()).getByRole('button', { name: 'Huỷ yêu cầu' })).toBeInTheDocument();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it.each([
     ['with the contact line when one is configured', 'hotro@nodi.vn'],
     ['without a contact line when none is configured', undefined],
   ])(
-    'reads "Tài khoản của bạn đang bị tạm khoá" for a suspended member, %s',
+    'reads "Your account is suspended" for a suspended member, %s',
     async (_case, email) => {
       const calls = stubApi(
         api({ [`GET ${REQUESTS}`]: { status: 403, body: { status: 403 } } }, email),
       );
       const { panel } = await openRequests();
 
-      const notice = await within(panel()).findByText('Tài khoản của bạn đang bị tạm khoá');
+      const notice = await within(panel()).findByText('Your account is suspended');
       if (email) {
         const contact = await within(panel()).findByRole('link', {
-          name: `Gửi email tới ${email}`,
+          name: `Email ${email}`,
         });
         expect(contact).toHaveAttribute('href', `mailto:${email}`);
         expect(
@@ -502,9 +551,9 @@ describe('RequestsTab', () => {
           expect(calls.some((call) => call.path === '/api/v1/support/settings')).toBe(true),
         );
         await new Promise((resolve) => setTimeout(resolve, 20));
-        expect(within(panel()).queryByText(/Cần người hỗ trợ/)).toBeNull();
+        expect(within(panel()).queryByText(/Need help from a person/)).toBeNull();
       }
-      expect(within(panel()).queryByRole('button', { name: 'Gửi yêu cầu hỗ trợ' })).toBeNull();
+      expect(within(panel()).queryByRole('button', { name: 'Send a support request' })).toBeNull();
     },
   );
 });

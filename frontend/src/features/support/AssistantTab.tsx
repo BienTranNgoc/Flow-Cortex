@@ -1,11 +1,12 @@
 import type { SupportAssistantHistoryMessage } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { LoadFailed } from './GuidesTab';
 import { ContactLine } from './HomeTab';
 import { Markdown } from './Markdown';
 import { SuspendedNotice } from './RequestForm';
-import { supportCopy } from './supportCopy';
+import { problemMessage } from './supportProblems';
 import { useSupportPanel, type RequestPrefill } from './supportPanelState';
 import {
   isMinuteCap,
@@ -20,7 +21,6 @@ import { isSuspended } from './useRequests';
 import { supportProblemCode } from './useSupportKb';
 import './assistant.css';
 
-const copy = supportCopy.assistant;
 const SERVER_OFF_CODES = new Set(['assistant-paused', 'assistant-disabled']);
 
 /** A refused question that goes back into the box instead of staying in the log as unsent. */
@@ -43,6 +43,7 @@ function ReplyOffers({
   answered,
   prefill,
 }: Readonly<{ answered: boolean; prefill: RequestPrefill }>) {
+  const { t } = useTranslation();
   const { dispatch, member } = useSupportPanel();
   if (member) {
     return (
@@ -51,7 +52,7 @@ function ReplyOffers({
         className={answered ? 'assistant-link' : 'support-button'}
         onClick={() => dispatch({ type: 'startRequest', prefill })}
       >
-        {answered ? copy.escalate : copy.newRequest}
+        {answered ? t('support.assistant.escalate') : t('support.assistant.newRequest')}
       </button>
     );
   }
@@ -60,10 +61,10 @@ function ReplyOffers({
       {!answered && (
         <div className="assistant-offers">
           <Link className="support-button assistant-offers__link" to="/login">
-            {copy.signIn}
+            {t('support.assistant.signIn')}
           </Link>
           <Link className="support-button assistant-offers__link" to="/register">
-            {copy.register}
+            {t('support.assistant.register')}
           </Link>
         </div>
       )}
@@ -76,6 +77,7 @@ function AssistantMessage({
   message,
   prefill,
 }: Readonly<{ message: SupportAssistantHistoryMessage; prefill: RequestPrefill }>) {
+  const { t } = useTranslation();
   const { dispatch } = useSupportPanel();
   const outcome = message.outcome ?? 'answered';
   // Messages saved before sources were recorded carry none.
@@ -83,17 +85,17 @@ function AssistantMessage({
 
   return (
     <li className="assistant-message assistant-message--assistant">
-      <Speaker name={copy.assistantName} />
+      <Speaker name={t('support.assistant.assistantName')} />
       {outcome === 'answered' ? (
         <Markdown>{message.text}</Markdown>
       ) : (
         <p className="assistant-message__fixed">
-          {outcome === 'blocked' ? copy.blocked : copy.noAnswer}
+          {outcome === 'blocked' ? t('support.assistant.blocked') : t('support.assistant.noAnswer')}
         </p>
       )}
       {outcome === 'answered' && sources.length > 0 && (
         <div className="assistant-sources">
-          <span className="assistant-sources__label">{copy.sources}</span>
+          <span className="assistant-sources__label">{t('support.assistant.sources')}</span>
           <ul className="assistant-sources__list">
             {sources.map((source) => (
               <li key={source.slug}>
@@ -132,30 +134,32 @@ function requestPrefill(
 }
 
 function UserMessage({ text }: Readonly<{ text: string }>) {
+  const { t } = useTranslation();
   return (
     <li className="assistant-message assistant-message--user">
-      <Speaker name={copy.you} />
+      <Speaker name={t('support.assistant.you')} />
       {text}
     </li>
   );
 }
 
 function UnavailableNotice() {
+  const { t } = useTranslation();
   const { dispatch, member } = useSupportPanel();
   return (
     <div className="support-state assistant-notice" role="status">
-      <p>{copy.unavailableNotice}</p>
+      <p>{t('support.assistant.unavailableNotice')}</p>
       {member ? (
         <button
           type="button"
           className="support-button"
           onClick={() => dispatch({ type: 'selectTab', tab: 'guides' })}
         >
-          {copy.toGuides}
+          {t('support.assistant.toGuides')}
         </button>
       ) : (
         <Link className="support-button assistant-offers__link" to="/login">
-          {copy.toSignIn}
+          {t('support.assistant.toSignIn')}
         </Link>
       )}
     </div>
@@ -163,20 +167,22 @@ function UnavailableNotice() {
 }
 
 function SendFailed({ error, onRetry }: Readonly<{ error: unknown; onRetry: () => void }>) {
+  const { t } = useTranslation();
   const { member } = useSupportPanel();
   const code = supportProblemCode(error);
 
   if (code === 'assistant-quota') {
+    const resumeAt = resumeTime(error);
     return (
       <div className="support-state" role="alert">
         <p>
           {isMinuteCap(error)
-            ? copy.tooFast(resumeTime(error))
-            : supportCopy.problems['assistant-quota'](resumeTime(error))}
+            ? t('support.assistant.tooFast', { resumeAt })
+            : problemMessage(code, { resumeAt }, t)}
         </p>
         {!member && !isMinuteCap(error) && (
           <Link className="support-button assistant-offers__link" to="/login">
-            {copy.signInForMore}
+            {t('support.assistant.signInForMore')}
           </Link>
         )}
       </div>
@@ -184,21 +190,24 @@ function SendFailed({ error, onRetry }: Readonly<{ error: unknown; onRetry: () =
   }
   const final = code === 'question-too-long' || code === 'support-disabled';
   const message =
-    final || code === 'assistant-unavailable' ? supportCopy.problems[code] : copy.sendFailed;
+    final || code === 'assistant-unavailable'
+      ? problemMessage(code, {}, t)
+      : t('support.assistant.sendFailed');
   return (
     <div className="support-state" role="alert">
       <p>{message}</p>
       {!final && (
         <button type="button" className="support-button" onClick={onRetry}>
-          {copy.retry}
+          {t('support.assistant.retry')}
         </button>
       )}
     </div>
   );
 }
 
-/** Trợ lý: the conversation log, the reply state, and the question box under it. */
+/** Assistant: the conversation log, the reply state, and the question box under it. */
 export function AssistantTab() {
+  const { t } = useTranslation();
   const { state, dispatch, member } = useSupportPanel();
   const availability = useAssistantAvailability();
   const { query: history, startOver } = useAssistantConversation(member);
@@ -278,11 +287,11 @@ export function AssistantTab() {
   return (
     <div className="assistant">
       {messages.length === 0 && unsent === undefined && history.isSuccess && (
-        <p className="assistant-intro">{copy.intro}</p>
+        <p className="assistant-intro">{t('support.assistant.intro')}</p>
       )}
       {history.isPending && (
         <p className="support-state" role="status">
-          {supportCopy.common.loading}
+          {t('support.common.loading')}
         </p>
       )}
       {history.isError &&
@@ -296,7 +305,7 @@ export function AssistantTab() {
         className="assistant-log"
         role="log"
         aria-live="polite"
-        aria-label={copy.logLabel}
+        aria-label={t('support.assistant.logLabel')}
         tabIndex={0}
       >
         {messages.map((message, index) =>
@@ -314,7 +323,7 @@ export function AssistantTab() {
       </ol>
       {ask.isPending && (
         <p className="assistant-typing" role="status">
-          {copy.typing}
+          {t('support.assistant.typing')}
         </p>
       )}
       {ask.isError &&
@@ -330,12 +339,12 @@ export function AssistantTab() {
       {(availability === 'off' || serverOff) && <UnavailableNotice />}
       {messages.length > 0 && (
         <button type="button" className="assistant-link" onClick={newConversation}>
-          {copy.newConversation}
+          {t('support.assistant.newConversation')}
         </button>
       )}
       <form className="assistant-form" onSubmit={submit}>
         <label className="assistant-form__label" htmlFor={inputId}>
-          {copy.inputLabel}
+          {t('support.assistant.inputLabel')}
         </label>
         <textarea
           ref={inputRef}
@@ -343,7 +352,7 @@ export function AssistantTab() {
           className="assistant-form__input"
           rows={3}
           value={draft}
-          placeholder={copy.inputPlaceholder}
+          placeholder={t('support.assistant.inputPlaceholder')}
           disabled={!open}
           aria-describedby={counterId}
           onChange={(event) => setDraft(event.target.value)}
@@ -358,7 +367,7 @@ export function AssistantTab() {
                 : 'assistant-counter'
             }
           >
-            {copy.counter(length, MAX_QUESTION_LENGTH)}
+            {t('support.assistant.counter', { length, max: MAX_QUESTION_LENGTH })}
           </span>
           <button
             type="submit"
@@ -366,7 +375,7 @@ export function AssistantTab() {
             disabled={!canSend && !ask.isPending}
             aria-disabled={ask.isPending || undefined}
           >
-            {copy.send}
+            {t('support.assistant.send')}
           </button>
         </div>
       </form>

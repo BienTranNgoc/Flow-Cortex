@@ -7,11 +7,11 @@ import {
 } from '@flow-cortex/api-client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useForm, type FieldPath } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { usePageTitle } from '../../../app/usePageTitle';
 import { Markdown } from '../Markdown';
-import { supportCopy } from '../supportCopy';
 import { supportProblemCode } from '../unwrapSupport';
 import './kb.css';
 import {
@@ -23,24 +23,28 @@ import {
   useSaveArticleMutation,
 } from './useKnowledgeBase';
 
-const copy = supportCopy.editor;
 const NEW_ARTICLE = 'new';
 const FEATURED_POSITIONS = ['1', '2', '3'] as const;
 
+// Validation messages are locale keys, translated where they render.
 const articleSchema = z.object({
-  title: z.string().trim().min(1, copy.validation.title).max(150, copy.validation.title),
+  title: z
+    .string()
+    .trim()
+    .min(1, 'support.editor.validation.title')
+    .max(150, 'support.editor.validation.title'),
   slug: z
     .string()
-    .min(1, copy.validation.slugLength)
-    .max(80, copy.validation.slugLength)
-    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, copy.validation.slugPattern),
-  groupId: z.string().min(1, copy.validation.group),
+    .min(1, 'support.editor.validation.slugLength')
+    .max(80, 'support.editor.validation.slugLength')
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'support.editor.validation.slugPattern'),
+  groupId: z.string().min(1, 'support.editor.validation.group'),
   // Disabled for an archived article, where the form reads no value.
   featuredPosition: z.enum(['', ...FEATURED_POSITIONS]).optional(),
   body: z
     .string()
-    .max(20000, copy.validation.body)
-    .refine((body) => body.trim().length > 0, copy.validation.body),
+    .max(20000, 'support.editor.validation.body')
+    .refine((body) => body.trim().length > 0, 'support.editor.validation.body'),
 });
 
 type ArticleFormValues = z.infer<typeof articleSchema>;
@@ -87,32 +91,33 @@ const FIELD_PROBLEMS: Partial<Record<string, Field>> = {
 };
 
 const VALIDATION_MESSAGES: Record<Field, string> = {
-  title: copy.validation.title,
-  slug: copy.validation.slugPattern,
-  groupId: copy.validation.group,
-  featuredPosition: copy.fields.featuredArchived,
-  body: copy.validation.body,
+  title: 'support.editor.validation.title',
+  slug: 'support.editor.validation.slugPattern',
+  groupId: 'support.editor.validation.group',
+  featuredPosition: 'support.editor.fields.featuredArchived',
+  body: 'support.editor.validation.body',
 };
 
-/** The problem codes whose message has its own entry in the copy. */
+/** The locale key for the problem codes that have their own message. */
 function problemMessage(code: string): string | undefined {
   switch (code) {
     case 'slug-taken':
     case 'featured-full':
     case 'featured-position-taken':
     case 'article-not-found':
-      return supportCopy.problems[code];
+      return `support.problems.${code}`;
     case 'group-not-found':
-      return copy.validation.group;
+      return 'support.editor.validation.group';
     default:
       return undefined;
   }
 }
 
 export function ArticleEditorPage() {
+  const { t } = useTranslation();
   const { articleId = NEW_ARTICLE } = useParams();
   const id = articleId === NEW_ARTICLE ? undefined : articleId;
-  usePageTitle(id ? copy.editTitle : copy.createTitle);
+  usePageTitle(t(id ? 'support.editor.editTitle' : 'support.editor.createTitle'));
   const articleQuery = useArticleQuery(id);
   const groupsQuery = useGroupsQuery();
 
@@ -125,7 +130,9 @@ export function ArticleEditorPage() {
   if (notFound || (failed && missing)) {
     content = (
       <div className="cortex-admin-error">
-        <p role="alert">{notFound ? copy.notFound : supportCopy.common.loadFailed}</p>
+        <p role="alert">
+          {notFound ? t('support.editor.notFound') : t('support.common.loadFailed')}
+        </p>
         {!notFound && (
           <button
             type="button"
@@ -135,24 +142,24 @@ export function ArticleEditorPage() {
               void groupsQuery.refetch();
             }}
           >
-            {supportCopy.common.retry}
+            {t('support.common.retry')}
           </button>
         )}
       </div>
     );
   } else if (missing || !groupsQuery.data) {
-    content = <output>{supportCopy.common.loading}</output>;
+    content = <output>{t('support.common.loading')}</output>;
   } else if (groupsQuery.data.length === 0) {
     content = (
       <div className="cortex-admin-empty">
-        <p>{copy.noGroups}</p>
-        <Link to="/support/groups">{copy.toGroups}</Link>
+        <p>{t('support.editor.noGroups')}</p>
+        <Link to="/support/groups">{t('support.editor.toGroups')}</Link>
       </div>
     );
   } else {
     content = (
       <>
-        {failed && <p className="cortex-admin-stale">{supportCopy.common.refreshFailed}</p>}
+        {failed && <p className="cortex-admin-stale">{t('support.common.refreshFailed')}</p>}
         <ArticleForm
           key={id ?? NEW_ARTICLE}
           id={id}
@@ -166,12 +173,12 @@ export function ArticleEditorPage() {
   return (
     <main>
       <Link className="cortex-admin-back-link" to="/support/articles">
-        {copy.backToList}
+        {t('support.editor.backToList')}
       </Link>
       <div className="cortex-admin-page-heading">
         <div>
-          <p className="cortex-admin-eyebrow">{supportCopy.articles.eyebrow}</p>
-          <h1>{id ? copy.editTitle : copy.createTitle}</h1>
+          <p className="cortex-admin-eyebrow">{t('support.articles.eyebrow')}</p>
+          <h1>{t(id ? 'support.editor.editTitle' : 'support.editor.createTitle')}</h1>
         </div>
       </div>
       {content}
@@ -188,6 +195,7 @@ function ArticleForm({
   article: AdminSupportKbArticle | undefined;
   groups: AdminSupportKbGroup[];
 }>) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const formId = useId();
   const save = useSaveArticleMutation(id);
@@ -255,7 +263,7 @@ function ArticleForm({
           );
           return;
         }
-        setFormError(message ?? supportCopy.common.saveFailed);
+        setFormError(message ?? 'support.common.saveFailed');
       },
     });
   });
@@ -268,8 +276,8 @@ function ArticleForm({
   });
   const fieldError = (field: Field) =>
     errors[field] && (
-      <p id={errorId(field)} role="alert">
-        {errors[field]?.message}
+      <p id={errorId(field)} className="cortex-admin-form-error" role="alert">
+        {t(errors[field]?.message ?? '')}
       </p>
     );
   const slugHintId = `${formId}-slug-hint`;
@@ -289,22 +297,22 @@ function ArticleForm({
           />
         )}
         <div className="cortex-admin-field">
-          <label htmlFor={fieldId('title')}>{copy.fields.title}</label>
+          <label htmlFor={fieldId('title')}>{t('support.editor.fields.title')}</label>
           <input {...fieldProps('title')} {...register('title')} />
           {fieldError('title')}
         </div>
         <div className="cortex-admin-field">
-          <label htmlFor={fieldId('slug')}>{copy.fields.slug}</label>
+          <label htmlFor={fieldId('slug')}>{t('support.editor.fields.slug')}</label>
           <input {...fieldProps('slug', slugHintId)} autoComplete="off" {...register('slug')} />
           <small id={slugHintId} className="support-hint">
-            {copy.fields.slugHint}
+            {t('support.editor.fields.slugHint')}
           </small>
           {fieldError('slug')}
         </div>
         <div className="cortex-admin-field">
-          <label htmlFor={fieldId('groupId')}>{copy.fields.group}</label>
+          <label htmlFor={fieldId('groupId')}>{t('support.editor.fields.group')}</label>
           <select {...fieldProps('groupId')} {...register('groupId')}>
-            <option value="">{copy.fields.groupPlaceholder}</option>
+            <option value="">{t('support.editor.fields.groupPlaceholder')}</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -314,41 +322,43 @@ function ArticleForm({
           {fieldError('groupId')}
         </div>
         <div className="cortex-admin-field">
-          <label htmlFor={fieldId('featuredPosition')}>{copy.fields.featured}</label>
+          <label htmlFor={fieldId('featuredPosition')}>{t('support.editor.fields.featured')}</label>
           <select
             {...fieldProps('featuredPosition', archived ? featuredHintId : undefined)}
             disabled={archived}
             {...register('featuredPosition')}
           >
-            <option value="">{copy.fields.featuredNone}</option>
+            <option value="">{t('support.editor.fields.featuredNone')}</option>
             {FEATURED_POSITIONS.map((position) => (
               <option key={position} value={position}>
-                {copy.fields.featuredOption(Number(position))}
+                {t('support.editor.fields.featuredOption', { position })}
               </option>
             ))}
           </select>
           {archived && (
             <small id={featuredHintId} className="support-hint">
-              {copy.fields.featuredArchived}
+              {t('support.editor.fields.featuredArchived')}
             </small>
           )}
           {fieldError('featuredPosition')}
         </div>
         <div className="cortex-admin-field support-body-field">
-          <label htmlFor={fieldId('body')}>{copy.fields.body}</label>
+          <label htmlFor={fieldId('body')}>{t('support.editor.fields.body')}</label>
           <textarea rows={18} {...fieldProps('body')} {...register('body')} />
           {fieldError('body')}
         </div>
-        {formError && <p role="alert">{formError}</p>}
+        {formError && <p role="alert">{t(formError)}</p>}
         <div className="support-actions">
           <button type="submit" className="cortex-admin-btn cortex-admin-btn--primary" aria-disabled={save.isPending}>
             {save.isPending
-              ? supportCopy.common.saving
+              ? t('support.common.saving')
               : id
-                ? supportCopy.common.save
-                : copy.create}
+                ? t('support.common.save')
+                : t('support.editor.create')}
           </button>
-          {saved && !isDirty && <output className="cortex-admin-form-success">{copy.saved}</output>}
+          {saved && !isDirty && (
+            <output className="cortex-admin-form-success">{t('support.editor.saved')}</output>
+          )}
         </div>
       </form>
       <Preview body={watch('body')} />
@@ -365,6 +375,7 @@ function ArticleStatus({
   dirty: boolean;
   onDone: (result: AdminSupportKbArticle) => void;
 }>) {
+  const { t } = useTranslation();
   const change = useArticleStatusMutation(article.id);
   const refreshArticle = useRefreshArticle();
   const noteId = useId();
@@ -382,18 +393,20 @@ function ArticleStatus({
   }, [refocus, article.status]);
   const actions: { action: 'publish' | 'archive'; label: string }[] = {
     draft: [
-      { action: 'publish' as const, label: copy.publish },
-      { action: 'archive' as const, label: copy.archive },
+      { action: 'publish' as const, label: t('support.editor.publish') },
+      { action: 'archive' as const, label: t('support.editor.archive') },
     ],
-    published: [{ action: 'archive' as const, label: copy.archive }],
-    archived: [{ action: 'publish' as const, label: copy.republish }],
+    published: [{ action: 'archive' as const, label: t('support.editor.archive') }],
+    archived: [{ action: 'publish' as const, label: t('support.editor.republish') }],
   }[article.status];
   const code = supportProblemCode(change.error);
 
   return (
     <div className="support-status">
       <p>
-        <strong>{copy.status(supportCopy.articleStatus[article.status])}</strong>
+        <strong>
+          {t('support.editor.status', { label: t(`support.articleStatus.${article.status}`) })}
+        </strong>
       </p>
       <div className="support-actions" ref={actionsRef}>
         {actions.map(({ action, label }) => (
@@ -413,20 +426,24 @@ function ArticleStatus({
               change.mutate(action, {
                 onSuccess: (result) => {
                   onDone(result);
-                  setAnnouncement(copy.statusChanged(supportCopy.articleStatus[result.status]));
+                  setAnnouncement(
+                    t('support.editor.statusChanged', {
+                      label: t(`support.articleStatus.${result.status}`),
+                    }),
+                  );
                   setRefocus(true);
                 },
                 onError: () => void refreshArticle(article.id),
               });
             }}
           >
-            {change.isPending && change.variables === action ? copy.working : label}
+            {change.isPending && change.variables === action ? t('support.editor.working') : label}
           </button>
         ))}
       </div>
       {dirty && (
         <small id={noteId} className="support-hint">
-          {copy.saveBeforeStatus}
+          {t('support.editor.saveBeforeStatus')}
         </small>
       )}
       <p role="status" className="support-announcement">
@@ -435,8 +452,8 @@ function ArticleStatus({
       {change.error && (
         <p role="alert">
           {code === 'article-not-found'
-            ? supportCopy.problems['article-not-found']
-            : supportCopy.common.saveFailed}
+            ? t('support.problems.article-not-found')
+            : t('support.common.saveFailed')}
         </p>
       )}
     </div>
@@ -444,14 +461,15 @@ function ArticleStatus({
 }
 
 function Preview({ body }: Readonly<{ body: string }>) {
+  const { t } = useTranslation();
   const headingId = useId();
   return (
     <section className="support-preview" aria-labelledby={headingId}>
-      <h2 id={headingId}>{copy.previewHeading}</h2>
+      <h2 id={headingId}>{t('support.editor.previewHeading')}</h2>
       {body.trim() ? (
         <Markdown>{body}</Markdown>
       ) : (
-        <p className="support-hint">{copy.previewEmpty}</p>
+        <p className="support-hint">{t('support.editor.previewEmpty')}</p>
       )}
     </section>
   );
