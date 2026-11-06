@@ -85,7 +85,7 @@ export function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { passwordReset } = useFeatures();
+  const { passwordReset, supportWidget } = useFeatures();
   const loginMutation = useLoginMutation();
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
@@ -160,6 +160,10 @@ export function LoginPage() {
     ? accountLockedMessage(loginMutation.error, t, activeLocale())
     : undefined;
   const resetLink = <Link to="/forgot-password" />;
+  // A link to a panel that never opens would be a dead end, so the sentence stays plain text.
+  const helpParams = new URLSearchParams(searchParams);
+  helpParams.set('help', 'home');
+  const helpLink = supportWidget ? <Link to={{ search: `?${helpParams}` }} /> : <></>;
   const alertBody = (() => {
     if (notConfirmed) return t('auth.login.emailNotConfirmed');
     if (wrongCredentials) return failureMessage(loginMutation, t, 'auth.login.failedFallback');
@@ -193,7 +197,9 @@ export function LoginPage() {
       }
       return lockedText ?? failureMessage(loginMutation, t, 'auth.login.retryLater');
     }
-    return oauthError ? t(oauthErrorKey(oauthError)) : undefined;
+    return oauthError ? (
+      <Trans i18nKey={oauthErrorKey(oauthError)} components={{ help: helpLink }} />
+    ) : undefined;
   })();
   const dataState = submitState(submitSucceeded, isPending);
 
