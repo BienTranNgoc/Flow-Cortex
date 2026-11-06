@@ -65,7 +65,7 @@ export function WorkflowCard({ workflow }: Readonly<WorkflowCardProps>) {
               <li className="workflow-card__chip">{t('dashboard.card.sharedWithAll')}</li>
             )}
             <li className="workflow-card__chip">{etaLabel(meta.etaSeconds, t)}</li>
-            <li className="workflow-card__chip">{t('dashboard.card.steps', { n: stepCount })}</li>
+            <li className="workflow-card__chip">{t('dashboard.card.steps', { count: stepCount, n: stepCount })}</li>
           </ul>
         </div>
 

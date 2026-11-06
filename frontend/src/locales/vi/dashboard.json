@@ -21,7 +21,8 @@
     "stepFallback": "Bước {{order}}",
     "etaSeconds": "~{{value}} giây",
     "etaMinutes": "~{{value}} phút",
-    "steps": "{{n}} bước",
+    "steps_one": "{{n}} bước",
+    "steps_other": "{{n}} bước",
     "launch": "Khởi chạy"
   },
   "thumb": {
@@ -35,7 +36,8 @@
     "audio": "Âm thanh",
     "demo": "Demo",
     "production": "Sản xuất",
-    "count": "{{n}} quy trình"
+    "count_one": "{{n}} quy trình",
+    "count_other": "{{n}} quy trình"
   },
   "search": {
     "label": "Tìm quy trình",

@@ -41,6 +41,9 @@ describe('SmsOutboxPage', () => {
     renderRoute('/sms-outbox', '/sms-outbox', <SmsOutboxPage />);
 
     const table = await screen.findByRole('table');
+    const region = screen.getByRole('region', { name: 'SMS outbox table' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(region).toContainElement(table);
     expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
       'Number',
       'Text',

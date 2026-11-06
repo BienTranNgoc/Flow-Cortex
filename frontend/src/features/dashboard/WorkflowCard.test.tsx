@@ -16,6 +16,26 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   ],
 };
 
+describe('WorkflowCard in English', () => {
+  it('says "step" for one step and "steps" for several', () => {
+    const single = { ...PRODUCT_VIDEO, steps: (PRODUCT_VIDEO.steps ?? []).slice(0, 1) };
+    const { unmount } = render(
+      <MemoryRouter>
+        <WorkflowCard workflow={single} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('1 step')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <MemoryRouter>
+        <WorkflowCard workflow={PRODUCT_VIDEO} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('3 steps')).toBeInTheDocument();
+  });
+});
+
 describe('WorkflowCard in Vietnamese', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('vi');

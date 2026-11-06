@@ -49,7 +49,8 @@ function safeName(workflow: WorkflowResponse, t: TFunction): string {
 }
 
 function stepCount(count: number, t: TFunction): string {
-  return t(count === 1 ? 'workflow.list.stepOne' : 'workflow.list.stepOther', {
+  return t('workflow.list.stepCount', {
+    count,
     n: formatNumber(count, activeLocale()),
   });
 }
@@ -364,6 +365,7 @@ export function WorkflowsListPage() {
           <footer className="wf-list__footer">
             <span>
               {t('workflow.list.showing', {
+                count: total,
                 shown: formatNumber(filtered.length, locale),
                 total: formatNumber(total, locale),
               })}

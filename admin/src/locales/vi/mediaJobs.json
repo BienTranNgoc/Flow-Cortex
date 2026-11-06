@@ -1,6 +1,8 @@
 {
   "title": "Tác vụ media",
-  "noun": "tác vụ media",
+  "noun_one": "tác vụ media",
+  "noun_other": "tác vụ media",
+  "tableLabel": "Bảng tác vụ media",
   "columns": {
     "jobId": "ID tác vụ",
     "run": "Lượt chạy",

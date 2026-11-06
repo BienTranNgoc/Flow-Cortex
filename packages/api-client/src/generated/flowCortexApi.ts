@@ -256,7 +256,7 @@ export interface ProductVideoRunRequest {
   promotion?: string;
   /**
    * @minItems 1
-   * @maxItems 10
+   * @maxItems 1
    */
   uploadIds: string[];
   video: VideoConfig;

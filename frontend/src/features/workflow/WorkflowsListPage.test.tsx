@@ -141,6 +141,18 @@ describe('WorkflowsListPage', () => {
     expect(screen.queryByText('Failed')).not.toBeInTheDocument();
   });
 
+  it('uses the singular for one workflow and one step', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [ECHO] },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    expect(await screen.findByText('Showing 1 of 1 workflow')).toBeInTheDocument();
+    expect(screen.getAllByText('1 step').length).toBeGreaterThan(0);
+  });
+
   it('keeps only the workflows whose name matches the search', async () => {
     const user = userEvent.setup();
     stubApi({

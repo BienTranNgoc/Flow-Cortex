@@ -57,7 +57,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     void fixtureArtifactsCarryAProductVideoThroughTwoGeneratedClips() throws Exception {
         UserView owner = newUser("product-round-trip");
         String token = loginAs(owner);
-        List<UUID> uploads = List.of(uploadImage(owner), uploadImage(owner));
+        List<UUID> uploads = List.of(uploadImage(owner));
 
         ResponseEntity<RunResponseView> started = post("/api/v1/product-videos/runs", token,
                 new ProductVideoView("Bình giữ nhiệt", "Giữ đồ uống tiện lợi", "Đặt mua ngay", uploads,
@@ -124,12 +124,11 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
-                renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString(),
-                renderInputs.get(4).get("key").asString()))
-                .containsExactly("image_1", "image_2", "speech", "generated_video_1", "generated_video_2");
-        assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(speechKey);
-        assertThat(renderJob.get("inputs").get(3).get("objectKey").asString()).isEqualTo(firstClipKey);
-        assertThat(renderJob.get("inputs").get(4).get("objectKey").asString()).isEqualTo(secondClipKey);
+                renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString()))
+                .containsExactly("image_1", "speech", "generated_video_1", "generated_video_2");
+        assertThat(renderJob.get("inputs").get(1).get("objectKey").asString()).isEqualTo(speechKey);
+        assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(firstClipKey);
+        assertThat(renderJob.get("inputs").get(3).get("objectKey").asString()).isEqualTo(secondClipKey);
 
         String videoKey = outputKey(renderJob, "video.mp4");
         put(MEDIA_BUCKET, videoKey, "video/mp4", "fixture mp4");

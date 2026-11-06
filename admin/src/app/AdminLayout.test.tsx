@@ -114,7 +114,8 @@ describe('AdminLayout', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(menu).toBeInTheDocument();
     expect(menu).toHaveTextContent(ADMIN_ME.email);
-    expect(menu).toHaveTextContent(ADMIN_ME.role);
+    expect(menu).toHaveTextContent('Admin');
+    expect(menu).not.toHaveTextContent(ADMIN_ME.role);
     expect(screen.getByRole('menuitem', { name: 'Account details' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Language/ })).not.toBeInTheDocument();
@@ -157,7 +158,8 @@ describe('AdminLayout', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Account' });
     expect(dialog).toHaveTextContent(ADMIN_ME.email);
-    expect(dialog).toHaveTextContent(ADMIN_ME.role);
+    expect(dialog).toHaveTextContent('Admin');
+    expect(dialog).not.toHaveTextContent(ADMIN_ME.role);
     expect(dialog).not.toHaveTextContent('Two-factor authentication');
     expect(dialog).not.toHaveTextContent('Session timeout');
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();

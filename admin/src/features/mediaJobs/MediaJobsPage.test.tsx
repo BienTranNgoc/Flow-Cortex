@@ -211,12 +211,12 @@ describe('MediaJobsPage', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('shows status codes as sent in English and leaves the capability raw', async () => {
+  it('labels the status in English and leaves the capability raw', async () => {
     stubApi({ [JOBS_PATH]: page([job('job-1', { status: 'pending' })]) });
     renderRoute('/media-jobs', '/media-jobs', <MediaJobsPage />);
     const row = (await screen.findByText('job-1')).closest('tr') as HTMLElement;
 
-    expect(within(row).getByText('pending')).toBeInTheDocument();
+    expect(within(row).getByText('Pending')).toBeInTheDocument();
     expect(within(row).getByText('video.transcode')).toBeInTheDocument();
   });
 

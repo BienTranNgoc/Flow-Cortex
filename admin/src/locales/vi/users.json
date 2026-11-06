@@ -38,8 +38,10 @@
   },
   "directory": {
     "label": "Danh sách người dùng",
+    "tableLabel": "Bảng người dùng",
     "title": "Tất cả người dùng",
-    "count": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
+    "count_one": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
+    "count_other": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
     "refresh": "Làm mới",
     "refreshing": "Đang làm mới…",
     "search": "Tìm kiếm",
