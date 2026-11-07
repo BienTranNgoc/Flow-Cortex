@@ -1,7 +1,7 @@
 """The generated contract models accept reference messages and reject what the schemas forbid."""
 
 import json
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 from conftest import CONTRACTS
@@ -9,7 +9,8 @@ from pydantic import ValidationError
 
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.contracts.media_progress import MediaProgress
-from flowcortex_worker.contracts.media_result import MediaResult
+from flowcortex_worker.contracts.media_result import MediaError, MediaResult
+from flowcortex_worker.errors import ErrorCode
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.provider.contracts.provider_script_result import ProviderScriptData
 from flowcortex_worker.provider.contracts.provider_speech_result import ProviderSpeechData
@@ -237,6 +238,37 @@ def test_extract_audio_contract_values_validate() -> None:
                 "message": "no audio",
                 "retryable": False,
             },
+        }
+    )
+
+
+def test_the_worker_error_codes_are_exactly_the_schemas() -> None:
+    assert set(get_args(ErrorCode)) == set(get_args(MediaError.model_fields["code"].annotation))
+
+
+@pytest.mark.parametrize("capability", ["transcribe", "separate_audio", "compose_dub"])
+def test_dub_capabilities_validate(capability: str) -> None:
+    MediaJob.model_validate(job() | {"capability": capability})
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "duration_exceeded",
+        "no_audio_stream",
+        "no_speech_detected",
+        "separation_failed",
+        "compose_failed",
+        "voice_alignment_failed",
+    ],
+)
+def test_dub_error_codes_validate(code: str) -> None:
+    MediaResult.model_validate(
+        result()
+        | {
+            "status": "error",
+            "outputs": [],
+            "error": {"code": code, "message": "limit", "retryable": False},
         }
     )
 

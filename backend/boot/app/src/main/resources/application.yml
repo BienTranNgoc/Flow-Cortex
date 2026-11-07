@@ -312,6 +312,30 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+  # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
+  # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
+  # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,
+  # like the switches above. The key is never logged.
+  dub:
+    enabled: ${FLOWCORTEX_DUB_ENABLED:false}
+    # How fast a voice reads Vietnamese: a line may have floor(rate x slot seconds) characters.
+    chars-per-second: 13
+    # An unedited line expected to take longer than this multiple of its slot is reworded first.
+    shorten-above: 1.2
+    voices:
+      female: Kore
+      male: Charon
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      base-url: https://generativelanguage.googleapis.com/v1beta
+      # Tried in order; the later one is the fallback.
+      translate-models: gemini-3.5-flash-lite,gemini-3.8-flash
+      tts-models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
+      # Per model: attempts, the waits between them, and how long one call may take. The dub
+      # steps' max run times are derived from these.
+      attempts: 3
+      retry-waits: 10s,30s
+      call-timeout: 60s
   # Product Video is opt-in outside development. Turning it off blocks only new
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
@@ -329,6 +353,9 @@ flowcortex:
       extract_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:10m}
       align_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:10m}
       render_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:5m}
+      transcribe: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_TRANSCRIBE:2m}
+      separate_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:4m}
+      compose_dub: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_COMPOSE_DUB:6m}
     # The broker's per-delivery ack deadline; must outlast every max run time.
     consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
     # The provider runtime runs on the same ack deadline, so its ceilings are checked against

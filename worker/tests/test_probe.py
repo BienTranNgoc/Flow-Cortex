@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -203,3 +204,89 @@ def test_ffprobe_may_open_local_files_only(clip: Path) -> None:
     flag = runner.argv.index("-protocol_whitelist")
     assert runner.argv[flag + 1] == "file"
     assert flag < runner.argv.index(str(clip))
+
+
+def make_wav(path: Path, seconds: int) -> Path:
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
+         "-i", f"sine=duration={seconds}:sample_rate=8000", "-c:a", "pcm_s16le", str(path)],
+        check=True,
+    )  # fmt: skip
+    return path
+
+
+def make_silent_clip(path: Path) -> Path:
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=duration=1:size=64x64:rate=5",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)],
+        check=True,
+    )  # fmt: skip
+    return path
+
+
+LIMITS: dict[str, object] = {"maxDurationMs": 60000, "requireAudio": True}
+
+
+def job_with(params: Mapping[str, object]) -> MediaJob:
+    return MediaJob.model_validate(job_body(params=params))
+
+
+def test_a_clip_over_the_duration_limit_is_refused(tmp_path: Path) -> None:
+    long_clip = make_wav(tmp_path / "long.wav", 75)
+
+    with pytest.raises(PermanentError) as failed:
+        probe.handle(job_with(LIMITS), {"media": long_clip}, ProcessRunner())
+
+    assert failed.value.code == "duration_exceeded"
+    assert "60000" in str(failed.value)
+    assert str(long_clip) not in str(failed.value)
+
+
+def test_a_clip_of_exactly_the_duration_limit_passes(tmp_path: Path) -> None:
+    exact = make_wav(tmp_path / "exact.wav", 60)
+
+    outcome = probe.handle(job_with(LIMITS), {"media": exact}, ProcessRunner())
+
+    assert outcome.data["durationMs"] == 60000
+
+
+def test_a_clip_without_audio_is_refused_when_audio_is_required(tmp_path: Path) -> None:
+    silent = make_silent_clip(tmp_path / "silent.mp4")
+
+    with pytest.raises(PermanentError) as failed:
+        probe.handle(job_with(LIMITS), {"media": silent}, ProcessRunner())
+
+    assert failed.value.code == "no_audio_stream"
+    assert str(silent) not in str(failed.value)
+
+
+def test_without_limits_in_the_params_nothing_is_refused(tmp_path: Path) -> None:
+    silent = make_silent_clip(tmp_path / "silent.mp4")
+    long_clip = make_wav(tmp_path / "long.wav", 75)
+
+    assert probe.handle(job(), {"media": silent}, ProcessRunner()).data["audioCodec"] is None
+    assert probe.handle(job(), {"media": long_clip}, ProcessRunner()).data["durationMs"] == 75000
+
+
+def test_the_duration_limit_alone_does_not_demand_audio(tmp_path: Path) -> None:
+    silent = make_silent_clip(tmp_path / "silent.mp4")
+
+    outcome = probe.handle(job_with({"maxDurationMs": 60000}), {"media": silent}, ProcessRunner())
+
+    assert outcome.data["audioCodec"] is None
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"maxDurationMs": "60000"},
+        {"maxDurationMs": 0},
+        {"maxDurationMs": True},
+        {"requireAudio": "yes"},
+    ],
+)
+def test_malformed_limits_are_a_contract_violation(clip: Path, params: dict[str, object]) -> None:
+    with pytest.raises(PermanentError) as failed:
+        probe.handle(job_with(params), {"media": clip}, ProcessRunner())
+
+    assert failed.value.code == "contract_violation"

@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.web;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -15,11 +16,12 @@ import java.util.UUID;
  * /api/v1/uploads}) instead, plus the file's {@code originalName}, kept for display only; the
  * server trims it to 255 characters, so a longer name is accepted.
  *
- * <p>{@code acknowledgeCost} is the member's confirmation of the run's cost; absent means not confirmed.
+ * <p>{@code options} travel with the run to its steps; omitted, the run gets the defaults.
+ * {@code acknowledgeCost} is the member's confirmation of the run's cost; absent means not confirmed.
  */
 record StartRunRequest(@Size(max = 10_000) String input, UUID uploadId,
         @Size(min = 1, max = 10) List<UUID> uploadIds, @Size(max = 1024) String originalName,
-        Boolean acknowledgeCost) {
+        @Valid RunOptionsRequest options, Boolean acknowledgeCost) {
 
     @AssertTrue(message = "Use uploadId or uploadIds, not both")
     @JsonIgnore

@@ -13,6 +13,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
   isShared: true,
+  available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'Generate script', type: 'provider-script', mode: 'remote' },
   ],

@@ -109,7 +109,7 @@ public class ProductVideoService {
             }
             steps = runSteps.saveAll(steps);
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, steps, registry::isRemote);
+            return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
         });
     }
 

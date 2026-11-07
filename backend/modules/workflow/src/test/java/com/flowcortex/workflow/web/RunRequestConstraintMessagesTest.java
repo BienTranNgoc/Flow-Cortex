@@ -37,7 +37,7 @@ class RunRequestConstraintMessagesTest {
     void aStartRunRequestKeepsTodaysCustomSentences() {
         UUID upload = UUID.randomUUID();
 
-        assertThat(englishErrors(new StartRunRequest(null, upload, List.of(upload, upload), null, null)))
+        assertThat(englishErrors(new StartRunRequest(null, upload, List.of(upload, upload), null, null, null)))
                 .containsEntry("uploadSelectionUnambiguous", "Use uploadId or uploadIds, not both")
                 .containsEntry("uploadOrderDistinct", "uploadIds must not contain duplicates");
     }

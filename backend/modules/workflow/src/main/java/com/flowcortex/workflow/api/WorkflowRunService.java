@@ -30,11 +30,13 @@ public interface WorkflowRunService {
             String originalName);
 
     /**
-     * {@link #startRun(UUID, UUID, String, UUID, List, String)} with {@code acknowledgeCost}: the member has
-     * confirmed the run's cost, which a {@link RunStartGuard} may require.
+     * {@link #startRun(UUID, UUID, String, UUID, List, String)} with the run's {@code options} and
+     * {@code acknowledgeCost}: the member has confirmed the run's cost, which a {@link RunStartGuard} may require.
+     * <p>The run keeps {@code options} for its steps; {@code null}, or a {@code null} voice, means
+     * {@link RunOptions#DEFAULTS}. The caller has checked the voice is one the steps know.
      */
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
-            String originalName, boolean acknowledgeCost);
+            String originalName, RunOptions options, boolean acknowledgeCost);
 
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input);

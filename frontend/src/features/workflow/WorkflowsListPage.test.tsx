@@ -11,6 +11,7 @@ const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
   isShared: false,
+  available: true,
   steps: [],
 };
 
@@ -18,6 +19,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
   isShared: true,
+  available: true,
   steps: [],
 };
 

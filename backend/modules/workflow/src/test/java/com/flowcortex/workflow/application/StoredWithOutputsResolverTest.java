@@ -23,6 +23,15 @@ class StoredWithOutputsResolverTest {
               {"stepOrder":3,"outputName":"speech.wav","inputKey":"speech"}
             ]}
             """;
+    private static final String UPLOAD =
+            "{\"key\":\"media\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"owner/upload\"}";
+    private static final String COMPOSE = """
+            {"label":"AI","outputInputs":[
+              {"stepOrder":6,"outputName":"accompaniment.wav","inputKey":"music"},
+              {"stepOrder":7,"outputName":"voice.wav","inputKey":"voice","optional":true},
+              {"stepOrder":7,"outputName":"voice-manifest.json","inputKey":"manifest"}
+            ]}
+            """;
     private final StoredWithOutputsResolver resolver = new StoredWithOutputsResolver();
     private final ObjectMapper json = new ObjectMapper();
 
@@ -64,6 +73,93 @@ class StoredWithOutputsResolverTest {
                 RUN_ID, 4))
                 .isInstanceOf(StepFailedException.class)
                 .hasMessageContaining("unique");
+    }
+
+    @Test
+    void aSingleStoredUploadReferenceComesFirstThenTheDeclaredOutputs() throws Exception {
+        String music = "runs/" + RUN_ID + "/steps/6/attempts/1/accompaniment.wav";
+        String config = """
+                {"outputInputs":[{"stepOrder":6,"outputName":"accompaniment.wav","inputKey":"music"}]}
+                """;
+
+        String resolved = resolver.resolve(UPLOAD, config, Map.of(6, outputs("accompaniment.wav", music)),
+                RUN_ID, 8);
+
+        assertThat(inputs(resolved)).containsExactly(
+                new MediaJobInput("media", "flowcortex-uploads", "owner/upload"),
+                new MediaJobInput("music", "media", music));
+    }
+
+    @Test
+    void anObjectAnInlineStepStoredInTheUploadsBucketReachesALaterStep() throws Exception {
+        String voice = "runs/" + RUN_ID + "/steps/7/voice.wav";
+        String config = """
+                {"outputInputs":[{"stepOrder":7,"outputName":"voice.wav","inputKey":"voice"}]}
+                """;
+        String recorded = "[{\"name\":\"voice.wav\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"" + voice
+                + "\",\"mime\":\"audio/wav\",\"bytes\":3}]";
+
+        String resolved = resolver.resolve(UPLOAD, config, Map.of(7, recorded), RUN_ID, 8);
+
+        assertThat(inputs(resolved)).containsExactly(
+                new MediaJobInput("media", "flowcortex-uploads", "owner/upload"),
+                new MediaJobInput("voice", "flowcortex-uploads", voice));
+    }
+
+    @Test
+    void anOptionalObjectTheStepDidNotRecordIsLeftOut() throws Exception {
+        String music = "runs/" + RUN_ID + "/steps/6/attempts/1/accompaniment.wav";
+        String manifest = "runs/" + RUN_ID + "/steps/7/voice-manifest.json";
+
+        String resolved = resolver.resolve(UPLOAD, COMPOSE,
+                Map.of(6, outputs("accompaniment.wav", music), 7, outputs("voice-manifest.json", manifest)),
+                RUN_ID, 8);
+
+        assertThat(inputs(resolved)).containsExactly(
+                new MediaJobInput("media", "flowcortex-uploads", "owner/upload"),
+                new MediaJobInput("music", "media", music),
+                new MediaJobInput("manifest", "media", manifest));
+    }
+
+    @Test
+    void anOptionalObjectOfAStepThatRecordedNothingIsLeftOut() throws Exception {
+        String config = """
+                {"outputInputs":[{"stepOrder":7,"outputName":"voice.wav","inputKey":"voice","optional":true}]}
+                """;
+
+        assertThat(inputs(resolver.resolve(UPLOAD, config, Map.of(), RUN_ID, 8)))
+                .containsExactly(new MediaJobInput("media", "flowcortex-uploads", "owner/upload"));
+    }
+
+    @Test
+    void aMissingObjectThatIsNotOptionalFailsWithContractViolationNamingTheStepAndTheName() {
+        String vocals = "runs/" + RUN_ID + "/steps/6/attempts/1/vocals.wav";
+
+        assertThatThrownBy(() -> resolver.resolve(UPLOAD, COMPOSE, Map.of(6, outputs("vocals.wav", vocals)),
+                RUN_ID, 8))
+                .isInstanceOfSatisfying(StepFailedException.class, e -> {
+                    assertThat(e.code()).isEqualTo("contract_violation");
+                    assertThat(e.getMessage()).isEqualTo("Step 6 must have exactly one output named accompaniment.wav");
+                });
+    }
+
+    @Test
+    void anOptionalFlagThatIsNotABooleanIsAContractViolation() {
+        String config = """
+                {"outputInputs":[{"stepOrder":7,"outputName":"voice.wav","inputKey":"voice","optional":"yes"}]}
+                """;
+
+        String voice = outputs("voice.wav", "runs/" + RUN_ID + "/steps/7/voice.wav");
+
+        assertThatThrownBy(() -> resolver.resolve(UPLOAD, config, Map.of(7, voice), RUN_ID, 8))
+                .isInstanceOfSatisfying(StepFailedException.class, e -> {
+                    assertThat(e.code()).isEqualTo("contract_violation");
+                    assertThat(e.getMessage()).contains("optional");
+                });
+    }
+
+    private List<MediaJobInput> inputs(String resolved) throws Exception {
+        return json.readValue(resolved, new TypeReference<List<MediaJobInput>>() { });
     }
 
     private static String outputs(String name, String key) {

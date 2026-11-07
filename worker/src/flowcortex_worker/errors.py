@@ -12,7 +12,13 @@ ErrorCode = Literal[
     "provider_request_failed",
     "provider_response_invalid",
     "contract_violation",
-    "run_timeout"
+    "run_timeout",
+    "duration_exceeded",
+    "no_audio_stream",
+    "no_speech_detected",
+    "separation_failed",
+    "compose_failed",
+    "voice_alignment_failed",
     ]
 
 

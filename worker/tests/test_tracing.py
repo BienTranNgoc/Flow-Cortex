@@ -104,7 +104,10 @@ def test_store_calls_are_traced_without_signed_url_parts(
     client.put_object(Bucket=UPLOAD_BUCKET, Key=key, Body=b"x")
     storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
     with storage.fetched(
-        MediaJobInput(key="media", bucket=UPLOAD_BUCKET, objectKey=key), 10, ProcessRunner()
+        MediaJobInput(key="media", bucket=UPLOAD_BUCKET, objectKey=key),
+        10,
+        ProcessRunner(),
+        run_id=uuid.uuid4(),
     ):
         pass
     storage.put(

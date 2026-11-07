@@ -17,6 +17,7 @@ import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
@@ -110,8 +111,6 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         return startRun(currentUserId, workflowId, input, null, null);
     }
 
-    // Not @Transactional: the checks, the upload lookup and the copy into the run's inputs all run
-    // before the run's own transaction opens, so no database transaction waits on the object store.
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, String originalName) {
         return startRun(currentUserId, workflowId, input, uploadId, null, originalName);
@@ -120,12 +119,14 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName) {
-        return startRun(currentUserId, workflowId, input, uploadId, uploadIds, originalName, false);
+        return startRun(currentUserId, workflowId, input, uploadId, uploadIds, originalName, null, false);
     }
 
+    // Not @Transactional: the checks, the upload lookup and the copy into the run's inputs all run
+    // before the run's own transaction opens, so no database transaction waits on the object store.
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
-            String originalName, boolean acknowledgeCost) {
+            String originalName, RunOptions options, boolean acknowledgeCost) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -169,9 +170,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         String stepInputJson = copied.isEmpty() ? null : json(singleUpload ? copied.getFirst() : copied);
 
         String displayedInput = runInput;
+        String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(runId, workflow.getId(),
-                    currentUserId, displayedInput, Instant.now()));
+                    currentUserId, displayedInput, runOptions, Instant.now()));
             if (!copies.isEmpty()) {
                 mediaJobs.bindRunInputs(run.getId(), copies);
             }
@@ -192,15 +194,15 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             // Published within this tx; RunAdvancer's @ApplicationModuleListener only
             // fires after commit — this method returns first.
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, runSteps, registry::isRemote);
+            return WorkflowMapper.toRunView(run, runSteps, registry::isRemote, mediaJobs::isDownloadable);
         });
     }
 
-    private String json(Object reference) {
+    private String json(Object value) {
         try {
-            return objectMapper.writeValueAsString(reference);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("An object reference could not be serialized", e);
+            throw new IllegalStateException(value.getClass().getSimpleName() + " could not be serialized", e);
         }
     }
 
@@ -222,7 +224,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
-        return WorkflowMapper.toRunView(run, steps, registry::isRemote);
+        return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
     }
 
     @Override
@@ -241,6 +243,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (!MediaJob.isBelow(MediaJob.outputPrefix(runId, stepOrder), output.objectKey())) {
             LOG.warn("Stored output not signed, it lies outside its step: runId={} stepOrder={} name={} bucket={} key={}",
                     runId, stepOrder, name, output.bucket(), output.objectKey());
+            throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
+        }
+        if (!mediaJobs.isDownloadable(output.bucket())) {
+            // An inline step's intermediate in the uploads bucket is recorded but never offered for download.
+            LOG.info("Stored output not signed, its bucket is not downloadable: runId={} stepOrder={} name={} bucket={}",
+                    runId, stepOrder, name, output.bucket());
             throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
         }
         MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());

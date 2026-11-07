@@ -35,7 +35,15 @@ class MediaJob(BaseModel):
     ]
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Annotated[
-        Literal["probe", "extract_audio", "align_audio", "render_video"],
+        Literal[
+            "probe",
+            "extract_audio",
+            "align_audio",
+            "render_video",
+            "transcribe",
+            "separate_audio",
+            "compose_dub",
+        ],
         Field(title="MediaCapability"),
     ]
     inputs: Annotated[list[MediaJobInput], Field(min_length=1)]

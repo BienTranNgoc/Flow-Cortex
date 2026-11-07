@@ -34,9 +34,13 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     Class<? extends Payload>[] payload() default {};
 
-    /** The steps being created, with the types the registry knows and those of them that run remotely. */
+    /**
+     * The steps being created, with the types the registry knows, those of them that take the
+     * assets stored at run start, and those of them that run remotely.
+     */
     @KnownStepTypes
-    record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes) {
+    record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes,
+            Set<String> remoteTypes) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
@@ -67,8 +71,28 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
                     valid = false;
                     violation(hibernateContext, "'{type}' needs an uploaded file, so the workflow must start with a media step", type, i);
                 }
+                boolean runsInline = allowedTypes.contains(type) && !definition.remoteTypes().contains(type);
+                String configFault = configFault(steps.get(i), i + 1, runsInline);
+                if (configFault != null) {
+                    valid = false;
+                    // A message parameter is inserted literally, so the caller's text is never interpolated.
+                    hibernateContext.addMessageParameter("fault", configFault)
+                            .buildConstraintViolationWithTemplate("{fault}")
+                            .addPropertyNode("steps")
+                            .addPropertyNode("config").inIterable().atIndex(i)
+                            .addConstraintViolation();
+                }
             }
             return valid;
+        }
+
+        /** What is wrong with the {@code outputInputs} step {@code order} declares in its config, or {@code null}. */
+        private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
+            String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
+            if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
+                return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
+            }
+            return fault;
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

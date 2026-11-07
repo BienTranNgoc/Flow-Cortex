@@ -13,12 +13,25 @@ from unittest import mock
 import boto3
 import pytest
 from botocore.stub import Stubber
-from conftest import MEDIA_BUCKET, UPLOAD_BUCKET, Silo, captured_logs, job_body
+from conftest import (
+    MEDIA_BUCKET,
+    UPLOAD_BUCKET,
+    FakeConnection,
+    Silo,
+    captured_logs,
+    job_body,
+    published,
+    run_consumer,
+    settled,
+)
 
 from flowcortex_worker.contracts.media_job import MediaJob, MediaJobInput
 from flowcortex_worker.errors import PermanentError, TransientError
+from flowcortex_worker.handlers.registry import HandlerOutcome, OutputFile
 from flowcortex_worker.runtime import ProcessKilled, ProcessRunner
 from flowcortex_worker.storage import Storage, output_key
+
+RUN = uuid.uuid4()
 
 
 def upload(silo: Silo, body: bytes) -> MediaJobInput:
@@ -31,7 +44,7 @@ def test_input_is_downloaded_to_a_temporary_file_removed_afterwards(silo: Silo) 
     ref = upload(silo, b"0123456789")
     storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner()) as path:
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path:
         assert path.read_bytes() == b"0123456789"
         assert oct(path.stat().st_mode & 0o777) == "0o600"
 
@@ -45,7 +58,7 @@ def test_temporary_file_is_removed_when_the_handler_fails(silo: Silo) -> None:
 
     with (
         pytest.raises(RuntimeError),
-        storage.fetched(ref, max_bytes=10, abort=ProcessRunner()) as path,
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path,
     ):
         raise RuntimeError("handler failed")
 
@@ -60,7 +73,7 @@ def test_object_over_the_job_maximum_is_rejected_without_downloading(silo: Silo)
     with (
         mock.patch.object(client, "get_object") as download,
         pytest.raises(PermanentError) as rejected,
-        storage.fetched(ref, max_bytes=9, abort=ProcessRunner()),
+        storage.fetched(ref, max_bytes=9, abort=ProcessRunner(), run_id=RUN),
     ):
         pass
 
@@ -75,7 +88,7 @@ def test_missing_object_is_rejected(silo: Silo) -> None:
 
     with (
         pytest.raises(PermanentError) as rejected,
-        storage.fetched(ref, max_bytes=10, abort=ProcessRunner()),
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN),
     ):
         pass
 
@@ -99,29 +112,136 @@ def test_unreachable_store_is_transient() -> None:
 
     storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with pytest.raises(TransientError), storage.fetched(ref, max_bytes=10, abort=ProcessRunner()):
+    with (
+        pytest.raises(TransientError),
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN),
+    ):
         pass
 
 
 def test_output_asset_can_be_used_as_a_later_step_input(silo: Silo) -> None:
-    key = "runs/one/steps/3/attempts/1/speech.wav"
+    key = f"runs/{RUN}/steps/3/attempts/1/speech.wav"
     silo.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"speech")
     ref = MediaJobInput(key="speech", bucket=MEDIA_BUCKET, objectKey=key)
     storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner()) as path:
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path:
         assert path.read_bytes() == b"speech"
 
 
 def test_input_outside_configured_media_buckets_is_a_contract_violation(silo: Silo) -> None:
-    ref = MediaJobInput(key="media", bucket="foreign-bucket", objectKey="runs/x/steps/1/a")
+    ref = MediaJobInput(key="media", bucket="foreign-bucket", objectKey=f"runs/{RUN}/steps/1/a")
     storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
 
-    with pytest.raises(PermanentError) as rejected, storage.fetched(
-        ref, max_bytes=10, abort=ProcessRunner()
+    with (
+        pytest.raises(PermanentError) as rejected,
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN),
     ):
         pass
     assert rejected.value.code == "contract_violation"
+
+
+@pytest.mark.parametrize(
+    ("bucket", "key"),
+    [
+        (MEDIA_BUCKET, "runs/{run}/inputs/image_1"),
+        (MEDIA_BUCKET, "runs/{run}/steps/4/attempts/1/speech.wav"),
+        (MEDIA_BUCKET, "runs/{run}/steps/6/attempts/2/clip.mp4"),
+        (UPLOAD_BUCKET, "u-1/image-1"),
+    ],
+    ids=["bound-product-image", "provider-speech", "provider-clip", "member-upload-image"],
+)
+def test_every_input_a_product_video_job_sends_is_downloaded(
+    silo: Silo, bucket: str, key: str
+) -> None:
+    object_key = key.format(run=RUN)
+    silo.client().put_object(Bucket=bucket, Key=object_key, Body=b"asset")
+    ref = MediaJobInput(key="image_1", bucket=bucket, objectKey=object_key)
+    storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path:
+        assert path.read_bytes() == b"asset"
+
+
+def test_an_earlier_steps_object_of_the_jobs_own_run_is_downloaded(silo: Silo) -> None:
+    key = f"runs/{RUN}/steps/6/accompaniment.wav"
+    silo.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"music")
+    ref = MediaJobInput(key="music", bucket=MEDIA_BUCKET, objectKey=key)
+    storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path:
+        assert path.read_bytes() == b"music"
+
+
+@pytest.mark.parametrize(
+    ("bucket", "key"),
+    [
+        (MEDIA_BUCKET, "runs/{other}/steps/2/source-audio.wav"),
+        (MEDIA_BUCKET, "runs/{run}/../{other}/steps/2/source-audio.wav"),
+        (MEDIA_BUCKET, "runs/{run}"),
+        (MEDIA_BUCKET, "other/{run}/steps/2/source-audio.wav"),
+        ("flowcortex-third", "runs/{run}/steps/2/source-audio.wav"),
+        (UPLOAD_BUCKET, "runs/{other}/steps/7/voice.wav"),
+        (UPLOAD_BUCKET, "runs/{run}/../{other}/steps/7/voice.wav"),
+        (UPLOAD_BUCKET, "runs/{run}/"),
+    ],
+)
+def test_an_object_neither_a_member_upload_nor_of_the_jobs_own_run_is_refused_unread(
+    bucket: str, key: str
+) -> None:
+    client = mock.Mock()
+    ref = MediaJobInput(
+        key="music", bucket=bucket, objectKey=key.format(run=RUN, other=uuid.uuid4())
+    )
+    storage = Storage(client, MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with (
+        pytest.raises(PermanentError) as rejected,
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN),
+    ):
+        pass
+
+    assert rejected.value.code == "contract_violation"
+    client.head_object.assert_not_called()
+    client.get_object.assert_not_called()
+
+
+def test_an_intermediate_of_the_jobs_own_run_in_the_uploads_bucket_is_downloaded(
+    silo: Silo,
+) -> None:
+    key = f"runs/{RUN}/steps/7/voice.wav"
+    silo.client().put_object(Bucket=UPLOAD_BUCKET, Key=key, Body=b"voice")
+    ref = MediaJobInput(key="voice.wav", bucket=UPLOAD_BUCKET, objectKey=key)
+    storage = Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET)
+
+    with storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN) as path:
+        assert path.read_bytes() == b"voice"
+
+
+def test_a_job_reads_an_earlier_steps_object_of_its_own_run(silo: Silo) -> None:
+    body = job_body(stepOrder=8)
+    key = f"runs/{body['runId']}/steps/6/accompaniment.wav"
+    silo.client().put_object(Bucket=MEDIA_BUCKET, Key=key, Body=b"music")
+    body["inputs"] = [{"key": "music", "bucket": MEDIA_BUCKET, "objectKey": key}]
+    conn = FakeConnection()
+    conn.deliver(body)
+    read: dict[str, bytes] = {}
+
+    def handler(job: Any, inputs: Any, processes: Any) -> HandlerOutcome:
+        read["music"] = inputs["music"].read_bytes()
+        return HandlerOutcome(data={}, files=[OutputFile("done.json", "application/json", b"{}")])
+
+    run_consumer(
+        conn,
+        storage=Storage(silo.client(), MEDIA_BUCKET, UPLOAD_BUCKET),
+        resolve=lambda capability: handler,
+        until=settled,
+        timeout=30,
+    )
+
+    assert read == {"music": b"music"}
+    [result] = published(conn, "result")
+    assert b'"status":"completed"' in result.body
 
 
 def test_output_keys_are_deterministic_and_overwrite(silo: Silo) -> None:
@@ -199,7 +319,7 @@ def test_a_kill_stops_a_stalled_download_and_removes_the_file() -> None:
     before = set(Path(tempfile.gettempdir()).glob("flowcortex-job-*"))
 
     began = time.monotonic()
-    with pytest.raises(ProcessKilled) as killed, storage.fetched(ref, 10, runner):
+    with pytest.raises(ProcessKilled) as killed, storage.fetched(ref, 10, runner, run_id=RUN):
         pass
 
     assert killed.value.reason == "run_timeout"
@@ -274,7 +394,7 @@ def test_forbidden_input_is_transient_and_logged_for_the_operator() -> None:
         stubber,
         captured_logs() as lines,
         pytest.raises(TransientError),
-        storage.fetched(ref, 10, ProcessRunner()),
+        storage.fetched(ref, 10, ProcessRunner(), run_id=RUN),
     ):
         pass
 
@@ -297,7 +417,7 @@ def test_object_replaced_after_the_size_check_is_rejected(silo: Silo) -> None:
     with (
         mock.patch.object(client, "head_object", side_effect=head_then_replace),
         pytest.raises(PermanentError) as rejected,
-        storage.fetched(ref, max_bytes=10, abort=ProcessRunner()),
+        storage.fetched(ref, max_bytes=10, abort=ProcessRunner(), run_id=RUN),
     ):
         pass
 
