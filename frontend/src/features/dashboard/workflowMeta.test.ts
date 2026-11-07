@@ -13,6 +13,7 @@ const workflow = (name: string, types: readonly string[]): WorkflowResponse => (
   id: name,
   name,
   isShared: true,
+  available: true,
   steps: types.map((type, index) => step(type, index + 1)),
 });
 

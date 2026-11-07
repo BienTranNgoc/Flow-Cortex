@@ -91,9 +91,6 @@ class MediaJobsImplTest {
         "flowcortex.media.max-runtime.extract_audio=10m",
         "flowcortex.media.max-runtime.align_audio=10m",
         "flowcortex.media.max-runtime.render_video=10m",
-        "flowcortex.media.max-runtime.transcribe=2m",
-        "flowcortex.media.max-runtime.separate_audio=4m",
-        "flowcortex.media.max-runtime.compose_dub=6m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
         "flowcortex.media.provider-queue-timeout=5m",
@@ -556,27 +553,6 @@ class MediaJobsImplTest {
     }
 
     @Test
-    void limitsForEveryDubCapabilityReturnTheConfiguredValues() {
-        runner.run(context -> {
-            MediaJobs jobs = context.getBean(MediaJobs.class);
-            assertThat(jobs.limitsFor("transcribe").maxRuntime()).isEqualTo(Duration.ofMinutes(2));
-            assertThat(jobs.limitsFor("separate_audio").maxRuntime()).isEqualTo(Duration.ofMinutes(4));
-            assertThat(jobs.limitsFor("compose_dub").maxRuntime()).isEqualTo(Duration.ofMinutes(6));
-        });
-    }
-
-    @Test
-    void aDubCapabilityWithoutAMaxRuntimeFailsStartup() {
-        runner.withPropertyValues("flowcortex.media.max-runtime.compose_dub=")
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .rootCause()
-                            .hasMessageContaining("max-runtime.compose_dub");
-                });
-    }
-
-    @Test
     void limitsForAnUnknownCapabilityIsRefused() {
         runner.run(context -> assertThatThrownBy(() -> context.getBean(MediaJobs.class).limitsFor("transcode"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -706,7 +682,6 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
-                "flowcortex.media.max-runtime.compose_dub=5m",
                 "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
             assertThat(context).hasFailed();
@@ -720,7 +695,6 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
-                "flowcortex.media.max-runtime.compose_dub=5m",
                 "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());

@@ -9,6 +9,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   id: 'wf-pv',
   name: 'Product Video',
   isShared: true,
+  available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'script', type: 'script', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },

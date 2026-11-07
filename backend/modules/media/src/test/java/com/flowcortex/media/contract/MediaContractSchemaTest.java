@@ -298,22 +298,7 @@ class MediaContractSchemaTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"transcribe", "separate_audio", "compose_dub"})
-    void dubCapabilitiesConformToTheJobSchema(String capability) {
-        MediaJob source = job();
-        MediaJob dub = new MediaJob(source.schemaVersion(), source.jobId(), source.runId(),
-                source.correlationId(), source.stepOrder(), MediaCapability.fromValue(capability),
-                source.inputs(), source.params(), source.outputPrefix(), source.attempt(),
-                source.maxRuntimeSeconds(), source.maxInputBytes(), source.issuedAt());
-
-        assertThat(errors(jobSchema, dub)).isEmpty();
-        assertThat(VALIDATOR.validate(dub)).isEmpty();
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-        "duration_exceeded", "no_audio_stream", "no_speech_detected",
-        "separation_failed", "compose_failed", "voice_alignment_failed"})
+    @ValueSource(strings = {"duration_exceeded", "no_audio_stream"})
     void dubErrorCodesConformToTheResultSchema(String code) {
         MediaError.Code parsed = Arrays.stream(MediaError.Code.values())
                 .filter(c -> c.value().equals(code)).findFirst().orElseThrow();

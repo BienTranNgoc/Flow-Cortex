@@ -18,6 +18,7 @@ import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
@@ -89,6 +90,35 @@ class WorkflowRunServiceImplTest {
                     ResponseStatusException status = (ResponseStatusException) e;
                     assertThat(status.getStatusCode().value()).isEqualTo(503);
                     assertThat(english(status)).isEqualTo("Media engine is currently disabled");
+                });
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aDubStepWhileDubbingIsUnavailableIsRefusedBeforeTheCreditGuardAndCreatesNothing() {
+        StepExecutor translate = mock(StepExecutor.class);
+        when(translate.type()).thenReturn("translate");
+        when(translate.mode()).thenReturn(StepExecutor.Mode.INLINE);
+        when(translate.available()).thenReturn(false);
+        RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
+            throw new IllegalStateException("the credit guard must not be consulted");
+        };
+        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
+                workflowRunRepository, runStepRepository, events, new StepExecutorRegistry(List.of(translate)),
+                mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
+                new RunStartGuards(List.of(creditGuard)), true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "translate");
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), "hi"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> {
+                    ResponseStatusException status = (ResponseStatusException) e;
+                    assertThat(status.getStatusCode().value()).isEqualTo(503);
+                    assertThat(status.getBody().getProperties()).containsEntry("code", "dub_disabled");
+                    assertThat(english(status)).isEqualTo("Vietnamese dubbing is currently disabled");
                 });
 
         verify(workflowRunRepository, never()).save(any());

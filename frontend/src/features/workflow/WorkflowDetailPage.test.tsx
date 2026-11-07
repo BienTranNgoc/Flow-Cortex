@@ -42,6 +42,7 @@ const INCOMPLETE: WorkflowResponse = {
   id: 'w1',
   name: 'Incomplete Demo (step 2 not configured)',
   isShared: true,
+  available: true,
   steps: [
     { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
     { id: 'ws2', stepOrder: 2, name: 'Echo step 2', type: 'echo', mode: 'inline' },

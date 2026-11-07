@@ -145,6 +145,9 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
+        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
+            throw new DubDisabledException();
+        }
         runStartGuards.check(currentUserId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());

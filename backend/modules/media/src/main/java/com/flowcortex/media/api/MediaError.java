@@ -19,11 +19,7 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout"),
         DURATION_EXCEEDED("duration_exceeded"),
-        NO_AUDIO_STREAM("no_audio_stream"),
-        NO_SPEECH_DETECTED("no_speech_detected"),
-        SEPARATION_FAILED("separation_failed"),
-        COMPOSE_FAILED("compose_failed"),
-        VOICE_ALIGNMENT_FAILED("voice_alignment_failed");
+        NO_AUDIO_STREAM("no_audio_stream");
 
         private final String value;
 

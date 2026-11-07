@@ -246,20 +246,11 @@ def test_the_worker_error_codes_are_exactly_the_schemas() -> None:
     assert set(get_args(ErrorCode)) == set(get_args(MediaError.model_fields["code"].annotation))
 
 
-@pytest.mark.parametrize("capability", ["transcribe", "separate_audio", "compose_dub"])
-def test_dub_capabilities_validate(capability: str) -> None:
-    MediaJob.model_validate(job() | {"capability": capability})
-
-
 @pytest.mark.parametrize(
     "code",
     [
         "duration_exceeded",
         "no_audio_stream",
-        "no_speech_detected",
-        "separation_failed",
-        "compose_failed",
-        "voice_alignment_failed",
     ],
 )
 def test_dub_error_codes_validate(code: str) -> None:

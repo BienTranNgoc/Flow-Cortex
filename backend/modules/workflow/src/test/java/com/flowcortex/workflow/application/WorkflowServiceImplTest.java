@@ -102,13 +102,12 @@ class WorkflowServiceImplTest {
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
-                                        + "compose_dub, echo, extract_audio, fail, generate_script, generate_speech, "
-                                        + "generate_storyboard, generate_video, probe, render_video, separate_audio, "
-                                        + "transcribe",
+                                        + "echo, extract_audio, fail, generate_script, generate_speech, "
+                                        + "generate_storyboard, generate_video, probe, render_video",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
-                                        + "align_audio, compose_dub, echo, extract_audio, fail, generate_script, "
-                                        + "generate_speech, generate_storyboard, generate_video, probe, render_video, "
-                                        + "separate_audio, transcribe"));
+                                        + "align_audio, echo, extract_audio, fail, generate_script, "
+                                        + "generate_speech, generate_storyboard, generate_video, probe, "
+                                        + "render_video"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
@@ -197,7 +196,7 @@ class WorkflowServiceImplTest {
         service.createWorkflow(UUID.randomUUID(), "Declared inputs", false, List.of(
                 new NewWorkflowStep("probe", "probe", null),
                 new NewWorkflowStep("extract", "extract_audio", null),
-                new NewWorkflowStep("compose", "compose_dub", null, config)));
+                new NewWorkflowStep("compose", "render_video", null, config)));
 
         org.mockito.ArgumentCaptor<List<WorkflowStep>> saved = org.mockito.ArgumentCaptor.captor();
         verify(workflowStepRepository).saveAll(saved.capture());

@@ -43,6 +43,13 @@ class RunRequestConstraintMessagesTest {
     }
 
     @Test
+    void anUnknownVoiceResolvesTheBundleKeyOfTheNestedPath() {
+        StartRunRequest request = new StartRunRequest(null, null, null, null, new RunOptionsRequest("robot"), null);
+
+        assertThat(englishErrors(request)).containsOnly(Map.entry("options.voice", "Voice must be female or male"));
+    }
+
+    @Test
     void aProductVideoRunRequestKeepsTodaysCustomSentences() {
         UUID upload = UUID.randomUUID();
         ProductVideoRunRequest request = new ProductVideoRunRequest("Lamp", "A desk lamp", "Buy now", " ", null,
