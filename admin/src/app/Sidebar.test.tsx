@@ -210,6 +210,49 @@ describe('Sidebar', () => {
     expect(tip.style.top).toBe('222px');
   });
 
+  it('lets the keyboard reach a disabled rail entry, shows its tooltip there, and keeps it inert', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const entry = screen.getByText('Voice Quota').closest('[aria-disabled]') as HTMLElement;
+    expect(entry).toHaveAttribute('tabindex', '0');
+    const tip = entry.querySelector<HTMLElement>('.cortex-admin-nav__tip') as HTMLElement;
+    vi.spyOn(entry, 'getBoundingClientRect').mockReturnValue({ top: 300, height: 44 } as DOMRect);
+
+    await user.tab();
+    while (document.activeElement !== entry && document.activeElement !== document.body) {
+      await user.tab();
+    }
+    expect(entry).toHaveFocus();
+    expect(tip.style.top).toBe('322px');
+
+    await user.keyboard('{Enter}');
+    await user.click(entry);
+    expect(entry).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('link', { name: /Voice Quota/ })).not.toBeInTheDocument();
+  });
+
+  it('follows the entry with the open rail tooltip when the list scrolls', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /Runs/ });
+    const tip = link.querySelector<HTMLElement>('.cortex-admin-nav__tip') as HTMLElement;
+    const rect = vi.spyOn(link, 'getBoundingClientRect');
+    rect.mockReturnValue({ top: 200, height: 44 } as DOMRect);
+    fireEvent.focus(link);
+    expect(tip.style.top).toBe('222px');
+
+    rect.mockReturnValue({ top: 150, height: 44 } as DOMRect);
+    fireEvent.scroll(container.querySelector('.cortex-admin-nav__groups') as HTMLElement);
+    expect(tip.style.top).toBe('172px');
+  });
+
   describe('with a count', () => {
     const SUPPORT: NavGroup[] = [
       {

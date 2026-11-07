@@ -69,7 +69,6 @@
   border-radius: var(--radius-md);
   background: var(--paper-2);
   box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-quick) var(--ease-standard);
 }
 
 .runs-page__row:hover {

@@ -20,12 +20,22 @@ interface SidebarProps {
 const noop = () => {};
 
 /** The rail list scrolls and so clips children; the tooltip is fixed and takes its y from its entry. */
-function placeTip(event: SyntheticEvent<HTMLElement>) {
-  const entry = event.currentTarget;
+function placeEntryTip(entry: HTMLElement) {
   const tip = entry.querySelector<HTMLElement>('.cortex-admin-nav__tip');
   if (!tip) return;
   const rect = entry.getBoundingClientRect();
   tip.style.top = `${rect.top + rect.height / 2}px`;
+}
+
+function placeTip(event: SyntheticEvent<HTMLElement>) {
+  placeEntryTip(event.currentTarget);
+}
+
+/** Scrolling moves every entry under a fixed tooltip, so each one is re-placed and the open one follows its entry. */
+function replaceTips(event: SyntheticEvent<HTMLElement>) {
+  for (const entry of event.currentTarget.querySelectorAll<HTMLElement>('.cortex-admin-nav__item')) {
+    placeEntryTip(entry);
+  }
 }
 
 /**
@@ -88,7 +98,11 @@ export function Sidebar({
           </button>
         )}
       </div>
-      <nav aria-label={t('common.shell.nav.label')} className="cortex-admin-nav__groups">
+      <nav
+        aria-label={t('common.shell.nav.label')}
+        className="cortex-admin-nav__groups"
+        onScroll={replaceTips}
+      >
         {nav.map((group) => {
           const items = group.items.filter((item) => can(role, item.action));
           if (items.length === 0) {
@@ -111,8 +125,10 @@ export function Sidebar({
                         <span
                           className="cortex-admin-nav__item"
                           aria-disabled="true"
+                          tabIndex={0}
                           data-tag={tag}
                           onMouseEnter={placeTip}
+                          onFocus={placeTip}
                         >
                           <span className="cortex-admin-nav__item-icon" aria-hidden="true">
                             <Icon size={20} />

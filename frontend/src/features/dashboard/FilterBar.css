@@ -21,9 +21,6 @@
   font-weight: 600;
   cursor: pointer;
   min-height: var(--control-h);
-  transition: color var(--dur-quick) var(--ease-standard),
-    border-color var(--dur-quick) var(--ease-standard),
-    background var(--dur-quick) var(--ease-standard);
 }
 
 .dashboard-filter__chip:hover {

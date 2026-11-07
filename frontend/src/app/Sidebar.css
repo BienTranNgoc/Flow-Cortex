@@ -45,8 +45,6 @@
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink-3);
-  transition: background var(--dur-quick) var(--ease-standard),
-    color var(--dur-quick) var(--ease-standard);
 }
 
 .sidebar__collapse {
@@ -120,8 +118,6 @@
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition: background var(--dur-quick) var(--ease-standard),
-    color var(--dur-quick) var(--ease-standard);
 }
 
 .sidebar-nav__link:not(:disabled):hover,

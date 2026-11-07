@@ -13,9 +13,6 @@ colors:
   btn-bg: '#ffffff'
   btn-bg-hover: '#f1f4f9'
   input-bg: '#ffffff'
-  glow: '#d9e4f3'
-  header-bg: '#ffffff'
-  footer-bg: '#eef2f7'
   chrome-hover: '#f1f4f8'
   chrome-active: '#cfeae6'
   chrome-border: '#e6e9ed'
@@ -26,14 +23,11 @@ colors:
   ink-4: '#4a5762'
   ink-5: '#76838f'
   nav-ink: '#2b3641'
-  ink-disabled: '#ffffff'
   line: '#98a3ad'
   line-2: '#76838f'
   line-3: '#b6c0cb'
   line-soft: '#c4ccd5'
-  line-subtle: '#b6c0cb'
   card-border: '#98a3ad'
-  control-border: '#76838f'
   input-border: '#5a6b78'
   input-border-hover: '#3a4a5b'
   edge: '#5a6b78'
@@ -41,28 +35,21 @@ colors:
   primary-foreground: '#ffffff'
   primary-hover: '#054842'
   accent: '#066058'
-  accent-soft: '#cfeae6'
   primary-soft: '#cfeae6'
   teal: '#066058'
   teal-bright: '#054842'
   teal-deep: '#04332f'
   tone-blue-text: '#1d4ed8'
   tone-blue-bg: '#e6efff'
-  tone-blue-line: '#b9d0ff'
   tone-cyan-text: '#0b6f7a'
   tone-cyan-bg: '#dff7fb'
-  tone-cyan-line: '#95dde6'
   tone-violet-text: '#4f3bd6'
   tone-violet-bg: '#ece6ff'
-  tone-violet-line: '#c4b6ff'
   tone-amber-text: '#92580a'
   tone-amber-bg: '#fff3dd'
-  tone-amber-line: '#f4d99a'
   tone-green-bg: '#d6f3df'
-  tone-green-line: '#95d8aa'
   tone-rose-text: '#b8264b'
   tone-rose-bg: '#fde0e6'
-  tone-rose-line: '#f0a8b6'
   red: '#b8264b'
   red-soft: '#fde0e6'
   red-strong: '#d12d57'
@@ -75,7 +62,6 @@ colors:
   green-vivid: '#0a6b3e'
   shadow-color: '#0c1620'
   auth-ocean: '#0b57a6'
-  auth-ocean-mid: '#0b6fa3'
   auth-card: '#f1f6f8'
   auth-ink: '#061016'
   auth-ink-2: '#26343d'
@@ -113,7 +99,7 @@ rounded:
 
 ## Overview
 
-The member app has two themes. Light is the default (`:root` in `tokens.css`); dark applies when the root element carries `data-theme="dark"`, and its block in `tokens.css` overrides every colour token above under the same name. The user picks a theme with the header toggle, which is stored on the device; with no stored choice the system preference decides. `public/theme-init.js` applies that choice before the app bundle loads, so the first paint is already in the right theme. The document advertises `color-scheme: light dark` and the active theme narrows it, so browser-drawn controls (file picker, progress bars) match. One accent family, teal (`primary`), carries links, eyebrows and the call to action; `accent` and `accent-soft` are aliases of `primary` and `primary-soft`, never a second accent. Chrome is flat: no gradient, glow, blur or glass outside the auth shell. The public auth screens are the exception: they use the fixed light auth palette (see Colors) whatever theme is chosen.
+The member app has two themes. Light is the default (`:root` in `tokens.css`); dark applies when the root element carries `data-theme="dark"`, and its block in `tokens.css` overrides every colour token above under the same name. The user picks a theme with the header toggle, which is stored on the device; with no stored choice the system preference decides. `public/theme-init.js` applies that choice before the app bundle loads, so the first paint is already in the right theme. The document advertises `color-scheme: light dark` and the active theme narrows it, so browser-drawn controls (file picker, progress bars) match. One accent family, teal (`primary`), carries links, eyebrows and the call to action; `accent` is an alias of `primary`, never a second accent. Chrome is flat: no gradient, glow, blur or glass outside the auth shell. The public auth screens are the exception: they use the fixed light auth palette (see Colors) whatever theme is chosen.
 
 ## Colors
 
@@ -122,11 +108,11 @@ The member app has two themes. Light is the default (`:root` in `tokens.css`); d
 - Chrome and card edges: `chrome-border` and `card-edge` (decorative, no 3:1 floor); `line` keeps its value for dividers that carry meaning.
 - Border: `line` for cards and dividers, `line-2` for button outlines, `input-border` for fields (3:1 on every surface a field sits on), `edge` (the same colour) for pipeline connectors and their port dots (3:1 on `paper-2` and `paper-3`).
 - Status: each state pairs a foreground with its `-soft` background (`primary`, `warning`, `green`, `red`, `accent`); pending uses `ink-3` on `line`. Running is `primary` on `primary-soft`; `warning` means "Needs you" and nothing else.
-- Links use `primary`; the header navigation uses `nav-ink` on `header-bg`.
+- Links use `primary`; the header navigation uses `nav-ink` on `paper-2`.
 - Translucent fills are `color-mix(in srgb, var(--token) N%, transparent)` over an opaque token (`primary`, `ink`, `red-strong`, `green-bright`), never an `rgba()` literal.
 - Shadows: `shadow-sm`, `shadow` and `shadow-lg` are ink-tinted (black in dark), and `focus-ring` is a 2px `primary` ring. A stylesheet takes every `box-shadow` from these tokens; raw shadow values live only in `tokens.css`.
 - Primary button: `primary` fill with `primary-foreground` text, `primary-hover` on hover and press; disabled is flat `paper-3` with `ink-4`; success is `green-soft` with `green` text.
-- Workflow categories each pair a `tone-*-text` with its `tone-*-bg` and `tone-*-line`.
+- Workflow categories each pair a `tone-*-text` with its `tone-*-bg`.
 
 ### Auth palette
 
@@ -135,7 +121,6 @@ The public auth screens (sign in, register, confirm email, set password) are a f
 | token               | value     | use                                                                |
 | ------------------- | --------- | ------------------------------------------------------------------ |
 | `auth-ocean`        | `#0b57a6` | banner base; `auth-on-ocean` text 7.17:1                           |
-| `auth-ocean-mid`    | `#0b6fa3` | art reference only: baked into the banner WebP, no CSS user        |
 | `auth-card`         | `#f1f6f8` | card fill, never below 90% where text sits                         |
 | `auth-ink`          | `#061016` | headings and body on the card (17.63:1)                            |
 | `auth-ink-2`        | `#26343d` | field labels                                                       |

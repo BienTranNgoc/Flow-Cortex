@@ -270,7 +270,7 @@ describe('WorkflowsListPage', () => {
       'GET /api/v1/workflows': () => {
         workflowCalls += 1;
         return workflowCalls === 1
-          ? { status: 503, body: { status: 503, detail: 'down' } }
+          ? { status: 503, body: { status: 503 } }
           : { status: 200, body: [DOUYIN, ECHO, FAIL] };
       },
       'GET /api/v1/capabilities': capabilities(true),
@@ -286,6 +286,23 @@ describe('WorkflowsListPage', () => {
     expect(screen.getByText('Failing Demo (deliberate)')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(workflowCalls).toBe(2);
+  });
+
+  it('shows the server detail in the inline error when the request fails with one', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 503,
+        body: { status: 503, detail: 'Workflows are paused for maintenance.' },
+      },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Workflows are paused for maintenance.');
+    expect(alert).not.toHaveTextContent('Could not load workflows.');
+    expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('says nothing matches a search and clears it with one action', async () => {

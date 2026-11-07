@@ -44,8 +44,6 @@
   padding: 0.35rem 0.7rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--card-edge);
-  transition: color var(--dur-quick) var(--ease-standard),
-    border-color var(--dur-quick) var(--ease-standard);
 }
 
 .launchpad-cards__see-all:hover {
@@ -84,7 +82,7 @@
   }
 }
 
-@container (min-width: 960px) {
+@container (min-width: 900px) {
   .workflow-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

@@ -142,9 +142,7 @@ a {
   font-weight: 600;
   cursor: pointer;
   min-height: var(--control-h);
-  transition: color var(--dur-quick) var(--ease-standard),
-    background var(--dur-quick) var(--ease-standard),
-    transform var(--dur-quick) var(--ease-standard);
+  transition: transform var(--dur-quick) var(--ease-standard);
   margin-right: 0;
 }
 
@@ -198,8 +196,6 @@ a {
   border-radius: var(--radius-md);
   color: var(--ink-3);
   text-decoration: none;
-  transition: background var(--dur-quick) var(--ease-standard),
-    color var(--dur-quick) var(--ease-standard);
 }
 
 .cortex-footer__social-link:hover {

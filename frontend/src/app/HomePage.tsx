@@ -2,6 +2,7 @@ import { ArrowRight } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
+import { problemDetailOf } from '../lib/problemMessage';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
 import { FilterBar } from '../features/dashboard/FilterBar';
 import { SearchBar } from '../features/dashboard/SearchBar';
@@ -87,7 +88,7 @@ export function HomePage() {
         {workflowsQuery.isError && (
           <StatusBlock
             kind="error"
-            message={t('common.home.loadWorkflowsError')}
+            message={problemDetailOf(workflowsQuery.error) ?? t('common.home.loadWorkflowsError')}
             action={{ label: t('common.state.retry'), onClick: () => void workflowsQuery.refetch() }}
           />
         )}

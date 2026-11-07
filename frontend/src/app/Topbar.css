@@ -32,7 +32,6 @@
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
-  transition: background var(--dur-quick) var(--ease-standard);
 }
 
 .topbar__menu:not(:disabled):hover {

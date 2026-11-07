@@ -4,8 +4,7 @@
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-lg);
   background: var(--paper-2);
-  transition: border-color var(--dur-standard) var(--ease-standard),
-    transform var(--dur-standard) var(--ease-standard);
+  transition: transform var(--dur-standard) var(--ease-standard);
 }
 
 .workflow-card::after {

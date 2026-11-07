@@ -7,14 +7,12 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid var(--card-edge);
+  border: 1px solid var(--chrome-border);
   border-radius: 50%;
   background: color-mix(in srgb, var(--input-bg) 60%, transparent);
   cursor: pointer;
   width: max(38px, var(--control-h));
   height: max(38px, var(--control-h));
-  transition: border-color var(--dur-quick) var(--ease-standard),
-    background var(--dur-quick) var(--ease-standard);
 }
 
 .cortex-user-menu__trigger:hover,
@@ -50,8 +48,8 @@
   right: 0;
   min-width: 280px;
   padding: 0.45rem;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-lg);
   background: var(--paper-2);
   box-shadow: var(--shadow-lg);
   display: flex;
@@ -65,7 +63,7 @@
   align-items: center;
   gap: 0.7rem;
   padding: 0.5rem 0.55rem 0.7rem;
-  border-bottom: 1px solid var(--card-edge);
+  border-bottom: 1px solid var(--chrome-border);
   margin-bottom: 0.3rem;
 }
 
@@ -120,7 +118,7 @@
 
 .cortex-user-menu__divider {
   height: 1px;
-  background: var(--card-edge);
+  background: var(--chrome-border);
   margin: 0.35rem 0;
 }
 
@@ -145,6 +143,12 @@
 .cortex-user-menu__item:hover,
 .cortex-user-menu__item:focus-visible {
   background: var(--chrome-hover);
+  color: var(--ink);
+}
+
+.cortex-user-menu__item:active,
+.cortex-user-menu__item[aria-current='page'] {
+  background: var(--chrome-active);
   color: var(--ink);
 }
 

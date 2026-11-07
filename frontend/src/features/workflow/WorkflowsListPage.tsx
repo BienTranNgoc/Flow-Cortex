@@ -8,6 +8,7 @@ import { Skeleton } from '../../app/Skeleton';
 import { StatusBlock } from '../../app/StatusBlock';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { problemDetailOf } from '../../lib/problemMessage';
 import { useMeQuery } from '../auth/useAuth';
 import { iconForWorkflow } from '../dashboard/workflowIconKey';
 import { metaFor, type StatusTone } from '../dashboard/workflowMeta';
@@ -215,7 +216,7 @@ export function WorkflowsListPage() {
       {workflowsQuery.isError && !showLoading && (
         <StatusBlock
           kind="error"
-          message={t('workflow.list.loadError')}
+          message={problemDetailOf(workflowsQuery.error) ?? t('workflow.list.loadError')}
           action={{ label: t('common.state.retry'), onClick: () => void workflowsQuery.refetch() }}
         />
       )}

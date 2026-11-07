@@ -1451,7 +1451,6 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
   display: block;
   height: 100%;
   border-radius: inherit;
-  transition: width var(--dur-standard) var(--ease-standard);
 }
 
 .cortex-admin-status-fill--running {
@@ -1974,17 +1973,6 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
   }
 }
 
-/* The trigger keeps its aria-label, so the visible name can go where the bar runs out of room. */
-@media (max-width: 480px) {
-  .cortex-admin-user-menu__name {
-    display: none;
-  }
-
-  .cortex-admin-user-menu__trigger {
-    padding-right: 0.5rem;
-  }
-}
-
 @media (max-width: 1023px) {
   .cortex-admin-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -2029,12 +2017,12 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
   }
 }
 
+/* The trigger keeps its aria-label, so the visible name can go where the bar runs out of room. */
 @media (max-width: 480px) {
   .cortex-admin-header__inner {
     gap: 0.5rem;
   }
 
-  .cortex-admin-header__brand-name,
   .cortex-admin-user-menu__name,
   .cortex-admin-user-menu__chevron {
     display: none;
@@ -2388,8 +2376,6 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
   text-decoration: none;
   font-weight: 600;
   border-bottom: 1px solid color-mix(in srgb, var(--admin-primary) 40%, transparent);
-  transition: color var(--dur-quick) var(--ease-standard),
-    border-color var(--dur-quick) var(--ease-standard);
 }
 
 .auth-shell__form-foot a:hover {

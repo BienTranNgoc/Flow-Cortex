@@ -119,12 +119,28 @@ describe('HomePage — launchpad cards', () => {
   it('shows a load error with retry when the workflows API fails', async () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ME },
-      'GET /api/v1/workflows': { status: 500, body: { detail: 'boom' } },
+      'GET /api/v1/workflows': { status: 500, body: { status: 500 } },
     });
 
     renderHome();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load workflows');
+  });
+
+  it('shows the server detail in the inline error when the workflows request fails with one', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 503,
+        body: { status: 503, detail: 'Workflows are paused for maintenance.' },
+      },
+    });
+
+    renderHome();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Workflows are paused for maintenance.');
+    expect(alert).not.toHaveTextContent('Could not load workflows');
   });
 
   it('shows a retry block (not a redirect) when /me returns a 5xx', async () => {
@@ -215,7 +231,7 @@ describe('HomePage — launchpad cards', () => {
       'GET /api/v1/workflows': () => {
         attempts += 1;
         return attempts === 1
-          ? { status: 500, body: { detail: 'boom' } }
+          ? { status: 500, body: { status: 500 } }
           : { status: 200, body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)] };
       },
     });
