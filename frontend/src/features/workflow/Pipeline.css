@@ -7,9 +7,7 @@
   margin: 0 0 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(var(--line) 1px, transparent 1px) 0 0 / 16px 16px,
-    var(--paper-2);
+  background: var(--paper);
 }
 
 .pipeline-list {
@@ -50,8 +48,7 @@
   font: inherit;
   text-align: left;
   transition: transform var(--dur-quick) var(--ease-standard),
-              border-color var(--dur-quick) var(--ease-standard),
-              box-shadow var(--dur-quick) var(--ease-standard);
+              border-color var(--dur-quick) var(--ease-standard);
 }
 
 button.pipeline-node {
@@ -67,8 +64,7 @@ button.pipeline-node:hover {
 .pipeline-node[aria-pressed='true'] {
   border-color: var(--primary);
   border-left-color: var(--bar);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 20%, transparent),
-              inset 0 0 0 1px var(--primary);
+  box-shadow: var(--focus-ring);
 }
 
 .pipeline-node:focus-visible {
@@ -245,7 +241,9 @@ button.pipeline-node:hover {
 }
 
 .pipeline-connector[data-state='broken'] {
-  background: repeating-linear-gradient(180deg, var(--edge-color) 0 4px, transparent 4px 8px);
+  width: 0;
+  border-left: 2px dashed var(--edge-color);
+  background: none;
 }
 
 .step-detail {
@@ -293,7 +291,7 @@ button.pipeline-node:hover {
   margin-top: 1rem;
   padding: 1.25rem;
   border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, var(--card-from), var(--card-to));
+  background: var(--paper-3);
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow);
 }
@@ -311,7 +309,7 @@ button.pipeline-node:hover {
   gap: 0.5rem;
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--teal-bright);
+  color: var(--primary);
 }
 
 .video-player-frame {
@@ -357,28 +355,26 @@ button.pipeline-node:hover {
   background: var(--btn-bg-hover);
   border-color: var(--primary);
   color: var(--primary);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 .video-download-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: var(--gradient-cta);
+  background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 700;
   padding: 0.45rem 1rem;
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--cta-from) 35%, transparent);
   transition: transform var(--dur-quick) var(--ease-standard),
-              box-shadow var(--dur-quick) var(--ease-standard);
+              background-color var(--dur-quick) var(--ease-standard);
 }
 
 .video-download-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--cta-from) 50%, transparent);
+  background: var(--primary-hover);
 }
 
 .pipeline-hint {
@@ -513,7 +509,10 @@ button.pipeline-node:hover {
   }
 
   .pipeline[data-layout='row'] .pipeline-connector[data-state='broken'] {
-    background: repeating-linear-gradient(90deg, var(--edge-color) 0 4px, transparent 4px 8px);
+    width: var(--pipeline-gap);
+    height: 0;
+    border-left: 0;
+    border-top: 2px dashed var(--edge-color);
   }
 }
 

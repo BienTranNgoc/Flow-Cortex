@@ -3,9 +3,10 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
-import { AlertCircle, ArrowRight, Loader2, Shield } from 'lucide-react';
+import { NodiMark } from '@flow-cortex/ui-kit';
+import { ArrowRight, CircleNotch, WarningCircle } from '@phosphor-icons/react';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { BRAND_NAME } from '../../app/brand';
+import { NODI_WORDMARK } from '../../app/brand';
 import { usePageTitle } from '../../app/usePageTitle';
 import { AppLanguageToggle } from '../../lib/AppLanguageToggle';
 import { activeLocale } from '../../lib/i18n';
@@ -46,40 +47,18 @@ export function LoginPage() {
 
   return (
     <main className="auth-shell">
-      <aside className="auth-shell__aside" aria-hidden="true">
-        <div className="auth-shell__aurora" />
-        <div className="auth-shell__orb auth-shell__orb--cyan" />
-        <div className="auth-shell__orb auth-shell__orb--violet" />
-        <div className="auth-shell__orb auth-shell__orb--teal" />
-        <div className="auth-shell__aside-grid" />
-        <div className="auth-shell__aside-content">
-          <div className="auth-shell__brand">
-            <span className="auth-shell__brand-mark">
-              <Shield size={18} />
-            </span>
-            <div className="auth-shell__brand-text">
-              <strong>{BRAND_NAME}</strong>
-              <span>{t('common.header.console')}</span>
-            </div>
+      <div className="auth-shell__language">
+        <AppLanguageToggle />
+      </div>
+      <section className="auth-shell__card">
+        <div className="auth-shell__brand">
+          <span className="auth-shell__brand-mark" aria-hidden="true">
+            <NodiMark size={32} />
+          </span>
+          <div className="auth-shell__brand-text">
+            <strong>{NODI_WORDMARK}</strong>
+            <span>{t('common.header.console')}</span>
           </div>
-          <div className="auth-shell__pitch">
-            <h2>{t('auth.login.pitch.title')}</h2>
-            <p>{t('auth.login.pitch.lede')}</p>
-            <ul className="auth-shell__pitch-list">
-              {PITCH_POINT_KEYS.map((key) => (
-                <li key={key}>
-                  <span className="auth-shell__pitch-dot" /> {t(key)}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="auth-shell__aside-foot">{t('auth.login.asideFoot')}</p>
-        </div>
-      </aside>
-
-      <section className="auth-shell__form-pane">
-        <div className="auth-shell__language">
-          <AppLanguageToggle />
         </div>
         <div className="auth-shell__form-inner">
           <header className="auth-shell__form-header">
@@ -108,7 +87,7 @@ export function LoginPage() {
               />
               {errors.email?.message && (
                 <p className="auth-form__error" role="alert">
-                  <AlertCircle aria-hidden="true" size={14} />
+                  <WarningCircle aria-hidden="true" size={14} />
                   {t(errors.email.message)}
                 </p>
               )}
@@ -128,7 +107,7 @@ export function LoginPage() {
               />
               {errors.password?.message && (
                 <p className="auth-form__error" role="alert">
-                  <AlertCircle aria-hidden="true" size={14} />
+                  <WarningCircle aria-hidden="true" size={14} />
                   {t(errors.password.message)}
                 </p>
               )}
@@ -136,7 +115,7 @@ export function LoginPage() {
 
             {serverError && (
               <p className="auth-form__error auth-form__error--server" role="alert">
-                <AlertCircle aria-hidden="true" size={14} />
+                <WarningCircle aria-hidden="true" size={14} />
                 {serverError}
               </p>
             )}
@@ -148,7 +127,7 @@ export function LoginPage() {
             >
               {loginMutation.isPending ? (
                 <>
-                  <Loader2 aria-hidden="true" size={16} className="auth-form__spinner" />
+                  <CircleNotch aria-hidden="true" size={16} className="auth-form__spinner" />
                   {t('auth.login.submitting')}
                 </>
               ) : (
@@ -166,6 +145,19 @@ export function LoginPage() {
           </footer>
         </div>
       </section>
+
+      <aside className="auth-shell__pitch">
+        <h2>{t('auth.login.pitch.title')}</h2>
+        <p>{t('auth.login.pitch.lede')}</p>
+        <ul className="auth-shell__pitch-list">
+          {PITCH_POINT_KEYS.map((key) => (
+            <li key={key}>
+              <span className="auth-shell__pitch-dot" aria-hidden="true" /> {t(key)}
+            </li>
+          ))}
+        </ul>
+        <p className="auth-shell__aside-foot">{t('auth.login.asideFoot')}</p>
+      </aside>
     </main>
   );
 }

@@ -1,29 +1,30 @@
-import type { LucideIcon } from 'lucide-react';
 import {
-  Activity,
-  AudioWaveform,
-  Boxes,
-  ClipboardList,
+  ChatText,
+  ClipboardText,
   Coins,
   Cpu,
-  LayoutDashboard,
+  Cube,
+  GearSix,
   ListChecks,
-  MessageSquare,
   Play,
-  Settings2,
+  Pulse,
   ShieldCheck,
+  SquaresFour,
   Users,
-} from 'lucide-react';
+  Waveform,
+  type Icon,
+} from '@phosphor-icons/react';
 import { can, type Action } from './permissions';
 
-/** `label` and `tag` are i18n keys; the sidebar translates them. */
+/** `label` and `tag` are i18n keys; the sidebar translates them. A `badge` above 0 shows a count. */
 export interface NavItem {
   label: string;
   path: string;
-  icon: LucideIcon;
+  icon: Icon;
   action: Action;
   disabled?: boolean;
   tag?: string;
+  badge?: number;
 }
 
 export interface NavGroup {
@@ -42,7 +43,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.dashboard',
         path: '/dashboard',
-        icon: LayoutDashboard,
+        icon: SquaresFour,
         action: 'runs.view',
       },
     ],
@@ -54,7 +55,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.workflows',
         path: '/workflows',
-        icon: Boxes,
+        icon: Cube,
         action: 'workflows.view',
         disabled: true,
         tag: COMING_SOON,
@@ -100,13 +101,13 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.smsOutbox',
         path: '/sms-outbox',
-        icon: MessageSquare,
+        icon: ChatText,
         action: 'users.manage',
       },
       {
         label: 'common.shell.nav.items.features',
         path: '/features',
-        icon: Settings2,
+        icon: GearSix,
         action: 'features.toggle',
         disabled: true,
         tag: COMING_SOON,
@@ -114,7 +115,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.auditLog',
         path: '/audit',
-        icon: ClipboardList,
+        icon: ClipboardText,
         action: 'audit.view',
         disabled: true,
         tag: COMING_SOON,
@@ -128,13 +129,13 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.mediaJobs',
         path: '/media-jobs',
-        icon: Activity,
+        icon: Pulse,
         action: 'mediaJobs.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',
         path: '/voice-quota',
-        icon: AudioWaveform,
+        icon: Waveform,
         action: 'voice.view',
         disabled: true,
         tag: COMING_SOON,

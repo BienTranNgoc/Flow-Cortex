@@ -7,12 +7,34 @@ import i18n from './lib/i18n';
 import { stubApi } from './test/fakeApi';
 
 const loginPage = vi.hoisted(() => ({ throws: false }));
+const pages = vi.hoisted(() => ({ homeThrows: true }));
 
 vi.mock('./app/HomePage', () => ({
   HomePage: () => {
-    throw new TypeError('Home exploded');
+    if (pages.homeThrows) throw new TypeError('Home exploded');
+    return (
+      <>
+        <h1>Home page</h1>
+        <a href="/workflows/1">First workflow</a>
+      </>
+    );
   },
 }));
+
+vi.mock('./features/workflow/WorkflowDetailPage', () => ({
+  WorkflowDetailPage: () => {
+    throw new TypeError('Detail exploded');
+  },
+}));
+
+vi.mock('./features/workflow/WorkflowsListPage', async () => {
+  const { PageHeading } = await import('./app/PageHeading');
+  return { WorkflowsListPage: () => <PageHeading title="Workflows" /> };
+});
+
+afterEach(() => {
+  pages.homeThrows = true;
+});
 
 const MEMBER_ME = {
   'GET /api/v1/auth/me': {
@@ -190,6 +212,49 @@ describe('App', () => {
     consoleError.mockRestore();
   });
 
+  it('keeps the sidebar usable after a page throws, and Home opens without the error view', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+    setToken('t', true);
+    window.history.pushState({}, '', '/workflows/42');
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    pages.homeThrows = false;
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    await user.click(within(nav).getByRole('link', { name: 'Home' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home page' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+
+    setToken(null);
+    vi.unstubAllGlobals();
+    consoleError.mockRestore();
+  });
+
+  it('frames /workflows with one navigation, one banner and one main landmark', async () => {
+    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+    setToken('t', true);
+    window.history.pushState({}, '', '/workflows');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Workflows' })).toBeInTheDocument();
+    expect(screen.getAllByRole('navigation')).toHaveLength(1);
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
+    expect(screen.getByRole('main')).toContainElement(
+      screen.getByRole('heading', { level: 1, name: 'Workflows' }),
+    );
+
+    setToken(null);
+    vi.unstubAllGlobals();
+  });
+
   it('sends an ADMIN who opens /users to / and shows no Users link', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
@@ -238,7 +303,7 @@ describe('App', () => {
     },
   );
 
-  it('lists Runs and Integrations in the nav when the demo pages flag is on', async () => {
+  it('lists Runs and Integrations in the sidebar nav when the demo pages flag is on', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
     stubApi(MEMBER_ME);
@@ -252,6 +317,7 @@ describe('App', () => {
       const nav = screen.getByRole('navigation', { name: 'Main navigation' });
       expect(within(nav).getByRole('link', { name: 'Runs' })).toBeInTheDocument();
       expect(within(nav).getByRole('link', { name: 'Integrations' })).toBeInTheDocument();
+      expect(nav.closest('aside')).not.toBeNull();
     } finally {
       setToken(null);
       vi.unstubAllEnvs();
@@ -260,7 +326,7 @@ describe('App', () => {
     }
   });
 
-  it('keeps Sign out in the header when /me fails', async () => {
+  it('keeps Sign out in the topbar when /me fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
     stubApi({ 'GET /api/v1/auth/me': { status: 500, body: { status: 500, detail: 'boom' } } });
@@ -270,12 +336,61 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /open account menu/i }));
-    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    const topbar = screen.getByRole('banner');
+    await user.click(within(topbar).getByRole('button', { name: /open account menu/i }));
+    expect(await within(topbar).findByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
 
     setToken(null);
     vi.unstubAllGlobals();
     consoleError.mockRestore();
+  });
+
+  describe('skip link and page-change focus', () => {
+    beforeEach(() => {
+      pages.homeThrows = false;
+      stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+      setToken('t', true);
+      window.history.pushState({}, '', '/');
+    });
+    afterEach(() => {
+      setToken(null);
+      vi.unstubAllGlobals();
+    });
+
+    it('moves no focus on a direct load, so the first Tab reaches the skip link', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+
+      await screen.findByRole('heading', { level: 1, name: 'Home page' });
+      expect(document.body).toHaveFocus();
+
+      await user.tab();
+      expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveFocus();
+    });
+
+    it('puts focus in main after one Tab and Enter, before the first page control', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('heading', { level: 1, name: 'Home page' });
+
+      await user.tab();
+      await user.keyboard('{Enter}');
+
+      expect(screen.getByRole('main')).toHaveFocus();
+      expect(screen.getByRole('link', { name: 'First workflow' })).not.toHaveFocus();
+    });
+
+    it('focuses the new page heading after choosing Workflows in the sidebar', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('heading', { level: 1, name: 'Home page' });
+
+      const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+      await user.click(within(nav).getByRole('link', { name: 'Workflows' }));
+
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Workflows' });
+      await waitFor(() => expect(heading).toHaveFocus());
+    });
   });
 });

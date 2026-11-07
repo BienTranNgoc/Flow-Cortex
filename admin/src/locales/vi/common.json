@@ -20,7 +20,6 @@
   },
   "header": {
     "title": "Quản trị Flow-Cortex",
-    "homeLink": "Trang chủ quản trị FlowCortex",
     "console": "Trang quản trị"
   },
   "account": {
@@ -40,10 +39,12 @@
   },
   "shell": {
     "noPage": "Tài khoản này không có trang nào để truy cập.",
+    "brandAdmin": "Quản trị",
     "nav": {
       "label": "Điều hướng quản trị",
-      "menu": "Menu",
-      "hideMenu": "Ẩn menu",
+      "openMenu": "Mở menu",
+      "closeMenu": "Đóng menu",
+      "withCount": "{{label}}, {{count}}",
       "expand": "Mở rộng thanh bên",
       "collapse": "Thu gọn thanh bên",
       "comingSoon": "Sắp ra mắt",

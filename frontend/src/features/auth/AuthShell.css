@@ -327,7 +327,7 @@
   border: 0.12cqw solid color-mix(in srgb, var(--auth-on-ocean) 70%, transparent);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--auth-glass-dark) 70%, transparent);
-  box-shadow: 0 0 1.2cqw color-mix(in srgb, var(--teal-glow) 50%, transparent);
+  box-shadow: 0 0 1.2cqw color-mix(in srgb, var(--auth-glow) 50%, transparent);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -384,9 +384,9 @@
 
 .auth-promo__tag {
   border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--tone-amber-from), var(--tone-amber-to));
-  box-shadow: 0 0 1.1cqw color-mix(in srgb, var(--tone-amber-to) 60%, transparent);
-  color: var(--tone-amber-on);
+  background: linear-gradient(90deg, var(--auth-progress-from), var(--auth-progress-to));
+  box-shadow: 0 0 1.1cqw color-mix(in srgb, var(--auth-progress-to) 60%, transparent);
+  color: var(--auth-progress-on);
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -633,7 +633,7 @@
 }
 
 .auth-btn--primary {
-  background: var(--gradient-cta);
+  background: var(--auth-gradient-cta);
   color: var(--primary-foreground);
 }
 

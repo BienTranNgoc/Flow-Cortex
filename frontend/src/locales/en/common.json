@@ -37,6 +37,13 @@
     "runs": "Runs",
     "integrations": "Integrations",
     "docs": "Docs",
+    "docsGroup": "Docs sections",
+    "brand": "nodi",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
     "credits": "{{amount}} credits",
     "signOut": "Sign out"
   },
@@ -52,7 +59,14 @@
     "helpDocs": "Help & docs",
     "signingOut": "Signing out…"
   },
+  "state": {
+    "retry": "Retry",
+    "empty": "There are no workflows yet.",
+    "noMatch": "No workflow matches your search.",
+    "clearFilters": "Clear filters"
+  },
   "shell": {
+    "skipToContent": "Skip to content",
     "brandPanel": {
       "headline": "Your AI media <highlight>studio</highlight> for production-grade pipelines.",
       "lede": "Source, process, review and export media in one click — built for creators who need consistent output, not another toy.",
@@ -69,17 +83,10 @@
   "home": {
     "loading": "Loading…",
     "loadProfileError": "Could not load your profile.",
-    "retry": "Retry",
-    "eyebrow": "CREATOR LAUNCHPAD · READY TO CREATE",
-    "headline": "<strong>Your AI media</strong> <accent>studio</accent>",
     "lede": "One click launches a production-ready pipeline: source, process, review, export.",
     "pickTitle": "Pick a pipeline",
     "viewAll": "View all workflows",
-    "loadingWorkflows": "Loading workflows…",
     "loadWorkflowsError": "Could not load workflows.",
-    "noMatch": "No workflows match your filter.",
-    "clearFilters": "Clear filters",
-    "empty": "No workflows available yet.",
     "stagesTitle": "How Flow-Cortex Handles Your Video Runs",
     "stages": {
       "source": {
@@ -99,15 +106,14 @@
         "body": "Download the finished output while it is still within the asset retention window."
       }
     },
-    "welcome": "Welcome, {{name}}",
-    "manageProfile": "Manage your profile"
+    "greeting": "Hello, {{name}}",
+    "greetingNoName": "Hello",
+    "start": "Start a workflow",
+    "readGuide": "Read the guide"
   },
   "docs": {
-    "eyebrow": "DOCUMENTATION",
     "title": "How FlowCortex works",
     "subtitle": "Concept guides, walk-throughs and the full HTTP API for the workflows you build.",
-    "sectionsLabel": "Docs sections",
-    "menuHint": "See full API Reference →",
     "tabs": {
       "overview": "Overview",
       "api": "API Reference",
@@ -138,7 +144,6 @@
     }
   },
   "runs": {
-    "eyebrow": "RUN HISTORY",
     "title": "Recent runs",
     "subtitle": "Track every pipeline you started: what is running, what needs your review, and what failed.",
     "searchPlaceholder": "Search by workflow name…",
@@ -171,7 +176,6 @@
     "demoFailure": "Step \"throw\" failed: deliberate failure for testing."
   },
   "integrations": {
-    "eyebrow": "CONNECTED SERVICES",
     "title": "Integrations",
     "subtitle": "Bring the AI providers and social accounts your workflows depend on. Keys stay on your account and are reused across every run.",
     "tabsLegend": "Integration categories",

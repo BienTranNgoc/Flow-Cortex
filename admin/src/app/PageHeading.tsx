@@ -7,11 +7,7 @@ interface PageHeadingProps {
   readonly actions?: ReactNode;
 }
 
-/**
- * Shared page header for every admin screen. Mirrors the structure of the
- * `HomePage` hero block from the member SPA (eyebrow + h1 + lede + actions)
- * so the two consoles feel like the same product.
- */
+/** Shared page header for every admin screen: optional eyebrow, h1, lede and wrapping actions. */
 export function PageHeading({ eyebrow, title, description, actions }: Readonly<PageHeadingProps>) {
   return (
     <header className="cortex-admin-page-heading">

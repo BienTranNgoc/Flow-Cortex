@@ -85,10 +85,10 @@ function renderForm(workflow: WorkflowResponse, routes: Record<string, Handler> 
   const view = renderRoute(
     '/workflows/:id',
     '/workflows/w1',
-    <>
+    <main>
       <WorkflowDetailPage />
       <Link to="/workflows">Leave</Link>
-    </>,
+    </main>,
     <>
       <Route path="/workflows/:workflowId/runs/:runId" element={<p>Run page r1</p>} />
       <Route path="/workflows" element={<p>Workflows list</p>} />

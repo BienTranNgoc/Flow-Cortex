@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import { useTheme } from './useTheme';
+import { initTheme, useTheme } from './useTheme';
 
 type ThemeApi = ReturnType<typeof useTheme>;
 
@@ -52,5 +52,36 @@ describe('useTheme', () => {
 
     expect(screen.getByTestId('theme').textContent).toBe('dark');
     expect(localStorage.getItem('flow-cortex:theme')).toBe('dark');
+  });
+
+  it('falls back to the system preference and raises no error when storage access throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    try {
+      initTheme();
+      expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+      const probe = vi.fn();
+      render(<Probe onReady={probe} />);
+      expect(screen.getByTestId('theme').textContent).toBe('light');
+
+      const api = probe.mock.calls.at(-1)?.[0] as ThemeApi | undefined;
+      act(() => api?.toggle());
+      expect(screen.getByTestId('theme').textContent).toBe('dark');
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
   });
 });

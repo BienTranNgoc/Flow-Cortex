@@ -43,128 +43,11 @@ a {
   opacity: 1;
 }
 
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-/* ===== HEADER — FlowCortex brand bar ==================================== */
-
-.cortex-header {
-  background: var(--header-glass-bg);
-  border-bottom: 1px solid var(--header-glass-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(var(--header-glass-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--header-glass-blur)) saturate(140%);
-}
-
-.cortex-header__inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-  height: 62px;
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.cortex-header__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-/* Flow-Cortex mark styles live in @flow-cortex/ui-kit (flowCortexLogo.css). */
-
-.cortex-header__brand-name {
-  font-weight: 800;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-  background: linear-gradient(90deg, var(--teal), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.cortex-header__nav {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex: 1;
-}
-
-.cortex-header__nav a,
-.cortex-header__nav-link {
-  padding: 0.4rem 0.85rem;
-  border-radius: 999px;
-  color: var(--nav-inactive-fg);
-  text-decoration: none;
-  font-size: 0.88rem;
-  font-weight: 500;
-  transition: color var(--dur-quick) var(--ease-standard),
-    background var(--dur-quick) var(--ease-standard);
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-}
-
-.cortex-header__nav a:hover,
-.cortex-header__nav-link:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
-}
-
-.cortex-header__nav a.is-active,
-.cortex-header__nav-link.is-active,
-.cortex-header__nav a.active {
-  color: var(--nav-active-fg);
-  background: var(--nav-active-bg);
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal-glow) 22%, transparent);
-}
-
-.cortex-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.cortex-gpu-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.75rem;
-  background: color-mix(in srgb, var(--paper-2) 85%, transparent);
-  border: 1px solid color-mix(in srgb, var(--teal-glow) 25%, transparent);
-  border-radius: 999px;
-  color: var(--teal-bright);
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: default;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.cortex-gpu-pill:hover {
-  border-color: color-mix(in srgb, var(--teal-glow) 45%, transparent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--teal-glow) 15%, transparent);
-}
-
-.cortex-gpu-pill svg {
-  color: var(--teal);
-}
-
 .cortex-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: var(--control-h);
   padding: 0.38rem 1.1rem;
   border-radius: 8px;
   font-size: 0.88rem;
@@ -183,34 +66,18 @@ a {
 
 .cortex-btn--ghost:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
-  border-color: color-mix(in srgb, var(--teal-glow) 30%, transparent);
+  background: var(--chrome-hover);
+  border-color: var(--line-2);
 }
 
 .cortex-btn--primary {
-  background: var(--gradient-cta);
+  background: var(--primary);
   color: var(--primary-foreground);
   border: none;
 }
 
 .cortex-btn--primary:hover {
-  filter: brightness(1.1);
-  box-shadow: 0 4px 18px color-mix(in srgb, var(--cta-from) 25%, transparent);
-}
-
-.cortex-header__user {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.cortex-header__email {
-  color: var(--ink-3);
-  font-size: 0.82rem;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--primary-hover);
 }
 
 /* ===== LANGUAGE TOGGLE ================================================== */
@@ -245,7 +112,7 @@ a {
 
 .language-toggle__option:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--teal-glow) 8%, transparent);
+  background: var(--chrome-hover);
 }
 
 .language-toggle__option[aria-pressed='true'],
@@ -274,18 +141,14 @@ a {
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
-  min-height: 36px;
-  transition: color var(--dur-quick) var(--ease-standard),
-    background var(--dur-quick) var(--ease-standard),
-    box-shadow var(--dur-quick) var(--ease-standard),
-    transform var(--dur-quick) var(--ease-standard);
+  min-height: var(--control-h);
+  transition: transform var(--dur-quick) var(--ease-standard);
   margin-right: 0;
 }
 
 .cortex-theme-toggle:hover {
   color: var(--teal-deep);
-  background: color-mix(in srgb, var(--teal-glow) 18%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--teal-glow) 35%, transparent);
+  background: var(--chrome-hover);
 }
 
 .cortex-theme-toggle:focus-visible {
@@ -295,8 +158,8 @@ a {
 
 .cortex-theme-toggle--compact {
   padding: 0.38rem;
-  min-height: 36px;
-  width: 36px;
+  min-height: var(--control-h);
+  width: var(--control-h);
   justify-content: center;
 }
 
@@ -307,184 +170,111 @@ a {
 /* ===== FOOTER =========================================================== */
 
 .cortex-footer {
-  background: var(--footer-bg);
-  border-top: 1px solid color-mix(in srgb, var(--indigo) 30%, transparent);
-  margin-top: 4rem;
-}
-
-.cortex-footer__inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 3rem 1.5rem 2.5rem;
-}
-
-.cortex-footer__brand {
   display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.cortex-footer__brand-row {
-  display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.55rem;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--chrome-border);
+  background: var(--paper-2);
 }
 
-.cortex-footer__brand-name {
-  font-weight: 800;
-  font-size: 1.1rem;
-  letter-spacing: -0.01em;
-  background: linear-gradient(90deg, var(--teal), var(--accent));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.cortex-footer__tagline {
+.cortex-footer__text {
   margin: 0;
   color: var(--ink-3);
-  font-size: 0.88rem;
-  line-height: 1.55;
-  max-width: 28ch;
-}
-
-.cortex-footer__social {
-  display: flex;
-  gap: 0.6rem;
-  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .cortex-footer__social-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--teal-glow) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ink-5) 25%, transparent);
+  width: var(--control-h);
+  height: var(--control-h);
+  border-radius: var(--radius-md);
   color: var(--ink-3);
   text-decoration: none;
-  transition: all 0.18s ease;
 }
 
 .cortex-footer__social-link:hover {
-  color: var(--teal);
-  background: color-mix(in srgb, var(--teal-glow) 10%, transparent);
-  border-color: color-mix(in srgb, var(--teal-glow) 35%, transparent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--teal) 12%, transparent);
+  color: var(--ink);
+  background: var(--chrome-hover);
 }
 
-.cortex-footer__bottom {
-  border-top: 1px solid color-mix(in srgb, var(--indigo) 20%, transparent);
-  padding: 1.25rem 1.5rem;
-  text-align: center;
+/* ===== SHELL — sidebar column + topbar/canvas column =================== */
+
+.app-shell {
+  --sidebar-w: 260px;
+  --content-max: 1440px;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100svh;
+  background: var(--paper);
+  transition: grid-template-columns var(--dur-standard) var(--ease-standard);
 }
 
-.cortex-footer__bottom p {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 0.8rem;
+.app-shell[data-sidebar='rail'] {
+  --sidebar-w: 72px;
 }
 
-/* ===== AMBIENT PAGE GLOW (authenticated pages) ========================== */
-
-.cortex-ambient {
-  position: relative;
+.app-shell[data-sidebar='drawer'] {
+  --sidebar-w: 0px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.cortex-ambient::before {
-  content: '';
-  position: fixed;
-  top: -30vmax;
-  left: -20vmax;
-  width: 60vmax;
-  height: 60vmax;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--indigo) 18%, transparent) 0%,
-    transparent 65%
-  );
-  pointer-events: none;
-  z-index: -1;
-  animation: ambient-pulse 20s ease-in-out infinite;
+.app-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100svh;
 }
 
-.cortex-ambient::after {
-  content: '';
-  position: fixed;
-  bottom: -25vmax;
-  right: -15vmax;
-  width: 55vmax;
-  height: 55vmax;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--teal-deep) 7%, transparent) 0%,
-    transparent 65%
-  );
-  pointer-events: none;
-  z-index: -1;
-  animation: ambient-pulse-b 28s ease-in-out infinite reverse;
-}
-
-@keyframes ambient-pulse {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(3%, 4%) scale(1.06); }
-}
-
-@keyframes ambient-pulse-b {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-4%, -3%) scale(1.08); }
-}
-
-/* ===== RESPONSIVE ======================================================== */
-
-@media (max-width: 768px) {
-  .cortex-header__inner {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 62px;
-    padding-block: 0.5rem;
-    row-gap: 0.5rem;
-  }
-
-  .cortex-header__nav {
-    order: 3;
-    flex: 1 0 100%;
-    flex-wrap: wrap;
-  }
-
-  .cortex-header__nav a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-  }
-
-  .cortex-header__email {
-    display: none;
-  }
-
-}
-
-@media (max-width: 480px) {
-  .cortex-header__inner {
-    gap: 0.75rem;
-    padding-inline: 1rem;
-  }
-
-  .cortex-gpu-pill {
-    padding-inline: 0.5rem;
-    white-space: nowrap;
-  }
-}
-
-/* An auto-margin flex item sizes to its content, so without width: 100% the column grows to a wide table's min-content width and widens the page. */
-.app-content {
+/* The grid column is minmax(0, 1fr) and the canvas fills it: an auto-margin item would size to its content, so a wide table would widen the page. */
+.app-main {
+  flex: 1;
   width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 1.5rem;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.app-main:focus,
+.app-main h1:focus {
+  outline: none;
+}
+
+@media (min-width: 768px) {
+  .app-main {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding: 2rem;
+  }
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding-inline: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
 }
 
 /* A link that is a page's next action gets the same 44px target as a button. */
@@ -609,60 +399,44 @@ a:focus-visible {
   animation-timing-function: var(--ease-standard);
 }
 
-/* ----- Primary button (gradient) --------------------------------------- */
+/* ----- Primary button ---------------------------------------------------- */
 
 .primary-button {
   width: 100%;
   margin: 0.75rem 0 0;
-  min-height: 48px;
+  min-height: var(--control-h);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--primary-foreground);
   font-weight: 800;
   font-size: 0.98rem;
   letter-spacing: 0.01em;
-  background: var(--gradient-cta);
+  background: var(--primary);
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--dur-quick) var(--ease-standard);
 }
 
-.primary-button:not(:disabled) {
-  background-image: linear-gradient(100deg, var(--cta-from), var(--cta-to), var(--cta-from));
-  background-size: 200% 100%;
-  animation: btn-shimmer 3.2s linear infinite;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--cta-from) 18%, transparent);
-}
-
-.primary-button:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
+.primary-button:hover:not(:disabled, [data-state='success']),
+.primary-button:active:not(:disabled, [data-state='success']) {
+  background: var(--primary-hover);
 }
 
 .primary-button:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .primary-button:disabled {
   cursor: not-allowed;
-  background: linear-gradient(100deg, var(--disabled-from), var(--disabled-to));
-  color: var(--ink-disabled);
-  animation: none;
+  background: var(--paper-3);
+  color: var(--ink-4);
 }
 
 .primary-button[data-state='success'] {
-  background: linear-gradient(100deg, var(--green-bright), var(--cta-from));
+  background: var(--green-soft);
+  color: var(--green);
   animation: btn-success-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes btn-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
 }
 
 @keyframes btn-success-pop {
@@ -677,44 +451,25 @@ a:focus-visible {
   }
 }
 
-/* ----- Eyebrow (animated gradient text) -------------------------------- */
+/* ----- Eyebrow ---------------------------------------------------------- */
 
 .eyebrow {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--ink-3);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.13em;
-  background: linear-gradient(90deg, var(--cta-from), var(--accent), var(--violet), var(--cta-from));
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: ai-gradient-pan 6s linear infinite;
-}
-
-@keyframes ai-gradient-pan {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
 }
 
 /* ----- Reduced motion --------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .primary-button,
-  .eyebrow,
   button,
   .action-link,
   .form-error,
-  .cortex-ambient::before,
-  .cortex-ambient::after,
-  .cortex-header__nav a,
+  .app-shell,
   .cortex-btn,
-  .cortex-gpu-pill,
   .cortex-footer__social-link {
     animation: none !important;
     transition: none !important;
@@ -725,9 +480,5 @@ a:focus-visible {
   ::view-transition-old(*),
   ::view-transition-new(*) {
     animation: none !important;
-  }
-
-  .cortex-footer__social-link:hover {
-    transform: none;
   }
 }

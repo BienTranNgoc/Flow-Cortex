@@ -1,14 +1,30 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import viAuth from '../../locales/vi/auth.json';
 import viCommon from '../../locales/vi/common.json';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { renderRoute, stubApi, testQueryClient } from '../../test/fakeApi';
 import { LoginPage } from './LoginPage';
 
 function renderLogin() {
   return renderRoute('/login', '/login', <LoginPage />);
+}
+
+function renderLoginFrom(from?: string) {
+  render(
+    <QueryClientProvider client={testQueryClient()}>
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: from ? { from } : null }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/runs" element={<p>runs page</p>} />
+          <Route path="/users" element={<p>users page</p>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 describe('LoginPage', () => {
@@ -38,6 +54,43 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
+  });
+
+  it('leaves the sign-in page for the default landing page once a token is stored', () => {
+    setToken('stored-token', false);
+    renderLoginFrom();
+
+    expect(screen.getByText('runs page')).toBeInTheDocument();
+  });
+
+  it('returns to the page that sent the visitor here', () => {
+    setToken('stored-token', false);
+    renderLoginFrom('/users');
+
+    expect(screen.getByText('users page')).toBeInTheDocument();
+  });
+
+  it('leaves the sign-in page after a successful sign-in', async () => {
+    stubApi({
+      'POST /api/v1/auth/login': { status: 200, body: { accessToken: 'fresh-token' } },
+    });
+    const user = userEvent.setup();
+    renderLoginFrom();
+
+    await user.type(screen.getByLabelText('Email'), 'admin@flowcortex.dev');
+    await user.type(screen.getByLabelText('Password'), 'secret');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByText('runs page')).toBeInTheDocument();
+  });
+
+  it('renders one centred card with no decorative aside', () => {
+    renderLogin();
+
+    expect(
+      document.querySelector('.auth-shell__aurora, .auth-shell__orb, .auth-shell__aside-grid'),
+    ).toBeNull();
+    expect(document.querySelector('.auth-shell__card')).not.toBeNull();
   });
 
   describe('in Vietnamese', () => {

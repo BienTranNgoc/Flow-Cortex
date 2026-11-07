@@ -1,30 +1,19 @@
 .wf-list {
-  max-width: 1100px;
+  max-width: var(--content-max, 1440px);
   margin: 0 auto;
-  padding: 1.75rem 1rem 3rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.wf-list__header {
+.wf-list .page-heading {
+  margin-bottom: 0;
+}
+
+.wf-list__results {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.wf-list__title {
-  margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  letter-spacing: -0.01em;
-}
-
-.wf-list__welcome {
-  margin: 0.25rem 0 0;
-  color: var(--ink-3);
-  font-size: 0.95rem;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .wf-list__toolbar {
@@ -35,7 +24,7 @@
   padding: 0.75rem;
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+  background: var(--paper-2);
 }
 
 .wf-list__search {
@@ -43,7 +32,7 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1 1 240px;
-  min-height: 38px;
+  min-height: var(--control-h);
   padding: 0 0.75rem;
   border: 1px solid var(--input-border);
   border-radius: var(--radius-sm);
@@ -58,8 +47,8 @@
   outline: none;
   color: var(--ink);
   font-size: 0.92rem;
-  min-height: 0;
-  padding: 0.55rem 0;
+  min-height: var(--control-h);
+  padding: 0;
 }
 
 .wf-list__scope {
@@ -76,7 +65,7 @@
 
 .wf-list__scope-btn {
   padding: 0.3rem 0.65rem;
-  min-height: 32px;
+  min-height: var(--control-h);
   border-radius: 999px;
   border: 1px solid var(--card-edge);
   background: transparent;
@@ -88,7 +77,7 @@
 .wf-list__scope-btn.is-active {
   background: var(--nav-active-bg);
   color: var(--nav-active-fg);
-  border-color: color-mix(in srgb, var(--teal-glow) 30%, transparent);
+  border-color: var(--primary);
   font-weight: 600;
 }
 
@@ -101,15 +90,15 @@
   border: 1px solid var(--card-edge);
   border-radius: 999px;
   padding: 0.2rem;
-  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+  background: var(--paper-2);
 }
 
 .wf-list__layout-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--control-h);
+  height: var(--control-h);
   border: 0;
   background: transparent;
   border-radius: 999px;
@@ -122,20 +111,10 @@
   color: var(--nav-active-fg);
 }
 
-.wf-list__status {
-  margin: 0;
-  color: var(--ink-3);
-  font-size: 0.95rem;
-}
-
-.wf-list__status--error {
-  color: var(--red);
-}
-
 .wf-list__table-wrap {
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--paper-2) 60%, transparent);
+  background: var(--paper-2);
   overflow-x: auto;
 }
 
@@ -158,7 +137,7 @@
   letter-spacing: 0.08em;
   color: var(--ink-4);
   padding: 0.75rem 1rem;
-  background: color-mix(in srgb, var(--paper-1) 70%, transparent);
+  background: var(--paper-3);
   border-bottom: 1px solid var(--card-edge);
 }
 
@@ -173,7 +152,7 @@
 }
 
 .wf-list__table tbody tr:hover {
-  background: color-mix(in srgb, var(--teal-glow) 5%, transparent);
+  background: var(--chrome-hover);
 }
 
 .wf-list__name {
@@ -195,19 +174,22 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--teal-glow) 12%, transparent);
-  color: var(--teal);
+  background: var(--primary-soft);
+  color: var(--primary);
   flex-shrink: 0;
 }
 
 .wf-list__name-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
   font-weight: 600;
   color: var(--ink);
   text-decoration: none;
 }
 
 .wf-list__name-link:hover {
-  color: var(--teal-bright);
+  color: var(--primary-hover);
 }
 
 .wf-list__shared {
@@ -258,20 +240,20 @@
 .wf-list__actions {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
 .wf-list__actions .cortex-btn {
-  min-height: 34px;
+  min-height: var(--control-h);
   padding: 0.3rem 0.7rem;
   font-size: 0.82rem;
 }
 
 .cortex-btn--icon {
   min-width: 0;
-  min-height: 32px;
-  width: 32px;
-  height: 32px;
+  min-height: var(--control-h);
+  width: var(--control-h);
+  height: var(--control-h);
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -286,19 +268,19 @@
 
 .cortex-btn--icon:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--teal-glow) 8%, transparent);
-  border-color: color-mix(in srgb, var(--teal-glow) 25%, transparent);
+  background: var(--chrome-hover);
+  border-color: var(--chrome-border);
 }
 
 .wf-list__run-btn {
-  color: var(--teal);
-  border-color: color-mix(in srgb, var(--teal-glow) 25%, transparent);
+  color: var(--primary);
+  border-color: var(--chrome-border);
 }
 
 .wf-list__run-btn:hover {
-  color: var(--teal-bright);
-  background: color-mix(in srgb, var(--teal-glow) 12%, transparent);
-  border-color: color-mix(in srgb, var(--teal-glow) 50%, transparent);
+  color: var(--primary-hover);
+  background: var(--chrome-active);
+  border-color: var(--primary);
 }
 
 .wf-list__actions-col {
@@ -320,12 +302,42 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  color: var(--primary-foreground);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0;
   flex-shrink: 0;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-5) 25%, transparent);
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue-text);
+}
+
+.wf-list__owner-avatar[data-tone='blue'] {
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue-text);
+}
+
+.wf-list__owner-avatar[data-tone='cyan'] {
+  background: var(--tone-cyan-bg);
+  color: var(--tone-cyan-text);
+}
+
+.wf-list__owner-avatar[data-tone='violet'] {
+  background: var(--tone-violet-bg);
+  color: var(--tone-violet-text);
+}
+
+.wf-list__owner-avatar[data-tone='amber'] {
+  background: var(--tone-amber-bg);
+  color: var(--tone-amber-text);
+}
+
+.wf-list__owner-avatar[data-tone='green'] {
+  background: var(--tone-green-bg);
+  color: var(--green-bright);
+}
+
+.wf-list__owner-avatar[data-tone='rose'] {
+  background: var(--tone-rose-bg);
+  color: var(--tone-rose-text);
 }
 
 .wf-list__owner-name {
@@ -355,8 +367,8 @@
 }
 
 .wf-list__owner-tag--mine {
-  background: color-mix(in srgb, var(--teal-glow) 22%, transparent);
-  color: var(--teal-bright);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
 }
 
 .wf-list__grid {
@@ -375,7 +387,7 @@
   padding: 1rem;
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--paper-2) 65%, transparent);
+  background: var(--paper-2);
 }
 
 .wf-list__grid-meta {
@@ -406,4 +418,56 @@
   color: var(--ink-4);
   font-size: 0.82rem;
   padding: 0 0.4rem;
+}
+
+@media (max-width: 720px) {
+  .wf-list__table-wrap {
+    border: 0;
+    background: transparent;
+    overflow-x: visible;
+  }
+
+  .wf-list__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .wf-list__table,
+  .wf-list__table tbody,
+  .wf-list__table tr,
+  .wf-list__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .wf-list__table tbody tr {
+    margin-bottom: 0.85rem;
+    padding: 0.5rem;
+    border: 1px solid var(--card-edge);
+    border-radius: var(--radius-md);
+    background: var(--paper-2);
+  }
+
+  .wf-list__table tbody td {
+    padding: 0.35rem 0.25rem;
+    border: 0;
+  }
+
+  .wf-list__table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+  }
+
+  .wf-list__actions-col {
+    width: 100%;
+  }
 }

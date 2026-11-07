@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
+import { SessionStatus } from '../../app/SessionStatus';
 import { useMeQuery } from './useAuth';
 
 /**
@@ -13,7 +14,7 @@ export function PasswordSetupGate({ children }: Readonly<{ children: ReactNode }
   const me = useMeQuery();
 
   if (me.isPending) {
-    return <output>{t('auth.session.checking')}</output>;
+    return <SessionStatus>{t('auth.session.checking')}</SessionStatus>;
   }
   if (me.data?.passwordSetupRequired) {
     return <Navigate to="/set-password" replace />;

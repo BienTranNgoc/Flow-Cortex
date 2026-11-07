@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { PageHeading } from './PageHeading';
 import { DEMO_RUNS, type DemoRun } from './runsDemo';
 import './RunsPage.css';
 
@@ -100,12 +101,8 @@ export function RunsPage() {
   }, [filter, query]);
 
   return (
-    <main className="runs-page">
-      <header className="runs-page__header">
-        <p className="eyebrow">{t('common.runs.eyebrow')}</p>
-        <h1>{t('common.runs.title')}</h1>
-        <p className="runs-page__subtitle">{t('common.runs.subtitle')}</p>
-      </header>
+    <div className="runs-page">
+      <PageHeading title={t('common.runs.title')} lede={t('common.runs.subtitle')} />
 
       <div className="runs-page__controls">
         <input
@@ -227,6 +224,6 @@ export function RunsPage() {
           })}
         </ul>
       )}
-    </main>
+    </div>
   );
 }

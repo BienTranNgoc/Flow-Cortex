@@ -1,12 +1,13 @@
 import { setToken } from '@flow-cortex/api-client';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
 import viUsers from '../locales/vi/users.json';
 import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
+import { stubMatchMedia } from '../test/matchMedia';
 import { AdminLayout } from './AdminLayout';
 
 function Exploding(): never {
@@ -20,6 +21,7 @@ function renderAdminPage() {
         <Routes>
           <Route element={<AdminLayout />}>
             <Route path="runs" element={<button type="button">Page action</button>} />
+            <Route path="users" element={<p>Users page</p>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -42,6 +44,7 @@ beforeEach(() => {
     configurable: true,
     value(this: HTMLDialogElement) {
       this.setAttribute('open', '');
+      this.querySelector<HTMLElement>('a[href], button:not(:disabled)')?.focus();
     },
   });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', {
@@ -166,6 +169,79 @@ describe('AdminLayout', () => {
     expect(trigger).toHaveFocus();
   });
 
+  describe('sidebar modes', () => {
+    afterEach(() => localStorage.clear());
+
+    it('honours a collapsed choice stored before the redesign and renders the rail', async () => {
+      localStorage.setItem('flow-cortex:admin:sidebar:collapsed', '1');
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      setToken('admin-token-rail', true);
+      renderAdminPage();
+
+      const nav = await screen.findByRole('navigation', { name: 'Admin navigation' });
+      expect(nav.closest('aside')).toHaveClass('cortex-admin-nav--collapsed');
+      expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('collapses from the control inside the sidebar and keeps the rail after a reload', async () => {
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      setToken('admin-token-toggle', true);
+      const first = renderAdminPage();
+
+      const nav = await screen.findByRole('navigation', { name: 'Admin navigation' });
+      await userEvent.click(
+        within(nav.closest('aside') as HTMLElement).getByRole('button', { name: 'Collapse sidebar' }),
+      );
+      expect(localStorage.getItem('flow-cortex:admin:sidebar:collapsed')).toBe('1');
+      first.unmount();
+
+      renderAdminPage();
+      const reloaded = await screen.findByRole('navigation', { name: 'Admin navigation' });
+      expect(reloaded.closest('aside')).toHaveClass('cortex-admin-nav--collapsed');
+    });
+  });
+
+  describe('drawer below 1024px', () => {
+    it('opens from the topbar menu button and returns focus to it after a choice', async () => {
+      stubMatchMedia(false);
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      setToken('admin-token-drawer', true);
+      renderAdminPage();
+
+      const menu = await screen.findByRole('button', { name: 'Open menu' });
+      expect(menu.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(screen.queryByRole('dialog', { name: 'Admin navigation' })).not.toBeInTheDocument();
+
+      await userEvent.click(menu);
+      const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });
+      expect(within(dialog).getByRole('button', { name: 'Close menu' })).toHaveFocus();
+
+      await userEvent.click(within(dialog).getByRole('link', { name: /Users/ }));
+      expect(screen.queryByRole('dialog', { name: 'Admin navigation' })).not.toBeInTheDocument();
+      expect(await screen.findByText('Users page')).toBeInTheDocument();
+      expect(menu).toHaveFocus();
+    });
+
+    it('closes when the viewport reaches 1024px and puts focus on the main region', async () => {
+      const media = stubMatchMedia(false);
+      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      setToken('admin-token-grow', true);
+      const { container } = renderAdminPage();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Open menu' }));
+      expect(screen.getByRole('dialog', { name: 'Admin navigation' })).toBeInTheDocument();
+
+      act(() => media.setMatches(true));
+
+      expect(container.querySelector('dialog.cortex-admin-nav')).toBeNull();
+      expect(container.querySelector('aside.cortex-admin-nav')).not.toBeNull();
+      expect(screen.getByRole('main')).toHaveFocus();
+    });
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -188,9 +264,10 @@ describe('AdminLayout', () => {
           name: new RegExp(`${viCommon.theme.switchToLight}|${viCommon.theme.switchToDark}`),
         }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole('link', { name: viCommon.header.homeLink }),
-      ).toHaveTextContent(viCommon.header.console);
+      expect(document.querySelector('.cortex-admin-nav__brand-label')).toHaveTextContent(
+        viCommon.shell.brandAdmin,
+      );
+      expect(screen.getByRole('button', { name: viCommon.shell.nav.openMenu })).toBeInTheDocument();
       expect(
         screen.getAllByRole('button', { name: viCommon.shell.nav.collapse }).length,
       ).toBeGreaterThan(0);
