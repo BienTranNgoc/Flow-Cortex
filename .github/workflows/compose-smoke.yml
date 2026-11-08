@@ -1,6 +1,6 @@
 name: compose-smoke
 
-# Builds every image, starts the whole compose stack and runs
+# Checks egress isolation, builds every image, starts the whole compose stack and runs
 # scripts/smoke-probe.sh: upload a clip, check it on the worker, download the
 # report, see the run in the admin list, fail a text file with probe_failed, and
 # carry a Product Video run through the fixture provider worker, a script
@@ -38,6 +38,9 @@ jobs:
             echo "::error::.env still holds a change-me placeholder"
             exit 1
           fi
+
+      - name: Egress isolation
+        run: scripts/check-egress-isolation.sh
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

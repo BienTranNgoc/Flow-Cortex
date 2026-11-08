@@ -11,10 +11,13 @@
 #   -> backend   http://localhost:8080   (API + /livez, /readyz)
 #   -> store     http://localhost:9000   (presigned uploads and downloads)
 #
-# Every published port binds 127.0.0.1. The worker has no published port and no
-# internet egress. Traces, logs and metrics are the optional overlay
-# compose.observability.yaml. No credential has a default here: a committed
-# value would be a known secret.
+# Every published port binds 127.0.0.1. The backend and the workers sit on the
+# internal network only: their one way out is egress-proxy, which lets just the
+# allowlisted hosts through (infra/egress-proxy/acl.yaml). egress-fetch is a
+# separate open-policy proxy on the fetch network for URL-download code only.
+# 127.0.0.1:8080 is relayed to the backend by api-publish. Traces, logs and
+# metrics are the optional overlay compose.observability.yaml. No credential has
+# a default here: a committed value would be a known secret.
 
 # What provider-worker and provider-video-worker share: one image, one broker and
 # store identity, the same health and shutdown handling. Each service adds the
@@ -24,7 +27,10 @@ x-provider-worker: &provider-worker
     context: ./worker
     target: provider-runtime
   image: flow-cortex-provider-worker:local
+  networks: [internal]
   depends_on:
+    egress-proxy:
+      condition: service_started
     rabbitmq-init:
       condition: service_completed_successfully
     minio-init:
@@ -39,6 +45,11 @@ x-provider-worker: &provider-worker
   restart: unless-stopped
 
 x-provider-worker-env: &provider-worker-env
+  HTTP_PROXY: http://egress-proxy:4750
+  HTTPS_PROXY: http://egress-proxy:4750
+  # edge_tts opens a wss:// websocket, which aiohttp resolves through WSS_PROXY.
+  WSS_PROXY: http://egress-proxy:4750
+  NO_PROXY: minio,rabbitmq,otel-collector,egress-proxy,localhost,127.0.0.1
   AMQP_URL: amqp://${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}:${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
   S3_ENDPOINT: http://minio:9000
   S3_REGION: us-east-1
@@ -54,8 +65,53 @@ x-provider-worker-env: &provider-worker-env
   OTEL_METRICS_EXPORTER: none
 
 services:
+  # The only route out for the backend and the provider workers: refuses every
+  # host not in the ACL file and every private, loopback, link-local or CGNAT
+  # destination. No published port.
+  egress-proxy:
+    build: ./infra/egress-proxy
+    image: flow-cortex-egress-proxy:local
+    # The ACL is passed again as a flag because Smokescreen applies the disabled
+    # policy only to an ACL loaded from the command line, not to one named in the
+    # config file; without it an `open` default would start unchallenged.
+    command:
+      - --config-file=/config/config.yaml
+      - --disable-acl-policy-action=open
+      - --egress-acl-file=/config/acl.yaml
+    networks: [internal, egress]
+    volumes:
+      - ${EGRESS_ACL_FILE:-./infra/egress-proxy/acl.yaml}:/config/acl.yaml:ro
+      - ./infra/egress-proxy/config.yaml:/config/config.yaml:ro
+    restart: unless-stopped
+
+  # Open-policy tier for URL downloads: any public host, private ranges still
+  # refused, rate limited. Reachable only from the fetch network.
+  egress-fetch:
+    build: ./infra/egress-proxy
+    image: flow-cortex-egress-proxy:local
+    command: [--config-file=/config/config.yaml]
+    networks: [fetch, egress]
+    volumes:
+      - ./infra/egress-proxy/fetch-acl.yaml:/config/acl.yaml:ro
+      - ./infra/egress-proxy/fetch-config.yaml:/config/config.yaml:ro
+    restart: unless-stopped
+
+  # Keeps 127.0.0.1:8080 working while the backend itself sits on internal
+  # networks only, where a published port does not work.
+  api-publish:
+    image: alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
+    command: TCP-LISTEN:8080,fork,reuseaddr TCP:backend:8080
+    networks: [default, internal]
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:17
+    networks: [default, internal]
     ports:
       - '127.0.0.1:5432:5432'
     environment:
@@ -164,6 +220,7 @@ services:
   # message shows up in the web UI at http://localhost:8025. Nothing leaves the machine.
   mailpit:
     image: axllent/mailpit:v1.20
+    networks: [default, internal]
     ports:
       - "127.0.0.1:8025:8025"
       - "127.0.0.1:1025:1025"
@@ -173,13 +230,18 @@ services:
     build:
       context: ./backend
     image: flow-cortex-backend:local
-    # The API on loopback only. Health and metrics answer on 8081 inside the
-    # service network and are never published.
-    ports:
-      - '127.0.0.1:8080:8080'
+    networks: [internal]
+    # Health and metrics answer on 8081 inside the service network and are never
+    # published; api-publish relays 8080 to the host loopback.
     expose:
       - '8081'
     environment:
+      # Every JVM HTTP client here (HttpURLConnection, JDK HttpClient, the AWS SDK)
+      # reads these properties; the bypass list keeps in-stack traffic direct.
+      JAVA_TOOL_OPTIONS: >-
+        -Dhttp.proxyHost=egress-proxy -Dhttp.proxyPort=4750
+        -Dhttps.proxyHost=egress-proxy -Dhttps.proxyPort=4750
+        -Dhttp.nonProxyHosts=localhost|127.*|[::1]|postgres|rabbitmq|minio|mailpit|otel-collector|egress-proxy|backend|frontend|admin
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowcortex
       SPRING_DATASOURCE_USERNAME: flowcortex
@@ -307,6 +369,8 @@ services:
       OTEL_METRICS_EXPORTER: none
     # Readiness covers the broker topology, so the backend waits for it.
     depends_on:
+      egress-proxy:
+        condition: service_started
       postgres:
         condition: service_healthy
       rabbitmq:
@@ -328,7 +392,8 @@ services:
 
   # Media worker: consumes media.jobs, reads uploads, writes reports. Its only
   # network is `internal`, so it reaches the broker and the store and nothing on
-  # the internet. No published ports.
+  # the internet; it makes no outbound call, so it has no proxy settings. No
+  # published ports.
   worker:
     build:
       context: ./worker
@@ -456,6 +521,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     image: flow-cortex-frontend:local
+    networks: [default, internal]
     ports:
       - '127.0.0.1:5173:8080'
     healthcheck:
@@ -473,6 +539,7 @@ services:
       context: .
       dockerfile: admin/Dockerfile
     image: flow-cortex-admin:local
+    networks: [default, internal]
     ports:
       - '127.0.0.1:5174:8080'
     healthcheck:
@@ -489,6 +556,11 @@ networks:
   default: {}
   # No internet egress: services here reach only each other.
   internal:
+    internal: true
+  # The only network with a route out; egress-proxy and egress-fetch alone join it.
+  egress: {}
+  # URL-download code only; egress-fetch is its sole other member.
+  fetch:
     internal: true
 
 volumes:

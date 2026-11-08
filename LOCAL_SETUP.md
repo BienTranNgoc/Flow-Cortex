@@ -151,19 +151,23 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows nine services `healthy` and `rabbitmq-init` and
-`minio-init` `Exited (0)`:
+`docker compose ps -a` then shows nine services `healthy`, `rabbitmq-init` and
+`minio-init` `Exited (0)`, and `mailpit`, `api-publish`, `egress-proxy` and
+`egress-fetch` `Up` with no health status (they carry no healthcheck):
 
 | Service | What it is | Address (all bound to 127.0.0.1) |
 |---|---|---|
-| `postgres` | the database | not published |
+| `postgres` | the database | `localhost:5432` |
 | `rabbitmq` | the broker: `media.*` and `provider.*` job/result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
 | `rabbitmq-init` | one-shot: creates the provider workers' restricted broker user (`PROVIDER_RABBITMQ_*`), then exits | — |
 | `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
 | `mailpit` | the mail sink: catches every email the backend sends (confirmation links); nothing is delivered | web UI <http://localhost:8025>, SMTP `localhost:1025` |
-| `backend` | the API | <http://localhost:8080> (`/livez`, `/readyz`) |
-| `worker` | the Python media worker | none — and no internet access |
+| `backend` | the API (internal network only; it reaches the internet through `egress-proxy`) | <http://localhost:8080>, through `api-publish` (`/livez`, `/readyz`) |
+| `api-publish` | a socat relay that publishes `backend` on `127.0.0.1:8080`, because a service on internal networks only cannot publish a port | <http://localhost:8080> |
+| `egress-proxy` | the forward proxy with the domain allowlist: the only way the backend and the provider workers reach third parties | not published |
+| `egress-fetch` | the open-policy proxy tier for URL downloads, on the `fetch` network; idle until a URL-fetch service joins it | not published |
+| `worker` | the Python media worker (internal network only, no proxy) | none — and no internet access |
 | `provider-worker` | the Python provider worker, on `provider.jobs`: script, storyboard and speech — `SCRIPT_PROVIDER` (fixture or openai) and `SPEECH_PROVIDER` (fixture or edge). Edge TTS is demo-only — it calls Microsoft's undocumented Edge Read Aloud endpoint (no SLA, it has broken before) and sends the approved script there; keep the pinned `edge-tts` current and move production speech to a contracted provider | none |
 | `provider-video-worker` | the same image on `provider.video.jobs`: the video clips — `VIDEO_PROVIDER` (fixture, seedance, veo or wan). `PROVIDER_VIDEO_WORKERS` replicas (default 2), one clip each, so a clip that runs for minutes never delays another run's script or speech. Seedance, Veo and Wan receive the storyboard scene prompts and the run's first product image | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
@@ -225,8 +229,32 @@ What to know about the media path:
   later; never `*`.
 - **No run history yet.** The run page's address is the only way back to a run,
   so download the report before you leave the page.
-- **The worker has no internet egress**, by design: its only network is the
-  internal compose network with the broker and the store.
+- **The media worker has no internet egress**, by design: its only network is the
+  internal compose network with the broker and the store. The backend and the provider
+  workers are on that network too; their third-party calls go through `egress-proxy`
+  (next bullet).
+- **Egress isolation.** `backend`, `provider-worker`, `provider-video-worker` and `worker`
+  have no route to the internet; only `egress-proxy` and `egress-fetch` are on the `egress`
+  network that has one. `postgres`, `mailpit`, `frontend` and `admin` also keep the default
+  network because they publish a port, so they must not run code that fetches URLs.
+  - `egress-proxy` lets only allowlisted hostnames through, and refuses any name that
+    resolves to a private, loopback, link-local or carrier-grade-NAT address, so
+    `http://minio:9000/` is unreachable through it. The allowlist is
+    `infra/egress-proxy/acl.yaml`, selected per environment by `EGRESS_ACL_FILE` in `.env`
+    (default: that file).
+  - `egress-fetch` is the open tier for URL downloads (any public host, same private-range
+    block, rate-limited). Its `fetch` network is internal and has no other member; only
+    URL-fetch code joins it, and nothing does yet.
+  - `127.0.0.1:8080` is served by the `api-publish` relay; callers are unchanged.
+  - **Add a host** (a vendor, or an operator-supplied base URL such as `GEMINI_BASE_URL` or
+    `SEEDANCE_BASE_URL`; list the exact host, because `*.example.com` does not match
+    `example.com` itself): add it to the file `EGRESS_ACL_FILE` names, then run
+    `docker compose up -d --force-recreate egress-proxy`. No image is rebuilt and the
+    backend and workers are not restarted. `compose.aws.yaml` refuses to start until
+    `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
+    host to it.
+  - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
+    connecting directly. Why and what else was weighed: `docs/ADR.md`, ADR-0010.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
   management port 8081 and the broker's metrics port 15692 are not published.
 - **Store keys.** The backend, media worker and provider worker each have their own store user
