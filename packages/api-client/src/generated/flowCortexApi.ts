@@ -80,6 +80,22 @@ export interface MeResponse {
   passwordSetupRequired?: boolean;
 }
 
+/**
+ * @pattern female|male
+ */
+export type RunOptionsRequestVoice =
+  (typeof RunOptionsRequestVoice)[keyof typeof RunOptionsRequestVoice];
+
+export const RunOptionsRequestVoice = {
+  female: 'female',
+  male: 'male',
+} as const;
+
+export interface RunOptionsRequest {
+  /** @pattern female|male */
+  voice?: RunOptionsRequestVoice;
+}
+
 export interface StartRunRequest {
   /**
    * @minLength 0
@@ -97,6 +113,7 @@ export interface StartRunRequest {
    * @maxLength 1024
    */
   originalName?: string;
+  options?: RunOptionsRequest;
   acknowledgeCost?: boolean;
 }
 
@@ -406,6 +423,7 @@ export interface WorkflowResponse {
   updatedAt?: string;
   steps?: WorkflowStepResponse[];
   estimatedCredits?: number;
+  available: boolean;
 }
 
 export interface OutputUrlResponse {

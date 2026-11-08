@@ -995,6 +995,16 @@ components:
           type: boolean
         passwordSetupRequired:
           type: boolean
+    RunOptionsRequest:
+      type: object
+      properties:
+        voice:
+          type: string
+          default: female
+          enum:
+          - female
+          - male
+          pattern: female|male
     StartRunRequest:
       type: object
       properties:
@@ -1016,6 +1026,8 @@ components:
           type: string
           maxLength: 1024
           minLength: 0
+        options:
+          $ref: "#/components/schemas/RunOptionsRequest"
         acknowledgeCost:
           type: boolean
     RunResponse:
@@ -1509,6 +1521,10 @@ components:
         estimatedCredits:
           type: integer
           format: int64
+        available:
+          type: boolean
+      required:
+      - available
     WorkflowStepResponse:
       type: object
       properties:

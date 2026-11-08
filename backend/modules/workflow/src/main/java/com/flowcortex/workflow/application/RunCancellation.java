@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -34,15 +35,17 @@ public class RunCancellation {
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
     private final StepExecutorRegistry registry;
+    private final MediaJobs mediaJobs;
     private final Clock clock;
     private final boolean enabled;
 
     RunCancellation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            StepExecutorRegistry registry, Clock clock,
+            StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock,
             @Value("${flowcortex.workflow.cancel.enabled:false}") boolean enabled) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.registry = registry;
+        this.mediaJobs = mediaJobs;
         this.clock = clock;
         this.enabled = enabled;
     }
@@ -74,12 +77,12 @@ public class RunCancellation {
         }
         LOG.info("Run cancel: outcome=already_stopping runId={} status={}", runId, run.getStatus());
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote);
+                registry::isRemote, mediaJobs::isDownloadable);
     }
 
     private RunView currentView(UUID currentUserId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId).orElseThrow();
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote);
+                registry::isRemote, mediaJobs::isDownloadable);
     }
 }

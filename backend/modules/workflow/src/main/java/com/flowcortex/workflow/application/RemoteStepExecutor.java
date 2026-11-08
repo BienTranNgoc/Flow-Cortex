@@ -142,10 +142,15 @@ class RemoteStepExecutor implements StepExecutor {
         if (config == null || config.isBlank()) {
             return Map.of();
         }
+        Map<String, Object> params;
         try {
-            return objectMapper.readValue(config, PARAMS);
+            params = objectMapper.readValue(config, PARAMS);
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation", "The step config is not a JSON object", e);
         }
+        if (params == null) {
+            throw new StepFailedException("contract_violation", "The step config is not a JSON object");
+        }
+        return params;
     }
 }

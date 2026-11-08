@@ -85,6 +85,8 @@ class RunAdvancerTest {
                 new EchoStepExecutor(),
                 new FailStepExecutor(),
                 new UpperStepExecutor(),
+                new StoringStepExecutor(),
+                new VoiceStepExecutor(),
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
@@ -114,6 +116,31 @@ class RunAdvancerTest {
 
     private RunStep pending(int order, String type) {
         return new RunStep(UUID.randomUUID(), runId, (short) order, type);
+    }
+
+    /** What a result reads about its step before closing it. */
+    private void givenTiming(RunStep step) {
+        when(runStepRepository.findTimingById(step.getId())).thenReturn(Optional.of(new RunStepRepository.Timing() {
+            @Override
+            public String getType() {
+                return step.getType();
+            }
+
+            @Override
+            public short getStepOrder() {
+                return step.getStepOrder();
+            }
+
+            @Override
+            public String getInput() {
+                return step.getInput();
+            }
+
+            @Override
+            public Instant getPickedUpAt() {
+                return step.getPickedUpAt();
+            }
+        }));
     }
 
     /** The same step as the repository returns it once completed. */
@@ -146,6 +173,156 @@ class RunAdvancerTest {
         public String execute(StepContext context) {
             return context.input().toUpperCase(java.util.Locale.ROOT);
         }
+    }
+
+    /** An inline type that stores one object for its own step, as an inline step that writes files does. */
+    private static final class StoringStepExecutor implements StepExecutor {
+
+        @Override
+        public String type() {
+            return "store";
+        }
+
+        @Override
+        public Mode mode() {
+            return Mode.INLINE;
+        }
+
+        @Override
+        public Duration maxRuntime() {
+            return Duration.ofSeconds(60);
+        }
+
+        @Override
+        public String execute(StepContext context) {
+            context.storedOutputs().add(new MediaOutput("voice.wav", "flowcortex-uploads",
+                    "runs/" + context.runId() + "/steps/" + context.stepOrder() + "/voice.wav", "audio/wav", 3L, null));
+            return "{\"voiced\":1}";
+        }
+    }
+
+    /** An inline type whose output is the voice its run was started with. */
+    private static final class VoiceStepExecutor implements StepExecutor {
+
+        @Override
+        public String type() {
+            return "voice";
+        }
+
+        @Override
+        public Mode mode() {
+            return Mode.INLINE;
+        }
+
+        @Override
+        public Duration maxRuntime() {
+            return Duration.ofSeconds(60);
+        }
+
+        @Override
+        public String execute(StepContext context) {
+            return context.options().voice();
+        }
+    }
+
+    /** A completed remote step that recorded {@code objects} ({@code name}, {@code bucket}, {@code objectKey} triples). */
+    private RunStep completedWithObjects(int order, String... objects) {
+        StringBuilder outputs = new StringBuilder("[");
+        for (int i = 0; i < objects.length; i += 3) {
+            outputs.append(i == 0 ? "" : ",").append("{\"name\":\"").append(objects[i]).append("\",\"bucket\":\"")
+                    .append(objects[i + 1]).append("\",\"objectKey\":\"").append(objects[i + 2])
+                    .append("\",\"mime\":\"application/octet-stream\",\"bytes\":1}");
+        }
+        RunStep step = new RunStep(UUID.randomUUID(), runId, (short) order, "probe", UPLOAD_REF);
+        step.markRunning(NOW);
+        step.markCompleted(UPLOAD_REF, "{}", NOW, outputs.append("]").toString());
+        return step;
+    }
+
+    private void givenExtractAudioLimits() {
+        givenMediaEnabled();
+        when(mediaJobs.limitsFor("extract_audio")).thenReturn(new MediaLimits(PROBE_QUEUE, PROBE_RUNTIME, 1000L));
+    }
+
+    @Test
+    void anObjectAnInlineStepStoredReachesALaterRemoteStepThroughItsOutputInputs() {
+        givenExtractAudioLimits();
+        String voiceKey = "runs/" + runId + "/steps/1/voice.wav";
+        RunStep voiced = completedWithObjects(1, "voice.wav", "flowcortex-uploads", voiceKey);
+        RunStep compose = new RunStep(UUID.randomUUID(), runId, (short) 2, "extract_audio", UPLOAD_REF,
+                "{\"label\":\"AI\",\"outputInputs\":["
+                        + "{\"stepOrder\":1,\"outputName\":\"voice.wav\",\"inputKey\":\"voice\"}]}", null);
+        givenRun(List.of(voiced, compose));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        ArgumentCaptor<MediaJob> job = ArgumentCaptor.forClass(MediaJob.class);
+        verify(mediaJobs).enqueue(job.capture());
+        assertThat(job.getValue().inputs()).containsExactly(
+                new MediaJobInput("source", "flowcortex-uploads", "owner/upload"),
+                new MediaJobInput("voice", "flowcortex-uploads", voiceKey));
+    }
+
+    @Test
+    void aDeclaredObjectTheEarlierStepDidNotRecordFailsTheStepWithContractViolationAndPublishesNothing() {
+        givenExtractAudioLimits();
+        List<RunStep> steps = new java.util.ArrayList<>();
+        for (int order = 1; order <= 5; order++) {
+            steps.add(completedWithObjects(order));
+        }
+        steps.add(completedWithObjects(6, "vocals.wav", "flowcortex-media", "runs/" + runId + "/steps/6/vocals.wav"));
+        RunStep compose = new RunStep(UUID.randomUUID(), runId, (short) 7, "extract_audio", UPLOAD_REF,
+                "{\"outputInputs\":[{\"stepOrder\":6,\"outputName\":\"accompaniment.wav\",\"inputKey\":\"music\"}]}",
+                null);
+        steps.add(compose);
+        givenRun(steps);
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).failIfRunning(compose.getId(), runId, (short) 1, "contract_violation",
+                "Step 6 must have exactly one output named accompaniment.wav", NOW);
+        verify(mediaJobs, never()).enqueue(any());
+        assertThat(run.getStatus().name()).isEqualTo("ERROR");
+    }
+
+    @Test
+    void anInlineStepRecordsTheObjectsItStoredAsItsOutputsLikeARemoteStep() {
+        RunStep step = pending(1, "store");
+        givenRun(List.of(step));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
+                .thenReturn(List.of(step), List.of(completed(1, step.getId(), "{\"voiced\":1}")));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).completeIfRunning(step.getId(), runId, (short) 1, "{\"voiced\":1}",
+                "[{\"name\":\"voice.wav\",\"bucket\":\"flowcortex-uploads\",\"objectKey\":\"runs/" + runId
+                        + "/steps/1/voice.wav\",\"mime\":\"audio/wav\",\"bytes\":3}]", NOW);
+    }
+
+    @Test
+    void anInlineStepReadsTheVoiceItsRunWasStartedWith() {
+        WorkflowRun maleRun = new WorkflowRun(runId, workflowId, UUID.randomUUID(), "clip.mp4",
+                "{\"voice\":\"male\"}", NOW);
+        RunStep step = pending(1, "voice");
+        givenRun(List.of(step));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
+                .thenReturn(List.of(step), List.of(completed(1, step.getId(), "male")));
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(maleRun));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).completeIfRunning(step.getId(), runId, (short) 1, "male", null, NOW);
     }
 
     @Test
@@ -316,6 +493,27 @@ class RunAdvancerTest {
     }
 
     @Test
+    void anInlineStepRecordsOneEventWithItsOutcomeErrorCodeAndDuration(CapturedOutput output) {
+        RunStep step1 = pending(1, "echo");
+        RunStep step2 = pending(2, "fail");
+        givenRun(List.of(step1, step2));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(runId))
+                .thenReturn(List.of(step1, step2), List.of(completed(1, step1.getId(), "hello"), step2));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(output).contains("Step finished: runId=" + runId + " runStepId=" + step1.getId()
+                + " stepOrder=1 type=echo outcome=completed durationMs=0")
+                .contains("Step finished: runId=" + runId + " runStepId=" + step2.getId()
+                        + " stepOrder=2 type=fail outcome=error code=null durationMs=0");
+    }
+
+    @Test
     void aRemoteStepIsEnqueuedInsideTheClaimAndTheAdvanceReturnsWithoutWaiting() {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
@@ -359,7 +557,7 @@ class RunAdvancerTest {
                 UUID.randomUUID(), runId, (short) 2, "extract_audio", UPLOAD_REF);
 
         givenRun(List.of(completedProbe, extractAudio));
-        when(runStepRepository.findById(probe.getId())).thenReturn(Optional.of(probe));
+        givenTiming(probe);
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any()))
                 .thenReturn(1);
         when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED))
@@ -434,7 +632,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, "generate_script");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
         advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
@@ -465,7 +663,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, "generate_script");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
 
@@ -565,7 +763,7 @@ class RunAdvancerTest {
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "generate_speech", input);
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         return step;
     }
 
@@ -676,7 +874,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, "probe");
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
         when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
         MediaOutput details = new MediaOutput("video-details.json", "flowcortex-media",
@@ -701,7 +899,7 @@ class RunAdvancerTest {
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         step.recordPickup(NOW.minusMillis(2_500), NOW.plus(LEASE), NOW.plus(PROBE_RUNTIME), (short) 0);
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
         advancer.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.ERROR, null, null,
@@ -769,7 +967,7 @@ class RunAdvancerTest {
         RunStep step = pending(1, capability);
         step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
         givenRun(List.of(step));
-        when(runStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
+        givenTiming(step);
         when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
 
         advancer.onRemoteCompleted(new MediaJobCompleted(
