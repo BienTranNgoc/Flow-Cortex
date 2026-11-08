@@ -24,6 +24,7 @@ import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.credit.api.CreditAccounts;
+import com.flowcortex.workflow.application.provider.ProviderStepPool;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
@@ -85,6 +86,7 @@ class RunAdvancerTest {
                 new EchoStepExecutor(),
                 new FailStepExecutor(),
                 new UpperStepExecutor(),
+                new ProviderStepExecutor(),
                 new StoringStepExecutor(),
                 new VoiceStepExecutor(),
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
@@ -96,9 +98,13 @@ class RunAdvancerTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     private RunAdvancer advancer(TaskExecutor taskExecutor) {
+        return advancer(taskExecutor, Runnable::run);
+    }
+
+    private RunAdvancer advancer(TaskExecutor taskExecutor, ProviderStepPool providerPool) {
         return new RunAdvancer(workflowRunRepository, runStepRepository, transactions, new InputResolver(), registry,
-                taskExecutor, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters, LEASE, clock, checkpoints,
-                validator);
+                taskExecutor, providerPool, scheduler, Tracer.NOOP, ObservationRegistry.NOOP, meters, LEASE, clock,
+                checkpoints, validator);
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
@@ -172,6 +178,40 @@ class RunAdvancerTest {
         @Override
         public String execute(StepContext context) {
             return context.input().toUpperCase(java.util.Locale.ROOT);
+        }
+    }
+
+    /** An inline type that waits on a provider, so it runs on the provider pool and waits longer for pickup. */
+    private static final class ProviderStepExecutor implements StepExecutor {
+
+        @Override
+        public String type() {
+            return "slow";
+        }
+
+        @Override
+        public Mode mode() {
+            return Mode.INLINE;
+        }
+
+        @Override
+        public Pool pool() {
+            return Pool.PROVIDER;
+        }
+
+        @Override
+        public Duration queueTimeout(Duration lease) {
+            return Duration.ofMinutes(20);
+        }
+
+        @Override
+        public Duration maxRuntime() {
+            return Duration.ofMinutes(15);
+        }
+
+        @Override
+        public String execute(StepContext context) {
+            return context.input();
         }
     }
 
@@ -866,6 +906,62 @@ class RunAdvancerTest {
         verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
         verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
         assertThat(output).contains("WARN").contains("left for the reaper");
+    }
+
+    @Test
+    void aProviderStepRunsOnTheProviderPoolAndNotOnTheSharedOne() {
+        List<Runnable> shared = new java.util.ArrayList<>();
+        List<Runnable> provider = new java.util.ArrayList<>();
+        RunAdvancer split = advancer(shared::add, provider::add);
+        givenRun(List.of(pending(1, "slow")));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        split.on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(provider).hasSize(1);
+        assertThat(shared).isEmpty();
+    }
+
+    @Test
+    void aStepOnTheSharedPoolNeverReachesTheProviderPool() {
+        List<Runnable> shared = new java.util.ArrayList<>();
+        List<Runnable> provider = new java.util.ArrayList<>();
+        RunAdvancer split = advancer(shared::add, provider::add);
+        givenRun(List.of(pending(1, "echo")));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        split.on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(shared).hasSize(1);
+        assertThat(provider).isEmpty();
+    }
+
+    @Test
+    void aProviderStepWaitsForPickupAsLongAsItsExecutorSays() {
+        givenRun(List.of(pending(1, "slow")));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+
+        advancer(task -> { }, task -> { }).on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).claimPending(any(), eq(NOW), eq(NOW.plus(Duration.ofMinutes(20))), any());
+    }
+
+    @Test
+    void aFullProviderPoolFailsTheStepAtOnceAsProviderBusyWithoutRunningIt(CapturedOutput output) {
+        RunAdvancer saturated = advancer(Runnable::run, task -> {
+            throw new TaskRejectedException("queue full");
+        });
+        RunStep step = pending(1, "slow");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        saturated.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), anyShort(), eq("provider_busy"),
+                contains("Too many"), any());
+        verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
+        assertThat(output).contains("WARN").contains("provider_busy");
     }
 
     @Test

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -23,11 +24,28 @@ public record DubProperties(
         @Positive double charsPerSecond,
         @Positive double shortenAbove,
         @NotEmpty Map<String, @NotBlank String> voices,
-        @NotNull @Valid Gemini gemini) {
+        @NotNull @Valid Gemini gemini,
+        @NotNull @Valid Pool pool) {
 
     /** The dub steps may run only with the switch on and a key to call the provider with. */
     public boolean available() {
         return enabled && gemini.hasKey();
+    }
+
+    /**
+     * The threads the provider-backed steps run on, apart from the shared async pool: {@code size}
+     * run at once and {@code queueCapacity} wait; a step arriving with the queue full fails at once.
+     */
+    public record Pool(@Positive int size, @PositiveOrZero int queueCapacity) {
+
+        /**
+         * How long a step may wait for a thread: the queue drains in rounds of {@code size}, each
+         * lasting at most one step's {@code maxRuntime}.
+         */
+        public Duration queueWait(Duration maxRuntime) {
+            int rounds = (queueCapacity + size - 1) / size;
+            return maxRuntime.multipliedBy(rounds);
+        }
     }
 
     /**

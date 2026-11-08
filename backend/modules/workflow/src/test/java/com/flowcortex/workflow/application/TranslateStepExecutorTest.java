@@ -146,6 +146,31 @@ class TranslateStepExecutorTest {
     }
 
     @Test
+    void aSegmentTooShortToHoldACharacterFailsContractViolationNamingItWithoutAProviderCall() {
+        // 50 ms at 13 characters a second is a limit of 0: no answer could ever be accepted.
+        String input = "{\"segments\":["
+                + "{\"index\":1,\"startMs\":500,\"endMs\":3100,\"zh\":\"你好朋友们\"},"
+                + "{\"index\":2,\"startMs\":5000,\"endMs\":5050,\"zh\":\"好\"}]}";
+
+        assertThatThrownBy(() -> new TranslateStepExecutor(gemini, dub())
+                .execute(context("translate", 4, input, "female")))
+                .isInstanceOfSatisfying(StepFailedException.class, e -> {
+                    assertThat(e.code()).isEqualTo("contract_violation");
+                    assertThat(e.getMessage()).contains("Segment 2").contains("too short");
+                });
+        verify(gemini, never()).generateJson(anyString(), anyString());
+    }
+
+    @Test
+    void itRunsOnTheProviderPoolAndWaitsForAThreadAsLongAsTheQueueMayTake() {
+        // Pool of 4 with room for 4 waiting: one round of up to 940 s on top of the lease.
+        TranslateStepExecutor executor = new TranslateStepExecutor(gemini, dub());
+
+        assertThat(executor.pool()).isEqualTo(StepExecutor.Pool.PROVIDER);
+        assertThat(executor.queueTimeout(Duration.ofSeconds(120))).isEqualTo(Duration.ofSeconds(1060));
+    }
+
+    @Test
     void duplicateSegmentIndexesFailContractViolationWithoutAProviderCall() {
         String duplicated = "{\"segments\":["
                 + "{\"index\":1,\"startMs\":500,\"endMs\":3100,\"zh\":\"你好朋友们\"},"

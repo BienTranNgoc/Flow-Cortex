@@ -338,6 +338,13 @@ flowcortex:
       attempts: 3
       retry-waits: 10s,30s
       call-timeout: 60s
+    # The translate and tts steps hold a thread for as long as the provider takes (up to minutes
+    # in an outage), so they run on their own threads and never starve the shared async pool.
+    # `size` run at once, `queue-capacity` wait; a step arriving with both full fails
+    # provider_busy at once, and a waiting step's queue deadline covers the rounds ahead of it.
+    pool:
+      size: 4
+      queue-capacity: 4
   # Product Video is opt-in outside development. Turning it off blocks only new
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:

@@ -71,6 +71,16 @@ class TtsStepExecutor implements StepExecutor {
     }
 
     @Override
+    public Pool pool() {
+        return Pool.PROVIDER;
+    }
+
+    @Override
+    public Duration queueTimeout(Duration lease) {
+        return lease.plus(dub.pool().queueWait(maxRuntime()));
+    }
+
+    @Override
     public boolean available() {
         return dub.available();
     }
