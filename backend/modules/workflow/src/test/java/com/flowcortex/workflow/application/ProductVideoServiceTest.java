@@ -47,11 +47,12 @@ class ProductVideoServiceTest {
     private final MediaJobs media = mock(MediaJobs.class);
     private final StepExecutorRegistry registry = new StepExecutorRegistry(media, Clock.systemUTC());
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final RunUpdates runUpdates = mock(RunUpdates.class);
     private final TransactionTemplate transactions = new TransactionTemplate(mock(PlatformTransactionManager.class));
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                transactions, new RunStartGuards(List.of()), enabled, true);
+                runUpdates, transactions, new RunStartGuards(List.of()), enabled, true);
     }
 
     @Test
@@ -79,7 +80,7 @@ class ProductVideoServiceTest {
             throw new IllegalStateException("refused");
         };
         ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
-                registry, events, transactions, new RunStartGuards(List.of(refusing)), true, true);
+                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), true, true);
 
         assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
                 .hasMessage("refused");
@@ -144,6 +145,7 @@ class ProductVideoServiceTest {
         assertThat(steps.getValue().get(0).getConfig()).isNull();
         assertThat(started.steps()).hasSize(5);
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
+        verify(runUpdates).touched(started.id());
     }
 
     private static WorkflowStep step(int order, String type) {

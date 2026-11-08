@@ -67,6 +67,9 @@ class RunStepTransactionsIT {
     @MockitoBean
     private CreditAccounts creditAccounts;
 
+    @MockitoBean
+    private RunUpdates runUpdates;
+
     @Autowired
     private RunStepRepository runStepRepository;
 
@@ -176,10 +179,10 @@ class RunStepTransactionsIT {
         RunStep step = claimed();
         Instant t0 = NOW.plusSeconds(10);
 
-        assertThat(transactions.extendLease(step.getId(), (short) 1, t0, t0.plusSeconds(120), (short) 10, (short) 0,
-                t0.plusSeconds(300))).isTrue();
-        assertThat(transactions.extendLease(step.getId(), (short) 1, t0.plusSeconds(30), t0.plusSeconds(150), null,
-                (short) 0, t0.plusSeconds(330))).isTrue();
+        assertThat(transactions.extendLease(step.getRunId(), step.getId(), (short) 1, t0, t0.plusSeconds(120),
+                (short) 10, (short) 0, t0.plusSeconds(300))).isTrue();
+        assertThat(transactions.extendLease(step.getRunId(), step.getId(), (short) 1, t0.plusSeconds(30),
+                t0.plusSeconds(150), null, (short) 0, t0.plusSeconds(330))).isTrue();
         RunStep afterHeartbeats = reload(step);
         assertThat(afterHeartbeats.getPickedUpAt()).isEqualTo(t0);
         assertThat(afterHeartbeats.getRunDeadline()).isEqualTo(t0.plusSeconds(300));
@@ -187,8 +190,8 @@ class RunStepTransactionsIT {
         assertThat(afterHeartbeats.getProgressPercent()).isEqualTo((short) 10);
 
         Instant redelivered = t0.plusSeconds(200);
-        assertThat(transactions.recordPickup(step.getId(), (short) 1, redelivered, redelivered.plusSeconds(120),
-                redelivered.plusSeconds(300), (short) 1)).isTrue();
+        assertThat(transactions.recordPickup(step.getRunId(), step.getId(), (short) 1, redelivered,
+                redelivered.plusSeconds(120), redelivered.plusSeconds(300), (short) 1)).isTrue();
         RunStep afterRedelivery = reload(step);
         assertThat(afterRedelivery.getPickedUpAt()).isEqualTo(t0);
         assertThat(afterRedelivery.getRunDeadline()).isEqualTo(redelivered.plusSeconds(300));
@@ -200,7 +203,7 @@ class RunStepTransactionsIT {
         RunStep step = claimed();
         transactions.fail(step.getRunId(), step.getId(), (short) 1, "queue_timeout", "late", NOW);
 
-        assertThat(transactions.recordPickup(step.getId(), (short) 1, NOW, NOW, NOW, (short) 0)).isFalse();
+        assertThat(transactions.recordPickup(step.getRunId(), step.getId(), (short) 1, NOW, NOW, NOW, (short) 0)).isFalse();
         assertThat(reload(step).getPickedUpAt()).isNull();
     }
 
@@ -211,7 +214,7 @@ class RunStepTransactionsIT {
         RunStep fresh = newPendingStep();
         transactions.claim(fresh.getRunId(), fresh.getId(), (short) 1, NOW, NOW.plusSeconds(1800), "in", () -> { });
         RunStep leaseGone = claimed();
-        transactions.recordPickup(leaseGone.getId(), (short) 1, NOW, NOW.minusSeconds(1), NOW.plusSeconds(300),
+        transactions.recordPickup(leaseGone.getRunId(), leaseGone.getId(), (short) 1, NOW, NOW.minusSeconds(1), NOW.plusSeconds(300),
                 (short) 0);
 
         assertThat(runStepRepository.findReapable(NOW, PageRequest.of(0, 1000))).extracting(RunStep::getId)
@@ -223,12 +226,12 @@ class RunStepTransactionsIT {
     void progressArrivingOutOfOrderNeverMovesTheLeaseDeliveryCountOrRunDeadlineBackwards() {
         RunStep step = claimed();
         Instant t0 = NOW.plusSeconds(10);
-        transactions.recordPickup(step.getId(), (short) 1, t0.plusSeconds(100), t0.plusSeconds(220),
+        transactions.recordPickup(step.getRunId(), step.getId(), (short) 1, t0.plusSeconds(100), t0.plusSeconds(220),
                 t0.plusSeconds(400), (short) 2);
 
-        assertThat(transactions.recordPickup(step.getId(), (short) 1, t0, t0.plusSeconds(120), t0.plusSeconds(300),
+        assertThat(transactions.recordPickup(step.getRunId(), step.getId(), (short) 1, t0, t0.plusSeconds(120), t0.plusSeconds(300),
                 (short) 1)).isTrue();
-        assertThat(transactions.extendLease(step.getId(), (short) 1, t0.plusSeconds(5), t0.plusSeconds(125), null,
+        assertThat(transactions.extendLease(step.getRunId(), step.getId(), (short) 1, t0.plusSeconds(5), t0.plusSeconds(125), null,
                 (short) 1, t0.plusSeconds(305))).isTrue();
 
         RunStep reloaded = reload(step);
@@ -241,7 +244,7 @@ class RunStepTransactionsIT {
     void theSchemaRejectsAProgressOutsideZeroToHundred() {
         RunStep step = claimed();
 
-        assertThatThrownBy(() -> transactions.extendLease(step.getId(), (short) 1, NOW, NOW.plusSeconds(120),
+        assertThatThrownBy(() -> transactions.extendLease(step.getRunId(), step.getId(), (short) 1, NOW, NOW.plusSeconds(120),
                 (short) 101, (short) 0, NOW.plusSeconds(300))).isInstanceOf(DataIntegrityViolationException.class);
     }
 

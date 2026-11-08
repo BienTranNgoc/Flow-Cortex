@@ -46,8 +46,9 @@ class ReviewTaskServiceImplTest {
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final ScriptRevisionRepository scriptRevisionRepository = mock(ScriptRevisionRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final RunUpdates runUpdates = mock(RunUpdates.class);
     private final ReviewTaskServiceImpl service = new ReviewTaskServiceImpl(reviewTaskRepository, runStepRepository,
-            workflowRunRepository, scriptRevisionRepository, events, Clock.fixed(NOW, ZoneOffset.UTC));
+            workflowRunRepository, scriptRevisionRepository, events, runUpdates, Clock.fixed(NOW, ZoneOffset.UTC));
 
     private final UUID ownerId = UUID.randomUUID();
     private final WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), ownerId, "hello", NOW);
@@ -214,6 +215,7 @@ class ReviewTaskServiceImplTest {
                 .isInstanceOf(ConflictException.class)
                 .satisfies(detail("This step is no longer waiting for review"));
         verify(workflowRunRepository, never()).save(any());
+        verify(runUpdates, never()).touched(any());
     }
 
     @Test
@@ -228,6 +230,7 @@ class ReviewTaskServiceImplTest {
         assertThat(view.reviewedAt()).isEqualTo(NOW);
         assertThat(run.getStatus().name()).isEqualTo("ERROR");
         verify(workflowRunRepository).save(run);
+        verify(runUpdates).touched(run.getId());
     }
 
     @Test

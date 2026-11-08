@@ -367,8 +367,8 @@ class RunAdvancer {
     private void runInline(StepExecutor executor, StepContext context) {
         Instant pickedUpAt = clock.instant();
         Instant runDeadline = pickedUpAt.plus(executor.maxRuntime());
-        if (!transactions.recordPickup(context.stepId(), context.attempt(), pickedUpAt, pickedUpAt.plus(lease),
-                runDeadline, INLINE_DELIVERY)) {
+        if (!transactions.recordPickup(context.runId(), context.stepId(), context.attempt(), pickedUpAt,
+                pickedUpAt.plus(lease), runDeadline, INLINE_DELIVERY)) {
             LOG.info("Step {} closed before it was picked up — not running it", context.stepOrder());
             return;
         }
@@ -420,7 +420,7 @@ class RunAdvancer {
     private void heartbeat(StepContext context, Instant runDeadline) {
         try {
             Instant now = clock.instant();
-            transactions.extendLease(context.stepId(), context.attempt(), now, now.plus(lease), null,
+            transactions.extendLease(context.runId(), context.stepId(), context.attempt(), now, now.plus(lease), null,
                     INLINE_DELIVERY, runDeadline);
         } catch (RuntimeException e) {
             // A thrown exception would silently cancel every later heartbeat of this step.
@@ -590,13 +590,13 @@ class RunAdvancer {
         boolean applied;
         if (progress.kind() == MediaProgress.Kind.STARTED) {
             Instant at = progress.at();
-            applied = transactions.recordPickup(step.getId(), attempt, at, at.plus(lease), at.plus(maxRuntime),
-                    deliveryCount);
+            applied = transactions.recordPickup(step.getRunId(), step.getId(), attempt, at, at.plus(lease),
+                    at.plus(maxRuntime), deliveryCount);
         } else {
             Instant now = clock.instant();
             Short percent = progress.percent() == null ? null : progress.percent().shortValue();
-            applied = transactions.extendLease(step.getId(), attempt, now, now.plus(lease), percent, deliveryCount,
-                    now.plus(maxRuntime));
+            applied = transactions.extendLease(step.getRunId(), step.getId(), attempt, now, now.plus(lease), percent,
+                    deliveryCount, now.plus(maxRuntime));
         }
         if (!applied) {
             LOG.debug("{} for closed step {} (attempt {}) ignored", progress.kind().value(), step.getId(), attempt);

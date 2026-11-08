@@ -57,6 +57,8 @@ spring:
   # all, 1 s then 2 s apart, and then the message goes to its dead-letter queue; an invalid message
   # goes there at once. The media listeners start only after the topology is declared.
   rabbitmq:
+    # Bounds a hung connect below the 30 s inline heartbeat interval, so no thread is held past one beat.
+    connection-timeout: ${SPRING_RABBITMQ_CONNECTION_TIMEOUT:5s}
     # Observed: a sent job carries the W3C trace context, a received result continues it.
     template:
       observation-enabled: true
@@ -302,6 +304,20 @@ flowcortex:
       render_video: 200
       translate: 100
       tts: 100
+  # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
+  # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
+  # hub-threads are the module's own, not Boot's pools.
+  realtime:
+    heartbeat: 15s
+    replay:
+      max-events: 1000
+      max-age: 120s
+    max-streams-per-user: 5
+    max-topics-per-stream: 8
+    queue-max-length: 10000
+    hub-threads: 2
+    publish:
+      queue-capacity: 1000
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the

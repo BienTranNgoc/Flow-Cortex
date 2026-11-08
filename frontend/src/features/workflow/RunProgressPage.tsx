@@ -255,7 +255,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
 }
 
 /**
- * `/workflows/:workflowId/runs/:runId` — polls the run until it reaches a terminal status: each
+ * `/workflows/:workflowId/runs/:runId` — follows the run by push until it reaches a terminal status: each
  * step advances pending -> running -> completed|error. Everything shown comes from the saved run,
  * so a run read long after it finished renders the same as it did then.
  */

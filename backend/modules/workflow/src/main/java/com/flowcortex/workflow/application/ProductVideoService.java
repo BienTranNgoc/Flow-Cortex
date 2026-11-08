@@ -49,14 +49,16 @@ public class ProductVideoService {
     private final RunStartGuards runStartGuards;
     private final boolean enabled;
     private final boolean workflowEnabled;
+    private final RunUpdates runUpdates;
     private final ObjectMapper json = new ObjectMapper();
 
     ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
-            TransactionTemplate transactions, RunStartGuards runStartGuards,
+            RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards,
             @Value("${flowcortex.product-video.enabled:false}") boolean enabled,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.runUpdates = runUpdates;
         this.workflows = workflows;
         this.workflowSteps = workflowSteps;
         this.runs = runs;
@@ -108,6 +110,7 @@ public class ProductVideoService {
                         definition.getType(), storedInput, definition.getConfig(), definition.getInputRef()));
             }
             steps = runSteps.saveAll(steps);
+            runUpdates.touched(run.getId());
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
             return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
         });

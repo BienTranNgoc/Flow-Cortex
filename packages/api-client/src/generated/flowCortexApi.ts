@@ -1044,6 +1044,10 @@ export type SearchSupportKbParams = {
   q: string;
 };
 
+export type OpenRealtimeStreamParams = {
+  topic?: string[];
+};
+
 export type CallbackParams = {
   code?: string;
   state?: string;
@@ -3932,6 +3936,69 @@ export const getOutputUrl = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getOutputUrlResponse> => {
   return customFetch<getOutputUrlResponse>(getGetOutputUrlUrl(id, order, name), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type openRealtimeStreamResponse200 = {
+  data: string;
+  status: 200;
+};
+
+export type openRealtimeStreamResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type openRealtimeStreamResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type openRealtimeStreamResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type openRealtimeStreamResponseSuccess = openRealtimeStreamResponse200 & {
+  headers: Headers;
+};
+export type openRealtimeStreamResponseError = (
+  openRealtimeStreamResponse400 | openRealtimeStreamResponse404 | openRealtimeStreamResponse429
+) & {
+  headers: Headers;
+};
+
+export type openRealtimeStreamResponse =
+  openRealtimeStreamResponseSuccess | openRealtimeStreamResponseError;
+
+export const getOpenRealtimeStreamUrl = (params?: OpenRealtimeStreamParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['topic'];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/realtime/stream?${stringifiedParams}`
+    : `/api/v1/realtime/stream`;
+};
+
+export const openRealtimeStream = async (
+  params?: OpenRealtimeStreamParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<openRealtimeStreamResponse> => {
+  return customFetch<openRealtimeStreamResponse>(getOpenRealtimeStreamUrl(params), {
     ...options,
     method: 'GET',
   });

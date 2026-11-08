@@ -173,11 +173,11 @@ Format per entry: **Context → Decision → Consequences**.
   publication registry as the transactional outbox (a job exists iff the claim
   committed), with a resubmitter for failed publications; inbound results and
   progress are transactional `@RabbitListener`s. Alternatives: **SQS**
-  (AWS-only), **Kafka** (partition head-of-line blocking, no per-message ack,
-  a 5-minute poll interval — the right tool for the later run-event stream,
-  the wrong one for tasks), **BullMQ** (no Java client), **a DB-table queue**
-  (couples the worker to the schema; a broker was chosen for its learning
-  value), and the **delayed-message plugin** for backoff (archived).
+  (AWS-only), **Kafka** (partition head-of-line blocking, no per-message ack, a
+  5-minute poll interval — the right tool for the later run-event stream
+  (superseded by ADR-0009), the wrong one for tasks), **BullMQ** (no Java client),
+  **a DB-table queue** (couples the worker to the schema; a broker was chosen for
+  its learning value), and the **delayed-message plugin** for backoff (archived).
 - **Decision — worker:** Python 3.12, one blocking `pika` connection owned by
   the main thread, prefetch 1, the handler on one worker thread that reaches
   pika only through `add_callback_threadsafe`. Message shapes are JSON Schemas
@@ -262,8 +262,9 @@ Format per entry: **Context → Decision → Consequences**.
     refused instead of falling back to a default; results return over the
     broker instead of an HMAC callback; URL fetch (`video_fetch`) runs behind
     egress isolation instead of unguarded.
-  - Kafka remains the candidate for a later run-event stream; run events stay
-    in-process until then.
+  - ADR-0009 supersedes the earlier plan that named Kafka for a later run-event
+    stream: run events go to the browser over SSE, fanned out between backend
+    instances through a RabbitMQ exchange.
 
 ---
 
@@ -291,6 +292,78 @@ Format per entry: **Context → Decision → Consequences**.
   imports a sibling app by relative path (AGENTS.md §10); the packages are
   the sanctioned shared code. CI installs once at the root and runs each check
   across the workspaces.
+
+---
+
+## ADR-0009 — Realtime transport: Server-Sent Events
+
+- **Context:** A run advances on the worker and in the API, and the run page
+  learned about it by polling `GET /api/v1/runs/{id}` on a timer. The product
+  needs push for run progress now and for chat later, always from the server to
+  the browser. Several backend instances may run, and a browser can hold the
+  stream through nginx in the frontend container and, in the AWS overlay,
+  through Caddy as well.
+- **Decision — transport:** Server-Sent Events over `GET /api/v1/realtime/stream`
+  with repeated `topic` query values (`user`, `run:<uuid>`; a later module adds
+  a topic by registering a `TopicAuthorizer`). SSE is one-way, rides plain
+  HTTP, and the browser resumes it with `Last-Event-ID`. Alternatives: a
+  **WebSocket** gateway (Xood runs three) is two-way and heavier than a one-way
+  push needs; two directions are a later ADR. **LISTEN/NOTIFY** or **Redis** for
+  fan-out were not added. **Kafka**, which ADR-0007 named for this stream, is
+  not needed: the events are signals that a refetch repairs, not a log.
+- **Decision — auth:** the client uses `fetch` with `Authorization: Bearer` and
+  parses the stream in `packages/api-client`; native `EventSource` is not used.
+  The access token lives in storage and the only cookie is path-scoped to
+  `/api/v1/auth`, so `EventSource` cannot authenticate here without a new ticket
+  endpoint or cookie. The endpoint answers 401 before any stream byte for a bad
+  token or a deleted user, 400 for a topic no authorizer claims, 404 for a
+  topic the caller may not read (a foreign run looks like a missing one), and
+  429 past the per-user cap. A stream ends cleanly at the expiry of the token
+  that opened it, and the client reconnects with its refreshed token.
+- **Decision — events:** `run.updated` carries only `{runId}`; the client
+  refetches the run, so the owner-scoped read model stays the one source of
+  truth. Each frame has `id: <instanceId>:<seq>`, `event: <type>` and a JSON
+  `data`. A heartbeat comment (`: ping`) goes out every 15 s.
+- **Decision — fan-out and replay:** publishing sends the event to the durable
+  fanout exchange `realtime.events`; each instance, the publisher included,
+  consumes it from its own exclusive, auto-delete queue (`x-max-length` 10,000)
+  and delivers to its local streams, so there is one delivery path. Messages are
+  non-persistent. Each instance keeps an in-memory replay ring (1,000 events or
+  120 s). A `Last-Event-ID` naming this instance and a seq inside the ring
+  replays; anything else, including another instance's id, gets one `resync`
+  event and the client refetches. A consumer that recovers from a broker failure
+  sends `resync` to every open stream. Limits: 8 topics per stream and 5 streams
+  per user, per instance; client backoff 1-30 s with full jitter. All are
+  starting values, measured only for the heartbeat.
+- **Decision — threads:** the module never blocks a caller. `publish` hands the
+  event to its own single-thread executor with a bounded queue, and a full queue
+  drops the event with a WARN; the hub owns its scheduler for heartbeats, expiry
+  and writes. Neither is exposed as a Spring `TaskScheduler` or `Executor` bean,
+  because Boot's shared pools back off when one exists. A bounded broker connect
+  timeout keeps a hung broker from holding a committing thread. On context close
+  the hub completes every stream so graceful shutdown does not wait on them.
+- **Decision — proxies:** nginx gets a `/api/v1/realtime/` location with
+  `proxy_buffering off`, a `proxy_read_timeout` of 150 s (ten heartbeats) and no
+  `add_header`, since a location that declares one drops the server-level
+  security headers; the backend also sends `X-Accel-Buffering: no`. Caddy routes
+  that path to `frontend:8080` without `encode`, whose default matcher includes
+  `text/*`, while every other path keeps compression. No polling fallback is
+  kept: two live paths for one thing is the debt this decision removes.
+- **Consequences:**
+  - Supersedes the ADR-0007 consequence that left run events to a later Kafka
+    stream, and that Decision's naming of Kafka for it.
+  - The client owns the SSE parser and the reconnect loop, locked by tests.
+  - A signal lost while connected is repaired by `resync` on consumer recovery
+    and by the client's refetch on every reconnect and window focus; a publish
+    dropped on a full queue is repaired only by the next event, reconnect or
+    focus.
+  - Replay is per instance, so a reconnect that lands on another instance
+    resyncs; correctness costs one refetch.
+  - A browser holds few HTTP/1.1 connections per origin; one stream per open
+    run page and the per-user cap keep a normal session inside it.
+  - Out of scope: two-way channels (a later ADR) and a durable event log.
+  - The realtime module depends on `user :: api` and never on `workflow`; run
+    ownership reaches it through the `TopicAuthorizer` SPI.
 
 ---
 

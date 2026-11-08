@@ -3,8 +3,17 @@
 # media.{$DOMAIN} and fail verification under any other host.
 
 app.{$DOMAIN} {
-	encode zstd gzip
-	reverse_proxy frontend:8080
+	# The event stream stays out of encode: its default matcher covers text/*, and a compressor
+	# would hold heartbeats back.
+	@realtime path /api/v1/realtime/*
+	handle @realtime {
+		reverse_proxy frontend:8080
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy frontend:8080
+	}
 }
 
 admin.{$DOMAIN} {

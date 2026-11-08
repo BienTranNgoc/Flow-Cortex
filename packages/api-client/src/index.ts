@@ -6,6 +6,8 @@ export * from './problemDetail';
 export type { ProblemDetail } from './problemDetail';
 export { setClientId } from './clientId';
 export { setLocaleProvider } from './locale';
+export { openEventStream } from './eventStream';
+export type { EventStream, EventStreamOptions, StreamEvent } from './eventStream';
 export { ensureSession, signOut } from './session';
 export { useAuthToken, useSessionReady } from './useSession';
 export * from './tokenStore';

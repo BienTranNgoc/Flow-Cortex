@@ -47,6 +47,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
     private final WorkflowRunRepository workflowRunRepository;
     private final ScriptRevisionRepository scriptRevisionRepository;
     private final ApplicationEventPublisher events;
+    private final RunUpdates runUpdates;
     private final Clock clock;
 
     @Autowired
@@ -55,10 +56,11 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         RunStepRepository runStepRepository,
         WorkflowRunRepository workflowRunRepository,
         ScriptRevisionRepository scriptRevisionRepository,
-        ApplicationEventPublisher events
+        ApplicationEventPublisher events,
+        RunUpdates runUpdates
     ) {
         this(reviewTaskRepository, runStepRepository, workflowRunRepository, scriptRevisionRepository,
-                events, Clock.systemUTC());
+                events, runUpdates, Clock.systemUTC());
     }
 
     ReviewTaskServiceImpl(
@@ -67,8 +69,10 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         WorkflowRunRepository workflowRunRepository,
         ScriptRevisionRepository scriptRevisionRepository,
         ApplicationEventPublisher events,
+        RunUpdates runUpdates,
         Clock clock
     ) {
+        this.runUpdates = runUpdates;
         this.reviewTaskRepository = reviewTaskRepository;
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
@@ -168,6 +172,7 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         }
         run.markError("Approval rejected", now);
         workflowRunRepository.save(run);
+        runUpdates.touched(run.getId());
         return toView(saved);
     }
 

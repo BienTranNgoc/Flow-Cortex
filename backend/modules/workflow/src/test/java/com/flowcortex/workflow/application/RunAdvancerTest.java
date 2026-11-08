@@ -93,7 +93,8 @@ class RunAdvancerTest {
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions =
-            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class));
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
+                    mock(RunUpdates.class));
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 

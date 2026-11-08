@@ -1,11 +1,12 @@
 import {
   setToken,
+  type EventStreamOptions,
   type RunResponse,
   type RunStepResponse,
   type ScriptRevisionResponse,
 } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
@@ -25,6 +26,44 @@ vi.mock('./browser', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openInCurrentTab: vi.fn(),
 }));
+
+interface FakeStream {
+  options: EventStreamOptions;
+  closed: boolean;
+}
+
+const streams = vi.hoisted(() => ({ opened: [] as FakeStream[] }));
+
+vi.mock('@flow-cortex/api-client', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openEventStream: (options: EventStreamOptions) => {
+    const stream: FakeStream = { options, closed: false };
+    streams.opened.push(stream);
+    return {
+      close: () => {
+        stream.closed = true;
+      },
+    };
+  },
+}));
+
+/** The streams the page holds open right now. */
+function openStreams(): FakeStream[] {
+  return streams.opened.filter((stream) => !stream.closed);
+}
+
+/** The server pushes an event on the page's open stream. */
+function push(event = 'run.updated') {
+  const stream = openStreams().at(-1);
+  if (!stream) {
+    throw new Error('the page holds no open stream');
+  }
+  act(() => stream.options.onEvent({ id: null, event, data: '{"runId":"r1"}' }));
+}
+
+function runReads(calls: Array<{ path: string }>): number {
+  return calls.filter((call) => call.path === '/api/v1/runs/r1').length;
+}
 
 const ENGINE_WORDS = ['lease', 'executor', 'heartbeat', 'dispatch', 'capability'];
 const MEMBER_PATH_WORDS = ['probe', 'engine', 'capability'];
@@ -144,6 +183,7 @@ describe('RunProgressPage', () => {
   const scrollIntoView = vi.fn();
   beforeEach(() => {
     setToken('t', true);
+    streams.opened.length = 0;
     scrollIntoView.mockClear();
     Object.assign(Element.prototype, { scrollIntoView });
   });
@@ -695,11 +735,7 @@ describe('RunProgressPage', () => {
       return calls;
     }
 
-    it('says it is waiting, keeps polling, and shows the pending content with Approve and Reject', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      onTestFinished(() => {
-        vi.useRealTimers();
-      });
+    it('says it is waiting, refetches on a pushed update, and shows the pending content with Approve and Reject', async () => {
       const calls = renderWaiting();
 
       expect(
@@ -711,8 +747,10 @@ describe('RunProgressPage', () => {
       const review = screen.getByRole('button', { name: /Review/ });
       expect(review).toHaveTextContent('Needs you');
       expect(review).toHaveAttribute('aria-pressed', 'true');
-      await vi.advanceTimersByTimeAsync(2500);
-      expect(calls.filter((call) => call.path === '/api/v1/runs/r1').length).toBeGreaterThan(1);
+      expect(openStreams().map((stream) => stream.options.topics)).toEqual([['run:r1']]);
+      const reads = runReads(calls);
+      push();
+      await waitFor(() => expect(runReads(calls)).toBeGreaterThan(reads));
     });
 
     it('approves the edited content and moves on with the run', async () => {
@@ -1051,13 +1089,77 @@ describe('RunProgressPage', () => {
     });
   });
 
+  describe('a running run followed by push', () => {
+    function renderFollowed() {
+      let current = run([step()]);
+      const calls = stubApi({ 'GET /api/v1/runs/r1': () => ({ status: 200, body: current }) });
+      const view = renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+      return {
+        calls,
+        view,
+        finish: (finished: RunResponse) => {
+          current = finished;
+        },
+      };
+    }
+
+    it('closes the stream and reads no more once a pushed update shows the run finished', async () => {
+      const { calls, finish } = renderFollowed();
+      await screen.findByRole('heading', { name: 'Run in progress' });
+      expect(openStreams()).toHaveLength(1);
+
+      finish(completedCheck());
+      push();
+
+      await screen.findByRole('heading', { name: 'Run completed' });
+      expect(openStreams()).toHaveLength(0);
+      expect(streams.opened).toHaveLength(1);
+      const reads = runReads(calls);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(runReads(calls)).toBe(reads);
+    });
+
+    it('subscribes to the lowercase topic when the route carries an uppercase run id', async () => {
+      stubApi({ 'GET /api/v1/runs/R1': { status: 200, body: run([step()]) } });
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/R1',
+        <RunProgressPage />,
+      );
+      await screen.findByRole('heading', { name: 'Run in progress' });
+
+      expect(openStreams().map((stream) => stream.options.topics)).toEqual([['run:r1']]);
+    });
+
+    it('closes the stream when the page goes away', async () => {
+      const { view } = renderFollowed();
+      await screen.findByRole('heading', { name: 'Run in progress' });
+
+      view.unmount();
+
+      expect(openStreams()).toHaveLength(0);
+    });
+
+    it('reads the run again on every (re)connect and on a resync', async () => {
+      const { calls } = renderFollowed();
+      await screen.findByRole('heading', { name: 'Run in progress' });
+      const stream = openStreams()[0];
+      const reads = runReads(calls);
+
+      act(() => stream?.options.onOpen?.());
+      await waitFor(() => expect(runReads(calls)).toBe(reads + 1));
+      push('resync');
+      await waitFor(() => expect(runReads(calls)).toBe(reads + 2));
+    });
+  });
+
   describe('a run saved earlier', () => {
-    it('keeps the queue_timeout sentence after the cause is gone and stops polling a finished run', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      onTestFinished(() => {
-        vi.useRealTimers();
-      });
-      const { calls } = renderRun(
+    it('keeps the queue_timeout sentence after the cause is gone and opens no stream for a finished run', async () => {
+      const { calls, queryClient } = renderRun(
         run(
           [
             step({
@@ -1077,8 +1179,9 @@ describe('RunProgressPage', () => {
           'The media engine was too busy to start this in time. Try running again.',
         ),
       ).toBeInTheDocument();
-      await vi.advanceTimersByTimeAsync(5000);
-      expect(calls.filter((call) => call.path === '/api/v1/runs/r1')).toHaveLength(1);
+      await settled(queryClient);
+      expect(streams.opened).toHaveLength(0);
+      expect(runReads(calls)).toBe(1);
     });
 
     it('still offers the downloads of a finished run and no start or re-upload action', async () => {
@@ -1300,7 +1403,7 @@ describe('RunProgressPage', () => {
       expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
     });
 
-    it('announces the step the page selects after a poll, and nothing on first render', async () => {
+    it('announces the step the page selects after a pushed update, and nothing on first render', async () => {
       const user = userEvent.setup();
       let current = checkpointRun({ status: 'pending' }, { status: 'running' });
       stubApi({
@@ -1310,11 +1413,7 @@ describe('RunProgressPage', () => {
           body: [{ id: 't1', runId: 'r1', status: 'pending', originalPayload: 'Draft caption' }],
         },
       });
-      const { queryClient } = renderRoute(
-        '/workflows/:workflowId/runs/:runId',
-        '/workflows/w1/runs/r1',
-        <RunProgressPage />,
-      );
+      renderRoute('/workflows/:workflowId/runs/:runId', '/workflows/w1/runs/r1', <RunProgressPage />);
       const announcement = () => screen.getByRole('main').querySelector('[role="status"]');
 
       await screen.findByRole('region', { name: 'Step 1' });
@@ -1323,7 +1422,7 @@ describe('RunProgressPage', () => {
       expect(announcement()).toBeEmptyDOMElement();
 
       current = checkpointRun({ status: 'pending' }, { status: 'waiting_approval' });
-      await queryClient.invalidateQueries();
+      push();
 
       await waitFor(() => expect(node(/Review/)).toHaveAttribute('aria-pressed', 'true'));
       expect(announcement()).toHaveTextContent('Review, Needs you');
@@ -1464,7 +1563,7 @@ describe('RunProgressPage', () => {
         expect(currentLocation()).toMatchObject({ search: '?from=home', hash: '#result' });
       });
 
-      it('puts focus on the heading once the run has loaded, and not again after a poll', async () => {
+      it('puts focus on the heading once the run has loaded, and not again after a refetch', async () => {
         const user = userEvent.setup();
         const queryClient = renderWithState({ focusHeading: true });
 
@@ -1705,12 +1804,9 @@ describe('RunProgressPage', () => {
       expect(await screen.findByRole('dialog')).not.toHaveTextContent(/Charged for this run/);
     });
 
-    it('sends one stop for a double press, then reads "Stopping…" with the later steps skipped and keeps polling', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      onTestFinished(() => {
-        vi.useRealTimers();
-      });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+    it('sends one stop for a double press, then reads "Stopping…" with the later steps skipped and follows pushed updates', async () => {
+      // No wait between the two presses: they land before the first stop request settles.
+      const user = userEvent.setup({ delay: null });
       const { calls } = renderStoppable(
         runningRun(),
         { status: 200, body: cancellingRun() },
@@ -1730,9 +1826,9 @@ describe('RunProgressPage', () => {
       expect(screen.getByRole('button', { name: /Step 2/ })).toHaveTextContent('Skipped');
       expect(screen.getByRole('button', { name: /Step 3/ })).toHaveTextContent('Skipped');
 
-      const reads = calls.filter((call) => call.path === '/api/v1/runs/r1').length;
-      await vi.advanceTimersByTimeAsync(2500);
-      expect(calls.filter((call) => call.path === '/api/v1/runs/r1').length).toBeGreaterThan(reads);
+      const reads = runReads(calls);
+      push();
+      await waitFor(() => expect(runReads(calls)).toBeGreaterThan(reads));
       expect(cancelCalls(calls)).toHaveLength(1);
     });
 

@@ -23,6 +23,7 @@ import type {
   StartRunRequest,
   UploadRequest,
 } from '@flow-cortex/api-client';
+import { useRunEvents } from './useRunEvents';
 
 /** What a reviewer decided: the edited text for a plain checkpoint, the revision for a script one. */
 export interface ApproveTaskInput {
@@ -77,30 +78,20 @@ export function useOutputUrlMutation(runId: string, stepOrder: number, name: str
   });
 }
 
-/**
- * Polls `/api/v1/runs/{id}` while the run is still `running`, `waiting_approval` or `cancelling`
- * — the start call returns before steps finish, so this is what actually shows a step
- * advancing pending -> running -> completed|error, and a review decided elsewhere still moves
- * the page on. A stopping run settles once its in-flight step finishes. Stops polling once the
- * run reaches a terminal status.
- */
+/** Loads the run and, while it is live, refetches it on each push from its event stream. */
 export function useRunQuery(runId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['runs', runId],
     queryFn: () => unwrap(getRun(runId as string, authHeaders())),
     enabled: Boolean(runId),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === 'running' || status === 'waiting_approval' || status === 'cancelling'
-        ? 1000
-        : false;
-    },
   });
+  useRunEvents(runId, query.data?.status, query.refetch);
+  return query;
 }
 
 /**
- * The answer is the run itself (`cancelling` or `cancelled`), so it replaces the polled copy; a
- * poll already in flight is dropped first so its older status cannot land on top. A refusal
+ * The answer is the run itself (`cancelling` or `cancelled`), so it replaces the cached copy; a
+ * refetch already in flight is dropped first so its older status cannot land on top. A refusal
  * (e.g. 409, the run already finished) reloads the run to show where it actually is.
  */
 export function useCancelRunMutation(runId: string) {

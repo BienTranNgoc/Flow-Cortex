@@ -37,11 +37,13 @@ public class RunCancellation {
     private final StepExecutorRegistry registry;
     private final MediaJobs mediaJobs;
     private final Clock clock;
+    private final RunUpdates runUpdates;
     private final boolean enabled;
 
     RunCancellation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock,
+            StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock, RunUpdates runUpdates,
             @Value("${flowcortex.workflow.cancel.enabled:false}") boolean enabled) {
+        this.runUpdates = runUpdates;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.registry = registry;
@@ -65,6 +67,7 @@ public class RunCancellation {
         if (workflowRunRepository.requestCancel(runId, currentUserId) == 1) {
             int skipped = runStepRepository.skipPending(runId);
             boolean settled = workflowRunRepository.settleCancelled(runId, Instant.now(clock)) == 1;
+            runUpdates.touched(runId);
             LOG.info("Run cancel: outcome=cancel_requested runId={} skippedSteps={} status={}", runId, skipped,
                     settled ? "cancelled" : "cancelling");
             return currentView(currentUserId, runId);
