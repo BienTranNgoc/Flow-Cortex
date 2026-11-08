@@ -559,8 +559,8 @@ Format per entry: **Context → Decision → Consequences**.
   | Face swap video, whole person (`video.person_swap`) | API-available | fal `fal-ai/pixverse/swap`: `fal-pixverse-swap.provider.ts:75,129` | unverified: the "Endpoint verified 2026-09-07" note is Xood's own claim; the fal page would settle it | `provider-face-swap-detect` |
   | Face swap image and video, face only | no commercial path verified | InsightFace inswapper, "free/non-commercial, internal use": `face-swap.provider.ts:28,72` (CPU sidecar), `video-swap.provider.ts:35,110`, `Dockerfile.gpu:2-4` | n/a: the model licence restricts commercial use, so a licensed model or API would settle it | none (a later licence decision) |
   | FLUX.2 image generation | API-available for image generation in general; FLUX.2-klein itself self-host-later | `flux2-klein-selfhost.provider.ts:22-26` (self-hosted on Xood's GPU), `providers.module.ts:318`; `byteplus-seedream.provider.ts` and `gemini-pro-image.provider.ts` exist | unverified: a FLUX.2-klein listing on fal or Replicate would settle it | `worker-gpu-self-host` for FLUX.2-klein |
-  | demucs (`audio.separate`) | CPU-first | `tasks/demucs.py:82` (`device="cpu"`), `Dockerfile.local-demucs`; `demucs-separate.provider.ts:28-36` (self-hosted on a separate media box over HTTP, not a vendor) | unverified: no API found; a fal or Replicate demucs model would settle it | `worker-audio-separate-speakers-beats`; GPU in `worker-gpu-self-host` |
-  | SAM 2.1 (`video.track_roles`) | CPU-first, feasibility unmeasured, expected to promote | `tasks/track_roles.py:31-32` (GPU figure only) | unverified | `worker-track-roles`; GPU in `worker-gpu-self-host` |
+  | demucs (`audio.separate`) | CPU-first | `tasks/demucs.py:295` (`device="cpu"`), `Dockerfile.local-demucs`; `demucs-separate.provider.ts:28-36` (self-hosted on a separate media box over HTTP, not a vendor) | unverified: no API found; a fal or Replicate demucs model would settle it | `worker-audio-separate-speakers-beats`; GPU in `worker-gpu-self-host` |
+  | SAM 2.1 (`video.track_roles`) | CPU-first, feasibility unmeasured, expected to promote | `tasks/track_roles.py:33-35` (GPU figure only: T4 on g4dn.xlarge, SAM 2.1 tiny) | unverified | `worker-track-roles`; GPU in `worker-gpu-self-host` |
   | RT-DETR (`video.role_suggest`) | CPU-first | `tasks/role_suggest.py:3`; `video-role-suggest.provider.ts:11` ("GPU worker") | unverified | `worker-trend-role-suggest`; GPU in `worker-gpu-self-host` |
   | LaMa (`image.clean_overlay`) | CPU-first | `image-clean-overlay.provider.ts:35` ("FREE (self-host)"); `tasks/image_clean_overlay.py:76` (`lama_inpaint`); `requirements.txt:39` | unverified | `worker-image-clean-overlay` |
   | Depth Anything / clay render | CPU-first; GPU self-host-later | `xood-clay-render/depth.py:37-39` (CPU fallback, "roughly 10x slower"); `ark.py` calls BytePlus for generation | unverified | `worker-gpu-self-host` (clay pipeline is a separate follow-up) |
@@ -568,7 +568,9 @@ Format per entry: **Context → Decision → Consequences**.
 
   Paths are relative to the Xood repositories `xood-backend/src/providers/providers/`
   (`*.provider.ts`), `xood-media-worker/` (`tasks/`, `Dockerfile*`,
-  `requirements.txt`) and `xood-clay-render/`, at their `main` branch. The
+  `requirements.txt`) and `xood-clay-render/`, at the origin/main commits read:
+  `xood-backend` f1aaea107, `xood-media-worker` 1b8f15c63, `xood-clay-render`
+  d89eaf235. The
   face-only rows are not ported: product parity for face swap is the fal
   whole-person swap.
 - **Decision — threshold:** a capability moves from an API to self-hosting
