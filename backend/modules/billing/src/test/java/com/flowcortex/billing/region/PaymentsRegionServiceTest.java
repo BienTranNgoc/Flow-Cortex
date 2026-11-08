@@ -2,6 +2,10 @@ package com.flowcortex.billing.region;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -9,8 +13,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 class PaymentsRegionServiceTest {
 
@@ -114,6 +123,75 @@ class PaymentsRegionServiceTest {
         assertThat(service.refresh(serving(500), NOW.plusSeconds(60))).isFalse();
 
         assertThat(service.currentTable()).isSameAs(before);
+    }
+
+    private static List<ILoggingEvent> capture(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(PaymentsRegionService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+        }
+        return appender.list;
+    }
+
+    @Test
+    void startupWithAnOldSnapshotLogsNoError() {
+        PaymentsRegionService service = new PaymentsRegionService(
+                Clock.fixed(NOW.plus(Duration.ofDays(30)), ZoneOffset.UTC));
+
+        List<ILoggingEvent> events = capture(service::load);
+
+        assertThat(service.currentTable()).isNotNull();
+        assertThat(events).extracting(ILoggingEvent::getLevel).doesNotContain(Level.ERROR);
+        assertThat(events).extracting(ILoggingEvent::getLevel).contains(Level.WARN);
+    }
+
+    @Test
+    void staleTableIsReportedAtErrorAfterAFailedRefresh() {
+        PaymentsRegionService service = service();
+        service.refresh(serving(300), NOW);
+
+        List<ILoggingEvent> events = capture(() -> service.refresh(url -> {
+            throw new IOException("network down");
+        }, NOW.plus(Duration.ofDays(8))));
+
+        assertThat(events).extracting(ILoggingEvent::getLevel).contains(Level.ERROR);
+    }
+
+    @Test
+    void scheduledRefreshReturnsWhileTheDownloadIsStillRunning() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger downloads = new AtomicInteger();
+        RirFetch.Fetcher blocking = url -> {
+            downloads.incrementAndGet();
+            started.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            throw new IOException("released");
+        };
+        PaymentsRegionService service = new PaymentsRegionService(Clock.fixed(NOW, ZoneOffset.UTC), () -> blocking);
+        try {
+            long begin = System.nanoTime();
+            service.scheduledRefresh();
+            assertThat(Duration.ofNanos(System.nanoTime() - begin)).isLessThan(Duration.ofSeconds(2));
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+
+            service.scheduledRefresh();
+            release.countDown();
+            Thread.sleep(200);
+            assertThat(downloads.get()).isEqualTo(1);
+        } finally {
+            release.countDown();
+            service.shutdown();
+        }
     }
 
     @Test

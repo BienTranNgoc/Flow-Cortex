@@ -35,6 +35,7 @@ public final class RirFetch {
             new Source("lacnic", "https://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest", Md5.OPTIONAL),
             new Source("afrinic", "https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-latest", Md5.OPTIONAL));
 
+    public static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(15);
     public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(120);
     public static final int MIN_VN_IPV4_RECORDS = 1_000;
     private static final int MAX_CHANGE_PERCENT = 30;
@@ -47,7 +48,7 @@ public final class RirFetch {
      * redirects stay off.
      */
     public static Fetcher httpFetcher() {
-        HttpClient client = HttpClient.newBuilder().connectTimeout(FETCH_TIMEOUT).build();
+        HttpClient client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
         return url -> {
             HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(FETCH_TIMEOUT).GET().build();
             try {
