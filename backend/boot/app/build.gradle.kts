@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:billing"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
