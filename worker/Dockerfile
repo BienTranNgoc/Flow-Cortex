@@ -21,9 +21,17 @@ RUN uv sync --frozen --no-build --no-dev --no-editable
 FROM python:3.12-slim AS media-runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
+      fontconfig fonts-dejavu-core fonts-montserrat fonts-open-sans fonts-quicksand \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home worker \
  && install -d -m 0700 -o worker -g worker /run/flowcortex
+
+# Caption fonts: the build fails here, as root, when a declared family does not resolve to
+# itself. fc-cache -f writes /var/cache/fontconfig, so it cannot run after USER.
+COPY fonts/ /usr/share/fonts/truetype/flowcortex/
+RUN fc-cache -f
+COPY docker/check_fonts.py /opt/check_fonts.py
+RUN python3 /opt/check_fonts.py /usr/share/fonts/truetype/flowcortex/manifest.json
 
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
