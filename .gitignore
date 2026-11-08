@@ -49,3 +49,5 @@ docker-compose.override.yml
 .mypy_cache/
 .ruff_cache/
 *.uv-cache/
+.tmp-secrets.json
+.env.bak

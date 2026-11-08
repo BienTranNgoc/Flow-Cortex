@@ -53,7 +53,7 @@ jobs:
               echo "$1=false" >> "$GITHUB_OUTPUT"
             fi
           }
-          area backend '^(backend/|docs/openapi\.yaml$|\.github/workflows/backend-ci\.yml$)'
+          area backend '^(backend/|docs/openapi\.yaml$|scripts/check-migration-version(\.test)?\.sh$|\.github/workflows/backend-ci\.yml$)'
           area frontend '^(frontend/|admin/|packages/|package\.json$|package-lock\.json$|\.prettierrc$|docs/openapi\.yaml$|\.github/workflows/frontend-ci\.yml$)'
           area contracts '^(contracts/|backend/modules/media/|worker/|\.github/workflows/contracts-ci\.yml$)'
           area worker '^(worker/|contracts/|\.github/workflows/worker-ci\.yml$)'
