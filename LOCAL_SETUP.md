@@ -247,6 +247,9 @@ apply a change with `docker compose up -d backend`.
   member app is unaffected.
 - `FLOWCORTEX_WORKFLOW_ENABLED=false`: no new runs (503); started and finished runs
   stay readable.
+- `FLOWCORTEX_SPACES_ENABLED=false` (the default outside compose): the session space
+  answers 503 "This feature is turned off"; personal spaces are still provisioned when
+  an account is activated, so nothing is lost when it is turned on.
 
 **Demo switches.** Compose turns all five on; `application.yml` keeps the first four
 off for a bare `bootRun` and any environment that does not set them. Same mechanism

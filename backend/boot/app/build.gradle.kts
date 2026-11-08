@@ -24,6 +24,7 @@ dependencies {
     implementation(project(":modules:credit"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
+    implementation(project(":modules:space"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

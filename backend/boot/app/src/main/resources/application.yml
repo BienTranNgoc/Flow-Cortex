@@ -280,6 +280,9 @@ flowcortex:
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
     sender: ${FLOWCORTEX_SMS_SENDER:}
+  # Personal spaces: off means the session space answers 503; spaces are still provisioned at activation.
+  spaces:
+    enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
   # Every registered step type needs a cost here, or startup fails.
   credits:
