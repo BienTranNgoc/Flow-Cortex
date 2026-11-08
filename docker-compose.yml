@@ -209,6 +209,7 @@ services:
       FLOWCORTEX_MEDIA_ENABLED: ${FLOWCORTEX_MEDIA_ENABLED:-true}
       # Vietnamese dubbing: off by default, and available only with a Gemini key as well.
       FLOWCORTEX_DUB_ENABLED: ${FLOWCORTEX_DUB_ENABLED:-false}
+      # One Gemini key serves dubbing and the Help Center assistant; empty fails both.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Admin-console kill switch: off answers /api/v1/admin/** with 503; the member API is unaffected.
       FLOWCORTEX_ADMIN_ENABLED: ${FLOWCORTEX_ADMIN_ENABLED:-true}
@@ -229,8 +230,6 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/api/v1/auth/oauth/google/callback}
-      # Help Center assistant's language model key; empty fails every assistant answer.
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Help Center switches, contact and assistant limits (see .env.example).
       FLOWCORTEX_SUPPORT_ENABLED: ${FLOWCORTEX_SUPPORT_ENABLED:-false}
       FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED: ${FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED:-false}
