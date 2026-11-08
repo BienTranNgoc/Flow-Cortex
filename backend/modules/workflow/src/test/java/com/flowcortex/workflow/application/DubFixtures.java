@@ -21,7 +21,8 @@ final class DubFixtures {
                 new DubProperties.Gemini(key, "https://gemini.test/v1beta",
                         List.of("gemini-3.5-flash-lite", "gemini-3.8-flash"),
                         List.of("gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"), 3,
-                        List.of(Duration.ofSeconds(10), Duration.ofSeconds(30)), Duration.ofSeconds(60)));
+                        List.of(Duration.ofSeconds(10), Duration.ofSeconds(30)), Duration.ofSeconds(60)),
+                new DubProperties.Pool(4, 4));
     }
 
     static DubProperties dub() {

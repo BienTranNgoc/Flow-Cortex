@@ -14,6 +14,7 @@ import com.flowcortex.media.api.provider.ProviderStoryboardData;
 import com.flowcortex.media.api.provider.ProviderVideoData;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
+import com.flowcortex.workflow.application.provider.ProviderStepPool;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -56,7 +57,8 @@ import org.springframework.stereotype.Component;
 /**
  * Moves a run forward one step per event — the run start, an inline step finishing, or a remote
  * result — never in a loop. {@link #advance} claims the lowest pending step and hands it on: an
- * inline step to Boot's {@code applicationTaskExecutor}, whose task records pickup, heartbeats
+ * inline step to Boot's {@code applicationTaskExecutor} (a provider-backed one to its own bounded
+ * pool, failing {@code provider_busy} when that is full), whose task records pickup, heartbeats
  * the lease every 30 s while it runs, then completes the step and advances again; a remote step
  * to the media engine inside the claim transaction, after which this returns at once and the step
  * moves only when {@link #onRemoteProgress} / {@link #onRemoteCompleted} events arrive.
@@ -77,6 +79,7 @@ class RunAdvancer {
     private static final String BAGGAGE_RUN_ID = "runId";
     private static final String RUN_OBSERVATION = "workflow.run";
     private static final Duration HEARTBEAT = Duration.ofSeconds(30);
+    private static final String PROVIDER_BUSY = "provider_busy";
     /** Inline steps have no broker, so no redeliveries to count. */
     private static final short INLINE_DELIVERY = 0;
 
@@ -88,6 +91,7 @@ class RunAdvancer {
     private final InputResolver inputResolver;
     private final StepExecutorRegistry registry;
     private final TaskExecutor taskExecutor;
+    private final ProviderStepPool providerPool;
     private final TaskScheduler scheduler;
     private final Tracer tracer;
     private final ObservationRegistry observations;
@@ -102,29 +106,32 @@ class RunAdvancer {
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
-            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, TaskScheduler scheduler,
+            @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor, ProviderStepPool providerPool,
+            TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
             ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
-                taskExecutor, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
+                taskExecutor, providerPool, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
                 Clock.systemUTC(), checkpointTransactions, mediaJobs, validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
-            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
+            ObservationRegistry observations,
             MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
             Validator validator) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
-                taskExecutor, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
+                taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
                 validator);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
-            TaskExecutor taskExecutor, TaskScheduler scheduler, Tracer tracer, ObservationRegistry observations,
+            TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
+            ObservationRegistry observations,
             MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
             MediaJobs mediaJobs, Validator validator) {
         this.workflowRunRepository = workflowRunRepository;
@@ -133,6 +140,7 @@ class RunAdvancer {
         this.inputResolver = inputResolver;
         this.registry = registry;
         this.taskExecutor = taskExecutor;
+        this.providerPool = providerPool;
         this.scheduler = scheduler;
         this.tracer = tracer;
         this.observations = observations;
@@ -327,17 +335,33 @@ class RunAdvancer {
     }
 
     private void submitInline(UUID runId, RunStep step, StepExecutor executor, StepContext context) {
+        Runnable task = () -> inRun(runId, () -> {
+            try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),
+                    null)) {
+                runInline(executor, context);
+            }
+        });
+        boolean provider = executor.pool() == StepExecutor.Pool.PROVIDER;
         try {
-            taskExecutor.execute(() -> inRun(runId, () -> {
-                try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),
-                        null)) {
-                    runInline(executor, context);
-                }
-            }));
+            if (provider) {
+                providerPool.execute(task);
+            } else {
+                taskExecutor.execute(task);
+            }
         } catch (TaskRejectedException e) {
+            if (provider) {
+                failProviderBusy(context, e);
+                return;
+            }
             LOG.warn("Step {} could not be scheduled ({}) — left for the reaper to close at its queue deadline",
                     step.getStepOrder(), e.getMessage());
         }
+    }
+
+    /** A provider step that finds every provider thread busy and the queue full fails now rather than waiting. */
+    private void failProviderBusy(StepContext context, TaskRejectedException cause) {
+        failInline(context, PROVIDER_BUSY, "Too many videos are being processed right now. Try again in a few minutes.",
+                cause, clock.instant());
     }
 
     private void runInline(StepExecutor executor, StepContext context) {

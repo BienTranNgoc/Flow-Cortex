@@ -124,7 +124,8 @@ class DubTelemetryTest {
     @Test
     void aFailedStepLogsNeitherTheTextNorTheProvidersMessage(CapturedOutput output) {
         DubProperties oneAttempt = new DubProperties(true, 13, 1.2, dub.voices(), new DubProperties.Gemini(KEY, BASE,
-                List.of("gemini-3.5-flash-lite"), List.of("gemini-3.8-flash-tts"), 1, List.of(), Duration.ofSeconds(1)));
+                List.of("gemini-3.5-flash-lite"), List.of("gemini-3.8-flash-tts"), 1, List.of(), Duration.ofSeconds(1)),
+                dub.pool());
         RestClient.Builder single = RestClient.builder();
         MockRestServiceServer stub = MockRestServiceServer.bindTo(single).build();
         stub.expect(requestTo(BASE + "/models/gemini-3.5-flash-lite:generateContent"))

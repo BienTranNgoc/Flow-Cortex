@@ -59,6 +59,16 @@ class TranslateStepExecutor implements StepExecutor {
     }
 
     @Override
+    public Pool pool() {
+        return Pool.PROVIDER;
+    }
+
+    @Override
+    public Duration queueTimeout(Duration lease) {
+        return lease.plus(dub.pool().queueWait(maxRuntime()));
+    }
+
+    @Override
     public boolean available() {
         return dub.available();
     }
@@ -72,6 +82,11 @@ class TranslateStepExecutor implements StepExecutor {
         for (DubSegments.Segment segment : segments) {
             if (segment.zh() == null) {
                 throw DubSegments.contractViolation("Segment " + segment.index() + " has no Chinese line");
+            }
+        }
+        for (DubSegments.Segment segment : segments) {
+            if (DubSegments.limit(dub.charsPerSecond(), segment) < 1) {
+                throw DubSegments.contractViolation("Segment " + segment.index() + " is too short to voice");
             }
         }
         if (segments.isEmpty()) {

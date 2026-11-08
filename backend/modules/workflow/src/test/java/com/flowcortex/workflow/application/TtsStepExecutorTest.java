@@ -284,4 +284,11 @@ class TtsStepExecutorTest {
         assertThat(executor().mode()).isEqualTo(StepExecutor.Mode.INLINE);
         assertThat(executor().type()).isEqualTo("tts");
     }
+
+    @Test
+    void itRunsOnTheProviderPoolAndWaitsForAThreadAsLongAsTheQueueMayTake() {
+        // Pool of 4 with room for 4 waiting: one round of up to 780 s on top of the lease.
+        assertThat(executor().pool()).isEqualTo(StepExecutor.Pool.PROVIDER);
+        assertThat(executor().queueTimeout(Duration.ofSeconds(120))).isEqualTo(Duration.ofSeconds(900));
+    }
 }
