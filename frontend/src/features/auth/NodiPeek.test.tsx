@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { NodiPeek } from './NodiPeek';
-import { NodiMark } from './NodiMark';
+import { NodiMark } from '@flow-cortex/ui-kit';
 
 describe('NodiPeek', () => {
   it('puts the pose on data-pose of a hidden svg', () => {

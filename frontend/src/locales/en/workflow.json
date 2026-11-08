@@ -194,7 +194,6 @@
     },
     "loading": "Loading workflows…",
     "loadError": "Could not load workflows.",
-    "noMatch": "No workflows match the current filter.",
     "tableLabel": "Workflows table",
     "column": {
       "name": "Name",

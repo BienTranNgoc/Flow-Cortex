@@ -1,5 +1,5 @@
 export { ErrorBoundary, type ErrorBoundaryLabels } from './ErrorBoundary';
-export { FlowCortexLogo } from './FlowCortexLogo';
+export { NodiMark } from './NodiMark';
 export {
   createUseTheme,
   type CreateUseThemeResult,

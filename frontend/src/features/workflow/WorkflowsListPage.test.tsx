@@ -11,6 +11,7 @@ const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
   isShared: false,
+  available: true,
   steps: [],
 };
 
@@ -18,6 +19,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
   isShared: true,
+  available: true,
   steps: [],
 };
 
@@ -25,6 +27,7 @@ const DOUYIN: WorkflowResponse = {
   id: 'douyin',
   name: 'Douyin Video Repurpose',
   isShared: true,
+  available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -35,6 +38,7 @@ const ECHO: WorkflowResponse = {
   id: 'echo',
   name: 'Echo Demo (all steps succeed)',
   isShared: false,
+  available: true,
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -42,6 +46,7 @@ const FAIL: WorkflowResponse = {
   id: 'fail',
   name: 'Failing Demo (deliberate)',
   isShared: false,
+  available: true,
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
 
@@ -236,6 +241,112 @@ describe('WorkflowsListPage', () => {
     expect(screen.getByRole('button', { name: 'List layout' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('opens with the shared heading block and leaves the main landmark to the shell', async () => {
+    const { container } = stubAndRender([DOUYIN]);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Workflows' })).toBeInTheDocument();
+    expect(container.querySelector('main')).toBeNull();
+    expect(container.querySelector('.page-heading h1')).not.toBeNull();
+  });
+
+  it('marks the list busy with row placeholders until the workflows arrive', async () => {
+    let answer: (reply: FakeReply) => void = () => {};
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': () => new Promise<FakeReply>((resolve) => (answer = resolve)),
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    const { container } = renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    await waitFor(() => expect(container.querySelector('[aria-busy="true"]')).not.toBeNull());
+    expect(container.querySelectorAll('.skeleton-row').length).toBeGreaterThan(0);
+
+    answer({ status: 200, body: [DOUYIN] });
+    expect(await screen.findByText('Douyin Video Repurpose')).toBeInTheDocument();
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(container.querySelector('.skeleton-row')).toBeNull();
+  });
+
+  it('shows an inline error with Retry, and lists the workflows after the retry succeeds', async () => {
+    const user = userEvent.setup();
+    let workflowCalls = 0;
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': () => {
+        workflowCalls += 1;
+        return workflowCalls === 1
+          ? { status: 503, body: { status: 503 } }
+          : { status: 200, body: [DOUYIN, ECHO, FAIL] };
+      },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not load workflows.');
+    await user.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Douyin Video Repurpose')).toBeInTheDocument();
+    expect(screen.getByText('Echo Demo (all steps succeed)')).toBeInTheDocument();
+    expect(screen.getByText('Failing Demo (deliberate)')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(workflowCalls).toBe(2);
+  });
+
+  it('shows the server detail in the inline error when the request fails with one', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 503,
+        body: { status: 503, detail: 'Workflows are paused for maintenance.' },
+      },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Workflows are paused for maintenance.');
+    expect(alert).not.toHaveTextContent('Could not load workflows.');
+    expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('says nothing matches a search and clears it with one action', async () => {
+    const user = userEvent.setup();
+    stubAndRender([DOUYIN, ECHO, FAIL]);
+
+    await screen.findByText('Echo Demo (all steps succeed)');
+    const search = screen.getByPlaceholderText('Search workflows...');
+    await user.type(search, 'zzz');
+
+    expect(screen.getByText('No workflow matches your search.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(search).toHaveValue('');
+    expect(screen.getByText('Douyin Video Repurpose')).toBeInTheDocument();
+    expect(screen.getByText('Echo Demo (all steps succeed)')).toBeInTheDocument();
+    expect(screen.getByText('Failing Demo (deliberate)')).toBeInTheDocument();
+  });
+
+  it('points an account with no workflows at the guide', async () => {
+    stubAndRender([]);
+
+    expect(await screen.findByText('There are no workflows yet.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Read the guide' })).toHaveAttribute('href', '/docs/guides');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
+  });
+
+  it('paints each owner avatar from a tone token, not an inline colour', async () => {
+    const { container } = stubAndRender([DOUYIN, ECHO]);
+
+    await screen.findByText('Echo Demo (all steps succeed)');
+    const avatars = container.querySelectorAll<HTMLElement>('.wf-list__owner-avatar');
+    expect(avatars.length).toBeGreaterThan(0);
+    for (const avatar of avatars) {
+      expect(avatar.dataset.tone).toMatch(/^(blue|cyan|violet|amber|green|rose)$/);
+      expect(avatar).not.toHaveAttribute('style');
+    }
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -261,6 +372,15 @@ describe('WorkflowsListPage', () => {
     });
   });
 });
+
+function stubAndRender(workflows: WorkflowResponse[]) {
+  stubApi({
+    'GET /api/v1/auth/me': { status: 200, body: ME },
+    'GET /api/v1/workflows': { status: 200, body: workflows },
+    'GET /api/v1/capabilities': capabilities(true),
+  });
+  return renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+}
 
 function withinTable(scope: HTMLElement, text: string): HTMLElement {
   const node = [...scope.querySelectorAll('th')].find((th) => th.textContent?.trim() === text);

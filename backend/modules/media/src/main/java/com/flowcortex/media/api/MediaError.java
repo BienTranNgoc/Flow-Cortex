@@ -17,7 +17,9 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         PROVIDER_REQUEST_FAILED("provider_request_failed"),
         PROVIDER_RESPONSE_INVALID("provider_response_invalid"),
         CONTRACT_VIOLATION("contract_violation"),
-        RUN_TIMEOUT("run_timeout");
+        RUN_TIMEOUT("run_timeout"),
+        DURATION_EXCEEDED("duration_exceeded"),
+        NO_AUDIO_STREAM("no_audio_stream");
 
         private final String value;
 

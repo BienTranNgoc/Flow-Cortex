@@ -1,0 +1,134 @@
+/* ===== Page heading ====================================================== */
+
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-heading__text {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.page-heading__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.page-heading__lede {
+  margin: 0.25rem 0 0;
+  max-width: 60ch;
+  color: var(--ink-3);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.page-heading__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .page-heading__title {
+    font-size: 1.75rem;
+  }
+}
+
+/* ===== Skeleton ========================================================== */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--paper-3);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton--media {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.skeleton--title {
+  height: 1.25rem;
+  width: 60%;
+}
+
+.skeleton--line {
+  height: 0.875rem;
+  width: 90%;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+}
+
+.skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--card-edge);
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ===== Status block ====================================================== */
+
+.status-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.status-block--error {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.status-block__message {
+  flex: 1 1 14rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.status-block button {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

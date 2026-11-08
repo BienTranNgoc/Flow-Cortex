@@ -1,8 +1,9 @@
 import { setToken } from '@flow-cortex/api-client';
 import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18n from '../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
-import { Header } from './Header';
+import { Topbar } from './Topbar';
 
 const FEATURES = {
   emailConfirmation: false,
@@ -21,15 +22,29 @@ function stubWithMe(routes: Parameters<typeof stubApi>[0]) {
   return stubApi({ 'GET /api/v1/auth/me': ME, ...routes });
 }
 
-function renderHeader() {
-  return renderRoute('/', '/', <Header />);
+interface RenderOptions {
+  showMenuButton?: boolean;
+  drawerOpen?: boolean;
+  onOpenMenu?: () => void;
+}
+
+function renderTopbar({
+  showMenuButton = false,
+  drawerOpen = false,
+  onOpenMenu = () => {},
+}: RenderOptions = {}) {
+  return renderRoute(
+    '/',
+    '/',
+    <Topbar showMenuButton={showMenuButton} drawerOpen={drawerOpen} onOpenMenu={onOpenMenu} />,
+  );
 }
 
 function balanceCalls(calls: { path: string }[]) {
   return calls.filter((call) => call.path === '/api/v1/credits/balance');
 }
 
-describe('Header', () => {
+describe('Topbar', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -37,10 +52,23 @@ describe('Header', () => {
   it('offers the language toggle to a signed-in member', () => {
     stubApi({});
 
-    renderHeader();
+    renderTopbar();
 
     expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'VI Tiếng Việt' })).toBeInTheDocument();
+  });
+
+  it('holds the language toggle beside the theme toggle in the banner', () => {
+    stubApi({});
+
+    renderTopbar();
+
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('group', { name: 'Language' })).toBeInTheDocument();
+    expect(
+      within(banner).getByRole('button', { name: /^Switch to (dark|light) theme$/ }),
+    ).toBeInTheDocument();
+    expect(within(banner).getByRole('button', { name: /open account menu/i })).toBeInTheDocument();
   });
 
   describe('in Vietnamese', () => {
@@ -51,26 +79,68 @@ describe('Header', () => {
       await i18n.changeLanguage('en');
     });
 
-    it('labels the navigation, the theme switch and the language group next to it', () => {
+    it('labels the theme switch and the language group next to it', () => {
       stubApi({});
 
-      renderHeader();
+      renderTopbar();
 
-      const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
-      expect(within(nav).getByRole('link', { name: 'Trang chủ' })).toBeInTheDocument();
-      expect(within(nav).getByRole('link', { name: 'Quy trình' })).toBeInTheDocument();
-      expect(within(nav).getByRole('button', { name: 'Tài liệu' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Trang chủ FlowCortex' })).toBeInTheDocument();
       expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeInTheDocument();
       expect(
         screen.getByRole('button', { name: /^Chuyển sang giao diện (tối|sáng)$/ }),
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Mở menu tài khoản' })).toBeInTheDocument();
     });
+
+    it('names the menu button in Vietnamese', () => {
+      stubApi({});
+
+      renderTopbar({ showMenuButton: true });
+
+      expect(screen.getByRole('button', { name: 'Mở menu' })).toBeInTheDocument();
+    });
   });
 });
 
-describe('Header credits', () => {
+describe('Topbar menu button', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is absent while the sidebar is pinned or a rail', () => {
+    stubApi({});
+
+    renderTopbar({ showMenuButton: false });
+
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+  });
+
+  it('is named, hides its icon from assistive technology and opens the drawer', async () => {
+    stubApi({});
+    const onOpenMenu = vi.fn();
+    const user = userEvent.setup();
+
+    renderTopbar({ showMenuButton: true, onOpenMenu });
+
+    const button = screen.getByRole('button', { name: 'Open menu' });
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await user.click(button);
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the open drawer through aria-expanded', () => {
+    stubApi({});
+
+    renderTopbar({ showMenuButton: true, drawerOpen: true });
+
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+});
+
+describe('Topbar credits', () => {
   beforeEach(() => setToken('t', true));
   afterEach(() => {
     setToken(null);
@@ -84,7 +154,7 @@ describe('Header credits', () => {
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
 
-    renderHeader();
+    renderTopbar();
 
     expect(await screen.findByText('1,000 credits')).toBeInTheDocument();
     expect(screen.queryByText(/GPU Credits/)).not.toBeInTheDocument();
@@ -97,7 +167,7 @@ describe('Header credits', () => {
       'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
     });
 
-    const { queryClient } = renderHeader();
+    const { queryClient } = renderTopbar();
     await waitFor(() => expect(calls.some((call) => call.path === '/api/v1/features')).toBe(true));
     await settled(queryClient);
 
@@ -114,7 +184,7 @@ describe('Header credits', () => {
       },
     });
 
-    const { queryClient } = renderHeader();
+    const { queryClient } = renderTopbar();
     await waitFor(() => expect(balanceCalls(calls)).toHaveLength(1));
     await settled(queryClient);
 
@@ -128,7 +198,7 @@ describe('Header credits', () => {
       'GET /api/v1/credits/balance': () => reply,
     });
 
-    const { queryClient } = renderHeader();
+    const { queryClient } = renderTopbar();
     expect(await screen.findByText('1,000 credits')).toBeInTheDocument();
 
     act(() => queryClient.setQueryData(['runs', 'r1'], { id: 'r1', status: 'running' }));
@@ -156,7 +226,7 @@ describe('Header credits', () => {
         'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000 } },
       });
 
-      renderHeader();
+      renderTopbar();
 
       expect(await screen.findByText('1.000 Credit')).toBeInTheDocument();
     });

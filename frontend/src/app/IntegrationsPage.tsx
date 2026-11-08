@@ -11,6 +11,7 @@ import {
   ElevenLabsLogo,
   WhisperLogo,
 } from './providerLogos';
+import { PageHeading } from './PageHeading';
 import './IntegrationsPage.css';
 
 type ProviderCategory = 'text' | 'media' | 'audio' | 'social';
@@ -155,12 +156,8 @@ export function IntegrationsPage() {
   );
 
   return (
-    <main className="integrations-page">
-      <header className="integrations-page__header">
-        <p className="eyebrow">{t('common.integrations.eyebrow')}</p>
-        <h1>{t('common.integrations.title')}</h1>
-        <p className="integrations-page__subtitle">{t('common.integrations.subtitle')}</p>
-      </header>
+    <div className="integrations-page">
+      <PageHeading title={t('common.integrations.title')} lede={t('common.integrations.subtitle')} />
 
       <fieldset className="integrations-page__tabs">
         <legend className="visually-hidden">{t('common.integrations.tabsLegend')}</legend>
@@ -249,6 +246,6 @@ export function IntegrationsPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { setToken } from '@flow-cortex/api-client';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { App } from '../App';
 import { ADMIN_ME, stubApi } from '../test/fakeApi';
 import type * as Permissions from './permissions';
@@ -38,5 +38,26 @@ describe('a partial grant', () => {
     expect(screen.queryByRole('link', { name: /Media jobs/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Runs/ })).toBeInTheDocument();
     expect(calls.some((call) => call.path === '/api/v1/admin/media/jobs')).toBe(false);
+  });
+
+  it('keeps the brand with its Admin label and marks the Dashboard entry as current', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
+      'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
+      'GET /api/v1/users': { status: 200, body: [] },
+    });
+    setToken('admin-token-partial-brand', true);
+    window.history.pushState({}, '', '/dashboard');
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: 'Admin navigation' });
+    const sidebar = nav.closest('aside') as HTMLElement;
+    expect(within(sidebar).getByText('nodi')).toBeInTheDocument();
+    expect(within(sidebar).getByText('Admin')).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Dashboard/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).queryByRole('link', { name: /Media jobs/i })).not.toBeInTheDocument();
   });
 });

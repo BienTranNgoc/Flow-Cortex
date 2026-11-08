@@ -11,7 +11,13 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
 import i18n from '../../lib/i18n';
 import viWorkflow from '../../locales/vi/workflow.json';
-import { renderRoute, settled, stubApi, type FakeReply, type Handler } from '../../test/fakeApi';
+import {
+  renderRoute as renderRouteBare,
+  settled,
+  stubApi,
+  type FakeReply,
+  type Handler,
+} from '../../test/fakeApi';
 import { openInCurrentTab } from './browser';
 import { RunProgressPage } from './RunProgressPage';
 
@@ -92,6 +98,11 @@ function completedPipeline(): RunResponse {
     ],
     { status: 'completed' },
   );
+}
+
+/** The page renders inside the shell's single `main`, so the harness supplies it. */
+function renderRoute(...[path, url, element, extra]: Parameters<typeof renderRouteBare>) {
+  return renderRouteBare(path, url, <main>{element}</main>, extra);
 }
 
 /** Only the run is served: the page must not need the workflow to show it. */

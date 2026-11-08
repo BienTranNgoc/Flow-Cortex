@@ -5,7 +5,7 @@ import banner1x from '../../assets/auth/nodi-auth-banner.webp';
 import banner2x from '../../assets/auth/nodi-auth-banner@2x.webp';
 import { AppLanguageToggle } from '../../lib/AppLanguageToggle';
 import { authPromo, type AuthPromo } from './authPromo';
-import { NodiMark } from './NodiMark';
+import { NodiMark } from '@flow-cortex/ui-kit';
 import { NodiPeek } from './NodiPeek';
 import type { NodiPose } from './nodiPeekState';
 import './AuthShell.css';

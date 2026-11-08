@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
@@ -198,10 +199,8 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   };
 
   return (
-    <main>
-      <h1 ref={headingRef} tabIndex={-1}>
-        {runHeading(run.status, t)}
-      </h1>
+    <div>
+      <PageHeading ref={headingRef} title={runHeading(run.status, t)} />
       {STOPPABLE.has(run.status ?? '') && (
         <StopControl
           runId={runId}
@@ -251,7 +250,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
           {t('workflow.run.back')}
         </Link>
       )}
-    </main>
+    </div>
   );
 }
 

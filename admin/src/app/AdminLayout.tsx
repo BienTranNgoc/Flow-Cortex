@@ -1,23 +1,23 @@
-import { ErrorBoundary, FlowCortexLogo, ThemeToggle } from '@flow-cortex/ui-kit';
+import { ErrorBoundary, ThemeToggle } from '@flow-cortex/ui-kit';
 import {
-  ChevronDown,
+  CaretDown,
   Copy,
-  LogOut,
-  Mail,
-  PanelLeft,
-  PanelRight,
+  Envelope,
+  List,
   ShieldCheck,
-  Trash2,
-  UserCircle2,
-} from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+  SignOut,
+  Trash,
+  UserCircle,
+} from '@phosphor-icons/react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
 import { roleLabel } from '../features/users/enumLabels';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
-import { BRAND_NAME } from './brand';
 import { Sidebar } from './Sidebar';
+import { useIsDesktop } from './useIsDesktop';
+import { useLiveNav } from './useLiveNav';
 import { useTheme } from './useTheme';
 
 const SIDEBAR_COLLAPSED_KEY = 'flow-cortex:admin:sidebar:collapsed';
@@ -31,11 +31,12 @@ function readCollapsed(): boolean {
 }
 
 /**
- * Console shell: glass header, sidebar nav, main content wrapped in an
+ * Console shell: flat topbar, sidebar nav, main content wrapped in an
  * ErrorBoundary keyed by path so navigating away clears the failed view.
  */
 export function AdminLayout() {
   const me = useMeQuery().data;
+  const nav = useLiveNav(me?.role);
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -43,12 +44,27 @@ export function AdminLayout() {
   const [collapsed, setCollapsed] = useState<boolean>(() =>
     typeof window === 'undefined' ? false : readCollapsed(),
   );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const isDesktop = useIsDesktop();
   const accountDialogRef = useRef<HTMLDialogElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerButtonRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const displayName = me?.name?.trim() || me?.email || t('common.account.fallbackName');
   const avatarInitial = displayName.trim().charAt(0).toLocaleUpperCase();
-  const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    drawerButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop && drawerOpen) {
+      setDrawerOpen(false);
+      mainRef.current?.focus();
+    }
+  }, [isDesktop, drawerOpen]);
 
   useEffect(() => {
     try {
@@ -125,30 +141,16 @@ export function AdminLayout() {
       <header className="cortex-admin-header">
         <div className="cortex-admin-header__inner">
           <button
+            ref={drawerButtonRef}
             type="button"
-            className="cortex-admin-header__collapse-toggle"
-            aria-pressed={collapsed}
-            aria-label={collapseLabel}
-            title={collapseLabel}
-            onClick={() => setCollapsed((value) => !value)}
+            className="cortex-admin-header__menu"
+            aria-label={t('common.shell.nav.openMenu')}
+            aria-haspopup="dialog"
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen(true)}
           >
-            {collapsed ? (
-              <PanelLeft aria-hidden="true" size={16} />
-            ) : (
-              <PanelRight aria-hidden="true" size={16} />
-            )}
+            <List aria-hidden="true" size={20} />
           </button>
-          <a
-            className="cortex-admin-header__brand"
-            href="/dashboard"
-            aria-label={t('common.header.homeLink')}
-          >
-            <span className="cortex-admin-header__brand-mark" aria-hidden="true">
-              <FlowCortexLogo size={22} />
-            </span>
-            <span className="cortex-admin-header__brand-name">{BRAND_NAME}</span>
-            <span className="cortex-admin-header__title">{t('common.header.console')}</span>
-          </a>
           <div className="cortex-admin-header__actions">
             <AppLanguageToggle />
             <ThemeToggle
@@ -179,7 +181,7 @@ export function AdminLayout() {
                     <span className="cortex-admin-user-menu__presence" aria-hidden="true" />
                   </span>
                   <span className="cortex-admin-user-menu__name">{displayName}</span>
-                  <ChevronDown
+                  <CaretDown
                     aria-hidden="true"
                     size={14}
                     className="cortex-admin-user-menu__chevron"
@@ -230,7 +232,7 @@ export function AdminLayout() {
                         accountDialogRef.current?.showModal();
                       }}
                     >
-                      <UserCircle2 aria-hidden="true" size={16} />
+                      <UserCircle aria-hidden="true" size={20} />
                       <span>{t('common.account.details')}</span>
                     </button>
 
@@ -245,7 +247,7 @@ export function AdminLayout() {
                         void logout();
                       }}
                     >
-                      <LogOut aria-hidden="true" size={16} />
+                      <SignOut aria-hidden="true" size={20} />
                       <span>{t('common.account.signOut')}</span>
                     </button>
                   </div>
@@ -255,8 +257,15 @@ export function AdminLayout() {
           </div>
         </div>
       </header>
-      <Sidebar role={me?.role} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
-      <main className="cortex-admin-content">
+      <Sidebar
+        role={me?.role}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((value) => !value)}
+        drawerOpen={drawerOpen}
+        onDrawerClose={closeDrawer}
+        nav={nav}
+      />
+      <main ref={mainRef} tabIndex={-1} className="cortex-admin-content">
         <ErrorBoundary
           key={pathname}
           labels={{
@@ -295,7 +304,7 @@ export function AdminLayout() {
                 </span>
               </div>
               <div className="cortex-admin-account-dialog__email-row">
-                <Mail aria-hidden="true" size={13} />
+                <Envelope aria-hidden="true" size={13} />
                 <span>{me.email ?? '—'}</span>
                 <button
                   type="button"
@@ -328,7 +337,7 @@ export function AdminLayout() {
               disabled
               title={t('common.account.deleteHint')}
             >
-              <Trash2 aria-hidden="true" size={15} />
+              <Trash aria-hidden="true" size={15} />
               <span>{t('common.account.delete')}</span>
               <span className="cortex-admin-account-dialog__action-meta">
                 {t('common.account.deleteDisabled')}

@@ -1,6 +1,7 @@
 import type { WorkflowResponse } from '@flow-cortex/api-client';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import { WorkflowCard } from './WorkflowCard';
 
@@ -8,6 +9,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   id: 'wf-pv',
   name: 'Product Video',
   isShared: true,
+  available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'script', type: 'script', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -63,5 +65,48 @@ describe('WorkflowCard in Vietnamese', () => {
     expect(screen.getByText('3 bước')).toBeInTheDocument();
     expect(screen.getByText('Bước 3')).toBeInTheDocument();
     expect(screen.getByText('Khởi chạy')).toBeInTheDocument();
+  });
+});
+
+describe('WorkflowCard anatomy', () => {
+  function follows(a: Node, b: Node) {
+    return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it('puts the media tile first, then title, description and chips', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <WorkflowCard workflow={PRODUCT_VIDEO} />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: 'Open Product Video' });
+    const media = link.firstElementChild;
+    expect(media).toHaveClass('workflow-card__media');
+    expect(media).toContainElement(screen.getByText('script'));
+    const title = screen.getByRole('heading', { name: 'Product Video' });
+    const description = screen.getByText(/Generate a product video end-to-end/);
+    const chips = container.querySelector('.workflow-card__chips');
+    expect(chips).not.toBeNull();
+    expect(follows(media as Node, title)).toBe(true);
+    expect(follows(title, description)).toBe(true);
+    expect(follows(description, chips as Node)).toBe(true);
+    expect(chips).toHaveTextContent('3 steps');
+  });
+
+  it('opens the workflow page when the card is chosen', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<WorkflowCard workflow={PRODUCT_VIDEO} />} />
+          <Route path="/workflows/:id" element={<p>Detail wf-pv</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('link', { name: 'Open Product Video' }));
+
+    expect(screen.getByText('Detail wf-pv')).toBeInTheDocument();
   });
 });

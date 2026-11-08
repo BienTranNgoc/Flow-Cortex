@@ -1,21 +1,33 @@
 import { setToken } from '@flow-cortex/api-client';
+import { Lifebuoy, SquaresFour } from '@phosphor-icons/react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
 import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
+import { stubMatchMedia } from '../test/matchMedia';
+import type { NavGroup } from './nav';
 import { queryClient } from './queryClient';
 import { Sidebar } from './Sidebar';
+import { useLiveNav } from './useLiveNav';
 
 const OPEN_COUNT_PATH = '/api/v1/admin/support/requests/open-count';
+
+function LiveSidebar({ role, collapsed }: Readonly<{ role: string; collapsed: boolean }>) {
+  return (
+    <Sidebar role={role} collapsed={collapsed} onToggle={() => {}} nav={useLiveNav(role)} />
+  );
+}
 
 function renderSidebar(role: string, collapsed = false) {
   return render(
     <QueryClientProvider client={testQueryClient()}>
       <MemoryRouter>
-        <Sidebar role={role} collapsed={collapsed} onToggle={() => {}} />
+        <LiveSidebar role={role} collapsed={collapsed} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -134,10 +146,300 @@ describe('Sidebar', () => {
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
-  it('does not render the collapse toggle inside the sidebar (header hosts it instead)', () => {
-    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-    renderSidebar('ADMIN');
-    expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument();
+  it('hosts the collapse control inside the sidebar and reports its state with aria-pressed', async () => {
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed={false} onToggle={onToggle} />
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Admin navigation' });
+    const aside = nav.closest('aside');
+    const collapse = within(aside as HTMLElement).getByRole('button', { name: 'Collapse sidebar' });
+    expect(collapse).toHaveAttribute('aria-pressed', 'false');
+    expect(collapse.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+    await userEvent.click(collapse);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={onToggle} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('shows the Nodi mark, the wordmark and the Admin label as the sidebar brand', () => {
+    render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const brand = screen.getByText('nodi').parentElement as HTMLElement;
+    expect(brand.querySelector('svg.nodi-mark')).not.toBeNull();
+    expect(within(brand).getByText('Admin')).toBeInTheDocument();
+  });
+
+  it('marks the current entry and draws its icon filled, the others regular', () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const current = screen.getByRole('link', { name: /Dashboard/ });
+    expect(current).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /Runs/ })).not.toHaveAttribute('aria-current');
+
+    const filled = renderToStaticMarkup(<SquaresFour weight="fill" />);
+    const regular = renderToStaticMarkup(<SquaresFour weight="regular" />);
+    const markup = current.querySelector('svg')?.innerHTML ?? '';
+    expect(markup).not.toBe('');
+    expect(filled).toContain(markup);
+    expect(regular).not.toContain(markup);
+  });
+
+  it('carries no native title tooltip on any entry, expanded or in the rail', () => {
+    for (const collapsed of [false, true]) {
+      const { container, unmount } = render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed={collapsed} onToggle={() => {}} />
+        </MemoryRouter>,
+      );
+      expect(container.querySelectorAll('[title]')).toHaveLength(0);
+      unmount();
+    }
+  });
+
+  it('gives a disabled rail entry a tooltip that names its coming-soon tag, and no link', () => {
+    render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const entry = screen.getByText('Voice Quota').closest('[aria-disabled]');
+    expect(entry).toHaveAttribute('aria-disabled', 'true');
+    expect(entry?.closest('a')).toBeNull();
+    const tip = (entry as HTMLElement).querySelector('.cortex-admin-nav__tip');
+    expect(tip).toHaveAttribute('data-tip', 'Voice Quota — Coming soon');
+    expect(tip).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('places a rail tooltip at the hovered or focused entry, so it can escape the scrolling list', () => {
+    render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /Runs/ });
+    const tip = link.querySelector<HTMLElement>('.cortex-admin-nav__tip') as HTMLElement;
+    expect(tip.style.top).toBe('');
+    vi.spyOn(link, 'getBoundingClientRect').mockReturnValue({ top: 200, height: 44 } as DOMRect);
+
+    fireEvent.focus(link);
+    expect(tip.style.top).toBe('222px');
+
+    tip.style.top = '';
+    fireEvent.mouseEnter(link);
+    expect(tip.style.top).toBe('222px');
+  });
+
+  it('lets the keyboard reach a disabled rail entry, shows its tooltip there, and keeps it inert', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const entry = screen.getByText('Voice Quota').closest('[aria-disabled]') as HTMLElement;
+    expect(entry).toHaveAttribute('tabindex', '0');
+    const tip = entry.querySelector<HTMLElement>('.cortex-admin-nav__tip') as HTMLElement;
+    vi.spyOn(entry, 'getBoundingClientRect').mockReturnValue({ top: 300, height: 44 } as DOMRect);
+
+    await user.tab();
+    while (document.activeElement !== entry && document.activeElement !== document.body) {
+      await user.tab();
+    }
+    expect(entry).toHaveFocus();
+    expect(tip.style.top).toBe('322px');
+
+    await user.keyboard('{Enter}');
+    await user.click(entry);
+    expect(entry).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('link', { name: /Voice Quota/ })).not.toBeInTheDocument();
+  });
+
+  it('follows the entry with the open rail tooltip when the list scrolls', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /Runs/ });
+    const tip = link.querySelector<HTMLElement>('.cortex-admin-nav__tip') as HTMLElement;
+    const rect = vi.spyOn(link, 'getBoundingClientRect');
+    rect.mockReturnValue({ top: 200, height: 44 } as DOMRect);
+    fireEvent.focus(link);
+    expect(tip.style.top).toBe('222px');
+
+    rect.mockReturnValue({ top: 150, height: 44 } as DOMRect);
+    fireEvent.scroll(container.querySelector('.cortex-admin-nav__groups') as HTMLElement);
+    expect(tip.style.top).toBe('172px');
+  });
+
+  describe('with a count', () => {
+    const SUPPORT: NavGroup[] = [
+      {
+        id: 'support',
+        label: 'common.shell.nav.groups.overview',
+        items: [
+          { label: 'Support', path: '/support', icon: Lifebuoy, action: 'runs.view', badge: 3 },
+          { label: 'Empty', path: '/empty', icon: Lifebuoy, action: 'runs.view', badge: 0 },
+          { label: 'Plain', path: '/plain', icon: Lifebuoy, action: 'runs.view' },
+        ],
+      },
+    ];
+
+    it('shows the number beside an expanded label and reads it as part of the name', () => {
+      render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} nav={SUPPORT} />
+        </MemoryRouter>,
+      );
+      const link = screen.getByRole('link', { name: 'Support, 3' });
+      expect(within(link).getByText('3')).toBeInTheDocument();
+    });
+
+    it('marks the rail icon and words the tooltip and the name as "label, count"', () => {
+      render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed onToggle={() => {}} nav={SUPPORT} />
+        </MemoryRouter>,
+      );
+      const link = screen.getByRole('link', { name: 'Support, 3' });
+      expect(link.querySelector('.cortex-admin-nav__badge')).not.toBeNull();
+      const tip = link.querySelector('.cortex-admin-nav__tip');
+      expect(tip).toHaveAttribute('data-tip', 'Support, 3');
+      expect(tip).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('shows nothing for a zero or an absent count', () => {
+      const { container } = render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} nav={SUPPORT} />
+        </MemoryRouter>,
+      );
+      for (const name of ['Empty', 'Plain']) {
+        const link = screen.getByRole('link', { name });
+        expect(link.querySelector('.cortex-admin-nav__badge')).toBeNull();
+        expect(link).not.toHaveAttribute('aria-label');
+      }
+      expect(container.querySelectorAll('.cortex-admin-nav__badge')).toHaveLength(1);
+    });
+  });
+
+  describe('as a drawer below 1024px', () => {
+    const showModalDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLDialogElement.prototype,
+      'showModal',
+    );
+    const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+
+    beforeEach(() => {
+      Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+        configurable: true,
+        value(this: HTMLDialogElement) {
+          this.setAttribute('open', '');
+        },
+      });
+      Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+        configurable: true,
+        value(this: HTMLDialogElement) {
+          this.removeAttribute('open');
+          this.dispatchEvent(new Event('close'));
+        },
+      });
+    });
+    afterEach(() => {
+      for (const [name, descriptor] of [
+        ['showModal', showModalDescriptor],
+        ['close', closeDescriptor],
+      ] as const) {
+        if (descriptor) {
+          Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
+        } else {
+          Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+        }
+      }
+    });
+
+    it('opens as a modal dialog holding the full navigation, with no collapse control', () => {
+      stubMatchMedia(false);
+      render(
+        <MemoryRouter>
+          <Sidebar role="ADMIN" collapsed onToggle={() => {}} drawerOpen onDrawerClose={() => {}} />
+        </MemoryRouter>,
+      );
+      const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });
+      expect(dialog).toHaveAttribute('open');
+      expect(within(dialog).getByRole('link', { name: /Users/ })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /sidebar/ })).not.toBeInTheDocument();
+      expect(dialog).not.toHaveClass('cortex-admin-nav--collapsed');
+    });
+
+    it('renders an aside, not a dialog, once the viewport reaches 1024px', () => {
+      stubMatchMedia(true);
+      const { container } = render(
+        <MemoryRouter>
+          <Sidebar
+            role="ADMIN"
+            collapsed={false}
+            onToggle={() => {}}
+            drawerOpen
+            onDrawerClose={() => {}}
+          />
+        </MemoryRouter>,
+      );
+      expect(container.querySelector('dialog')).toBeNull();
+      expect(container.querySelector('aside')).not.toBeNull();
+    });
+
+    it('closes on choosing an entry, on Escape and on a backdrop click, not on an inner click', async () => {
+      stubMatchMedia(false);
+      const onDrawerClose = vi.fn();
+      render(
+        <MemoryRouter>
+          <Sidebar
+            role="ADMIN"
+            collapsed={false}
+            onToggle={() => {}}
+            drawerOpen
+            onDrawerClose={onDrawerClose}
+          />
+        </MemoryRouter>,
+      );
+      const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });
+
+      await userEvent.click(within(dialog).getByText('Users'));
+      expect(dialog).not.toHaveAttribute('open');
+      expect(onDrawerClose).toHaveBeenCalledTimes(1);
+
+      dialog.setAttribute('open', '');
+      fireEvent.click(within(dialog).getByRole('navigation'));
+      expect(dialog).toHaveAttribute('open');
+
+      fireEvent.click(dialog);
+      expect(dialog).not.toHaveAttribute('open');
+      expect(onDrawerClose).toHaveBeenCalledTimes(2);
+
+      dialog.setAttribute('open', '');
+      fireEvent(dialog, new Event('close'));
+      expect(onDrawerClose).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('in Vietnamese', () => {
@@ -163,7 +465,11 @@ describe('Sidebar', () => {
 
       const voice = screen.getByText(nav.items.voiceQuota).closest('[aria-disabled]');
       expect(voice).toHaveTextContent(nav.comingSoon);
-      expect(voice).toHaveAttribute('title', `${nav.items.voiceQuota} — ${nav.comingSoon}`);
+      expect(voice).not.toHaveAttribute('title');
+      expect(voice?.querySelector('.cortex-admin-nav__tip')).toHaveAttribute(
+        'data-tip',
+        `${nav.items.voiceQuota} — ${nav.comingSoon}`,
+      );
       expect(voice?.querySelector('.cortex-admin-nav__visually-hidden')).toHaveTextContent(
         nav.unavailable,
       );

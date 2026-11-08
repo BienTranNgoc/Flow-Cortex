@@ -12,7 +12,7 @@ function rule(css: string, selector: string): string {
 describe('colour scheme', () => {
   it('declares a dark default via tokens', () => {
     const tokens = read('../styles/tokens.css');
-    expect(tokens).toMatch(/--admin-paper:\s*#080c13;/);
+    expect(tokens).toMatch(/--admin-paper:\s*#0f1113;/);
   });
 
   it('paints its own page background and button surface from tokens', () => {

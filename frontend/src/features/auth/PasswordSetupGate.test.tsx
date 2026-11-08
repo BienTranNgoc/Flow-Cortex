@@ -61,6 +61,17 @@ describe('PasswordSetupGate', () => {
     expect(await screen.findByText('Workspace')).toBeInTheDocument();
   });
 
+  it('shows the session check in a flat status region while /me is pending', () => {
+    stubApi({ 'GET /api/v1/auth/me': () => new Promise<never>(() => {}) });
+
+    renderGated();
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Checking your session…');
+    expect(status).toHaveClass('session-status');
+    expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -74,7 +85,9 @@ describe('PasswordSetupGate', () => {
 
       renderGated();
 
-      expect(await screen.findByText('Đang kiểm tra phiên đăng nhập…')).toBeInTheDocument();
+      const status = await screen.findByRole('status');
+      expect(status).toHaveTextContent('Đang kiểm tra phiên đăng nhập…');
+      expect(status).toHaveClass('session-status');
       expect(screen.queryByText('Workspace')).not.toBeInTheDocument();
     });
   });

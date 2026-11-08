@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
 import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { accountStatsEnabled } from '../../app/featureFlags';
+import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
@@ -49,29 +50,29 @@ export function ProfilePage() {
 
   if (meQuery.isLoading) {
     return (
-      <main className="profile-page">
+      <div className="profile-page">
         <output>{t('auth.profile.loading')}</output>
-      </main>
+      </div>
     );
   }
   if (meQuery.isError) {
     return (
-      <main className="profile-page">
-        <h1>{t('auth.profile.title')}</h1>
+      <div className="profile-page">
+        <PageHeading title={t('auth.profile.title')} />
         <p role="alert" className="form-error">
           {t('auth.profile.loadError')}{' '}
           <button type="button" onClick={() => void meQuery.refetch()}>
             {t('auth.profile.retry')}
           </button>
         </p>
-      </main>
+      </div>
     );
   }
   if (!meQuery.data) {
     return (
-      <main className="profile-page">
+      <div className="profile-page">
         <output>{t('auth.profile.loading')}</output>
-      </main>
+      </div>
     );
   }
 
@@ -83,12 +84,8 @@ export function ProfilePage() {
   const serverError = failureMessage(updateMutation, t);
 
   return (
-    <main className="profile-page">
-      <header className="profile-page__header">
-        <p className="eyebrow">{t('auth.profile.eyebrow')}</p>
-        <h1>{t('auth.profile.headline')}</h1>
-        <p className="profile-page__subtitle">{t('auth.profile.subtitle')}</p>
-      </header>
+    <div className="profile-page">
+      <PageHeading title={t('auth.profile.headline')} lede={t('auth.profile.subtitle')} />
 
       <div className="profile-grid">
         {/* Left card — identity */}
@@ -98,7 +95,6 @@ export function ProfilePage() {
         >
           <div className="profile-avatar" aria-hidden="true">
             <span>{initials}</span>
-            <span className="profile-avatar__pulse" />
           </div>
 
           <div className="profile-identity__text">
@@ -240,6 +236,6 @@ export function ProfilePage() {
           )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -18,6 +18,7 @@ import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
@@ -89,6 +90,35 @@ class WorkflowRunServiceImplTest {
                     ResponseStatusException status = (ResponseStatusException) e;
                     assertThat(status.getStatusCode().value()).isEqualTo(503);
                     assertThat(english(status)).isEqualTo("Media engine is currently disabled");
+                });
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void aDubStepWhileDubbingIsUnavailableIsRefusedBeforeTheCreditGuardAndCreatesNothing() {
+        StepExecutor translate = mock(StepExecutor.class);
+        when(translate.type()).thenReturn("translate");
+        when(translate.mode()).thenReturn(StepExecutor.Mode.INLINE);
+        when(translate.available()).thenReturn(false);
+        RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
+            throw new IllegalStateException("the credit guard must not be consulted");
+        };
+        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
+                workflowRunRepository, runStepRepository, events, new StepExecutorRegistry(List.of(translate)),
+                mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
+                new RunStartGuards(List.of(creditGuard)), true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "translate");
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), "hi"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> {
+                    ResponseStatusException status = (ResponseStatusException) e;
+                    assertThat(status.getStatusCode().value()).isEqualTo(503);
+                    assertThat(status.getBody().getProperties()).containsEntry("code", "dub_disabled");
+                    assertThat(english(status)).isEqualTo("Vietnamese dubbing is currently disabled");
                 });
 
         verify(workflowRunRepository, never()).save(any());
@@ -372,5 +402,41 @@ class WorkflowRunServiceImplTest {
 
         assertThat(view.id()).isEqualTo(run.getId());
         assertThat(view.steps()).hasSize(1);
+    }
+
+    /** A completed step 7 of a run of {@code ownerId} that recorded {@code voice.wav} in {@code bucket}. */
+    private WorkflowRun givenRecordedOutput(UUID ownerId, String bucket) {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), ownerId, "in", Instant.now());
+        RunStep step = new RunStep(UUID.randomUUID(), run.getId(), (short) 7, "tts");
+        step.markRunning(Instant.now());
+        step.markCompleted("in", "{}", Instant.now(), "[{\"name\":\"voice.wav\",\"bucket\":\"" + bucket
+                + "\",\"objectKey\":\"runs/" + run.getId() + "/steps/7/voice.wav\",\"mime\":\"audio/wav\",\"bytes\":4}]");
+        when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.of(run));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(run.getId())).thenReturn(List.of(step));
+        return run;
+    }
+
+    @Test
+    void anOutputInABucketThatIsNotDownloadableIsNotFoundAndNothingIsSigned() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenRecordedOutput(ownerId, "flowcortex-uploads");
+        when(mediaJobs.isDownloadable("flowcortex-uploads")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 7, "voice.wav"))
+                .isInstanceOf(NotFoundException.class);
+        verify(mediaJobs, never()).presignedGet(any(), any(), any());
+    }
+
+    @Test
+    void aSigningFaultOnADownloadableOutputIsNotTurnedIntoNotFound() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenRecordedOutput(ownerId, "flowcortex-media");
+        when(mediaJobs.isDownloadable("flowcortex-media")).thenReturn(true);
+        when(mediaJobs.presignedGet(any(), any(), any())).thenThrow(new IllegalArgumentException("Not a plain file name"));
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 7, "voice.wav"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -37,9 +37,16 @@ class RunRequestConstraintMessagesTest {
     void aStartRunRequestKeepsTodaysCustomSentences() {
         UUID upload = UUID.randomUUID();
 
-        assertThat(englishErrors(new StartRunRequest(null, upload, List.of(upload, upload), null, null)))
+        assertThat(englishErrors(new StartRunRequest(null, upload, List.of(upload, upload), null, null, null)))
                 .containsEntry("uploadSelectionUnambiguous", "Use uploadId or uploadIds, not both")
                 .containsEntry("uploadOrderDistinct", "uploadIds must not contain duplicates");
+    }
+
+    @Test
+    void anUnknownVoiceResolvesTheBundleKeyOfTheNestedPath() {
+        StartRunRequest request = new StartRunRequest(null, null, null, null, new RunOptionsRequest("robot"), null);
+
+        assertThat(englishErrors(request)).containsOnly(Map.entry("options.voice", "Voice must be female or male"));
     }
 
     @Test

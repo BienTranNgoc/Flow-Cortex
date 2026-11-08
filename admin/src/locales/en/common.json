@@ -20,7 +20,6 @@
   },
   "header": {
     "title": "Flow-Cortex Admin",
-    "homeLink": "FlowCortex admin home",
     "console": "Admin console"
   },
   "account": {
@@ -40,10 +39,12 @@
   },
   "shell": {
     "noPage": "No page is available to this account.",
+    "brandAdmin": "Admin",
     "nav": {
       "label": "Admin navigation",
-      "menu": "Menu",
-      "hideMenu": "Hide menu",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "withCount": "{{label}}, {{count}}",
       "expand": "Expand sidebar",
       "collapse": "Collapse sidebar",
       "comingSoon": "Coming soon",

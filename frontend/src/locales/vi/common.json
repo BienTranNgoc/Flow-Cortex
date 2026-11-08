@@ -37,6 +37,13 @@
     "runs": "Lượt chạy",
     "integrations": "Tích hợp",
     "docs": "Tài liệu",
+    "docsGroup": "Các mục tài liệu",
+    "brand": "nodi",
+    "menu": "Menu",
+    "openMenu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "collapse": "Thu gọn thanh bên",
+    "expand": "Mở rộng thanh bên",
     "credits": "{{amount}} Credit",
     "signOut": "Đăng xuất"
   },
@@ -52,7 +59,14 @@
     "helpDocs": "Trợ giúp và tài liệu",
     "signingOut": "Đang đăng xuất…"
   },
+  "state": {
+    "retry": "Thử lại",
+    "empty": "Chưa có quy trình nào.",
+    "noMatch": "Không có quy trình nào khớp với tìm kiếm của bạn.",
+    "clearFilters": "Xóa bộ lọc"
+  },
   "shell": {
+    "skipToContent": "Chuyển đến nội dung",
     "brandPanel": {
       "headline": "<highlight>Studio</highlight> media AI của bạn cho các quy trình chuẩn sản xuất.",
       "lede": "Lấy nguồn, xử lý, duyệt và xuất media chỉ với một cú nhấp — dành cho nhà sáng tạo cần đầu ra ổn định, chứ không phải một công cụ cho vui.",
@@ -69,17 +83,10 @@
   "home": {
     "loading": "Đang tải…",
     "loadProfileError": "Không tải được hồ sơ của bạn.",
-    "retry": "Thử lại",
-    "eyebrow": "KHÔNG GIAN SÁNG TẠO · SẴN SÀNG BẮT ĐẦU",
-    "headline": "<accent>Studio</accent> <strong>media AI của bạn</strong>",
     "lede": "Một cú nhấp khởi chạy quy trình sẵn sàng cho sản xuất: lấy nguồn, xử lý, duyệt, xuất.",
     "pickTitle": "Chọn một quy trình",
     "viewAll": "Xem tất cả quy trình",
-    "loadingWorkflows": "Đang tải quy trình…",
     "loadWorkflowsError": "Không tải được danh sách quy trình.",
-    "noMatch": "Không có quy trình nào khớp với bộ lọc của bạn.",
-    "clearFilters": "Xóa bộ lọc",
-    "empty": "Chưa có quy trình nào.",
     "stagesTitle": "Cách Flow-Cortex xử lý các lượt chạy video của bạn",
     "stages": {
       "source": {
@@ -99,15 +106,14 @@
         "body": "Tải xuống kết quả hoàn chỉnh khi nó vẫn còn trong thời hạn lưu giữ tệp."
       }
     },
-    "welcome": "Chào mừng, {{name}}",
-    "manageProfile": "Quản lý hồ sơ của bạn"
+    "greeting": "Xin chào, {{name}}",
+    "greetingNoName": "Xin chào",
+    "start": "Bắt đầu workflow",
+    "readGuide": "Đọc hướng dẫn"
   },
   "docs": {
-    "eyebrow": "TÀI LIỆU",
     "title": "Cách FlowCortex hoạt động",
     "subtitle": "Hướng dẫn khái niệm, hướng dẫn từng bước và toàn bộ HTTP API cho các quy trình bạn xây dựng.",
-    "sectionsLabel": "Các mục tài liệu",
-    "menuHint": "Xem toàn bộ tài liệu tham khảo API →",
     "tabs": {
       "overview": "Tổng quan",
       "api": "Tài liệu tham khảo API",
@@ -138,7 +144,6 @@
     }
   },
   "runs": {
-    "eyebrow": "LỊCH SỬ LƯỢT CHẠY",
     "title": "Lượt chạy gần đây",
     "subtitle": "Theo dõi mọi quy trình bạn đã khởi chạy: lượt nào đang chạy, lượt nào cần bạn duyệt và lượt nào thất bại.",
     "searchPlaceholder": "Tìm theo tên quy trình…",
@@ -171,7 +176,6 @@
     "demoFailure": "Bước \"throw\" thất bại: lỗi cố ý để kiểm thử."
   },
   "integrations": {
-    "eyebrow": "DỊCH VỤ ĐÃ KẾT NỐI",
     "title": "Tích hợp",
     "subtitle": "Kết nối các nhà cung cấp AI và tài khoản mạng xã hội mà quy trình của bạn cần. Khóa được lưu trong tài khoản của bạn và dùng lại cho mọi lượt chạy.",
     "tabsLegend": "Nhóm tích hợp",

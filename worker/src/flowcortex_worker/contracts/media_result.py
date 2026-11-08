@@ -44,6 +44,8 @@ class MediaError(BaseModel):
             "provider_response_invalid",
             "contract_violation",
             "run_timeout",
+            "duration_exceeded",
+            "no_audio_stream",
         ],
         Field(title="MediaErrorCode"),
     ]

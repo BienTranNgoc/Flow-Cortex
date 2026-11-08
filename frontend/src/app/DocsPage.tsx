@@ -1,16 +1,10 @@
-import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { demoPagesEnabled } from './featureFlags';
+import { PageHeading } from './PageHeading';
 import './DocsPage.css';
 
 type Tab = 'overview' | 'api' | 'guides';
-
-const TABS: ReadonlyArray<{ id: Tab; labelKey: string; to: string }> = [
-  { id: 'overview', labelKey: 'common.docs.tabs.overview', to: '/docs' },
-  { id: 'api', labelKey: 'common.docs.tabs.api', to: '/docs/api' },
-  { id: 'guides', labelKey: 'common.docs.tabs.guides', to: '/docs/guides' },
-];
 
 const AUTH_SNIPPET = `POST /api/v1/auth/login
 Content-Type: application/json
@@ -32,51 +26,22 @@ export interface DocsPageProps {
   readonly initialTab?: 'api' | 'guides';
 }
 
-const TAB_FROM_INITIAL: Record<NonNullable<DocsPageProps['initialTab']>, Tab> = {
-  api: 'api',
-  guides: 'guides',
-};
+const LEGACY_TAB_PATH: Record<string, string> = { api: '/docs/api', guides: '/docs/guides' };
 
 export function DocsPage({ initialTab }: Readonly<DocsPageProps>) {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const urlTab = (searchParams.get('tab') as Tab | null) ?? null;
-  const [local, setLocal] = useState<Tab | null>(initialTab ? TAB_FROM_INITIAL[initialTab] : null);
-  const active: Tab = urlTab ?? local ?? 'overview';
+  const [searchParams] = useSearchParams();
+  const legacyPath = LEGACY_TAB_PATH[searchParams.get('tab') ?? ''];
+  const active: Tab = initialTab ?? 'overview';
   const showDemoPages = demoPagesEnabled();
 
-  const onSelect = (next: Tab) => {
-    setLocal(null);
-    const params = new URLSearchParams(searchParams);
-    if (next === 'overview') {
-      params.delete('tab');
-    } else {
-      params.set('tab', next);
-    }
-    setSearchParams(params, { replace: true });
-  };
+  if (legacyPath) {
+    return <Navigate to={legacyPath} replace />;
+  }
 
   return (
-    <main className="docs-page">
-      <header className="docs-page__header">
-        <p className="eyebrow">{t('common.docs.eyebrow')}</p>
-        <h1>{t('common.docs.title')}</h1>
-        <p className="docs-page__subtitle">{t('common.docs.subtitle')}</p>
-      </header>
-
-      <nav className="docs-page__nav" aria-label={t('common.docs.sectionsLabel')}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`docs-page__nav-link${active === tab.id ? ' is-active' : ''}`}
-            aria-current={active === tab.id ? 'page' : undefined}
-            onClick={() => onSelect(tab.id)}
-          >
-            {t(tab.labelKey)}
-          </button>
-        ))}
-      </nav>
+    <div className="docs-page">
+      <PageHeading title={t('common.docs.title')} lede={t('common.docs.subtitle')} />
 
       {active === 'overview' && (
         <section className="docs-page__section">
@@ -145,6 +110,6 @@ export function DocsPage({ initialTab }: Readonly<DocsPageProps>) {
           </ul>
         </section>
       )}
-    </main>
+    </div>
   );
 }

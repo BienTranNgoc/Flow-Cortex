@@ -15,6 +15,12 @@ interface StepExecutor {
         REMOTE
     }
 
+    /** Which thread pool an inline step runs on; a step that waits on a provider must not hold a shared thread. */
+    enum Pool {
+        SHARED,
+        PROVIDER
+    }
+
     enum InputPolicy {
         RESOLVED,
         STORED,
@@ -24,6 +30,11 @@ interface StepExecutor {
     String type();
 
     Mode mode();
+
+    /** Only read for an {@link Mode#INLINE} step. */
+    default Pool pool() {
+        return Pool.SHARED;
+    }
 
     /** Stored policies are reserved for media assets snapshotted when the run starts. */
     default InputPolicy inputPolicy() {
@@ -45,6 +56,11 @@ interface StepExecutor {
     /** How long a claimed step may wait for pickup. An inline step is picked up by a local thread, so the lease bounds it. */
     default Duration queueTimeout(Duration lease) {
         return lease;
+    }
+
+    /** Whether this step type may run now; a workflow with a step that may not is refused at start. */
+    default boolean available() {
+        return true;
     }
 
     String execute(StepContext context);

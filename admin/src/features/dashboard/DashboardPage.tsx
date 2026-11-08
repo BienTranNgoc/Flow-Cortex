@@ -1,7 +1,7 @@
 import { ListAdminRunsStatus } from '@flow-cortex/api-client';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { ArrowsClockwise } from '@phosphor-icons/react';
 import { EmptyState } from '../../app/EmptyState';
 import { MetricCard } from '../../app/MetricCard';
 import { PageHeading } from '../../app/PageHeading';
@@ -77,7 +77,7 @@ export function DashboardPage() {
             onClick={refresh}
             disabled={isRefreshing}
           >
-            <RefreshCw size={16} aria-hidden="true" />
+            <ArrowsClockwise size={16} aria-hidden="true" />
             <span>{isRefreshing ? t('dashboard.refreshing') : t('dashboard.refresh')}</span>
           </button>
         }

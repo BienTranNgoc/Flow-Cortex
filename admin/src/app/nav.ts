@@ -1,37 +1,38 @@
-import type { LucideIcon } from 'lucide-react';
 import {
-  Activity,
-  AudioWaveform,
   BookOpen,
-  Boxes,
-  ClipboardList,
+  ChatText,
+  ClipboardText,
   Coins,
   Cpu,
+  Cube,
+  GearSix,
   Headset,
-  LayoutDashboard,
-  Layers,
   ListChecks,
-  MessageSquare,
   Play,
-  Settings2,
+  Pulse,
   ShieldCheck,
-  Sparkles,
+  Sparkle,
+  SquaresFour,
+  Stack,
   Users,
-} from 'lucide-react';
+  Waveform,
+  type Icon,
+} from '@phosphor-icons/react';
 import { can, type Action } from './permissions';
 
-/** A live count the sidebar shows beside an entry. */
-export type NavBadge = 'openSupportRequests';
+/** A live source `useLiveNav` reads into an entry's `badge`; it also picks the count's wording. */
+export type NavLiveCount = 'openSupportRequests';
 
-/** `label` and `tag` are i18n keys; the sidebar translates them. */
+/** `label` and `tag` are i18n keys; the sidebar translates them. A `badge` above 0 shows a count. */
 export interface NavItem {
   label: string;
   path: string;
-  icon: LucideIcon;
+  icon: Icon;
   action: Action;
   disabled?: boolean;
   tag?: string;
-  badge?: NavBadge;
+  badge?: number;
+  liveCount?: NavLiveCount;
 }
 
 export interface NavGroup {
@@ -50,7 +51,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.dashboard',
         path: '/dashboard',
-        icon: LayoutDashboard,
+        icon: SquaresFour,
         action: 'runs.view',
       },
     ],
@@ -62,7 +63,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.workflows',
         path: '/workflows',
-        icon: Boxes,
+        icon: Cube,
         action: 'workflows.view',
         disabled: true,
         tag: COMING_SOON,
@@ -108,13 +109,13 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.smsOutbox',
         path: '/sms-outbox',
-        icon: MessageSquare,
+        icon: ChatText,
         action: 'users.manage',
       },
       {
         label: 'common.shell.nav.items.features',
         path: '/features',
-        icon: Settings2,
+        icon: GearSix,
         action: 'features.toggle',
         disabled: true,
         tag: COMING_SOON,
@@ -122,7 +123,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.auditLog',
         path: '/audit',
-        icon: ClipboardList,
+        icon: ClipboardText,
         action: 'audit.view',
         disabled: true,
         tag: COMING_SOON,
@@ -136,13 +137,13 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.mediaJobs',
         path: '/media-jobs',
-        icon: Activity,
+        icon: Pulse,
         action: 'mediaJobs.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',
         path: '/voice-quota',
-        icon: AudioWaveform,
+        icon: Waveform,
         action: 'voice.view',
         disabled: true,
         tag: COMING_SOON,
@@ -170,7 +171,7 @@ export const NAV: NavGroup[] = [
       {
         label: 'common.shell.nav.items.supportGroups',
         path: '/support/groups',
-        icon: Layers,
+        icon: Stack,
         action: 'support.manage',
       },
       {
@@ -178,12 +179,12 @@ export const NAV: NavGroup[] = [
         path: '/support/requests',
         icon: Headset,
         action: 'support.manage',
-        badge: 'openSupportRequests',
+        liveCount: 'openSupportRequests',
       },
       {
         label: 'common.shell.nav.items.supportSettings',
         path: '/support/settings',
-        icon: Sparkles,
+        icon: Sparkle,
         action: 'support.manage',
       },
     ],

@@ -77,6 +77,71 @@ describe('RequireAdminApp', () => {
     expect(calls.filter((call) => call.path === '/api/v1/auth/refresh')).toHaveLength(1);
   });
 
+  it('announces the session check in a flat status region until the refresh answers', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    stubApi({
+      'POST /api/v1/auth/refresh': async () => {
+        await gate;
+        return { status: 401, body: { status: 401 } };
+      },
+    });
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <Routes>
+            <Route
+              path="/runs"
+              element={
+                <RequireAdminApp>
+                  <p>admin content</p>
+                </RequireAdminApp>
+              }
+            />
+            <Route path="/login" element={<p>login page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Checking your session…');
+    expect(status).toHaveClass('cortex-admin-session-status');
+    release();
+    expect(await screen.findByText('login page')).toBeInTheDocument();
+  });
+
+  it('announces the account check in a flat status region until /me answers', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    stubApi({
+      'GET /api/v1/auth/me': async () => {
+        await gate;
+        return { status: 200, body: ADMIN_ME };
+      },
+    });
+    setToken('admin-token-pending', true);
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <RequireAdminApp>
+            <p>admin content</p>
+          </RequireAdminApp>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Checking your account…');
+    expect(status).toHaveClass('cortex-admin-session-status');
+    release();
+    expect(await screen.findByText('admin content')).toBeInTheDocument();
+  });
+
   it('calls the logout endpoint on sign-out', async () => {
     const calls = stubApi({
       'GET /api/v1/auth/me': { status: 200, body: MEMBER_ME },
