@@ -40,6 +40,10 @@ class ConnectorEncryptionConfig {
             throw new IllegalStateException("No connector encryption key is set. Set " + KEYS_SETTING
                     + "<ID> (32 random bytes in base64) for every key id, including " + current + ".");
         }
+        if (!KEY_ID.matcher(current).matches()) {
+            throw new IllegalStateException(CURRENT_SETTING + " '" + current + "' must match "
+                    + KEY_ID.pattern() + "; key ids are lower-case (" + KEYS_SETTING + "K1 is id k1).");
+        }
         Map<String, SecretKey> ring = new LinkedHashMap<>();
         keys.forEach((id, value) -> ring.put(id, parseKey(id, value)));
         if (!ring.containsKey(current)) {

@@ -48,6 +48,15 @@ class ConnectorEncryptionKeyTest {
     }
 
     @Test
+    void upperCaseCurrentIdIsRefusedWithALowerCaseHint() {
+        assertThatThrownBy(() -> ConnectorEncryptionConfig.buildCipher("K1", Map.of("k1", key(32))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT 'K1'")
+                .hasMessageContaining("[a-z0-9]{1,16}")
+                .hasMessageContaining("lower-case");
+    }
+
+    @Test
     void blankNonCurrentKeyNamesItsId() {
         assertThatThrownBy(() -> ConnectorEncryptionConfig.buildCipher("k1", Map.of("k1", key(32), "k0", " ")))
                 .isInstanceOf(IllegalStateException.class)
