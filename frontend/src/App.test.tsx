@@ -80,7 +80,7 @@ describe('App', () => {
   it('shows the fallback with its Reload button when the sign-in page throws', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     loginPage.throws = true;
-    stubApi({});
+    stubApi(FEATURES_OFF);
     window.history.pushState({}, '', '/login');
 
     render(<App />);

@@ -28,6 +28,8 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.Tag;
+import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.TaggingDirective;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -44,7 +46,8 @@ public class S3MediaStore implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(S3MediaStore.class);
     /** Signed, but set by the browser itself; a script may not set them. */
     private static final Set<String> SET_BY_THE_BROWSER = Set.of("host", "content-length");
-    static final String RUN_INPUT_TAG = "flowcortex-retention=run-input";
+    private static final String RETENTION_TAG_KEY = "flowcortex-retention";
+    static final String RUN_INPUT_TAG = RETENTION_TAG_KEY + "=run-input";
 
     private final S3Client client;
     private final S3Presigner presigner;
@@ -144,11 +147,30 @@ public class S3MediaStore implements AutoCloseable {
      * @throws UploadRejectedException on field {@code uploadIds} if the upload is gone
      */
     public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        copyTagged(sourceBucket, sourceKey, targetBucket, targetKey, RUN_INPUT_TAG);
+    }
+
+    /** As {@link #copy(String, String, String, String)}, but the copy carries only {@code flowcortex-retention=<retention>}. */
+    public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey,
+            String retention) {
+        copyTagged(sourceBucket, sourceKey, targetBucket, targetKey, RETENTION_TAG_KEY + "=" + retention);
+    }
+
+    /** Replaces every tag of the object with {@code flowcortex-retention=<retention>}. */
+    public void retag(String bucket, String key, String retention) {
+        client.putObjectTagging(request -> request.bucket(bucket).key(key)
+                .tagging(Tagging.builder()
+                        .tagSet(Tag.builder().key(RETENTION_TAG_KEY).value(retention).build())
+                        .build()));
+    }
+
+    private void copyTagged(String sourceBucket, String sourceKey, String targetBucket, String targetKey,
+            String tagging) {
         try {
             client.copyObject(request -> request
                     .sourceBucket(sourceBucket).sourceKey(sourceKey)
                     .destinationBucket(targetBucket).destinationKey(targetKey)
-                    .tagging(RUN_INPUT_TAG)
+                    .tagging(tagging)
                     .taggingDirective(TaggingDirective.REPLACE)
                     .overrideConfiguration(timeouts -> timeouts
                             .apiCallTimeout(copyTimeout)

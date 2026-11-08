@@ -9,6 +9,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
+import com.flowcortex.media.api.StoredAttachment;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.provider.ProviderJobPayload;
 import com.flowcortex.media.api.UploadGrant;
@@ -51,6 +52,10 @@ class MediaJobsImpl implements MediaJobs {
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
+    private static final String ATTACHMENT_PREFIX = "support/";
+    /** Retention tag values the media bucket's lifecycle rules key on: pending expires, attachment is kept. */
+    private static final String SUPPORT_PENDING = "support-pending";
+    private static final String SUPPORT_ATTACHMENT = "support-attachment";
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -222,6 +227,110 @@ class MediaJobsImpl implements MediaJobs {
                     new MediaJobInput(source.key(), properties.s3().bucket(), targetKey)));
         }
         return List.copyOf(copies);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes) {
+        if (keyPrefix == null || !keyPrefix.startsWith(ATTACHMENT_PREFIX) || keyPrefix.endsWith("/")) {
+            throw new IllegalArgumentException("Attachments are kept only under " + ATTACHMENT_PREFIX + ": "
+                    + keyPrefix);
+        }
+        if (inputs == null || inputs.isEmpty() || inputs.size() > 10) {
+            throw new IllegalArgumentException("Keep between 1 and 10 attachments");
+        }
+        List<MediaAsset> sources = new java.util.ArrayList<>();
+        for (MediaAssetInput input : inputs) {
+            MediaAsset asset = assets.findById(input.assetId())
+                    .orElseThrow(() -> new IllegalStateException("Attachment is not registered: " + input.assetId()));
+            if (!"image".equals(asset.getKind()) || asset.getBytes() > maxBytes) {
+                LOG.info("Attachment refused: asset={} kind={} bytes={} max={}", asset.getId(), asset.getKind(),
+                        asset.getBytes(), maxBytes);
+                throw new UploadRejectedException("uploadIds",
+                        new LocalizedMessage("upload.attachmentSize", maxBytes));
+            }
+            sources.add(asset);
+        }
+        String bucket = properties.s3().bucket();
+        List<StoredAttachment> kept = new java.util.ArrayList<>();
+        for (int index = 0; index < inputs.size(); index++) {
+            MediaJobInput source = inputs.get(index).input();
+            String targetKey = keyPrefix + "/" + (index + 1);
+            store.copy(source.bucket(), source.objectKey(), bucket, targetKey, SUPPORT_PENDING);
+            if (properties.upload().contentCheck().enabled()) {
+                byte[] prefix = store.readPrefix(bucket, targetKey, ContentSniffer.PREFIX_LENGTH)
+                        .orElseThrow(() -> refusedAttachment(bucket, targetKey, "gone before the content check"));
+                if (!ContentSniffer.matches("image", prefix)) {
+                    throw refusedAttachment(bucket, targetKey, "content is not image");
+                }
+                if (!sniffedImageType(prefix).equals(sources.get(index).getMimeType())) {
+                    throw refusedAttachment(bucket, targetKey, "content is not " + sources.get(index).getMimeType());
+                }
+            }
+            MediaAsset asset = sources.get(index);
+            kept.add(new StoredAttachment(bucket, targetKey, asset.getMimeType(), asset.getBytes()));
+        }
+        List<StoredAttachment> retagged = new java.util.ArrayList<>();
+        try {
+            for (StoredAttachment attachment : kept) {
+                store.retag(bucket, attachment.objectKey(), SUPPORT_ATTACHMENT);
+                retagged.add(attachment);
+            }
+        } catch (RuntimeException e) {
+            try {
+                releaseAttachments(retagged);
+            } catch (RuntimeException release) {
+                e.addSuppressed(release);
+            }
+            throw e;
+        }
+        return List.copyOf(kept);
+    }
+
+    @Override
+    public void releaseAttachments(List<StoredAttachment> attachments) {
+        String bucket = properties.s3().bucket();
+        for (StoredAttachment attachment : attachments) {
+            if (!bucket.equals(attachment.bucket()) || !attachment.objectKey().startsWith(ATTACHMENT_PREFIX)) {
+                throw new IllegalArgumentException("Not a kept attachment: " + attachment.bucket() + "/"
+                        + attachment.objectKey());
+            }
+        }
+        RuntimeException first = null;
+        for (StoredAttachment attachment : attachments) {
+            try {
+                store.retag(bucket, attachment.objectKey(), SUPPORT_PENDING);
+                LOG.info("Attachment released: bucket={} key={}", bucket, attachment.objectKey());
+            } catch (RuntimeException e) {
+                LOG.warn("Attachment release failed: bucket={} key={} error={}", bucket, attachment.objectKey(),
+                        e.getClass().getSimpleName());
+                if (first == null) {
+                    first = e;
+                } else {
+                    first.addSuppressed(e);
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
+    }
+
+    /** The MIME type of an image prefix {@link ContentSniffer} already accepted as an image. */
+    private static String sniffedImageType(byte[] prefix) {
+        if (prefix[0] == (byte) 0x89) {
+            return "image/png";
+        }
+        if (prefix[0] == (byte) 0xFF) {
+            return "image/jpeg";
+        }
+        return "image/webp";
+    }
+
+    /** The refused copy keeps its pending tag and expires; the backend may not delete in the media bucket. */
+    private static UploadRejectedException refusedAttachment(String bucket, String key, String reason) {
+        LOG.info("Attachment refused: bucket={} key={} reason={}", bucket, key, reason);
+        return new UploadRejectedException("uploadIds", new LocalizedMessage("upload.attachmentNotImage"));
     }
 
     @Override

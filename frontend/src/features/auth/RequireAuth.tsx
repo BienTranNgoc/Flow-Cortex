@@ -20,7 +20,7 @@ export function RequireAuth({ children }: Readonly<{ children: ReactNode }>) {
     return <SessionStatus>{t('auth.session.checking')}</SessionStatus>;
   }
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
   return <>{children}</>;
 }

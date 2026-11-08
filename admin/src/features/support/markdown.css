@@ -1,0 +1,10 @@
+.support-markdown a {
+  color: var(--admin-primary);
+}
+
+.support-markdown pre {
+  overflow-x: auto;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--admin-paper);
+}

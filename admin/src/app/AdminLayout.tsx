@@ -17,6 +17,7 @@ import { roleLabel } from '../features/users/enumLabels';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { Sidebar } from './Sidebar';
 import { useIsDesktop } from './useIsDesktop';
+import { useLiveNav } from './useLiveNav';
 import { useTheme } from './useTheme';
 
 const SIDEBAR_COLLAPSED_KEY = 'flow-cortex:admin:sidebar:collapsed';
@@ -35,6 +36,7 @@ function readCollapsed(): boolean {
  */
 export function AdminLayout() {
   const me = useMeQuery().data;
+  const nav = useLiveNav(me?.role);
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -261,6 +263,7 @@ export function AdminLayout() {
         onToggle={() => setCollapsed((value) => !value)}
         drawerOpen={drawerOpen}
         onDrawerClose={closeDrawer}
+        nav={nav}
       />
       <main ref={mainRef} tabIndex={-1} className="cortex-admin-content">
         <ErrorBoundary

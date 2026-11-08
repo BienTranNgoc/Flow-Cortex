@@ -133,6 +133,45 @@ class S3MediaStoreTest {
     }
 
     @Test
+    void anAttachmentCopyCarriesTheRetentionTheCallerNames() throws IOException {
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        HttpServer server = fakeStore(200, "<CopyObjectResult><ETag>\"etag\"</ETag>"
+                + "<LastModified>2026-10-14T10:00:00.000Z</LastModified></CopyObjectResult>", headers);
+        try (S3MediaStore local = storeAt(server)) {
+            local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media", "support/r/m/1", "support-pending");
+        } finally {
+            server.stop(0);
+        }
+
+        assertThat(headers).containsEntry("x-amz-tagging", "flowcortex-retention=support-pending")
+                .containsEntry("x-amz-tagging-directive", "REPLACE");
+    }
+
+    @Test
+    void retaggingReplacesTheObjectsTagSetWithTheNamedRetention() throws IOException {
+        List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " "
+                    + new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+        server.start();
+        try (S3MediaStore local = storeAt(server)) {
+            local.retag("flowcortex-media", "support/r/m/1", "support-attachment");
+        } finally {
+            server.stop(0);
+        }
+
+        assertThat(requests).singleElement().satisfies(request -> {
+            assertThat(request).startsWith("PUT /flowcortex-media/support/r/m/1?tagging");
+            assertThat(request).contains("<Key>flowcortex-retention</Key>")
+                    .contains("<Value>support-attachment</Value>");
+        });
+    }
+
+    @Test
     void onlyASourceThatVanishedBeforeTheCopyIsRefusedAsAnUploadToRepeat() throws IOException {
         HttpServer missing = fakeStore(404, "<Error><Code>NoSuchKey</Code>"
                 + "<Message>The specified key does not exist.</Message></Error>", new ConcurrentHashMap<>());

@@ -88,6 +88,17 @@
   --target-min: 44px;
   --control-h: 2.25rem;
   --hit-min: 2.75rem;
+  --support-launcher-clearance: 88px;
+
+  /* Nodi mascot art */
+  --nodi-body: #35e5e0;
+  --nodi-ink: #061016;
+  --nodi-cheek: #5174ff;
+  --nodi-blush: #ff8fa3;
+  --nodi-eye: #ffffff;
+  --nodi-port: #0b6a80;
+  --nodi-headset: #ff7a59;
+  --nodi-earcup: #ffb46b;
 
   /* Motion */
   --dur-quick: 120ms;
@@ -137,14 +148,6 @@
   --auth-progress-from: #f4a04a;
   --auth-progress-to: #e25c3a;
   --auth-progress-on: #3a1503;
-
-  /* Nodi mascot art */
-  --nodi-body: #35e5e0;
-  --nodi-ink: #061016;
-  --nodi-cheek: #5174ff;
-  --nodi-blush: #ff8fa3;
-  --nodi-eye: #ffffff;
-  --nodi-port: #0b6a80;
 
   /* Typography */
   --font-sans: 'Google Sans Flex Variable', Inter, ui-sans-serif, system-ui, sans-serif;

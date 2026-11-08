@@ -50,13 +50,16 @@
       "comingSoon": "Sắp ra mắt",
       "disabledTitle": "{{label}} — {{tag}}",
       "unavailable": "không khả dụng",
+      "withOpenCount_one": "{{label}}, {{count}} yêu cầu đang mở",
+      "withOpenCount_other": "{{label}}, {{count}} yêu cầu đang mở",
       "systemStatus": "Hệ thống ổn định",
       "groups": {
         "overview": "Tổng quan",
         "workflowOps": "Vận hành quy trình",
         "creditsBilling": "Credit & thanh toán",
         "administration": "Quản trị",
-        "system": "Hệ thống"
+        "system": "Hệ thống",
+        "support": "Hỗ trợ"
       },
       "items": {
         "dashboard": "Tổng quan",
@@ -71,7 +74,11 @@
         "auditLog": "Nhật ký kiểm toán",
         "mediaJobs": "Tác vụ media",
         "voiceQuota": "Hạn mức giọng nói",
-        "health": "Tình trạng hệ thống"
+        "health": "Tình trạng hệ thống",
+        "supportArticles": "Bài hướng dẫn",
+        "supportGroups": "Chủ đề",
+        "supportRequests": "Yêu cầu",
+        "supportSettings": "Cài đặt trợ lý"
       }
     },
     "noAccess": {

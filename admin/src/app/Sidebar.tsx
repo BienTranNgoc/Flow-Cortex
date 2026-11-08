@@ -4,7 +4,7 @@ import { useEffect, useRef, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { NODI_WORDMARK } from './brand';
-import { NAV, type NavGroup } from './nav';
+import { NAV, type NavGroup, type NavItem, type NavLiveCount } from './nav';
 import { can } from './permissions';
 import { useIsDesktop } from './useIsDesktop';
 
@@ -18,6 +18,10 @@ interface SidebarProps {
 }
 
 const noop = () => {};
+
+const LIVE_COUNT_NAME: Record<NavLiveCount, string> = {
+  openSupportRequests: 'common.shell.nav.withOpenCount',
+};
 
 /** The rail list scrolls and so clips children; the tooltip is fixed and takes its y from its entry. */
 function placeEntryTip(entry: HTMLElement) {
@@ -56,6 +60,11 @@ export function Sidebar({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const rail = isDesktop && collapsed;
   const collapseLabel = collapsed ? t('common.shell.nav.expand') : t('common.shell.nav.collapse');
+  const nameOf = (item: NavItem, label: string, count: number) => {
+    if (count <= 0) return label;
+    const key = item.liveCount ? LIVE_COUNT_NAME[item.liveCount] : 'common.shell.nav.withCount';
+    return t(key, { label, count });
+  };
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -148,7 +157,7 @@ export function Sidebar({
                     );
                   }
                   const count = item.badge ?? 0;
-                  const name = count > 0 ? t('common.shell.nav.withCount', { label, count }) : label;
+                  const name = nameOf(item, label, count);
                   return (
                     <li key={item.path}>
                       <NavLink

@@ -1,0 +1,158 @@
+{
+  "launcher": {
+    "label": "Trợ giúp",
+    "unread": "Có phản hồi mới"
+  },
+  "panel": {
+    "title": "Trung tâm trợ giúp",
+    "close": "Đóng"
+  },
+  "tabs": {
+    "home": "Trang chủ",
+    "assistant": "Trợ lý",
+    "guides": "Hướng dẫn",
+    "requests": "Yêu cầu"
+  },
+  "common": {
+    "loading": "Đang tải…",
+    "retry": "Thử lại",
+    "loadFailed": "Không tải được nội dung. Bạn thử lại nhé.",
+    "refreshFailed": "Không làm mới được nội dung. Nội dung bên dưới có thể đã cũ.",
+    "back": "Quay lại"
+  },
+  "contact": {
+    "lead": "Cần người hỗ trợ?",
+    "sendTo": "Gửi email tới {{email}}"
+  },
+  "home": {
+    "greeting": "Xin chào! Nodi có thể giúp gì cho bạn?",
+    "startHeading": "Bắt đầu",
+    "suggestedHeading": "Câu hỏi gợi ý",
+    "suggestedQuestions": {
+      "credit": "Vì sao tôi bị báo thiếu credit?",
+      "firstRun": "Làm sao chạy workflow đầu tiên?",
+      "runFailed": "Vì sao lượt chạy của tôi bị lỗi?"
+    },
+    "newRequest": "Gửi yêu cầu hỗ trợ"
+  },
+  "article": {
+    "notPublished": "Bài viết này không còn được công bố",
+    "backToGuides": "Về Hướng dẫn",
+    "backToHome": "Về Trang chủ"
+  },
+  "guides": {
+    "searchLabel": "Tìm bài hướng dẫn",
+    "searchPlaceholder": "Ví dụ: thiếu credit",
+    "resultsHeading": "Kết quả tìm kiếm",
+    "empty": "Chưa có bài hướng dẫn nào",
+    "noMatch": "Không tìm thấy bài phù hợp",
+    "askAssistant": "Hỏi trợ lý"
+  },
+  "assistant": {
+    "intro": "Hãy đặt câu hỏi, trợ lý sẽ trả lời dựa trên các bài hướng dẫn của Nodi.",
+    "logLabel": "Cuộc trò chuyện với trợ lý",
+    "you": "Bạn",
+    "assistantName": "Trợ lý",
+    "inputLabel": "Câu hỏi của bạn",
+    "inputPlaceholder": "Nhập câu hỏi…",
+    "send": "Gửi",
+    "counter": "{{length}}/{{max}}",
+    "typing": "Trợ lý đang trả lời…",
+    "sendFailed": "Chưa gửi được câu hỏi. Bạn thử lại nhé.",
+    "tooFast": "Bạn hỏi hơi nhanh, thử lại sau {{resumeAt}}.",
+    "sources": "Nguồn",
+    "noAnswer": "Mình chưa có câu trả lời cho câu hỏi này",
+    "blocked": "Mình không thể trả lời câu hỏi này",
+    "escalate": "Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ",
+    "newRequest": "Gửi yêu cầu hỗ trợ",
+    "signIn": "Đăng nhập",
+    "register": "Tạo tài khoản",
+    "signInForMore": "Đăng nhập để có thêm lượt",
+    "newConversation": "Cuộc trò chuyện mới",
+    "unavailableNotice": "Trợ lý tạm thời không hoạt động",
+    "toGuides": "Xem Hướng dẫn",
+    "toSignIn": "Đăng nhập",
+    "retry": "Thử lại"
+  },
+  "requests": {
+    "selected": "Yêu cầu #{{number}}",
+    "newRequest": "Yêu cầu mới",
+    "listHeading": "Yêu cầu của bạn",
+    "empty": "Bạn chưa gửi yêu cầu nào",
+    "create": "Gửi yêu cầu hỗ trợ",
+    "createAnother": "Tạo yêu cầu mới",
+    "submit": "Gửi yêu cầu",
+    "sending": "Đang gửi…",
+    "submitFailed": "Chưa gửi được. Bạn thử lại nhé.",
+    "reload": "Tải lại",
+    "backToList": "Về danh sách yêu cầu",
+    "typeLabel": "Loại yêu cầu",
+    "typePlaceholder": "Chọn loại yêu cầu",
+    "typeRequired": "Hãy chọn loại yêu cầu",
+    "types": {
+      "account": "Tài khoản",
+      "credit": "Credit",
+      "workflow": "Workflow/Run",
+      "technical": "Lỗi kỹ thuật",
+      "other": "Khác"
+    },
+    "statuses": {
+      "new": "Mới",
+      "in_progress": "Đang xử lý",
+      "waiting_member": "Chờ bạn phản hồi",
+      "resolved": "Đã giải quyết",
+      "closed": "Đã đóng"
+    },
+    "closedReasons": {
+      "cancelled": "Bạn đã huỷ yêu cầu",
+      "confirmed": "Bạn đã xác nhận xong",
+      "auto": "Tự đóng sau 7 ngày không có phản hồi",
+      "admin": "Nodi hỗ trợ đã đóng yêu cầu"
+    },
+    "subjectLabel": "Tiêu đề",
+    "subjectLength": "Tiêu đề cần 5–120 ký tự",
+    "descriptionLabel": "Mô tả",
+    "descriptionLength": "Mô tả cần 10–5000 ký tự",
+    "attachLabel": "Đính kèm ảnh (tối đa 3)",
+    "attachRemove": "Bỏ ảnh {{name}}",
+    "attachType": "Chỉ nhận ảnh PNG, JPG hoặc WebP",
+    "attachSize": "Ảnh tối đa 5 MB",
+    "attachEmpty": "Ảnh trống — hãy chọn ảnh khác",
+    "attachNameLength": "Tên tệp tối đa 255 ký tự",
+    "attachCount": "Tối đa 3 ảnh mỗi tin nhắn",
+    "attachUploadFailed": "Không tải được ảnh lên. Bạn thử lại nhé.",
+    "attachmentAlt": "Ảnh đính kèm {{position}}",
+    "replyLabel": "Trả lời",
+    "replyLength": "Nội dung cần 1–5000 ký tự",
+    "replySend": "Gửi trả lời",
+    "closedNotice": "Yêu cầu đã đóng",
+    "confirmResolved": "Đã xong, đóng yêu cầu",
+    "cancel": "Huỷ yêu cầu",
+    "cancelQuestion": "Huỷ yêu cầu này? Sau khi huỷ, bạn không thể trả lời tiếp.",
+    "cancelYes": "Có, huỷ yêu cầu",
+    "cancelNo": "Không",
+    "notFound": "Không tìm thấy yêu cầu",
+    "suspended": "Tài khoản của bạn đang bị tạm khoá",
+    "conversationLinked": "Kèm hội thoại với trợ lý",
+    "conversationUnlinked": "Không đính kèm được cuộc trò chuyện với trợ lý. Bạn gửi lại để gửi yêu cầu không kèm cuộc trò chuyện.",
+    "unread": "Có phản hồi mới",
+    "you": "Bạn",
+    "supportTeam": "Nodi hỗ trợ"
+  },
+  "problems": {
+    "support-disabled": "Trung tâm trợ giúp tạm thời không hoạt động",
+    "article-not-found": "Bài viết này không còn được công bố",
+    "assistant-quota": "Bạn đã dùng hết lượt hỏi hôm nay. Bạn có thể hỏi tiếp sau {{resumeAt}}.",
+    "assistant-paused": "Trợ lý tạm thời không hoạt động",
+    "assistant-disabled": "Trợ lý tạm thời không hoạt động",
+    "assistant-unavailable": "Trợ lý đang bận, bạn thử lại sau ít phút nhé",
+    "question-too-long": "Câu hỏi tối đa 1000 ký tự",
+    "attachment-rejected": "Tệp không phải ảnh hợp lệ",
+    "attachments-unavailable": "Tạm thời chưa gửi được ảnh — bạn có thể gửi yêu cầu không kèm ảnh",
+    "request-not-found": "Không tìm thấy yêu cầu",
+    "request-closed": "Yêu cầu đã đóng",
+    "transition-not-allowed": "Yêu cầu không thể chuyển sang trạng thái này",
+    "request-state-changed": "Yêu cầu vừa được cập nhật — tải lại để xem",
+    "idempotency-key-reused": "Yêu cầu này đã được gửi — tải lại để xem"
+  }
+}

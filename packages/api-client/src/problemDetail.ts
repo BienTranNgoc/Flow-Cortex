@@ -11,6 +11,12 @@ export interface ProblemDetail {
   errors?: Record<string, string>;
   /** Present on a 423 account-locked problem — the ISO-8601 instant the lock ends. */
   lockedUntil?: string;
+  /** The machine-readable reason, also the last segment of `type`; absent on some generic errors. */
+  code?: string;
+  /** When a quota or a pause lifts (ISO-8601), on `assistant-quota` and `assistant-paused`. */
+  retryAt?: string;
+  /** Articles still in a topic group, on `group-not-empty`. */
+  articleCount?: number;
 }
 
 /** Thrown by {@link unwrap} for any non-2xx response. */

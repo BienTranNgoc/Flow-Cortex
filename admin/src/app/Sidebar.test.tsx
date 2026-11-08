@@ -1,5 +1,6 @@
 import { setToken } from '@flow-cortex/api-client';
 import { Lifebuoy, SquaresFour } from '@phosphor-icons/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -7,11 +8,30 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
-import { ADMIN_ME, stubApi } from '../test/fakeApi';
+import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { stubMatchMedia } from '../test/matchMedia';
 import type { NavGroup } from './nav';
 import { queryClient } from './queryClient';
 import { Sidebar } from './Sidebar';
+import { useLiveNav } from './useLiveNav';
+
+const OPEN_COUNT_PATH = '/api/v1/admin/support/requests/open-count';
+
+function LiveSidebar({ role, collapsed }: Readonly<{ role: string; collapsed: boolean }>) {
+  return (
+    <Sidebar role={role} collapsed={collapsed} onToggle={() => {}} nav={useLiveNav(role)} />
+  );
+}
+
+function renderSidebar(role: string, collapsed = false) {
+  return render(
+    <QueryClientProvider client={testQueryClient()}>
+      <MemoryRouter>
+        <LiveSidebar role={role} collapsed={collapsed} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 afterEach(() => {
   setToken(null);
@@ -21,11 +41,8 @@ afterEach(() => {
 
 describe('Sidebar', () => {
   it('links dashboard and permitted entries, and shows disabled items as inert text', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
-      </MemoryRouter>,
-    );
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    renderSidebar('ADMIN');
 
     expect(screen.getByRole('link', { name: /Dashboard/ })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/runs');
@@ -55,11 +72,8 @@ describe('Sidebar', () => {
   ])(
     'shows %s as a disabled "Coming soon" entry, never a link',
     (label) => {
-      render(
-        <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
-        </MemoryRouter>,
-      );
+      stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+      renderSidebar('ADMIN');
 
       const entry = screen.getByText(label).closest('[aria-disabled]');
       expect(entry).toHaveAttribute('aria-disabled', 'true');
@@ -69,13 +83,42 @@ describe('Sidebar', () => {
   );
 
   it('shows no entry a role may not use', () => {
-    render(
-      <MemoryRouter>
-        <Sidebar role="MEMBER" collapsed={false} onToggle={() => {}} />
-      </MemoryRouter>,
-    );
+    const calls = stubApi({});
+    renderSidebar('MEMBER');
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('groups the Help Center pages under "Support" with the open request count on Requests', async () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 4 } } });
+    renderSidebar('ADMIN');
+
+    const group = screen.getByRole('list', { name: 'Support' });
+    expect(group).toContainElement(screen.getByRole('link', { name: 'Guide articles' }));
+    expect(screen.getByRole('link', { name: 'Topics' })).toHaveAttribute('href', '/support/groups');
+    expect(screen.getByRole('link', { name: 'Assistant settings' })).toHaveAttribute(
+      'href',
+      '/support/settings',
+    );
+    const requests = await screen.findByRole('link', { name: 'Requests, 4 open requests' });
+    expect(requests).toHaveAttribute('href', '/support/requests');
+    expect(requests).toHaveTextContent('4');
+  });
+
+  it('names a single open request in the singular', async () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 1 } } });
+    renderSidebar('ADMIN');
+
+    expect(await screen.findByRole('link', { name: 'Requests, 1 open request' })).toBeInTheDocument();
+  });
+
+  it('shows no count on Requests while nothing is open', async () => {
+    const calls = stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    renderSidebar('ADMIN');
+
+    await vi.waitFor(() => expect(calls.some((call) => call.path === OPEN_COUNT_PATH)).toBe(true));
+    expect(screen.getByRole('link', { name: 'Requests' })).not.toHaveTextContent(/\d/);
   });
 
   it('falls back to Dashboard when the address bar names a disabled entry', async () => {
@@ -83,6 +126,7 @@ describe('Sidebar', () => {
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
       'GET /api/v1/users': { status: 200, body: [] },
+      [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } },
     });
     setToken('admin-token-voice', true);
     window.history.pushState({}, '', '/voice-quota');
@@ -93,19 +137,12 @@ describe('Sidebar', () => {
   });
 
   it('switches between expanded and icon-only mode', async () => {
-    const { container } = render(
-      <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
-      </MemoryRouter>,
-    );
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { container } = renderSidebar('ADMIN');
     expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass('cortex-admin-nav--collapsed');
     expect(screen.getByText('Dashboard')).toBeVisible();
 
-    render(
-      <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
-      </MemoryRouter>,
-    );
+    renderSidebar('ADMIN', true);
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
@@ -414,11 +451,8 @@ describe('Sidebar', () => {
     });
 
     it('labels the groups, links, disabled entries and system status in Vietnamese', () => {
-      render(
-        <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
-        </MemoryRouter>,
-      );
+      stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+      renderSidebar('ADMIN');
       const { nav } = viCommon.shell;
 
       expect(screen.getByRole('navigation', { name: nav.label })).toBeInTheDocument();

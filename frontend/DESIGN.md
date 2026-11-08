@@ -84,6 +84,8 @@ colors:
   nodi-blush: '#ff8fa3'
   nodi-eye: '#ffffff'
   nodi-port: '#0b6a80'
+  nodi-headset: '#ff7a59'
+  nodi-earcup: '#ffb46b'
 typography:
   sans:
     fontFamily: Google Sans Flex Variable
@@ -174,6 +176,19 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Pipeline: a `paper-2` frame holding `paper-3` nodes joined by connectors; a node has a 4px left bar in its status colour, and the selected node is outlined in `primary`. Connectors are `green` when done, `primary` when active, `edge` (dashed when broken) otherwise.
 - Card: `paper-2` fill, `card-edge` edge, `shadow-sm`.
 - Icons: Phosphor, one weight family. `ThemeToggle` keeps its own sun and moon glyphs as the one exception.
+
+### Help Center
+
+- Launcher: a 56px button fixed bottom-right (20px from the edges, safe-area aware), `paper-3` fill, `line-2` outline, fully rounded, `shadow`. It holds the headset mascot, painted only from the `nodi-*` tokens (`nodi-headset` and `nodi-earcup` belong to the launcher alone); from 640px up the label "Trợ giúp" shows beside it in `ink`. Its accessible name is "Trợ giúp" at every width, and it reports `aria-expanded`.
+- Clearance: while the widget is on, the page body gains `support-launcher-clearance` (88px) of bottom padding, so the launcher never covers the last control of a page.
+- Panel: a `role="dialog"` labelled "Trung tâm trợ giúp", 400 × min(640px, 100svh − 96px), sitting above the launcher; `paper-3` body, `paper-2` header with `line` dividers, `lg` radius, `shadow-lg`. It enters with `opacity` and an 8px rise over `dur-standard`. Below 640px it fills the screen with no radius and a 44px close button. Escape or the close button closes it and returns focus to the launcher.
+- Tabs: a `role="tablist"` with a roving tabindex; arrow keys, Home and End move and select. A guest sees Trang chủ and Trợ lý; a member also sees Hướng dẫn and Yêu cầu. A tab is `ink-3`, the selected one `ink` with a 2px `primary` underline.
+- Lists (Bắt đầu articles, suggested questions, guide groups, search results): full-width 44px rows in the button style, section titles in small uppercase `ink-3`.
+- States: loading is an `ink-3` status line; a failed read shows a `red` message with "Thử lại"; empty and no-match states offer "Hỏi trợ lý"; an article that is no longer published says so and leads back to Hướng dẫn (Trang chủ for a guest).
+- Article: a "Quay lại" link-style button (focused while the article loads), the title (focused when it loads) and the Markdown body in `ink-2`, with code on `input-bg`. Raw HTML shows as text and an image as its alt text; only http(s), mailto and app-relative links are links (`//host` is not), and external ones open in a new tab. An unpublished article is announced as a status and focuses its way back.
+- Small screens: below 640px the open panel is modal (`aria-modal="true"`) and everything outside it is `inert`; the desktop panel stays non-modal. Escape closes the panel only when pressed inside it.
+- Trợ lý: an `ink-3` intro, then a `role="log"` (`aria-live="polite"`, focusable) of messages. A member's question is a `btn-bg` bubble with a `line-2` edge and `md` radius; an answer is Markdown with its sources as fully rounded `btn-bg` chips, and under every member answer a `primary` link-style "Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ" that opens the request form prefilled with the question and linked to the conversation. "Trợ lý đang trả lời…" is a `role="status"` line; errors are `role="alert"` with "Thử lại". The question box is a field with an `ink-3` counter ("n/1000") that turns `red` over the limit.
+- Yêu cầu: the member's requests as list rows, newest activity first, each with a status chip (foreground on its `-soft` partner: Mới `accent`, Đang xử lý `primary`, Chờ bạn phản hồi `warning`, Đã giải quyết `green`, Đã đóng `ink-3` on `line`). A thread shows member messages on `input-bg` and team messages on `paper`. An unread admin reply puts an 8px `red` dot on the launcher, the Yêu cầu tab and the request row, with "Có phản hồi mới" in their accessible names.
 
 ## Do's and Don'ts
 

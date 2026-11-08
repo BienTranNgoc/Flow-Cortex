@@ -1,9 +1,11 @@
 import { ErrorBoundary } from '@flow-cortex/ui-kit';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import './styles/tokens.css';
 import './app/base.css';
+import { AccountCacheReset } from './app/AccountCacheReset';
 import { DocsPage } from './app/DocsPage';
 import { demoPagesEnabled } from './app/featureFlags';
 import { HomePage } from './app/HomePage';
@@ -11,6 +13,7 @@ import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { RunsPage } from './app/RunsPage';
+import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
@@ -43,9 +46,23 @@ function ContainedOutlet() {
   );
 }
 
+const SupportWidget = lazy(() =>
+  import('./features/support/SupportWidget').then((module) => ({ default: module.SupportWidget })),
+);
+
+function SupportWidgetWhenOn() {
+  const { supportWidget } = useFeatures();
+  return supportWidget ? (
+    <Suspense fallback={null}>
+      <SupportWidget />
+    </Suspense>
+  ) : null;
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <AccountCacheReset />
       <BrowserRouter>
         <Routes>
           <Route element={<AuthLayout />}>
@@ -82,6 +99,7 @@ export function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <SupportWidgetWhenOn />
       </BrowserRouter>
     </QueryClientProvider>
   );
