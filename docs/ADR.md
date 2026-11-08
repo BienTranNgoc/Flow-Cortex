@@ -510,3 +510,100 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+## ADR-0011 — GPU workers: external APIs first, self-host later
+
+- **Context:** Xood is the functional target (ADR-0007, `docs/ADR.md:252`), and
+  part of its media work is GPU-class: face swap, upscaling, FLUX.2 image
+  generation, SAM 2.1 role tracking, RT-DETR role suggestion, LaMa overlay
+  clean-up, demucs stem separation, Depth Anything / clay render and Blender
+  preview. Every change that ports one of them needs to know whether it is a
+  provider adapter, a CPU handler or a self-host item; without this entry each
+  re-decides it. Vendor calls already leave from a provider worker today
+  (Seedance on BytePlus, WAN on Replicate), and the backend calls Google OAuth
+  and Gemini, while OpenAI calls leave from a provider worker; ADR-0010 lists
+  both tiers. No fal integration exists, and
+  `infra/egress-proxy/acl.yaml` has no fal host. Production is described as an
+  Oracle A1 VM (`docs/ADR.md:203`); whether it offers a GPU was not verified.
+- **Decision — policy:** GPU-class capabilities are served by external APIs
+  (fal, Replicate, BytePlus) called per use first, and self-hosted on a GPU
+  later, once the threshold below is met. The per-call price of an API is a
+  `rateCardRef` row of the rate-card contract owned by the
+  `step-pricing-contract` change, not a new price table here;
+  `step-pricing-contract` is a dependency that is not on `origin/development`
+  yet (`CreditAccounts.estimate(List<String>)` is the only pricing surface
+  there).
+- **Decision — boundaries kept:** a vendor API is called by the backend or by a
+  provider worker (the two tiers ADR-0010 lists). The media worker stays
+  keyless with no internet egress (ADR-0007, `docs/ADR.md:185`). Vendor calls
+  leave through ADR-0010's "Egress isolation: one forward proxy with a domain
+  allowlist": the adapter change that first calls a new vendor host adds it to
+  `infra/egress-proxy/acl.yaml` and to the adapter's in-code result-download
+  host list. ADR-0007 is not edited here; reconciling its "HTTP-provider steps
+  stay in the API, where the keys live" (`docs/ADR.md:258`) with the
+  provider-worker tier is left open.
+- **Decision — classes:** *API-available* means Xood's code calls a vendor API
+  for that capability. *CPU-first* means no API is confirmed, so the capability
+  runs on CPU first. *Self-host-later* means the capability is, or would be, a
+  GPU item once the threshold is met. Each row separates what Xood's code
+  proves (a cited `file:line`) from what a provider catalogue claims; a
+  catalogue claim reads `verified @ <URL, date>` or `unverified` with what
+  would settle it. No catalogue was read for this entry (no web access in the
+  authoring session), so every catalogue cell is `unverified`: reading the
+  fal, Replicate and BytePlus catalogues for the capability settles it, and a
+  row that turns out API-available is an edit of that one row.
+
+  | Capability | Class | Xood evidence | Catalogue status | Next change |
+  |---|---|---|---|---|
+  | Upscale: clarity, seedvr2, flux video, SUPIR | API-available | fal queue API: `clarity-upscale.provider.ts:78,120`; `seedvr2-upscale.provider.ts:89,128`; `flux-video-upscale.provider.ts:186-188`; `supir-upscale.provider.ts:11-15`, registered at `providers.module.ts:434` | unverified: fal model pages not read | `provider-upscalers` |
+  | Face swap video, whole person (`video.person_swap`) | API-available | fal `fal-ai/pixverse/swap`: `fal-pixverse-swap.provider.ts:75,129` | unverified: the "Endpoint verified 2026-09-07" note is Xood's own claim; the fal page would settle it | `provider-face-swap-detect` |
+  | Face swap image and video, face only | no commercial path verified | InsightFace inswapper, "free/non-commercial, internal use": `face-swap.provider.ts:28,72` (CPU sidecar), `video-swap.provider.ts:35,110`, `Dockerfile.gpu:2-4` | n/a: the model licence restricts commercial use, so a licensed model or API would settle it | none (a later licence decision) |
+  | FLUX.2 image generation | API-available for image generation in general; FLUX.2-klein itself self-host-later | `flux2-klein-selfhost.provider.ts:22-26` (self-hosted on Xood's GPU), `providers.module.ts:318`; `byteplus-seedream.provider.ts` and `gemini-pro-image.provider.ts` exist | unverified: a FLUX.2-klein listing on fal or Replicate would settle it | `worker-gpu-self-host` for FLUX.2-klein |
+  | demucs (`audio.separate`) | CPU-first | `tasks/demucs.py:82` (`device="cpu"`), `Dockerfile.local-demucs`; `demucs-separate.provider.ts:28-36` (self-hosted on a separate media box over HTTP, not a vendor) | unverified: no API found; a fal or Replicate demucs model would settle it | `worker-audio-separate-speakers-beats`; GPU in `worker-gpu-self-host` |
+  | SAM 2.1 (`video.track_roles`) | CPU-first, feasibility unmeasured, expected to promote | `tasks/track_roles.py:31-32` (GPU figure only) | unverified | `worker-track-roles`; GPU in `worker-gpu-self-host` |
+  | RT-DETR (`video.role_suggest`) | CPU-first | `tasks/role_suggest.py:3`; `video-role-suggest.provider.ts:11` ("GPU worker") | unverified | `worker-trend-role-suggest`; GPU in `worker-gpu-self-host` |
+  | LaMa (`image.clean_overlay`) | CPU-first | `image-clean-overlay.provider.ts:35` ("FREE (self-host)"); `tasks/image_clean_overlay.py:76` (`lama_inpaint`); `requirements.txt:39` | unverified | `worker-image-clean-overlay` |
+  | Depth Anything / clay render | CPU-first; GPU self-host-later | `xood-clay-render/depth.py:37-39` (CPU fallback, "roughly 10x slower"); `ark.py` calls BytePlus for generation | unverified | `worker-gpu-self-host` (clay pipeline is a separate follow-up) |
+  | Blender preview (`video.preview`) | CPU-first | consumer `video-project/preview/preview-job.ts:18` names a "worker blender"; its source is not in the available Xood copies | unverified: no per-call API known | `worker-blender-preview`; GPU render in `worker-gpu-self-host` |
+
+  Paths are relative to the Xood repositories `xood-backend/src/providers/providers/`
+  (`*.provider.ts`), `xood-media-worker/` (`tasks/`, `Dockerfile*`,
+  `requirements.txt`) and `xood-clay-render/`, at their `main` branch. The
+  face-only rows are not ported: product parity for face swap is the fal
+  whole-person swap.
+- **Decision — threshold:** a capability moves from an API to self-hosting
+  when, for that capability, `S` (trailing-30-day API spend, calls times the
+  `rateCardRef` price) is at least `H` (all-in monthly cost of the smallest GPU
+  host that meets the capability's latency), and the measured call volume would
+  keep that host busy for at least a fraction `U` (utilisation) of its hours.
+  The constants `U`, the review period, `H` and the call volume are not set
+  here; the `worker-gpu-self-host` proposal fills them once rate-card rows and a
+  checked GPU price exist. No capability moves before they are filled, and this
+  entry carries no figure for them.
+- **Decision — promotion of CPU-first capabilities:** a CPU-first capability is
+  promoted, to an API or to self-hosting, when its measured P95 CPU wall time
+  exceeds the capability's `flowcortex.media.max-runtime` value. The handler
+  change measures it: `worker-track-roles` for `video.track_roles` (expected
+  to promote: Xood's only figure is for a GPU), `worker-trend-role-suggest` for
+  `video.role_suggest`, `worker-audio-separate-speakers-beats` for
+  `audio.separate`, `worker-image-clean-overlay` for `image.clean_overlay` and
+  `worker-blender-preview` for `video.preview`. Clay render has no measuring
+  change yet: `worker-gpu-self-host` or the clay-pipeline follow-up must name
+  its owner before it can cross the threshold.
+- **Consequences:**
+  - API-available rows go to the provider-adapter changes
+    `provider-face-swap-detect` (whole-person swap) and `provider-upscalers`
+    (all four upscalers, though the roadmap row names three). Both add the fal
+    queue and result hosts (Xood evidence `queue.fal.run`, `*.fal.media`; a
+    `*.` glob does not match the bare domain) to `infra/egress-proxy/acl.yaml`
+    and to the adapter's result-download host list.
+  - CPU-first rows go to `worker-track-roles`, `worker-trend-role-suggest`,
+    `worker-audio-separate-speakers-beats`, `worker-image-clean-overlay` and
+    `worker-blender-preview`; each owns the measurement that promotes it.
+  - Self-host-later items (GPU image, GPU autoscale, FLUX.2-klein, and the GPU
+    leg of demucs, SAM 2.1, RT-DETR, Depth Anything and Blender) belong to
+    `worker-gpu-self-host`, a follow-up that also chooses the host and vendor;
+    this entry chooses neither.
+  - The face-only face-swap rows have no owner until a licensed model is
+    chosen. Whole-person swap compliance (deepfake audit logging, AI-content
+    labelling) is not gated by this entry.
