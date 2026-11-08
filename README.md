@@ -1,8 +1,10 @@
 # Flow-Cortex
 
-A personal project scaffolded on the same engineering conventions as the
-DigiShield reference repo, deliberately scaled down to a solo project (Tầng 0–1:
-foundations + architecture, no cloud infra yet).
+Nodi FlowCortex is built toward full feature parity with Xood (backend, member
+app, admin console, media worker, clay render), ported domain by domain. Xood
+sets what the product does; the engineering conventions come from the
+DigiShield reference repo, adopted in tiers (ADR-0001), and the architecture
+decisions live in [docs/ADR.md](docs/ADR.md) (Xood target: ADR-0007).
 
 - **Repo:** https://github.com/BienTranNgoc/Flow-Cortex
 - **Stack:** Spring Boot 4.1 / Java 25 (API) · Python 3.12 media worker over
@@ -99,7 +101,13 @@ just won't be actionable.
 - **Tests:** written alongside code; coverage is measured now, gated later
   (see ADR-0001).
 
-## Roadmap (next tầng, when the project earns it)
+## Roadmap
+
+**Product:** Xood parity, delivered as dependency-ordered waves of OpenSpec
+changes (foundations → workflow engine and media capabilities → community and
+growth).
+
+**Engineering tiers** (ADR-0001):
 
 - **Tầng 2 — contract-first:** define an OpenAPI spec, generate the frontend API
   client (orval), add contract-drift checks. *(landed — see ADR-0005; both

@@ -6,13 +6,18 @@ Format per entry: **Context → Decision → Consequences**.
 
 ---
 
-## ADR-0001 — Scale the reference conventions down for a solo project
+## ADR-0001 — Adopt the reference conventions in tiers
 
+- **Status:** the tiering below still holds; two parts are superseded. Product
+  scope is full feature parity with Xood (ADR-0007, "Xood is the functional
+  target", 2026-11-06), not a scaled-down personal project. The single Gradle
+  module and the deferred `buildSrc` / Spring Modulith / contract-first / CI
+  tiers have landed (ADR-0003, ADR-0005, `.github/`).
 - **Context:** Flow-Cortex adopts the DigiShield reference repo's conventions,
   but DigiShield is a multi-team enterprise system (9 modules, Terraform/EKS,
   three static-analysis gates, full BRD/FRD/ADR doc set). Copying all of that
-  into a one-person project is over-engineering.
-- **Decision:** Adopt only "Tầng 0–1" now:
+  on day one, before any product code exists, is over-engineering.
+- **Decision:** Adopt only "Tầng 0–1" at the start:
   - Git discipline (Conventional Commits + protected `main`) — copied verbatim.
   - `.editorconfig`, ESLint/Prettier, layered package structure.
   - A single Gradle module (not a multi-module build) until a second bounded
@@ -244,11 +249,19 @@ Format per entry: **Context → Decision → Consequences**.
     worker as a Spring profile of the same JAR and keeps events in-process
     (Modulith only). Here the cross-process hop is the broker and the worker
     is a separate Python service, because the capabilities are Python tools.
-  - **Lessons from Xood**, adopted: the inline/remote split (HTTP-provider
-    steps stay in the API, where the keys live), a backend reaper for stale
-    steps, a keyless worker. Rejected: a schema-less message body, a default
-    capability fallback, an HMAC callback (results come back over the broker,
-    so there is no second auth mechanism), and an unguarded URL fetch.
+  - **Xood is the functional target:** Nodi FlowCortex is built toward feature
+    parity with Xood (`xood-backend`, `xood-frontend`, `xood-admin`,
+    `xood-media-worker`, `xood-clay-render`) at their `main` branch. Every Xood
+    capability, including every media-worker task, is in scope and is ported
+    domain by domain. Xood
+    sets *what* the product does; this ADR and ADR-0001…0008 set *how* it is
+    built. Adopted as-is: the inline/remote split (HTTP-provider steps stay in
+    the API, where the keys live), a backend reaper for stale steps, a keyless
+    worker. Ported with a safer mechanism, same behaviour: message bodies get a
+    JSON Schema in `contracts/` instead of none; an unknown capability is
+    refused instead of falling back to a default; results return over the
+    broker instead of an HMAC callback; URL fetch (`video_fetch`) runs behind
+    egress isolation instead of unguarded.
   - Kafka remains the candidate for a later run-event stream; run events stay
     in-process until then.
 
