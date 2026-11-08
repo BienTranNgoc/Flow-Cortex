@@ -84,3 +84,34 @@ def test_ffmpeg_failure_is_a_contract_violation_and_leaves_no_video(tmp_path: Pa
         caption_burn.handle(job, {"video": source}, runner)
     assert excinfo.value.code == "contract_violation"
     assert not (tmp_path / caption_burn.VIDEO_NAME).exists()
+
+
+def test_odd_dimensions_are_made_even_and_cropped_in_the_filter(tmp_path: Path) -> None:
+    source = tmp_path / "in.mp4"
+    source.write_bytes(b"x")
+    calls: list[list[str]] = []
+
+    class Recording(FakeRunner):
+        def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+            calls.append(argv)
+            return super().run(argv)
+
+    job = cast(
+        Any,
+        SimpleNamespace(
+            params={"words": [{"word": "hi", "start": 0.0, "end": 0.5}], "startOffset": 0}
+        ),
+    )
+    odd = {"width": 321, "height": 321}
+    runner = cast(ProcessRunner, Recording([probe([odd]), done(code=1)]))
+    with pytest.raises(PermanentError):
+        caption_burn.handle(job, {"video": source}, runner)
+    vf = calls[1][calls[1].index("-vf") + 1]
+    assert vf.startswith("crop=320:320:0:0,ass=")
+    assert "PlayResX: 320\nPlayResY: 320\n" in (tmp_path / caption_burn.ASS_NAME).read_text()
+
+
+def test_one_pixel_dimension_is_refused(tmp_path: Path) -> None:
+    runner = cast(ProcessRunner, FakeRunner([probe([{"width": 1, "height": 1080}])]))
+    with pytest.raises(PermanentError, match="usable dimensions"):
+        caption_burn._displayed_size(tmp_path / "in.mp4", runner)

@@ -70,7 +70,7 @@ def handle(
             "-map_metadata",
             "-1",
             "-vf",
-            f"ass={script_path}",
+            f"crop={width}:{height}:0:0,ass={script_path}",
             "-c:v",
             "libx264",
             "-preset",
@@ -178,7 +178,12 @@ def _displayed_size(source: Path, processes: ProcessRunner) -> tuple[int, int]:
             and math.isfinite(rotation)
             and round(rotation) % 180 == 90
         ):
-            return height, width
+            width, height = height, width
+            break
+    # libx264 with yuv420p cannot encode an odd dimension; the burn crops the frame to this size.
+    width, height = width - width % 2, height - height % 2
+    if width < 2 or height < 2:
+        raise PermanentError("contract_violation", "the input video has no usable dimensions")
     return width, height
 
 

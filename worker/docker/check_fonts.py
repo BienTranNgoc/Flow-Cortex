@@ -10,7 +10,8 @@ build (exit 1, every failing family named on stderr) when:
   * a face's em-per-line differs from the manifest value (or the pinned value of the four
     Debian-packaged families),
   * the Debian families' glyph advances differ from glyph-advances.json,
-  * ffmpeg has no `ass` filter.
+  * ffmpeg has no `ass` filter,
+  * libass renders no filled box for a BorderStyle 3 backdrop line.
 
 Usage: check_fonts.py <path to manifest.json>
 """
@@ -20,6 +21,7 @@ import os
 import struct
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from typing import Any
 
@@ -283,6 +285,71 @@ def check_ass_filter() -> list[str]:
     return ["ffmpeg has no `ass` filter; captions cannot be burned"]
 
 
+# Same Style layout as captions/ass.py emits for a backdrop: BorderStyle 3, the box drawn in
+# OutlineColour (white), no shadow. The text is black and the spaces draw nothing, so a white
+# pixel at the middle of the gap exists only when a filled box sits behind the line.
+_BOX_W, _BOX_H = 640, 360
+_BOX_GAP = "\\h" * 14
+_BOX_ASS = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {_BOX_W}
+PlayResY: {_BOX_H}
+
+[V4+ Styles]
+Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,\
+Bold,BorderStyle,Outline,Shadow,Alignment,MarginV
+Style: K,DejaVu Sans,40,&H00000000,&H00000000,&H00FFFFFF,&HFF000000,-1,3,6,0,2,60
+
+[Events]
+Format: Layer,Start,End,Style,Text
+Dialogue: 0,0:00:00.00,0:00:02.00,K,H{_BOX_GAP}H
+"""
+
+
+def check_backdrop_box() -> list[str]:
+    with tempfile.TemporaryDirectory() as tmp:
+        script = os.path.join(tmp, "box.ass")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(_BOX_ASS)
+        run = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                f"color=c=black:s={_BOX_W}x{_BOX_H}:d=1",
+                "-vf",
+                f"ass={script}",
+                "-frames:v",
+                "1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "-",
+            ],
+            capture_output=True,
+            timeout=60,
+            check=False,
+        )
+    frame = run.stdout
+    if run.returncode != 0 or len(frame) != _BOX_W * _BOX_H:
+        return [f"backdrop frame did not render: {run.stderr.decode(errors='replace').strip()}"]
+    column = [frame[y * _BOX_W + _BOX_W // 2] for y in range(_BOX_H)]
+    lit = sum(1 for v in column if v > 200)
+    # A box is at least the 40 px line plus its pad; an outline ring or no box leaves the gap dark.
+    if lit < 40 or column[2] > 16:
+        return [
+            f"BorderStyle 3 drew no filled box ({lit} lit pixels in the gap column, "
+            f"background {column[2]}); backdrops would not render"
+        ]
+    print(f"OK: libass draws the backdrop box ({lit} px tall at the line centre)")
+    return []
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print("usage: check_fonts.py <manifest.json>", file=sys.stderr)
@@ -294,7 +361,10 @@ def main() -> int:
         problems.extend(check_family(fam, "bold", em[fam]))
         problems.extend(check_family(fam, "regular", em[fam]))
     problems.extend(check_glyph_advances(manifest))
-    problems.extend(check_ass_filter())
+    ass_problems = check_ass_filter()
+    problems.extend(ass_problems)
+    if not ass_problems:
+        problems.extend(check_backdrop_box())
     if problems:
         for p in problems:
             print(f"FATAL: {p}", file=sys.stderr)

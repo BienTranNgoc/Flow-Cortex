@@ -133,13 +133,13 @@ def build_ass(
     height: int,
 ) -> tuple[str, int]:
     """Return the ASS script for `width` x `height` and its number of Dialogue lines."""
-    box = f"BorderStyle: {style.border_style}\n" if style.border_style != 1 else ""
     header = (
-        f"[Script Info]\nScriptType: v4.00+\nPlayResX: {width}\nPlayResY: {height}\n{box}\n"
+        f"[Script Info]\nScriptType: v4.00+\nPlayResX: {width}\nPlayResY: {height}\n\n"
         "[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,"
-        "OutlineColour,BackColour,Bold,Outline,Shadow,Alignment,MarginV\n"
+        "OutlineColour,BackColour,Bold,BorderStyle,Outline,Shadow,Alignment,MarginV\n"
         f"Style: K,{style.font},{style.size},{style.primary},{style.secondary},"
-        f"{style.outline_colour},{style.back_colour},{style.bold},{style.outline},"
+        f"{style.outline_colour},{style.back_colour},{style.bold},{style.border_style},"
+        f"{style.outline},"
         f"{style.shadow},{style.align},{style.margin_v}\n\n"
         "[Events]\nFormat: Layer,Start,End,Style,Text\n"
     )

@@ -115,12 +115,13 @@ def test_unknown_highlight_mode_is_refused() -> None:
 def test_preset_backdrop_draws_a_box_instead_of_the_text_outline() -> None:
     style = resolve_style({"backdrop": "dark_soft", "outlineColor": "#FF0000"}, 1000)
     assert (style.border_style, style.outline, style.outline_colour) == (3, 6, "&H99000000")
-    assert (style.shadow, style.back_colour) == (1, "&H00000000")
+    assert (style.shadow, style.back_colour) == (0, "&HFF000000")
 
 
 def test_custom_backdrop_uses_its_colour() -> None:
     style = resolve_style({"backdrop": "custom", "backdropColor": "#102030"}, 1000)
     assert (style.border_style, style.outline, style.outline_colour) == (3, 6, "&H00302010")
+    assert (style.shadow, style.back_colour) == (0, "&HFF000000")
 
 
 def test_custom_backdrop_without_colour_is_refused() -> None:

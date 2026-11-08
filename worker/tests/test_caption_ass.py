@@ -15,7 +15,7 @@ from flowcortex_worker.captions.ass import (
 )
 from flowcortex_worker.captions.style import resolve_style
 
-STYLE_LINE = "Style: K,DejaVu Sans,84,&H0000E0FF,&H00FFFFFF,&H00000000,&H00000000,-1,5,1,2,300"
+STYLE_LINE = "Style: K,DejaVu Sans,84,&H0000E0FF,&H00FFFFFF,&H00000000,&H00000000,-1,1,5,1,2,300"
 
 
 def w(word: str, start: float, end: float, line_break: bool = False) -> CaptionWord:
@@ -170,11 +170,16 @@ def test_landscape_input_writes_play_res_and_font_from_height() -> None:
     assert f"Style: K,DejaVu Sans,{round(4.375 * 1080 / 100)}," in ass
 
 
-def test_box_backdrop_writes_border_style_three() -> None:
+def test_border_style_is_a_style_line_field_after_bold() -> None:
     ass, _ = burn([w("a", 0, 1)], {"backdrop": "dark_solid"})
-    assert "BorderStyle: 3\n" in ass
+    assert "Bold,BorderStyle,Outline," in ass
+    style_line = next(x for x in ass.splitlines() if x.startswith("Style: K,"))
+    assert ",-1,3,6," in style_line
+    assert "BorderStyle:" not in ass
     plain, _ = burn([w("a", 0, 1)])
-    assert "BorderStyle" not in plain
+    plain_style = next(x for x in plain.splitlines() if x.startswith("Style: K,"))
+    assert ",-1,1," in plain_style
+    assert "BorderStyle:" not in plain
 
 
 def test_dialogue_text_is_cleaned() -> None:

@@ -24,8 +24,10 @@ _BACKDROPS: dict[str, tuple[str, int, int] | None] = {
 _OUTLINE_W = {"none": 0, "thin": 2, "medium": 5, "thick": 9}
 _CUSTOM_BOX_PAD = 6
 _SHADOW_PCT = 4
-_NO_SHADOW_COLOUR = "&H00000000"
-_DEFAULT_SHADOW = (1, _NO_SHADOW_COLOUR)
+_OPAQUE_BLACK = "&H00000000"
+_TRANSPARENT = "&HFF000000"
+_DEFAULT_SHADOW = (1, _OPAQUE_BLACK)
+_BACKDROP_SHADOW = (0, _TRANSPARENT)
 _DEFAULT_SIZE_PCT = 84 * 100.0 / 1920
 _DEFAULT_MARGIN_PCT = 300 * 100.0 / 1920
 
@@ -85,7 +87,7 @@ def _resolve_shadow(spec: Mapping[str, Any], size: int) -> tuple[int, str]:
         return _DEFAULT_SHADOW
     shadow = spec["shadow"]
     if shadow is None:
-        return 0, _NO_SHADOW_COLOUR
+        return 0, _OPAQUE_BLACK
     if not isinstance(shadow, Mapping) or set(shadow) != {"color"}:
         raise ValueError(f"shadow must be {{color: #RRGGBB}} or null, got: {shadow!r}")
     return max(1, round(_SHADOW_PCT * size / 100)), ass_color(shadow["color"])
@@ -133,11 +135,11 @@ def resolve_style(spec: Mapping[str, Any] | None, height: int) -> CaptionStyle:
     preset = _BACKDROPS.get(backdrop)
     if backdrop == "custom":
         outline_colour, outline, border_style = ass_color(backdrop_hex), _CUSTOM_BOX_PAD, 3
-        shadow, back_colour = _DEFAULT_SHADOW
+        shadow, back_colour = _BACKDROP_SHADOW
     elif preset is not None:
         box_hex, box_transparency, pad = preset
         outline_colour, outline, border_style = ass_color(box_hex, box_transparency), pad, 3
-        shadow, back_colour = _DEFAULT_SHADOW
+        shadow, back_colour = _BACKDROP_SHADOW
     else:
         outline_colour, border_style = text_outline_colour, 1
         outline = text_outline
