@@ -329,6 +329,10 @@ the member app reads it once per session.
   codes is rate-limited per member (10 codes and 3 different numbers a day), per client IP
   (30 an hour), per number and overall; the `FLOWCORTEX_PHONE_*` variables in `.env.example` set the limits.
 
+**Connector key.** The compose stack needs `FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1` in `.env`,
+generated with `openssl rand -base64 32` (the `change-me` placeholder stops the backend). A bare
+`bootRun` with `SPRING_PROFILES_ACTIVE=dev` uses the dev keyring instead.
+
 **Resetting state.** `docker compose down -v` deletes every volume (database,
 broker, store), so the next `up` seeds from scratch. You need it, or the narrower
 fix named in each case, when:
