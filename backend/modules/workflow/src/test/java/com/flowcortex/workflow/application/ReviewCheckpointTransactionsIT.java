@@ -24,6 +24,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,9 @@ class ReviewCheckpointTransactionsIT {
     }
 
     private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.MICROS);
+
+    @MockitoBean
+    private RunUpdates runUpdates;
 
     @Autowired
     private ReviewCheckpointTransactions checkpoints;

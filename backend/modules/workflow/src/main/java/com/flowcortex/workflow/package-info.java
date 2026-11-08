@@ -5,8 +5,9 @@
  * declared explicitly below: it depends on the user module only through its
  * public {@code api} port (for the current user), on the media module only through
  * its {@code api} port (to dispatch remote steps and receive their results), on the credit
- * module only through its {@code api} port (to estimate, charge and refund run steps), plus
- * the shared libraries.
+ * module only through its {@code api} port (to estimate, charge and refund run steps), on the
+ * realtime module only through its {@code api} port (to publish run updates and authorize the
+ * run topic), plus the shared libraries.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Workflow",
@@ -14,6 +15,7 @@
                 "user :: api",
                 "media :: api",
                 "credit :: api",
+                "realtime :: api",
                 "shared :: web",
                 "shared :: security"
         }

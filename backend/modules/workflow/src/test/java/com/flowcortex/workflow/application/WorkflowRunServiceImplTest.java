@@ -57,10 +57,11 @@ class WorkflowRunServiceImplTest {
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final RunUpdates runUpdates = mock(RunUpdates.class);
 
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
-                runStepRepository, events, registry, mediaJobs, mock(UserDirectory.class),
+                runStepRepository, events, runUpdates, registry, mediaJobs, mock(UserDirectory.class),
                 new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
     }
 
@@ -106,7 +107,7 @@ class WorkflowRunServiceImplTest {
             throw new IllegalStateException("the credit guard must not be consulted");
         };
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
-                workflowRunRepository, runStepRepository, events, new StepExecutorRegistry(List.of(translate)),
+                workflowRunRepository, runStepRepository, events, runUpdates, new StepExecutorRegistry(List.of(translate)),
                 mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
                 new RunStartGuards(List.of(creditGuard)), true);
         UUID ownerId = UUID.randomUUID();
@@ -180,6 +181,7 @@ class WorkflowRunServiceImplTest {
         assertThat(started.steps()).allSatisfy(step -> assertThat(step.status()).isEqualTo("pending"));
         assertThat(savedSteps()).extracting(RunStep::getInputRef).containsExactly(null, "{step:1}");
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
+        verify(runUpdates).touched(started.id());
     }
 
     @Test

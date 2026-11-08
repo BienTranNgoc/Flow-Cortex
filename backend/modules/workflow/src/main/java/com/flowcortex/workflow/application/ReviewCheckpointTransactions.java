@@ -30,6 +30,7 @@ class ReviewCheckpointTransactions {
     private final RunStepRepository runStepRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final ScriptRevisionRepository scriptRevisionRepository;
+    private final RunUpdates runUpdates;
     /**
      * Its own plain mapper, like {@link InputResolver}: this module runs on Jackson 2 while Boot 4's
      * context publishes a Jackson 3 {@code tools.jackson} bean, so injecting one would not resolve.
@@ -38,11 +39,12 @@ class ReviewCheckpointTransactions {
 
     ReviewCheckpointTransactions(ReviewTaskRepository reviewTaskRepository,
             RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            ScriptRevisionRepository scriptRevisionRepository) {
+            ScriptRevisionRepository scriptRevisionRepository, RunUpdates runUpdates) {
         this.reviewTaskRepository = reviewTaskRepository;
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.scriptRevisionRepository = scriptRevisionRepository;
+        this.runUpdates = runUpdates;
     }
 
     /**
@@ -74,6 +76,7 @@ class ReviewCheckpointTransactions {
             reviewTaskRepository.save(task);
         }
         workflowRunRepository.save(run);
+        runUpdates.touched(run.getId());
         return true;
     }
 
@@ -113,6 +116,7 @@ class ReviewCheckpointTransactions {
         }
         run.resume();
         workflowRunRepository.save(run);
+        runUpdates.touched(run.getId());
         return true;
     }
 

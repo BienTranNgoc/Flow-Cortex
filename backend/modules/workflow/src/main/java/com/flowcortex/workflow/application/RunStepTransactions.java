@@ -47,12 +47,14 @@ class RunStepTransactions {
     private final RunStepRepository runStepRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final CreditAccounts creditAccounts;
+    private final RunUpdates runUpdates;
 
     RunStepTransactions(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            CreditAccounts creditAccounts) {
+            CreditAccounts creditAccounts, RunUpdates runUpdates) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.creditAccounts = creditAccounts;
+        this.runUpdates = runUpdates;
     }
 
     /**
@@ -83,6 +85,7 @@ class RunStepTransactions {
         if (runStepRepository.claimPending(stepId, now, queueDeadline, resolvedInput) != 1) {
             return ClaimOutcome.LOST;
         }
+        runUpdates.touched(runId);
         if (!charge(runId, stepId)) {
             failRunning(runId, stepId, attempt, InsufficientCreditsException.CODE, NOT_ENOUGH_CREDITS, now);
             return ClaimOutcome.FAILED;
@@ -98,17 +101,30 @@ class RunStepTransactions {
 
     /** A delivery's pickup; {@code false} if the step is no longer running at this attempt. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    boolean recordPickup(UUID stepId, short attempt, Instant at, Instant leaseUntil, Instant runDeadline,
+    boolean recordPickup(UUID runId, UUID stepId, short attempt, Instant at, Instant leaseUntil, Instant runDeadline,
             short deliveryCount) {
-        return runStepRepository.recordPickup(stepId, attempt, at, leaseUntil, runDeadline, deliveryCount) == 1;
+        if (runStepRepository.recordPickup(stepId, attempt, at, leaseUntil, runDeadline, deliveryCount) != 1) {
+            return false;
+        }
+        runUpdates.touched(runId);
+        return true;
     }
 
-    /** A heartbeat; {@code false} if the step is no longer running at this attempt. */
+    /**
+     * A heartbeat; {@code false} if the step is no longer running at this attempt. A beat without a
+     * {@code percent} moves only the lease, which no run read shows, so it is not signalled.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    boolean extendLease(UUID stepId, short attempt, Instant now, Instant leaseUntil, Short percent,
+    boolean extendLease(UUID runId, UUID stepId, short attempt, Instant now, Instant leaseUntil, Short percent,
             short deliveryCount, Instant runDeadlineIfUnset) {
-        return runStepRepository.extendLease(stepId, attempt, now, leaseUntil, percent, deliveryCount,
-                runDeadlineIfUnset) == 1;
+        if (runStepRepository.extendLease(stepId, attempt, now, leaseUntil, percent, deliveryCount,
+                runDeadlineIfUnset) != 1) {
+            return false;
+        }
+        if (percent != null) {
+            runUpdates.touched(runId);
+        }
+        return true;
     }
 
     /** {@code running -> completed}; marks the owning run {@code completed} too if this was the last step. */
@@ -124,6 +140,7 @@ class RunStepTransactions {
         if (runStepRepository.completeIfRunning(stepId, runId, attempt, output, outputs, now) != 1) {
             return false;
         }
+        runUpdates.touched(runId);
         afterAccepted.run();
         completeRunIfAllStepsCompleted(runId, now);
         return true;
@@ -154,6 +171,7 @@ class RunStepTransactions {
         if (runStepRepository.failIfRunning(stepId, runId, attempt, code, message, now) != 1) {
             return false;
         }
+        runUpdates.touched(runId);
         creditAccounts.refundStep(runId, stepId, code);
         if (settleIfCancelling(runId, now)) {
             return true;
@@ -161,6 +179,7 @@ class RunStepTransactions {
         WorkflowRun run = requireRun(runId);
         if (run.markError(message, now)) {
             workflowRunRepository.save(run);
+            runUpdates.touched(runId);
             LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
         }
         return true;
@@ -178,6 +197,7 @@ class RunStepTransactions {
         if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
+            runUpdates.touched(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
     }
@@ -187,6 +207,7 @@ class RunStepTransactions {
         if (workflowRunRepository.settleCancelled(runId, now) != 1) {
             return false;
         }
+        runUpdates.touched(runId);
         LOG.info("Workflow run finished: runId={} status=cancelled", runId);
         return true;
     }

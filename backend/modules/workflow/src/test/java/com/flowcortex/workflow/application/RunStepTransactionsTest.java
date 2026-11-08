@@ -3,6 +3,8 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,8 +32,9 @@ class RunStepTransactionsTest {
 
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
+    private final RunUpdates runUpdates = mock(RunUpdates.class);
     private final RunStepTransactions transactions =
-            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class));
+            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class), runUpdates);
 
     private final UUID runId = UUID.randomUUID();
     private final UUID stepId = UUID.randomUUID();
@@ -153,5 +156,98 @@ class RunStepTransactionsTest {
         transactions.completeRunIfDone(runId, NOW);
 
         assertThat(run.getStatus().name()).isEqualTo("COMPLETED");
+        verify(runUpdates, atLeastOnce()).touched(runId);
+    }
+
+    @Test
+    void completeRunIfDoneSignalsNothingWhileAStepIsOpen() {
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        transactions.completeRunIfDone(runId, NOW);
+
+        verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void aWonClaimSignalsTheRunAndALostOneDoesNot() {
+        when(runStepRepository.claimPending(stepId, NOW, NOW.plusSeconds(120), "in")).thenReturn(1, 0);
+
+        transactions.claim(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), "in", () -> { });
+        verify(runUpdates).touched(runId);
+
+        transactions.claim(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), "in", () -> { });
+        verify(runUpdates).touched(runId);
+    }
+
+    @Test
+    void aWonCompletionSignalsTheRunAndALostOneDoesNot() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1, 0);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+        verify(runUpdates, atLeastOnce()).touched(runId);
+        clearInvocations(runUpdates);
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+        verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void aWonFailureSignalsTheRunAndALostOneDoesNot() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1, 0);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+        verify(runUpdates, atLeastOnce()).touched(runId);
+        clearInvocations(runUpdates);
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+        verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void aFailureThatSettlesACancellingRunSignalsIt() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
+        when(workflowRunRepository.settleCancelled(runId, NOW)).thenReturn(1);
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+
+        verify(runUpdates, atLeastOnce()).touched(runId);
+    }
+
+    @Test
+    void aLeaseExtensionSignalsOnlyWhenItCarriesAPercent() {
+        when(runStepRepository.extendLease(any(), anyShort(), any(), any(), any(), anyShort(), any())).thenReturn(1);
+
+        transactions.extendLease(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), null, (short) 0,
+                NOW.plusSeconds(300));
+        verify(runUpdates, never()).touched(any());
+
+        transactions.extendLease(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), (short) 40, (short) 0,
+                NOW.plusSeconds(300));
+        verify(runUpdates).touched(runId);
+    }
+
+    @Test
+    void aLeaseExtensionThatLostTheStepSignalsNothing() {
+        when(runStepRepository.extendLease(any(), anyShort(), any(), any(), any(), anyShort(), any())).thenReturn(0);
+
+        transactions.extendLease(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), (short) 40, (short) 0,
+                NOW.plusSeconds(300));
+
+        verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void aPickupThatAppliesSignalsTheRunAndOneThatDoesNotDoesNot() {
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1, 0);
+
+        transactions.recordPickup(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), NOW.plusSeconds(300),
+                (short) 0);
+        verify(runUpdates).touched(runId);
+
+        transactions.recordPickup(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), NOW.plusSeconds(300),
+                (short) 0);
+        verify(runUpdates).touched(runId);
     }
 }

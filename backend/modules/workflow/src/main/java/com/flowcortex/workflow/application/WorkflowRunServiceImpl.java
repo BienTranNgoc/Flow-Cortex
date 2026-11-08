@@ -86,13 +86,16 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final UserDirectory userDirectory;
     private final TransactionTemplate transactionTemplate;
     private final RunStartGuards runStartGuards;
+    private final RunUpdates runUpdates;
     private final boolean workflowEnabled;
 
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            ApplicationEventPublisher events, StepExecutorRegistry registry, MediaJobs mediaJobs,
-            UserDirectory userDirectory, TransactionTemplate transactionTemplate, RunStartGuards runStartGuards,
+            ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
+            MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
+            RunStartGuards runStartGuards,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.runUpdates = runUpdates;
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
         this.workflowRunRepository = workflowRunRepository;
@@ -193,6 +196,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                         stepDef.getInputRef()));
             }
             runSteps = runStepRepository.saveAll(runSteps);
+            runUpdates.touched(run.getId());
 
             // Published within this tx; RunAdvancer's @ApplicationModuleListener only
             // fires after commit — this method returns first.

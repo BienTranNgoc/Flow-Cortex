@@ -72,6 +72,9 @@ class RunStepClaimConcurrencyIT {
     @MockitoBean
     private CreditAccounts creditAccounts;
 
+    @MockitoBean
+    private RunUpdates runUpdates;
+
     @Test
     void exactlyOneOfTwoConcurrentClaimsSucceeds() throws Exception {
         WorkflowRun run = workflowRunRepository.saveAndFlush(
