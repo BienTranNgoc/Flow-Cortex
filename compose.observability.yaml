@@ -97,6 +97,8 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    # `internal` to scrape backend:8081, which is on no other network.
+    networks: [default, internal]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus

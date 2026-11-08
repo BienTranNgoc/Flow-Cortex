@@ -291,3 +291,149 @@ Format per entry: **Context → Decision → Consequences**.
   imports a sibling app by relative path (AGENTS.md §10); the packages are
   the sanctioned shared code. CI installs once at the root and runs each check
   across the workspaces.
+
+---
+
+## ADR-0010 — Egress isolation: one forward proxy with a domain allowlist
+
+- **Context:** ADR-0007 left URL ingest out because an IP-pinned HTTP guard
+  cannot protect yt-dlp, and required the download capability to run behind
+  egress isolation (`docs/ADR.md:191-196`, `:263-264`); this entry fulfils
+  that. Every outbound call the stack makes today:
+  - the backend: the Google OAuth token exchange and key fetch (both over
+    `HttpURLConnection`), the help-center Gemini client (`HttpURLConnection`),
+    the dub-step Gemini client (JDK `HttpClient`), and SMTP, which in the AWS
+    overlay goes to an external relay;
+  - the provider workers: `urllib` in the OpenAI, Seedance, Veo and Wan
+    adapters, the Edge TTS websocket, and result downloads, which the adapters
+    already restrict in code to a few vendor domains;
+  - the media worker makes none.
+
+  Before this change `backend` and both provider workers sat on the default
+  compose network, which has a route out, so a bug in any of them could reach
+  any host, including the cloud metadata address.
+- **Decision:** a forward proxy plus a domain allowlist is the only way out.
+  - **Proxy:** `egress-proxy` runs Smokescreen v0.1.0 with a default-deny
+    policy (`enforce`) and a hostname allowlist. It sits on `internal` and on
+    `egress`, the only network with a route out, and publishes no port.
+    `backend`, `provider-worker` and `provider-video-worker` are attached to
+    `internal` only, so a connection that skips the proxy fails.
+  - **Private ranges:** after DNS resolution Smokescreen refuses private,
+    loopback, link-local and carrier-grade-NAT addresses (and IPv6 forms that
+    embed IPv4), even for an allowlisted name. Compose service names and the
+    metadata address are therefore unreachable through it. No range exception
+    is configured.
+  - **Engine choice:** Smokescreen was built for SSRF defence, so the private
+    range block is its default behaviour, and SMTP over CONNECT needs no port
+    exception. It publishes no image for v0.1.0, so `infra/egress-proxy/`
+    builds one: the release tarball is fetched per architecture and checked
+    against pinned SHA-256 values, and the runtime stage is
+    `gcr.io/distroless/static:nonroot` pinned by digest. `egress-proxy` also
+    starts with `--disable-acl-policy-action=open` and loads its ACL through
+    `--egress-acl-file`, because Smokescreen v0.1.0 enforces the disabled
+    policy only on an ACL given by that flag (an `acl_file` in the config
+    file alone still starts on an open default). The committed ACL therefore
+    cannot be widened to an open policy by editing its default.
+  - **Open tier for URL downloads:** a second service, `egress-fetch`, runs
+    the same image with the policy `open` (any public host) behind the same
+    private-range block, rate limits (100 concurrent requests, 50 requests per
+    second, burst 150, 50 concurrent CONNECT tunnels) and its own network
+    `fetch`, which is `internal` and has no member but `egress-fetch`. Only
+    URL-fetch code joins `fetch`; `backend` and the provider workers stay on
+    `internal` and cannot reach it. The first URL-fetch service joins `fetch`
+    in its own change, so the tier is built and checked but idle until then.
+  - **Topology:** services that publish a host port keep `default` (a
+    published port on a container whose only networks are internal did not
+    work when tried), so `postgres`, `mailpit`, `frontend` and `admin` are on
+    `default` and `internal`. `127.0.0.1:8080` is kept by a one-line relay,
+    `api-publish` (`alpine/socat`, pinned by digest), on `default` and
+    `internal`, so every caller of that address is unchanged.
+  - **Clients:** the backend JVM gets `JAVA_TOOL_OPTIONS` with the proxy and a
+    `http.nonProxyHosts` list for the internal services; the provider workers
+    get `HTTP_PROXY`, `HTTPS_PROXY` and `WSS_PROXY` (the Edge TTS websocket
+    reads `WSS_PROXY`) and a `NO_PROXY` list for `minio`, `rabbitmq` and
+    `otel-collector`. In the AWS overlay SMTP goes through the proxy with the
+    Jakarta Mail `mail.smtp.proxy.host` and `.port` properties.
+  - **Guard:** `scripts/check-egress-isolation.sh` reads
+    `docker compose config` for the base file and each overlay and fails when
+    an application service regains a non-internal network, when anything but
+    the two proxies is on `egress`, when a proxy publishes a port, or when
+    `fetch` is not internal or has another member. CI runs it.
+  - **Allowlist per environment:** the committed list is
+    `infra/egress-proxy/acl.yaml`, seeded with the hosts the code calls:
+    `*.googleapis.com`, `api.openai.com`, `api.replicate.com`,
+    `replicate.delivery`, `*.replicate.delivery`, `*.bytepluses.com`,
+    `*.volces.com`, `*.aliyuncs.com` and `speech.platform.bing.com`. Compose
+    mounts the file named by `EGRESS_ACL_FILE` (default: the committed one);
+    `compose.aws.yaml` requires the variable, so the AWS host keeps its own
+    copy outside the checkout, with its SMTP relay host added.
+  - **Add a host without a code deploy:** edit the file `EGRESS_ACL_FILE`
+    names, then run `docker compose up -d --force-recreate egress-proxy`. No
+    application image is rebuilt and neither the backend nor a worker is
+    restarted. A live reload was not measured, so recreate is the documented
+    path. Policy `report` (allow and log unlisted hosts) exists for finding
+    hosts before enforcing.
+  - **URL downloads and yt-dlp:** they use `egress-fetch` and nothing else,
+    because yt-dlp resolves and follows hosts a vendor allowlist cannot list,
+    and an IP-pinned HTTP guard cannot protect it (ADR-0007). The risk that
+    remains is that a URL-fetch bug can send traffic to any public host; the
+    private-range block, the rate limits, the internal-only `fetch` network
+    and the guard script bound it. **No residential upstream proxy exists at
+    launch**: nothing has measured that a platform blocks the cloud address,
+    and an upstream proxy adds cost and a third party that sees every URL. A
+    measured platform block on the deployment's address reopens that decision;
+    the hook is an upstream-proxy setting on `egress-fetch`, so no application
+    code changes. Adding it is a change of its own. The open tier itself is
+    reopened for review if the limits prove wrong for real traffic: the values
+    are Smokescreen's README example, not tuned to Nodi.
+- **Alternatives:**
+  - **Squid:** rejected. Its default configuration uses the private ranges as
+    source ACLs, so a destination block has to be written by hand and kept
+    correct, and it denies CONNECT to ports other than 443 by default, so SMTP
+    through the proxy needs an exception. Smokescreen gives both for free.
+  - **No proxy: a host firewall, or `enable_ip_masquerade=false` on
+    `default`:** rejected. Neither is portable to the compose smoke job, and
+    the second fails open when the host does its own NAT.
+  - **A single enforce-only proxy with no open tier:** rejected, because URL
+    downloads cannot be allowlisted.
+  - **Dropping the `backend` publish and sending callers through `frontend`:**
+    rejected: `/readyz` is not under `/api/`, so the nginx proxy and several
+    scripts and docs would change.
+- **Consequences:**
+  - **High availability:** a single `egress-proxy` container with
+    `restart: unless-stopped`. It is a single point of failure for third-party
+    calls; replicas are the follow-up. The image has no shell, so there is no
+    container healthcheck and dependents wait with `service_started`.
+  - **Fail closed:** while the proxy is down, or when a client ignores the
+    proxy settings, the call fails instead of connecting directly: the
+    network is internal. The Python adapters raise `TransientError` on
+    `URLError`, and Google sign-in answers its existing token-endpoint
+    failure.
+  - **An allowlist gap breaks one provider** while the rest work.
+    Operator-supplied base URLs (`SCRIPT_PROVIDER_BASE_URL`,
+    `FLOWCORTEX_PROVIDER_BASE_URL`, `SEEDANCE_BASE_URL`, `GEMINI_BASE_URL`)
+    point at hosts the seed cannot know, so the operator lists the exact host.
+    A `*.` glob does not match the bare domain: `SEEDANCE_BASE_URL` may be the
+    bare `bytepluses.com` (`worker/src/flowcortex_worker/provider/seedance_adapter.py:226`
+    accepts it), which then needs its own entry, and a `GEMINI_BASE_URL` host
+    outside `*.googleapis.com` needs one too.
+  - **Client rule for later changes:** the JDK `HttpClient` and
+    `HttpURLConnection` honour the JVM proxy properties, so a client built on
+    them needs no extra setting. Any other client library is checked against
+    the proxy when it is introduced, or configured with the proxy explicitly;
+    Reactor Netty does not honour the properties by default. A client that
+    ignores them fails closed on the internal network, which is a defect to
+    fix, not a bypass.
+  - **Services with a published port keep a route out** (`default`), so they
+    must not run URL-fetching or other outbound-call code; the guard script
+    lists them by name, and a new service fails the check until it is
+    internal-only or consciously added to that list.
+  - **Large downloads:** result downloads of up to 100 MB pass through the
+    proxy; a 32 MB ranged download through `egress-proxy` completed in 2.7 s,
+    and the tunnel idle timeout on slower or larger transfers was not measured.
+  - **Client address:** direct calls to `127.0.0.1:8080` now reach `backend`
+    from the relay container. Every host caller already shared one address,
+    so per-IP limits behave as before; browser calls through `frontend` keep
+    the forwarded client address.
+  - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
+    internet route and how to add a host.

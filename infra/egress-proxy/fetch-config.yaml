@@ -1,0 +1,8 @@
+ip: 0.0.0.0
+port: 4750
+acl_file: /config/acl.yaml
+allow_missing_role: true
+max_concurrent_requests: 100
+max_request_rate: 50
+max_request_burst: 150
+max_concurrent_connect_tunnels: 50

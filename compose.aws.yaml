@@ -37,6 +37,13 @@ services:
     environment:
       MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)}
 
+  # The allowlist lives outside the checkout on the host: it needs the SMTP relay
+  # host, which differs per deployment. Replaces the base file's mount list.
+  egress-proxy:
+    volumes: !override
+      - ${EGRESS_ACL_FILE:?Set EGRESS_ACL_FILE (see .env.example)}:/config/acl.yaml:ro
+      - ./infra/egress-proxy/config.yaml:/config/config.yaml:ro
+
   backend:
     environment:
       S3_PUBLIC_ENDPOINT: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
@@ -51,6 +58,9 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:?Set SPRING_MAIL_PASSWORD to the relay password (see .env.example)}
       SPRING_MAIL_SMTP_AUTH: "true"
       SPRING_MAIL_SMTP_STARTTLS: "true"
+      # Jakarta Mail tunnels SMTP through the egress proxy; the relay host must be in its ACL.
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_PROXY_HOST: egress-proxy
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_PROXY_PORT: "4750"
       # Off until a real SMS sender exists: the dev `outbox` sender keeps codes in a DB table.
       FLOWCORTEX_SMS_SENDER: ""
       FLOWCORTEX_PHONE_VERIFICATION_ENABLED: "false"

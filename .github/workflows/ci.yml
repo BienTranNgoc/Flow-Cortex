@@ -57,7 +57,7 @@ jobs:
           area frontend '^(frontend/|admin/|packages/|package\.json$|package-lock\.json$|\.prettierrc$|docs/openapi\.yaml$|\.github/workflows/frontend-ci\.yml$)'
           area contracts '^(contracts/|backend/modules/media/|worker/|\.github/workflows/contracts-ci\.yml$)'
           area worker '^(worker/|contracts/|\.github/workflows/worker-ci\.yml$)'
-          area smoke '^(backend/|worker/|contracts/|frontend/|admin/|packages/|infra/|docker-compose\.yml$|\.env\.example$|package\.json$|package-lock\.json$|scripts/smoke-probe\.sh$|\.github/workflows/compose-smoke\.yml$)|(^|/)Dockerfile$'
+          area smoke '^(backend/|worker/|contracts/|frontend/|admin/|packages/|infra/|docker-compose\.yml$|compose\.(aws|observability)\.yaml$|observability/|\.env\.example$|package\.json$|package-lock\.json$|scripts/smoke-probe\.sh$|scripts/check-egress-isolation\.sh$|\.github/workflows/compose-smoke\.yml$)|(^|/)Dockerfile$'
 
   backend:
     needs: changes

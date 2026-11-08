@@ -1,0 +1,5 @@
+ip: 0.0.0.0
+port: 4750
+acl_file: /config/acl.yaml
+# Clients carry no identity; every request is judged by the default policy.
+allow_missing_role: true

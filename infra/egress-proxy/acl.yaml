@@ -1,0 +1,17 @@
+version: v1
+# The loader insists on a services list; clients carry no identity, so it stays empty.
+services: []
+default:
+  name: default
+  project: flow-cortex
+  action: enforce
+  allowed_domains:
+    - '*.googleapis.com'
+    - api.openai.com
+    - api.replicate.com
+    - replicate.delivery
+    - '*.replicate.delivery'
+    - '*.bytepluses.com'
+    - '*.volces.com'
+    - '*.aliyuncs.com'
+    - speech.platform.bing.com
