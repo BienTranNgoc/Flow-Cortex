@@ -8,6 +8,7 @@ ARG SHA256_AMD64=4e1e447449e3cc653dae956208588722b5c8fe8ce894f633adc756a851d1ec4
 ARG SHA256_ARM64=f15ddd0dc2b2cbc6d7318f441928939eb9bedfab2a1881508af3096a1e24b7c9
 
 WORKDIR /dl
+RUN apk add --no-cache curl
 RUN set -eu; \
     case "${TARGETARCH}" in \
       amd64) sum="${SHA256_AMD64}" ;; \
@@ -15,7 +16,8 @@ RUN set -eu; \
       *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     file="smokescreen_${SMOKESCREEN_VERSION}_linux_${TARGETARCH}.tar.gz"; \
-    wget -q "https://github.com/stripe/smokescreen/releases/download/${SMOKESCREEN_VERSION}/${file}"; \
+    curl -fsSL --proto '=https' --proto-redir '=https' -o "${file}" \
+      "https://github.com/stripe/smokescreen/releases/download/${SMOKESCREEN_VERSION}/${file}"; \
     echo "${sum}  ${file}" | sha256sum -c -; \
     tar -xzf "${file}"; \
     mv "smokescreen_${SMOKESCREEN_VERSION}_linux_${TARGETARCH}/smokescreen" /smokescreen
