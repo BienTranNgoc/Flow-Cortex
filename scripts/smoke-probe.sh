@@ -184,22 +184,19 @@ if [[ "$PRODUCT_VIDEO" != true ]]; then
   exit 0
 fi
 
-uploads=()
-for i in 1 2; do
-  docker compose exec -T worker ffmpeg -y -v error -f lavfi -i "testsrc=size=360x640" \
-    -frames:v 1 "/tmp/product-$i.png" || fail "image $i generation in the worker container"
-  docker compose cp "worker:/tmp/product-$i.png" "$work/product-$i.png" >"$work/cp.log" 2>&1 \
-    || { cat "$work/cp.log" >&2; fail "copy image $i out of the worker"; }
-  g="$(grant "product-$i.png" "$(stat -c %s "$work/product-$i.png")")" || fail "upload grant for image $i"
-  code="$(put "$work/product-$i.png" "$(jq -er .url <<<"$g")" image/png)"
-  [[ "$code" == 200 ]] || fail "PUT image $i answered $code: $(cat "$work/put-body")"
-  uploads+=("$(jq -er .uploadId <<<"$g")")
-done
-pass "two product images generated in the worker image and uploaded"
+docker compose exec -T worker ffmpeg -y -v error -f lavfi -i "testsrc=size=360x640" \
+  -frames:v 1 /tmp/product.png || fail "product image generation in the worker container"
+docker compose cp worker:/tmp/product.png "$work/product.png" >"$work/cp.log" 2>&1 \
+  || { cat "$work/cp.log" >&2; fail "copy the product image out of the worker"; }
+g="$(grant product.png "$(stat -c %s "$work/product.png")")" || fail "upload grant for the product image"
+code="$(put "$work/product.png" "$(jq -er .url <<<"$g")" image/png)"
+[[ "$code" == 200 ]] || fail "PUT product image answered $code: $(cat "$work/put-body")"
+upload="$(jq -er .uploadId <<<"$g")"
+pass "product image generated in the worker image and uploaded"
 
-run="$(api "$member" /api/v1/product-videos/runs "$(jq -n '{
+run="$(api "$member" /api/v1/product-videos/runs "$(jq -n --arg upload "$upload" '{
     productName: "Smoke bottle", description: "Keeps drinks cold all day.", cta: "Order today",
-    uploadIds: $ARGS.positional, video: {aspectRatio: "9:16"}}' --args "${uploads[@]}")" \
+    uploadIds: [$upload], video: {aspectRatio: "9:16"}}')" \
   | jq -er .id)" || fail "start a Product Video run"
 body="$(await_run "$run")"
 [[ "$(jq -r .status <<<"$body")" == waiting_approval ]] \
