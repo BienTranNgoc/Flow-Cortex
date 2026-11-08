@@ -289,6 +289,8 @@ services:
       FLOWCORTEX_PHONE_GLOBAL_SENDS_PER_DAY: ${FLOWCORTEX_PHONE_GLOBAL_SENDS_PER_DAY:-2000}
       FLOWCORTEX_PHONE_SEND_ATTEMPT_RETENTION: ${FLOWCORTEX_PHONE_SEND_ATTEMPT_RETENTION:-30d}
       FLOWCORTEX_SMS_OUTBOX_RETENTION: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:-7d}
+      # Personal spaces: off makes the session space answer 503; spaces are still provisioned.
+      FLOWCORTEX_SPACES_ENABLED: ${FLOWCORTEX_SPACES_ENABLED:-true}
       # Confirmation mail goes to the Mailpit sink unless .env names a relay; links in it point
       # at the member app.
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
