@@ -17,12 +17,13 @@ import java.util.UUID;
 record WorkflowResponse(
         UUID id, String name, boolean isShared, Instant createdAt, Instant updatedAt,
         List<WorkflowStepResponse> steps, Long estimatedCredits,
-        @Schema(requiredMode = RequiredMode.REQUIRED) boolean available) {
+        @Schema(requiredMode = RequiredMode.REQUIRED) boolean available,
+        @Schema(allowableValues = {"draft", "published"}) String status) {
 
     static WorkflowResponse from(WorkflowView view, CreditAccounts credits) {
         return new WorkflowResponse(view.id(), view.name(), view.shared(), view.createdAt(), view.updatedAt(),
                 view.steps().stream().map(WorkflowStepResponse::from).toList(),
                 credits.enabled() ? credits.estimate(view.steps().stream().map(WorkflowStepView::type).toList()) : null,
-                view.available());
+                view.available(), view.status());
     }
 }

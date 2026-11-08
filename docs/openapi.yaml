@@ -352,6 +352,62 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows:
+    get:
+      tags:
+      - workflows-controller
+      operationId: listWorkflows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowResponse"
+    post:
+      tags:
+      - workflows-controller
+      operationId: createWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/steps:
+    post:
+      tags:
+      - workflows-controller
+      operationId: addStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -1101,6 +1157,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/admin/workflows:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: createAdminWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/admin/workflows/{id}/steps:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: addAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -1297,20 +1396,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/workflows:
-    get:
-      tags:
-      - workflows-controller
-      operationId: listWorkflows
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowResponse"
   /api/v1/workflows/{id}:
     get:
       tags:
@@ -1330,6 +1415,145 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+    delete:
+      tags:
+      - workflows-controller
+      operationId: deleteWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/workflows/{id}:
+    delete:
+      tags:
+      - admin-workflows-controller
+      operationId: deleteAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/admin/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/support/settings:
     get:
       tags:
@@ -2423,6 +2647,93 @@ components:
       - status
       - title
       - updatedAt
+    CreateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        shared:
+          type: boolean
+      required:
+      - name
+    WorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        isShared:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepResponse"
+        estimatedCredits:
+          type: integer
+          format: int64
+        available:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      required:
+      - available
+    WorkflowStepResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+        type:
+          type: string
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+        inputRef:
+          type: string
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - mode
+    CreateStepRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
+      required:
+      - type
     RunOptionsRequest:
       type: object
       properties:
@@ -3152,53 +3463,35 @@ components:
       required:
       - body
       - status
-    WorkflowResponse:
+    UpdateWorkflowRequest:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
         name:
           type: string
-        isShared:
+          maxLength: 255
+          minLength: 0
+          pattern: (?s)\s*\S.*
+        shared:
           type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        steps:
-          type: array
-          items:
-            $ref: "#/components/schemas/WorkflowStepResponse"
-        estimatedCredits:
-          type: integer
-          format: int64
-        available:
-          type: boolean
-      required:
-      - available
-    WorkflowStepResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        stepOrder:
-          type: integer
-          format: int32
-        name:
-          type: string
-        type:
-          type: string
-        mode:
+        status:
           type: string
           enum:
-          - inline
-          - remote
-      required:
-      - mode
+          - draft
+          - published
+          pattern: draft|published
+    UpdateStepRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
     SupportSettings:
       type: object
       properties:
