@@ -912,6 +912,7 @@ export interface FeaturesResponse {
 
 export interface BalanceResponse {
   balance?: number;
+  granted?: number;
 }
 
 export interface CapabilitiesResponse {

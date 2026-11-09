@@ -22,6 +22,9 @@ public interface CreditAccounts {
     /** The member's balance; {@code 0} when they have no wallet yet. */
     long balance(UUID userId);
 
+    /** Credits ever added to the member's wallet by a crediting kind; {@code 0} without any. */
+    long granted(UUID userId);
+
     /**
      * Charges the step's cost in the caller's transaction, only if the balance covers it. Returns
      * {@code false} when it does not (nothing is written); a step that costs nothing is never recorded.

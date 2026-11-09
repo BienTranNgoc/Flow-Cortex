@@ -3438,6 +3438,9 @@ components:
         balance:
           type: integer
           format: int64
+        granted:
+          type: integer
+          format: int64
     CapabilitiesResponse:
       type: object
       properties:

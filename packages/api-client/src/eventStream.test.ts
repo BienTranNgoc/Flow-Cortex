@@ -1,4 +1,5 @@
 import { openEventStream, type StreamEvent } from './eventStream';
+import { subscribeNetworkSignals, type NetworkSignal } from './networkSignals';
 import { setToken } from './tokenStore';
 
 const encoder = new TextEncoder();
@@ -314,5 +315,80 @@ describe('openEventStream', () => {
     await vi.advanceTimersByTimeAsync(60_000);
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  describe('network signals', () => {
+    let signals: NetworkSignal[];
+    let unsubscribe: () => void;
+
+    beforeEach(() => {
+      signals = [];
+      unsubscribe = subscribeNetworkSignals((signal) => signals.push(signal));
+    });
+
+    afterEach(() => unsubscribe());
+
+    const types = () => signals.map((signal) => signal.type);
+
+    it('sends one stream-down for a rejected fetch, however many retries follow', async () => {
+      const handle = open([
+        () => {
+          throw new TypeError('network down');
+        },
+        () => {
+          throw new TypeError('network down');
+        },
+      ]);
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(types()).toEqual(['stream-down']);
+      handle.close();
+    });
+
+    it('sends stream-up for the same stream when a later connection opens', async () => {
+      const stream = liveStream();
+      const handle = open([
+        () => {
+          throw new TypeError('network down');
+        },
+        stream.response,
+      ]);
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(types()).toEqual(['stream-down', 'stream-up']);
+      expect(signals[1]).toMatchObject({ streamId: (signals[0] as { streamId: number }).streamId });
+      handle.close();
+    });
+
+    it('sends nothing when the body ends cleanly', async () => {
+      const stream = liveStream();
+      const handle = open([stream.response, liveStream().response]);
+      await settle();
+      stream.end();
+      await settle();
+
+      expect(signals).toEqual([]);
+      handle.close();
+    });
+
+    it('reports a 429 as rate-limited with no wait, without counting as down', async () => {
+      const handle = open([problem(429)]);
+      await settle();
+
+      expect(signals).toEqual([{ type: 'rate-limited', waitSeconds: null }]);
+      handle.close();
+    });
+
+    it('sends stream-up when close() ends a stream that is down', async () => {
+      const handle = open([problem(503)]);
+      await settle();
+      expect(types()).toEqual(['stream-down']);
+
+      handle.close();
+
+      expect(types()).toEqual(['stream-down', 'stream-up']);
+    });
   });
 });

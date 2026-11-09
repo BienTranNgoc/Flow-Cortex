@@ -399,6 +399,66 @@ a:focus-visible {
   animation-timing-function: var(--ease-standard);
 }
 
+/* ----- Error view -------------------------------------------------------- */
+
+.error-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 60dvh;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--ink);
+}
+
+.error-view--root {
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+.error-view h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.error-view p {
+  max-width: 32rem;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.98rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.error-view button {
+  min-height: var(--control-h);
+  min-width: var(--hit-min);
+  margin-top: 0.5rem;
+  padding: 0.38rem 1.25rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.error-view button:hover,
+.error-view button:active {
+  background: var(--primary-hover);
+}
+
+.error-view button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* ----- Primary button ---------------------------------------------------- */
 
 .primary-button {
