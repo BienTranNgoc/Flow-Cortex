@@ -326,6 +326,10 @@ def _check_style(raw: Any, path: str) -> Mapping[str, Any]:
     return style
 
 
+def _line_endings(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _check_cue(raw: Any, path: str) -> CaptionCue:
     cue = _mapping(raw, path)
     start = _int(cue.get("startMs"), f"{path}.startMs")
@@ -338,7 +342,7 @@ def _check_cue(raw: Any, path: str) -> CaptionCue:
         word = _mapping(raw_word, here)
         words.append(
             CaptionWord(
-                _string(word.get("t"), f"{here}.t"),
+                _line_endings(_string(word.get("t"), f"{here}.t")),
                 _int(word.get("startMs"), f"{here}.startMs"),
                 _int(word.get("endMs"), f"{here}.endMs"),
             )
@@ -348,7 +352,7 @@ def _check_cue(raw: Any, path: str) -> CaptionCue:
         id=_string(cue.get("id", ""), f"{path}.id"),
         start_ms=start,
         end_ms=end,
-        text=_string(cue.get("text"), f"{path}.text"),
+        text=_line_endings(_string(cue.get("text"), f"{path}.text")),
         style_id=_optional_string(cue.get("styleId"), f"{path}.styleId"),
         row=None if row is None else _string(row, f"{path}.row", minimum=1),
         words=tuple(words),

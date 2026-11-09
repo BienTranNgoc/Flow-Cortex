@@ -170,7 +170,9 @@ def timecode(ms: float) -> str:
 
 
 def ass_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", "\\N")
+    escaped = text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+    # libass ends a script line at a bare CR, so none may reach the file.
+    return escaped.replace("\r\n", "\\N").replace("\r", "\\N").replace("\n", "\\N")
 
 
 def _is_syllable(token: str) -> bool:
@@ -280,20 +282,21 @@ def karaoke_text(
     return out
 
 
-def _clusters(cues: Sequence[PlannedCue]) -> list[list[PlannedCue]]:
+def _clusters(cues: Sequence[PlannedCue]) -> list[list[tuple[int, PlannedCue]]]:
     """Cues overlapping in time, directly or through a third; touching edges do not overlap."""
-    ordered = sorted(cues, key=lambda c: (c.start_ms, c.id))
-    clusters: list[list[PlannedCue]] = []
-    current: list[PlannedCue] = []
+    ordered = sorted(enumerate(cues), key=lambda ic: (ic[1].start_ms, ic[0]))
+    clusters: list[list[tuple[int, PlannedCue]]] = []
+    current: list[tuple[int, PlannedCue]] = []
     current_end = 0.0
-    for cue in ordered:
+    for item in ordered:
+        cue = item[1]
         if current and cue.start_ms < current_end:
-            current.append(cue)
+            current.append(item)
             current_end = max(current_end, cue.end_ms)
         else:
             if current:
                 clusters.append(current)
-            current, current_end = [cue], cue.end_ms
+            current, current_end = [item], cue.end_ms
     if current:
         clusters.append(current)
     return clusters
@@ -301,22 +304,22 @@ def _clusters(cues: Sequence[PlannedCue]) -> list[list[PlannedCue]]:
 
 def stack_positions(
     cues: Sequence[PlannedCue], styles: CaptionStyles, width: int, height: int
-) -> dict[str, tuple[int, int, int]]:
-    """`(x, y, \\an)` per cue id for every overlapping cluster that spans two or more rows.
+) -> dict[int, tuple[int, int, int]]:
+    """`(x, y, \\an)` per cue index in `cues`, for every overlapping cluster of two or more rows.
 
     Each row gets one slot for the whole cluster, as tall as that row's tallest block, so a
     cue does not drift while another row is silent. Slots stack from the style's anchor: bottom
     keeps the lowest slot at the margin, top keeps the highest, middle centres the pile, and a
     free position (`x`/`y`) centres each block in its slot. A single-row cluster is left to libass.
     """
-    out: dict[str, tuple[int, int, int]] = {}
+    out: dict[int, tuple[int, int, int]] = {}
     for cluster in _clusters(cues):
-        rows = sorted({c.row_index or 0 for c in cluster})
+        rows = sorted({c.row_index or 0 for _, c in cluster})
         if len(rows) < 2:
             continue
         slot = dict.fromkeys(rows, 0.0)
-        info: list[tuple[PlannedCue, int, str, float, float]] = []
-        for cue in cluster:
+        info: list[tuple[int, int, str, float, float]] = []
+        for index, cue in cluster:
             style = styles.of(cue.style_id)
             row = cue.row_index or 0
             if cue.text:
@@ -331,11 +334,11 @@ def stack_positions(
                 kind, cx, cy = "middle", width / 2, height / 2
             else:
                 kind, cx, cy = "bottom", width / 2, float(height - style.caption.margin_v)
-            info.append((cue, row, kind, cx, cy))
+            info.append((index, row, kind, cx, cy))
         above = {r: sum(slot[q] for q in rows if q < r) for r in rows}
         below = {r: sum(slot[q] for q in rows if q > r) for r in rows}
         total, last = sum(slot.values()), slot[rows[-1]]
-        for cue, row, kind, cx, cy in info:
+        for index, row, kind, cx, cy in info:
             if kind == "top":
                 y, an = cy + above[row], 8
             elif kind == "middle":
@@ -344,7 +347,7 @@ def stack_positions(
                 y, an = cy - below[row] + (last - slot[row]) / 2, 5
             else:
                 y, an = cy - below[row], 2
-            out[cue.id] = (_js_round(cx), _js_round(y), an)
+            out[index] = (_js_round(cx), _js_round(y), an)
     return out
 
 
@@ -408,7 +411,7 @@ def ass_document(plan: TimelinePlan, styles: CaptionStyles, start_ms: float, dur
         "Format: Layer,Start,End,Style,Text",
     ]
     stacked = stack_positions(plan.cues, styles, width, height)
-    for cue in plan.cues:
+    for index, cue in enumerate(plan.cues):
         low, high = max(cue.start_ms, start_ms), min(cue.end_ms, end_ms)
         if high <= low:
             continue
@@ -421,7 +424,7 @@ def ass_document(plan: TimelinePlan, styles: CaptionStyles, start_ms: float, dur
             # Without word times there is no \k tag, and libass would fill the whole cue with
             # PrimaryColour (the highlight), so the text colour is set back explicitly.
             text = f"{{\\1c{_inline_colour(style.text_hex)}}}{caption_text(cue.text, style)}"
-        lead = caption_lead(style, cue.start_ms >= start_ms, stacked.get(cue.id))
+        lead = caption_lead(style, cue.start_ms >= start_ms, stacked.get(index))
         lines.append(
             f"Dialogue: 0,{timecode(low - start_ms)},{timecode(high - start_ms)},"
             f"{style.name},{lead}{text}"

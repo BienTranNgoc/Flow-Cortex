@@ -270,6 +270,30 @@ def test_top_anchored_rows_stack_downwards() -> None:
     assert "{\\an8\\pos(540,502)}" in bottom
 
 
+@pytest.mark.parametrize("ids", [("a", "b"), ("x", "x"), (None, None)])
+def test_stacked_slots_do_not_depend_on_cue_ids(ids: tuple[str | None, str | None]) -> None:
+    cues = []
+    for cue_id, row in zip(ids, ("rw1", "rw2"), strict=True):
+        item = cue(row=row, endMs=2000)
+        if cue_id is None:
+            del item["id"]
+        else:
+            item["id"] = cue_id
+        cues.append(item)
+    mutate = captions(cues, rows=[{"id": "rw1"}, {"id": "rw2"}])
+    first, second = dialogues(render(mutate))
+    assert "{\\an2\\pos(540,1519)}" in first
+    assert "{\\an2\\pos(540,1620)}" in second
+
+
+def test_crlf_in_cue_text_is_one_typed_newline() -> None:
+    text = render(captions([cue(text="A\r\nB")]))
+    (line,) = dialogues(text)
+    assert line.endswith("A\\NB")
+    assert "\r" not in text
+    assert ass_escape("A\rB\r\nC") == "A\\NB\\NC"
+
+
 def test_single_row_overlap_is_left_to_libass() -> None:
     cues = [cue(id="one"), cue(id="two", row="rw1")]
     for line in dialogues(render(captions(cues))):
