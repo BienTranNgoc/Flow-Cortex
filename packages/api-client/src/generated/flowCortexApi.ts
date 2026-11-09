@@ -316,7 +316,8 @@ export interface WorkflowStepResponse {
   name?: string;
   type?: string;
   mode: WorkflowStepResponseMode;
-  inputRef?: string;
+  /** @nullable */
+  inputRef?: string | null;
   /** @nullable */
   config?: string | null;
 }
@@ -1876,10 +1877,39 @@ export type createWorkflowResponse201 = {
   status: 201;
 };
 
+export type createWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type createWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
   headers: Headers;
 };
-export type createWorkflowResponse = createWorkflowResponseSuccess;
+export type createWorkflowResponseError = (
+  | createWorkflowResponse400
+  | createWorkflowResponse403
+  | createWorkflowResponse404
+  | createWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createWorkflowResponse = createWorkflowResponseSuccess | createWorkflowResponseError;
 
 export const getCreateWorkflowUrl = () => {
   return `/api/v1/workflows`;
@@ -1921,10 +1951,36 @@ export type addStepResponse201 = {
   status: 201;
 };
 
+export type addStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type addStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
-export type addStepResponse = addStepResponseSuccess;
+export type addStepResponseError = (
+  addStepResponse400 | addStepResponse403 | addStepResponse404 | addStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addStepResponse = addStepResponseSuccess | addStepResponseError;
 
 export const getAddStepUrl = (id: string) => {
   return `/api/v1/workflows/${id}/steps`;
@@ -3326,10 +3382,40 @@ export type createAdminWorkflowResponse201 = {
   status: 201;
 };
 
+export type createAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type createAdminWorkflowResponseSuccess = createAdminWorkflowResponse201 & {
   headers: Headers;
 };
-export type createAdminWorkflowResponse = createAdminWorkflowResponseSuccess;
+export type createAdminWorkflowResponseError = (
+  | createAdminWorkflowResponse400
+  | createAdminWorkflowResponse404
+  | createAdminWorkflowResponse409
+  | createAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminWorkflowResponse =
+  createAdminWorkflowResponseSuccess | createAdminWorkflowResponseError;
 
 export const getCreateAdminWorkflowUrl = () => {
   return `/api/v1/admin/workflows`;
@@ -3371,10 +3457,40 @@ export type addAdminWorkflowStepResponse201 = {
   status: 201;
 };
 
+export type addAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type addAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type addAdminWorkflowStepResponseSuccess = addAdminWorkflowStepResponse201 & {
   headers: Headers;
 };
-export type addAdminWorkflowStepResponse = addAdminWorkflowStepResponseSuccess;
+export type addAdminWorkflowStepResponseError = (
+  | addAdminWorkflowStepResponse400
+  | addAdminWorkflowStepResponse404
+  | addAdminWorkflowStepResponse409
+  | addAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addAdminWorkflowStepResponse =
+  addAdminWorkflowStepResponseSuccess | addAdminWorkflowStepResponseError;
 
 export const getAddAdminWorkflowStepUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}/steps`;
@@ -3764,10 +3880,39 @@ export type deleteWorkflowResponse204 = {
   status: 204;
 };
 
+export type deleteWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
   headers: Headers;
 };
-export type deleteWorkflowResponse = deleteWorkflowResponseSuccess;
+export type deleteWorkflowResponseError = (
+  | deleteWorkflowResponse400
+  | deleteWorkflowResponse403
+  | deleteWorkflowResponse404
+  | deleteWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowResponse = deleteWorkflowResponseSuccess | deleteWorkflowResponseError;
 
 export const getDeleteWorkflowUrl = (id: string) => {
   return `/api/v1/workflows/${id}`;
@@ -3783,15 +3928,36 @@ export const deleteWorkflow = async (
   });
 };
 
-export type updateWorkflowResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
+export type updateWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateWorkflowResponseSuccess = updateWorkflowResponse200 & {
+export type updateWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateWorkflowResponseError = (
+  | updateWorkflowResponse400
+  | updateWorkflowResponse403
+  | updateWorkflowResponse404
+  | updateWorkflowResponse422
+) & {
   headers: Headers;
 };
-export type updateWorkflowResponse = updateWorkflowResponseSuccess;
+
+export type updateWorkflowResponse = updateWorkflowResponseError;
 
 export const getUpdateWorkflowUrl = (id: string) => {
   return `/api/v1/workflows/${id}`;
@@ -3829,15 +3995,33 @@ export const updateWorkflow = async (
   });
 };
 
-export type updateStepResponse200 = {
-  data: WorkflowStepResponse;
-  status: 200;
+export type updateStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateStepResponseSuccess = updateStepResponse200 & {
+export type updateStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateStepResponseError = (
+  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
+) & {
   headers: Headers;
 };
-export type updateStepResponse = updateStepResponseSuccess;
+
+export type updateStepResponse = updateStepResponseError;
 
 export const getUpdateStepUrl = (id: string, stepId: string) => {
   return `/api/v1/workflows/${id}/steps/${stepId}`;
@@ -3881,10 +4065,40 @@ export type deleteAdminWorkflowResponse204 = {
   status: 204;
 };
 
+export type deleteAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type deleteAdminWorkflowResponseSuccess = deleteAdminWorkflowResponse204 & {
   headers: Headers;
 };
-export type deleteAdminWorkflowResponse = deleteAdminWorkflowResponseSuccess;
+export type deleteAdminWorkflowResponseError = (
+  | deleteAdminWorkflowResponse400
+  | deleteAdminWorkflowResponse404
+  | deleteAdminWorkflowResponse409
+  | deleteAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowResponse =
+  deleteAdminWorkflowResponseSuccess | deleteAdminWorkflowResponseError;
 
 export const getDeleteAdminWorkflowUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}`;
@@ -3900,15 +4114,36 @@ export const deleteAdminWorkflow = async (
   });
 };
 
-export type updateAdminWorkflowResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
+export type updateAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateAdminWorkflowResponseSuccess = updateAdminWorkflowResponse200 & {
+export type updateAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowResponseError = (
+  | updateAdminWorkflowResponse400
+  | updateAdminWorkflowResponse404
+  | updateAdminWorkflowResponse409
+  | updateAdminWorkflowResponse422
+) & {
   headers: Headers;
 };
-export type updateAdminWorkflowResponse = updateAdminWorkflowResponseSuccess;
+
+export type updateAdminWorkflowResponse = updateAdminWorkflowResponseError;
 
 export const getUpdateAdminWorkflowUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}`;
@@ -3946,15 +4181,36 @@ export const updateAdminWorkflow = async (
   });
 };
 
-export type updateAdminWorkflowStepResponse200 = {
-  data: WorkflowStepResponse;
-  status: 200;
+export type updateAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateAdminWorkflowStepResponseSuccess = updateAdminWorkflowStepResponse200 & {
+export type updateAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowStepResponseError = (
+  | updateAdminWorkflowStepResponse400
+  | updateAdminWorkflowStepResponse404
+  | updateAdminWorkflowStepResponse409
+  | updateAdminWorkflowStepResponse422
+) & {
   headers: Headers;
 };
-export type updateAdminWorkflowStepResponse = updateAdminWorkflowStepResponseSuccess;
+
+export type updateAdminWorkflowStepResponse = updateAdminWorkflowStepResponseError;
 
 export const getUpdateAdminWorkflowStepUrl = (id: string, stepId: string) => {
   return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
