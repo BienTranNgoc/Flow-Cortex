@@ -11,8 +11,16 @@
 -- effective_from = T, open-ended, in the same migration. A bare INSERT of a second open row is
 -- refused by uq_rate_card_key_open; a closed row with no successor ends coverage and stops startup.
 --
--- Rollback: DROP TABLE capability_pricing; DROP TABLE rate_card; together with reverting the code
--- (the flowcortex.credits.step-costs property map comes back with it).
+-- Rollback (revert the code too; the flowcortex.credits.step-costs property map comes back with it).
+-- Run in one transaction, and include the history delete: without it Flyway still counts this
+-- version as applied and a later roll-forward skips the migration, leaving the tables missing.
+--   BEGIN;
+--   DROP TABLE capability_pricing;
+--   DROP TABLE rate_card;
+--   DELETE FROM flyway_schema_history WHERE version = '2026.11.10.100';
+--   COMMIT;
+-- This holds only until a later migration inserts rate_card rows; after that, roll back with a
+-- forward migration.
 
 CREATE TABLE rate_card (
     id               uuid          PRIMARY KEY,
