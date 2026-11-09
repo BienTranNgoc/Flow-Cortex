@@ -11,17 +11,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.IntUnaryOperator;
-import java.util.regex.Matcher;
 
 /**
  * Pure planner for deleting or reordering the steps of a workflow. Steps read each other by
  * position ({@code inputRef} {@code {step:K}} and {@code config.outputInputs[].stepOrder}), so
  * every renumber maps each such reference to the new order of the step it named. A reference whose
- * K names no current step is left as stored: it is neither a reader nor a forward reference.
+ * K names no current step is left as stored: it is neither a reader nor a forward reference. An
+ * {@code inputRef} that names its step ({@code {step:NAME}}) reads the uniquely named step and is
+ * forward-checked like a positional one, but is never rewritten: a name survives any renumber.
  */
 final class StepRenumbering {
 
@@ -77,6 +79,7 @@ final class StepRenumbering {
             return new Stale();
         }
         int n = sorted.size();
+        Map<String, Integer> names = uniqueNames(sorted);
         int deletedOrder = deleted.order();
         TreeSet<Integer> readers = new TreeSet<>();
         for (Row row : sorted) {
@@ -84,7 +87,7 @@ final class StepRenumbering {
                 continue;
             }
             boolean[] reads = {false};
-            references(row, n, k -> {
+            references(row, n, names, k -> {
                 reads[0] |= k == deletedOrder;
                 return k;
             });
@@ -131,13 +134,17 @@ final class StepRenumbering {
             return new Unchanged();
         }
         int n = sorted.size();
+        Map<String, Integer> names = uniqueNames(sorted);
         IntUnaryOperator remap = newOrderOf::get;
         List<Planned> planned = new ArrayList<>();
         List<Integer> forward = new ArrayList<>();
         for (int i = 0; i < stepIds.size(); i++) {
             Planned step = rewritten(byId.get(stepIds.get(i)), i + 1, n, remap);
             planned.add(step);
-            Integer target = inputRefTarget(step.row().inputRef(), n);
+            Integer target = inputRefTarget(step.row().inputRef(), n, names);
+            if (target != null && isNamed(step.row().inputRef())) {
+                target = newOrderOf.get(target);
+            }
             if (target != null && target >= step.row().order()) {
                 forward.add(i);
             }
@@ -156,43 +163,54 @@ final class StepRenumbering {
     }
 
     /** Visits every explicit reference of {@code row} that names a current step (1..n). */
-    private static void references(Row row, int n, IntUnaryOperator visit) {
-        rewriteInputRef(row.inputRef(), n, visit);
+    private static void references(Row row, int n, Map<String, Integer> names, IntUnaryOperator visit) {
+        Integer target = inputRefTarget(row.inputRef(), n, names);
+        if (target != null) {
+            visit.applyAsInt(target);
+        }
         rewriteConfig(row.config(), n, visit);
     }
 
-    private static Integer inputRefTarget(String inputRef, int n) {
-        Matcher matcher = matcher(inputRef);
-        if (matcher == null) {
+    /**
+     * The current order of the step an {@code inputRef} reads: the position when positional and within 1..n, the
+     * order of the uniquely named step when by name, null when it reads no current step.
+     */
+    private static Integer inputRefTarget(String inputRef, int n, Map<String, Integer> names) {
+        Optional<StepReferences.Reference> reference = StepReferences.parse(inputRef);
+        if (reference.isEmpty()) {
             return null;
         }
-        int k = parse(matcher.group(1));
-        return k >= 1 && k <= n ? k : null;
+        return switch (reference.get().head()) {
+            case StepReferences.Order order -> order.value() >= 1 && order.value() <= n ? order.value() : null;
+            case StepReferences.Name name -> names.get(name.value());
+        };
     }
 
-    private static Matcher matcher(String inputRef) {
-        if (inputRef == null) {
-            return null;
-        }
-        Matcher matcher = InputResolver.REF_PATTERN.matcher(inputRef);
-        return matcher.matches() ? matcher : null;
+    private static boolean isNamed(String inputRef) {
+        return StepReferences.parse(inputRef)
+                .filter(reference -> reference.head() instanceof StepReferences.Name)
+                .isPresent();
     }
 
-    /** The digits as an int, or -1 when they do not fit (such a reference names no current step). */
-    private static int parse(String digits) {
-        try {
-            return Integer.parseInt(digits);
-        } catch (NumberFormatException e) {
-            return -1;
+    /** Name to order for the names exactly one row carries; an ambiguous name reads no step. */
+    private static Map<String, Integer> uniqueNames(List<Row> rows) {
+        Map<String, Integer> unique = new HashMap<>();
+        Set<String> ambiguous = new HashSet<>();
+        for (Row row : rows) {
+            if (row.name() != null && unique.putIfAbsent(row.name(), row.order()) != null) {
+                ambiguous.add(row.name());
+            }
         }
+        unique.keySet().removeAll(ambiguous);
+        return unique;
     }
 
     private static String rewriteInputRef(String inputRef, int n, IntUnaryOperator remap) {
-        Matcher matcher = matcher(inputRef);
-        if (matcher == null) {
+        Optional<StepReferences.Reference> parsed = StepReferences.parse(inputRef);
+        if (parsed.isEmpty() || !(parsed.get().head() instanceof StepReferences.Order order)) {
             return inputRef;
         }
-        int k = parse(matcher.group(1));
+        int k = order.value();
         if (k < 1 || k > n) {
             return inputRef;
         }
@@ -200,8 +218,7 @@ final class StepRenumbering {
         if (mapped == k) {
             return inputRef;
         }
-        String field = matcher.group(2);
-        return "{step:" + mapped + (field == null ? "" : "." + field) + "}";
+        return StepReferences.format(StepReferences.Order.of(mapped), parsed.get().path());
     }
 
     private static String rewriteConfig(String config, int n, IntUnaryOperator remap) {

@@ -45,7 +45,46 @@ class WorkflowReadinessGuardTest {
                 Arguments.of("reads from itself", second(null, "{step:2.value}"),
                         "Reads from step 2, which is not an earlier step"),
                 Arguments.of("reads from step 0", second(null, "{step:0.value}"),
-                        "Reads from step 0, which is not an earlier step"));
+                        "Reads from step 0, which is not an earlier step"),
+                Arguments.of("reads the whole output of itself", second(null, "{step:2}"),
+                        "Reads from step 2, which is not an earlier step"),
+                Arguments.of("malformed reference", second(null, "{step: 1}"), MALFORMED),
+                Arguments.of("empty head", second(null, "{step:}"), MALFORMED),
+                Arguments.of("unknown name", second(null, "{step:script}"),
+                        "Reads from “script”, but no step has that name"),
+                Arguments.of("named step not earlier", second(null, "{step:Shout.text}"),
+                        "Reads from “Shout”, which is not an earlier step"),
+                Arguments.of("nested path to a later step", second(null, "{step:5.a.b}"),
+                        "Reads from step 5, which is not an earlier step"));
+    }
+
+    private static final String MALFORMED = "Reads a reference that is not written as {step:ORDER} or {step:NAME}";
+
+    @Test
+    void anAmbiguousNameIsRefusedAtTheReader() {
+        List<StepDef> steps = List.of(new StepDef(1, "draft", "echo", null, null),
+                new StepDef(2, "draft", "echo", null, null), new StepDef(3, "mix", "echo", null, "{step:draft}"));
+
+        assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(englishErrors(e))
+                        .containsExactly(
+                                Map.entry("step3", "Reads from “draft”, but more than one step has that name")));
+    }
+
+    @Test
+    void aCleanNamedReferenceStarts() {
+        List<StepDef> steps = List.of(FIRST, new StepDef(2, "Next", "echo", null, "{step:Say hello.items[0]}"));
+
+        assertThatCode(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aConfigProblemOutranksAReferenceProblemOnTheSameStep() {
+        StepDef step = second("{\"profile\":\"\"}", "{step:9}");
+
+        assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, List.of(FIRST, step), CONTEXT))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(englishErrors(e))
+                        .containsExactly(Map.entry("step2", "Profile is empty")));
     }
 
     @ParameterizedTest(name = "{0}")

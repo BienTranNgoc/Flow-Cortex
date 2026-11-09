@@ -184,6 +184,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 mediaJobs.bindRunInputs(run.getId(), copies);
             }
             List<RunStep> runSteps = new ArrayList<>();
+            List<StepReferences.Step> referenceSteps = stepDefs.stream()
+                    .map(def -> new StepReferences.Step(def.getId(), def.getStepOrder(), def.getName(),
+                            def.getInputRef()))
+                    .toList();
             for (WorkflowStep stepDef : stepDefs) {
                 String stepInput = registry.isRemote(stepDef.getType()) ? stepInputJson : null;
                 runSteps.add(new RunStep(
@@ -193,7 +197,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                         stepDef.getType(),
                         stepInput,
                         stepDef.getConfig(),
-                        stepDef.getInputRef()));
+                        StepReferences.canonicalize(stepDef.getInputRef(), referenceSteps)));
             }
             runSteps = runStepRepository.saveAll(runSteps);
             runUpdates.touched(run.getId());

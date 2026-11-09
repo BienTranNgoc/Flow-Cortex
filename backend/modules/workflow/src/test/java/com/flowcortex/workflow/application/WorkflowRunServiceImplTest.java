@@ -374,6 +374,26 @@ class WorkflowRunServiceImplTest {
         return upload;
     }
 
+    @Test
+    void aNamedReferenceIsStoredAsTheOrderOfTheNamedStepWhenTheRunStarts() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "draft", "echo", null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "voice", "echo", "{step:1}"),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 3, "mix", "echo", "{step:draft.title}"));
+        when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowRunRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.startRun(ownerId, workflow.getId(), "hello");
+
+        assertThat(savedSteps()).extracting(RunStep::getInputRef)
+                .containsExactly(null, "{step:1}", "{step:1.title}");
+    }
+
     @SuppressWarnings("unchecked")
     private Collection<RunStep> savedSteps() {
         ArgumentCaptor<Collection<RunStep>> steps = ArgumentCaptor.forClass(Collection.class);

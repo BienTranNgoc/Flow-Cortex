@@ -732,6 +732,124 @@ class WorkflowServiceImplTest {
         verify(workflowStepRepository, never()).setOrder(eq(a), anyShort());
     }
 
+    private List<WorkflowStep> echoes(Workflow workflow, String[] names, String[] refs) {
+        List<WorkflowStep> steps = withSteps(workflow, java.util.Collections.nCopies(names.length, "echo")
+                .toArray(new String[0]));
+        for (int i = 0; i < names.length; i++) {
+            steps.get(i).edit(names[i], steps.get(i).getConfig(), refs[i]);
+        }
+        return steps;
+    }
+
+    private static void assertReferenceInvalid(Throwable e) {
+        assertThat(e).isInstanceOfSatisfying(UnprocessableEntityException.class, ex -> {
+            assertThat(ex.getCode()).isEqualTo("WORKFLOW_STEP_REFERENCE_INVALID");
+            assertThat(ex.getErrors()).containsKey("inputRef");
+        });
+    }
+
+    @Test
+    void appendingAStepWithABrokenReferenceIsRefusedOnInputRefAndNothingIsSaved() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "draft"}, new String[] {null, null});
+        Workflow single = stored(draft(ANA, false));
+        echoes(single, new String[] {"draft"}, new String[] {null});
+
+        for (String ref : List.of("{step:script.text}", "{step:draft}", "{step:3}", "{step:9}", "{step: 1}")) {
+            assertThatThrownBy(() -> service.addStep(ANA, workflow.getId(), new NewStep(null, "echo", ref, null)))
+                    .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+        }
+        assertThatThrownBy(() -> service.addStep(ANA, single.getId(), new NewStep(null, "echo", "{step:2}", null)))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+        Workflow empty = stored(draft(ANA, false));
+        withSteps(empty);
+        assertThatThrownBy(() -> service.addStep(ANA, empty.getId(), new NewStep(null, "echo", "{step:1}", null)))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void editingAStepToReadALaterStepIsRefused() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice", "mix"},
+                new String[] {null, null, null});
+
+        assertThatThrownBy(() -> service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, null, "{step:mix}")))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+
+        assertThat(steps.get(1).getInputRef()).isNull();
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void aCleanNamedReferenceIsSavedAsWritten() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "voice"}, new String[] {null, null});
+
+        WorkflowStepView added = service.addStep(ANA, workflow.getId(),
+                new NewStep(null, "echo", "{step:draft.title}", null));
+
+        assertThat(added.inputRef()).isEqualTo("{step:draft.title}");
+    }
+
+    @Test
+    void renamingOrClearingANameAnotherStepReadsIsAConflictNamingTheReaders() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice", "mix"},
+                new String[] {null, null, "{step:draft}"});
+
+        for (String renamed : List.of("outline", "")) {
+            assertThatThrownBy(() -> service.updateStep(ANA, workflow.getId(), steps.get(0).getId(),
+                    new StepEdit(renamed, null, null)))
+                    .isInstanceOfSatisfying(ConflictException.class, e -> assertThat(e.getDetail().args())
+                            .containsExactly("draft", "3"));
+        }
+        assertThat(steps.get(0).getName()).isEqualTo("draft");
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void renamingAStepNobodyReadsByNameIsAllowedAndKeepsPositionalReaders() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice"},
+                new String[] {null, "{step:1}"});
+
+        service.updateStep(ANA, workflow.getId(), steps.get(0).getId(), new StepEdit("outline", null, null));
+
+        assertThat(steps.get(0).getName()).isEqualTo("outline");
+        assertThat(steps.get(1).getInputRef()).isEqualTo("{step:1}");
+    }
+
+    @Test
+    void appendingAStepWithANameAnotherStepReadsIsAConflict() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "voice"}, new String[] {null, "{step:draft}"});
+
+        assertThatThrownBy(() -> service.addStep(ANA, workflow.getId(), new NewStep("draft", "echo", null, null)))
+                .isInstanceOfSatisfying(ConflictException.class, e -> assertThat(e.getDetail().args())
+                        .containsExactly("draft", "2"));
+
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void aPreExistingBrokenReferenceDoesNotBlockAnUnrelatedWrite() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"a", "b"}, new String[] {null, "{step:5.output}"});
+
+        service.updateStep(ANA, workflow.getId(), steps.get(0).getId(), new StepEdit("renamed", null, null));
+        service.addStep(ANA, workflow.getId(), new NewStep(null, "echo", null, null));
+        service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"label\":\"x\"}", null));
+        service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"label\":\"y\"}", "{step:5.output}"));
+
+        assertThat(steps.get(1).getInputRef()).isEqualTo("{step:5.output}");
+        assertThat(steps.get(1).getConfig()).isEqualTo("{\"label\":\"y\"}");
+    }
+
     private static NewWorkflowStep remote(String name, String outputInputs) {
         return new NewWorkflowStep(name, "extract_audio", null, "{\"outputInputs\":" + outputInputs + "}");
     }

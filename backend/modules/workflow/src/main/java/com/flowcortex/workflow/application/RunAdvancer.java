@@ -271,8 +271,7 @@ class RunAdvancer {
         Runnable inClaim;
         try {
             String stepConfig = step.getConfig();
-            StepExecutor.InputPolicy inputPolicy = executor.map(value -> value.inputPolicy(stepConfig))
-                    .orElse(StepExecutor.InputPolicy.RESOLVED);
+            StepExecutor.InputPolicy inputPolicy = registry.inputPolicy(step.getType(), stepConfig);
             resolvedInput = switch (inputPolicy) {
                 case STORED -> step.getInput();
                 case STORED_WITH_OUTPUTS -> storedWithOutputsResolver.resolve(step.getInput(),
