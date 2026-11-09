@@ -334,7 +334,7 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
 
         ResponseEntity<String> forward = restTemplate.exchange(steps + "/order", HttpMethod.PUT,
                 jsonEntity(token, Map.of("stepIds", List.of(second, first, third))), String.class);
-        assertThat(forward.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(forward.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(stepIdsInOrder(workflowId)).containsExactly(first, second, third);
 
         ResponseEntity<WorkflowResponseView> moved = restTemplate.exchange(steps + "/order", HttpMethod.PUT,
