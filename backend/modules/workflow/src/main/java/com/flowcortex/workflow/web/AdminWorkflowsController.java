@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -134,5 +135,40 @@ class AdminWorkflowsController {
         UUID adminId = currentUserResolver.requireAdmin(jwt);
         return ResponseEntity.ok(WorkflowStepResponse.from(workflowAuthoring.updateStep(Caller.admin(adminId), id,
                 stepId, AuthoringRequests.stepEdit(request))));
+    }
+
+    @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @Operation(operationId = "deleteAdminWorkflowStep")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/{id}/steps/{stepId}")
+    ResponseEntity<Void> deleteStep(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @PathVariable UUID stepId) {
+        workflowAuthoring.deleteStep(Caller.admin(currentUserResolver.requireAdmin(jwt)), id, stepId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @Operation(operationId = "reorderAdminWorkflowSteps")
+    @PutMapping(value = "/{id}/steps/order", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<WorkflowResponse> reorderSteps(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @Valid @RequestBody ReorderStepsRequest request) {
+        UUID adminId = currentUserResolver.requireAdmin(jwt);
+        return ResponseEntity.ok(WorkflowResponse.from(
+                workflowAuthoring.reorderSteps(Caller.admin(adminId), id, request.stepIds()), creditAccounts));
     }
 }

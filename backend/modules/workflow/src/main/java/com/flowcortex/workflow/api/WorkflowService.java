@@ -39,4 +39,19 @@ public interface WorkflowService {
 
     /** Edits name, config and input reference of a step of the workflow; the type and position never change. */
     WorkflowStepView updateStep(UUID callerId, UUID workflowId, UUID stepId, StepEdit edit);
+
+    /**
+     * Removes a step and closes the gap: later steps move down one and every explicit reference keeps reading the
+     * step it read. Refused with 409 while another step reads the deleted one; other refusals as for
+     * {@link #updateWorkflow}, plus 404 for a step of another workflow and 400 when the result is not a valid
+     * definition.
+     */
+    void deleteStep(UUID callerId, UUID workflowId, UUID stepId);
+
+    /**
+     * Puts the steps in the order of {@code stepIds}, which must list every step exactly once: 422 on a repeated id,
+     * 409 on a missing or foreign one, 422 when a step would read a step at or after itself. References move with
+     * their steps. Refusals as for {@link #deleteStep}.
+     */
+    WorkflowView reorderSteps(UUID callerId, UUID workflowId, List<UUID> stepIds);
 }

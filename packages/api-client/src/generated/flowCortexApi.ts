@@ -819,6 +819,14 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface ReorderStepsRequest {
+  /**
+   * @minItems 0
+   * @maxItems 32767
+   */
+  stepIds: string[];
+}
+
 /**
  * @pattern draft|published
  */
@@ -1845,6 +1853,166 @@ export const updateAdminSupportKbArticle = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminSupportKbArticleRequest),
+  });
+};
+
+export type reorderWorkflowStepsResponse200 = {
+  data: WorkflowResponse;
+  status: 200;
+};
+
+export type reorderWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderWorkflowStepsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type reorderWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderWorkflowStepsResponseSuccess = reorderWorkflowStepsResponse200 & {
+  headers: Headers;
+};
+export type reorderWorkflowStepsResponseError = (
+  | reorderWorkflowStepsResponse400
+  | reorderWorkflowStepsResponse403
+  | reorderWorkflowStepsResponse404
+  | reorderWorkflowStepsResponse409
+  | reorderWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderWorkflowStepsResponse =
+  | reorderWorkflowStepsResponseSuccess
+  | reorderWorkflowStepsResponseError;
+
+export const getReorderWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/steps/order`;
+};
+
+export const reorderWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderWorkflowStepsResponse>(getReorderWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type reorderAdminWorkflowStepsResponse200 = {
+  data: WorkflowResponse;
+  status: 200;
+};
+
+export type reorderAdminWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderAdminWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderAdminWorkflowStepsResponseSuccess = reorderAdminWorkflowStepsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminWorkflowStepsResponseError = (
+  | reorderAdminWorkflowStepsResponse400
+  | reorderAdminWorkflowStepsResponse404
+  | reorderAdminWorkflowStepsResponse409
+  | reorderAdminWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminWorkflowStepsResponse =
+  | reorderAdminWorkflowStepsResponseSuccess
+  | reorderAdminWorkflowStepsResponseError;
+
+export const getReorderAdminWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/order`;
+};
+
+export const reorderAdminWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminWorkflowStepsResponse>(getReorderAdminWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
   });
 };
 
@@ -3829,6 +3997,68 @@ export const updateWorkflow = async (
   });
 };
 
+export type deleteWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowStepResponseError = (
+  | deleteWorkflowStepResponse400
+  | deleteWorkflowStepResponse403
+  | deleteWorkflowStepResponse404
+  | deleteWorkflowStepResponse409
+  | deleteWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowStepResponse =
+  | deleteWorkflowStepResponseSuccess
+  | deleteWorkflowStepResponseError;
+
+export const getDeleteWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowStepResponse> => {
+  return customFetch<deleteWorkflowStepResponse>(getDeleteWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type updateStepResponse200 = {
   data: WorkflowStepResponse;
   status: 200;
@@ -3943,6 +4173,62 @@ export const updateAdminWorkflow = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateWorkflowRequest),
+  });
+};
+
+export type deleteAdminWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteAdminWorkflowStepResponseSuccess = deleteAdminWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminWorkflowStepResponseError = (
+  | deleteAdminWorkflowStepResponse400
+  | deleteAdminWorkflowStepResponse404
+  | deleteAdminWorkflowStepResponse409
+  | deleteAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowStepResponse =
+  | deleteAdminWorkflowStepResponseSuccess
+  | deleteAdminWorkflowStepResponseError;
+
+export const getDeleteAdminWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteAdminWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminWorkflowStepResponse> => {
+  return customFetch<deleteAdminWorkflowStepResponse>(getDeleteAdminWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
   });
 };
 

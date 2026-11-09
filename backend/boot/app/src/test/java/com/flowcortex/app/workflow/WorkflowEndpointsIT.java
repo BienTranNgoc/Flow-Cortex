@@ -8,6 +8,7 @@ import com.flowcortex.workflow.api.WorkflowView;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -303,6 +304,74 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(list.getBody()).extracting(WorkflowResponseView::id).doesNotContain(deletedId);
         assertThat(get("/api/v1/workflows/" + deletedId, token, String.class).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void anOwnerReordersAndDeletesStepsAndAReferencedDeleteIsRefusedInTheCallersLanguage() {
+        UserView owner = newUser("http-step-editing");
+        UUID workflowId = insertWorkflow(owner.id(), "draft", false, null);
+        UUID first = insertStep(workflowId, 1, "First", null);
+        UUID second = insertStep(workflowId, 2, "Second", "{step:1}");
+        UUID third = insertStep(workflowId, 3, "Third", null);
+        String token = loginAs(owner);
+        String steps = "/api/v1/workflows/" + workflowId + "/steps";
+
+        HttpHeaders vietnamese = new HttpHeaders();
+        vietnamese.setBearerAuth(token);
+        vietnamese.set(HttpHeaders.ACCEPT_LANGUAGE, "vi");
+        ResponseEntity<String> refused = restTemplate.exchange(steps + "/" + first, HttpMethod.DELETE,
+                new HttpEntity<>(vietnamese), String.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(refused.getBody()).contains("Không thể xóa bước 1");
+        assertThat(stepIdsInOrder(workflowId)).containsExactly(first, second, third);
+
+        ResponseEntity<WorkflowResponseView> reordered = restTemplate.exchange(steps + "/order", HttpMethod.PUT,
+                jsonEntity(token, Map.of("stepIds", List.of(first, second, third))),
+                WorkflowResponseView.class);
+        assertThat(reordered.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(reordered.getBody().steps()).extracting(WorkflowStepResponseView::id)
+                .containsExactly(first, second, third);
+
+        ResponseEntity<String> forward = restTemplate.exchange(steps + "/order", HttpMethod.PUT,
+                jsonEntity(token, Map.of("stepIds", List.of(second, first, third))), String.class);
+        assertThat(forward.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(stepIdsInOrder(workflowId)).containsExactly(first, second, third);
+
+        ResponseEntity<WorkflowResponseView> moved = restTemplate.exchange(steps + "/order", HttpMethod.PUT,
+                jsonEntity(token, Map.of("stepIds", List.of(third, first, second))),
+                WorkflowResponseView.class);
+        assertThat(moved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(stepIdsInOrder(workflowId)).containsExactly(third, first, second);
+        assertThat(inputRefOf(second)).isEqualTo("{step:2}");
+
+        ResponseEntity<String> deleted = restTemplate.exchange(steps + "/" + third, HttpMethod.DELETE,
+                jsonEntity(token, null), String.class);
+        assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(stepIdsInOrder(workflowId)).containsExactly(first, second);
+        assertThat(inputRefOf(second)).isEqualTo("{step:1}");
+    }
+
+    private static HttpEntity<Object> jsonEntity(String token, Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(body, headers);
+    }
+
+    private List<UUID> stepIdsInOrder(UUID workflowId) {
+        return jdbcTemplate.queryForList("SELECT id FROM workflow_step WHERE workflow_id = ? ORDER BY step_order",
+                UUID.class, workflowId);
+    }
+
+    private String inputRefOf(UUID stepId) {
+        return jdbcTemplate.queryForObject("SELECT input_ref FROM workflow_step WHERE id = ?", String.class, stepId);
+    }
+
+    private UUID insertStep(UUID workflowId, int order, String name, String inputRef) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO workflow_step (id, workflow_id, step_order, name, type, input_ref) "
+                + "VALUES (?, ?, ?, ?, 'echo', ?)", id, workflowId, order, name, inputRef);
+        return id;
     }
 
     private UUID insertWorkflow(UUID ownerId, String status, boolean shared, Timestamp deletedAt) {
