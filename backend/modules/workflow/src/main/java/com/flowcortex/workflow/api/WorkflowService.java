@@ -11,6 +11,9 @@ public interface WorkflowService {
 
     List<WorkflowView> listVisibleWorkflows(UUID currentUserId);
 
+    /** The same visible set as {@link #listVisibleWorkflows}, shaped for the chat assistant's catalog lookup. */
+    List<ChatWorkflowView> listChatCatalog(UUID userId);
+
     /** @throws NotFoundException if {@code workflowId} is not visible to {@code currentUserId} */
     WorkflowView getVisibleWorkflow(UUID currentUserId, UUID workflowId);
 

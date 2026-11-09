@@ -1,0 +1,120 @@
+{
+  "page": {
+    "title": "Trò chuyện"
+  },
+  "list": {
+    "label": "Các cuộc trò chuyện của bạn",
+    "heading": "Cuộc trò chuyện",
+    "open": "Cuộc trò chuyện",
+    "close": "Đóng",
+    "new": "Cuộc trò chuyện mới",
+    "loading": "Đang tải các cuộc trò chuyện…",
+    "empty": "Chưa có cuộc trò chuyện nào. Hãy bắt đầu một cuộc mới.",
+    "loadFailed": "Không tải được các cuộc trò chuyện của bạn.",
+    "retry": "Thử lại",
+    "createFailed": "Không thể bắt đầu cuộc trò chuyện mới."
+  },
+  "row": {
+    "rename": "Đổi tên",
+    "delete": "Xoá",
+    "renameLabel": "Tên cuộc trò chuyện",
+    "save": "Lưu",
+    "cancel": "Huỷ",
+    "counter": "{{length}}/{{max}}",
+    "titleEmpty": "Hãy đặt tên cho cuộc trò chuyện.",
+    "titleTooLong": "Tên tối đa {{max}} ký tự.",
+    "renameFailed": "Không thể đổi tên cuộc trò chuyện."
+  },
+  "delete": {
+    "title": "Xoá cuộc trò chuyện này?",
+    "text": "“{{title}}” và toàn bộ tin nhắn sẽ bị xoá. Không thể hoàn tác.",
+    "keep": "Giữ lại",
+    "confirm": "Xoá",
+    "deleting": "Đang xoá…",
+    "failed": "Không thể xoá cuộc trò chuyện."
+  },
+  "thread": {
+    "empty": "Hỏi bất cứ điều gì, hoặc mô tả bạn muốn tạo gì.",
+    "loading": "Đang tải tin nhắn…",
+    "loadFailed": "Không tải được cuộc trò chuyện này.",
+    "retry": "Thử lại",
+    "log": "Tin nhắn",
+    "you": "Bạn",
+    "assistant": "Trợ lý",
+    "streaming": "Đang viết…",
+    "failed": "Trợ lý chưa trả lời được.",
+    "tryAgain": "Thử lại",
+    "stopped": "Đã dừng"
+  },
+  "composer": {
+    "label": "Tin nhắn",
+    "placeholder": "Mô tả bạn muốn tạo gì…",
+    "send": "Gửi",
+    "sending": "Đang gửi…",
+    "stop": "Dừng",
+    "stopping": "Đang dừng…",
+    "attach": "Đính kèm ảnh",
+    "counter": "{{length}}/{{max}}",
+    "over": "Một tin nhắn tối đa {{max}} ký tự."
+  },
+  "attach": {
+    "uploading": "Đang tải lên…",
+    "ready": "Sẵn sàng",
+    "failed": "Không tải được ảnh này lên.",
+    "remove": "Bỏ {{name}}",
+    "tooMany": "Tối đa {{max}} ảnh."
+  },
+  "card": {
+    "label": "Lượt chạy đề xuất: {{name}}",
+    "input": "Đầu vào:",
+    "images": "Ảnh đầu vào:",
+    "noImages": "Chưa đính kèm",
+    "optional": "(không bắt buộc)",
+    "field": {
+      "productName": "Tên sản phẩm",
+      "description": "Mô tả",
+      "cta": "Lời kêu gọi hành động",
+      "price": "Giá",
+      "promotion": "Khuyến mãi"
+    },
+    "imagesExpired": "Ảnh đã hết hạn — hãy đính kèm lại",
+    "attachAgain": "Đính kèm ảnh lại",
+    "changeImages": "Đổi ảnh",
+    "run": "Chạy",
+    "running": "Đang bắt đầu…",
+    "started": "Đã bắt đầu chạy",
+    "invalid": "Một số thông tin cần sửa trước khi chạy.",
+    "failed": "Không bắt đầu được lượt chạy. Vui lòng thử lại."
+  },
+  "run": {
+    "label": "Lượt chạy",
+    "loading": "Đang tải lượt chạy…",
+    "loadFailed": "Không tải được lượt chạy này.",
+    "retry": "Thử lại",
+    "statusLabel": "Trạng thái:",
+    "status": {
+      "pending": "Đang chờ",
+      "running": "Đang chạy",
+      "waitingApproval": "Chờ bạn duyệt",
+      "cancelling": "Đang dừng…",
+      "completed": "Hoàn tất",
+      "error": "Thất bại",
+      "cancelled": "Đã hủy",
+      "other": "{{status}}"
+    },
+    "progress": "Đã xong {{done}}/{{total}} bước",
+    "review": "Cần duyệt",
+    "outputs": "Kết quả:",
+    "results": "Mở kết quả",
+    "open": "Mở lượt chạy"
+  },
+  "problems": {
+    "notFound": "Cuộc trò chuyện này không còn tồn tại.",
+    "startNew": "Bắt đầu cuộc trò chuyện mới",
+    "off": "Tính năng trò chuyện đang tạm tắt.",
+    "quota": "Bạn đã dùng hết lượt trò chuyện hôm nay.",
+    "resumeAt": "Bạn có thể trò chuyện lại {{time}}.",
+    "inProgress": "Trợ lý vẫn đang trả lời.",
+    "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+  }
+}
