@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Refuses a start the member cannot pay for: a balance of zero or less always, a balance below the
  * estimate unless the member acknowledged the cost. Startup fails when a step type the engine can
- * run has no configured cost, whatever the credits switch says.
+ * run has no rate-card price, whatever the credits switch says.
  */
 @Component
 @Order(2)

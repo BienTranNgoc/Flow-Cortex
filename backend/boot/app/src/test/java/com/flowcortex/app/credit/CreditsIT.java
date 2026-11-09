@@ -22,6 +22,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.BooleanSupplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -35,14 +37,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Run credits with the switch on. {@code echo} costs 10 and {@code fail} 50 here, so the scenarios
- * read as the spec's: a workflow of echo then fail is estimated at 60. Balances are set with SQL
- * once the signup grant has created the wallet; the sweep is pushed out to an hour so it never
- * advances a seeded run.
+ * read as the spec's: a workflow of echo then fail is estimated at 60. The prices are the seeded
+ * {@code rate_card} rows, set to those values by SQL before each test and put back after. Balances
+ * are set with SQL once the signup grant has created the wallet; the sweep is pushed out to an hour
+ * so it never advances a seeded run.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.credits.enabled=true",
-        "flowcortex.credits.step-costs.echo=10",
-        "flowcortex.credits.step-costs.fail=50",
         "flowcortex.workflow.cancel.enabled=true",
         "flowcortex.workflow.reaper-interval-ms=3600000"})
 @AutoConfigureTestRestTemplate
@@ -61,6 +62,24 @@ class CreditsIT extends AbstractWorkflowHttpIT {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @BeforeEach
+    void priceEchoAndFailForTheScenarios() {
+        setSeededPrice("echo", 10);
+        setSeededPrice("fail", 50);
+    }
+
+    @AfterEach
+    void restoreTheSeededPrices() {
+        setSeededPrice("echo", 1);
+        setSeededPrice("fail", 20);
+    }
+
+    private void setSeededPrice(String ref, int credits) {
+        int updated = jdbcTemplate.update("UPDATE rate_card SET credits_per_unit = ? WHERE rate_card_ref = ? "
+                + "AND effective_to IS NULL", credits, ref);
+        assertThat(updated).as("seeded open rate_card row of %s", ref).isEqualTo(1);
+    }
 
     record StartRequest(String input, Boolean acknowledgeCost) {
     }
