@@ -42,6 +42,7 @@ public class ClusterJobRunner {
     private final String owner = owner();
     private final Map<String, UUID> held = new ConcurrentHashMap<>();
     private final AtomicBoolean registered = new AtomicBoolean();
+    private volatile boolean closing;
 
     @Autowired
     ClusterJobRunner(ClusterJobRegistry registry, ScheduledJobRepository schedule) {
@@ -75,6 +76,9 @@ public class ClusterJobRunner {
             return;
         }
         for (ClusterJob job : registry.jobs()) {
+            if (closing) {
+                return;
+            }
             try {
                 runIfDue(job);
             } catch (RuntimeException e) {
@@ -86,6 +90,7 @@ public class ClusterJobRunner {
     /** Gives up every claim this instance still holds; a job still running then finishes as {@code lease_lost}. */
     @EventListener(ContextClosedEvent.class)
     public void release() {
+        closing = true;
         Instant now = clock.instant();
         for (Map.Entry<String, UUID> claim : held.entrySet()) {
             try {
@@ -105,6 +110,12 @@ public class ClusterJobRunner {
             return;
         }
         held.put(job.name(), token);
+        if (closing) {
+            // release() may have iterated `held` before the put above, so this claim is given back here.
+            held.remove(job.name(), token);
+            schedule.release(job.name(), token, clock.instant());
+            return;
+        }
         Outcome outcome = Outcome.SUCCEEDED;
         String error = null;
         try {
