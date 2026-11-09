@@ -7,6 +7,55 @@ servers:
 security:
 - BearerAuth: []
 paths:
+  /api/v1/workflows/{id}/steps/order:
+    put:
+      tags:
+      - workflows-controller
+      operationId: reorderWorkflowSteps
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderStepsRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users/{id}:
     get:
       tags:
@@ -112,6 +161,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/workflows/{id}/steps/order:
+    put:
+      tags:
+      - admin-workflows-controller
+      operationId: reorderAdminWorkflowSteps
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderStepsRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/settings:
     get:
       tags:
@@ -352,110 +444,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/workflows/{id}/steps/order:
-    put:
-      tags:
-      - workflows-controller
-      operationId: reorderWorkflowSteps
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReorderStepsRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkflowResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "403":
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "404":
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "422":
-          description: Unprocessable Content
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/admin/workflows/{id}/steps/order:
-    put:
-      tags:
-      - admin-workflows-controller
-      operationId: reorderAdminWorkflowSteps
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReorderStepsRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkflowResponse"
-        "400":
-          description: Bad Request
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "404":
-          description: Not Found
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "409":
-          description: Conflict
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-        "422":
-          description: Unprocessable Content
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -481,6 +469,30 @@ paths:
               $ref: "#/components/schemas/CreateWorkflowRequest"
         required: true
       responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
           content:
@@ -506,6 +518,30 @@ paths:
               $ref: "#/components/schemas/CreateStepRequest"
         required: true
       responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
           content:
@@ -1273,6 +1309,30 @@ paths:
               $ref: "#/components/schemas/CreateWorkflowRequest"
         required: true
       responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
           content:
@@ -1298,6 +1358,30 @@ paths:
               $ref: "#/components/schemas/CreateStepRequest"
         required: true
       responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
           content:
@@ -1531,6 +1615,30 @@ paths:
           type: string
           format: uuid
       responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "204":
           description: No Content
     patch:
@@ -1551,12 +1659,30 @@ paths:
               $ref: "#/components/schemas/UpdateWorkflowRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "400":
+          description: Bad Request
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/WorkflowResponse"
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/steps/{stepId}:
     delete:
       tags:
@@ -1576,8 +1702,6 @@ paths:
           type: string
           format: uuid
       responses:
-        "204":
-          description: No Content
         "400":
           description: Bad Request
           content:
@@ -1608,6 +1732,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
     patch:
       tags:
       - workflows-controller
@@ -1632,12 +1758,30 @@ paths:
               $ref: "#/components/schemas/UpdateStepRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "400":
+          description: Bad Request
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/WorkflowStepResponse"
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/workflows/{id}:
     delete:
       tags:
@@ -1651,53 +1795,6 @@ paths:
           type: string
           format: uuid
       responses:
-        "204":
-          description: No Content
-    patch:
-      tags:
-      - admin-workflows-controller
-      operationId: updateAdminWorkflow
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkflowRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkflowResponse"
-  /api/v1/admin/workflows/{id}/steps/{stepId}:
-    delete:
-      tags:
-      - admin-workflows-controller
-      operationId: deleteAdminWorkflowStep
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: stepId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "204":
-          description: No Content
         "400":
           description: Bad Request
           content:
@@ -1722,6 +1819,95 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/{id}/steps/{stepId}:
+    delete:
+      tags:
+      - admin-workflows-controller
+      operationId: deleteAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
     patch:
       tags:
       - admin-workflows-controller
@@ -1746,12 +1932,30 @@ paths:
               $ref: "#/components/schemas/UpdateStepRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "400":
+          description: Bad Request
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/WorkflowStepResponse"
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/settings:
     get:
       tags:
@@ -2425,6 +2629,37 @@ paths:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
 components:
   schemas:
+    ReorderStepsRequest:
+      type: object
+      properties:
+        stepIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 32767
+          minItems: 0
+      required:
+      - stepIds
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
     UpdateUserRequest:
       type: object
       properties:
@@ -2486,25 +2721,6 @@ components:
       - lastName
       - password
       - passwordSetupToken
-    ProblemDetail:
-      type: object
-      properties:
-        type:
-          type: string
-          format: uri
-        title:
-          type: string
-        status:
-          type: integer
-          format: int32
-        detail:
-          type: string
-        instance:
-          type: string
-          format: uri
-        properties:
-          type: object
-          additionalProperties: {}
     AccessTokenResponse:
       type: object
       properties:
@@ -2907,7 +3123,9 @@ components:
           - inline
           - remote
         inputRef:
-          type: string
+          type:
+          - string
+          - "null"
         config:
           type:
           - string
@@ -3661,18 +3879,6 @@ components:
       required:
       - body
       - status
-    ReorderStepsRequest:
-      type: object
-      properties:
-        stepIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          maxItems: 32767
-          minItems: 0
-      required:
-      - stepIds
     UpdateWorkflowRequest:
       type: object
       properties:
