@@ -16,6 +16,9 @@ from typing import Any
 from .document import Canvas, CaptionWord, Document, Motion, Scene, kept_by_row
 
 MAX_CHAIN_SCENES = 12
+# Peak RSS of one ffmpeg grows about 340 MiB per chained scene (3 scenes 1178 MiB, 6 scenes
+# 2212 MiB); a 60 s 1080x1920 render with 4-scene chunks peaked at 1761 MiB.
+MAX_CHUNK_SCENES = 4
 CAPTION_GRID_MS = 10
 PROBE_KEYS = (
     "durationMs",
@@ -83,9 +86,15 @@ class PlannedScene:
 
 @dataclass(frozen=True)
 class Chunk:
+    """`lead_scene` is a scene of the chunk before, whose tail opens this chunk (its transition
+    into the first scene is encoded here); `cut_after` means the last scene's transition into
+    the next chunk is left to that chunk, so this one stops where the cross-fade starts."""
+
     scene_indexes: tuple[int, ...]
     start_ms: float
     dur_ms: float
+    lead_scene: int | None = None
+    cut_after: bool = False
 
 
 @dataclass(frozen=True)
@@ -364,23 +373,60 @@ def _plan_handles(scenes: Sequence[PlannedScene]) -> list[dict[str, str]]:
     return handles
 
 
-def _plan_chunks(scenes: Sequence[PlannedScene]) -> list[Chunk]:
+def _cut_ms(scene: PlannedScene, frame: float) -> float:
+    """Where the cross-fade out of `scene` starts, floored to the frame grid: a chunk cut here
+    keeps whole frames, and the chunk after it replays the fade from this point."""
+    transition = scene.transition_out
+    assert transition is not None
+    tail = transition.dur_ms / 2 if transition.mode == "extend" else 0.0
+    start = scene.at_ms + scene.dur_ms + tail - transition.dur_ms
+    return math.floor(start / frame + 1e-6) * frame
+
+
+def _plan_chunks(
+    scenes: Sequence[PlannedScene], frame: float, max_chunk_scenes: int
+) -> list[Chunk]:
+    """Cut the scenes into encode chunks. A chain of transitions longer than `max_chunk_scenes`
+    is split into consecutive chunks, because one ffmpeg graph buffers every chain input and its
+    memory grows with the chain. A split lands on a transition: the earlier chunk stops where
+    the cross-fade starts and the later chunk opens with the earlier chunk's last scene, so the
+    fade is encoded once, in the later chunk."""
     chunks: list[Chunk] = []
     current: list[int] = []
     for i, scene in enumerate(scenes):
         current.append(i)
-        if scene.transition_out is None or i == len(scenes) - 1:
-            if len(current) > MAX_CHAIN_SCENES:
-                raise ValueError(
-                    f"timeline.scenes[{current[0]}]: {len(current)} scenes are chained by "
-                    f"transitions, over the limit of {MAX_CHAIN_SCENES}; add a boundary "
-                    "without a transition"
-                )
-            first, last = scenes[current[0]], scenes[current[-1]]
-            chunks.append(
-                Chunk(tuple(current), first.at_ms, last.at_ms + last.dur_ms - first.at_ms)
+        if scene.transition_out is not None and i != len(scenes) - 1:
+            continue
+        if len(current) > MAX_CHAIN_SCENES:
+            raise ValueError(
+                f"timeline.scenes[{current[0]}]: {len(current)} scenes are chained by "
+                f"transitions, over the limit of {MAX_CHAIN_SCENES}; add a boundary "
+                "without a transition"
             )
-            current = []
+        groups = [
+            current[at : at + max_chunk_scenes] for at in range(0, len(current), max_chunk_scenes)
+        ]
+        start = scenes[current[0]].at_ms
+        for g, group in enumerate(groups):
+            last = scenes[group[-1]]
+            cut_after = g < len(groups) - 1
+            end = _cut_ms(last, frame) if cut_after else last.at_ms + last.dur_ms
+            if end - start < frame / 2:
+                raise ValueError(
+                    f"timeline.scenes[{group[-1]}]: the scene is shorter than its transition, "
+                    "so a chunk cannot end where the transition starts"
+                )
+            chunks.append(
+                Chunk(
+                    tuple(group),
+                    start,
+                    end - start,
+                    lead_scene=groups[g - 1][-1] if g > 0 else None,
+                    cut_after=cut_after,
+                )
+            )
+            start = end
+        current = []
     return chunks
 
 
@@ -438,11 +484,16 @@ def _plan_cues(
 
 
 def plan_timeline(
-    document: Document, probes: Mapping[str, Mapping[str, Any]], profile: str
+    document: Document,
+    probes: Mapping[str, Mapping[str, Any]],
+    profile: str,
+    max_chunk_scenes: int = MAX_CHUNK_SCENES,
 ) -> TimelinePlan:
     """Plan the whole render. `probes` maps an asset id to its measured values (`PROBE_KEYS`)."""
     if profile not in PROFILES:
         raise ValueError(f"params.profile: must be one of {', '.join(PROFILES)}, got {profile!r}")
+    if max_chunk_scenes < 1:
+        raise ValueError(f"max_chunk_scenes: must be at least 1, got {max_chunk_scenes}")
     canvas = document.canvas
     frame = 1000.0 / canvas.fps
     snapped: list[dict[str, Any]] = []
@@ -450,7 +501,7 @@ def plan_timeline(
 
     scenes = _plan_scenes(document, probes, frame, canvas.fps, snapped, warnings)
     handles = _plan_handles(scenes)
-    chunks = _plan_chunks(scenes)
+    chunks = _plan_chunks(scenes, frame, max_chunk_scenes)
     cues, style, lang = _plan_cues(document, snapped, warnings)
     out_width, out_height = output_size(canvas.width, canvas.height, profile)
     last = scenes[-1]

@@ -11,6 +11,7 @@ from test_render_document import project, scene
 from flowcortex_worker.render.document import Document, parse_document
 from flowcortex_worker.render.timeline import (
     MAX_CHAIN_SCENES,
+    MAX_CHUNK_SCENES,
     TimelinePlan,
     karaoke_spans,
     output_size,
@@ -176,9 +177,98 @@ def test_chain_of_thirteen_scenes_is_refused() -> None:
     refused(fills(13, chained=12), "13 scenes", f"{MAX_CHAIN_SCENES}")
 
 
-def test_chain_of_twelve_scenes_is_accepted() -> None:
+def chained_fills(count: int, mode: str = "overlap", dur: int = 400) -> list[dict[str, Any]]:
+    """`count` one-second fills chained by `mode` transitions; overlaps pull the next start back."""
+    step = 1000 - (dur if mode == "overlap" else 0)
+    return [
+        scene(
+            i,
+            clipId=None,
+            srcOutMs=1000,
+            durMs=1000,
+            atMs=step * i,
+            transitionOut=transition(mode, dur) if i < count - 1 else None,
+        )
+        for i in range(count)
+    ]
+
+
+def real_scenes(planned: TimelinePlan) -> list[tuple[int, ...]]:
+    return [c.scene_indexes for c in planned.chunks]
+
+
+def test_chain_of_twelve_scenes_is_accepted_and_split_at_the_cap() -> None:
     planned = plan(fills(12, chained=11))
-    assert len(planned.chunks) == 1
+    assert real_scenes(planned) == [(0, 1, 2, 3), (4, 5, 6, 7), (8, 9, 10, 11)]
+    assert MAX_CHUNK_SCENES == 4
+
+
+def test_chain_of_one_scene_is_one_chunk_without_a_lead() -> None:
+    planned = plan([scene(0)])
+    assert real_scenes(planned) == [(0,)]
+    assert planned.chunks[0].lead_scene is None
+    assert not planned.chunks[0].cut_after
+
+
+def test_chain_at_the_cap_stays_one_chunk() -> None:
+    planned = plan(chained_fills(MAX_CHUNK_SCENES))
+    assert real_scenes(planned) == [tuple(range(MAX_CHUNK_SCENES))]
+    assert planned.chunks[0].lead_scene is None
+
+
+def test_chain_one_over_the_cap_splits_into_cap_and_one() -> None:
+    planned = plan(chained_fills(MAX_CHUNK_SCENES + 1))
+    first, second = planned.chunks
+    assert [first.scene_indexes, second.scene_indexes] == [
+        tuple(range(MAX_CHUNK_SCENES)),
+        (MAX_CHUNK_SCENES,),
+    ]
+    assert first.lead_scene is None and first.cut_after
+    assert second.lead_scene == MAX_CHUNK_SCENES - 1 and not second.cut_after
+
+
+@pytest.mark.parametrize("mode", ["overlap", "extend"])
+@pytest.mark.parametrize("cap", [1, 2, 3, 4, 5, 12])
+def test_split_chunks_tile_the_unsplit_timeline(mode: str, cap: int) -> None:
+    scenes = chained_fills(12, mode)
+    whole = plan(scenes)
+    split = plan_timeline(doc_of(scenes), PROBES, "final", max_chunk_scenes=cap)
+    assert split.total_ms == whole.total_ms
+    assert split.scenes == whole.scenes
+    assert split.chunks[0].start_ms == 0
+    for a, b in zip(split.chunks, split.chunks[1:], strict=False):
+        assert a.start_ms + a.dur_ms == pytest.approx(b.start_ms)
+    last = split.chunks[-1]
+    assert last.start_ms + last.dur_ms == pytest.approx(whole.total_ms)
+    assert sum(len(c.scene_indexes) for c in split.chunks) == 12
+
+
+@pytest.mark.parametrize("mode", ["overlap", "extend"])
+def test_transition_on_a_chunk_boundary_opens_the_next_chunk_with_the_previous_scene(
+    mode: str,
+) -> None:
+    planned = plan(chained_fills(MAX_CHUNK_SCENES + 2, mode))
+    first, second = planned.chunks
+    boundary = planned.scenes[MAX_CHUNK_SCENES]
+    shift = 400 / 2 if mode == "extend" else 0
+    # The cut falls on the frame grid at or just before where the cross-fade starts.
+    assert second.start_ms <= boundary.at_ms - shift + 1e-6
+    assert second.start_ms > boundary.at_ms - shift - 1000 / 30
+    assert second.lead_scene == MAX_CHUNK_SCENES - 1
+    assert first.cut_after
+
+
+def test_a_scene_shorter_than_its_cut_transition_is_refused() -> None:
+    scenes = chained_fills(3)
+    scenes[1] = {**scenes[1], "durMs": 300, "srcOutMs": 300}
+    scenes[2] = {**scenes[2], "atMs": 500}
+    with pytest.raises(ValueError, match=r"scenes\[1\]"):
+        plan_timeline(doc_of(scenes), PROBES, "final", max_chunk_scenes=1)
+
+
+def test_chunk_cap_below_one_is_refused() -> None:
+    with pytest.raises(ValueError, match="max_chunk_scenes"):
+        plan_timeline(doc_of([scene(0)]), PROBES, "final", max_chunk_scenes=0)
 
 
 def test_source_one_millisecond_short_is_clamped_with_a_warning() -> None:

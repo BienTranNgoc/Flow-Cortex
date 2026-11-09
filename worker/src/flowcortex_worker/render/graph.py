@@ -133,17 +133,39 @@ def chunk_command(
     blur_sigma = (
         CONTAIN_BLUR_SIGMA * min(width, height) / min(plan.canvas.width, plan.canvas.height)
     )
-    scenes = [plan.scenes[i] for i in chunk.scene_indexes]
+    lead = chunk.lead_scene
+    scenes = [plan.scenes[i] for i in ([] if lead is None else [lead]) + list(chunk.scene_indexes)]
 
+    # A segment is a scene's picture and sound with the handles its transitions borrow. `seg_off`
+    # is how far into the segment this chunk starts (only a lead scene starts late), `seg_dur`
+    # how long the chunk plays it and `seg_full` the whole segment, which an image's zoom spans.
     seg_in: list[float] = []
+    seg_off: list[float] = []
     seg_dur: list[float] = []
+    seg_full: list[float] = []
+    position = 0.0
     for k, scene in enumerate(scenes):
-        before = scenes[k - 1].transition_out if k > 0 else None
-        after = scene.transition_out if k < len(scenes) - 1 else None
+        if k > 0:
+            before = scenes[k - 1].transition_out
+        elif lead is not None and lead > 0:
+            before = plan.scenes[lead - 1].transition_out
+        else:
+            before = None
+        last = k == len(scenes) - 1
+        after = None if last and not chunk.cut_after else scene.transition_out
         head = before.dur_ms / 2 if before is not None and before.mode == "extend" else 0.0
         tail = after.dur_ms / 2 if after is not None and after.mode == "extend" else 0.0
+        full = scene_length_ms(scene) + head + tail
+        off = chunk.start_ms - (scene.at_ms - head) if k == 0 and lead is not None else 0.0
+        dur = full - off
+        if last and chunk.cut_after:
+            dur = chunk.dur_ms - position
         seg_in.append(scene.src_in_ms - head)
-        seg_dur.append(scene_length_ms(scene) + head + tail)
+        seg_off.append(off)
+        seg_dur.append(dur)
+        seg_full.append(full)
+        transition = scene.transition_out
+        position += dur - (transition.dur_ms if transition is not None and not last else 0.0)
 
     verbose = prints_captions(plan, chunk)
     cmd = [
@@ -167,6 +189,7 @@ def chunk_command(
         dur_s = seg_dur[k] / 1000.0
         # `fps=` ends every picture chain: ffmpeg 7.1 `xfade` wants a constant frame rate on both
         # inputs, and the `trim,setpts` before it would leave the rate undefined.
+        off_s = seg_off[k] / 1000.0
         tail_chain = (
             f"setsar=1,format=yuv420p,trim=duration={dur_s:.4f},setpts=PTS-STARTPTS,fps={fps}"
         )
@@ -183,10 +206,10 @@ def chunk_command(
             parts.append(f"[{vi}:v]{tail_chain}[v{k}]")
         elif scene.kind == "image":
             vi = add_input(
-                "-loop", "1", "-framerate", str(fps), "-t", f"{dur_s:.4f}",
+                "-loop", "1", "-framerate", str(fps), "-t", f"{dur_s + off_s:.4f}",
                 *_ASSET_INPUT, "-i", files[scene.clip_id],
             )  # fmt: skip
-            frames = max(1, round(dur_s * fps))
+            frames = max(1, round(seg_full[k] / 1000.0 * fps))
             motion = ""
             if scene.motion is not None:
                 z0, z1 = scene.motion.from_scale, scene.motion.to_scale
@@ -201,10 +224,14 @@ def chunk_command(
                 scene.offset_x or 0.0, scene.offset_y or 0.0,
                 scene.zoom if scene.zoom is not None else 1.0, fps,
             )  # fmt: skip
+            # A lead image plays on from where the cut chunk stopped, so its zoom is rendered
+            # whole and the part already shown is dropped.
+            if off_s > 0:
+                tail_chain = tail_chain.replace("trim=duration", f"trim=start={off_s:.4f}:duration")
             parts.append(f"[{vi}:v]{graph},{motion}{tail_chain}[v{k}]")
         else:
             vi = add_input(
-                "-ss", f"{seg_in[k] / 1000.0:.4f}", "-t", f"{dur_s:.4f}",
+                "-ss", f"{(seg_in[k] + seg_off[k]) / 1000.0:.4f}", "-t", f"{dur_s:.4f}",
                 *_ASSET_INPUT, "-i", files[scene.clip_id],
             )  # fmt: skip
             prefix = _HDR_PREFIX if is_hdr(scene.probe) else ""

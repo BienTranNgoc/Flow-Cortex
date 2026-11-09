@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from test_render_document import scene
-from test_render_timeline import PROBES, plan
+from test_render_timeline import PROBES, doc_of, plan
 
 from flowcortex_worker.render.graph import (
     chunk_command,
@@ -16,7 +16,7 @@ from flowcortex_worker.render.graph import (
     join_command,
     mux_command,
 )
-from flowcortex_worker.render.timeline import TimelinePlan
+from flowcortex_worker.render.timeline import TimelinePlan, plan_timeline
 
 FILES = {"a1": "/in/a1", "a2": "/in/a2"}
 
@@ -95,6 +95,55 @@ def test_extend_lengthens_both_neighbours_and_sets_the_xfade_offset() -> None:
     # first segment 3200 ms, transition 400 ms
     assert "xfade=transition=fade:duration=0.4000:offset=2.8000" in graph_of(cmd)
     assert cmd[cmd.index("-t", len(cmd) - 12) + 1] == "6.0000"
+
+
+def split_chain() -> TimelinePlan:
+    probes = {**PROBES, "a1": {**PROBES["a1"], "durationMs": 20000}}
+    scenes = [
+        scene(0, transitionOut=transition("extend")),
+        scene(1, srcInMs=1000, srcOutMs=4000, transitionOut=transition("extend")),
+        scene(2, srcInMs=1000, srcOutMs=4000),
+    ]
+    return plan_timeline(doc_of(scenes), probes, "final", max_chunk_scenes=2)
+
+
+def test_cut_chunk_stops_where_the_fade_starts() -> None:
+    cmd = command(split_chain(), 0)
+    ts = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-t"]
+    # scene 1 plays 3000 ms of the 3400 ms segment; the fade out of it belongs to the next chunk
+    assert ts[:2] == ["3.2000", "3.0000"]
+    assert "xfade=transition=fade:duration=0.4000:offset=2.8000" in graph_of(cmd)
+    assert cmd[cmd.index("-t", len(cmd) - 12) + 1] == "5.8000"
+
+
+def test_chunk_after_a_cut_opens_with_the_tail_of_the_previous_scene() -> None:
+    cmd = command(split_chain(), 1)
+    ss = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-ss"]
+    ts = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-t"]
+    assert ss == ["3.8000", "0.8000"]
+    assert ts[:2] == ["0.4000", "3.2000"]
+    assert "xfade=transition=fade:duration=0.4000:offset=0.0000" in graph_of(cmd)
+    assert cmd[cmd.index("-t", len(cmd) - 12) + 1] == "3.2000"
+
+
+def test_lead_image_renders_its_whole_zoom_and_drops_what_the_cut_chunk_showed() -> None:
+    scenes = [
+        scene(
+            0,
+            clipId="a2",
+            motion={"kind": "zoom_in", "from": 1.0, "to": 1.3},
+            transitionOut=transition("overlap"),
+        ),
+        scene(1, atMs=2600),
+    ]
+    split = plan_timeline(doc_of(scenes), PROBES, "final", max_chunk_scenes=1)
+    cut, after = command(split, 0), command(split, 1)
+    assert "zoompan=z='1.0+(1.3-1.0)*on/90'" in graph_of(cut)
+    graph = graph_of(after)
+    assert "zoompan=z='1.0+(1.3-1.0)*on/90'" in graph
+    assert "trim=start=2.6000:duration=0.4000" in graph
+    at = after.index("-loop")
+    assert after[at : at + 6] == ["-loop", "1", "-framerate", "30", "-t", "3.0000"]
 
 
 def test_overlap_adds_no_handle() -> None:
