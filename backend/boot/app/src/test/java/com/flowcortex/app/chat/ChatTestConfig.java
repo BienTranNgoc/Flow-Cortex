@@ -1,5 +1,7 @@
 package com.flowcortex.app.chat;
 
+import com.flowcortex.chat.config.ChatProperties;
+import com.flowcortex.chat.config.ChatSwitch;
 import com.flowcortex.chat.turn.ChatEvents;
 import com.flowcortex.llm.api.LlmChatClient;
 import com.flowcortex.llm.api.LlmChatListener;
@@ -14,11 +16,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-/** A scriptable provider and a recording event seam, so no test reaches the real model. */
+/**
+ * A scriptable provider, a recording event seam that still forwards to the real realtime binding, and an
+ * environment switch a test flips at runtime: every chat IT shares one application context, so none of them
+ * may need a property of its own.
+ */
 @TestConfiguration(proxyBeanMethods = false)
 class ChatTestConfig {
 
@@ -30,8 +38,33 @@ class ChatTestConfig {
 
     @Bean
     @Primary
-    RecordingEvents recordingEvents() {
-        return new RecordingEvents();
+    RecordingEvents recordingEvents(@Qualifier("chatRealtimeEvents") ChatEvents realtime) {
+        return new RecordingEvents(realtime);
+    }
+
+    @Bean
+    @Primary
+    SwitchableChatSwitch switchableChatSwitch(ChatProperties properties, JdbcTemplate jdbcTemplate) {
+        return new SwitchableChatSwitch(properties, jdbcTemplate);
+    }
+
+    /** The environment half of the chat switch, on by default; the console half stays in the database. */
+    static final class SwitchableChatSwitch extends ChatSwitch {
+
+        private volatile boolean environmentEnabled = true;
+
+        SwitchableChatSwitch(ChatProperties properties, JdbcTemplate jdbcTemplate) {
+            super(properties, jdbcTemplate);
+        }
+
+        void environmentEnabled(boolean enabled) {
+            environmentEnabled = enabled;
+        }
+
+        @Override
+        public boolean envEnabled() {
+            return environmentEnabled;
+        }
     }
 
     interface Step {
@@ -123,8 +156,13 @@ class ChatTestConfig {
 
     static final class RecordingEvents implements ChatEvents {
 
+        private final ChatEvents delegate;
         private final List<Delta> deltas = new CopyOnWriteArrayList<>();
         private final List<Update> updates = new CopyOnWriteArrayList<>();
+
+        RecordingEvents(ChatEvents delegate) {
+            this.delegate = delegate;
+        }
 
         void reset() {
             deltas.clear();
@@ -142,11 +180,13 @@ class ChatTestConfig {
         @Override
         public void delta(UUID conversationId, UUID messageId, int offset, String text) {
             deltas.add(new Delta(conversationId, messageId, offset, text));
+            delegate.delta(conversationId, messageId, offset, text);
         }
 
         @Override
         public void updated(UUID conversationId, UUID messageId) {
             updates.add(new Update(conversationId, messageId));
+            delegate.updated(conversationId, messageId);
         }
     }
 }

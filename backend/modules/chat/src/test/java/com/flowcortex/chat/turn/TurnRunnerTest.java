@@ -54,7 +54,7 @@ class TurnRunnerTest {
 
     private TurnRunner runner(int threads, int queue) {
         ChatProperties properties = new ChatProperties(true, "model", new ChatProperties.Quota(100, 5000, 10),
-                Duration.ofSeconds(90), Duration.ofSeconds(30), 4, threads, queue);
+                Duration.ofSeconds(90), Duration.ofSeconds(30), 4, threads, queue, 8192, 1024);
         runner = new TurnRunner(store, events, llm, quota, telemetry, properties, Clock.fixed(NOW, ZoneOffset.UTC),
                 tools, JsonMapper.builder().build());
         return runner;
@@ -106,6 +106,51 @@ class TurnRunnerTest {
 
         verify(store, timeout(WAIT_MS)).finish(job.assistantId(), "failed", "", "{\"error\":\"empty\"}");
         verify(quota, timeout(WAIT_MS)).refund(job.ownerId(), DAY);
+    }
+
+    @Test
+    void anAnswerCutOffAtTheOutputCapIsKeptAsDoneAndNotRefunded() {
+        alive();
+        when(llm.stream(any(), any())).thenAnswer(call -> {
+            call.<com.flowcortex.llm.api.LlmChatListener>getArgument(1).onText("A long answer that stops mid");
+            return new LlmChatOutcome.Truncated("m", 5, 8192);
+        });
+        when(store.finish(any(), eq("done"), any(), any())).thenReturn(1);
+        TurnJob job = job(NOW.plusSeconds(60));
+
+        runner(1, 1).start(job);
+
+        verify(store, timeout(WAIT_MS)).finish(job.assistantId(), "done", "A long answer that stops mid", null);
+        verify(quota, never()).refund(any(), any());
+    }
+
+    @Test
+    void anAnswerCutOffBeforeAnyTextFailsAsEmptyAndRefundsTheCharge() {
+        alive();
+        when(llm.stream(any(), any())).thenReturn(new LlmChatOutcome.Truncated("m", 5, 8192));
+        when(store.finish(any(), eq("failed"), any(), any())).thenReturn(1);
+        TurnJob job = job(NOW.plusSeconds(60));
+
+        runner(1, 1).start(job);
+
+        verify(store, timeout(WAIT_MS)).finish(job.assistantId(), "failed", "", "{\"error\":\"empty\"}");
+        verify(quota, timeout(WAIT_MS)).refund(job.ownerId(), DAY);
+    }
+
+    @Test
+    void theRequestCarriesTheConfiguredOutputCapAndThinkingBudget() {
+        alive();
+        when(llm.stream(any(), any())).thenReturn(finished());
+        when(store.finish(any(), any(), any(), any())).thenReturn(1);
+        TurnJob job = job(NOW.plusSeconds(60));
+
+        runner(1, 1).start(job);
+
+        org.mockito.ArgumentCaptor<com.flowcortex.llm.api.LlmChatRequest> sent =
+                org.mockito.ArgumentCaptor.forClass(com.flowcortex.llm.api.LlmChatRequest.class);
+        verify(llm, timeout(WAIT_MS)).stream(sent.capture(), any());
+        assertThat(sent.getValue().maxOutputTokens()).isEqualTo(8192);
+        assertThat(sent.getValue().thinkingBudget()).isEqualTo(1024);
     }
 
     @Test

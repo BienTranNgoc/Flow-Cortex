@@ -107,7 +107,7 @@ public class TurnRunner {
             }
             LlmChatRequest request = ChatPromptBuilder.request(properties.model(),
                     store.window(job.conversationId(), job.userSeq(), ChatPromptBuilder.WINDOW), job.language(),
-                    tools.declarations());
+                    tools.declarations(), properties.maxOutputTokens(), properties.thinkingBudget());
             ToolContext context = new ToolContext(job.ownerId(), job.conversationId(), Attachments.fromPayload(
                     jsonMapper, store.payloadAt(job.conversationId(), job.userSeq())));
             ToolRounds.Result result = ToolRounds.run(llm, request, tools, context, listener,
@@ -131,6 +131,15 @@ public class TurnRunner {
                     conclude(job, "failed", body, "empty", started, finished.inputTokens(), finished.outputTokens());
                 } else {
                     conclude(job, "done", body, null, started, finished.inputTokens(), finished.outputTokens());
+                }
+            }
+            case LlmChatOutcome.Truncated truncated -> {
+                if (body.isBlank() && !cardProposed) {
+                    conclude(job, "failed", body, "empty", started, truncated.inputTokens(),
+                            truncated.outputTokens());
+                } else {
+                    LOG.info("chat.turn outcome=truncated output_tokens={}", truncated.outputTokens());
+                    conclude(job, "done", body, null, started, truncated.inputTokens(), truncated.outputTokens());
                 }
             }
             case LlmChatOutcome.Cancelled _ -> {

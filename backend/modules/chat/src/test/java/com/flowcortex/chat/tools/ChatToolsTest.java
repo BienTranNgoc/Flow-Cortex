@@ -309,7 +309,21 @@ class ChatToolsTest {
 
     private LlmChatRequest firstRequest() {
         return new LlmChatRequest("m", "system", List.of(new LlmTurn.User("hi")), tools.declarations(), 0.7, 256,
-                "en");
+                "en", 64);
+    }
+
+    @Test
+    void everyRoundAfterAToolCallKeepsTheOutputCapAndThinkingBudget() {
+        catalog(textFlow);
+        AlwaysCalling llm = new AlwaysCalling();
+
+        ToolRounds.run(llm, firstRequest(), tools, context(0), new Collector(), 2, () -> { });
+
+        assertThat(llm.requests).hasSize(3)
+                .allSatisfy(sent -> {
+                    assertThat(sent.maxOutputTokens()).isEqualTo(256);
+                    assertThat(sent.thinkingBudget()).isEqualTo(64);
+                });
     }
 
     @Test

@@ -5,6 +5,7 @@ import static com.flowcortex.app.chat.ChatTestConfig.StubChatClient.text;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.flowcortex.chat.cards.CardStore;
 import com.flowcortex.llm.api.LlmChatOutcome;
 import com.flowcortex.llm.api.LlmTurn;
 import com.flowcortex.user.api.UserView;
@@ -26,10 +27,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -40,18 +37,10 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Cards over HTTP with a scripted provider: the model proposes a run through the tool loop, and the member's
- * confirm is the only thing that starts one. Dedicated context: credits and Product Video are on, and
- * {@code echo} costs 10, {@code probe} 40.
+ * confirm is the only thing that starts one. Credits are on in the shared context: {@code echo} costs 10,
+ * {@code probe} 40.
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
-        "flowcortex.chat.enabled=true",
-        "flowcortex.product-video.enabled=true",
-        "flowcortex.credits.enabled=true",
-        "flowcortex.credits.step-costs.echo=10",
-        "flowcortex.credits.step-costs.probe=40",
-        "flowcortex.workflow.reaper-interval-ms=3600000"})
-@AutoConfigureTestRestTemplate
-@Import(ChatTestConfig.class)
+@ChatIt
 class ChatCardsIT extends ChatItSupport {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -59,6 +48,9 @@ class ChatCardsIT extends ChatItSupport {
 
     @Autowired
     private WorkflowService workflowService;
+
+    @Autowired
+    private CardStore cardStore;
 
     record Pv(String productName, String description, String cta, String price, String promotion) {
     }
@@ -263,6 +255,36 @@ class ChatCardsIT extends ChatItSupport {
         assertThat(runsOf(owner)).isEqualTo(1);
         assertThat(runMessages(conversation)).isEqualTo(1);
         assertThat(cardState(card)).isEqualTo("started");
+    }
+
+    @Test
+    void aCardStartedByTheWinnerShowsTheEditsTheRunStartedWithNotALoserEarlierAmendment() {
+        workflows();
+        UserView owner = fundedMember("card-winner", 1000);
+        String token = login(owner.email());
+        UUID conversation = conversation(owner.id(), "Thread");
+        UUID winnerImage = upload(owner, token, "winner.png");
+        UUID loserImage = upload(owner, token, "loser.png");
+        UUID card = card(conversation, runCard(imageWorkflow.id(), imageWorkflow.name(),
+                List.of(new Att(winnerImage, "winner.png")), null));
+        UUID runId = UUID.randomUUID();
+
+        int loserAmended = cardStore.amendOpen(card, "{\"state\":\"pending\",\"uploads\":[{\"uploadId\":\""
+                + loserImage + "\",\"fileName\":\"loser.png\"}]}");
+        int winnerStarted = cardStore.markStarted(card, runId, "{\"uploads\":[{\"uploadId\":\"" + winnerImage
+                + "\",\"fileName\":\"winner.png\"}]}");
+        int loserStarted = cardStore.markStarted(card, UUID.randomUUID(), "{\"uploads\":[{\"uploadId\":\""
+                + loserImage + "\",\"fileName\":\"loser.png\"}]}");
+
+        assertThat(loserAmended).isEqualTo(1);
+        assertThat(winnerStarted).isEqualTo(1);
+        assertThat(loserStarted).isZero();
+        assertThat(cardState(card)).isEqualTo("started");
+        assertThat(jdbcTemplate.queryForObject("SELECT payload->>'runId' FROM chat_message WHERE id = ?",
+                String.class, card)).isEqualTo(runId.toString());
+        assertThat(jdbcTemplate.queryForList("SELECT a->>'fileName' FROM chat_message, "
+                + "jsonb_array_elements(payload->'uploads') a WHERE id = ?", String.class, card))
+                .containsExactly("winner.png");
     }
 
     @Test

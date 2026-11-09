@@ -686,7 +686,7 @@ export interface ChatFirstMessage {
 export interface ChatConversationCreate {
   /** @maxLength 80 */
   title?: string;
-  firstMessage?: ChatFirstMessage;
+  firstMessage: ChatFirstMessage;
 }
 
 /**

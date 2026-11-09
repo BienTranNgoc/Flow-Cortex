@@ -177,6 +177,36 @@ describe('ChatPage new conversation', () => {
   });
 });
 
+describe('ChatPage New button', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the empty thread without sending any request to create a conversation', async () => {
+    const calls = stubApi({
+      'GET /api/v1/chat/conversations': LIST(),
+      'GET /api/v1/chat/conversations/c1/messages': MESSAGES(),
+      'POST /api/v1/chat/conversations': {
+        status: 201,
+        body: { id: 'c9', title: 'New chat', lastActivityAt: '2026-11-07T10:00:00Z', createdAt: '2026-11-07T10:00:00Z' },
+      },
+    });
+    const { queryClient } = renderRoute(
+      '/chat/:conversationId',
+      '/chat/c1',
+      <ChatPage />,
+      <Route path="/chat" element={<p>empty thread</p>} />,
+    );
+    await settled(queryClient);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
+
+    expect(await screen.findByText('empty thread')).toBeInTheDocument();
+    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
+  });
+});
+
 describe('ChatPage failed answer', () => {
   afterEach(() => {
     vi.unstubAllGlobals();

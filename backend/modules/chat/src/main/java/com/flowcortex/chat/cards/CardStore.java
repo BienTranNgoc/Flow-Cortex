@@ -79,10 +79,15 @@ public class CardStore {
                 messageId, PENDING);
     }
 
-    /** Marks an open card started with its run; 0 when another confirm already did. */
-    public int markStarted(UUID messageId, UUID runId) {
-        return jdbcTemplate.update("UPDATE chat_message SET payload = payload || jsonb_build_object('state', ?::text, "
-                + "'runId', ?::text) WHERE id = ? AND payload->>'state' IN (?, ?)", STARTED, runId.toString(),
-                messageId, PENDING, IMAGES_EXPIRED);
+    /**
+     * Marks an open card started with its run and, in the same update, writes {@code startedWithJson}: the
+     * images and product fields that run was started with, which replace whatever a confirm that lost the race
+     * amended meanwhile. 0 when another confirm already started it.
+     */
+    public int markStarted(UUID messageId, UUID runId, String startedWithJson) {
+        return jdbcTemplate.update("UPDATE chat_message SET payload = payload || ?::jsonb || "
+                + "jsonb_build_object('state', ?::text, 'runId', ?::text) WHERE id = ? "
+                + "AND payload->>'state' IN (?, ?)", startedWithJson, STARTED, runId.toString(), messageId, PENDING,
+                IMAGES_EXPIRED);
     }
 }

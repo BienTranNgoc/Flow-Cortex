@@ -49,6 +49,9 @@ abstract class ChatItSupport extends AbstractPostgresBootTest {
     @Autowired
     protected TurnRunner runner;
 
+    @Autowired
+    protected ChatTestConfig.SwitchableChatSwitch chatSwitch;
+
     protected UserView admin;
 
     record LoginRequest(String email, String password) {
@@ -77,8 +80,14 @@ abstract class ChatItSupport extends AbstractPostgresBootTest {
         admin = userService.createInitialAdmin(uniqueEmail("chat-admin"), "password123", "Chat Admin");
         jdbcTemplate.update("UPDATE chat_settings SET enabled = true, updated_by = NULL WHERE id = 1");
         jdbcTemplate.update("DELETE FROM chat_quota_usage WHERE subject = 'global'");
+        chatSwitch.environmentEnabled(true);
         stub.reset();
         events.reset();
+    }
+
+    @AfterEach
+    void restoreEnvironmentSwitch() {
+        chatSwitch.environmentEnabled(true);
     }
 
     /** Runs started by a confirmed card carry remote steps the admin media-jobs counts would otherwise see. */

@@ -1,25 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { newUuidV4 } from '../support/uuid';
 import './chat.css';
-import { chatProblem } from './chatProblem';
 import { ConversationRow } from './ConversationRow';
 import { DeleteDialog } from './DeleteDialog';
 import { NewThreadPane } from './NewThreadPane';
 import { ThreadPane } from './ThreadPane';
-import {
-  useConversationList,
-  useCreateConversation,
-  useDeleteConversation,
-} from './useConversations';
+import { useConversationList, useDeleteConversation } from './useConversations';
 
 export function ChatPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { conversationId } = useParams();
   const list = useConversationList();
-  const create = useCreateConversation();
   const remove = useDeleteConversation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
@@ -35,15 +28,8 @@ export function ChatPage() {
   }, [drawerOpen]);
 
   const startNew = () => {
-    create.mutate(
-      { key: newUuidV4() },
-      {
-        onSuccess: (created) => {
-          setDrawerOpen(false);
-          void navigate(`/chat/${created.id}`);
-        },
-      },
-    );
+    setDrawerOpen(false);
+    void navigate('/chat');
   };
 
   const confirmDelete = () => {
@@ -93,19 +79,9 @@ export function ChatPage() {
             {t('chat.list.close')}
           </button>
         </div>
-        <button
-          type="button"
-          className="chat-button chat-button--primary"
-          disabled={create.isPending}
-          onClick={startNew}
-        >
+        <button type="button" className="chat-button chat-button--primary" onClick={startNew}>
           {t('chat.list.new')}
         </button>
-        {create.isError && (
-          <p role="alert" className="form-error">
-            {chatProblem(create.error, t).message || t('chat.list.createFailed')}
-          </p>
-        )}
         {list.isPending && <p role="status">{t('chat.list.loading')}</p>}
         {list.isError && (
           <div role="alert" className="chat-state">

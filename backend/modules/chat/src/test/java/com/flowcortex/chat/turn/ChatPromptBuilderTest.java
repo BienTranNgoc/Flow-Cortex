@@ -27,7 +27,15 @@ class ChatPromptBuilderTest {
     }
 
     private static LlmChatRequest request(Turn... history) {
-        return ChatPromptBuilder.request("m", List.of(history), "en", List.of());
+        return ChatPromptBuilder.request("m", List.of(history), "en", List.of(), 8192, 1024);
+    }
+
+    @Test
+    void theRequestCarriesTheOutputCapAndTheThinkingBudgetItWasGiven() {
+        LlmChatRequest request = request(user("hi"));
+
+        assertThat(request.maxOutputTokens()).isEqualTo(8192);
+        assertThat(request.thinkingBudget()).isEqualTo(1024);
     }
 
     @Test

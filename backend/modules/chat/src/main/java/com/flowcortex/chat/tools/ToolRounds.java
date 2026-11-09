@@ -63,7 +63,7 @@ public final class ToolRounds {
             }
             onRound.run();
             request = new LlmChatRequest(first.model(), first.systemInstruction(), turns, first.tools(),
-                    first.temperature(), first.maxOutputTokens(), first.language());
+                    first.temperature(), first.maxOutputTokens(), first.language(), first.thinkingBudget());
         }
     }
 }

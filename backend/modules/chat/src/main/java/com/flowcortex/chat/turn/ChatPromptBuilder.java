@@ -17,7 +17,6 @@ final class ChatPromptBuilder {
     static final int WINDOW = 20;
 
     private static final double TEMPERATURE = 0.7;
-    private static final int MAX_OUTPUT_TOKENS = 2048;
 
     private static final String INSTRUCTION = """
             You are Nodi, the assistant of a platform where members create videos and images with AI workflows.
@@ -37,10 +36,14 @@ final class ChatPromptBuilder {
     private ChatPromptBuilder() {
     }
 
-    /** {@code history} is the window ending at the member message being answered, oldest first. */
-    static LlmChatRequest request(String model, List<Turn> history, String language, List<LlmTool> tools) {
+    /**
+     * {@code history} is the window ending at the member message being answered, oldest first.
+     * {@code maxOutputTokens} bounds thinking and answer together; {@code thinkingBudget} is the share thinking may use.
+     */
+    static LlmChatRequest request(String model, List<Turn> history, String language, List<LlmTool> tools,
+            int maxOutputTokens, int thinkingBudget) {
         return new LlmChatRequest(model, instruction(language), turns(history), tools, TEMPERATURE,
-                MAX_OUTPUT_TOKENS, language);
+                maxOutputTokens, language, thinkingBudget);
     }
 
     static String instruction(String language) {

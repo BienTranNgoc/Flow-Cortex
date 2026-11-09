@@ -32,7 +32,7 @@ class TurnSweeperTest {
     private final ChatQuota quota = mock(ChatQuota.class);
     private final ChatTelemetry telemetry = mock(ChatTelemetry.class);
     private final ChatProperties properties = new ChatProperties(true, "model",
-            new ChatProperties.Quota(100, 5000, 10), Duration.ofSeconds(90), GRACE, 4, 8, 32);
+            new ChatProperties.Quota(100, 5000, 10), Duration.ofSeconds(90), GRACE, 4, 8, 32, 8192, 1024);
     private final TurnSweeper sweeper = new TurnSweeper(store, events, quota, telemetry, properties,
             Clock.fixed(NOW, ZoneOffset.UTC));
 

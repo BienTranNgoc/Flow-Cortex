@@ -47,11 +47,6 @@ public class ConversationStore {
                 + "WHERE owner_id = ? ORDER BY last_activity_at DESC, id DESC", CONVERSATION, ownerId);
     }
 
-    @Transactional
-    public StoredConversation create(UUID ownerId, String title) {
-        return create(ownerId, UUID.randomUUID(), title);
-    }
-
     /** Creates the conversation under a caller-chosen id, so a claim written first can name it. */
     @Transactional
     public StoredConversation create(UUID ownerId, UUID id, String title) {

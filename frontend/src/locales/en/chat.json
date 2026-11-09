@@ -11,8 +11,7 @@
     "loading": "Loading conversations…",
     "empty": "No conversations yet. Start a new chat.",
     "loadFailed": "Could not load your conversations.",
-    "retry": "Retry",
-    "createFailed": "Could not start a new chat."
+    "retry": "Retry"
   },
   "row": {
     "rename": "Rename",

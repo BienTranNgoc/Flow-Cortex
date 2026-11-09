@@ -21,7 +21,7 @@ public class ChatSwitch {
     private final ChatProperties properties;
     private final JdbcTemplate jdbcTemplate;
 
-    ChatSwitch(ChatProperties properties, JdbcTemplate jdbcTemplate) {
+    protected ChatSwitch(ChatProperties properties, JdbcTemplate jdbcTemplate) {
         this.properties = properties;
         this.jdbcTemplate = jdbcTemplate;
     }

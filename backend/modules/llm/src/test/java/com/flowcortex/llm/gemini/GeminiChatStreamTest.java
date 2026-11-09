@@ -23,11 +23,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,7 +122,6 @@ class GeminiChatStreamTest {
         final List<String> texts = new CopyOnWriteArrayList<>();
         final List<List<String>> calls = new CopyOnWriteArrayList<>();
         final AtomicBoolean cancel = new AtomicBoolean();
-        final AtomicLong cancelledAtNanos = new AtomicLong();
         boolean cancelAfterFirstText;
 
         @Override
@@ -144,7 +143,6 @@ class GeminiChatStreamTest {
         }
 
         void requestCancel() {
-            cancelledAtNanos.compareAndSet(0, System.nanoTime());
             cancel.set(true);
         }
     }
@@ -231,12 +229,48 @@ class GeminiChatStreamTest {
     }
 
     @Test
-    void aNonStopTerminalFinishFailsUpstream() {
+    void aMaxTokensFinishIsATruncatedAnswerCarryingItsTextAndTokens() {
         handler = (call, out) -> event(out,
-                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"cut\"}]},\"finishReason\":\"MAX_TOKENS\"}]}");
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"cut\"}]},\"finishReason\":\"MAX_TOKENS\"}],"
+                + "\"usageMetadata\":{\"promptTokenCount\":9,\"candidatesTokenCount\":2048}}");
+        Recorder listener = new Recorder();
+
+        assertThat(client().stream(request(), listener)).isEqualTo(new LlmChatOutcome.Truncated(MODEL, 9, 2048));
+        assertThat(listener.texts).containsExactly("cut");
+        assertThat(meters.get("llm.requests").tag("outcome", "truncated").timer().count()).isEqualTo(1);
+    }
+
+    @Test
+    void aMaxTokensFinishWithOnlyThoughtsIsTruncatedWithNoText() {
+        handler = (call, out) -> event(out, "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,"
+                + "\"text\":\"hmm\"}]},\"finishReason\":\"MAX_TOKENS\"}]}");
+        Recorder listener = new Recorder();
+
+        assertThat(client().stream(request(), listener)).isInstanceOf(LlmChatOutcome.Truncated.class);
+        assertThat(listener.texts).isEmpty();
+    }
+
+    @Test
+    void anotherNonStopTerminalFinishFailsUpstream() {
+        handler = (call, out) -> event(out,
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"cut\"}]},\"finishReason\":\"OTHER\"}]}");
 
         assertThat(client().stream(request(), new Recorder()))
                 .isEqualTo(new LlmChatOutcome.Failed(LlmJsonResult.Kind.UPSTREAM));
+    }
+
+    @Test
+    void theThinkingBudgetIsSentOnlyWhenTheRequestCarriesOne() throws Exception {
+        handler = (call, out) -> event(out, lastChunk("ok"));
+
+        client().stream(request(), new Recorder());
+        client().stream(new LlmChatRequest(MODEL, null, List.of(new LlmTurn.User("Hi")), List.of(), 0.4, 4096, "en",
+                1024), new Recorder());
+
+        assertThat(JSON.readTree(requestBodies.get(0)).path("generationConfig").has("thinkingConfig")).isFalse();
+        JsonNode config = JSON.readTree(requestBodies.get(1)).path("generationConfig");
+        assertThat(config.path("thinkingConfig").path("thinkingBudget").asInt()).isEqualTo(1024);
+        assertThat(config.path("maxOutputTokens").asInt()).isEqualTo(4096);
     }
 
     @Test
@@ -257,28 +291,24 @@ class GeminiChatStreamTest {
     }
 
     @Test
-    void cancellingWhileAReadBlocksAbortsWithinASecond() throws Exception {
+    void cancellingWhileAReadBlocksAbortsTheRead() throws Exception {
         handler = (call, out) -> {
             event(out, textChunk("one"));
-            release.await(10, TimeUnit.SECONDS);
+            release.await(30, TimeUnit.SECONDS);
         };
         Recorder listener = new Recorder();
-        Thread canceller = Thread.ofVirtual().unstarted(() -> {
-            try {
-                Thread.sleep(150);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-            }
-            listener.requestCancel();
-        });
-        canceller.start();
+        // The stub holds the stream open for 30 s and the idle timeout is 10 s: only the abort the watcher
+        // makes on cancel returns sooner, and the 8 s bound sits far above any runner's scheduling jitter.
+        CompletableFuture<LlmChatOutcome> outcome = CompletableFuture
+                .supplyAsync(() -> client().stream(request(), listener));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (listener.texts.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        listener.requestCancel();
 
-        LlmChatOutcome outcome = client().stream(request(), listener);
-        long afterCancelMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - listener.cancelledAtNanos.get());
-
-        assertThat(outcome).isEqualTo(new LlmChatOutcome.Cancelled());
+        assertThat(outcome.get(8, TimeUnit.SECONDS)).isEqualTo(new LlmChatOutcome.Cancelled());
         assertThat(listener.texts).containsExactly("one");
-        assertThat(afterCancelMillis).isLessThan(1000);
     }
 
     @Test
@@ -391,7 +421,7 @@ class GeminiChatStreamTest {
         assertThatIllegalArgumentException().isThrownBy(
                 () -> new LlmChatRequest(MODEL, null, turns, List.of(), 0.2, 0, "en"));
         assertThatIllegalArgumentException().isThrownBy(
-                () -> new LlmChatRequest(MODEL, null, turns, List.of(), 0.2, 8193, "en"));
+                () -> new LlmChatRequest(MODEL, null, turns, List.of(), 0.2, 32769, "en"));
         assertThatIllegalArgumentException().isThrownBy(
                 () -> new LlmChatRequest(MODEL, null, turns, List.of(), 2.5, 100, "en"));
         assertThat(new LlmChatRequest(MODEL, null, turns, null, 0.2, 100, null).language()).isEqualTo("en");

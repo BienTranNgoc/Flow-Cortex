@@ -60,7 +60,7 @@ export function useMessages(conversationId: string | undefined) {
 }
 
 export interface CreateConversationInput {
-  firstMessage?: ChatFirstMessage;
+  firstMessage: ChatFirstMessage;
   /** Kept by the caller across retries of the same click. */
   key: string;
 }
@@ -69,7 +69,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ firstMessage, key }: CreateConversationInput) =>
-      unwrapChat(createChatConversation(firstMessage ? { firstMessage } : {}, requestInit(key))),
+      unwrapChat(createChatConversation({ firstMessage }, requestInit(key))),
     onSuccess: (created) => {
       const { userMessage: _first, assistantMessageId: _answer, ...conversation } = created;
       queryClient.setQueryData<ChatConversationList>(chatKeys.list, (list) =>

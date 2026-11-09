@@ -126,7 +126,15 @@ public class CardService {
         }
 
         RunView run = start(ownerId, conversationId, messageId, card, draft, uploads, edits.acknowledgeCost());
-        return recorded(ownerId, conversationId, messageId, run.id());
+        ObjectNode startedWith = json.createObjectNode();
+        if (imageCard) {
+            startedWith.set("uploads", json.valueToTree(uploads));
+        }
+        if (draft != null) {
+            startedWith.set("productVideo", json.valueToTree(new ProductFields(draft.productName(),
+                    draft.description(), draft.cta(), draft.price(), draft.promotion())));
+        }
+        return recorded(ownerId, conversationId, messageId, run.id(), startedWith.toString());
     }
 
     private RunView start(UUID ownerId, UUID conversationId, UUID messageId, JsonNode card, ProductVideoDraft draft,
@@ -155,10 +163,14 @@ public class CardService {
         }
     }
 
-    /** Marks the card started and appends the run message, once; a confirm that lost the race changes nothing. */
-    private Confirmation recorded(UUID ownerId, UUID conversationId, UUID messageId, UUID runId) {
+    /**
+     * Marks the card started with the edits its run started with and appends the run message, once; a confirm
+     * that lost the race changes nothing.
+     */
+    private Confirmation recorded(UUID ownerId, UUID conversationId, UUID messageId, UUID runId,
+            String startedWithJson) {
         Optional<StoredMessage> runMessage = transactions.execute(status -> {
-            if (cards.markStarted(messageId, runId) == 0) {
+            if (cards.markStarted(messageId, runId, startedWithJson) == 0) {
                 return Optional.empty();
             }
             return cards.append(ownerId, conversationId, "run", runPayload(runId));

@@ -6,13 +6,11 @@ import com.flowcortex.user.api.UserView;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.TestPropertySource;
 
 /** The environment switch, the console switch and the admin settings route that flips the console one. */
 @ChatIt
@@ -27,6 +25,9 @@ class ChatSwitchIT extends ChatItSupport {
     }
 
     record ListResponse(List<Object> items, boolean chatEnabled) {
+    }
+
+    record Features(Boolean chat) {
     }
 
     @Test
@@ -107,25 +108,29 @@ class ChatSwitchIT extends ChatItSupport {
     }
 
     /** The environment switch is off while the console row is on. */
-    @Nested
-    @TestPropertySource(properties = "flowcortex.chat.enabled=false")
-    class EnvironmentOff {
+    @Test
+    void withTheEnvironmentSwitchOffASendIs503AndTheListReportsChatOffWhateverTheConsoleRowSays() {
+        UserView owner = member("switch-env");
+        String token = login(owner.email());
+        UUID conversation = conversation(owner.id(), "Thread");
+        chatSwitch.environmentEnabled(false);
 
-        @Test
-        void aSendIs503AndTheListReportsChatOffWhateverTheConsoleRowSays() {
-            UserView owner = member("switch-env");
-            String token = login(owner.email());
-            UUID conversation = conversation(owner.id(), "Thread");
+        ResponseEntity<Problem> send = send(token, conversation, UUID.randomUUID().toString(), "hello",
+                Problem.class);
+        ResponseEntity<ListResponse> list = restTemplate.exchange(BASE, HttpMethod.GET,
+                new HttpEntity<>(bearer(token)), ListResponse.class);
 
-            ResponseEntity<Problem> send = send(token, conversation, UUID.randomUUID().toString(), "hello",
-                    Problem.class);
-            ResponseEntity<ListResponse> list = restTemplate.exchange(BASE, HttpMethod.GET,
-                    new HttpEntity<>(bearer(token)), ListResponse.class);
+        assertThat(send.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(send.getBody().code()).isEqualTo("chat-disabled");
+        assertThat(list.getBody().chatEnabled()).isFalse();
+        assertThat(rows("chat_message", "conversation_id", conversation)).isZero();
+    }
 
-            assertThat(send.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-            assertThat(send.getBody().code()).isEqualTo("chat-disabled");
-            assertThat(list.getBody().chatEnabled()).isFalse();
-            assertThat(rows("chat_message", "conversation_id", conversation)).isZero();
-        }
+    @Test
+    void theFeaturesEndpointReportsChatOnWhenTheEnvironmentSwitchIsOn() {
+        ResponseEntity<Features> response = restTemplate.getForEntity("/api/v1/features", Features.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().chat()).isTrue();
     }
 }

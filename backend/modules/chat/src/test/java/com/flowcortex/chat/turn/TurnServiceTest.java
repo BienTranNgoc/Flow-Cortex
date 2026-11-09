@@ -48,7 +48,7 @@ class TurnServiceTest {
     private final ChatTelemetry telemetry = mock(ChatTelemetry.class);
     private final TurnService service = new TurnService(store, conversations, runner, quota, chatSwitch, telemetry,
             new ChatProperties(true, "model", new ChatProperties.Quota(100, 5000, 10), Duration.ofSeconds(90),
-                    Duration.ofSeconds(30), 4, 8, 32),
+                    Duration.ofSeconds(30), 4, 8, 32, 8192, 1024),
             mock(MessageSource.class), JsonMapper.builder().build(), Clock.fixed(NOW, ZoneOffset.UTC),
             mock(PlatformTransactionManager.class));
 

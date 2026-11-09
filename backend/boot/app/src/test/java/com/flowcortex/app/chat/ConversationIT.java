@@ -107,26 +107,25 @@ class ConversationIT extends AbstractPostgresBootTest {
     }
 
     @Test
-    void aMemberStartsAConversationWithTheDefaultOrAGivenTitle() {
-        String token = login(member("chat-create").email());
+    void aConversationIsOnlyEverCreatedWithAFirstMessage() {
+        UserView owner = member("chat-create");
+        HttpHeaders keyed = bearer(login(owner.email()));
+        keyed.set("Idempotency-Key", UUID.randomUUID().toString());
 
-        HttpHeaders vietnamese = bearer(token);
-        vietnamese.set(HttpHeaders.ACCEPT_LANGUAGE, "vi");
-        ResponseEntity<Item> untitled = restTemplate.exchange(BASE, HttpMethod.POST,
-                new HttpEntity<>(new TitleRequest(null), vietnamese), Item.class);
-        ResponseEntity<Item> titled = restTemplate.exchange(BASE, HttpMethod.POST,
-                new HttpEntity<>(new TitleRequest("  Kịch bản  "), bearer(token)), Item.class);
-        HttpHeaders english = bearer(token);
-        english.set(HttpHeaders.ACCEPT_LANGUAGE, "en");
-        ResponseEntity<Item> englishUntitled = restTemplate.exchange(BASE, HttpMethod.POST,
-                new HttpEntity<>(new TitleRequest(null), english), Item.class);
+        ResponseEntity<Problem> noBody = restTemplate.exchange(BASE, HttpMethod.POST, new HttpEntity<>(keyed),
+                Problem.class);
+        ResponseEntity<Problem> noMessage = restTemplate.exchange(BASE, HttpMethod.POST,
+                new HttpEntity<>(new TitleRequest(null), keyed), Problem.class);
+        ResponseEntity<Problem> titleOnly = restTemplate.exchange(BASE, HttpMethod.POST,
+                new HttpEntity<>(new TitleRequest("Kịch bản"), keyed), Problem.class);
 
-        assertThat(untitled.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(untitled.getBody().title()).isEqualTo("Cuộc trò chuyện mới");
-        assertThat(titled.getBody().title()).isEqualTo("Kịch bản");
-        assertThat(englishUntitled.getBody().title()).isEqualTo("New chat");
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM chat_conversation WHERE id = ?",
-                Integer.class, untitled.getBody().id())).isEqualTo(1);
+        for (ResponseEntity<Problem> refused : List.of(noBody, noMessage, titleOnly)) {
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(refused.getBody().type()).isEqualTo(PROBLEMS.resolve("validation-failed"));
+            assertThat(refused.getBody().errors()).containsKey("text");
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM chat_conversation WHERE owner_id = ?",
+                Integer.class, owner.id())).isZero();
     }
 
     @Test

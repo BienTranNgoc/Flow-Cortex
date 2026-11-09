@@ -16,6 +16,7 @@ import com.flowcortex.llm.api.LlmTurn;
 import com.flowcortex.user.api.UserView;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -23,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.TestPropertySource;
 
 /** The send, stream, stop, retry and refuse paths of a chat turn over HTTP with a scripted provider. */
 @ChatIt
@@ -503,10 +502,7 @@ class ChatTurnIT extends ChatItSupport {
     void theTitleBecomesTheFirstSixtyCharactersOnlyWhileItIsStillTheDefaultAndTheMessageIsTheFirst() {
         UserView owner = member("turn-title");
         String token = login(owner.email());
-        var vietnamese = bearer(token);
-        vietnamese.set("Accept-Language", "vi");
-        UUID untitled = restTemplate.exchange(BASE, HttpMethod.POST, new HttpEntity<>(vietnamese), Created.class)
-                .getBody().id();
+        UUID untitled = conversation(owner.id(), "Cuộc trò chuyện mới");
         UUID named = conversation(owner.id(), "Kịch bản của tôi");
         String longText = "x".repeat(100);
 
@@ -620,35 +616,48 @@ class ChatTurnIT extends ChatItSupport {
                 String.class, sent.userMessage().id())).containsExactly("cup.png", "lid.png");
     }
 
-    /** A one-thread, one-slot executor: the third turn has nowhere to wait. */
-    @Nested
-    @TestPropertySource(properties = {"flowcortex.chat.turn-threads=1", "flowcortex.chat.turn-queue=1"})
-    class Saturated {
+    /** Every thread busy and every queue slot taken: the next turn has nowhere to wait. */
+    @Test
+    void aTurnTheExecutorRefusesIsFailedRefundedAndPublishedAtOnce() throws Exception {
+        int threads = properties.turnThreads();
+        int capacity = threads + properties.turnQueue();
+        int perMember = properties.quota().perMinute();
+        CountDownLatch running = new CountDownLatch(threads);
+        CountDownLatch gate = new CountDownLatch(1);
+        for (int thread = 0; thread < threads; thread++) {
+            stub.script(finished(), text("answer"), signal(running), hold(gate));
+        }
+        List<Sent> accepted = new ArrayList<>();
+        UserView owner = null;
+        String token = null;
+        int sentByOwner = 0;
+        Sent refused = null;
+        for (int sent = 0; sent <= capacity; sent++) {
+            if (sent % perMember == 0) {
+                owner = member("turn-saturated");
+                token = login(owner.email());
+                sentByOwner = 0;
+            }
+            UUID conversation = conversation(owner.id(), "Thread " + sent);
+            Sent result = sendOk(token, conversation, "message " + sent);
+            sentByOwner++;
+            if (sent < capacity) {
+                accepted.add(result);
+            } else {
+                refused = result;
+            }
+            if (sent == threads - 1) {
+                assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            }
+        }
 
-        @Test
-        void aTurnTheExecutorRefusesIsFailedRefundedAndPublishedAtOnce() throws Exception {
-            UserView owner = member("turn-saturated");
-            String token = login(owner.email());
-            UUID running = conversation(owner.id(), "Running");
-            UUID queued = conversation(owner.id(), "Queued");
-            UUID refused = conversation(owner.id(), "Refused");
-            CountDownLatch emitted = new CountDownLatch(1);
-            CountDownLatch gate = new CountDownLatch(1);
-            stub.script(finished(), text("first answer"), signal(emitted), hold(gate));
-            stub.script(finished(), text("queued answer"));
-            Sent first = sendOk(token, running, "occupies the thread");
-            assertThat(emitted.await(5, TimeUnit.SECONDS)).isTrue();
-            Sent second = sendOk(token, queued, "waits in the queue");
-
-            Sent third = sendOk(token, refused, "nowhere to go");
-
-            assertThat(status(third.assistantMessageId())).isEqualTo("failed");
-            assertThat(errorCode(third.assistantMessageId())).isEqualTo("busy");
-            assertThat(events.updatesOf(third.assistantMessageId())).isEqualTo(1);
-            assertThat(memberCount(owner.id())).isEqualTo(2);
-            gate.countDown();
-            awaitStatus(first.assistantMessageId(), "done");
-            awaitStatus(second.assistantMessageId(), "done");
+        assertThat(status(refused.assistantMessageId())).isEqualTo("failed");
+        assertThat(errorCode(refused.assistantMessageId())).isEqualTo("busy");
+        assertThat(events.updatesOf(refused.assistantMessageId())).isEqualTo(1);
+        assertThat(memberCount(owner.id())).isEqualTo(sentByOwner - 1);
+        gate.countDown();
+        for (Sent sent : accepted) {
+            awaitStatus(sent.assistantMessageId(), "done");
         }
     }
 

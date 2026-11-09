@@ -1,5 +1,6 @@
 package com.flowcortex.app.chat;
 
+import com.flowcortex.media.api.MediaJobs;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -9,13 +10,26 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-/** One shared application context for every chat IT: chat on, the provider and the event seam stubbed. */
+/**
+ * The one application context every chat IT and the run request-key IT share: chat, credits (echo costs 10,
+ * probe 40) and Product Video on, the provider and the event seam stubbed. A test that needs a different
+ * setting flips it at runtime through {@link ChatTestConfig}; a property of its own would build another
+ * context, and the 1 GB test heap holds only a handful. {@code MediaJobs} is a spy so a test can count its calls.
+ */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.chat.enabled=true")
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
+        "flowcortex.chat.enabled=true",
+        "flowcortex.product-video.enabled=true",
+        "flowcortex.credits.enabled=true",
+        "flowcortex.credits.step-costs.echo=10",
+        "flowcortex.credits.step-costs.probe=40",
+        "flowcortex.workflow.reaper-interval-ms=3600000"})
 @AutoConfigureTestRestTemplate
 @Import(ChatTestConfig.class)
-@interface ChatIt {
+@MockitoSpyBean(types = MediaJobs.class)
+public @interface ChatIt {
 }

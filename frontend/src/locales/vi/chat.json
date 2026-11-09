@@ -11,8 +11,7 @@
     "loading": "Đang tải các cuộc trò chuyện…",
     "empty": "Chưa có cuộc trò chuyện nào. Hãy bắt đầu một cuộc mới.",
     "loadFailed": "Không tải được các cuộc trò chuyện của bạn.",
-    "retry": "Thử lại",
-    "createFailed": "Không thể bắt đầu cuộc trò chuyện mới."
+    "retry": "Thử lại"
   },
   "row": {
     "rename": "Đổi tên",

@@ -132,22 +132,4 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
                     .isEqualTo(new FeaturesView(false, false, true, false, false, false, true, true, false));
         }
     }
-
-    @Nested
-    @TestPropertySource(properties = "flowcortex.chat.enabled=true")
-    class WithChatOn {
-
-        @Autowired
-        private TestRestTemplate nestedRestTemplate;
-
-        @Test
-        void theChatSwitchReadsTrue() {
-            ResponseEntity<FeaturesView> response =
-                    nestedRestTemplate.getForEntity("/api/v1/features", FeaturesView.class);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat(response.getBody())
-                    .isEqualTo(new FeaturesView(false, false, true, false, false, false, false, false, true));
-        }
-    }
 }

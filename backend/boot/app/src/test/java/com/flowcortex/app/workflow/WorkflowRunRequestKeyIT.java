@@ -2,10 +2,12 @@ package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.flowcortex.app.chat.ChatIt;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
@@ -15,6 +17,7 @@ import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowView;
 import jakarta.validation.ConstraintViolationException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,20 +31,14 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
-        "flowcortex.product-video.enabled=true"
-})
-@AutoConfigureTestRestTemplate
+/** Shares the chat ITs' context: credits are on there, so every member below is funded first. */
+@ChatIt
 class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
 
     @Autowired
@@ -50,8 +47,17 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
     @Autowired
     private JdbcTemplate jdbc;
 
-    @MockitoSpyBean
+    @Autowired
     private MediaJobs mediaJobs;
+
+    @Override
+    protected UserView newUser(String prefix) {
+        UserView user = super.newUser(prefix);
+        await().atMost(Duration.ofSeconds(8)).until(() -> jdbc.queryForObject(
+                "SELECT count(*) FROM credit_wallet WHERE user_id = ?", Long.class, user.id()) == 1);
+        jdbc.update("UPDATE credit_wallet SET balance = 1000000 WHERE user_id = ?", user.id());
+        return user;
+    }
 
     @BeforeEach
     void enableMedia() {

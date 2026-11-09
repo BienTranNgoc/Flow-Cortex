@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -47,23 +46,22 @@ class ConversationController {
 
     private final ConversationStore store;
     private final ChatCaller caller;
-    private final MessageSource messages;
     private final TurnService turns;
     private final ChatSwitch chatSwitch;
     private final MessageViews views;
 
-    ConversationController(ConversationStore store, ChatCaller caller, MessageSource messages, TurnService turns,
+    ConversationController(ConversationStore store, ChatCaller caller, TurnService turns,
             ChatSwitch chatSwitch, MessageViews views) {
         this.store = store;
         this.caller = caller;
-        this.messages = messages;
         this.turns = turns;
         this.chatSwitch = chatSwitch;
         this.views = views;
     }
 
     @Schema(name = "ChatConversationCreate")
-    record CreateRequest(@Schema(maxLength = MAX_TITLE_CHARS) String title, FirstMessage firstMessage) {
+    record CreateRequest(@Schema(maxLength = MAX_TITLE_CHARS) String title,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) FirstMessage firstMessage) {
     }
 
     @Schema(name = "ChatFirstMessage")
@@ -72,7 +70,7 @@ class ConversationController {
             @ArraySchema(maxItems = SendInput.MAX_ATTACHMENTS) List<Attachment> attachments) {
     }
 
-    /** {@code userMessage} and {@code assistantMessageId} are set when the create carried a first message. */
+    /** The conversation with the first message it was created for and the answer being written to it. */
     @Schema(name = "ChatConversationCreated")
     record CreatedView(UUID id, String title, Instant lastActivityAt, Instant createdAt, MessageView userMessage,
             UUID assistantMessageId) {
@@ -131,23 +129,16 @@ class ConversationController {
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey, Locale locale) {
         UUID owner = caller.require(jwt).id();
         String given = body == null || body.title() == null ? "" : body.title().strip();
-        FirstMessage first = body == null ? null : body.firstMessage();
-        if (first == null) {
-            String title = given.isEmpty() ? messages.getMessage("chat.conversation.untitled", null, locale)
-                    : validTitle(given);
-            return created(store.create(owner, title), null);
-        }
+        FirstMessage first = body == null || body.firstMessage() == null ? new FirstMessage(null, null)
+                : body.firstMessage();
         String key = SendInput.key(idempotencyKey);
         SendInput.Message message = SendInput.message(first.text(), first.attachments());
         CreatedConversation created = turns.create(owner, given.isEmpty() ? null : validTitle(given), key,
                 message.text(), message.attachments(), SendInput.language(locale));
-        return created(created.conversation(), created.first());
-    }
-
-    private CreatedView created(StoredConversation conversation, TurnService.Started first) {
+        StoredConversation conversation = created.conversation();
         return new CreatedView(conversation.id(), conversation.title(), conversation.lastActivityAt(),
-                conversation.createdAt(), first == null ? null : views.view(first.userMessage()),
-                first == null ? null : first.assistantMessageId());
+                conversation.createdAt(), views.view(created.first().userMessage()),
+                created.first().assistantMessageId());
     }
 
     @Operation(operationId = "renameChatConversation")

@@ -182,12 +182,18 @@ final class GeminiChatClient implements LlmChatClient {
         if (watch.idleExpired) {
             return failed(model, "timeout", LlmJsonResult.Kind.TIMEOUT, started, null);
         }
+        String answered = round.version == null ? model : round.version;
+        if ("MAX_TOKENS".equals(round.finishReason)) {
+            LOG.warn("llm.request mode=stream outcome=truncated model={} latency_ms={} input_tokens={} "
+                    + "output_tokens={}", answered, millisSince(started), round.inputTokens, round.outputTokens);
+            return finish(model, "truncated", started,
+                    new LlmChatOutcome.Truncated(answered, round.inputTokens, round.outputTokens));
+        }
         if (!"STOP".equals(round.finishReason)) {
             LOG.warn("llm.request mode=stream outcome=upstream model={} latency_ms={} finish_reason={} "
                     + "error=unusable_stream", model, millisSince(started), round.finishReason);
             return finish(model, "upstream", started, new LlmChatOutcome.Failed(LlmJsonResult.Kind.UPSTREAM));
         }
-        String answered = round.version == null ? model : round.version;
         LOG.info("llm.request mode=stream outcome=answered model={} latency_ms={} input_tokens={} output_tokens={} "
                 + "tool_calls={}", answered, millisSince(started), round.inputTokens, round.outputTokens,
                 round.toolCalls.size());
@@ -291,6 +297,9 @@ final class GeminiChatClient implements LlmChatClient {
         ObjectNode config = body.putObject("generationConfig");
         config.put("temperature", request.temperature());
         config.put("maxOutputTokens", request.maxOutputTokens());
+        if (request.thinkingBudget() != null) {
+            config.putObject("thinkingConfig").put("thinkingBudget", request.thinkingBudget());
+        }
         return body;
     }
 

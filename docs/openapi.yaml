@@ -3451,6 +3451,8 @@ components:
           maxLength: 80
         firstMessage:
           $ref: "#/components/schemas/ChatFirstMessage"
+      required:
+      - firstMessage
     ChatFirstMessage:
       type: object
       properties:

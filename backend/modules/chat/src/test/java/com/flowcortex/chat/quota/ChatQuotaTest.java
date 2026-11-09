@@ -28,7 +28,7 @@ class ChatQuotaTest {
 
     private ChatQuota quota(int perMinute) {
         ChatProperties properties = new ChatProperties(true, "model", new ChatProperties.Quota(100, 5000, perMinute),
-                Duration.ofSeconds(90), Duration.ofSeconds(30), 4, 8, 32);
+                Duration.ofSeconds(90), Duration.ofSeconds(30), 4, 8, 32, 8192, 1024);
         return new ChatQuota(ledger, new ChatMinuteLimiter(properties, clock), properties, clock);
     }
 
