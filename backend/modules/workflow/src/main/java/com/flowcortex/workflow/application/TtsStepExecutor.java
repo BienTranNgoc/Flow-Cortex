@@ -4,11 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flowcortex.llm.api.LlmSlots;
+import com.flowcortex.llm.api.LlmSpeechResult;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.workflow.application.provider.DubProperties;
-import com.flowcortex.workflow.application.provider.GeminiClient;
-import com.flowcortex.workflow.application.provider.GeminiException;
+import com.flowcortex.workflow.application.provider.DubSlots;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Comparator;
@@ -43,12 +44,12 @@ class TtsStepExecutor implements StepExecutor {
     private static final Duration MARGIN = Duration.ofMinutes(1);
 
     private final ObjectMapper json = new ObjectMapper();
-    private final GeminiClient gemini;
+    private final LlmSlots llm;
     private final MediaJobs mediaJobs;
     private final DubProperties dub;
 
-    TtsStepExecutor(GeminiClient gemini, MediaJobs mediaJobs, DubProperties dub) {
-        this.gemini = gemini;
+    TtsStepExecutor(LlmSlots llm, MediaJobs mediaJobs, DubProperties dub) {
+        this.llm = llm;
         this.mediaJobs = mediaJobs;
         this.dub = dub;
     }
@@ -66,8 +67,7 @@ class TtsStepExecutor implements StepExecutor {
     /** Above the shortening request and the voice request both making every call they may make. */
     @Override
     public Duration maxRuntime() {
-        DubProperties.Gemini gemini = dub.gemini();
-        return gemini.worstCase(gemini.translateModels().size()).plus(gemini.speechWorstCase()).plus(MARGIN);
+        return llm.jsonWorstCase(DubSlots.TRANSLATE).plus(llm.speechWorstCase(DubSlots.SPEECH)).plus(MARGIN);
     }
 
     @Override
@@ -82,7 +82,7 @@ class TtsStepExecutor implements StepExecutor {
 
     @Override
     public boolean available() {
-        return dub.available();
+        return dub.enabled() && llm.configured();
     }
 
     @Override
@@ -112,14 +112,13 @@ class TtsStepExecutor implements StepExecutor {
 
         String model = null;
         if (!voiced.isEmpty()) {
-            GeminiClient.Speech speech;
-            try {
-                speech = gemini.speak(String.join(PAUSE, text.values()), voice);
-            } catch (GeminiException e) {
-                throw DubSegments.providerFailure(e);
+            switch (llm.speak(DubSlots.SPEECH, String.join(PAUSE, text.values()), voice)) {
+                case LlmSpeechResult.Spoken spoken -> {
+                    model = spoken.model();
+                    store(context, VOICE_FILE, "audio/wav", spoken.wav());
+                }
+                case LlmSpeechResult.Failed failed -> throw DubSegments.providerFailure(failed.kind());
             }
-            model = speech.model();
-            store(context, VOICE_FILE, "audio/wav", speech.wav());
         }
         store(context, MANIFEST, "application/json", manifest(voice, model, voiced, text));
         return "{\"voiced\":" + voiced.size() + "}";
@@ -143,12 +142,8 @@ class TtsStepExecutor implements StepExecutor {
                     .append(DubSegments.limit(dub.charsPerSecond(), segment)).append(" characters): ")
                     .append(segment.vi());
         }
-        Map<Integer, String> answer;
-        try {
-            answer = DubSegments.lines(json, gemini.generateJson(prompt.toString(), DubSegments.LINES_SCHEMA));
-        } catch (GeminiException e) {
-            throw DubSegments.providerFailure(e);
-        }
+        Map<Integer, String> answer = DubSegments.lines(json,
+                llm.generateJson(DubSlots.TRANSLATE, prompt.toString(), DubSegments.LINES_SCHEMA));
         int shortened = 0;
         for (DubSegments.Segment segment : overruns) {
             String shorter = answer == null || answer.get(segment.index()) == null ? null

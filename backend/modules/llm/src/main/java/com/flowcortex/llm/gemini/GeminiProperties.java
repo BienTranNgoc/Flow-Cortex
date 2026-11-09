@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Gemini API settings. A blank {@code apiKey} still lets the app start; every call then fails as
- * {@code UPSTREAM} and logs a config error. {@code readTimeout} applies to each socket read;
+ * {@code REJECTED} and logs a config error. {@code readTimeout} bounds each request;
  * {@code answerTimeout} bounds one whole answer.
  */
 @ConfigurationProperties("flowcortex.llm.gemini")
@@ -30,5 +30,11 @@ public record GeminiProperties(String apiKey, URI baseUrl, Duration connectTimeo
 
     boolean hasApiKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    /** The base URL without a trailing slash. */
+    String endpoint() {
+        String base = baseUrl.toString();
+        return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
     }
 }

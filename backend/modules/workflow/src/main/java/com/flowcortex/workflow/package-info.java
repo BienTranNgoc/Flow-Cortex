@@ -7,7 +7,8 @@
  * its {@code api} port (to dispatch remote steps and receive their results), on the credit
  * module only through its {@code api} port (to estimate, charge and refund run steps), on the
  * realtime module only through its {@code api} port (to publish run updates and authorize the
- * run topic), plus the shared libraries.
+ * run topic), on the llm module only through its {@code api} port (to ask the model by purpose for
+ * the dub steps), plus the shared libraries.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Workflow",
@@ -16,6 +17,7 @@
                 "media :: api",
                 "credit :: api",
                 "realtime :: api",
+                "llm :: api",
                 "shared :: web",
                 "shared :: security"
         }
