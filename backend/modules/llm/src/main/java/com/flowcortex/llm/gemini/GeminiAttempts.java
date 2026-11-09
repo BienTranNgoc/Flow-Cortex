@@ -134,7 +134,7 @@ final class GeminiAttempts {
         JsonNode candidate = root.path("candidates").path(0);
         String finishReason = textOrNull(candidate.path("finishReason"));
         String blockReason = promptBlock != null ? promptBlock
-                : BLOCKING_FINISH_REASONS.contains(finishReason) ? finishReason : null;
+                : finishReason != null && BLOCKING_FINISH_REASONS.contains(finishReason) ? finishReason : null;
         if (blockReason != null) {
             return new Interpreted("blocked", new LlmJsonResult.Blocked(blockReason),
                     " reason=" + blockReason + " input_tokens=" + inputTokens + " output_tokens=" + outputTokens);

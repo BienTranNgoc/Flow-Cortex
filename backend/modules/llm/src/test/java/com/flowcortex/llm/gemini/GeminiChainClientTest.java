@@ -171,6 +171,17 @@ class GeminiChainClientTest {
     }
 
     @Test
+    void anAnswerWithoutAFinishReasonIsStillTheAnswer() {
+        expectTranslate(LITE).andRespond(withSuccess(
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"[\\\"Xin chào\\\"]\"}]}}]}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client().generateJson(TRANSLATE, "translate these", SCHEMA))
+                .isEqualTo(new LlmJsonResult.Answered("[\"Xin chào\"]", LITE, 0, 0));
+        server.verify();
+    }
+
+    @Test
     void serverErrorsMoveTheRequestToTheFallbackModelAfterTheConfiguredWaits() {
         expectTranslate(LITE).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
         expectTranslate(LITE).andRespond(withException(new SocketTimeoutException("timed out")));
