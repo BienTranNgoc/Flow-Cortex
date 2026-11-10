@@ -16,6 +16,8 @@ include(
     ":modules:space",
     ":modules:realtime",
     ":modules:chat",
+    ":modules:mail",
+    ":modules:notification",
     ":shared:web",
     ":shared:security",
 )

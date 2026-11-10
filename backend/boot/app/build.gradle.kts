@@ -29,6 +29,8 @@ dependencies {
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:chat"))
+    implementation(project(":modules:notification"))
+    implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

@@ -37,9 +37,9 @@ class CreditsController {
         UUID userId = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.current.notFound", id)))
                 .id();
-        return ResponseEntity.ok(new BalanceResponse(creditAccounts.balance(userId)));
+        return ResponseEntity.ok(new BalanceResponse(creditAccounts.balance(userId), creditAccounts.granted(userId)));
     }
 
-    record BalanceResponse(long balance) {
+    record BalanceResponse(long balance, long granted) {
     }
 }

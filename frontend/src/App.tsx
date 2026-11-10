@@ -18,6 +18,7 @@ import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
@@ -26,6 +27,8 @@ import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
+import { NotificationsPage } from './features/notifications/NotificationsPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -41,6 +44,7 @@ function ContainedOutlet() {
         title: t('common.errorView.title'),
         message: t('common.errorView.message'),
         reload: t('common.errorView.reload'),
+        retry: t('common.errorView.retry'),
       }}
     >
       <Outlet />
@@ -55,9 +59,11 @@ const SupportWidget = lazy(() =>
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
   return supportWidget ? (
-    <Suspense fallback={null}>
-      <SupportWidget />
-    </Suspense>
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <SupportWidget />
+      </Suspense>
+    </ErrorBoundary>
   ) : null;
 }
 
@@ -81,6 +87,7 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
           </Route>
           <Route
             element={
@@ -94,6 +101,8 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />

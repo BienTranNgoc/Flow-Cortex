@@ -175,6 +175,16 @@ flowcortex:
   # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:
     public-url: ${FLOWCORTEX_APP_PUBLIC_URL:}
+  # The one sender of every mail. link-secret (>= 32 bytes) signs unsubscribe links and, together with
+  # flowcortex.app.public-url, becomes required once the catalog holds a care or promotional key.
+  mail:
+    from: ${FLOWCORTEX_MAIL_FROM:no-reply@flow-cortex.dev}
+    from-name: ${FLOWCORTEX_MAIL_FROM_NAME:Nodi}
+    link-secret: ${FLOWCORTEX_MAIL_LINK_SECRET:}
+    links:
+      rate-limit:
+        capacity: ${FLOWCORTEX_MAIL_LINK_RATE_LIMIT:10}
+        period: ${FLOWCORTEX_MAIL_LINK_RATE_WINDOW:60s}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -324,6 +334,9 @@ flowcortex:
     hub-threads: 2
     publish:
       queue-capacity: 1000
+  # In-app notifications: a member keeps their newest max-per-member; older ones are deleted on insert.
+  notifications:
+    max-per-member: 500
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
@@ -402,8 +415,6 @@ flowcortex:
       member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
       guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
-    mail:
-      from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
     # Request lifecycle: the three switches and three numbers below are configured here and changed at
     # runtime in the console Settings page; a switch set to false here stays off whatever is stored.
     lifecycle:

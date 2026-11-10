@@ -1,0 +1,41 @@
+{
+  "title": "Notifications",
+  "bell": {
+    "label": "Notifications, {{unread}} unread"
+  },
+  "unreadMark": "Unread:",
+  "markAllRead": "Mark all as read",
+  "viewAll": "View all notifications",
+  "preferencesLink": "Notification settings",
+  "filterLabel": "Show notifications",
+  "filter": {
+    "all": "All",
+    "unread": "Unread"
+  },
+  "empty": "You have no notifications yet.",
+  "emptyUnread": "Nothing unread. You are all caught up.",
+  "goToWorkflows": "Go to workflows",
+  "loadMore": "Load more",
+  "loadError": "Notifications could not be loaded.",
+  "retry": "Try again",
+  "preferences": {
+    "title": "Notification settings",
+    "lede": "Choose what Nodi tells you about.",
+    "back": "Back to notifications",
+    "loadError": "Your notification settings could not be loaded.",
+    "saveError": "Your change could not be saved. The setting was put back.",
+    "alwaysSent": "Account and security emails, such as password resets and sign-in confirmations, are always sent.",
+    "inApp": {
+      "label": "In-app notifications",
+      "description": "Show updates in the bell and on the notifications page."
+    },
+    "careEmail": {
+      "label": "Tips and reminders by email",
+      "description": "Occasional help to get the most out of Nodi."
+    },
+    "marketingEmail": {
+      "label": "News and offers by email",
+      "description": "Product news and promotions."
+    }
+  }
+}

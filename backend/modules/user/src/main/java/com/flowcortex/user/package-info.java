@@ -13,7 +13,8 @@
                 "jobs :: api",
                 "shared :: web",
                 "shared :: security",
-                "settings :: api"
+                "settings :: api",
+                "mail :: api"
         }
 )
 package com.flowcortex.user;

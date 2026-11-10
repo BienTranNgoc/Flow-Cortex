@@ -2,6 +2,7 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.app.MailParts;
 import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -77,7 +78,7 @@ class CapturingMailSender extends JavaMailSenderImpl {
             try {
                 Address[] recipients = message.getAllRecipients();
                 sent.add(new CapturedMail(Arrays.stream(recipients).map(Address::toString).toList(),
-                        message.getSubject(), String.valueOf(message.getContent())));
+                        message.getSubject(), MailParts.textOf(message)));
             } catch (MessagingException | IOException ex) {
                 throw new IllegalStateException("Could not read a captured message", ex);
             }
