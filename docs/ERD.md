@@ -21,6 +21,7 @@ erDiagram
   run_step ||--o| review_task : "run_step_id, UNIQUE — one checkpoint per step"
   review_task ||--o{ script_revision : "review_task_id"
   media_asset ||--o{ media_asset_binding : "asset_id"
+  media_asset ||--o| space_asset : "media_asset_id, UNIQUE (no FK)"
 
   app_user {
     uuid id PK
@@ -106,6 +107,40 @@ erDiagram
     uuid asset_id FK
     smallint position "UNIQUE (run_id, position), preserves request order"
     timestamptz created_at
+  }
+  space_asset {
+    uuid id PK
+    uuid space_id "owning space, no FK"
+    uuid owner_id "no FK"
+    uuid media_asset_id UK "the stored file; an upload asset points at the run's copy, no FK"
+    varchar source "run | upload"
+    varchar kind "video | image | audio"
+    text title "1-200 code points"
+    text title_base "run titles: the name before the (N) and index suffixes"
+    integer title_version "N of the (N) suffix, 1 = none"
+    varchar bucket "UNIQUE with object_key"
+    varchar object_key
+    varchar mime_type
+    bigint bytes
+    uuid run_id "producing run, or the run that bound the upload"
+    uuid run_step_id "NOT NULL exactly when source = run"
+    uuid workflow_id
+    text workflow_name "copied at registration"
+    timestamptz created_at
+  }
+  space_asset_registration {
+    uuid id PK
+    varchar source_type "run_outputs | run_inputs, UNIQUE with source_id"
+    uuid source_id "run id"
+    uuid owner_id
+    varchar status "pending | done | skipped | stuck"
+    integer attempts "stuck at 288"
+    varchar last_error_code
+    timestamptz next_attempt_at "partial index WHERE status = pending"
+    timestamptz lease_until "5 minutes from claim"
+    uuid lease_token "fences finish and retry"
+    timestamptz created_at
+    timestamptz updated_at "finished rows deleted after 30 days"
   }
   product_video_input {
     uuid run_id PK,FK
