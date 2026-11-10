@@ -14,6 +14,7 @@ include(
     ":modules:space",
     ":modules:realtime",
     ":modules:connector",
+    ":modules:chat",
     ":shared:web",
     ":shared:security",
 )
