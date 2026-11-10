@@ -19,6 +19,14 @@ class StateSettings(BaseSettings):
         return self.worker_state_dir / "alive"
 
 
+class FetchSettings(BaseSettings):
+    """The forward proxy every URL download leaves through; empty refuses all downloads."""
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    fetch_proxy_url: str = ""
+
+
 class Settings(StateSettings):
     amqp_url: SecretStr
     s3_endpoint: str = Field(min_length=1)
