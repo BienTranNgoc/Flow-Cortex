@@ -1,4 +1,5 @@
-"""Renders a project: measure the assets, plan once, encode chunk by chunk, join, mux, verify.
+"""Renders a project or plans it: measure the assets, plan once, encode chunk by chunk, join,
+mix the audio, normalise, verify.
 
 The document, the plan and the argument lists come from the pure modules next to this one; this
 module is the only place that runs a process or touches a file. Anything those modules refuse
@@ -20,26 +21,49 @@ from ..contracts.media_job import MediaJob
 from ..errors import PermanentError
 from ..handlers import HandlerOutcome, OutputFile
 from ..runtime import ProcessRunner
-from .document import ASSET_PREFIX, PROJECT_INPUT, parse_document, parse_job
-from .graph import (
-    chunk_command,
-    chunk_path,
-    concat_list,
-    join_command,
-    mux_command,
-    prints_captions,
+from .document import (
+    ASSET_PREFIX,
+    PROJECT_INPUT,
+    Document,
+    ImageOverlay,
+    parse_document,
+    parse_job,
 )
-from .subtitles import ass_document, caption_styles
-from .timeline import TimelinePlan, plan_timeline
+from .graph import chunk_command, chunk_path, concat_list, join_command, prints_text
+from .mix import (
+    final_mux_command,
+    loudness_measure_command,
+    loudnorm_filter,
+    mix_command,
+    parse_loudnorm,
+)
+from .overlays import thin_strip_warnings
+from .plan import RENDERER, honours, manifest_hash, plan_document
+from .subtitles import CaptionStyles, ass_document, caption_styles
+from .timeline import (
+    Chunk,
+    PlannedTextOverlay,
+    TimelinePlan,
+    declared_probes,
+    plan_timeline,
+)
 
-RENDERER = "flowcortex.video.render/1"
 VIDEO_NAME = "video.mp4"
 CAPTIONS_NAME = "captions.ass"
+PLAN_NAME = "plan.json"
 BASE_NAME = "base.mp4"
 LIST_NAME = "chunks.txt"
 
 VIDEO_FORMATS = frozenset({"mov,mp4,m4a,3gp,3g2,mj2", "matroska,webm"})
 IMAGE_FORMATS = frozenset({"png_pipe", "jpeg_pipe", "webp_pipe"})
+AUDIO_FORMATS = frozenset({"mp3", "wav", "mov,mp4,m4a,3gp,3g2,mj2", "matroska,webm"})
+OVERLAY_MAX_PIXELS = 4096 * 4096
+
+_USES = {
+    "video": ("a video scene", VIDEO_FORMATS),
+    "image": ("an image scene or overlay", IMAGE_FORMATS),
+    "audio": ("a voice or music clip", AUDIO_FORMATS),
+}
 
 
 def _violation(message: str) -> PermanentError:
@@ -76,8 +100,20 @@ def _rotation(stream: Mapping[str, Any]) -> int:
     return 0
 
 
+def _duration_ms(container: Mapping[str, Any], asset_id: str) -> float:
+    try:
+        seconds = float(container["duration"])
+    except (KeyError, TypeError, ValueError):
+        seconds = math.nan
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise PermanentError("probe_failed", f"asset {asset_id!r} has no readable duration")
+    return seconds * 1000.0
+
+
 def probe_asset(path: Path, asset_id: str, kind: str, processes: ProcessRunner) -> dict[str, Any]:
-    """Measure one asset and refuse any container or stream its scene kind does not accept."""
+    """Measure one asset and refuse any container or stream its use (`video` or `image` scene or
+    overlay, `audio` voice or music clip) does not accept."""
+    use, allowed = _USES.get(kind, _USES["video"])
     report = _probe_json(
         [
             "ffprobe", "-v", "error", "-protocol_whitelist", "file",
@@ -93,14 +129,16 @@ def probe_asset(path: Path, asset_id: str, kind: str, processes: ProcessRunner) 
     container = report.get("format")
     container = container if isinstance(container, dict) else {}
     name = container.get("format_name")
-    allowed = IMAGE_FORMATS if kind == "image" else VIDEO_FORMATS
     if name not in allowed:
         raise PermanentError(
             "probe_failed",
-            f"asset {asset_id!r} is a {name!r} file; a {kind} scene accepts "
-            + ", ".join(sorted(allowed)),
+            f"asset {asset_id!r} is a {name!r} file; {use} accepts " + ", ".join(sorted(allowed)),
         )
     streams = [s for s in report.get("streams") or [] if isinstance(s, dict)]
+    if kind == "audio":
+        if not any(s.get("codec_type") == "audio" for s in streams):
+            raise PermanentError("probe_failed", f"asset {asset_id!r} has no audio stream")
+        return {"hasAudio": True, "durationMs": _duration_ms(container, asset_id)}
     pictures = [
         s
         for s in streams
@@ -119,13 +157,7 @@ def probe_asset(path: Path, asset_id: str, kind: str, processes: ProcessRunner) 
         "colorTransfer": picture.get("color_transfer"),
     }
     if kind != "image":
-        try:
-            seconds = float(container["duration"])
-        except (KeyError, TypeError, ValueError):
-            seconds = math.nan
-        if not math.isfinite(seconds) or seconds <= 0:
-            raise PermanentError("probe_failed", f"asset {asset_id!r} has no readable duration")
-        measured["durationMs"] = seconds * 1000.0
+        measured["durationMs"] = _duration_ms(container, asset_id)
     return measured
 
 
@@ -219,6 +251,146 @@ def _check_output(video: Path, plan: TimelinePlan, processes: ProcessRunner) -> 
     return duration
 
 
+def _plan_bytes(plan_json: Mapping[str, Any]) -> bytes:
+    """Sorted keys and no spaces, so a plan job and a render of one document write equal bytes."""
+    text = json.dumps(plan_json, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return text.encode("utf-8")
+
+
+def _plan_outcome(document: Document, profile: str) -> HandlerOutcome:
+    """A dry run: plan from the values the document declares, start no process."""
+    try:
+        plan = plan_timeline(document, declared_probes(document), profile, measured=False)
+        caption_styles(plan, plan.canvas.width, plan.canvas.height, load_glyph_advances)
+        plan_json = plan_document(plan, document)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _violation(str(exc)) from exc
+    return HandlerOutcome(
+        data={
+            "renderer": RENDERER,
+            "mode": "plan",
+            "profile": plan.profile,
+            "width": plan.out_width,
+            "height": plan.out_height,
+            "planHash": plan_json["planHash"],
+            "honoredCount": len(honours()),
+            "manifestHash": manifest_hash(),
+            "durationMs": plan_json["durationMs"],
+            "encodeCount": plan_json["encodeCount"],
+            "warnings": list(plan.warnings),
+            "snapped": list(plan.snapped),
+            "handles": list(plan.handles),
+        },
+        files=[OutputFile(PLAN_NAME, "application/json", _plan_bytes(plan_json))],
+    )
+
+
+def _measure_assets(
+    document: Document, files: Mapping[str, str], processes: ProcessRunner
+) -> dict[str, dict[str, Any]]:
+    """Probe every asset for each way the document uses it, then bound the overlay images.
+
+    The scene probe, when there is one, is the asset's planning probe; an asset used only as an
+    overlay or a clip is planned from its overlay or clip probe.
+    """
+    scene_kind = {s.clip_id: s.asset_kind or "" for s in document.scenes if s.clip_id is not None}
+    overlay_images = {o.asset_id for o in document.overlays if isinstance(o, ImageOverlay)}
+    clip_audio = {c.asset_id for c in document.voice_clips}
+    clip_audio |= {c.asset_id for c in document.music_clips}
+    probes: dict[str, dict[str, Any]] = {}
+    for asset_id, path in files.items():
+        kinds: list[str] = []
+        if asset_id in scene_kind:
+            kinds.append(scene_kind[asset_id])
+        if asset_id in overlay_images:
+            kinds.append("image")
+        if asset_id in clip_audio:
+            kinds.append("audio")
+        measured = {
+            kind: probe_asset(Path(path), asset_id, kind, processes)
+            for kind in dict.fromkeys(kinds)
+        }
+        probes[asset_id] = measured[kinds[0]]
+        if asset_id in overlay_images:
+            _check_overlay_image(asset_id, measured["image"], document.assets[asset_id].animation)
+    return probes
+
+
+def _check_overlay_image(
+    asset_id: str, probe: Mapping[str, Any], sheet: Mapping[str, int] | None
+) -> None:
+    """Each overlay input is held decoded as RGBA, so its pixel count is bounded here, not by the
+    upload size; a sheet must hold the grid the document declares."""
+    width, height = probe.get("width"), probe.get("height")
+    if not isinstance(width, int) or not isinstance(height, int) or width < 1 or height < 1:
+        raise PermanentError("probe_failed", f"asset {asset_id!r} has no readable image size")
+    if width * height > OVERLAY_MAX_PIXELS:
+        raise PermanentError(
+            "probe_failed",
+            f"asset {asset_id!r} is {width}x{height} ({width * height} px); an image overlay "
+            f"holds at most {OVERLAY_MAX_PIXELS} px",
+        )
+    if sheet is None:
+        return
+    need_w = sheet["cols"] * sheet["frameW"]
+    need_h = math.ceil(sheet["frameCount"] / sheet["cols"]) * sheet["frameH"]
+    if width < need_w or height < need_h:
+        raise PermanentError(
+            "probe_failed",
+            f"asset {asset_id!r} is {width}x{height}, smaller than the {need_w}x{need_h} its "
+            f"animation declares ({sheet['frameCount']} frames in {sheet['cols']} columns of "
+            f"{sheet['frameW']}x{sheet['frameH']})",
+        )
+
+
+def _printed_fonts(plan: TimelinePlan, styles: CaptionStyles, chunk: Chunk) -> str:
+    """The families the chunk's libass script asks for, for the audit's error label."""
+    end = chunk.start_ms + chunk.dur_ms
+    fonts: set[str] = set()
+    if any(cue.start_ms < end and cue.end_ms > chunk.start_ms for cue in plan.cues):
+        fonts |= {style.caption.font for style in styles.all()}
+    for overlay in plan.overlays:
+        if (
+            isinstance(overlay, PlannedTextOverlay)
+            and overlay.start_ms < end
+            and overlay.end_ms > chunk.start_ms
+        ):
+            fonts.add(overlay.style.get("font", styles.base.caption.font))
+            fonts.update(
+                entry["font"] for entry in overlay.style.get("lines") or [] if "font" in entry
+            )
+    return ", ".join(sorted(fonts))
+
+
+def _measure_loudness(path: Path, processes: ProcessRunner) -> dict[str, Any]:
+    argv = loudness_measure_command(str(path))
+    argv.insert(argv.index("-af"), "-vn")
+    completed = processes.run(argv)
+    if completed.returncode != 0:
+        raise _violation(f"the loudness measurement of {path.name} failed")
+    try:
+        return parse_loudnorm(completed.stderr.decode(errors="replace"))
+    except ValueError as exc:
+        raise _violation(f"the loudness measurement of {path.name}: {exc}") from exc
+
+
+def _loudness_report(
+    before: Mapping[str, Any], after: Mapping[str, Any]
+) -> dict[str, float] | None:
+    """The re-measured output loudness and the mix's before value; None when the output measures
+    silent or unreadable, since JSON cannot carry an infinite number."""
+    try:
+        report = {
+            "I": float(after["input_i"]),
+            "LRA": float(after["input_lra"]),
+            "TP": float(after["input_tp"]),
+            "beforeI": float(before["input_i"]),
+        }
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _violation(f"the rendered video's loudness is unreadable: {exc}") from exc
+    return report if all(math.isfinite(v) for v in report.values()) else None
+
+
 def render_project(
     job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner
 ) -> HandlerOutcome:
@@ -235,12 +407,11 @@ def render_project(
     except (KeyError, TypeError, ValueError) as exc:
         raise _violation(str(exc)) from exc
 
-    kinds = {s.clip_id: s.asset_kind for s in document.scenes if s.clip_id is not None}
+    if spec.mode == "plan":
+        return _plan_outcome(document, spec.profile)
+
     files = {asset_id: str(inputs[f"{ASSET_PREFIX}{asset_id}"]) for asset_id in spec.asset_ids}
-    probes = {
-        asset_id: probe_asset(Path(files[asset_id]), asset_id, kinds[asset_id] or "", processes)
-        for asset_id in spec.asset_ids
-    }
+    probes = _measure_assets(document, files, processes)
 
     work = project_path.parent
     produced: list[Path] = []
@@ -252,7 +423,7 @@ def render_project(
             styles = caption_styles(
                 plan, plan.canvas.width, plan.canvas.height, load_glyph_advances
             )
-            font = ", ".join(sorted({style.caption.font for style in styles.all()}))
+            plan_json = plan_document(plan, document)
         except (KeyError, TypeError, ValueError) as exc:
             raise _violation(str(exc)) from exc
 
@@ -260,7 +431,7 @@ def render_project(
             queried = processes.run(["fc-query", "-f", "%{family[0]}", path])
             return queried.stdout.decode(errors="replace") if queried.returncode == 0 else ""
 
-        warnings = list(plan.warnings)
+        warnings = [*plan.warnings, *thin_strip_warnings(plan, probes)]
         chunk_files: list[str] = []
         total = len(plan.chunks)
         for index, chunk in enumerate(plan.chunks):
@@ -277,9 +448,13 @@ def render_project(
                 raise _violation(f"{step}: {exc}") from exc
             stderr = _run_step(processes, argv, Path(chunk_path(str(work), index)), step)
             chunk_files.append(chunk_path(str(work), index))
-            if prints_captions(plan, chunk):
+            if prints_text(plan, chunk):
                 try:
-                    warnings += audit_libass(stderr.decode(errors="replace"), font, family_of)
+                    warnings += audit_libass(
+                        stderr.decode(errors="replace"),
+                        _printed_fonts(plan, styles, chunk),
+                        family_of,
+                    )
                 except ValueError as exc:
                     raise _violation(f"{step}: {exc}") from exc
 
@@ -293,13 +468,41 @@ def render_project(
             _run_step(
                 processes, join_command(chunk_files, str(listing), str(base)), base, "the join"
             )
+
+        try:
+            mix_argv, mix_path = mix_command(plan, str(base), files, str(work))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise _violation(f"the audio mix: {exc}") from exc
+        mix = Path(mix_path)
+        produced.append(mix)
+        _run_step(processes, mix_argv, mix, "the audio mix")
+        before = _measure_loudness(mix, processes)
+        try:
+            audio_filter = loudnorm_filter(before)
+        except ValueError as exc:
+            raise _violation(f"the loudness measurement: {exc}") from exc
+        if audio_filter is None:
+            warnings.append(
+                "the mix holds no audible sound (below -70 LUFS): no audio was normalised"
+            )
         _run_step(
             processes,
-            mux_command(str(base), str(video), plan.total_ms, _video_start(base, processes)),
+            final_mux_command(
+                str(base),
+                str(mix),
+                str(video),
+                plan.total_ms,
+                _video_start(base, processes),
+                audio_filter,
+            ),
             video,
             "the audio mux",
         )
         duration = _check_output(video, plan, processes)
+        loudness = None
+        if audio_filter is not None:
+            after = _measure_loudness(video, processes)
+            loudness = _loudness_report(before, after)
 
         captions = ass_document(plan, styles, 0.0, plan.total_ms).encode("utf-8")
         succeeded = True
@@ -312,11 +515,16 @@ def render_project(
     return HandlerOutcome(
         data={
             "renderer": RENDERER,
+            "mode": "render",
             "profile": plan.profile,
             "width": plan.out_width,
             "height": plan.out_height,
             "durationSeconds": round(duration, 3),
             "encodeCount": total,
+            "planHash": plan_json["planHash"],
+            "honoredCount": len(honours()),
+            "manifestHash": manifest_hash(),
+            "loudness": loudness,
             "warnings": warnings,
             "snapped": list(plan.snapped),
             "handles": list(plan.handles),
@@ -324,5 +532,6 @@ def render_project(
         files=[
             OutputFile(VIDEO_NAME, "video/mp4", video),
             OutputFile(CAPTIONS_NAME, "text/x-ssa", captions),
+            OutputFile(PLAN_NAME, "application/json", _plan_bytes(plan_json)),
         ],
     )
