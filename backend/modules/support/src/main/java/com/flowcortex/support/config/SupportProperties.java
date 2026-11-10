@@ -19,8 +19,7 @@ import org.springframework.validation.annotation.Validated;
 public record SupportProperties(
         boolean enabled,
         @Email String contactEmail,
-        @NotNull @Valid Assistant assistant,
-        @NotNull @Valid Mail mail) {
+        @NotNull @Valid Assistant assistant) {
 
     /** The contact address, absent when none is configured. */
     public Optional<String> contact() {
@@ -38,9 +37,5 @@ public record SupportProperties(
             @Min(1) int memberDailyQuota,
             @Min(1) int guestDailyQuota,
             @Min(1) int guestNetworkDailyQuota) {
-    }
-
-    /** Sender of the reply notification mails. */
-    public record Mail(@NotBlank @Email String from) {
     }
 }

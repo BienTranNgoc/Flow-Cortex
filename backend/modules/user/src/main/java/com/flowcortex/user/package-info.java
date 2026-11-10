@@ -11,7 +11,8 @@
         allowedDependencies = {
                 "shared :: web",
                 "shared :: security",
-                "shared :: ratelimit"
+                "shared :: ratelimit",
+                "mail :: api"
         }
 )
 package com.flowcortex.user;

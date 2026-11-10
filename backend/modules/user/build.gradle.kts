@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":modules:mail"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.
@@ -16,9 +17,7 @@ dependencies {
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
     implementation(project(":shared:ratelimit"))
     implementation("tools.jackson.core:jackson-databind")
-    // Email confirmation links go out over SMTP (Mailpit in the local stack).
-    implementation("org.springframework.boot:spring-boot-starter-mail")
-    // Confirmation mails the SMTP server refused are counted.
+    // Confirmation mails the mail transport reports as failed are counted.
     implementation("io.micrometer:micrometer-core")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

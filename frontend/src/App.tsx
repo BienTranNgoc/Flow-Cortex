@@ -16,6 +16,9 @@ import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
+import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
+import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
@@ -62,6 +65,12 @@ function SupportWidgetWhenOn() {
   ) : null;
 }
 
+const chatPage = (
+  <ChatFeatureGate>
+    <ChatPage />
+  </ChatFeatureGate>
+);
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -76,6 +85,7 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
           </Route>
           <Route
             element={
@@ -95,6 +105,8 @@ export function App() {
               {demoPagesEnabled() && <Route path="runs" element={<RunsPage />} />}
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
+              <Route path="chat" element={chatPage} />
+              <Route path="chat/:conversationId" element={chatPage} />
               <Route path="docs" element={<DocsPage />} />
               <Route path="docs/api" element={<DocsPage initialTab="api" />} />
               <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />

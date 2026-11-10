@@ -11,6 +11,7 @@ import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
 import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
+import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { RunsPage } from './features/runs/RunsPage';
@@ -35,6 +36,7 @@ const PAGES: Record<string, ReactElement> = {
   '/support/groups': <TopicGroupsPage />,
   '/support/requests': <RequestsInboxPage />,
   '/support/settings': <SupportSettingsPage />,
+  '/chat/settings': <ChatSettingsPage />,
 };
 
 /** Pages under a sidebar entry, routable only where that entry is. */
