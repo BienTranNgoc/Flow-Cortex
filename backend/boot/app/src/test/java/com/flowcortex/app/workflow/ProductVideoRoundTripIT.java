@@ -49,7 +49,8 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     @BeforeEach
     void prepareQueues() {
         org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
-        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs")) {
+        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs",
+                "media.render.jobs")) {
             amqpAdmin.purgeQueue(queue, false);
         }
     }
@@ -122,7 +123,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         // Every provider job of the run was taken off its own queue; nothing went to the wrong one.
         assertThat(rabbit.receive("provider.jobs", 200)).isNull();
 
-        JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
+        JsonNode renderJob = receiveJob("media.render.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
                 renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString()))

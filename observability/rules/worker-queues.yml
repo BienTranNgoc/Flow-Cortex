@@ -1,0 +1,20 @@
+groups:
+  - name: worker-queues
+    rules:
+      - alert: WorkerQueueBacklog
+        expr: rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue=~"media\\.jobs|media\\.render\\.jobs|provider\\.jobs|provider\\.video\\.jobs"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue {{ $labels.queue }} has had ready messages for 15 minutes"
+          description: '{{ $labels.queue }} has not emptied for 15 minutes (consumers busy or absent). {{ if eq $labels.queue "media.render.jobs" }}Raise MEDIA_RENDER_WORKERS{{ else if eq $labels.queue "provider.video.jobs" }}Raise PROVIDER_VIDEO_WORKERS{{ else }}This lane has a single container; check its logs and whether a job is stuck{{ end }}.'
+
+      - alert: WorkerDeadLetters
+        expr: rabbitmq_queue_messages{job="rabbitmq-per-object",queue=~"(media|provider)\\..+\\.dlq"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dead-letter queue {{ $labels.queue }} holds messages"
+          description: "A dead-letter queue has no TTL or consumer, so this alert fires until the queue is emptied. Inspect the message in the management UI (127.0.0.1:15672), then run `docker compose exec rabbitmq rabbitmqctl purge_queue {{ $labels.queue }}` once it has been handled."
