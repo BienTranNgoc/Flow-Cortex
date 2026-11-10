@@ -2,36 +2,53 @@ package com.flowcortex.support.request;
 
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.support.request.InboxQuery.InboxFilter;
+import com.flowcortex.support.request.RequestRepository.AssigneeGroup;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
+import com.flowcortex.support.request.RequestRepository.FacetRows;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
 import com.flowcortex.support.request.RequestRepository.RequestRow;
 import com.flowcortex.support.request.RequestStateMachine.Move;
 import com.flowcortex.support.request.RequestStateMachine.Refusal;
 import com.flowcortex.support.request.RequestStateMachine.Transition;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
+import com.flowcortex.support.request.RequestViews.AdminFacets;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.AdminSummary;
+import com.flowcortex.support.request.RequestViews.AssigneeCount;
+import com.flowcortex.support.request.RequestViews.AssigneeFacet;
 import com.flowcortex.support.request.RequestViews.Attachment;
+import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
+import com.flowcortex.support.request.RequestViews.BulkAssignResult;
 import com.flowcortex.support.request.RequestViews.ConversationMessage;
 import com.flowcortex.support.request.RequestViews.Detail;
+import com.flowcortex.support.request.RequestViews.FacetCount;
 import com.flowcortex.support.request.RequestViews.Message;
 import com.flowcortex.support.request.RequestViews.Requester;
 import com.flowcortex.support.request.RequestViews.Summary;
+import com.flowcortex.support.request.RequestViews.SupportAssignee;
 import com.flowcortex.support.web.SupportProblemException;
+import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -50,6 +67,8 @@ class RequestService {
     static final Set<String> TYPES = Set.of("account", "credit", "workflow", "technical", "other");
     static final int PAGE_SIZE = 20;
     static final int MAX_PAGE = 10_000;
+    static final int MAX_BULK = 100;
+    private static final List<String> TYPE_ORDER = List.of("account", "credit", "workflow", "technical", "other");
 
     private static final String CREATE = "request";
     private static final String REPLY = "message";
@@ -70,17 +89,19 @@ class RequestService {
     private final MailOutboxRepository outbox;
     private final AttachmentService attachments;
     private final UserDirectory users;
+    private final AdminPermissions adminPermissions;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     RequestService(RequestRepository requests, IdempotencyGuard idempotency, MailOutboxRepository outbox,
-            AttachmentService attachments, UserDirectory users, PlatformTransactionManager transactionManager,
-            Clock clock) {
+            AttachmentService attachments, UserDirectory users, AdminPermissions adminPermissions,
+            PlatformTransactionManager transactionManager, Clock clock) {
         this.requests = requests;
         this.idempotency = idempotency;
         this.outbox = outbox;
         this.attachments = attachments;
         this.users = users;
+        this.adminPermissions = adminPermissions;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -186,27 +207,124 @@ class RequestService {
         return requests.countUnread(memberId);
     }
 
-    AdminPage page(String status, String type, int page) {
-        String statusFilter = blankToNull(status);
-        String typeFilter = blankToNull(type);
-        Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
-        if (statusFilter != null && RequestStatus.parse(statusFilter).isEmpty()) {
-            errors.put("status", new LocalizedMessage("support.request.error.statusUnknown"));
-        }
-        if (typeFilter != null && !TYPES.contains(typeFilter)) {
-            errors.put("type", new LocalizedMessage("support.request.error.typeUnknown"));
-        }
-        if (page < 0 || page > MAX_PAGE) {
-            errors.put("page", new LocalizedMessage("support.request.error.page", MAX_PAGE));
-        }
-        requireValid(errors);
-        List<RequestRow> rows = requests.page(statusFilter, typeFilter, page * PAGE_SIZE, PAGE_SIZE);
-        Map<UUID, String> emails = users.findEmailsByIds(rows.stream().map(RequestRow::requesterId).distinct().toList());
+    /** @param callerId what {@code assignee=me} stands for */
+    AdminPage page(String status, String type, String assignee, String created, String q, String sort, int page,
+            UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, sort, page, callerId);
+        List<RequestRow> rows = requests.page(filter, page * PAGE_SIZE, PAGE_SIZE);
+        Set<UUID> ids = new LinkedHashSet<>();
+        rows.forEach(row -> ids.add(row.requesterId()));
+        rows.stream().map(RequestRow::assigneeId).filter(Objects::nonNull).forEach(ids::add);
+        Map<UUID, String> emails = users.findEmailsByIds(List.copyOf(ids));
         List<AdminSummary> items = rows.stream()
                 .map(row -> new AdminSummary(row.number(), row.type(), row.subject(), row.status().value(),
-                        requester(row.requesterId(), emails), row.createdAt(), row.lastActivityAt()))
+                        requester(row.requesterId(), emails), assignee(row.assigneeId(), emails), row.createdAt(),
+                        row.lastActivityAt()))
                 .toList();
-        return new AdminPage(items, page, PAGE_SIZE, requests.count(statusFilter, typeFilter));
+        return new AdminPage(items, page, PAGE_SIZE, requests.count(filter));
+    }
+
+    /** The inbox's counts under the same filters as {@link #page}, each ignoring its own selection. */
+    AdminFacets facets(String status, String type, String assignee, String created, String q, UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, 0, callerId);
+        FacetRows rows = requests.facets(filter, callerId);
+        Map<UUID, String> emails = users.findEmailsByIds(
+                rows.people().stream().map(AssigneeGroup::id).toList());
+        List<AssigneeCount> people = rows.people().stream()
+                .map(group -> new AssigneeCount(group.id(), emails.get(group.id()), group.count())).toList();
+        return new AdminFacets(
+                counts(Arrays.stream(RequestStatus.values()).map(RequestStatus::value).toList(), rows.status()),
+                counts(TYPE_ORDER, rows.type()),
+                counts(Arrays.stream(InboxQuery.CreatedBucket.values()).map(InboxQuery.CreatedBucket::value).toList(),
+                        rows.created()),
+                new AssigneeFacet(rows.unassigned(), rows.mine(), people));
+    }
+
+    /**
+     * Sets, changes or (with a null {@code assigneeId}) clears the assignee. Assigning a new request picks it up;
+     * the same assignee on a request that would keep its status changes nothing.
+     */
+    AdminDetail assign(UUID adminId, long number, UUID assigneeId) {
+        RequestRow row = byNumber(number);
+        if (assigneeId != null) {
+            requireEligible(assigneeId);
+        }
+        Move move = allowed(row, RequestEvent.ADMIN_ASSIGN);
+        RequestStatus target = assigneeId == null ? row.status() : move.target();
+        if (Objects.equals(row.assigneeId(), assigneeId) && target == row.status()) {
+            return adminView(row);
+        }
+        if (!requests.assign(row.id(), row.status(), target, assigneeId, Instant.now(clock))) {
+            throw refusal(row, "request-state-changed",
+                    new LocalizedMessage("support.request.changedMeanwhile", row.number()));
+        }
+        LOG.info("support.request outcome=assigned request={} actor={} cleared={} picked_up={}", row.number(),
+                adminId, assigneeId == null, target != row.status());
+        return adminView(requireById(row.id()));
+    }
+
+    /**
+     * Assigns up to {@link #MAX_BULK} distinct requests to one assignee, each in its own transaction, so a
+     * request that fails does not stop the others.
+     */
+    BulkAssignResult bulkAssign(UUID adminId, List<Long> numbers, UUID assigneeId) {
+        requireNumbers(numbers);
+        if (assigneeId == null) {
+            requireValid(Map.of("assigneeId", new LocalizedMessage("support.request.error.assigneeRequired")));
+        }
+        requireEligible(assigneeId);
+        List<Long> assigned = new ArrayList<>();
+        List<Long> unchanged = new ArrayList<>();
+        List<BulkAssignFailure> failed = new ArrayList<>();
+        for (long number : numbers) {
+            BulkAssignOutcome outcome = transaction.execute(status -> assignOne(number, assigneeId));
+            switch (outcome) {
+                case ASSIGNED -> assigned.add(number);
+                case UNCHANGED -> unchanged.add(number);
+                default -> failed.add(new BulkAssignFailure(number, outcome.reason()));
+            }
+        }
+        LOG.info("support.request outcome=bulk_assigned actor={} assigned={} unchanged={} failed={}", adminId,
+                assigned.size(), unchanged.size(), failed.size());
+        return new BulkAssignResult(assigned, unchanged, failed);
+    }
+
+    private BulkAssignOutcome assignOne(long number, UUID assigneeId) {
+        RequestRow row = requests.findByNumber(number).orElse(null);
+        BulkAssignOutcome planned = BulkAssignOutcome.plan(row, assigneeId);
+        if (planned != BulkAssignOutcome.TO_WRITE) {
+            return planned;
+        }
+        Move move = allowed(row, RequestEvent.ADMIN_ASSIGN);
+        return BulkAssignOutcome.written(
+                requests.assign(row.id(), row.status(), move.target(), assigneeId, Instant.now(clock)));
+    }
+
+    private void requireEligible(UUID assigneeId) {
+        if (!adminPermissions.holds(assigneeId, Permission.SUPPORT_TICKET_REPLY)) {
+            requireValid(Map.of("assigneeId", new LocalizedMessage("support.request.error.assigneeIneligible")));
+        }
+    }
+
+    private static void requireNumbers(List<Long> numbers) {
+        boolean valid = numbers != null && !numbers.isEmpty() && numbers.size() <= MAX_BULK
+                && numbers.stream().allMatch(number -> number != null && number > 0)
+                && new HashSet<>(numbers).size() == numbers.size();
+        if (!valid) {
+            requireValid(Map.of("numbers", new LocalizedMessage("support.request.error.numbers", MAX_BULK)));
+        }
+    }
+
+    private InboxFilter inboxFilter(String status, String type, String assignee, String created, String q,
+            String sort, int page, UUID callerId) {
+        InboxQuery.Parsed parsed = InboxQuery.parse(status, type, assignee, created, q, sort, page, callerId,
+                Instant.now(clock));
+        requireValid(parsed.errors());
+        return parsed.filter();
+    }
+
+    private static List<FacetCount> counts(List<String> values, Map<String, Long> found) {
+        return values.stream().map(value -> new FacetCount(value, found.getOrDefault(value, 0L))).toList();
     }
 
     AdminDetail adminDetail(long number) {
@@ -366,9 +484,11 @@ class RequestService {
         List<String> allowedStatuses = ADMIN_STATUS_TARGETS.entrySet().stream()
                 .filter(target -> RequestStateMachine.next(row.status(), target.getValue()) instanceof Move)
                 .map(Map.Entry::getKey).toList();
+        Map<UUID, String> emails = users.findEmailsByIds(Stream.of(row.requesterId(), row.assigneeId())
+                .filter(Objects::nonNull).distinct().toList());
         return new AdminDetail(row.number(), row.type(), row.subject(), row.status().value(), row.closedReason(),
                 row.memberUnread(), row.createdAt(), row.lastActivityAt(), row.resolvedAt(),
-                requester(row.requesterId(), users.findEmailsByIds(List.of(row.requesterId()))), thread(row),
+                requester(row.requesterId(), emails), assignee(row.assigneeId(), emails), thread(row),
                 conversation, row.aiConversationLinked() && row.aiConversationId() == null, allowedStatuses);
     }
 
@@ -394,6 +514,14 @@ class RequestService {
         return new Requester(id, email, email == null);
     }
 
+    private static SupportAssignee assignee(UUID id, Map<UUID, String> emails) {
+        if (id == null) {
+            return null;
+        }
+        String email = emails.get(id);
+        return new SupportAssignee(id, email, email == null);
+    }
+
     private static String requireBody(String body) {
         String text = trimmed(body);
         if (!lengthBetween(text, 1, 5000)) {
@@ -411,10 +539,6 @@ class RequestService {
 
     private static String trimmed(String value) {
         return value == null ? "" : value.strip();
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static boolean lengthBetween(String value, int min, int max) {

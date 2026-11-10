@@ -19,6 +19,23 @@ export function StatusBadge({ status }: Readonly<{ status: AdminSupportRequestSu
   );
 }
 
+export function AssigneeLabel({
+  assignee,
+}: Readonly<{ assignee?: { email?: string; deleted: boolean } | undefined }>) {
+  const { t } = useTranslation();
+  if (!assignee) {
+    return <span className="request-muted-text">{t('support.requests.unassigned')}</span>;
+  }
+  if (assignee.deleted || !assignee.email) {
+    return (
+      <span className="status-badge cortex-admin-pill cortex-admin-pill--error">
+        {t('support.requests.assigneeDeleted')}
+      </span>
+    );
+  }
+  return <>{assignee.email}</>;
+}
+
 export function RequesterLabel({
   requester,
 }: Readonly<{ requester: { email?: string; deleted: boolean } }>) {

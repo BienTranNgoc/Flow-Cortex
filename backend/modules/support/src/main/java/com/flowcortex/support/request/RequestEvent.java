@@ -10,5 +10,6 @@ enum RequestEvent {
     ADMIN_SET_IN_PROGRESS,
     ADMIN_SET_RESOLVED,
     ADMIN_SET_CLOSED,
+    ADMIN_ASSIGN,
     AUTO_CLOSE
 }

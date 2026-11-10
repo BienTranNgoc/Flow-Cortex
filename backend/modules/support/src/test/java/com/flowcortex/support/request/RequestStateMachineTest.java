@@ -55,6 +55,11 @@ class RequestStateMachineTest {
         "ADMIN_SET_CLOSED, waiting_member, closed admin",
         "ADMIN_SET_CLOSED, resolved, closed admin",
         "ADMIN_SET_CLOSED, closed, 409 transition-not-allowed",
+        "ADMIN_ASSIGN, new, in_progress",
+        "ADMIN_ASSIGN, in_progress, in_progress",
+        "ADMIN_ASSIGN, waiting_member, waiting_member",
+        "ADMIN_ASSIGN, resolved, resolved",
+        "ADMIN_ASSIGN, closed, 409 request-closed",
         "AUTO_CLOSE, new, 409 transition-not-allowed",
         "AUTO_CLOSE, in_progress, 409 transition-not-allowed",
         "AUTO_CLOSE, waiting_member, 409 transition-not-allowed",
@@ -74,7 +79,7 @@ class RequestStateMachineTest {
                         .map(status -> RequestStateMachine.next(status, event)))
                 .count();
 
-        assertThat(cells).isEqualTo(45);
+        assertThat(cells).isEqualTo(50);
     }
 
     private static String describe(Transition transition) {

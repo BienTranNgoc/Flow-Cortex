@@ -85,6 +85,7 @@ export const MeResponsePermissionsItem = {
   supportticketview: 'support.ticket.view',
   supportticketreply: 'support.ticket.reply',
   supportticketclose: 'support.ticket.close',
+  supportticketassign: 'support.ticket.assign',
   contenthelp_topicview: 'content.help_topic.view',
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
@@ -183,6 +184,12 @@ export interface SupportRequester {
   deleted: boolean;
 }
 
+export interface SupportAssignee {
+  id: string;
+  email?: string;
+  deleted: boolean;
+}
+
 export type SupportRequestMessageAuthorKind =
   (typeof SupportRequestMessageAuthorKind)[keyof typeof SupportRequestMessageAuthorKind];
 
@@ -242,10 +249,15 @@ export interface AdminSupportRequestDetail {
   lastActivityAt: string;
   resolvedAt?: string;
   requester: SupportRequester;
+  assignee?: SupportAssignee;
   messages: SupportRequestMessage[];
   conversation?: SupportConversationMessage[];
   conversationExpired: boolean;
   allowedStatuses: AdminSupportRequestDetailAllowedStatusesItem[];
+}
+
+export interface AdminSupportRequestAssignee {
+  assigneeId?: string;
 }
 
 export interface AdminSupportKbGroupRequest {
@@ -849,6 +861,36 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface AdminSupportBulkAssign {
+  /**
+   * @minItems 1
+   * @maxItems 100
+   * @items.minimum 1
+   */
+  numbers: number[];
+  assigneeId: string;
+}
+
+export type SupportBulkAssignFailureReason =
+  (typeof SupportBulkAssignFailureReason)[keyof typeof SupportBulkAssignFailureReason];
+
+export const SupportBulkAssignFailureReason = {
+  not_found: 'not_found',
+  closed: 'closed',
+  changed: 'changed',
+} as const;
+
+export interface SupportBulkAssignFailure {
+  number: number;
+  reason: SupportBulkAssignFailureReason;
+}
+
+export interface AdminSupportBulkAssignResult {
+  assigned: number[];
+  unchanged: number[];
+  failed: SupportBulkAssignFailure[];
+}
+
 export interface AdminAccountResponse {
   id: string;
   email: string;
@@ -1071,6 +1113,7 @@ export interface AdminSupportRequestSummary {
   subject: string;
   status: AdminSupportRequestSummaryStatus;
   requester: SupportRequester;
+  assignee?: SupportAssignee;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -1080,6 +1123,30 @@ export interface AdminSupportRequestPage {
   page: number;
   size: number;
   total: number;
+}
+
+export interface SupportAssigneeCount {
+  id: string;
+  email?: string;
+  count: number;
+}
+
+export interface AdminSupportAssigneeFacet {
+  unassigned: number;
+  mine: number;
+  people: SupportAssigneeCount[];
+}
+
+export interface SupportFacetCount {
+  value: string;
+  count: number;
+}
+
+export interface AdminSupportRequestFacets {
+  status: SupportFacetCount[];
+  type: SupportFacetCount[];
+  created: SupportFacetCount[];
+  assignee: AdminSupportAssigneeFacet;
 }
 
 export type AdminSupportKbArticleSummaryStatus =
@@ -1148,6 +1215,7 @@ export const RoleResponsePermissionsItem = {
   supportticketview: 'support.ticket.view',
   supportticketreply: 'support.ticket.reply',
   supportticketclose: 'support.ticket.close',
+  supportticketassign: 'support.ticket.assign',
   contenthelp_topicview: 'content.help_topic.view',
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
@@ -1193,6 +1261,12 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export interface AdminAssignee {
+  id: string;
+  email: string;
+  name: string;
+}
+
 export interface PageViewAdminAccountResponse {
   items: AdminAccountResponse[];
   page: number;
@@ -1227,6 +1301,17 @@ export type ListAdminSupportRequestsParams = {
   status?: ListAdminSupportRequestsStatus;
   type?: ListAdminSupportRequestsType;
   /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: ListAdminSupportRequestsCreated;
+  /**
+   * Subject text, or a request number with or without a leading #
+   * @maxLength 100
+   */
+  q?: string;
+  sort?: ListAdminSupportRequestsSort;
+  /**
    * @minimum 0
    * @maximum 10000
    */
@@ -1253,6 +1338,70 @@ export const ListAdminSupportRequestsType = {
   workflow: 'workflow',
   technical: 'technical',
   other: 'other',
+} as const;
+
+export type ListAdminSupportRequestsCreated =
+  (typeof ListAdminSupportRequestsCreated)[keyof typeof ListAdminSupportRequestsCreated];
+
+export const ListAdminSupportRequestsCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
+} as const;
+
+export type ListAdminSupportRequestsSort =
+  (typeof ListAdminSupportRequestsSort)[keyof typeof ListAdminSupportRequestsSort];
+
+export const ListAdminSupportRequestsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+} as const;
+
+export type GetAdminSupportRequestFacetsParams = {
+  status?: GetAdminSupportRequestFacetsStatus;
+  type?: GetAdminSupportRequestFacetsType;
+  /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: GetAdminSupportRequestFacetsCreated;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type GetAdminSupportRequestFacetsStatus =
+  (typeof GetAdminSupportRequestFacetsStatus)[keyof typeof GetAdminSupportRequestFacetsStatus];
+
+export const GetAdminSupportRequestFacetsStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type GetAdminSupportRequestFacetsType =
+  (typeof GetAdminSupportRequestFacetsType)[keyof typeof GetAdminSupportRequestFacetsType];
+
+export const GetAdminSupportRequestFacetsType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type GetAdminSupportRequestFacetsCreated =
+  (typeof GetAdminSupportRequestFacetsCreated)[keyof typeof GetAdminSupportRequestFacetsCreated];
+
+export const GetAdminSupportRequestFacetsCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
 } as const;
 
 export type ListAdminSmsOutboxParams = {
@@ -1317,6 +1466,10 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type ListAdminAssigneesParams = {
+  for?: string;
+};
 
 export type ListAdminAccountsParams = {
   /**
@@ -1684,6 +1837,76 @@ export const setAdminSupportRequestStatus = async (
       body: JSON.stringify(adminSupportRequestStatusChange),
     },
   );
+};
+
+export type assignAdminSupportRequestResponse200 = {
+  data: AdminSupportRequestDetail;
+  status: 200;
+};
+
+export type assignAdminSupportRequestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type assignAdminSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type assignAdminSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type assignAdminSupportRequestResponseSuccess = assignAdminSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type assignAdminSupportRequestResponseError = (
+  | assignAdminSupportRequestResponse400
+  | assignAdminSupportRequestResponse404
+  | assignAdminSupportRequestResponse409
+) & {
+  headers: Headers;
+};
+
+export type assignAdminSupportRequestResponse =
+  assignAdminSupportRequestResponseSuccess | assignAdminSupportRequestResponseError;
+
+export const getAssignAdminSupportRequestUrl = (number: number) => {
+  return `/api/v1/admin/support/requests/${number}/assignee`;
+};
+
+export const assignAdminSupportRequest = async (
+  number: number,
+  adminSupportRequestAssignee: AdminSupportRequestAssignee,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<assignAdminSupportRequestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<assignAdminSupportRequestResponse>(getAssignAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportRequestAssignee),
+  });
 };
 
 export type renameAdminSupportKbGroupResponse200 = {
@@ -3711,6 +3934,66 @@ export const replyToAdminSupportRequest = async (
   });
 };
 
+export type bulkAssignAdminSupportRequestsResponse200 = {
+  data: AdminSupportBulkAssignResult;
+  status: 200;
+};
+
+export type bulkAssignAdminSupportRequestsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type bulkAssignAdminSupportRequestsResponseSuccess =
+  bulkAssignAdminSupportRequestsResponse200 & {
+    headers: Headers;
+  };
+export type bulkAssignAdminSupportRequestsResponseError =
+  bulkAssignAdminSupportRequestsResponse400 & {
+    headers: Headers;
+  };
+
+export type bulkAssignAdminSupportRequestsResponse =
+  bulkAssignAdminSupportRequestsResponseSuccess | bulkAssignAdminSupportRequestsResponseError;
+
+export const getBulkAssignAdminSupportRequestsUrl = () => {
+  return `/api/v1/admin/support/requests/bulk-assign`;
+};
+
+export const bulkAssignAdminSupportRequests = async (
+  adminSupportBulkAssign: AdminSupportBulkAssign,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<bulkAssignAdminSupportRequestsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<bulkAssignAdminSupportRequestsResponse>(
+    getBulkAssignAdminSupportRequestsUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(adminSupportBulkAssign),
+    },
+  );
+};
+
 export type listAdminSupportKbGroupsResponse200 = {
   data: AdminSupportKbGroup[];
   status: 200;
@@ -5269,6 +5552,56 @@ export const countOpenSupportRequests = async (
   });
 };
 
+export type getAdminSupportRequestFacetsResponse200 = {
+  data: AdminSupportRequestFacets;
+  status: 200;
+};
+
+export type getAdminSupportRequestFacetsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getAdminSupportRequestFacetsResponseSuccess =
+  getAdminSupportRequestFacetsResponse200 & {
+    headers: Headers;
+  };
+export type getAdminSupportRequestFacetsResponseError = getAdminSupportRequestFacetsResponse400 & {
+  headers: Headers;
+};
+
+export type getAdminSupportRequestFacetsResponse =
+  getAdminSupportRequestFacetsResponseSuccess | getAdminSupportRequestFacetsResponseError;
+
+export const getGetAdminSupportRequestFacetsUrl = (params?: GetAdminSupportRequestFacetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests/facets?${stringifiedParams}`
+    : `/api/v1/admin/support/requests/facets`;
+};
+
+export const getAdminSupportRequestFacets = async (
+  params?: GetAdminSupportRequestFacetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportRequestFacetsResponse> => {
+  return customFetch<getAdminSupportRequestFacetsResponse>(
+    getGetAdminSupportRequestFacetsUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type listAdminSmsOutboxResponse200 = {
   data: SmsOutboxEntryResponse[];
   status: 200;
@@ -5395,6 +5728,50 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAssigneesResponse400 = {
+  data: AdminAssignee[];
+  status: 400;
+};
+
+export type listAdminAssigneesResponse403 = {
+  data: AdminAssignee[];
+  status: 403;
+};
+
+export type listAdminAssigneesResponseError = (
+  listAdminAssigneesResponse400 | listAdminAssigneesResponse403
+) & {
+  headers: Headers;
+};
+
+export type listAdminAssigneesResponse = listAdminAssigneesResponseError;
+
+export const getListAdminAssigneesUrl = (params?: ListAdminAssigneesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/assignees?${stringifiedParams}`
+    : `/api/v1/admin/assignees`;
+};
+
+export const listAdminAssignees = async (
+  params?: ListAdminAssigneesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAssigneesResponse> => {
+  return customFetch<listAdminAssigneesResponse>(getListAdminAssigneesUrl(params), {
     ...options,
     method: 'GET',
   });

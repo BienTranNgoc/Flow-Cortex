@@ -2,6 +2,7 @@ package com.flowcortex.support.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,17 +22,23 @@ import com.flowcortex.support.request.RequestRepository.RequestRow;
 import com.flowcortex.support.request.RequestService.NewRequest;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
+import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
+import com.flowcortex.support.request.RequestViews.BulkAssignResult;
 import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.web.SupportProblemException;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
@@ -46,8 +53,9 @@ class RequestServiceTest {
     private final MailOutboxRepository outbox = mock(MailOutboxRepository.class);
     private final AttachmentService attachments = mock(AttachmentService.class);
     private final UserDirectory users = mock(UserDirectory.class);
+    private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final RequestService service = new RequestService(requests, idempotency, outbox, attachments, users,
-            mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
+            adminPermissions, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
 
@@ -311,7 +319,7 @@ class RequestServiceTest {
         UUID id = UUID.randomUUID();
         UUID conversation = UUID.randomUUID();
         RequestRow linked = new RequestRow(id, 12, member, "credit", "Không thấy credit", RequestStatus.NEW,
-                conversation, true, false, NOW, null, null, null, NOW);
+                conversation, true, false, NOW, null, null, null, NOW, null);
         when(requests.findByNumber(12)).thenReturn(Optional.of(linked));
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
         when(requests.conversation(conversation)).thenReturn(List.of(
@@ -329,7 +337,7 @@ class RequestServiceTest {
     void aLinkedConversationTheRetentionDeletedShowsAsExpiredWhileNoLinkDoesNot() {
         UUID expiredId = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(expiredId, 12, member, "credit",
-                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW)));
+                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW, null)));
         when(requests.findByNumber(13)).thenReturn(Optional.of(row(UUID.randomUUID(), 13, RequestStatus.NEW)));
 
         AdminDetail expired = service.adminDetail(12);
@@ -343,10 +351,11 @@ class RequestServiceTest {
 
     @Test
     void anInboxPageBeyondTenThousandIsRefusedInsteadOfOverflowing() {
-        assertProblem(() -> service.page(null, null, Integer.MAX_VALUE), HttpStatus.BAD_REQUEST,
+        assertProblem(() -> service.page(null, null, null, null, null, null, Integer.MAX_VALUE, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+        assertProblem(() -> service.page(null, null, null, null, null, null, 10_001, admin), HttpStatus.BAD_REQUEST,
                 "validation-failed");
-        assertProblem(() -> service.page(null, null, 10_001), HttpStatus.BAD_REQUEST, "validation-failed");
-        verify(requests, never()).page(any(), any(), anyInt(), anyInt());
+        verify(requests, never()).page(any(), anyInt(), anyInt());
     }
 
     @Test
@@ -361,27 +370,85 @@ class RequestServiceTest {
     @Test
     void theInboxPagesByTwentyAndRefusesUnknownFilters() {
         UUID id = UUID.randomUUID();
-        when(requests.page("new", "credit", 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW)));
-        when(requests.count("new", "credit")).thenReturn(21L);
-        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
+        UUID linh = UUID.randomUUID();
+        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, 1, admin, NOW)
+                .filter();
+        when(requests.page(filter, 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
+        when(requests.count(filter)).thenReturn(21L);
+        when(users.findEmailsByIds(List.of(member, linh))).thenReturn(Map.of(member, "m@example.com"));
 
-        AdminPage page = service.page("new", "credit", 1);
+        AdminPage page = service.page("new", "credit", "me", null, null, null, 1, admin);
 
-        assertThat(page.items()).singleElement().satisfies(item -> assertThat(item.requester().email())
-                .isEqualTo("m@example.com"));
+        assertThat(page.items()).singleElement().satisfies(item -> {
+            assertThat(item.requester().email()).isEqualTo("m@example.com");
+            assertThat(item.assignee().id()).isEqualTo(linh);
+            assertThat(item.assignee().deleted()).isTrue();
+        });
         assertThat(page.total()).isEqualTo(21);
-        assertProblem(() -> service.page("open", "billing", -1), HttpStatus.BAD_REQUEST, "validation-failed");
+        assertProblem(() -> service.page("open", "billing", null, null, null, null, -1, admin), HttpStatus.BAD_REQUEST,
+                "validation-failed");
     }
 
     @Test
-    void theCountsAndTheListComeFromTheRepository() {
-        when(requests.countUnread(member)).thenReturn(2L);
-        when(requests.countOpen()).thenReturn(3L);
-        when(requests.listOfRequester(member)).thenReturn(List.of(row(UUID.randomUUID(), 4, RequestStatus.NEW)));
+    void bulkAssignClassifiesEachNumber() {
+        UUID linh = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        RequestRow fresh = row(UUID.randomUUID(), 30, RequestStatus.NEW);
+        RequestRow already = row(UUID.randomUUID(), 31, RequestStatus.IN_PROGRESS, member, linh);
+        RequestRow closed = row(UUID.randomUUID(), 9, RequestStatus.CLOSED);
+        RequestRow racing = row(UUID.randomUUID(), 32, RequestStatus.IN_PROGRESS, member, other);
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(fresh));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(already));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(closed));
+        when(requests.findByNumber(32)).thenReturn(Optional.of(racing));
+        when(requests.findByNumber(999)).thenReturn(Optional.empty());
+        when(requests.assign(fresh.id(), RequestStatus.NEW, RequestStatus.IN_PROGRESS, linh, NOW)).thenReturn(true);
+        when(requests.assign(racing.id(), RequestStatus.IN_PROGRESS, RequestStatus.IN_PROGRESS, linh, NOW))
+                .thenReturn(false);
 
-        assertThat(service.unreadCount(member)).isEqualTo(2);
-        assertThat(service.openCount()).isEqualTo(3);
-        assertThat(service.list(member)).singleElement().satisfies(s -> assertThat(s.number()).isEqualTo(4));
+        BulkAssignResult result = service.bulkAssign(admin, List.of(30L, 31L, 9L, 999L, 32L), linh);
+
+        assertThat(result.assigned()).containsExactly(30L);
+        assertThat(result.unchanged()).containsExactly(31L);
+        assertThat(result.failed()).extracting(BulkAssignFailure::number, BulkAssignFailure::reason)
+                .containsExactly(tuple(9L, "closed"), tuple(999L, "not_found"), tuple(32L, "changed"));
+        verify(requests, never()).assign(eq(already.id()), any(), any(), any(), any());
+        verify(requests, never()).assign(eq(closed.id()), any(), any(), any(), any());
+    }
+
+    @Test
+    void bulkAssignRefusesEmptyOversizedOrRepeatedListsBeforeAnyWrite() {
+        UUID linh = UUID.randomUUID();
+        List<Long> oversized = LongStream.rangeClosed(1, 101).boxed().toList();
+
+        for (List<Long> numbers : Arrays.asList(List.<Long>of(), oversized, List.of(1L, 1L), null,
+                Arrays.asList(1L, null), List.of(0L))) {
+            assertThatThrownBy(() -> service.bulkAssign(admin, numbers, linh))
+                    .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                        assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                        assertThat(e.fieldErrors()).containsOnlyKeys("numbers");
+                    });
+        }
+        verifyNoInteractions(adminPermissions);
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anIneligibleAssigneeFailsTheWholeBatch() {
+        UUID editor = UUID.randomUUID();
+        when(adminPermissions.holds(editor, Permission.SUPPORT_TICKET_REPLY)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.bulkAssign(admin, List.of(30L, 31L), editor))
+                .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.fieldErrors()).containsOnlyKeys("assigneeId");
+                });
+        assertThatThrownBy(() -> service.bulkAssign(admin, List.of(30L), null))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.fieldErrors()).containsOnlyKeys("assigneeId"));
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+        verify(requests, never()).findByNumber(30);
     }
 
     @Test
@@ -401,9 +468,13 @@ class RequestServiceTest {
     }
 
     private static RequestRow row(UUID id, long number, RequestStatus status, UUID requester) {
+        return row(id, number, status, requester, null);
+    }
+
+    private static RequestRow row(UUID id, long number, RequestStatus status, UUID requester, UUID assignee) {
         return new RequestRow(id, number, requester, "credit", "Không thấy credit", status, null, false, false, NOW,
                 status == RequestStatus.RESOLVED ? NOW : null, null,
-                status == RequestStatus.CLOSED ? "cancelled" : null, NOW);
+                status == RequestStatus.CLOSED ? "cancelled" : null, NOW, assignee);
     }
 
     private static void assertProblem(Runnable call, HttpStatus status, String code) {

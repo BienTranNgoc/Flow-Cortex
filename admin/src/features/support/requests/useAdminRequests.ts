@@ -1,12 +1,18 @@
 import {
+  assignAdminSupportRequest,
   authHeaders,
+  bulkAssignAdminSupportRequests,
   getAdminSupportRequest,
+  getAdminSupportRequestFacets,
   listAdminSupportRequests,
   replyToAdminSupportRequest,
   setAdminSupportRequestStatus,
   type AdminSupportRequestDetail,
   type AdminSupportRequestReply,
   type AdminSupportRequestStatusChangeStatus,
+  type ListAdminSupportRequestsCreated,
+  type ListAdminSupportRequestsParams,
+  type ListAdminSupportRequestsSort,
   type ListAdminSupportRequestsStatus,
   type ListAdminSupportRequestsType,
 } from '@flow-cortex/api-client';
@@ -27,21 +33,42 @@ const REQUESTS_KEY = ['admin', 'support', 'requests'] as const;
 const DETAIL = 'detail';
 const detailKey = (number: number) => [...REQUESTS_KEY, DETAIL, number] as const;
 
-/** One page of requests, newest activity first; the previous page stays visible while the next loads. */
-export function useRequestsQuery(
-  page: number,
-  status: ListAdminSupportRequestsStatus | undefined,
-  type: ListAdminSupportRequestsType | undefined,
-) {
+/** The inbox filter as the URL carries it; an absent key means no filter on that dimension. */
+export interface RequestFilter {
+  status?: ListAdminSupportRequestsStatus | undefined;
+  type?: ListAdminSupportRequestsType | undefined;
+  /** `me`, `unassigned` or an account id. */
+  assignee?: string | undefined;
+  created?: ListAdminSupportRequestsCreated | undefined;
+  q?: string | undefined;
+  sort?: ListAdminSupportRequestsSort | undefined;
+  page: number;
+}
+
+/** Drops the absent keys: the generated params type rejects an explicit `undefined`. */
+function definedOnly<T extends object>(params: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined),
+  ) as { [K in keyof T]?: Exclude<T[K], undefined> };
+}
+
+/** One page of requests; the previous page stays visible while the next loads. */
+export function useRequestsQuery(filter: RequestFilter) {
+  const params: ListAdminSupportRequestsParams = definedOnly({ ...filter });
   return useQuery({
-    queryKey: [...REQUESTS_KEY, 'list', page, status, type],
-    queryFn: () =>
-      unwrapSupport(
-        listAdminSupportRequests(
-          { page, ...(status ? { status } : {}), ...(type ? { type } : {}) },
-          authHeaders(),
-        ),
-      ),
+    queryKey: [...REQUESTS_KEY, 'list', params],
+    queryFn: () => unwrapSupport(listAdminSupportRequests(params, authHeaders())),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Counts per status, type, created bucket and assignee, each ignoring its own selection. */
+export function useRequestFacets(filter: RequestFilter) {
+  const { page: _page, sort: _sort, ...rest } = filter;
+  const params = definedOnly(rest);
+  return useQuery({
+    queryKey: [...REQUESTS_KEY, 'facets', params],
+    queryFn: () => unwrapSupport(getAdminSupportRequestFacets(params, authHeaders())),
     placeholderData: keepPreviousData,
   });
 }
@@ -90,6 +117,29 @@ export function useSetStatus(number: number) {
       unwrapSupport(setAdminSupportRequestStatus(number, { status }, authHeaders())),
     onSuccess: (detail) => showDetail(queryClient, detail),
     onError: (error) => onRefused(queryClient, error),
+  });
+}
+
+/** Sets or clears (`undefined`) the assignee; assigning a new request picks it up into in progress. */
+export function useAssignRequest(number: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assigneeId: string | undefined) =>
+      unwrapSupport(
+        assignAdminSupportRequest(number, assigneeId ? { assigneeId } : {}, authHeaders()),
+      ),
+    onSuccess: (detail) => showDetail(queryClient, detail),
+    onError: (error) => onRefused(queryClient, error),
+  });
+}
+
+export function useBulkAssign() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ numbers, assigneeId }: { numbers: number[]; assigneeId: string }) =>
+      unwrapSupport(bulkAssignAdminSupportRequests({ numbers, assigneeId }, authHeaders())),
+    // Each row may be assigned, refused or changed by someone else: every list is stale either way.
+    onSettled: () => invalidateLists(queryClient),
   });
 }
 

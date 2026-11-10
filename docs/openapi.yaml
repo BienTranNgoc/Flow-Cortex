@@ -190,6 +190,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}/assignee:
+    put:
+      tags:
+      - admin-request-controller
+      operationId: assignAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestAssignee"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: validation-failed (errors.assigneeId)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups/{id}:
     put:
       tags:
@@ -1352,6 +1395,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/bulk-assign:
+    post:
+      tags:
+      - admin-request-controller
+      operationId: bulkAssignAdminSupportRequests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportBulkAssign"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportBulkAssignResult"
+        "400":
+          description: "validation-failed (errors.numbers, errors.assigneeId)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups:
     get:
       tags:
@@ -2335,6 +2402,39 @@ paths:
           - workflow
           - technical
           - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        description: "Subject text, or a request number with or without a leading\
+          \ #"
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
       - name: page
         in: query
         required: false
@@ -2352,7 +2452,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
-          description: "validation-failed (errors.status, errors.type, errors.page)"
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -2394,6 +2495,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SupportCount"
+  /api/v1/admin/support/requests/facets:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportRequestFacets
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestFacets"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/sms-outbox:
     get:
       tags:
@@ -2518,6 +2683,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/assignees:
+    get:
+      tags:
+      - admin-assignees-controller
+      operationId: listAdminAssignees
+      parameters:
+      - name: for
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Missing or unknown list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAssignee"
+        "403":
+          description: The caller may not read this list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAssignee"
   /api/v1/admin/accounts:
     get:
       tags:
@@ -2692,6 +2885,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -2793,6 +2987,8 @@ components:
           format: date-time
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         messages:
           type: array
           items:
@@ -2823,6 +3019,19 @@ components:
       - status
       - subject
       - type
+    SupportAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        deleted:
+          type: boolean
+      required:
+      - deleted
+      - id
     SupportConversationMessage:
       type: object
       properties:
@@ -2907,6 +3116,12 @@ components:
       required:
       - deleted
       - id
+    AdminSupportRequestAssignee:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
     AdminSupportKbGroupRequest:
       type: object
       properties:
@@ -3831,6 +4046,60 @@ components:
       required:
       - body
       - status
+    AdminSupportBulkAssign:
+      type: object
+      properties:
+        numbers:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+        assigneeId:
+          type: string
+          format: uuid
+      required:
+      - assigneeId
+      - numbers
+    AdminSupportBulkAssignResult:
+      type: object
+      properties:
+        assigned:
+          type: array
+          items:
+            type: integer
+            format: int64
+        unchanged:
+          type: array
+          items:
+            type: integer
+            format: int64
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportBulkAssignFailure"
+      required:
+      - assigned
+      - failed
+      - unchanged
+    SupportBulkAssignFailure:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum:
+          - not_found
+          - closed
+          - changed
+      required:
+      - number
+      - reason
     AdminAccountResponse:
       type: object
       properties:
@@ -4195,6 +4464,8 @@ components:
           - closed
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         createdAt:
           type: string
           format: date-time
@@ -4209,6 +4480,70 @@ components:
       - status
       - subject
       - type
+    AdminSupportAssigneeFacet:
+      type: object
+      properties:
+        unassigned:
+          type: integer
+          format: int64
+        mine:
+          type: integer
+          format: int64
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssigneeCount"
+      required:
+      - mine
+      - people
+      - unassigned
+    AdminSupportRequestFacets:
+      type: object
+      properties:
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        type:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        assignee:
+          $ref: "#/components/schemas/AdminSupportAssigneeFacet"
+      required:
+      - assignee
+      - created
+      - status
+      - type
+    SupportAssigneeCount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - id
+    SupportFacetCount:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - value
     AdminSupportKbArticleList:
       type: object
       properties:
@@ -4350,6 +4685,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -4441,6 +4777,20 @@ components:
       - page
       - size
       - total
+    AdminAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+      required:
+      - email
+      - id
+      - name
     PageViewAdminAccountResponse:
       type: object
       properties:

@@ -3,6 +3,8 @@ package com.flowcortex.support.request;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
+import com.flowcortex.support.request.RequestViews.AdminFacets;
+import com.flowcortex.support.request.RequestViews.BulkAssignResult;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.Count;
 import com.flowcortex.support.web.SupportCaller;
@@ -66,23 +68,70 @@ class AdminRequestController {
             String status) {
     }
 
+    /** {@code assigneeId} null clears the assignee. */
+    @Schema(name = "AdminSupportRequestAssignee")
+    record AssigneeRequest(@Schema(format = "uuid") UUID assigneeId) {
+    }
+
+    @Schema(name = "AdminSupportBulkAssign")
+    record BulkAssignRequest(
+            @ArraySchema(arraySchema = @Schema(requiredMode = RequiredMode.REQUIRED),
+                    minItems = 1, maxItems = RequestService.MAX_BULK, uniqueItems = true,
+                    schema = @Schema(type = "integer", format = "int64", minimum = "1"))
+            List<Long> numbers,
+            @Schema(requiredMode = RequiredMode.REQUIRED, format = "uuid") UUID assigneeId) {
+    }
+
     @Operation(operationId = "listAdminSupportRequests")
     @ApiResponse(responseCode = "200")
-    @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, errors.page)",
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, "
+            + "errors.assignee, errors.created, errors.q, errors.sort, errors.page)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminPage list(
+    AdminPage list(@AuthenticationPrincipal Jwt jwt,
             @Parameter(schema = @Schema(allowableValues = {"new", "in_progress", "waiting_member", "resolved",
                     "closed"}))
             @RequestParam(required = false) String status,
             @Parameter(schema = @Schema(allowableValues = {"account", "credit", "workflow", "technical", "other"}))
             @RequestParam(required = false) String type,
+            @Parameter(description = "me, unassigned or an account id")
+            @RequestParam(required = false) String assignee,
+            @Parameter(schema = @Schema(allowableValues = {"today", "7d", "30d", "older"}))
+            @RequestParam(required = false) String created,
+            @Parameter(description = "Subject text, or a request number with or without a leading #",
+                    schema = @Schema(maxLength = InboxQuery.MAX_SEARCH_LENGTH))
+            @RequestParam(required = false) String q,
+            @Parameter(schema = @Schema(allowableValues = {"newest", "oldest"}, defaultValue = "newest"))
+            @RequestParam(required = false) String sort,
             @Parameter(schema = @Schema(type = "integer", format = "int32", defaultValue = "0", minimum = "0",
                     maximum = "" + RequestService.MAX_PAGE))
             @RequestParam(defaultValue = "0") int page) {
-        return requests.page(status, type, page);
+        return requests.page(status, type, assignee, created, q, sort, page, caller.require(jwt).id());
+    }
+
+    @Operation(operationId = "getAdminSupportRequestFacets")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, "
+            + "errors.assignee, errors.created, errors.q)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
+    @GetMapping(value = "/facets", produces = MediaType.APPLICATION_JSON_VALUE)
+    AdminFacets facets(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(schema = @Schema(allowableValues = {"new", "in_progress", "waiting_member", "resolved",
+                    "closed"}))
+            @RequestParam(required = false) String status,
+            @Parameter(schema = @Schema(allowableValues = {"account", "credit", "workflow", "technical", "other"}))
+            @RequestParam(required = false) String type,
+            @Parameter(description = "me, unassigned or an account id")
+            @RequestParam(required = false) String assignee,
+            @Parameter(schema = @Schema(allowableValues = {"today", "7d", "30d", "older"}))
+            @RequestParam(required = false) String created,
+            @Parameter(schema = @Schema(maxLength = InboxQuery.MAX_SEARCH_LENGTH))
+            @RequestParam(required = false) String q) {
+        return requests.facets(status, type, assignee, created, q, caller.require(jwt).id());
     }
 
     @Operation(operationId = "countOpenSupportRequests")
@@ -152,5 +201,36 @@ class AdminRequestController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     AdminDetail status(@PathVariable long number, @RequestBody StatusRequest body) {
         return requests.setStatus(number, body.status());
+    }
+
+    @Operation(operationId = "assignAdminSupportRequest")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors.assigneeId)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "request-not-found",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "request-closed, request-state-changed",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_ASSIGN)
+    @PutMapping(value = "/{number}/assignee", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    AdminDetail assign(@AuthenticationPrincipal Jwt jwt, @PathVariable long number,
+            @RequestBody AssigneeRequest body) {
+        return requests.assign(caller.require(jwt).id(), number, body.assigneeId());
+    }
+
+    @Operation(operationId = "bulkAssignAdminSupportRequests")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors.numbers, errors.assigneeId)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_ASSIGN)
+    @PostMapping(value = "/bulk-assign", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    BulkAssignResult bulkAssign(@AuthenticationPrincipal Jwt jwt, @RequestBody BulkAssignRequest body) {
+        return requests.bulkAssign(caller.require(jwt).id(), body.numbers(), body.assigneeId());
     }
 }

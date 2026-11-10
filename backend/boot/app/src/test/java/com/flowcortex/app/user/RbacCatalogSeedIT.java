@@ -52,7 +52,7 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         Map<String, Boolean> catalog = Arrays.stream(Permission.values())
                 .collect(Collectors.toMap(Permission::key, Permission::superAdminOnly));
-        assertThat(catalog).hasSize(21);
+        assertThat(catalog).hasSize(22);
         assertThat(rows).isEqualTo(catalog);
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
@@ -65,10 +65,10 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).hasSize(17).isEqualTo(operationManager);
+        assertThat(keysOf("OPERATION_MANAGER")).hasSize(18).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
@@ -76,6 +76,10 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
                 Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
+
+        assertThat(Permission.SUPPORT_TICKET_ASSIGN.superAdminOnly()).isFalse();
+        assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(Permission.SUPPORT_TICKET_ASSIGN.key());
+        assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(Permission.SUPPORT_TICKET_ASSIGN.key());
 
         Integer workflowManageHolders = jdbc.queryForObject(
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
