@@ -13,6 +13,7 @@ include(
     ":modules:llm",
     ":modules:support",
     ":modules:space",
+    ":modules:asset",
     ":modules:realtime",
     ":modules:chat",
     ":shared:web",

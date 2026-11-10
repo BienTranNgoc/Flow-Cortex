@@ -370,6 +370,14 @@ flowcortex:
     pool:
       size: 4
       queue-capacity: 4
+  # Registering a run's assets makes object-store calls, so it runs on its own threads and never
+  # holds the shared async pool that advances runs; a hand-off finding both full waits for the sweep.
+  asset:
+    registration:
+      sweep-interval: 120s
+      pool:
+        size: 2
+        queue-capacity: 20
   # Product Video is opt-in outside development. Turning it off blocks only new
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
