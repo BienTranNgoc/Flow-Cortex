@@ -33,3 +33,32 @@ and commit `src/flowcortex_worker/contracts/`; never edit those files by hand (C
 
 **Telemetry** — standard `OTEL_*` variables; `OTEL_TRACES_EXPORTER=none` (and `_LOGS_`, `_METRICS_`)
 keeps spans and trace ids in the JSON logs without a collector.
+
+**Image clean overlay** — the `clean_overlay` capability removes watermark-like overlays and
+burned-in captions from one image: faces are protected, caption and logo regions are detected
+(EasyOCR CRAFT plus a repeated-pattern search, or the `customRegions` boxes), filled with LaMa, and
+the recognised text can be returned as layers.
+
+- Params: `region` (`auto` or `manual`), `customRegions` (boxes `x`, `y`, `w`, `h` as ratios 0-1),
+  `strength` (1-5), `extractText` (boolean). Any other key, or a value out of range, ends as
+  `contract_violation`. Result: `clean.png` (BGRA when a PNG/WebP input had transparency) and the
+  pipeline's result keys, among them `regionsRemoved` and `textLayers`.
+- It runs only on the `overlay-runtime` image (`docker build --target overlay-runtime worker/`);
+  there is no compose service until the owner of the capability enum adds the lane. The default
+  `media-runtime` and `provider-runtime` images are unchanged and never import numpy, OpenCV or
+  torch. The handler is registered under `clean_overlay` through `HANDLER_MODULES`.
+- Models live in `/opt/flowcortex/models` (`FLOWCORTEX_OVERLAY_MODELS`), sha256-checked at build
+  time and again in the final stage; nothing is downloaded at run time. Licences and source URLs:
+  `models/MODEL-LICENSES.md`.
+- Only the child process decodes the image: PNG, JPEG and WebP up to `overlay/protocol.MAX_PIXELS`
+  (25,000,000 until the benchmark says otherwise); anything else is `input_rejected`.
+- **Measure** — `docker run --rm --network none --memory 6g --entrypoint python -v
+  "$PWD/worker/scripts:/bench:ro" <overlay image> /bench/bench_clean_overlay.py` prints P50, P95 and
+  peak RSS per size (1024², 2048², 3840×2160, 5000²), the CPU model and the torch thread count.
+  Budget: 900 s wall and 6 GiB RSS per image. The `overlay-image` CI job runs it after the
+  self-check and fails when a size is over budget; then lower `MAX_PIXELS` to the largest size
+  within budget. No figure is recorded yet: add the CI run's P95, peak RSS and CPU line here, and
+  the production worker host's.
+- Promotion rule (ADR-0011): the measured P95 is compared with
+  `flowcortex.media.max-runtime.clean_overlay` once the enum owner adds the capability; the
+  max-runtime must sit above it with headroom.

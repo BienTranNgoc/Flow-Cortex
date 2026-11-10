@@ -33,13 +33,47 @@ jobs:
       - name: Install
         # --locked also fails when uv.lock no longer matches pyproject.toml. --no-build:
         # dependencies come from wheels only; uv still builds the worker itself.
-        run: uv sync --locked --no-build
+        run: uv sync --locked --no-build --extra overlay
 
       - name: Lint
-        run: uv run --frozen --no-build ruff check .
+        run: uv run --frozen --no-build --extra overlay ruff check .
 
       - name: Type-check
-        run: uv run --frozen --no-build mypy
+        run: uv run --frozen --no-build --extra overlay mypy
 
       - name: Test
-        run: uv run --frozen --no-build pytest -rs
+        run: uv run --frozen --no-build --extra overlay pytest -rs
+
+  overlay-image:
+    # Builds the overlay image and proves it cleans a captioned picture with networking off.
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build overlay-runtime
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: worker
+          target: overlay-runtime
+          load: true
+          push: false
+          tags: flowcortex-worker-overlay:ci
+          cache-from: type=gha,scope=worker-overlay
+          cache-to: type=gha,scope=worker-overlay,mode=max
+
+      - name: Self-check without network
+        run: |
+          docker run --rm --network none --entrypoint python flowcortex-worker-overlay:ci \
+            -m flowcortex_worker.overlay.selfcheck
+
+      - name: Benchmark without network
+        # Exits non-zero when a size is killed, exceeds 900 s or peaks above 6 GiB; the printed
+        # P95, peak RSS and CPU line go into worker/README.md.
+        run: |
+          docker run --rm --network none --memory 6g --entrypoint python \
+            -v "$PWD/worker/scripts:/bench:ro" flowcortex-worker-overlay:ci \
+            /bench/bench_clean_overlay.py | tee "$GITHUB_STEP_SUMMARY"

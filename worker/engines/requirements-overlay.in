@@ -1,0 +1,8 @@
+# Overlay image: CPU torch and EasyOCR, installed with --require-hashes --no-deps in the
+# build-overlay stage. numpy and OpenCV repeat the pins of uv.lock (extra "overlay") so the
+# compile resolves against the same versions.
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+torch==2.4.0+cpu
+torchvision==0.19.0+cpu
+easyocr>=1.7.2
