@@ -32,24 +32,33 @@ class WorkflowReadinessGuard implements RunStartGuard {
 
     @Override
     public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
+        Map<Integer, LocalizedMessage> faults = faults(steps);
+        if (faults.isEmpty()) {
+            return;
+        }
         if (steps.isEmpty()) {
-            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete.noSteps"), CODE);
+            throw new UnprocessableEntityException(faults.get(0), CODE);
         }
         Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
-        Integer firstFailing = null;
+        faults.forEach((order, reason) -> failures.put("step" + order, reason));
+        int firstFailing = faults.keySet().iterator().next();
+        throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
+                failures);
+    }
+
+    /**
+     * Every reason this workflow cannot start, keyed by step order in step order; a workflow without steps is one
+     * fault under key {@code 0}. Empty when the workflow can start.
+     */
+    Map<Integer, LocalizedMessage> faults(List<StepDef> steps) {
+        if (steps.isEmpty()) {
+            return Map.of(0, new LocalizedMessage("workflow.incomplete.noSteps"));
+        }
+        Map<Integer, LocalizedMessage> faults = new LinkedHashMap<>();
         for (StepDef step : steps) {
-            Optional<LocalizedMessage> reason = reason(step);
-            if (reason.isPresent()) {
-                failures.put("step" + step.order(), reason.get());
-                if (firstFailing == null) {
-                    firstFailing = step.order();
-                }
-            }
+            reason(step).ifPresent(reason -> faults.put(step.order(), reason));
         }
-        if (firstFailing != null) {
-            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
-                    failures);
-        }
+        return faults;
     }
 
     private Optional<LocalizedMessage> reason(StepDef step) {
