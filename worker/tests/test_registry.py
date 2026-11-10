@@ -97,3 +97,14 @@ def test_the_default_registry_resolves_every_capability() -> None:
 
 def test_the_module_level_resolve_returns_the_render_handler() -> None:
     assert registry.resolve("render_video") is render_video.handle
+
+
+def test_the_audio_capabilities_sit_beside_the_default_rows() -> None:
+    for capability in ("separate_audio", "speakers", "beats", "caption_burn"):
+        assert capability in registry.HANDLER_MODULES
+
+
+def test_an_audio_only_worker_loads_just_its_handler() -> None:
+    handlers = registry.load_handlers(frozenset({"separate_audio"}))
+
+    assert set(handlers) == {"separate_audio"}

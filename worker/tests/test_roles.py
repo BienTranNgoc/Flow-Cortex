@@ -18,6 +18,10 @@ def test_the_render_queue_is_accepted_as_written() -> None:
     assert media_queue("media.render.jobs") == "media.render.jobs"
 
 
+def test_the_audio_queue_is_accepted_as_written() -> None:
+    assert media_queue("media.audio.jobs") == "media.audio.jobs"
+
+
 def test_unknown_queue_names_both_accepted_queues() -> None:
     with pytest.raises(RoleError) as refused:
         media_queue("media.preview.jobs")
@@ -25,6 +29,7 @@ def test_unknown_queue_names_both_accepted_queues() -> None:
     assert "media.preview.jobs" in str(refused.value)
     assert "media.jobs" in str(refused.value)
     assert "media.render.jobs" in str(refused.value)
+    assert "media.audio.jobs" in str(refused.value)
 
 
 def test_blanks_and_spaces_in_the_capability_list_are_ignored() -> None:
