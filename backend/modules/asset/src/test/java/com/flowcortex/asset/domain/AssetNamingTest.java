@@ -21,6 +21,13 @@ class AssetNamingTest {
     }
 
     @Test
+    void unicodeSpacesCollapseLikeAsciiSpaces() {
+        assertThat(AssetNaming.runTitleBase("Áo  thun　trắng  ", "W", RUN_ID))
+                .isEqualTo("Áo thun trắng · W");
+        assertThat(AssetNaming.uploadTitle(" a  b.png ", 1, "W", "k")).isEqualTo("a b.png");
+    }
+
+    @Test
     void baseIsShortInputDotWorkflowName() {
         assertThat(AssetNaming.runTitleBase("Áo thun cotton trắng", "Product video", RUN_ID))
                 .isEqualTo("Áo thun cotton trắng · Product video");

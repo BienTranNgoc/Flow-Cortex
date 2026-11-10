@@ -11,12 +11,12 @@ public final class AssetNaming {
     static final int SHORT_INPUT_CODE_POINTS = 60;
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern WHITESPACE = Pattern.compile("[\\s\\p{Z}]+");
     private static final String SEPARATOR = " · ";
 
     private AssetNaming() {}
 
-    /** Base of a run asset title: {@code <short input> · <workflow name>}, else the workflow name, else {@code Run <8 hex>}. */
+    /** Base of a run asset title: {@code <short input> · <workflow name>}, else the workflow name, else the short input alone, else {@code Run <8 hex>}. */
     public static String runTitleBase(String input, String workflowName, UUID runId) {
         String shortInput = cut(firstNonBlankLine(input), SHORT_INPUT_CODE_POINTS);
         String name = normalize(workflowName);
