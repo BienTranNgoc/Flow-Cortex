@@ -5,19 +5,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Places the caller of a {@link PaymentsRegionGated} handler by the address the container resolved
  * ({@code getRemoteAddr()}, which honours the forwarded-header strategy) and refuses it under enforce.
- * The mode binds at startup.
+ * The mode binds at startup. Registered by {@link PaymentsRegionConfig}, which MVC test slices skip.
  */
-@Component
-class PaymentsRegionInterceptor implements HandlerInterceptor, WebMvcConfigurer {
+class PaymentsRegionInterceptor implements HandlerInterceptor {
 
     private final PaymentsRegionService service;
     private final PaymentsRegionGateMode mode;
@@ -28,11 +24,6 @@ class PaymentsRegionInterceptor implements HandlerInterceptor, WebMvcConfigurer 
         this.service = service;
         this.mode = PaymentsRegionGateMode.parse(properties.mode());
         this.telemetry = telemetry;
-    }
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(this).addPathPatterns("/api/**");
     }
 
     @Override
