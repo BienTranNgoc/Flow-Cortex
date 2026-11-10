@@ -6,6 +6,7 @@ dependencies {
     // UploadRejectedException, part of the api package, carries a LocalizedMessage.
     api(project(":shared:web"))
     implementation(project(":modules:space"))
+    implementation(project(":modules:jobs"))
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     // Modulith externalizes @Externalized events to the broker through the event
     // publication registry (the outbox the workflow module already persists).

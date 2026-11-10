@@ -9,6 +9,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Media",
         allowedDependencies = {
+                "jobs :: api",
                 "shared :: web",
                 "space :: api"
         }

@@ -10,6 +10,7 @@ import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.media.api.RunInput;
+import com.flowcortex.media.api.RunInputsBound;
 import com.flowcortex.media.api.StoredAttachment;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.provider.ProviderJobPayload;
@@ -391,6 +392,7 @@ class MediaJobsImpl implements MediaJobs {
         requireBindable(copies);
         Instant now = Instant.now();
         List<MediaAssetBinding> rows = new java.util.ArrayList<>();
+        Set<UUID> owners = new java.util.HashSet<>();
         for (int index = 0; index < copies.size(); index++) {
             MediaAssetInput copy = copies.get(index);
             MediaJobInput input = copy.input();
@@ -398,9 +400,17 @@ class MediaJobsImpl implements MediaJobs {
                     || !runInputKey(runId, input.key()).equals(input.objectKey())) {
                 throw new IllegalArgumentException("Only a copy under the run's inputs can be bound: " + input.key());
             }
+            owners.add(assets.findById(copy.assetId())
+                    .orElseThrow(() -> new IllegalArgumentException("A bound copy needs a registered upload: "
+                            + input.key()))
+                    .getOwnerId());
             rows.add(new MediaAssetBinding(runId, input.key(), copy.assetId(), (short) index, now));
         }
+        if (owners.size() != 1) {
+            throw new IllegalArgumentException("A run's bound inputs must belong to one owner");
+        }
         bindings.saveAll(rows);
+        events.publishEvent(new RunInputsBound(runId, owners.iterator().next()));
     }
 
     private static void requireBindable(List<MediaAssetInput> inputs) {
