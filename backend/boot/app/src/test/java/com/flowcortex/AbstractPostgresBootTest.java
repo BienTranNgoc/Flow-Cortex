@@ -1,6 +1,11 @@
 package com.flowcortex;
 
 import java.net.URI;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -58,6 +63,20 @@ public abstract class AbstractPostgresBootTest {
         try (S3Client store = objectStore()) {
             store.createBucket(bucket -> bucket.bucket(UPLOAD_BUCKET));
             store.createBucket(bucket -> bucket.bucket(MEDIA_BUCKET));
+        }
+    }
+
+    /**
+     * Rate-limit budgets live in the shared database, so a 429 spent by one class would leak into the
+     * next. Plain JDBC, because some subclasses have no Spring context; a no-op until Flyway has created the table.
+     */
+    @BeforeEach
+    void emptyRateLimitBuckets() throws SQLException {
+        try (Connection connection = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+                Statement statement = connection.createStatement()) {
+            statement.execute("DO $$ BEGIN IF to_regclass('public.rate_limit_bucket') IS NOT NULL THEN "
+                    + "DELETE FROM rate_limit_bucket; END IF; END $$");
         }
     }
 

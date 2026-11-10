@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":modules:media"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.
@@ -15,9 +16,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-mail")
-    implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
     implementation("org.commonmark:commonmark:${providers.gradleProperty("commonmarkVersion").get()}")
-    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
     implementation("io.micrometer:micrometer-core")
     implementation("io.micrometer:context-propagation")
@@ -27,4 +26,5 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("io.micrometer:micrometer-observation-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
 }
