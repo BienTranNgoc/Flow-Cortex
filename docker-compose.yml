@@ -349,6 +349,7 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:-15m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
@@ -457,6 +458,25 @@ services:
       OTEL_SERVICE_NAME: render-worker
     deploy:
       replicas: ${MEDIA_RENDER_WORKERS:-1}
+
+  # Audio pool: consumes media.audio.jobs (separate_audio) on the audio-runtime image
+  # (torch, demucs, models baked in), so a separation never waits behind a probe and
+  # the heavy image is not pulled by the other media services. One job per container;
+  # the pool size is the replica count. No WORKER_ID: each replica reports its own
+  # container hostname.
+  audio-worker:
+    <<: *media-worker
+    build:
+      context: ./worker
+      target: audio-runtime
+    image: flow-cortex-audio-worker:local
+    environment:
+      <<: *media-worker-env
+      MEDIA_QUEUE: media.audio.jobs
+      WORKER_CAPABILITIES: separate_audio
+      OTEL_SERVICE_NAME: audio-worker
+    deploy:
+      replicas: ${MEDIA_AUDIO_WORKERS:-1}
 
   # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:
