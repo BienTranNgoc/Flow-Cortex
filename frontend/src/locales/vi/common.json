@@ -2,7 +2,8 @@
   "errorView": {
     "title": "Đã xảy ra lỗi",
     "message": "Không thể hiển thị trang này. Hãy tải lại để thử lần nữa.",
-    "reload": "Tải lại"
+    "reload": "Tải lại",
+    "retry": "Thử lại"
   },
   "errors": {
     "requestFailed": "Không thực hiện được yêu cầu. Hãy thử lại."
@@ -65,6 +66,11 @@
     "empty": "Chưa có quy trình nào.",
     "noMatch": "Không có quy trình nào khớp với tìm kiếm của bạn.",
     "clearFilters": "Xóa bộ lọc"
+  },
+  "networkStatus": {
+    "offline": "Bạn đang ngoại tuyến. Nội dung sẽ không tải được cho đến khi kết nối lại.",
+    "rateLimited": "Quá nhiều yêu cầu. Vui lòng chờ một lát.",
+    "reconnecting": "Đang kết nối lại cập nhật trực tiếp…"
   },
   "shell": {
     "skipToContent": "Chuyển đến nội dung",
