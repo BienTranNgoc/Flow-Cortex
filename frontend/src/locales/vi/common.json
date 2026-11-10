@@ -143,38 +143,6 @@
       "byoProvider": "<strong>Dùng nhà cung cấp AI của riêng bạn.</strong> Thêm khóa trên trang <integrationsLink>Tích hợp</integrationsLink>; mọi quy trình cần mô hình đó sẽ tự động dùng nó."
     }
   },
-  "runs": {
-    "title": "Lượt chạy gần đây",
-    "subtitle": "Theo dõi mọi quy trình bạn đã khởi chạy: lượt nào đang chạy, lượt nào cần bạn duyệt và lượt nào thất bại.",
-    "searchPlaceholder": "Tìm theo tên quy trình…",
-    "searchLabel": "Tìm lượt chạy",
-    "filterLegend": "Lọc theo trạng thái",
-    "status": {
-      "all": "Tất cả",
-      "success": "Thành công",
-      "failure": "Thất bại",
-      "waiting": "Chờ duyệt",
-      "running": "Đang chạy"
-    },
-    "trigger": {
-      "label": "Kích hoạt",
-      "manual": "Thủ công",
-      "webhook": "Webhook",
-      "schedule": "Theo lịch"
-    },
-    "empty": "Không có lượt chạy nào khớp với bộ lọc hiện tại.",
-    "runId": "Mã lượt chạy",
-    "copy": "Sao chép {{value}}",
-    "started": "Bắt đầu",
-    "ago": "{{time}} trước",
-    "justNow": "vừa xong",
-    "duration": "Thời lượng",
-    "durationRunning": "{{duration}} · đang chạy",
-    "retry": "Thử lại",
-    "retryNamed": "Thử lại {{name}}",
-    "viewDetail": "Xem chi tiết lượt chạy →",
-    "demoFailure": "Bước \"throw\" thất bại: lỗi cố ý để kiểm thử."
-  },
   "integrations": {
     "title": "Tích hợp",
     "subtitle": "Kết nối các nhà cung cấp AI và tài khoản mạng xã hội mà quy trình của bạn cần. Khóa được lưu trong tài khoản của bạn và dùng lại cho mọi lượt chạy.",

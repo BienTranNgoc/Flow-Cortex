@@ -2,6 +2,7 @@ import type { RunStepOutputResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AudioWaveform } from './AudioWaveform';
 import { openInCurrentTab } from './browser';
 import { useOutputUrlMutation } from './useWorkflows';
 
@@ -205,6 +206,9 @@ export function StoredOutputDownload({
 
   return (
     <div className="run-step-downloads">
+      {output.mime?.startsWith('audio/') && (
+        <AudioWaveform runId={runId} stepOrder={stepOrder} name={output.name} />
+      )}
       <button
         type="button"
         onClick={download}

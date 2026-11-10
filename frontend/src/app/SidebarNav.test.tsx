@@ -23,13 +23,13 @@ describe('SidebarNav', () => {
     vi.unstubAllEnvs();
   });
 
-  it('lists Home, Workflows and the Docs group while the demo pages flag is off', () => {
+  it('lists Home, Workflows, Runs and the Docs group while the demo pages flag is off', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
 
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows']);
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs']);
     expect(within(nav).getByRole('button', { name: 'Docs' })).toHaveAttribute(
       'aria-expanded',
       'false',
@@ -40,15 +40,28 @@ describe('SidebarNav', () => {
     );
   });
 
-  it('lists Runs and Integrations too when the flag is on, with Runs current on /runs', () => {
-    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+  it('marks Runs current on /runs while the demo pages flag is off', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
 
     renderNav('/runs');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Integrations']);
     expect(within(nav).getByRole('link', { name: 'Runs' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('adds Integrations after Runs when the flag is on, with Integrations current on /integrations', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+
+    renderNav('/integrations');
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Integrations']);
+    expect(within(nav).getByRole('link', { name: 'Integrations' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Runs' })).not.toHaveAttribute('aria-current');
   });
 
   it('opens the Docs group on a docs sub-page and marks only that entry current', () => {

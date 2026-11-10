@@ -3,6 +3,7 @@ package com.flowcortex.media.infrastructure;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.application.MediaProperties;
 import com.flowcortex.shared.web.LocalizedMessage;
+import java.io.InputStream;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -113,6 +114,14 @@ public class S3MediaStore implements AutoCloseable {
     public void put(String bucket, String key, String contentType, byte[] bytes) {
         client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType),
                 RequestBody.fromBytes(bytes));
+    }
+
+    /**
+     * The object's bytes as a stream the caller must close; closing before the end drops the connection.
+     * @throws software.amazon.awssdk.core.exception.SdkException if the object cannot be opened
+     */
+    public InputStream open(String bucket, String key) {
+        return client.getObject(request -> request.bucket(bucket).key(key));
     }
 
     /** @throws software.amazon.awssdk.core.exception.SdkException if the bucket cannot be reached or does not exist */

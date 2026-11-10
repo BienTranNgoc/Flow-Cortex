@@ -23,6 +23,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -450,6 +451,19 @@ class MediaJobsImpl implements MediaJobs {
                 properties.presignTtl());
         LOG.info("Download URL issued: bucket={} key={} expiresAt={}", bucket, key, get.expiresAt());
         return new MediaDownload(get.url(), get.expiresAt());
+    }
+
+    @Override
+    public InputStream openDownloadable(String bucket, String key) {
+        if (!isDownloadable(bucket)) {
+            throw new IllegalArgumentException("Only objects in the media bucket are readable, not " + bucket);
+        }
+        try {
+            return store.open(bucket, key);
+        } catch (SdkException e) {
+            LOG.warn("Stored output not opened: bucket={} key={}", bucket, key, e);
+            throw new MediaStoreUnavailableException("The object store did not serve the step's file", e);
+        }
     }
 
     @Override

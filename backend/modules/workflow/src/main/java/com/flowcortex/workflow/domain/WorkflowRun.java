@@ -3,9 +3,11 @@ package com.flowcortex.workflow.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -19,6 +21,7 @@ import org.hibernate.type.SqlTypes;
  * by a shared workflow DEFINITION.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "workflow_run")
 public class WorkflowRun {
 
@@ -52,6 +55,21 @@ public class WorkflowRun {
     @Column(name = "options", updatable = false)
     private String options;
 
+    /** The member's own name for the run; {@code null} shows the workflow's name. */
+    @Column(name = "title")
+    private String title;
+
+    @Column(name = "favorite", nullable = false)
+    private boolean favorite;
+
+    /** Set only by {@code WorkflowRunRepository#softDelete}; the entity never writes it. */
+    @Column(name = "deleted_at", updatable = false)
+    private Instant deletedAt;
+
+    /** Trace id of the request that started the run; {@code null} for a run started before it was stored. */
+    @Column(name = "trace_id", updatable = false)
+    private String traceId;
+
     /** Required by JPA. */
     protected WorkflowRun() {
     }
@@ -68,6 +86,23 @@ public class WorkflowRun {
         this.options = options;
         this.status = RunStatus.RUNNING;
         this.startedAt = startedAt;
+    }
+
+    /** Gives every creation path a trace id, so a path that never passes one still stores one. */
+    @PrePersist
+    void ensureTraceId() {
+        if (traceId == null) {
+            traceId = RunTraceIds.random();
+        }
+    }
+
+    /** Fixes the trace id of a run that is not stored yet; its column is never updated afterwards. */
+    public WorkflowRun withTraceId(String traceId) {
+        if (this.traceId != null) {
+            throw new IllegalStateException("The trace id of run " + id + " is already fixed");
+        }
+        this.traceId = traceId;
+        return this;
     }
 
     public UUID getId() {
@@ -106,6 +141,31 @@ public class WorkflowRun {
 
     public String getOptions() {
         return options;
+    }
+
+    /** Stores the already normalized title; {@code null} clears it. */
+    public void rename(String normalizedTitle) {
+        this.title = normalizedTitle;
+    }
+
+    public void setFavorite(boolean favorite) {
+        this.favorite = favorite;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public boolean isFavorite() {
+        return favorite;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public String getTraceId() {
+        return traceId;
     }
 
     public String getErrorMessage() {

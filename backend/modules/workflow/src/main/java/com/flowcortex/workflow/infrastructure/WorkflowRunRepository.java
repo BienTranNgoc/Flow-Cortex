@@ -22,7 +22,77 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> {
 
-    Optional<WorkflowRun> findByIdAndOwnerId(UUID id, UUID ownerId);
+    /** The owner's run; a soft-deleted run is not found, so every owner-scoped caller answers 404 for it. */
+    @Query("SELECT r FROM WorkflowRun r WHERE r.id = :id AND r.ownerId = :ownerId AND r.deletedAt IS NULL")
+    Optional<WorkflowRun> findByIdAndOwnerId(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
+
+    /**
+     * Stamps the owner's finished run as deleted; {@code 0} when it is another owner's, already deleted,
+     * missing or still live. The caller holds {@link #lockById} so the status cannot change under the write.
+     */
+    @Modifying
+    @Query(value = "UPDATE workflow_run SET deleted_at = :now WHERE id = :id AND owner_id = :ownerId "
+            + "AND deleted_at IS NULL AND status IN ('completed', 'error', 'cancelled')", nativeQuery = true)
+    int softDelete(@Param("id") UUID id, @Param("ownerId") UUID ownerId, @Param("now") Instant now);
+
+    /**
+     * The owner's live runs, newest start first, with each workflow's name. Every filter that is
+     * {@code null} (or {@code favoriteOnly} false) matches all; {@code startedFrom} is inclusive,
+     * {@code startedBefore} exclusive.
+     */
+    @Query(value = "SELECT new com.flowcortex.workflow.infrastructure.RunHistoryRow(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND r.deletedAt IS NULL "
+            + "AND (:status IS NULL OR r.status = :status) "
+            + "AND (:workflowId IS NULL OR r.workflowId = :workflowId) "
+            + "AND (cast(:startedFrom as Instant) IS NULL OR r.startedAt >= :startedFrom) "
+            + "AND (cast(:startedBefore as Instant) IS NULL OR r.startedAt < :startedBefore) "
+            + "AND (:favoriteOnly = false OR r.favorite = true) "
+            + "ORDER BY r.startedAt DESC, r.id DESC",
+            countQuery = "SELECT count(r) FROM WorkflowRun r "
+                    + "WHERE r.ownerId = :ownerId AND r.deletedAt IS NULL "
+                    + "AND (:status IS NULL OR r.status = :status) "
+                    + "AND (:workflowId IS NULL OR r.workflowId = :workflowId) "
+                    + "AND (cast(:startedFrom as Instant) IS NULL OR r.startedAt >= :startedFrom) "
+                    + "AND (cast(:startedBefore as Instant) IS NULL OR r.startedAt < :startedBefore) "
+                    + "AND (:favoriteOnly = false OR r.favorite = true)")
+    Page<RunHistoryRow> findHistory(@Param("ownerId") UUID ownerId, @Param("status") RunStatus status,
+            @Param("workflowId") UUID workflowId, @Param("startedFrom") Instant startedFrom,
+            @Param("startedBefore") Instant startedBefore, @Param("favoriteOnly") boolean favoriteOnly,
+            Pageable page);
+
+    /** Every workflow the owner has a live run of, once each, by name; a deleted workflow is kept. */
+    @Query("SELECT DISTINCT new com.flowcortex.workflow.infrastructure.WorkflowChoice(w.id, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND r.deletedAt IS NULL ORDER BY w.name, w.id")
+    List<WorkflowChoice> findHistoryWorkflows(@Param("ownerId") UUID ownerId, Pageable page);
+
+    /** The owner's live runs that have not finished, newest start first (the tray's active bucket). */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.RunHistoryRow(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND r.deletedAt IS NULL AND r.status IN ("
+            + "com.flowcortex.workflow.domain.RunStatus.RUNNING, "
+            + "com.flowcortex.workflow.domain.RunStatus.WAITING_APPROVAL, "
+            + "com.flowcortex.workflow.domain.RunStatus.CANCELLING) "
+            + "ORDER BY r.startedAt DESC, r.id DESC")
+    List<RunHistoryRow> findTrayActive(@Param("ownerId") UUID ownerId, Pageable page);
+
+    /** The owner's runs that finished at or after {@code finishedSince}, most recently finished first. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.RunHistoryRow(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND r.deletedAt IS NULL AND r.status IN ("
+            + "com.flowcortex.workflow.domain.RunStatus.COMPLETED, "
+            + "com.flowcortex.workflow.domain.RunStatus.ERROR, "
+            + "com.flowcortex.workflow.domain.RunStatus.CANCELLED) "
+            + "AND r.finishedAt >= :finishedSince ORDER BY r.finishedAt DESC, r.id DESC")
+    List<RunHistoryRow> findTrayRecent(@Param("ownerId") UUID ownerId, @Param("finishedSince") Instant finishedSince,
+            Pageable page);
+
+    /** The owner's runs started at or after {@code since}, deleted ones included: their credits were spent. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.RunUsageRow(r.id, r.workflowId, w.name, r.status, "
+            + "r.startedAt) FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND r.startedAt >= :since ORDER BY r.startedAt DESC, r.id DESC")
+    List<RunUsageRow> findUsageRows(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
 
     /**
      * Running runs with no step in flight: nothing will move them unless someone advances them

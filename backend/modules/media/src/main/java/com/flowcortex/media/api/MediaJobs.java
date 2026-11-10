@@ -1,6 +1,7 @@
 package com.flowcortex.media.api;
 
 import com.flowcortex.media.api.provider.ProviderJob;
+import java.io.InputStream;
 import java.util.UUID;
 import java.util.List;
 
@@ -108,6 +109,14 @@ public interface MediaJobs {
      *         plain server-chosen file name
      */
     MediaDownload presignedGet(String bucket, String key, String fileName);
+
+    /**
+     * The bytes of the stored output {@code bucket}/{@code key} as a stream the caller must close. Only objects in
+     * the media bucket are ever read.
+     * @throws IllegalArgumentException if {@code bucket} is not the media bucket
+     * @throws MediaStoreUnavailableException if the store does not open the object
+     */
+    InputStream openDownloadable(String bucket, String key);
 
     /**
      * Stores {@code bytes} as object {@code name} of step {@code stepOrder} of run {@code runId}, at

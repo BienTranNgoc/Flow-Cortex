@@ -143,38 +143,6 @@
       "byoProvider": "<strong>Bring your own AI provider.</strong> Add a key on the <integrationsLink>Integrations</integrationsLink> page; any workflow that needs that model will pick it up automatically."
     }
   },
-  "runs": {
-    "title": "Recent runs",
-    "subtitle": "Track every pipeline you started: what is running, what needs your review, and what failed.",
-    "searchPlaceholder": "Search by workflow name…",
-    "searchLabel": "Search runs",
-    "filterLegend": "Filter by status",
-    "status": {
-      "all": "All",
-      "success": "Succeeded",
-      "failure": "Failed",
-      "waiting": "Waiting for review",
-      "running": "Running"
-    },
-    "trigger": {
-      "label": "Trigger",
-      "manual": "Manual",
-      "webhook": "Webhook",
-      "schedule": "Scheduled"
-    },
-    "empty": "No runs match the current filter.",
-    "runId": "Run ID",
-    "copy": "Copy {{value}}",
-    "started": "Started",
-    "ago": "{{time}} ago",
-    "justNow": "just now",
-    "duration": "Duration",
-    "durationRunning": "{{duration}} · running",
-    "retry": "Retry",
-    "retryNamed": "Retry {{name}}",
-    "viewDetail": "View run detail →",
-    "demoFailure": "Step \"throw\" failed: deliberate failure for testing."
-  },
   "integrations": {
     "title": "Integrations",
     "subtitle": "Bring the AI providers and social accounts your workflows depend on. Keys stay on your account and are reused across every run.",
