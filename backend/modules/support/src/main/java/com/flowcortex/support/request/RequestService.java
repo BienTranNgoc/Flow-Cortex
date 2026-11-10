@@ -2,8 +2,10 @@ package com.flowcortex.support.request;
 
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.support.config.SupportLifecycleSettings;
 import com.flowcortex.support.request.InboxQuery.InboxFilter;
 import com.flowcortex.support.request.RequestRepository.AssigneeGroup;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
@@ -33,6 +35,7 @@ import com.flowcortex.support.web.SupportProblemException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,7 +63,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Members file and follow their own requests; admins answer and move them. Every status change goes through the
  * lifecycle table and a conditional update, so of two concurrent changes exactly one wins. Attachments are copied
- * before the write's transaction opens; the write, its idempotency claim and its reply-mail event commit together.
+ * before the write's transaction opens; the write, its idempotency claim, its reply-mail due marker and the
+ * member's in-app notice commit together.
  */
 @Service
 class RequestService {
@@ -91,11 +95,12 @@ class RequestService {
     private final AttachmentService attachments;
     private final UserDirectory users;
     private final AdminPermissions adminPermissions;
+    private final Settings settings;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     RequestService(RequestRepository requests, IdempotencyGuard idempotency, ApplicationEventPublisher events,
-            AttachmentService attachments, UserDirectory users, AdminPermissions adminPermissions,
+            AttachmentService attachments, UserDirectory users, AdminPermissions adminPermissions, Settings settings,
             PlatformTransactionManager transactionManager, Clock clock) {
         this.requests = requests;
         this.idempotency = idempotency;
@@ -103,6 +108,7 @@ class RequestService {
         this.attachments = attachments;
         this.users = users;
         this.adminPermissions = adminPermissions;
+        this.settings = settings;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -255,10 +261,14 @@ class RequestService {
         if (Objects.equals(row.assigneeId(), assigneeId) && target == row.status()) {
             return adminView(row);
         }
-        if (!requests.assign(row.id(), row.status(), target, assigneeId, Instant.now(clock))) {
-            throw refusal(row, "request-state-changed",
-                    new LocalizedMessage("support.request.changedMeanwhile", row.number()));
-        }
+        transaction.executeWithoutResult(status -> {
+            Instant at = Instant.now(clock);
+            if (!requests.assign(row.id(), row.status(), target, assigneeId, at)) {
+                throw refusal(row, "request-state-changed",
+                        new LocalizedMessage("support.request.changedMeanwhile", row.number()));
+            }
+            notifyMember(row, RequestEvent.ADMIN_ASSIGN, target, null, at);
+        });
         LOG.info("support.request outcome=assigned request={} actor={} cleared={} picked_up={}", row.number(),
                 adminId, assigneeId == null, target != row.status());
         return adminView(requireById(row.id()));
@@ -297,8 +307,12 @@ class RequestService {
             return planned;
         }
         Move move = allowed(row, RequestEvent.ADMIN_ASSIGN);
-        return BulkAssignOutcome.written(
-                requests.assign(row.id(), row.status(), move.target(), assigneeId, Instant.now(clock)));
+        Instant at = Instant.now(clock);
+        boolean won = requests.assign(row.id(), row.status(), move.target(), assigneeId, at);
+        if (won) {
+            notifyMember(row, RequestEvent.ADMIN_ASSIGN, move.target(), null, at);
+        }
+        return BulkAssignOutcome.written(won);
     }
 
     private void requireEligible(UUID assigneeId) {
@@ -351,6 +365,8 @@ class RequestService {
             return adminView(requestOfMessage(earlier.get()));
         }
         Move move = allowed(row, event);
+        Duration mailWindow = Duration.ofMinutes(settings.get(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES)
+                .effective());
         UUID messageId = UUID.randomUUID();
         List<StoredAttachment> kept = attachments.keep(adminId, row.id(), messageId, ids);
         Optional<UUID> winner = writeKeeping(kept, () -> {
@@ -362,8 +378,8 @@ class RequestService {
             requireMoved(row, move, Boolean.TRUE, at);
             requests.insertMessage(messageId, row.id(), "admin", adminId, text, at);
             requests.insertAttachments(messageId, kept, at);
-            events.publishEvent(new SupportReplyMailRequested(row.id(), messageId, row.requesterId(), row.number(),
-                    row.locale()));
+            requests.markReplyMailDue(row.id(), messageId, at.plus(mailWindow));
+            notifyMember(row, event, move.target(), messageId, at);
             LOG.info("support.request outcome=replied request={} actor=admin status={} attachments={}", row.number(),
                     move.target().value(), kept.size());
             return Optional.<UUID>empty();
@@ -393,7 +409,14 @@ class RequestService {
         if (!(transition instanceof Move move)) {
             return false;
         }
-        boolean moved = requests.closeSeenResolution(row.id(), move.closedReason(), cutoff, Instant.now(clock));
+        boolean moved = Boolean.TRUE.equals(transaction.execute(status -> {
+            Instant at = Instant.now(clock);
+            boolean closed = requests.closeSeenResolution(row.id(), move.closedReason(), cutoff, at);
+            if (closed) {
+                notifyMember(row, RequestEvent.AUTO_CLOSE, move.target(), null, at);
+            }
+            return closed;
+        }));
         if (moved) {
             LOG.info("support.request outcome=auto_closed request={}", row.number());
         }
@@ -421,10 +444,23 @@ class RequestService {
 
     private RequestRow change(RequestRow row, RequestEvent event, String outcome) {
         Move move = allowed(row, event);
-        requireMoved(row, move, null, Instant.now(clock));
+        transaction.executeWithoutResult(status -> {
+            Instant at = Instant.now(clock);
+            requireMoved(row, move, null, at);
+            notifyMember(row, event, move.target(), null, at);
+        });
         LOG.info("support.request outcome={} request={} from={} to={}", outcome, row.number(), row.status().value(),
                 move.target().value());
         return requireById(row.id());
+    }
+
+    /**
+     * Publishes the member's in-app notice for {@code event} inside the caller's transaction, so it exists exactly
+     * when the change committed.
+     */
+    private void notifyMember(RequestRow row, RequestEvent event, RequestStatus to, UUID messageId, Instant at) {
+        MemberNotices.plan(event, row.status(), to).ifPresent(notice -> events.publishEvent(MemberNotices.event(
+                notice, MemberNotices.idFor(row.id(), messageId, to, at), row.requesterId(), row.number())));
     }
 
     private Move allowed(RequestRow row, RequestEvent event) {

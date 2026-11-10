@@ -15,6 +15,11 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.notification.api.NotificationRequested;
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
+import com.flowcortex.support.config.SupportLifecycleSettings;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.ConversationMessageRow;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
@@ -39,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.LongStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -56,10 +62,17 @@ class RequestServiceTest {
     private final AttachmentService attachments = mock(AttachmentService.class);
     private final UserDirectory users = mock(UserDirectory.class);
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
+    private final Settings settings = mock(Settings.class);
     private final RequestService service = new RequestService(requests, idempotency, publisher, attachments, users,
-            adminPermissions, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
+            adminPermissions, settings, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
+
+    @BeforeEach
+    void replyMailWindowIsFifteenMinutes() {
+        when(settings.get(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES))
+                .thenReturn(new SettingRead<>(15, 15, SettingSource.STORED));
+    }
 
     @Test
     void aNewRequestIsTrimmedStoredWithItsFirstMessageAndShownNew() {
@@ -274,7 +287,7 @@ class RequestServiceTest {
     }
 
     @Test
-    void anAdminReplyMarksUnreadAndQueuesOneMail() {
+    void anAdminReplyMarksUnreadDuesTheMailAfterTheWindowAndRingsTheBellOnce() {
         UUID id = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.NEW)));
         when(requests.findById(id)).thenReturn(Optional.of(row(id, 12, RequestStatus.RESOLVED)));
@@ -285,15 +298,84 @@ class RequestServiceTest {
 
         assertThat(detail.status()).isEqualTo("resolved");
         assertThat(detail.requester().deleted()).isFalse();
-        ArgumentCaptor<SupportReplyMailRequested> mail = ArgumentCaptor.forClass(SupportReplyMailRequested.class);
-        verify(publisher).publishEvent(mail.capture());
-        assertThat(mail.getValue()).satisfies(event -> {
-            assertThat(event.requestId()).isEqualTo(id);
-            assertThat(event.recipientUserId()).isEqualTo(member);
-            assertThat(event.requestNumber()).isEqualTo(12);
-            assertThat(event.locale()).isEqualTo("en");
+        ArgumentCaptor<UUID> message = ArgumentCaptor.forClass(UUID.class);
+        verify(requests).insertMessage(message.capture(), eq(id), eq("admin"), eq(admin), eq("Đã xử lý"), eq(NOW));
+        verify(requests).markReplyMailDue(id, message.getValue(), NOW.plusSeconds(15 * 60));
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue()).satisfies(event -> {
+            assertThat(event.id()).isEqualTo(MemberNotices.idFor(id, message.getValue(), RequestStatus.RESOLVED, NOW));
+            assertThat(event.memberId()).isEqualTo(member);
+            assertThat(event.type()).isEqualTo("support_reply");
+            assertThat(event.titleCode()).isEqualTo("notification.support.reply.title");
+            assertThat(event.args()).containsExactly(12L);
+            assertThat(event.link()).isEqualTo("/?help=request-12");
         });
-        verify(requests).insertMessage(any(), eq(id), eq("admin"), eq(admin), eq("Đã xử lý"), eq(NOW));
+    }
+
+    @Test
+    void anAdminStatusChangeRingsItsNoticeAndAMemberChangeRingsNothing() {
+        UUID id = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.findById(id)).thenReturn(Optional.of(row(id, 12, RequestStatus.RESOLVED)));
+        when(requests.move(id, RequestStatus.IN_PROGRESS, RequestStatus.RESOLVED, null, null, NOW)).thenReturn(true);
+        when(requests.move(id, RequestStatus.IN_PROGRESS, RequestStatus.CLOSED, "cancelled", null, NOW))
+                .thenReturn(true);
+
+        service.setStatus(12, "resolved");
+        service.cancel(member, 12);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.resolved.title");
+        assertThat(bell.getValue().id()).isEqualTo(MemberNotices.idFor(id, null, RequestStatus.RESOLVED, NOW));
+    }
+
+    @Test
+    void aChangeThatLostTheRaceRingsNothing() {
+        UUID id = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(false);
+
+        assertProblem(() -> service.setStatus(12, "resolved"), HttpStatus.CONFLICT, "request-state-changed");
+
+        verify(publisher, never()).publishEvent(any(NotificationRequested.class));
+    }
+
+    @Test
+    void aPickUpRingsTheInProgressNoticeAndAnAssignmentThatKeepsTheStatusRingsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID fresh = UUID.randomUUID();
+        UUID open = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(row(fresh, 30, RequestStatus.NEW)));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS)));
+        when(requests.findById(any())).thenAnswer(call -> Optional.of(row(call.getArgument(0), 30,
+                RequestStatus.IN_PROGRESS, member, linh)));
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(true);
+
+        service.assign(admin, 30, linh);
+        service.assign(admin, 31, linh);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.inProgress.title");
+        assertThat(bell.getValue().id()).isEqualTo(MemberNotices.idFor(fresh, null, RequestStatus.IN_PROGRESS, NOW));
+    }
+
+    @Test
+    void anAutoCloseRingsTheClosedNoticeOnlyWhenItWon() {
+        RequestRow resolved = row(UUID.randomUUID(), 12, RequestStatus.RESOLVED);
+        Instant cutoff = NOW.minusSeconds(7 * 24 * 3600);
+        when(requests.closeSeenResolution(resolved.id(), "auto", cutoff, NOW)).thenReturn(true, false);
+
+        service.autoClose(resolved, cutoff);
+        service.autoClose(resolved, cutoff);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.closed.title");
     }
 
     @Test

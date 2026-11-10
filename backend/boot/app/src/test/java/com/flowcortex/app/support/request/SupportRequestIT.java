@@ -7,7 +7,10 @@ import static org.awaitility.Awaitility.await;
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.app.MailParts;
 import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
-import com.flowcortex.support.request.SupportReplyMailRequested;
+import com.flowcortex.notification.api.NotificationRequested;
+import com.flowcortex.settings.api.Settings;
+import com.flowcortex.support.config.SupportLifecycleSettings;
+import com.flowcortex.support.request.ReplyMailSweep;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import jakarta.mail.MessagingException;
@@ -65,7 +68,8 @@ import software.amazon.awssdk.services.s3.model.Tag;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.support.enabled=true",
         "flowcortex.media.upload.content-check.enabled=true",
-        "flowcortex.support.retention.interval=PT24H"})
+        "flowcortex.support.retention.interval=PT24H",
+        "flowcortex.support.reply-mail.sweep-interval=PT24H"})
 @AutoConfigureTestRestTemplate
 @Import(SupportRequestIT.Mail.class)
 @ExtendWith(OutputCaptureExtension.class)
@@ -97,6 +101,12 @@ class SupportRequestIT extends AbstractPostgresBootTest {
 
     @Autowired
     private FailedPublicationResubmitter resubmitter;
+
+    @Autowired
+    private ReplyMailSweep sweep;
+
+    @Autowired
+    private Settings settings;
 
     private UserView admin;
     private String adminToken;
@@ -171,6 +181,8 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         jdbcTemplate.update("DELETE FROM support_request");
         jdbcTemplate.update("DELETE FROM support_idempotency");
         jdbcTemplate.update("DELETE FROM event_publication WHERE listener_id = ?", REPLY_MAIL);
+        jdbcTemplate.update("DELETE FROM app_setting WHERE key LIKE 'support.reply_mail.%'");
+        jdbcTemplate.update("DELETE FROM app_setting_change WHERE key LIKE 'support.reply_mail.%'");
         mail.reset();
         admin = userService.createInitialAdmin(uniqueEmail("req-admin"), "password123", "Admin");
         adminToken = login(admin.email());
@@ -179,6 +191,8 @@ class SupportRequestIT extends AbstractPostgresBootTest {
     @AfterEach
     void resetMail() {
         mail.reset();
+        jdbcTemplate.update("DELETE FROM app_setting WHERE key LIKE 'support.reply_mail.%'");
+        jdbcTemplate.update("DELETE FROM app_setting_change WHERE key LIKE 'support.reply_mail.%'");
     }
 
     @Test
@@ -419,10 +433,14 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         long number = file(token, "credit").number();
 
         adminReply(number, "Đã kiểm tra.", "waiting_member");
+        assertThat(replyMailDueAt(number)).isNotNull();
+        assertThat(mail.attempts()).isZero();
+        sweep.run();
         awaitMailsSentTo(member, 1);
         awaitPublications(0);
         resubmitter.run();
 
+        assertThat(replyMailDueAt(number)).isNull();
         assertThat(mail.attempts()).isEqualTo(1);
         assertThat(mail.sentTo(member.email())).singleElement()
                 .satisfies(body -> assertThat(body).startsWith("Xin chào,")
@@ -443,6 +461,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
                 headers), DetailView.class).getBody().number();
 
         adminReply(number, "Checked.", "waiting_member");
+        sweep.run();
         awaitMailsSentTo(member, 1);
 
         assertThat(jdbcTemplate.queryForObject("SELECT locale FROM support_request WHERE number = ?", String.class,
@@ -460,6 +479,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         mail.failNext(6);
 
         adminReply(number, "Bạn xem lại giúp.", "waiting_member");
+        sweep.run();
         awaitFailedAttempt(1);
         for (long minutes : new long[] {1, 5, 15, 60, 240}) {
             retryAfter(Duration.ofMinutes(minutes), true);
@@ -473,7 +493,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
                 Long.class)).isEqualTo(1);
         assertThat(output.getAll().lines()
                 .filter(line -> line.contains("support.reply.mail outcome=failed request=" + number
-                        + " error=MailSendException")).count()).isEqualTo(6);
+                        + " error=send_failed")).count()).isEqualTo(6);
         assertThat(output.getAll()).contains("outbox outcome=gave_up").doesNotContain(member.email());
     }
 
@@ -484,6 +504,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         mail.failNext(2);
 
         adminReply(number, "Đã xử lý.", "resolved");
+        sweep.run();
         awaitFailedAttempt(1);
         retryAfter(Duration.ofMinutes(1), true);
         retryAfter(Duration.ofMinutes(5), false);
@@ -496,20 +517,139 @@ class SupportRequestIT extends AbstractPostgresBootTest {
     }
 
     @Test
-    void aReplyWhoseTransactionRollsBackLeavesNoPublicationAndSendsNoMail() {
+    void aReplyWhoseTransactionRollsBackLeavesNoDueMarkNoPublicationAndNoNotification() {
         UserView member = member("req-mail-rollback");
-        SupportReplyMailRequested event = new SupportReplyMailRequested(UUID.randomUUID(), UUID.randomUUID(),
-                member.id(), 4242, "vi");
+        long number = file(login(member.email()), "credit").number();
+        UUID requestId = jdbcTemplate.queryForObject("SELECT id FROM support_request WHERE number = ?", UUID.class,
+                number);
+        UUID message = UUID.randomUUID();
+        NotificationRequested bell = new NotificationRequested(UUID.randomUUID(), member.id(), "support_reply",
+                "notification.support.reply.title", "notification.support.reply.body", List.of(number),
+                "/?help=request-" + number);
 
         assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            publisher.publishEvent(event);
+            jdbcTemplate.update("UPDATE support_request SET reply_mail_due_at = now(), reply_mail_message_id = ? "
+                    + "WHERE id = ?", message, requestId);
+            publisher.publishEvent(bell);
             throw new IllegalStateException("rolled back");
         })).isInstanceOf(IllegalStateException.class);
 
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication WHERE listener_id = ? "
-                + "AND serialized_event LIKE ?", Long.class, REPLY_MAIL, "%" + event.requestId() + "%")).isZero();
+        assertThat(replyMailDueAt(number)).isNull();
+        sweep.run();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication WHERE serialized_event LIKE ?",
+                Long.class, "%" + bell.id() + "%")).isZero();
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            assertThat(mail.attempts()).isZero();
+            assertThat(supportNotices(member)).isEmpty();
+        });
+    }
+
+    @Test
+    void twoRepliesInsideTheWindowSendOneMail() {
+        settings.set(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES, 15, UUID.randomUUID());
+        UserView member = member("req-mail-window");
+        long number = file(login(member.email()), "credit").number();
+
+        Instant before = Instant.now();
+        adminReply(number, "Một.", "waiting_member");
+        UUID first = replyMailMessage(number);
+        adminReply(number, "Hai.", "waiting_member");
+
+        assertThat(replyMailMessage(number)).isNotEqualTo(first);
+        assertThat(replyMailDueAt(number).toInstant()).isBetween(before.plus(Duration.ofMinutes(15)),
+                Instant.now().plus(Duration.ofMinutes(15)));
+        sweep.run();
         await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
                 .untilAsserted(() -> assertThat(mail.attempts()).isZero());
+
+        jdbcTemplate.update("UPDATE support_request SET reply_mail_due_at = now() - interval '1 second' "
+                + "WHERE number = ?", number);
+        sweep.run();
+        awaitMailsSentTo(member, 1);
+        awaitPublications(0);
+        sweep.run();
+
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(mail.attempts()).isEqualTo(1));
+        assertThat(replyMailDueAt(number)).isNull();
+    }
+
+    @Test
+    void aReplyBetweenReadAndClaimKeepsTheNewerDueTime() throws Exception {
+        UserView member = member("req-mail-race");
+        long number = file(login(member.email()), "credit").number();
+        adminReply(number, "Một.", "waiting_member");
+        jdbcTemplate.update("UPDATE support_request SET reply_mail_due_at = now() - interval '1 minute' "
+                + "WHERE number = ?", number);
+        UUID newerMessage = UUID.randomUUID();
+        AtomicReference<CompletableFuture<Void>> running = new AtomicReference<>();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            jdbcTemplate.queryForObject("SELECT id FROM support_request WHERE number = ? FOR UPDATE", UUID.class,
+                    number);
+            running.set(CompletableFuture.runAsync(sweep::run));
+            awaitBlockedUpdates(1);
+            jdbcTemplate.update("UPDATE support_request SET reply_mail_due_at = now() + interval '15 minutes', "
+                    + "reply_mail_message_id = ? WHERE number = ?", newerMessage, number);
+        });
+        running.get().get(10, TimeUnit.SECONDS);
+
+        assertThat(replyMailDueAt(number)).isNotNull();
+        assertThat(replyMailMessage(number)).isEqualTo(newerMessage);
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(mail.attempts()).isZero());
+    }
+
+    @Test
+    void withReplyMailOffDueMailsWaitAndGoOutWhenOn() {
+        UserView member = member("req-mail-off");
+        long number = file(login(member.email()), "credit").number();
+        settings.set(SupportLifecycleSettings.REPLY_MAIL_ENABLED, false, UUID.randomUUID());
+
+        adminReply(number, "Đã kiểm tra.", "waiting_member");
+        sweep.run();
+
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(mail.attempts()).isZero());
+        assertThat(replyMailDueAt(number)).isNotNull();
+
+        settings.set(SupportLifecycleSettings.REPLY_MAIL_ENABLED, true, UUID.randomUUID());
+        sweep.run();
+        awaitMailsSentTo(member, 1);
+        assertThat(replyMailDueAt(number)).isNull();
+    }
+
+    @Test
+    void aDueMarkWhoseMessageIsGoneIsClearedWithoutMail(CapturedOutput output) {
+        UserView member = member("req-mail-gone");
+        long number = file(login(member.email()), "credit").number();
+        jdbcTemplate.update("UPDATE support_request SET reply_mail_due_at = now() - interval '1 minute', "
+                + "reply_mail_message_id = ? WHERE number = ?", UUID.randomUUID(), number);
+
+        sweep.run();
+
+        assertThat(replyMailDueAt(number)).isNull();
+        assertThat(output.getOut()).contains("support.reply.mail.sweep outcome=message_gone request=" + number)
+                .doesNotContain(member.email());
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(mail.attempts()).isZero());
+    }
+
+    @Test
+    void aReplyThatResolvesRingsOnce() {
+        UserView member = member("req-bell");
+        long number = file(login(member.email()), "credit").number();
+
+        adminReply(number, "Đã giải quyết.", "resolved");
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(supportNotices(member))
+                .singleElement().satisfies(notice -> {
+                    assertThat(notice).containsEntry("type", "support_reply")
+                            .containsEntry("title_code", "notification.support.reply.title")
+                            .containsEntry("link", "/?help=request-" + number);
+                }));
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(supportNotices(member)).hasSize(1));
     }
 
     @Test
@@ -802,6 +942,22 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         if (failsAgain) {
             awaitFailedAttempt(before + 1);
         }
+    }
+
+    private Timestamp replyMailDueAt(long number) {
+        return jdbcTemplate.queryForObject("SELECT reply_mail_due_at FROM support_request WHERE number = ?",
+                Timestamp.class, number);
+    }
+
+    private UUID replyMailMessage(long number) {
+        return jdbcTemplate.queryForObject("SELECT reply_mail_message_id FROM support_request WHERE number = ?",
+                UUID.class, number);
+    }
+
+    /** The support bells a member holds; the welcome notice every new member gets is not one of them. */
+    private List<Map<String, Object>> supportNotices(UserView member) {
+        return jdbcTemplate.queryForList("SELECT type, title_code, link FROM notification WHERE user_id = ? "
+                + "AND type LIKE 'support\\_%'", member.id());
     }
 
     private Timestamp seenAt(long number) {

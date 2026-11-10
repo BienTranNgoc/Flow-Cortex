@@ -65,6 +65,13 @@ class RequestRepository {
     record AssigneeGroup(UUID id, long count) {
     }
 
+    record DueReplyMail(UUID id, Instant dueAt) {
+    }
+
+    /** The reply mail a claim took over from the request row. */
+    record ClaimedReplyMail(UUID requestId, long number, UUID requesterId, String locale, UUID messageId) {
+    }
+
     /** People shown in the assignee counts. */
     static final int FACET_PEOPLE = 50;
 
@@ -221,6 +228,41 @@ class RequestRepository {
                 + "WHERE id = :id AND status = 'resolved' AND resolved_seen_at <= :cutoff", new MapSqlParameterSource()
                 .addValue("reason", closedReason).addValue("now", at).addValue("id", id)
                 .addValue("cutoff", Timestamp.from(cutoff))) == 1;
+    }
+
+    /**
+     * Notes that the request's member is to be mailed about {@code messageId} at {@code dueAt}; a later reply
+     * overwrites both, so the timer restarts and the mail links to the newest reply.
+     */
+    void markReplyMailDue(UUID id, UUID messageId, Instant dueAt) {
+        jdbc.update("UPDATE support_request SET reply_mail_due_at = :due, reply_mail_message_id = :message "
+                + "WHERE id = :id", new MapSqlParameterSource().addValue("due", Timestamp.from(dueAt))
+                .addValue("message", messageId).addValue("id", id));
+    }
+
+    /** At most {@code limit} requests whose reply mail is due at or before {@code now}, earliest first. */
+    List<DueReplyMail> dueReplyMails(Instant now, int limit) {
+        return jdbc.query("SELECT id, reply_mail_due_at FROM support_request WHERE reply_mail_due_at <= :now "
+                + "ORDER BY reply_mail_due_at, number LIMIT :limit",
+                new MapSqlParameterSource("now", Timestamp.from(now)).addValue("limit", limit),
+                (rs, n) -> new DueReplyMail(rs.getObject("id", UUID.class), instant(rs, "reply_mail_due_at")));
+    }
+
+    /**
+     * Clears the due marker only while it still holds {@code dueAt}: a reply that arrived after the read moved it,
+     * so this claim loses and the newer time stands. The message id is read from the row before it is cleared,
+     * because RETURNING would show the cleared value.
+     * @return what the marker held, or empty when the claim lost
+     */
+    Optional<ClaimedReplyMail> claimReplyMail(UUID id, Instant dueAt) {
+        return jdbc.query("UPDATE support_request r SET reply_mail_due_at = NULL, reply_mail_message_id = NULL "
+                + "FROM (SELECT id, reply_mail_message_id FROM support_request "
+                + "WHERE id = :id AND reply_mail_due_at = :due FOR UPDATE) held WHERE r.id = held.id "
+                + "RETURNING r.number, r.requester_id, r.locale, held.reply_mail_message_id",
+                new MapSqlParameterSource("id", id).addValue("due", Timestamp.from(dueAt)),
+                (rs, n) -> new ClaimedReplyMail(id, rs.getLong("number"), rs.getObject("requester_id", UUID.class),
+                        rs.getString("locale"), rs.getObject("reply_mail_message_id", UUID.class)))
+                .stream().findFirst();
     }
 
     /** Clears the unread mark; the first read of a resolution starts its close clock. */
