@@ -1,4 +1,4 @@
-import { ApiError, getToken, setToken, type ProblemDetail } from '@flow-cortex/api-client';
+import { ApiError, getToken, sessionFetch, type ProblemDetail } from '@flow-cortex/api-client';
 
 export interface CsvDownload {
   fileName: string;
@@ -31,15 +31,14 @@ async function problemOf(response: Response): Promise<ProblemDetail | undefined>
 
 /**
  * Fetches a CSV export with the caller's bearer token and saves it through a temporary link.
- * Throws {@link ApiError} for a non-2xx answer; a 401 clears the token like the generated client does.
+ * Throws {@link ApiError} for a non-2xx answer; a 401 goes through the shared refresh-and-replay first.
  */
 export async function downloadCsv(url: string): Promise<CsvDownload> {
   const token = getToken();
-  const response = await fetch(url, {
+  const response = await sessionFetch(url, {
     headers: { Accept: 'text/csv', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
   if (!response.ok) {
-    if (response.status === 401) setToken(null);
     throw new ApiError(response.status, await problemOf(response));
   }
   const blob = await response.blob();

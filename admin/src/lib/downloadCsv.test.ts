@@ -1,4 +1,4 @@
-import { ApiError, setToken } from '@flow-cortex/api-client';
+import { ApiError, getToken, setToken } from '@flow-cortex/api-client';
 import { downloadCsv } from './downloadCsv';
 
 function stubFetch(response: Response) {
@@ -31,9 +31,10 @@ describe('downloadCsv', () => {
     const result = await downloadCsv('/api/v1/admin/runs/export?status=error');
 
     expect(result).toEqual({ fileName: 'runs-20261108.csv', total: 1500 });
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/admin/runs/export?status=error', {
-      headers: { Accept: 'text/csv', Authorization: 'Bearer csv-token' },
-    });
+    const [calledUrl, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(calledUrl).toBe('/api/v1/admin/runs/export?status=error');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer csv-token');
+    expect(new Headers(init.headers).get('Accept')).toBe('text/csv');
     expect(click).toHaveBeenCalledTimes(1);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:csv');
     expect(document.querySelector('a[download]')).toBeNull();
@@ -46,13 +47,42 @@ describe('downloadCsv', () => {
     expect(await downloadCsv('/x')).toEqual({ fileName: 'export.csv', total: undefined });
   });
 
-  it('throws the problem of a refused export and clears the token on a 401', async () => {
+  it('throws the problem of a refused export', async () => {
     stubFetch(new Response(JSON.stringify({ status: 403, detail: 'Forbidden' }), { status: 403 }));
     await expect(downloadCsv('/x')).rejects.toMatchObject({ status: 403, message: 'Forbidden' });
+  });
 
-    stubFetch(new Response('', { status: 401 }));
+  it('refreshes an expired token on a 401 and downloads the file with the new one', async () => {
+    const authorizations: (string | null)[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (input === '/api/v1/auth/refresh') {
+          return new Response(JSON.stringify({ accessToken: 'fresh' }), { status: 200 });
+        }
+        const bearer = new Headers(init?.headers).get('Authorization');
+        authorizations.push(bearer);
+        return bearer === 'Bearer fresh'
+          ? new Response('a\r\n', { status: 200, headers: { 'Content-Disposition': 'attachment; filename="r.csv"' } })
+          : new Response('', { status: 401 });
+      }),
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    expect(await downloadCsv('/api/v1/admin/runs/export')).toEqual({ fileName: 'r.csv', total: undefined });
+    expect(authorizations).toEqual(['Bearer csv-token', 'Bearer fresh']);
+    expect(getToken()).toBe('fresh');
+  });
+
+  it('surfaces ApiError(401) when the refresh is refused', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 401 })),
+    );
+
     const error = await downloadCsv('/x').catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 401 });
+    expect(getToken()).toBeNull();
   });
 });
