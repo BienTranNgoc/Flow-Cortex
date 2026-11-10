@@ -70,6 +70,7 @@
         "providers": "Model Providers",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "settings": "Settings",
         "features": "Feature Switches",
         "auditLog": "Audit Log",
         "mediaJobs": "Media Jobs",

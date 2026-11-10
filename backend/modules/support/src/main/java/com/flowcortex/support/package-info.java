@@ -10,6 +10,7 @@
                 "user :: api",
                 "media :: api",
                 "llm :: api",
+                "settings :: api",
                 "shared :: web",
                 "shared :: security"
         }

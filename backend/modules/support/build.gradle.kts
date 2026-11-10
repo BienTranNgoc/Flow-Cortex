@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":modules:user"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:media"))
+    implementation(project(":modules:settings"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

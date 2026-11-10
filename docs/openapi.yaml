@@ -395,6 +395,65 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/settings/{key}:
+    put:
+      tags:
+      - admin-settings-controller
+      operationId: updateAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: setting.invalidValue (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-settings-controller
+      operationId: resetAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -2583,6 +2642,60 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SmsOutboxEntryResponse"
+  /api/v1/admin/settings:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettingList"
+  /api/v1/admin/settings/{key}/history:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettingHistory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminSettingChange"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/runs:
     get:
       tags:
@@ -2931,7 +3044,6 @@ components:
       - ceilingReachedToday
       - dailyCeiling
       - envEnabled
-      - updatedAt
     AdminSupportRequestStatusChange:
       type: object
       properties:
@@ -3228,6 +3340,90 @@ components:
       - status
       - title
       - updatedAt
+    AdminSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+      required:
+      - value
+    AdminSetting:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+        value:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        decidedValue:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - decidedValue
+      - group
+      - key
+      - source
+      - type
+      - value
     CreateWorkflowRequest:
       type: object
       properties:
@@ -4614,6 +4810,60 @@ components:
       - createdAt
       - id
       - phone
+    AdminSettingList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSetting"
+      required:
+      - items
+    AdminSettingChange:
+      type: object
+      properties:
+        previousValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        newValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        changedBy:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+    PageViewAdminSettingChange:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSettingChange"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     AdminRunResponse:
       type: object
       properties:
