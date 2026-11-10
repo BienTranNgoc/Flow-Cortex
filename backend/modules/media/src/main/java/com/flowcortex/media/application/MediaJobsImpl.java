@@ -348,6 +348,16 @@ class MediaJobsImpl implements MediaJobs {
         if (!properties.enabled()) {
             throw new MediaStoreUnavailableException("Media is switched off; no Drive file is kept", null);
         }
+        try {
+            return keepRegisteredDriveFile(ownerId, uploadId, contentType, spaceId, itemId);
+        } catch (SdkException e) {
+            LOG.warn("Drive file not kept: upload={} space={} item={}", uploadId, spaceId, itemId, e);
+            throw new MediaStoreUnavailableException("Drive file not kept: the object store did not answer", e);
+        }
+    }
+
+    private StoredDriveFile keepRegisteredDriveFile(UUID ownerId, UUID uploadId, String contentType, UUID spaceId,
+            UUID itemId) {
         MediaAsset asset = registerUpload(UploadPurpose.DRIVE_ITEM, ownerId, uploadId,
                 List.copyOf(purposes.mimeTypes(UploadPurpose.DRIVE_ITEM).keySet()), null);
         if (!asset.getKind().equals(contentType)) {

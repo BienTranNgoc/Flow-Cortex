@@ -6,6 +6,7 @@ import com.flowcortex.drive.domain.DriveItemRules.UpdateInput;
 import com.flowcortex.drive.domain.DriveRoles;
 import com.flowcortex.drive.domain.DriveRoles.ContentType;
 import com.flowcortex.drive.domain.ResultRules;
+import com.flowcortex.drive.item.DriveItemRepository.UploadUsage;
 import com.flowcortex.drive.web.DriveCaller.Caller;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJobs;
@@ -62,12 +63,15 @@ class DriveItemService {
     private final MediaJobs mediaJobs;
     private final RunResults runResults;
     private final Clock clock;
+    private final DriveProperties properties;
 
-    DriveItemService(DriveItemRepository repository, MediaJobs mediaJobs, RunResults runResults, Clock clock) {
+    DriveItemService(DriveItemRepository repository, MediaJobs mediaJobs, RunResults runResults, Clock clock,
+            DriveProperties properties) {
         this.repository = repository;
         this.mediaJobs = mediaJobs;
         this.runResults = runResults;
         this.clock = clock;
+        this.properties = properties;
     }
 
     DriveItemRow create(Caller caller, NewItem item) {
@@ -175,6 +179,10 @@ class DriveItemService {
         if (!mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
+        UploadUsage usage = repository.uploadUsage(caller.spaceId());
+        if (usage.items() + 1 > properties.maxItemsPerSpace() || usage.bytes() >= properties.maxBytesPerSpace()) {
+            throw quotaExceeded();
+        }
         UUID itemId = UUID.randomUUID();
         StoredDriveFile file;
         try {
@@ -188,11 +196,17 @@ class DriveItemService {
                 DriveItemRules.normalizeName(item.name()), item.contentType(), item.semanticRole(), null,
                 DriveItemRow.SOURCE_UPLOAD, file.bucket(), file.objectKey(), file.fileName(), file.mimeType(),
                 file.bytes(), null, null, clock.instant(), clock.instant());
+        boolean inserted;
         try {
-            repository.insert(row);
+            inserted = repository.insertUploadWithinQuota(row, properties.maxItemsPerSpace(),
+                    properties.maxBytesPerSpace());
         } catch (RuntimeException e) {
             releaseAfterFailedInsert(file);
             throw e;
+        }
+        if (!inserted) {
+            releaseAfterFailedInsert(file);
+            throw quotaExceeded();
         }
         confirmOrRemove(row, file);
         return row;
@@ -239,6 +253,10 @@ class DriveItemService {
 
     private static DriveValidationException runOutputInvalid() {
         return new DriveValidationException(Map.of(RUN_OUTPUT_FIELD, "drive.runOutput.invalid"));
+    }
+
+    private static DriveValidationException quotaExceeded() {
+        return new DriveValidationException(Map.of("uploadId", "drive.quotaExceeded"));
     }
 
     private static LocalizedStatusException storeUnavailable() {

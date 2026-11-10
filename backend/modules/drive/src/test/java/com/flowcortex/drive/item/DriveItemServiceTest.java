@@ -3,6 +3,7 @@ package com.flowcortex.drive.item;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.drive.item.DriveItemRepository.UploadUsage;
 import com.flowcortex.drive.item.DriveItemService.NewItem;
 import com.flowcortex.drive.web.DriveCaller.Caller;
 import com.flowcortex.media.api.MediaJobs;
@@ -46,7 +48,7 @@ class DriveItemServiceTest {
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final RunResults runResults = mock(RunResults.class);
     private final DriveItemService service = new DriveItemService(repository, mediaJobs, runResults,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC), new DriveProperties(10_000L, 3L));
 
     private final Caller caller = new Caller(UUID.randomUUID(), UUID.randomUUID());
 
@@ -54,6 +56,8 @@ class DriveItemServiceTest {
     void mediaIsOn() {
         when(mediaJobs.isEnabled()).thenReturn(true);
         when(mediaJobs.isDownloadable("flowcortex-media")).thenReturn(true);
+        when(repository.uploadUsage(any())).thenReturn(new UploadUsage(0, 0));
+        when(repository.insertUploadWithinQuota(any(), anyLong(), anyLong())).thenReturn(true);
     }
 
     private StoredDriveFile stored(UUID itemId) {
@@ -80,7 +84,7 @@ class DriveItemServiceTest {
 
         InOrder order = inOrder(mediaJobs, repository);
         order.verify(mediaJobs).keepDriveFile(caller.userId(), uploadId, "image", caller.spaceId(), created.id());
-        order.verify(repository).insert(created);
+        order.verify(repository).insertUploadWithinQuota(created, 3L, 10_000L);
         order.verify(mediaJobs).confirmDriveFile(stored(created.id()));
         assertThat(created.source()).isEqualTo("upload");
         assertThat(created.objectKey()).isEqualTo("drive/" + caller.spaceId() + "/" + created.id());
@@ -92,7 +96,7 @@ class DriveItemServiceTest {
     void aFailedInsertReleasesTheCopy() {
         when(mediaJobs.keepDriveFile(any(), any(), any(), any(), any())).thenAnswer(call -> stored(call.getArgument(4)));
         DataIntegrityViolationException failure = new DataIntegrityViolationException("boom");
-        doThrow(failure).when(repository).insert(any());
+        doThrow(failure).when(repository).insertUploadWithinQuota(any(), anyLong(), anyLong());
 
         assertThatThrownBy(() -> service.create(caller, upload(UUID.randomUUID()))).isSameAs(failure);
 
@@ -135,7 +139,35 @@ class DriveItemServiceTest {
 
         assertThatThrownBy(() -> service.create(caller, upload(UUID.randomUUID()))).isSameAs(refusal);
 
-        verify(repository, never()).insert(any());
+        verify(repository, never()).insertUploadWithinQuota(any(), anyLong(), anyLong());
+    }
+
+    @Test
+    void anUploadIntoAFullSpaceIsRefusedBeforeAnyCopy() {
+        for (UploadUsage full : List.of(new UploadUsage(3, 10), new UploadUsage(1, 10_000))) {
+            when(repository.uploadUsage(caller.spaceId())).thenReturn(full);
+
+            assertQuotaRefusal();
+        }
+
+        verify(mediaJobs, never()).keepDriveFile(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anUploadThatWouldPassTheCapAfterTheCopyIsRefusedAndTheCopyReleased() {
+        when(mediaJobs.keepDriveFile(any(), any(), any(), any(), any())).thenAnswer(call -> stored(call.getArgument(4)));
+        when(repository.insertUploadWithinQuota(any(), anyLong(), anyLong())).thenReturn(false);
+
+        assertQuotaRefusal();
+
+        verify(mediaJobs).releaseDriveFile(any(StoredDriveFile.class));
+        verify(mediaJobs, never()).confirmDriveFile(any());
+    }
+
+    private void assertQuotaRefusal() {
+        assertThatThrownBy(() -> service.create(caller, upload(UUID.randomUUID())))
+                .isInstanceOfSatisfying(DriveValidationException.class,
+                        e -> assertThat(e.errors()).containsEntry("uploadId", "drive.quotaExceeded"));
     }
 
     @Test

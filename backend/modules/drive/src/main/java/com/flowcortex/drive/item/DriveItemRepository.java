@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /** {@code drive_item} rows; every read and write is scoped to one space, so another space's id is simply absent. */
 @Repository
@@ -27,6 +28,10 @@ class DriveItemRepository {
             rs.getString("file_name"), rs.getString("mime_type"), rs.getObject("size_bytes", Long.class),
             rs.getObject("run_id", UUID.class), rs.getObject("step_order", Integer.class),
             rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+
+    /** What a space's uploaded files already hold. */
+    record UploadUsage(long items, long bytes) {
+    }
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -54,6 +59,30 @@ class DriveItemRepository {
                         .addValue("step", row.stepOrder())
                         .addValue("created", Timestamp.from(row.createdAt()))
                         .addValue("updated", Timestamp.from(row.updatedAt())));
+    }
+
+    /** Count and bytes of the space's uploaded files; run outputs point at run objects and add no storage. */
+    UploadUsage uploadUsage(UUID spaceId) {
+        return jdbc.queryForObject("SELECT count(*) AS items, COALESCE(sum(size_bytes), 0) AS bytes FROM drive_item "
+                + "WHERE space_id = :space AND source = :source",
+                new MapSqlParameterSource("space", spaceId).addValue("source", DriveItemRow.SOURCE_UPLOAD),
+                (rs, i) -> new UploadUsage(rs.getLong("items"), rs.getLong("bytes")));
+    }
+
+    /**
+     * Inserts an uploaded file's row unless the space would pass a cap. The check and the insert run under a
+     * per-space advisory lock, so parallel creates cannot all pass the check; returns whether it inserted.
+     */
+    @Transactional
+    boolean insertUploadWithinQuota(DriveItemRow row, long maxItems, long maxBytes) {
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtext(:space))",
+                new MapSqlParameterSource("space", row.spaceId().toString()));
+        UploadUsage usage = uploadUsage(row.spaceId());
+        if (usage.items() + 1 > maxItems || usage.bytes() + row.sizeBytes() > maxBytes) {
+            return false;
+        }
+        insert(row);
+        return true;
     }
 
     /** Newest first; a {@code null} {@code role} or {@code contentType} does not filter. */

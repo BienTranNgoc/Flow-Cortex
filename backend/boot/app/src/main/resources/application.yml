@@ -285,6 +285,10 @@ flowcortex:
   # Personal spaces: off means the session space answers 503; spaces are still provisioned at activation.
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
+  # Uploaded Drive files never expire, so each personal space is capped (run-output items add no storage).
+  drive:
+    max-bytes-per-space: ${FLOWCORTEX_DRIVE_MAX_BYTES_PER_SPACE:5368709120}
+    max-items-per-space: ${FLOWCORTEX_DRIVE_MAX_ITEMS_PER_SPACE:1000}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
   # Every registered step type needs a cost here, or startup fails.
   credits:

@@ -113,7 +113,7 @@ public interface MediaJobs {
      * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of another purpose or
      *         owner, too large, not the type it was declared as or over the pixel cap; on field
      *         {@code contentType} if its kind differs from {@code contentType}, before anything is copied
-     * @throws MediaStoreUnavailableException if media is switched off
+     * @throws MediaStoreUnavailableException if media is switched off or the object store does not answer
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     StoredDriveFile keepDriveFile(UUID ownerId, UUID uploadId, String contentType, UUID spaceId, UUID itemId);

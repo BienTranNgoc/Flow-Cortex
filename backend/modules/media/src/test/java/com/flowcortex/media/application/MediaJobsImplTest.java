@@ -58,6 +58,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
+import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
@@ -866,6 +868,40 @@ class MediaJobsImplTest {
             verify(store, never()).read(anyString(), anyString(), anyInt());
             verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
             verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void aDriveFileIsReportedUnavailableWhenTheObjectStoreDoesNotAnswer() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            SdkClientException outage = SdkClientException.create("connection refused");
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + uploadId)).thenThrow(outage);
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCause(outage);
+        });
+    }
+
+    @Test
+    void aDriveCopyThatTimesOutIsReportedUnavailable() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            ApiCallTimeoutException timeout = ApiCallTimeoutException.create(1000L);
+            doThrow(timeout).when(store).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCause(timeout);
         });
     }
 
