@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * {@code /api/v1/workflows/{id}/reviews} — the caller's single review ({@code mine}), the review list and summary,
@@ -126,11 +127,13 @@ class WorkflowReviewsController {
     }
 
     /**
-     * {@code rating} is a {@code Number} so Jackson cannot round 4.5 to 4; the rule that it is an integer from 1 to 5
-     * is the service's. {@code images} absent keeps the current images, {@code []} removes them.
+     * {@code rating} is read by {@link StrictRatingDeserializer}: only a JSON number reaches the service, with its exact
+     * decimal value, so 4.5 is never rounded to 4 and {@code "5"} is never read as 5; the rule that it is an integer
+     * from 1 to 5 is the service's. {@code images} absent keeps the current images, {@code []} removes them.
      */
     record ReviewRequest(
-            @Schema(type = "integer", minimum = "1", maximum = "5") Number rating,
+            @JsonDeserialize(using = StrictRatingDeserializer.class)
+            @Schema(type = "integer", minimum = "1", maximum = "5") BigDecimal rating,
             @Schema(maxLength = 5000, nullable = true) String body,
             @Schema(nullable = true) List<UUID> images) {
     }

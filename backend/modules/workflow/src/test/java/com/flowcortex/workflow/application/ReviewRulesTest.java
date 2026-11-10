@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.domain.ReviewReportReason;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -34,7 +35,10 @@ class ReviewRulesTest {
         assertRefused(() -> ReviewRules.rating(-1), "rating", "workflow.review.ratingInvalid");
         assertRefused(() -> ReviewRules.rating(4.5), "rating", "workflow.review.ratingInvalid");
         assertRefused(() -> ReviewRules.rating(null), "rating", "workflow.review.ratingInvalid");
-        assertRefused(() -> ReviewRules.rating(Double.NaN), "rating", "workflow.review.ratingInvalid");
+        assertThat(ReviewRules.rating(new BigDecimal("4.0"))).isEqualTo(4);
+        assertRefused(() -> ReviewRules.rating(new BigDecimal("4.0000000000000000001")), "rating",
+                "workflow.review.ratingInvalid");
+        assertRefused(() -> ReviewRules.rating(Double.NaN),"rating", "workflow.review.ratingInvalid");
         assertRefused(() -> ReviewRules.rating(Long.MAX_VALUE), "rating", "workflow.review.ratingInvalid");
     }
 

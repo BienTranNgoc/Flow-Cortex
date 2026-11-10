@@ -113,6 +113,10 @@ class WorkflowReviewEndpointsIT extends AbstractWorkflowHttpIT {
                 "{\"rating\":4,\"images\":[\"x\"]}"), "images");
         assertNamed(callJson(HttpMethod.PUT, WORKFLOWS + workflowId + "/reviews/mine", token,
                 "{\"rating\":\"yes\"}"), "rating");
+        for (String notANumber : List.of("\"5\"", "true", "[4]", "{}")) {
+            assertNamed(callJson(HttpMethod.PUT, WORKFLOWS + workflowId + "/reviews/mine", token,
+                    "{\"rating\":" + notANumber + "}"), "rating");
+        }
 
         assertThat(count("workflow_bookmark", workflowId)).isZero();
         assertThat(count("workflow_review", workflowId)).isZero();
@@ -206,6 +210,12 @@ class WorkflowReviewEndpointsIT extends AbstractWorkflowHttpIT {
             ResponseEntity<Map> refused = call(HttpMethod.PUT, path, benToken, Map.of("rating", bad));
             assertThat(refused.getStatusCode()).as(String.valueOf(bad)).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
             assertThat((Map<String, ?>) refused.getBody().get("errors")).containsKey("rating");
+        }
+        // A decimal that only becomes whole once read as a double must still be refused.
+        for (String bad : List.of("4.0000000000000000001", "null")) {
+            ResponseEntity<Map> refused = callJson(HttpMethod.PUT, path, benToken, "{\"rating\":" + bad + "}");
+            assertThat(refused.getStatusCode()).as(bad).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+            assertThat((Map<String, ?>) refused.getBody().get("errors")).as(bad).containsKey("rating");
         }
         assertThat(call(HttpMethod.PUT, path, benToken, Map.of("body", "no rating")).getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
