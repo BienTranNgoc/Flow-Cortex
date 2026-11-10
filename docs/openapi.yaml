@@ -770,6 +770,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/fork:
+    post:
+      tags:
+      - workflows-controller
+      operationId: forkWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
   /api/v1/users:
     get:
       tags:
@@ -1585,6 +1628,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/workflows/import:
+    post:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: importAdminWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportWorkflowRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "200":
+          description: The token had already produced this workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/import/review:
+    post:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: reviewAdminWorkflowImport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowArtifact"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: Content Too Large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -2707,6 +2822,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/workflows/{id}/export:
+    get:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: exportAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowArtifact"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/requests:
     get:
       tags:
@@ -3377,8 +3529,20 @@ components:
           - integer
           - "null"
           format: int32
+        allowFork:
+          type: boolean
+        forkCount:
+          type: integer
+          format: int32
+        forkedFromId:
+          type:
+          - string
+          - "null"
+          format: uuid
       required:
+      - allowFork
       - available
+      - forkCount
     WorkflowStepResponse:
       type: object
       properties:
@@ -4235,6 +4399,78 @@ components:
           type: string
       required:
       - status
+    ImportWorkflowRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        acknowledgeOutboundTargets:
+          type: boolean
+      required:
+      - token
+    WorkflowArtifact:
+      type: object
+      properties:
+        formatVersion:
+          type: integer
+          format: int32
+          maximum: 1
+          minimum: 1
+        exportedAt:
+          type: string
+          format: date-time
+        workflow:
+          $ref: "#/components/schemas/WorkflowArtifactWorkflow"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowArtifactStep"
+      required:
+      - exportedAt
+      - formatVersion
+      - steps
+      - workflow
+    WorkflowArtifactStep:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+          minimum: 1
+        name:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+        type:
+          type: string
+          maxLength: 50
+          minLength: 1
+        inputRef:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - config
+      - inputRef
+      - name
+      - stepOrder
+      - type
+    WorkflowArtifactWorkflow:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+      required:
+      - name
     AdminSupportRequestReply:
       type: object
       properties:
@@ -4270,6 +4506,8 @@ components:
           - draft
           - published
           pattern: draft|published
+        allowFork:
+          type: boolean
     RenameVersionRequest:
       type: object
       properties:

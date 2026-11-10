@@ -336,32 +336,18 @@ export interface WorkflowResponse {
   publishedVersionId?: string | null;
   /** @nullable */
   servedVersion?: number | null;
+  allowFork: boolean;
+  forkCount: number;
+  /** @nullable */
+  forkedFromId?: string | null;
 }
 
 export interface SaveVersionRequest {
-  /** @maxLength 200 */
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
   changelog?: string;
-}
-
-export interface RenameVersionRequest {
-  /** @maxLength 200 */
-  changelog: string;
-}
-
-export interface HotfixRequest {
-  /** @maxLength 200 */
-  note?: string;
-}
-
-export interface PublishedVersionRequest {
-  versionId?: string;
-}
-
-export interface PinVersionRequest {
-  /** @minimum 1 */
-  version: number;
-  /** @maxLength 200 */
-  reason?: string;
 }
 
 export type WorkflowVersionResponseSource =
@@ -390,106 +376,9 @@ export interface WorkflowVersionResponse {
   published: boolean;
 }
 
-export interface SnapshotStepResponse {
-  id: string;
-  stepOrder: number;
-  /** @nullable */
-  name?: string | null;
-  type: string;
-  /** @nullable */
-  inputRef?: string | null;
-  /** @nullable */
-  config?: string | null;
-}
-
-export interface SnapshotResponse {
-  name: string;
-  skeleton: boolean;
-  steps: SnapshotStepResponse[];
-}
-
-export interface WorkflowVersionDetailResponse {
-  version: WorkflowVersionResponse;
-  snapshot: SnapshotResponse;
-}
-
 export interface VersionSavedResponse {
   version: WorkflowVersionResponse;
   deduplicated: boolean;
-}
-
-export interface WorkflowVersionPageResponse {
-  items: WorkflowVersionResponse[];
-  /** @nullable */
-  nextBeforeVersion?: number | null;
-}
-
-export interface VersionPinResponse {
-  /** @nullable */
-  pinnedVersion?: number | null;
-  /** @nullable */
-  reason?: string | null;
-  /** @nullable */
-  pinnedAt?: string | null;
-}
-
-export interface DiffSideResponse {
-  ref: string;
-  /** @nullable */
-  version?: number | null;
-}
-
-export interface NameChangeResponse {
-  changed: boolean;
-  /** @nullable */
-  before?: string | null;
-  /** @nullable */
-  after?: string | null;
-}
-
-export type StepChangeResponseStatus =
-  (typeof StepChangeResponseStatus)[keyof typeof StepChangeResponseStatus];
-
-export const StepChangeResponseStatus = {
-  added: 'added',
-  removed: 'removed',
-  modified: 'modified',
-  moved: 'moved',
-} as const;
-
-/**
- * @nullable
- */
-export type StepChangeResponseBefore = { [key: string]: string | null } | null;
-
-/**
- * @nullable
- */
-export type StepChangeResponseAfter = { [key: string]: string | null } | null;
-
-export interface StepChangeResponse {
-  stepId: string;
-  status: StepChangeResponseStatus;
-  /** @nullable */
-  fromOrder?: number | null;
-  /** @nullable */
-  toOrder?: number | null;
-  /** @nullable */
-  name?: string | null;
-  type: string;
-  changedFields: string[];
-  /** @nullable */
-  before?: StepChangeResponseBefore;
-  /** @nullable */
-  after?: StepChangeResponseAfter;
-}
-
-export interface WorkflowVersionDiffResponse {
-  source: DiffSideResponse;
-  target: DiffSideResponse;
-  skeleton: boolean;
-  name: NameChangeResponse;
-  steps: StepChangeResponse[];
 }
 
 export interface CreateStepRequest {
@@ -587,6 +476,33 @@ export interface RunResponse {
   finishedAt?: string;
   steps?: RunStepResponse[];
   chargedCredits?: number;
+}
+
+export interface PinVersionRequest {
+  /** @minimum 1 */
+  version: number;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  reason?: string;
+}
+
+export interface VersionPinResponse {
+  /** @nullable */
+  pinnedVersion?: number | null;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  pinnedAt?: string | null;
+}
+
+export interface HotfixRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  note?: string;
 }
 
 export interface CreateUserRequest {
@@ -963,6 +879,53 @@ export interface ResetRequestedResponse {
   status: string;
 }
 
+export interface ImportWorkflowRequest {
+  /** @minLength 1 */
+  token: string;
+  acknowledgeOutboundTargets?: boolean;
+}
+
+export interface WorkflowArtifactWorkflow {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+}
+
+export interface WorkflowArtifactStep {
+  /** @minimum 1 */
+  stepOrder: number;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  name: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 50
+   */
+  type: string;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  inputRef: string | null;
+  /** @nullable */
+  config: string | null;
+}
+
+export interface WorkflowArtifact {
+  /**
+   * @minimum 1
+   * @maximum 1
+   */
+  formatVersion: number;
+  exportedAt: string;
+  workflow: WorkflowArtifactWorkflow;
+  steps: WorkflowArtifactStep[];
+}
+
 export type AdminSupportRequestReplyStatus =
   (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
 
@@ -999,6 +962,15 @@ export interface UpdateWorkflowRequest {
   shared?: boolean;
   /** @pattern draft|published */
   status?: UpdateWorkflowRequestStatus;
+  allowFork?: boolean;
+}
+
+export interface RenameVersionRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  changelog: string;
 }
 
 export interface UpdateStepRequest {
@@ -1013,6 +985,100 @@ export interface UpdateStepRequest {
    */
   inputRef?: string;
   config?: string;
+}
+
+export interface PublishedVersionRequest {
+  versionId?: string;
+}
+
+export interface WorkflowVersionPageResponse {
+  items: WorkflowVersionResponse[];
+  /** @nullable */
+  nextBeforeVersion?: number | null;
+}
+
+export interface SnapshotStepResponse {
+  id: string;
+  stepOrder: number;
+  /** @nullable */
+  name?: string | null;
+  type: string;
+  /** @nullable */
+  inputRef?: string | null;
+  /** @nullable */
+  config?: string | null;
+}
+
+export interface SnapshotResponse {
+  name: string;
+  skeleton: boolean;
+  steps: SnapshotStepResponse[];
+}
+
+export interface WorkflowVersionDetailResponse {
+  version: WorkflowVersionResponse;
+  snapshot: SnapshotResponse;
+}
+
+export interface DiffSideResponse {
+  ref: string;
+  /** @nullable */
+  version?: number | null;
+}
+
+export interface JsonNode {}
+
+export interface NameChangeResponse {
+  changed: boolean;
+  /** @nullable */
+  before?: string | null;
+  /** @nullable */
+  after?: string | null;
+}
+
+export type StepChangeResponseStatus =
+  (typeof StepChangeResponseStatus)[keyof typeof StepChangeResponseStatus];
+
+export const StepChangeResponseStatus = {
+  added: 'added',
+  removed: 'removed',
+  modified: 'modified',
+  moved: 'moved',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StepChangeResponseBefore = { [key: string]: JsonNode } | null;
+
+/**
+ * @nullable
+ */
+export type StepChangeResponseAfter = { [key: string]: JsonNode } | null;
+
+export interface StepChangeResponse {
+  stepId: string;
+  status: StepChangeResponseStatus;
+  /** @nullable */
+  fromOrder?: number | null;
+  /** @nullable */
+  toOrder?: number | null;
+  /** @nullable */
+  name?: string | null;
+  type: string;
+  changedFields: string[];
+  /** @nullable */
+  before?: StepChangeResponseBefore;
+  /** @nullable */
+  after?: StepChangeResponseAfter;
+}
+
+export interface WorkflowVersionDiffResponse {
+  source: DiffSideResponse;
+  target: DiffSideResponse;
+  skeleton: boolean;
+  name: NameChangeResponse;
+  steps: StepChangeResponse[];
 }
 
 export interface SupportSettings {
@@ -2121,6 +2187,219 @@ export const createWorkflow = async (
   });
 };
 
+export type listWorkflowVersionsResponse200 = {
+  data: WorkflowVersionPageResponse;
+  status: 200;
+};
+
+export type listWorkflowVersionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listWorkflowVersionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listWorkflowVersionsResponseSuccess = listWorkflowVersionsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowVersionsResponseError = (
+  listWorkflowVersionsResponse400 | listWorkflowVersionsResponse404
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowVersionsResponse =
+  listWorkflowVersionsResponseSuccess | listWorkflowVersionsResponseError;
+
+export const getListWorkflowVersionsUrl = (id: string, params?: ListWorkflowVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/versions?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/versions`;
+};
+
+export const listWorkflowVersions = async (
+  id: string,
+  params?: ListWorkflowVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowVersionsResponse> => {
+  return customFetch<listWorkflowVersionsResponse>(getListWorkflowVersionsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveWorkflowVersionResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type saveWorkflowVersionResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type saveWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type saveWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type saveWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type saveWorkflowVersionResponseSuccess = (
+  saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
+) & {
+  headers: Headers;
+};
+export type saveWorkflowVersionResponseError = (
+  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
+) & {
+  headers: Headers;
+};
+
+export type saveWorkflowVersionResponse =
+  saveWorkflowVersionResponseSuccess | saveWorkflowVersionResponseError;
+
+export const getSaveWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/versions`;
+};
+
+export const saveWorkflowVersion = async (
+  id: string,
+  saveVersionRequest?: SaveVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveWorkflowVersionResponse>(getSaveWorkflowVersionUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveVersionRequest),
+  });
+};
+
+export type rollbackWorkflowVersionResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type rollbackWorkflowVersionResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type rollbackWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type rollbackWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type rollbackWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type rollbackWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type rollbackWorkflowVersionResponseSuccess = (
+  rollbackWorkflowVersionResponse200 | rollbackWorkflowVersionResponse201
+) & {
+  headers: Headers;
+};
+export type rollbackWorkflowVersionResponseError = (
+  | rollbackWorkflowVersionResponse400
+  | rollbackWorkflowVersionResponse403
+  | rollbackWorkflowVersionResponse404
+  | rollbackWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type rollbackWorkflowVersionResponse =
+  rollbackWorkflowVersionResponseSuccess | rollbackWorkflowVersionResponseError;
+
+export const getRollbackWorkflowVersionUrl = (id: string, version: number) => {
+  return `/api/v1/workflows/${id}/versions/${version}/rollback`;
+};
+
+export const rollbackWorkflowVersion = async (
+  id: string,
+  version: number,
+  saveVersionRequest?: SaveVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<rollbackWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<rollbackWorkflowVersionResponse>(getRollbackWorkflowVersionUrl(id, version), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveVersionRequest),
+  });
+};
+
 export type addStepResponse201 = {
   data: WorkflowStepResponse;
   status: 201;
@@ -2236,6 +2515,269 @@ export const startRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRunRequest),
+  });
+};
+
+export type getWorkflowVersionPinResponse200 = {
+  data: VersionPinResponse;
+  status: 200;
+};
+
+export type getWorkflowVersionPinResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowVersionPinResponseSuccess = getWorkflowVersionPinResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowVersionPinResponseError = getWorkflowVersionPinResponse404 & {
+  headers: Headers;
+};
+
+export type getWorkflowVersionPinResponse =
+  getWorkflowVersionPinResponseSuccess | getWorkflowVersionPinResponseError;
+
+export const getGetWorkflowVersionPinUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const getWorkflowVersionPin = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowVersionPinResponse> => {
+  return customFetch<getWorkflowVersionPinResponse>(getGetWorkflowVersionPinUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type pinWorkflowVersionResponse200 = {
+  data: VersionPinResponse;
+  status: 200;
+};
+
+export type pinWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type pinWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pinWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
+  headers: Headers;
+};
+export type pinWorkflowVersionResponseError = (
+  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type pinWorkflowVersionResponse =
+  pinWorkflowVersionResponseSuccess | pinWorkflowVersionResponseError;
+
+export const getPinWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const pinWorkflowVersion = async (
+  id: string,
+  pinVersionRequest: PinVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<pinWorkflowVersionResponse>(getPinWorkflowVersionUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pinVersionRequest),
+  });
+};
+
+export type unpinWorkflowVersionResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type unpinWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
+  headers: Headers;
+};
+export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
+  headers: Headers;
+};
+
+export type unpinWorkflowVersionResponse =
+  unpinWorkflowVersionResponseSuccess | unpinWorkflowVersionResponseError;
+
+export const getUnpinWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const unpinWorkflowVersion = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<unpinWorkflowVersionResponse> => {
+  return customFetch<unpinWorkflowVersionResponse>(getUnpinWorkflowVersionUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type hotfixWorkflowResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type hotfixWorkflowResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type hotfixWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type hotfixWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type hotfixWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type hotfixWorkflowResponseSuccess = (
+  hotfixWorkflowResponse200 | hotfixWorkflowResponse201
+) & {
+  headers: Headers;
+};
+export type hotfixWorkflowResponseError = (
+  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
+) & {
+  headers: Headers;
+};
+
+export type hotfixWorkflowResponse = hotfixWorkflowResponseSuccess | hotfixWorkflowResponseError;
+
+export const getHotfixWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/hotfix`;
+};
+
+export const hotfixWorkflow = async (
+  id: string,
+  hotfixRequest?: HotfixRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<hotfixWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<hotfixWorkflowResponse>(getHotfixWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(hotfixRequest),
+  });
+};
+
+export type forkWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type forkWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type forkWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type forkWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type forkWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type forkWorkflowResponseSuccess = forkWorkflowResponse201 & {
+  headers: Headers;
+};
+export type forkWorkflowResponseError = (
+  | forkWorkflowResponse403
+  | forkWorkflowResponse404
+  | forkWorkflowResponse409
+  | forkWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type forkWorkflowResponse = forkWorkflowResponseSuccess | forkWorkflowResponseError;
+
+export const getForkWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/fork`;
+};
+
+export const forkWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<forkWorkflowResponse> => {
+  return customFetch<forkWorkflowResponse>(getForkWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -3703,6 +4245,141 @@ export const addAdminWorkflowStep = async (
   });
 };
 
+export type importAdminWorkflowResponse200 = {
+  data: WorkflowResponse;
+  status: 200;
+};
+
+export type importAdminWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type importAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type importAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type importAdminWorkflowResponseSuccess = (
+  importAdminWorkflowResponse200 | importAdminWorkflowResponse201
+) & {
+  headers: Headers;
+};
+export type importAdminWorkflowResponseError = (
+  importAdminWorkflowResponse400 | importAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type importAdminWorkflowResponse =
+  importAdminWorkflowResponseSuccess | importAdminWorkflowResponseError;
+
+export const getImportAdminWorkflowUrl = () => {
+  return `/api/v1/admin/workflows/import`;
+};
+
+export const importAdminWorkflow = async (
+  importWorkflowRequest: ImportWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<importAdminWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<importAdminWorkflowResponse>(getImportAdminWorkflowUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importWorkflowRequest),
+  });
+};
+
+export type reviewAdminWorkflowImportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reviewAdminWorkflowImportResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reviewAdminWorkflowImportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reviewAdminWorkflowImportResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reviewAdminWorkflowImportResponseError = (
+  | reviewAdminWorkflowImportResponse400
+  | reviewAdminWorkflowImportResponse413
+  | reviewAdminWorkflowImportResponse422
+  | reviewAdminWorkflowImportResponse429
+) & {
+  headers: Headers;
+};
+
+export type reviewAdminWorkflowImportResponse = reviewAdminWorkflowImportResponseError;
+
+export const getReviewAdminWorkflowImportUrl = () => {
+  return `/api/v1/admin/workflows/import/review`;
+};
+
+export const reviewAdminWorkflowImport = async (
+  workflowArtifact: WorkflowArtifact,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reviewAdminWorkflowImportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reviewAdminWorkflowImportResponse>(getReviewAdminWorkflowImportUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(workflowArtifact),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -4170,200 +4847,6 @@ export const updateWorkflow = async (
   });
 };
 
-export type updateStepResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type updateStepResponse403 = {
-  data: ProblemDetail;
-  status: 403;
-};
-
-export type updateStepResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type updateStepResponse422 = {
-  data: ProblemDetail;
-  status: 422;
-};
-
-export type updateStepResponseError = (
-  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
-) & {
-  headers: Headers;
-};
-
-export type updateStepResponse = updateStepResponseError;
-
-export const getUpdateStepUrl = (id: string, stepId: string) => {
-  return `/api/v1/workflows/${id}/steps/${stepId}`;
-};
-
-export const updateStep = async (
-  id: string,
-  stepId: string,
-  updateStepRequest: UpdateStepRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<updateStepResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<updateStepResponse>(getUpdateStepUrl(id, stepId), {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(updateStepRequest),
-  });
-};
-
-export type listWorkflowVersionsResponse200 = {
-  data: WorkflowVersionPageResponse;
-  status: 200;
-};
-
-export type listWorkflowVersionsResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type listWorkflowVersionsResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type listWorkflowVersionsResponseSuccess = listWorkflowVersionsResponse200 & {
-  headers: Headers;
-};
-export type listWorkflowVersionsResponseError = (
-  listWorkflowVersionsResponse400 | listWorkflowVersionsResponse404
-) & {
-  headers: Headers;
-};
-
-export type listWorkflowVersionsResponse =
-  listWorkflowVersionsResponseSuccess | listWorkflowVersionsResponseError;
-
-export const getListWorkflowVersionsUrl = (id: string, params?: ListWorkflowVersionsParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/v1/workflows/${id}/versions?${stringifiedParams}`
-    : `/api/v1/workflows/${id}/versions`;
-};
-
-export const listWorkflowVersions = async (
-  id: string,
-  params?: ListWorkflowVersionsParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<listWorkflowVersionsResponse> => {
-  return customFetch<listWorkflowVersionsResponse>(getListWorkflowVersionsUrl(id, params), {
-    ...options,
-    method: 'GET',
-  });
-};
-
-export type saveWorkflowVersionResponse200 = {
-  data: VersionSavedResponse;
-  status: 200;
-};
-
-export type saveWorkflowVersionResponse201 = {
-  data: VersionSavedResponse;
-  status: 201;
-};
-
-export type saveWorkflowVersionResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type saveWorkflowVersionResponse403 = {
-  data: ProblemDetail;
-  status: 403;
-};
-
-export type saveWorkflowVersionResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type saveWorkflowVersionResponseSuccess = (
-  saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
-) & {
-  headers: Headers;
-};
-export type saveWorkflowVersionResponseError = (
-  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
-) & {
-  headers: Headers;
-};
-
-export type saveWorkflowVersionResponse =
-  saveWorkflowVersionResponseSuccess | saveWorkflowVersionResponseError;
-
-export const getSaveWorkflowVersionUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/versions`;
-};
-
-export const saveWorkflowVersion = async (
-  id: string,
-  saveVersionRequest?: SaveVersionRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<saveWorkflowVersionResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<saveWorkflowVersionResponse>(getSaveWorkflowVersionUrl(id), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(saveVersionRequest),
-  });
-};
-
 export type getWorkflowVersionResponse200 = {
   data: WorkflowVersionDetailResponse;
   status: 200;
@@ -4476,63 +4959,44 @@ export const renameWorkflowVersion = async (
   });
 };
 
-export type rollbackWorkflowVersionResponse200 = {
-  data: VersionSavedResponse;
-  status: 200;
-};
-
-export type rollbackWorkflowVersionResponse201 = {
-  data: VersionSavedResponse;
-  status: 201;
-};
-
-export type rollbackWorkflowVersionResponse400 = {
+export type updateStepResponse400 = {
   data: ProblemDetail;
   status: 400;
 };
 
-export type rollbackWorkflowVersionResponse403 = {
+export type updateStepResponse403 = {
   data: ProblemDetail;
   status: 403;
 };
 
-export type rollbackWorkflowVersionResponse404 = {
+export type updateStepResponse404 = {
   data: ProblemDetail;
   status: 404;
 };
 
-export type rollbackWorkflowVersionResponse422 = {
+export type updateStepResponse422 = {
   data: ProblemDetail;
   status: 422;
 };
 
-export type rollbackWorkflowVersionResponseSuccess = (
-  rollbackWorkflowVersionResponse200 | rollbackWorkflowVersionResponse201
-) & {
-  headers: Headers;
-};
-export type rollbackWorkflowVersionResponseError = (
-  | rollbackWorkflowVersionResponse400
-  | rollbackWorkflowVersionResponse403
-  | rollbackWorkflowVersionResponse404
-  | rollbackWorkflowVersionResponse422
+export type updateStepResponseError = (
+  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
 ) & {
   headers: Headers;
 };
 
-export type rollbackWorkflowVersionResponse =
-  rollbackWorkflowVersionResponseSuccess | rollbackWorkflowVersionResponseError;
+export type updateStepResponse = updateStepResponseError;
 
-export const getRollbackWorkflowVersionUrl = (id: string, version: number) => {
-  return `/api/v1/workflows/${id}/versions/${version}/rollback`;
+export const getUpdateStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/workflows/${id}/steps/${stepId}`;
 };
 
-export const rollbackWorkflowVersion = async (
+export const updateStep = async (
   id: string,
-  version: number,
-  saveVersionRequest?: SaveVersionRequest,
+  stepId: string,
+  updateStepRequest: UpdateStepRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<rollbackWorkflowVersionResponse> => {
+): Promise<updateStepResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -4552,146 +5016,11 @@ export const rollbackWorkflowVersion = async (
     }
     return headers;
   };
-  return customFetch<rollbackWorkflowVersionResponse>(getRollbackWorkflowVersionUrl(id, version), {
+  return customFetch<updateStepResponse>(getUpdateStepUrl(id, stepId), {
     ...options,
-    method: 'POST',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(saveVersionRequest),
-  });
-};
-
-export type hotfixWorkflowResponse200 = {
-  data: VersionSavedResponse;
-  status: 200;
-};
-
-export type hotfixWorkflowResponse201 = {
-  data: VersionSavedResponse;
-  status: 201;
-};
-
-export type hotfixWorkflowResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type hotfixWorkflowResponse403 = {
-  data: ProblemDetail;
-  status: 403;
-};
-
-export type hotfixWorkflowResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type hotfixWorkflowResponseSuccess = (
-  hotfixWorkflowResponse200 | hotfixWorkflowResponse201
-) & {
-  headers: Headers;
-};
-export type hotfixWorkflowResponseError = (
-  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
-) & {
-  headers: Headers;
-};
-
-export type hotfixWorkflowResponse = hotfixWorkflowResponseSuccess | hotfixWorkflowResponseError;
-
-export const getHotfixWorkflowUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/hotfix`;
-};
-
-export const hotfixWorkflow = async (
-  id: string,
-  hotfixRequest?: HotfixRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<hotfixWorkflowResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<hotfixWorkflowResponse>(getHotfixWorkflowUrl(id), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(hotfixRequest),
-  });
-};
-
-export type diffWorkflowVersionsResponse200 = {
-  data: WorkflowVersionDiffResponse;
-  status: 200;
-};
-
-export type diffWorkflowVersionsResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type diffWorkflowVersionsResponse403 = {
-  data: ProblemDetail;
-  status: 403;
-};
-
-export type diffWorkflowVersionsResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type diffWorkflowVersionsResponseSuccess = diffWorkflowVersionsResponse200 & {
-  headers: Headers;
-};
-export type diffWorkflowVersionsResponseError = (
-  | diffWorkflowVersionsResponse400
-  | diffWorkflowVersionsResponse403
-  | diffWorkflowVersionsResponse404
-) & {
-  headers: Headers;
-};
-
-export type diffWorkflowVersionsResponse =
-  diffWorkflowVersionsResponseSuccess | diffWorkflowVersionsResponseError;
-
-export const getDiffWorkflowVersionsUrl = (id: string, params?: DiffWorkflowVersionsParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/v1/workflows/${id}/diff?${stringifiedParams}`
-    : `/api/v1/workflows/${id}/diff`;
-};
-
-export const diffWorkflowVersions = async (
-  id: string,
-  params?: DiffWorkflowVersionsParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<diffWorkflowVersionsResponse> => {
-  return customFetch<diffWorkflowVersionsResponse>(getDiffWorkflowVersionsUrl(id, params), {
-    ...options,
-    method: 'GET',
+    body: JSON.stringify(updateStepRequest),
   });
 };
 
@@ -4762,142 +5091,6 @@ export const setPublishedWorkflowVersion = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(publishedVersionRequest),
-  });
-};
-
-export type getWorkflowVersionPinResponse200 = {
-  data: VersionPinResponse;
-  status: 200;
-};
-
-export type getWorkflowVersionPinResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type getWorkflowVersionPinResponseSuccess = getWorkflowVersionPinResponse200 & {
-  headers: Headers;
-};
-export type getWorkflowVersionPinResponseError = getWorkflowVersionPinResponse404 & {
-  headers: Headers;
-};
-
-export type getWorkflowVersionPinResponse =
-  getWorkflowVersionPinResponseSuccess | getWorkflowVersionPinResponseError;
-
-export const getGetWorkflowVersionPinUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/pin`;
-};
-
-export const getWorkflowVersionPin = async (
-  id: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<getWorkflowVersionPinResponse> => {
-  return customFetch<getWorkflowVersionPinResponse>(getGetWorkflowVersionPinUrl(id), {
-    ...options,
-    method: 'GET',
-  });
-};
-
-export type pinWorkflowVersionResponse200 = {
-  data: VersionPinResponse;
-  status: 200;
-};
-
-export type pinWorkflowVersionResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type pinWorkflowVersionResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type pinWorkflowVersionResponse422 = {
-  data: ProblemDetail;
-  status: 422;
-};
-
-export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
-  headers: Headers;
-};
-export type pinWorkflowVersionResponseError = (
-  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
-) & {
-  headers: Headers;
-};
-
-export type pinWorkflowVersionResponse =
-  pinWorkflowVersionResponseSuccess | pinWorkflowVersionResponseError;
-
-export const getPinWorkflowVersionUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/pin`;
-};
-
-export const pinWorkflowVersion = async (
-  id: string,
-  pinVersionRequest: PinVersionRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<pinWorkflowVersionResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<pinWorkflowVersionResponse>(getPinWorkflowVersionUrl(id), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(pinVersionRequest),
-  });
-};
-
-export type unpinWorkflowVersionResponse204 = {
-  data: void;
-  status: 204;
-};
-
-export type unpinWorkflowVersionResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
-  headers: Headers;
-};
-export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
-  headers: Headers;
-};
-
-export type unpinWorkflowVersionResponse =
-  unpinWorkflowVersionResponseSuccess | unpinWorkflowVersionResponseError;
-
-export const getUnpinWorkflowVersionUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/pin`;
-};
-
-export const unpinWorkflowVersion = async (
-  id: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<unpinWorkflowVersionResponse> => {
-  return customFetch<unpinWorkflowVersionResponse>(getUnpinWorkflowVersionUrl(id), {
-    ...options,
-    method: 'DELETE',
   });
 };
 
@@ -5087,6 +5280,67 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type diffWorkflowVersionsResponse200 = {
+  data: WorkflowVersionDiffResponse;
+  status: 200;
+};
+
+export type diffWorkflowVersionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type diffWorkflowVersionsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type diffWorkflowVersionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type diffWorkflowVersionsResponseSuccess = diffWorkflowVersionsResponse200 & {
+  headers: Headers;
+};
+export type diffWorkflowVersionsResponseError = (
+  | diffWorkflowVersionsResponse400
+  | diffWorkflowVersionsResponse403
+  | diffWorkflowVersionsResponse404
+) & {
+  headers: Headers;
+};
+
+export type diffWorkflowVersionsResponse =
+  diffWorkflowVersionsResponseSuccess | diffWorkflowVersionsResponseError;
+
+export const getDiffWorkflowVersionsUrl = (id: string, params?: DiffWorkflowVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/diff?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/diff`;
+};
+
+export const diffWorkflowVersions = async (
+  id: string,
+  params?: DiffWorkflowVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<diffWorkflowVersionsResponse> => {
+  return customFetch<diffWorkflowVersionsResponse>(getDiffWorkflowVersionsUrl(id, params), {
+    ...options,
+    method: 'GET',
   });
 };
 
@@ -5801,6 +6055,52 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminWorkflowResponse200 = {
+  data: WorkflowArtifact;
+  status: 200;
+};
+
+export type exportAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type exportAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type exportAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type exportAdminWorkflowResponseSuccess = exportAdminWorkflowResponse200 & {
+  headers: Headers;
+};
+export type exportAdminWorkflowResponseError = (
+  exportAdminWorkflowResponse404 | exportAdminWorkflowResponse409 | exportAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type exportAdminWorkflowResponse =
+  exportAdminWorkflowResponseSuccess | exportAdminWorkflowResponseError;
+
+export const getExportAdminWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/export`;
+};
+
+export const exportAdminWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminWorkflowResponse> => {
+  return customFetch<exportAdminWorkflowResponse>(getExportAdminWorkflowUrl(id), {
     ...options,
     method: 'GET',
   });
