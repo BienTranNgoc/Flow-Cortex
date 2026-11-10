@@ -17,7 +17,7 @@ export function SettingHistory({ setting }: Readonly<SettingHistoryProps>) {
   const data = query.data;
   const panelId = `history-${setting.key}`;
 
-  const show = (value: boolean | number | null | undefined) => {
+  const show = (value: string | boolean | number | null | undefined) => {
     if (value === null || value === undefined) return t('settings.history.unset');
     if (typeof value === 'boolean') return t(value ? 'settings.value.on' : 'settings.value.off');
     return String(value);
