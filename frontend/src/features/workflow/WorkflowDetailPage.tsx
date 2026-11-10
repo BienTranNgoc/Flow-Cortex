@@ -183,7 +183,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   return (
     <div>
       <PageHeading title={workflow?.name ?? t('workflow.detail.heading')} />
-      {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
+      {workflow?.visibility === 'public' && <p>{t('workflow.detail.shared')}</p>}
       {workflowQuery.isError && <p role="alert">{t('workflow.detail.loadError')}</p>}
       {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
         <output>{t('workflow.detail.loading')}</output>

@@ -13,6 +13,7 @@ import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -123,8 +124,8 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
                 .filter(w -> w.name().equals("Failing Demo (middle step errors)"))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Failing demo workflow not seeded"));
-        assertThat(echoDemo.shared()).isTrue();
-        assertThat(failingDemo.shared()).isTrue();
+        assertThat(echoDemo.visibility()).isEqualTo(WorkflowVisibility.PUBLIC);
+        assertThat(failingDemo.visibility()).isEqualTo(WorkflowVisibility.PUBLIC);
 
         RunView echoRun = workflowRunService.startRun(viewer.id(), echoDemo.id(), "hello");
         RunView finishedEcho = awaitTerminal(viewer.id(), echoRun.id());
@@ -148,7 +149,7 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Check a video file workflow not seeded"));
 
-        assertThat(check.shared()).isTrue();
+        assertThat(check.visibility()).isEqualTo(WorkflowVisibility.PUBLIC);
         assertThat(check.steps()).extracting(step -> step.name())
             .containsExactly("Inspect the file", "Extract source audio");
         assertThat(check.steps()).extracting(step -> step.type())

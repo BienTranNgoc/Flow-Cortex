@@ -50,4 +50,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     /** Ids and emails only, whatever the status: the rest of the row, the password hash included, stays unread. */
     @Query("SELECT new com.flowcortex.user.infrastructure.UserEmail(u.id, u.email) FROM AppUser u WHERE u.id IN :ids")
     List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<UUID> ids);
+
+    /** Ids and display names only, whatever the status: the email and the password hash stay unread. */
+    @Query("SELECT new com.flowcortex.user.infrastructure.UserName(u.id, u.name) FROM AppUser u WHERE u.id IN :ids")
+    List<UserName> findNamesByIdIn(@Param("ids") Collection<UUID> ids);
 }

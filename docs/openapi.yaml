@@ -468,6 +468,11 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -475,12 +480,55 @@ paths:
               $ref: "#/components/schemas/StartRunRequest"
         required: true
       responses:
+        "410":
+          description: Gone
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/workflows/{id}/regenerate-key:
+    post:
+      tags:
+      - workflow-sharing-controller
+      operationId: regenerateWorkflowShareKey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareSettingsResponse"
   /api/v1/users:
     get:
       tags:
@@ -1504,7 +1552,24 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "410":
+          description: Gone
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
@@ -1591,6 +1656,67 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/visibility:
+    patch:
+      tags:
+      - workflow-sharing-controller
+      operationId: setWorkflowVisibility
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVisibilityRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareSettingsResponse"
   /api/v1/workflows/{id}/steps/{stepId}:
     patch:
       tags:
@@ -1640,6 +1766,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/admin/workflows/{id}:
     delete:
       tags:
@@ -1721,6 +1853,61 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/admin/workflows/{id}/visibility:
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: setAdminWorkflowVisibility
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVisibilityRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareSettingsResponse"
   /api/v1/admin/workflows/{id}/steps/{stepId}:
     patch:
       tags:
@@ -1770,6 +1957,256 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/workflows/{id}/visibility-audit:
+    get:
+      tags:
+      - workflow-sharing-controller
+      operationId: getWorkflowVisibilityAudit
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisibilityAuditPageResponse"
+  /api/v1/workflows/{id}/sharing:
+    get:
+      tags:
+      - workflow-sharing-controller
+      operationId: getWorkflowSharing
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareSettingsResponse"
+  /api/v1/workflows/{id}/link-grants:
+    get:
+      tags:
+      - workflow-sharing-controller
+      operationId: listWorkflowLinkGrants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkGrantPageResponse"
+    delete:
+      tags:
+      - workflow-sharing-controller
+      operationId: revokeAllWorkflowLinkGrants
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokedResponse"
+  /api/v1/workflows/{id}/access-log:
+    get:
+      tags:
+      - workflow-sharing-controller
+      operationId: getWorkflowAccessLog
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessLogPageResponse"
+  /api/v1/workflows/by-key/{key}:
+    get:
+      tags:
+      - workflow-sharing-controller
+      operationId: getWorkflowByShareKey
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "410":
+          description: Gone
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedWorkflowResponse"
   /api/v1/support/settings:
     get:
       tags:
@@ -2441,6 +2878,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/workflows/{id}/link-grants/{userId}:
+    delete:
+      tags:
+      - workflow-sharing-controller
+      operationId: revokeWorkflowLinkGrant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokedResponse"
 components:
   schemas:
     UpdateUserRequest:
@@ -2870,8 +3350,6 @@ components:
           type: string
           maxLength: 255
           minLength: 0
-        shared:
-          type: boolean
       required:
       - name
     WorkflowResponse:
@@ -2882,8 +3360,12 @@ components:
           format: uuid
         name:
           type: string
-        isShared:
-          type: boolean
+        visibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
         createdAt:
           type: string
           format: date-time
@@ -3082,6 +3564,31 @@ components:
       - deliveryCount
       - mode
       - outputs
+    ShareSettingsResponse:
+      type: object
+      properties:
+        visibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
+        shareKey:
+          type:
+          - string
+          - "null"
+        keyGeneratedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        keyExpiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - visibility
     CreateUserRequest:
       type: object
       properties:
@@ -3689,14 +4196,29 @@ components:
           maxLength: 255
           minLength: 0
           pattern: (?s)\s*\S.*
-        shared:
-          type: boolean
         status:
           type: string
           enum:
           - draft
           - published
           pattern: draft|published
+    SetVisibilityRequest:
+      type: object
+      properties:
+        visibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
+          pattern: private|unlisted|public
+        expiresAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - visibility
     UpdateStepRequest:
       type: object
       properties:
@@ -3709,6 +4231,123 @@ components:
           maxLength: 255
           minLength: 0
         config:
+          type: string
+    Entry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        changedAt:
+          type: string
+          format: date-time
+        changedBy:
+          type: string
+          format: uuid
+        name:
+          type:
+          - string
+          - "null"
+        fromVisibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
+        toVisibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
+        triggeredBy:
+          type: string
+          enum:
+          - owner
+          - admin
+          - key_regenerated
+        network:
+          type:
+          - string
+          - "null"
+        userAgent:
+          type:
+          - string
+          - "null"
+    Meta:
+      type: object
+      properties:
+        hasMore:
+          type: boolean
+        nextCursor:
+          type:
+          - string
+          - "null"
+    VisibilityAuditPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        meta:
+          $ref: "#/components/schemas/Meta"
+    Grant:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        name:
+          type:
+          - string
+          - "null"
+        grantedAt:
+          type: string
+          format: date-time
+    LinkGrantPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Grant"
+        meta:
+          $ref: "#/components/schemas/Meta"
+    AccessLogPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        meta:
+          $ref: "#/components/schemas/Meta"
+    SharedWorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        authorName:
+          type:
+          - string
+          - "null"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Step"
+    Step:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+        type:
           type: string
     SupportSettings:
       type: object
@@ -4212,6 +4851,12 @@ components:
       - page
       - size
       - total
+    RevokedResponse:
+      type: object
+      properties:
+        revoked:
+          type: integer
+          format: int32
   securitySchemes:
     BearerAuth:
       type: http

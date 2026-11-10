@@ -10,7 +10,7 @@ const PRODUCT_VIDEO_ID = 'pv';
 const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
-  isShared: false,
+  visibility: 'private',
   available: true,
   steps: [],
 };
@@ -18,7 +18,7 @@ const CHECK: WorkflowResponse = {
 const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
-  isShared: true,
+  visibility: 'public',
   available: true,
   steps: [],
 };
@@ -26,7 +26,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
 const DOUYIN: WorkflowResponse = {
   id: 'douyin',
   name: 'Douyin Video Repurpose',
-  isShared: true,
+  visibility: 'public',
   available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
@@ -37,7 +37,7 @@ const DOUYIN: WorkflowResponse = {
 const ECHO: WorkflowResponse = {
   id: 'echo',
   name: 'Echo Demo (all steps succeed)',
-  isShared: false,
+  visibility: 'private',
   available: true,
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
@@ -45,7 +45,7 @@ const ECHO: WorkflowResponse = {
 const FAIL: WorkflowResponse = {
   id: 'fail',
   name: 'Failing Demo (deliberate)',
-  isShared: false,
+  visibility: 'private',
   available: true,
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };

@@ -31,7 +31,8 @@ final class WorkflowMapper {
 
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
             Predicate<String> isAvailableType) {
-        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
+        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(),
+                workflow.getVisibility(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),

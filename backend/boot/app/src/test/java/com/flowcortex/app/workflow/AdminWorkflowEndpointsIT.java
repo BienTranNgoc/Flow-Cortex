@@ -92,6 +92,39 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void adminVisibilityRouteFollowsTheArbiter() {
+        UserView admin = newUser("admin-wf-visibility");
+        UserView member = userService.createUser(admin.id(), uniqueEmail("member-wf-vis"), "password123", "Member",
+                "MEMBER");
+        UUID workflowId = insertWorkflow(member.id(), "published", true);
+        String adminToken = loginAs(admin);
+        String path = "/api/v1/admin/workflows/" + workflowId + "/visibility";
+
+        assertThat(exchange(HttpMethod.PATCH, path, loginAs(member), Map.of("visibility", "private"))
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(jdbc.queryForObject("SELECT visibility FROM workflow WHERE id = ?", String.class, workflowId))
+                .isEqualTo("public");
+
+        ResponseEntity<Map> changed = exchange(HttpMethod.PATCH, path, adminToken, Map.of("visibility", "private"));
+        assertThat(changed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(changed.getBody()).containsEntry("visibility", "private");
+        assertThat(jdbc.queryForList("SELECT changed_by, from_visibility, to_visibility, triggered_by "
+                + "FROM workflow_visibility_audit WHERE workflow_id = ?", workflowId)).singleElement()
+                .satisfies(row -> {
+                    assertThat(row).containsEntry("changed_by", admin.id()).containsEntry("triggered_by", "admin");
+                    assertThat(row).containsEntry("from_visibility", "public")
+                            .containsEntry("to_visibility", "private");
+                });
+
+        ResponseEntity<Map> productVideo = exchange(HttpMethod.PATCH,
+                "/api/v1/admin/workflows/" + ProductVideoWorkflow.ID + "/visibility", adminToken,
+                Map.of("visibility", "private"));
+        assertThat(productVideo.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(jdbc.queryForObject("SELECT visibility FROM workflow WHERE id = ?", String.class,
+                ProductVideoWorkflow.ID)).isEqualTo("public");
+    }
+
+    @Test
     void everyAdminWriteToTheProductVideoWorkflowIsAConflict() {
         UserView admin = newUser("admin-wf-system");
         String token = loginAs(admin);
@@ -146,8 +179,9 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     private UUID insertWorkflow(UUID ownerId, String status, boolean shared) {
         UUID id = UUID.randomUUID();
         Timestamp now = Timestamp.from(Instant.now());
-        jdbc.update("INSERT INTO workflow (id, owner_id, name, is_shared, created_at, updated_at, status) "
-                + "VALUES (?, ?, 'Fixture', ?, ?, ?, ?)", id, ownerId, shared, now, now, status);
+        jdbc.update("INSERT INTO workflow (id, owner_id, name, is_shared, visibility, created_at, updated_at, status) "
+                + "VALUES (?, ?, 'Fixture', ?, ?, ?, ?, ?)", id, ownerId, shared, shared ? "public" : "private", now,
+                now, status);
         return id;
     }
 
