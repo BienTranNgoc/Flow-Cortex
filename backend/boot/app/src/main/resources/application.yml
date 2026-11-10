@@ -286,24 +286,12 @@ flowcortex:
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
-  # Every registered step type needs a cost here, or startup fails.
+  # Prices live in the rate_card and capability_pricing tables, not here. Every registered step type
+  # needs a capability_pricing row and an active rate_card row, or startup fails. To change a price,
+  # in one migration: UPDATE the key's open rate_card row SET effective_to = T, then INSERT the new
+  # open-ended row with effective_from = T.
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
-    step-costs:
-      echo: 1
-      fail: 20
-      # Brackets make the map binder keep the key exactly as written (upper case).
-      "[APPROVAL_CHECKPOINT]": 0
-      probe: 10
-      extract_audio: 50
-      align_audio: 50
-      generate_script: 100
-      generate_speech: 100
-      generate_storyboard: 100
-      generate_video: 200
-      render_video: 200
-      translate: 100
-      tts: 100
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
