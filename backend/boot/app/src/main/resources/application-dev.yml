@@ -8,6 +8,12 @@
 flowcortex:
   security:
     jwt-secret: ${JWT_SECRET:dev-only-insecure-jwt-signing-secret-do-not-use-elsewhere}
+  # Placeholder connector keyring for a bare bootRun; an environment value overrides it.
+  connectors:
+    encryption:
+      current: k1
+      keys:
+        k1: ZGV2LW9ubHktaW5zZWN1cmUtY29ubmVjdHIta2V5ISE=
   # Self-registered demo accounts belong to DevDataSeeder's first admin. Compose
   # passes the variable even when unset (empty), so .env names it too.
   registration:

@@ -278,6 +278,10 @@ flowcortex:
   # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
   phone:
     hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}
+  # A missing or invalid keyring stops startup; each key is 32 random bytes in base64, set as FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_<ID>.
+  connectors:
+    encryption:
+      current: ${FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT:}
   # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
