@@ -1,10 +1,12 @@
 import { withLocale } from './locale';
+import { emitNetworkSignal } from './networkSignals';
 import { refreshAccessToken } from './session';
 import { getToken } from './tokenStore';
 
 const STREAM_PATH = '/api/v1/realtime/stream';
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30_000;
+let nextStreamId = 0;
 
 export interface StreamEvent {
   id: string | null;
@@ -111,6 +113,22 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
+  const streamId = (nextStreamId += 1);
+  let down = false;
+
+  function markDown(): void {
+    if (!down) {
+      down = true;
+      emitNetworkSignal({ type: 'stream-down', streamId });
+    }
+  }
+
+  function markUp(): void {
+    if (down) {
+      down = false;
+      emitNetworkSignal({ type: 'stream-up', streamId });
+    }
+  }
 
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
@@ -173,29 +191,38 @@ export function openEventStream(options: EventStreamOptions): EventStream {
         if (isFinalRefusal(response.status)) {
           return;
         }
-        if (response.ok && response.body) {
+        if (response.status === 429) {
+          markUp();
+          emitNetworkSignal({ type: 'rate-limited', waitSeconds: null });
+        } else if (response.ok && response.body) {
           refreshedOn401 = false;
+          markUp();
           onOpen?.();
           if (await pump(response.body, () => (failures = 0))) {
             return;
           }
+        } else {
+          markDown();
         }
       } catch {
         // A failed connect or a broken body is retried below; only close() ends the loop.
         if (closed) {
           return;
         }
+        markDown();
       }
       await sleep(backoffDelay(failures));
       failures += 1;
     }
   }
 
-  void run();
+  // However the loop ends (close, refused topic, second 401) the stream stops counting as down.
+  void run().finally(markUp);
 
   return {
     close() {
       closed = true;
+      markUp();
       controller?.abort();
       if (timer !== null) {
         clearTimeout(timer);

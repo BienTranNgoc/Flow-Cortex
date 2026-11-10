@@ -8,6 +8,8 @@ export { setClientId } from './clientId';
 export { setLocaleProvider } from './locale';
 export { openEventStream } from './eventStream';
 export type { EventStream, EventStreamOptions, StreamEvent } from './eventStream';
+export { emitNetworkSignal, rateLimitWaitSeconds, subscribeNetworkSignals } from './networkSignals';
+export type { NetworkSignal } from './networkSignals';
 export { ensureSession, signOut } from './session';
 export { useAuthToken, useSessionReady } from './useSession';
 export * from './tokenStore';

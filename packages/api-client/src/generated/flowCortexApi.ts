@@ -944,6 +944,7 @@ export interface EmailLinkView {
 
 export interface BalanceResponse {
   balance?: number;
+  granted?: number;
 }
 
 export interface CapabilitiesResponse {

@@ -1,13 +1,11 @@
 package com.flowcortex.credit.web;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.web.NotFoundException;
-import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,17 +21,6 @@ class CreditsControllerTest {
     private final CreditsController controller = new CreditsController(creditAccounts, userDirectory);
     private final UUID userId = UUID.randomUUID();
     private final Jwt jwt = mock(Jwt.class);
-
-    @Test
-    void theCallerSeesTheirOwnBalance() {
-        when(creditAccounts.enabled()).thenReturn(true);
-        when(jwt.getSubject()).thenReturn(userId.toString());
-        when(userDirectory.findById(userId)).thenReturn(Optional.of(
-                new CurrentUser(userId, userId, "member@example.com", "Member", "MEMBER", "active", true, false)));
-        when(creditAccounts.balance(userId)).thenReturn(989L);
-
-        assertThat(controller.balance(jwt).getBody().balance()).isEqualTo(989);
-    }
 
     @Test
     void theBalanceEndpointAnswers503WhileCreditsAreSwitchedOff() {

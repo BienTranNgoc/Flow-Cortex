@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Footer } from './Footer';
+import { NetworkStatus } from './NetworkStatus';
 import { routeFocusTarget } from './routeFocus';
 import { Sidebar } from './Sidebar';
 import { useIsDesktop, useSidebarMode } from './sidebarMode';
@@ -43,6 +44,7 @@ export function Layout() {
 
   return (
     <div className="app-shell" data-sidebar={isDesktop ? mode : 'drawer'}>
+      <NetworkStatus />
       <a
         href="#main"
         className="skip-link"
