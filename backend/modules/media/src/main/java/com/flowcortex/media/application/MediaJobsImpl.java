@@ -258,7 +258,7 @@ class MediaJobsImpl implements MediaJobs {
         List<MediaOutput> copies = new java.util.ArrayList<>();
         for (int index = 0; index < outputs.size(); index++) {
             MediaOutput output = outputs.get(index);
-            store.copyKeepingTags(output.bucket(), output.objectKey(), output.bucket(), targetKeys.get(index));
+            store.copyWithoutTags(output.bucket(), output.objectKey(), output.bucket(), targetKeys.get(index));
             copies.add(new MediaOutput(output.name(), output.bucket(), targetKeys.get(index), output.mime(),
                     output.bytes(), output.meta()));
         }

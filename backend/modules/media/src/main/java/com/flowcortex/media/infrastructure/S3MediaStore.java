@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +29,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.TaggingDirective;
@@ -157,22 +159,27 @@ public class S3MediaStore implements AutoCloseable {
     }
 
     /**
-     * A server-side copy that keeps the source's tags, so a worker output copied into another run does not
-     * pick up the run-input expiry tag. Bounded by the copy timeout like {@link #copy(String, String, String, String)}.
+     * A server-side copy that carries no tags, so a worker output copied into another run does not pick up
+     * the run-input expiry tag. Worker outputs have no tags to keep, and copying tags would need tagging
+     * grants the backend does not hold. Bounded by the copy timeout like {@link #copy(String, String, String, String)}.
      * @throws UploadRejectedException on field {@code uploadIds} if the source object is gone
+     * @throws IllegalStateException if the store denies the copy, which means the backend policy lacks a grant
      */
-    public void copyKeepingTags(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+    public void copyWithoutTags(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
         try {
             client.copyObject(request -> request
                     .sourceBucket(sourceBucket).sourceKey(sourceKey)
                     .destinationBucket(targetBucket).destinationKey(targetKey)
-                    .taggingDirective(TaggingDirective.COPY)
+                    .tagging(Tagging.builder().tagSet(List.of()).build())
+                    .taggingDirective(TaggingDirective.REPLACE)
                     .overrideConfiguration(timeouts -> timeouts
                             .apiCallTimeout(copyTimeout)
                             .apiCallAttemptTimeout(copyTimeout)));
         } catch (NoSuchKeyException e) {
             LOG.info("Copy refused: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        } catch (S3Exception e) {
+            throw deniedCopy(e, sourceBucket, sourceKey, targetBucket, targetKey);
         }
     }
 
@@ -198,7 +205,21 @@ public class S3MediaStore implements AutoCloseable {
         } catch (NoSuchKeyException e) {
             LOG.info("Upload refused at run start: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        } catch (S3Exception e) {
+            throw deniedCopy(e, sourceBucket, sourceKey, targetBucket, targetKey);
         }
+    }
+
+    /** A 403 is a policy gap, not a transient fault: log it as configuration; any other status is rethrown as is. */
+    private static RuntimeException deniedCopy(S3Exception e, String sourceBucket, String sourceKey,
+            String targetBucket, String targetKey) {
+        if (e.statusCode() != 403) {
+            return e;
+        }
+        LOG.error("Object store denied a copy, so the backend's store policy is missing a grant: from={}/{} to={}/{}",
+                sourceBucket, sourceKey, targetBucket, targetKey, e);
+        return new IllegalStateException("The object store denied copying " + sourceBucket + "/" + sourceKey
+                + " to " + targetBucket + "/" + targetKey + "; check the backend store policy", e);
     }
 
     @Override

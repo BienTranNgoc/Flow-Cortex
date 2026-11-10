@@ -38,4 +38,10 @@ tasks.withType<Test> {
     inputs.dir(rootProject.projectDir.parentFile.resolve("contracts"))
         .withPropertyName("contracts")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The backend's object-store policy, applied to a real store by the policy IT.
+    val backendPolicy = rootProject.projectDir.parentFile.resolve("infra/minio/backend-policy.json")
+    systemProperty("flowcortex.backend-policy", backendPolicy.absolutePath)
+    inputs.file(backendPolicy)
+        .withPropertyName("backendPolicy")
+        .withPathSensitivity(PathSensitivity.NONE)
 }

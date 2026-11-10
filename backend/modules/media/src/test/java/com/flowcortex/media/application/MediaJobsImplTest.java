@@ -487,9 +487,9 @@ class MediaJobsImplTest {
                             "video/mp4", 42L, meta),
                     new MediaOutput("clip", "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4",
                             "video/mp4", 7L, null));
-            verify(store).copyKeepingTags("flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
                     "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/video.mp4");
-            verify(store).copyKeepingTags("flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
                     "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4");
         });
     }
@@ -512,7 +512,7 @@ class MediaJobsImplTest {
                         .as(key)
                         .isInstanceOf(IllegalArgumentException.class);
             }
-            verify(store, never()).copyKeepingTags(anyString(), anyString(), anyString(), anyString());
+            verify(store, never()).copyWithoutTags(anyString(), anyString(), anyString(), anyString());
         });
     }
 

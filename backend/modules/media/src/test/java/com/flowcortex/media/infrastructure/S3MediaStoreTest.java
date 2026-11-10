@@ -191,8 +191,13 @@ class S3MediaStoreTest {
         try (S3MediaStore local = storeAt(denied)) {
             assertThatThrownBy(() -> local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media",
                     "runs/r/inputs/image_1"))
-                    .isInstanceOf(S3Exception.class)
-                    .isNotInstanceOf(UploadRejectedException.class);
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("backend store policy")
+                    .hasCauseInstanceOf(S3Exception.class);
+            assertThatThrownBy(() -> local.copyWithoutTags("flowcortex-media", "runs/a/steps/1/x", "flowcortex-media",
+                    "runs/b/steps/1/attempts/1/x"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasCauseInstanceOf(S3Exception.class);
         } finally {
             denied.stop(0);
         }
