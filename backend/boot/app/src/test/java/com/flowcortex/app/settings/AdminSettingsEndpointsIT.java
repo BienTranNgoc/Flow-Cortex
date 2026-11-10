@@ -320,6 +320,22 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
         assertThat(history.items().get(0).changedBy()).isNull();
     }
 
+    @Test
+    void aStoredValueWithoutAnAuthorReadsNull() {
+        jdbc.update("INSERT INTO app_setting (key, value, updated_by, updated_at) VALUES (?, 'false', NULL, now())",
+                SWITCH_OFF);
+
+        Setting row = ownKeys(get(BASE, operatorToken, SettingList.class).getBody()).get(0);
+        ResponseEntity<Setting> sameValue = put(SWITCH_OFF, "{\"value\":false}", operatorToken, Setting.class);
+
+        assertThat(row.source()).isEqualTo("STORED");
+        assertThat(row.updatedBy()).isNull();
+        assertThat(row.updatedAt()).isNotNull();
+        assertThat(sameValue.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(sameValue.getBody().updatedBy()).isNull();
+        assertThat(sameValue.getBody().updatedAt()).isNotNull();
+    }
+
     private static List<Setting> ownKeys(SettingList list) {
         return list.items().stream().filter(item -> "itapi".equals(item.group())).toList();
     }

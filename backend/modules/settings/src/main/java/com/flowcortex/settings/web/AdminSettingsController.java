@@ -180,6 +180,6 @@ class AdminSettingsController {
         return new AdminSetting(name, name.substring(0, name.indexOf('.')), definition.type(),
                 view.read().effective(), view.read().decided(), view.read().source(), view.storedValue(),
                 definition.configuredValue(), definition.codeDefault(), definition.min(), definition.max(),
-                change == null ? null : emails.get(change.actor()), change == null ? null : change.at());
+                change == null || change.actor() == null ? null : emails.get(change.actor()), change == null ? null : change.at());
     }
 }
