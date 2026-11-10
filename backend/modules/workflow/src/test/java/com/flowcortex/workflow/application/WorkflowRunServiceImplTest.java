@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
@@ -62,7 +63,8 @@ class WorkflowRunServiceImplTest {
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
                 runStepRepository, events, runUpdates, registry, mediaJobs, mock(UserDirectory.class),
-                new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
+                new TransactionTemplate(transactions), new RunStartGuards(List.of()),
+                mock(CreditAccounts.class), workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -109,7 +111,7 @@ class WorkflowRunServiceImplTest {
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
                 workflowRunRepository, runStepRepository, events, runUpdates, new StepExecutorRegistry(List.of(translate)),
                 mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
-                new RunStartGuards(List.of(creditGuard)), true);
+                new RunStartGuards(List.of(creditGuard)), mock(CreditAccounts.class), true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "translate");
 

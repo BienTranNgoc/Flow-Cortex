@@ -46,7 +46,8 @@ describe('a partial grant', () => {
     for (const hidden of [/Users/, /Admin accounts/, /Requests/, /Guide articles/, /Topics/]) {
       expect(within(nav).queryByRole('link', { name: hidden })).not.toBeInTheDocument();
     }
-    expect(within(nav).getByText('Workflows & Templates').closest('[aria-disabled="true"]')).not.toBeNull();
+    expect(within(nav).queryByText('Workflows & Templates')).not.toBeInTheDocument();
+    expect(within(nav).getByText('Approval Queue').closest('[aria-disabled="true"]')).not.toBeNull();
   });
 
   it('keeps the brand with its Admin label and marks the Dashboard entry as current', async () => {

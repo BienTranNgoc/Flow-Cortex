@@ -218,5 +218,33 @@
     "sharedWorkflow": "Quy trình được chia sẻ",
     "mine": "Của tôi",
     "shared": "Được chia sẻ"
+  },
+  "builderDashboard": {
+    "heading": "Thống kê quy trình của bạn",
+    "lede": "Các quy trình của bạn đang hoạt động ra sao và được chạy bao nhiêu lần.",
+    "linkLabel": "Thống kê quy trình của bạn",
+    "loading": "Đang tải thống kê quy trình của bạn…",
+    "loadError": "Không tải được thống kê quy trình của bạn.",
+    "noWorkflows": "Bạn chưa có quy trình nào. Khi bạn sở hữu một quy trình, thống kê của nó sẽ hiện ở đây.",
+    "totals": {
+      "workflows": "Quy trình",
+      "published": "Đã xuất bản",
+      "runs": "Lượt chạy"
+    },
+    "period": {
+      "legend": "Khoảng thời gian",
+      "7d": "7 ngày",
+      "30d": "30 ngày",
+      "90d": "90 ngày"
+    },
+    "chart": {
+      "heading": "Lượt chạy mỗi ngày",
+      "label_one": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "label_other": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "tableLabel": "Lượt chạy mỗi ngày, dạng số",
+      "day": "Ngày",
+      "runs": "Lượt chạy",
+      "failed": "Thất bại"
+    }
   }
 }

@@ -8,7 +8,9 @@ import com.flowcortex.credit.infrastructure.CreditWalletRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -106,5 +108,18 @@ class CreditAccountsImpl implements CreditAccounts {
     @Transactional(readOnly = true)
     public long chargedForRun(UUID runId) {
         return ledger.sumChargedForRun(runId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> chargedForRuns(Collection<UUID> runIds) {
+        if (runIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Long> sums = new HashMap<>();
+        for (Object[] row : ledger.sumChargedForRuns(runIds)) {
+            sums.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        return sums;
     }
 }

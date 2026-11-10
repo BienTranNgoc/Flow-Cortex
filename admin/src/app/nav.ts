@@ -68,8 +68,7 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.workflows',
         path: '/workflows',
         icon: Cube,
-        disabled: true,
-        tag: COMING_SOON,
+        key: 'workflow.workflow.view',
       },
       { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, key: 'workflow.run.view' },
       {

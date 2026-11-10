@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -203,6 +204,26 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(get("/api/v1/workflows/" + workflow.id(), token, PricedWorkflowView.class).getBody()
                 .estimatedCredits()).isEqualTo(60);
         assertThat(get("/api/v1/credits/balance", token, BalanceView.class).getBody().balance()).isEqualTo(940);
+    }
+
+    @Test
+    void chargedForRunsIsDebitsMinusRefundsPerRunAndZeroForARunWithNoEntry() {
+        UserView member = memberWithBalance("grouped", 1000);
+        UUID charged = seedRun(member, "completed", "completed");
+        UUID uncharged = seedRun(member, "completed", "completed");
+        UUID unknown = UUID.randomUUID();
+        UUID step = stepIds(charged).get(0);
+        chargeBySql(member, charged, step, 30);
+        jdbcTemplate.update("INSERT INTO credit_ledger (id, user_id, run_id, run_step_id, kind, amount, created_at) "
+                + "VALUES (?, ?, ?, ?, 'refund', ?, ?)", UUID.randomUUID(), member.id(), charged, step, 10L,
+                Timestamp.from(Instant.now()));
+
+        Map<UUID, Long> sums = creditAccounts.chargedForRuns(List.of(charged, uncharged, unknown));
+
+        assertThat(sums).containsOnlyKeys(charged).containsEntry(charged, 20L);
+        assertThat(sums.getOrDefault(uncharged, 0L)).isZero();
+        assertThat(sums.getOrDefault(unknown, 0L)).isZero();
+        assertThat(creditAccounts.chargedForRuns(List.of())).isEmpty();
     }
 
     @Test

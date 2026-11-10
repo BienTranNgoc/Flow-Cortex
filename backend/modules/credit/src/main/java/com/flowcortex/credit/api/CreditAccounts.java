@@ -2,6 +2,7 @@ package com.flowcortex.credit.api;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -36,4 +37,7 @@ public interface CreditAccounts {
 
     /** What the run has cost: its charges minus its refunds. */
     long chargedForRun(UUID runId);
+
+    /** {@link #chargedForRun} for many runs in one grouped read; a run without ledger entries is absent from the map. */
+    Map<UUID, Long> chargedForRuns(Collection<UUID> runIds);
 }

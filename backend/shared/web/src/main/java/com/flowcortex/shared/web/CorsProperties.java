@@ -24,7 +24,7 @@ public record CorsProperties(List<String> allowedOrigins, List<String> allowedMe
             allowedHeaders = List.of("*");
         }
         if (exposedHeaders == null) {
-            exposedHeaders = List.of("X-Request-Id");
+            exposedHeaders = List.of("X-Request-Id", "X-Total-Count", "Content-Disposition");
         }
         if (allowCredentials && allowedOrigins.contains("*")) {
             throw new IllegalStateException(

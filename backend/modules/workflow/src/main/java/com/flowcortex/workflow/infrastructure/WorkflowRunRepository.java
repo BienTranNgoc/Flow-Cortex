@@ -67,10 +67,21 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
             + "AND s.status = com.flowcortex.workflow.domain.RunStepStatus.RUNNING)")
     int settleCancelled(@Param("id") UUID id, @Param("now") Instant now);
 
-    /** Every owner's runs, newest first, with their workflow's name; {@code status} {@code null} matches all. */
+    /**
+     * Every owner's runs, newest first, with their workflow's name. A {@code null} {@code status} or
+     * {@code workflowId} matches all. {@code from} (inclusive) and {@code to} (exclusive) are never
+     * {@code null}: PostgreSQL cannot type a null timestamp parameter in {@code :x IS NULL}, so an open
+     * end is passed as a bound outside any real start time.
+     */
     @Query(value = "SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
             + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
-            + "WHERE (:status IS NULL OR r.status = :status) ORDER BY r.startedAt DESC, r.id DESC",
-            countQuery = "SELECT count(r) FROM WorkflowRun r WHERE (:status IS NULL OR r.status = :status)")
-    Page<RunWithWorkflowName> findAllNewestFirst(@Param("status") RunStatus status, Pageable page);
+            + "WHERE (:status IS NULL OR r.status = :status) "
+            + "AND (:workflowId IS NULL OR r.workflowId = :workflowId) "
+            + "AND r.startedAt >= :from AND r.startedAt < :to ORDER BY r.startedAt DESC, r.id DESC",
+            countQuery = "SELECT count(r) FROM WorkflowRun r WHERE (:status IS NULL OR r.status = :status) "
+                    + "AND (:workflowId IS NULL OR r.workflowId = :workflowId) "
+                    + "AND r.startedAt >= :from AND r.startedAt < :to")
+    Page<RunWithWorkflowName> findAllNewestFirst(@Param("status") RunStatus status,
+            @Param("workflowId") UUID workflowId, @Param("from") Instant from, @Param("to") Instant to,
+            Pageable page);
 }

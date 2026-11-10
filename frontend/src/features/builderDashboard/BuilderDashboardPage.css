@@ -1,0 +1,116 @@
+.builder-dash {
+  max-width: var(--content-max, 1440px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.builder-dash .page-heading {
+  margin-bottom: 0;
+}
+
+.builder-dash__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.builder-dash__empty {
+  margin: 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+  color: var(--ink-3);
+}
+
+.builder-dash__totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.builder-dash__totals > div {
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.builder-dash__totals dt {
+  color: var(--ink-4);
+  font-size: 0.85rem;
+}
+
+.builder-dash__totals dd {
+  margin: 0.25rem 0 0;
+  color: var(--ink);
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.builder-dash__chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.builder-dash__chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.builder-dash__chart-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.builder-dash__period {
+  display: inline-flex;
+  gap: 0.45rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.builder-dash__period-btn {
+  padding: 0.3rem 0.65rem;
+  min-height: var(--control-h);
+  border-radius: 999px;
+  border: 1px solid var(--card-edge);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.builder-dash__period-btn.is-active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+
+.runs-bars__svg {
+  display: block;
+  width: 100%;
+  height: 220px;
+}
+
+.runs-bars__bar {
+  fill: var(--primary);
+}
+
+.runs-bars__failed {
+  fill: var(--red);
+}

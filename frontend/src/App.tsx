@@ -15,6 +15,7 @@ import { queryClient } from './app/queryClient';
 import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
+import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
@@ -86,6 +87,7 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
