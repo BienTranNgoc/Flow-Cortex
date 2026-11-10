@@ -407,6 +407,160 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/versions:
+    get:
+      tags:
+      - workflow-versions-controller
+      operationId: listWorkflowVersions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: beforeVersion
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersionPageResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - workflow-versions-controller
+      operationId: saveWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveVersionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/versions/{version}/rollback:
+    post:
+      tags:
+      - workflow-versions-controller
+      operationId: rollbackWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveVersionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/steps:
     post:
       tags:
@@ -481,6 +635,141 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/workflows/{id}/pin:
+    get:
+      tags:
+      - workflow-versions-controller
+      operationId: getWorkflowVersionPin
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionPinResponse"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - workflow-versions-controller
+      operationId: pinWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinVersionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionPinResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - workflow-versions-controller
+      operationId: unpinWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+  /api/v1/workflows/{id}/hotfix:
+    post:
+      tags:
+      - workflow-versions-controller
+      operationId: hotfixWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HotfixRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSavedResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users:
     get:
       tags:
@@ -1591,6 +1880,91 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/versions/{version}:
+    get:
+      tags:
+      - workflow-versions-controller
+      operationId: getWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersionDetailResponse"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - workflow-versions-controller
+      operationId: renameWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameVersionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersionResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/steps/{stepId}:
     patch:
       tags:
@@ -1622,6 +1996,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/published-version:
+    patch:
+      tags:
+      - workflow-versions-controller
+      operationId: setPublishedWorkflowVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishedVersionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
         "403":
           description: Forbidden
           content:
@@ -1766,6 +2182,53 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "422":
           description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/diff:
+    get:
+      tags:
+      - workflow-versions-controller
+      operationId: diffWorkflowVersions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: source
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: target
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersionDiffResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
           content:
             application/problem+json:
               schema:
@@ -2904,6 +3367,16 @@ components:
           enum:
           - draft
           - published
+        publishedVersionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        servedVersion:
+          type:
+          - integer
+          - "null"
+          format: int32
       required:
       - available
     WorkflowStepResponse:
@@ -2934,6 +3407,69 @@ components:
           - "null"
       required:
       - mode
+    SaveVersionRequest:
+      type: object
+      properties:
+        changelog:
+          type: string
+          maxLength: 200
+          minLength: 0
+    VersionSavedResponse:
+      type: object
+      properties:
+        version:
+          $ref: "#/components/schemas/WorkflowVersionResponse"
+        deduplicated:
+          type: boolean
+      required:
+      - deduplicated
+      - version
+    WorkflowVersionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int32
+        changelog:
+          type:
+          - string
+          - "null"
+        source:
+          type: string
+          enum:
+          - manual
+          - publish
+          - rollback
+          - hotfix
+        restoredFromVersion:
+          type:
+          - integer
+          - "null"
+          format: int32
+        publishedBy:
+          type:
+          - string
+          - "null"
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        published:
+          type: boolean
+      required:
+      - id
+      - published
+      - publishedAt
+      - source
+      - version
     CreateStepRequest:
       type: object
       properties:
@@ -3082,6 +3618,43 @@ components:
       - deliveryCount
       - mode
       - outputs
+    PinVersionRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+        reason:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - version
+    VersionPinResponse:
+      type: object
+      properties:
+        pinnedVersion:
+          type:
+          - integer
+          - "null"
+          format: int32
+        reason:
+          type:
+          - string
+          - "null"
+        pinnedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+    HotfixRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 200
+          minLength: 0
     CreateUserRequest:
       type: object
       properties:
@@ -3697,6 +4270,15 @@ components:
           - draft
           - published
           pattern: draft|published
+    RenameVersionRequest:
+      type: object
+      properties:
+        changelog:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - changelog
     UpdateStepRequest:
       type: object
       properties:
@@ -3710,6 +4292,176 @@ components:
           minLength: 0
         config:
           type: string
+    PublishedVersionRequest:
+      type: object
+      properties:
+        versionId:
+          type: string
+          format: uuid
+    WorkflowVersionPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowVersionResponse"
+        nextBeforeVersion:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - items
+    SnapshotResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        skeleton:
+          type: boolean
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/SnapshotStepResponse"
+      required:
+      - name
+      - skeleton
+      - steps
+    SnapshotStepResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+        inputRef:
+          type:
+          - string
+          - "null"
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - id
+      - stepOrder
+      - type
+    WorkflowVersionDetailResponse:
+      type: object
+      properties:
+        version:
+          $ref: "#/components/schemas/WorkflowVersionResponse"
+        snapshot:
+          $ref: "#/components/schemas/SnapshotResponse"
+      required:
+      - snapshot
+      - version
+    DiffSideResponse:
+      type: object
+      properties:
+        ref:
+          type: string
+        version:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - ref
+    JsonNode: {}
+    NameChangeResponse:
+      type: object
+      properties:
+        changed:
+          type: boolean
+        before:
+          type:
+          - string
+          - "null"
+        after:
+          type:
+          - string
+          - "null"
+      required:
+      - changed
+    StepChangeResponse:
+      type: object
+      properties:
+        stepId:
+          type: string
+        status:
+          type: string
+          enum:
+          - added
+          - removed
+          - modified
+          - moved
+        fromOrder:
+          type:
+          - integer
+          - "null"
+          format: int32
+        toOrder:
+          type:
+          - integer
+          - "null"
+          format: int32
+        name:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+        changedFields:
+          type: array
+          items:
+            type: string
+        before:
+          type:
+          - object
+          - "null"
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+        after:
+          type:
+          - object
+          - "null"
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+      required:
+      - changedFields
+      - status
+      - stepId
+      - type
+    WorkflowVersionDiffResponse:
+      type: object
+      properties:
+        source:
+          $ref: "#/components/schemas/DiffSideResponse"
+        target:
+          $ref: "#/components/schemas/DiffSideResponse"
+        skeleton:
+          type: boolean
+        name:
+          $ref: "#/components/schemas/NameChangeResponse"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepChangeResponse"
+      required:
+      - name
+      - skeleton
+      - source
+      - steps
+      - target
     SupportSettings:
       type: object
       properties:

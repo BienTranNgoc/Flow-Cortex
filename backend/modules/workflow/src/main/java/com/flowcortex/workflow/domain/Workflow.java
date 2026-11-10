@@ -17,6 +17,8 @@ import java.util.UUID;
 @Table(name = "workflow")
 public class Workflow {
 
+    public static final UUID SYSTEM_OWNER_ID = new UUID(0, 0);
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -41,6 +43,9 @@ public class Workflow {
 
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @Column(name = "published_version_id")
+    private UUID publishedVersionId;
 
     /** Required by JPA. */
     protected Workflow() {
@@ -78,6 +83,12 @@ public class Workflow {
 
     public void changeStatus(WorkflowStatus status) {
         this.status = status;
+        touch();
+    }
+
+    /** Moves the version non-owners are served; the caller guarantees it belongs to this workflow. */
+    public void pointTo(UUID versionId) {
+        this.publishedVersionId = versionId;
         touch();
     }
 
@@ -120,5 +131,14 @@ public class Workflow {
 
     public Instant getDeletedAt() {
         return deletedAt;
+    }
+
+    public UUID getPublishedVersionId() {
+        return publishedVersionId;
+    }
+
+    /** True for the migration-maintained seed workflows, which are served live and never versioned. */
+    public boolean isSystemOwned() {
+        return SYSTEM_OWNER_ID.equals(ownerId);
     }
 }

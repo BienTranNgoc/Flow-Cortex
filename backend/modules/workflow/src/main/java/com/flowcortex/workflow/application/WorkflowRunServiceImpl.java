@@ -32,7 +32,6 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.RunWithWorkflowName;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
-import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +76,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WorkflowRepository workflowRepository;
-    private final WorkflowStepRepository workflowStepRepository;
+    private final ServedDefinitions servedDefinitions;
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
     private final ApplicationEventPublisher events;
@@ -89,7 +88,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final RunUpdates runUpdates;
     private final boolean workflowEnabled;
 
-    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
+    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
             MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
@@ -97,7 +96,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
         this.runUpdates = runUpdates;
         this.workflowRepository = workflowRepository;
-        this.workflowStepRepository = workflowStepRepository;
+        this.servedDefinitions = servedDefinitions;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.events = events;
@@ -143,7 +142,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
-        List<WorkflowStep> stepDefs = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId());
+        List<WorkflowStep> stepDefs = servedDefinitions.stepsFor(workflow, currentUserId);
         // Refused up front: a run whose remote step would only fail media_disabled later.
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));

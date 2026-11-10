@@ -17,6 +17,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.api.RunView;
@@ -24,10 +25,13 @@ import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.domain.WorkflowVersion;
+import com.flowcortex.workflow.domain.WorkflowVersionSource;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,6 +55,9 @@ class WorkflowRunServiceImplTest {
 
     private final WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
     private final WorkflowStepRepository workflowStepRepository = mock(WorkflowStepRepository.class);
+    private final WorkflowVersionRepository versionRepository = mock(WorkflowVersionRepository.class);
+    private final ServedDefinitions servedDefinitions =
+            new ServedDefinitions(workflowStepRepository, versionRepository);
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
@@ -60,7 +67,7 @@ class WorkflowRunServiceImplTest {
     private final RunUpdates runUpdates = mock(RunUpdates.class);
 
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
-        return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
+        return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
                 runStepRepository, events, runUpdates, registry, mediaJobs, mock(UserDirectory.class),
                 new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
     }
@@ -106,7 +113,7 @@ class WorkflowRunServiceImplTest {
         RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
             throw new IllegalStateException("the credit guard must not be consulted");
         };
-        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
+        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, events, runUpdates, new StepExecutorRegistry(List.of(translate)),
                 mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
                 new RunStartGuards(List.of(creditGuard)), true);
@@ -182,6 +189,80 @@ class WorkflowRunServiceImplTest {
         assertThat(savedSteps()).extracting(RunStep::getInputRef).containsExactly(null, "{step:1}");
         verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
         verify(runUpdates).touched(started.id());
+    }
+
+    private static WorkflowVersion versionOf(Workflow workflow, int number, WorkflowStep... steps) {
+        return new WorkflowVersion(UUID.randomUUID(), workflow.getId(), number, null, WorkflowVersionSource.PUBLISH,
+                null, WorkflowSnapshots.of(workflow, List.of(steps)).toString(), workflow.getOwnerId(), Instant.now());
+    }
+
+    /** A shared workflow owned by someone else whose live draft has an echo step and a fail step. */
+    private Workflow sharedWorkflowOf(UUID ownerId, UUID viewerId) {
+        Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", true);
+        when(workflowRepository.findVisibleTo(workflow.getId(), viewerId)).thenReturn(Optional.of(workflow));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "live1", "echo", null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "live2", "fail", null)));
+        when(workflowRunRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        return workflow;
+    }
+
+    @Test
+    void aNonOwnerRunCopiesThePointedVersionsSteps() {
+        UUID ownerId = UUID.randomUUID();
+        UUID binh = UUID.randomUUID();
+        Workflow workflow = sharedWorkflowOf(ownerId, binh);
+        WorkflowVersion pointed = versionOf(workflow, 2,
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "pointed", "echo", null));
+        workflow.pointTo(pointed.getId());
+        when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
+
+        newService(true).startRun(binh, workflow.getId(), "hi");
+
+        assertThat(savedSteps()).extracting(RunStep::getType).containsExactly("echo");
+    }
+
+    @Test
+    void aPinnedCallerRunCopiesThePinnedVersionsSteps() {
+        UUID ownerId = UUID.randomUUID();
+        UUID binh = UUID.randomUUID();
+        Workflow workflow = sharedWorkflowOf(ownerId, binh);
+        WorkflowVersion pointed = versionOf(workflow, 2,
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "pointed", "echo", null));
+        WorkflowVersion pinned = versionOf(workflow, 1,
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "pinned1", "echo", null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "pinned2", "echo", null));
+        workflow.pointTo(pointed.getId());
+        when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
+        when(versionRepository.findPinnedBy(eq(binh), any())).thenReturn(List.of(pinned));
+
+        newService(true).startRun(binh, workflow.getId(), "hi");
+
+        assertThat(savedSteps()).extracting(RunStep::getType).containsExactly("echo", "echo");
+    }
+
+    @Test
+    void aServedVersionFailingAStartGuardCreatesNoRun() {
+        UUID ownerId = UUID.randomUUID();
+        UUID binh = UUID.randomUUID();
+        Workflow workflow = sharedWorkflowOf(ownerId, binh);
+        WorkflowVersion pointed = versionOf(workflow, 1,
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "first", "echo", "{step:2.output}"),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "second", "echo", null));
+        workflow.pointTo(pointed.getId());
+        when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
+        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
+                workflowRunRepository, runStepRepository, events, runUpdates, registry, mediaJobs,
+                mock(UserDirectory.class), new TransactionTemplate(transactions),
+                new RunStartGuards(List.of(new WorkflowReadinessGuard())), true);
+
+        assertThatThrownBy(() -> service.startRun(binh, workflow.getId(), "hi"))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("WORKFLOW_INCOMPLETE"));
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
     }
 
     @Test
