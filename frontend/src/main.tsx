@@ -1,5 +1,6 @@
 import '@fontsource-variable/google-sans-flex';
 import { setLocaleProvider } from '@flow-cortex/api-client';
+import { configureClientErrorReporting } from '@flow-cortex/ui-kit';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { activeLocale } from './lib/i18n';
@@ -7,6 +8,7 @@ import { App } from './App';
 import { initTheme } from './app/useTheme';
 
 setLocaleProvider(activeLocale);
+configureClientErrorReporting({ app: 'member' });
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

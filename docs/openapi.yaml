@@ -996,6 +996,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/client-errors:
+    post:
+      tags:
+      - client-errors-controller
+      summary: Report an error the web app contained
+      operationId: reportClientError
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        "204":
+          description: "Accepted, or ignored while the intake is off"
+        "400":
+          description: "client_error_content_type, client_error_unreadable, client_error_invalid"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: client_error_too_large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: client_error_rate_limited (Retry-After)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
