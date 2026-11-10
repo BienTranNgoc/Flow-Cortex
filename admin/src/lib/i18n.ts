@@ -4,6 +4,7 @@ import enAuth from '../locales/en/auth.json';
 import enCommon from '../locales/en/common.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
+import enProviders from '../locales/en/providers.json';
 import enRuns from '../locales/en/runs.json';
 import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
@@ -13,6 +14,7 @@ import viAuth from '../locales/vi/auth.json';
 import viCommon from '../locales/vi/common.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
+import viProviders from '../locales/vi/providers.json';
 import viRuns from '../locales/vi/runs.json';
 import viSmsOutbox from '../locales/vi/smsOutbox.json';
 import viSupport from '../locales/vi/support.json';
@@ -26,6 +28,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     auth: viAuth,
     users: viUsers,
     adminAccounts: viAdminAccounts,
+    providers: viProviders,
     runs: viRuns,
     mediaJobs: viMediaJobs,
     dashboard: viDashboard,
@@ -37,6 +40,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     auth: enAuth,
     users: enUsers,
     adminAccounts: enAdminAccounts,
+    providers: enProviders,
     runs: enRuns,
     mediaJobs: enMediaJobs,
     dashboard: enDashboard,

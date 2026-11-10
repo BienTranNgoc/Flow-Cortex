@@ -1,0 +1,124 @@
+{
+  "title": "Model Providers",
+  "eyebrow": "Credits & billing",
+  "description": "The language models Nodi may call, and the providers behind them.",
+  "tabs": {
+    "label": "Model Providers sections",
+    "models": "Models",
+    "providers": "Providers"
+  },
+  "retry": "Retry",
+  "loading": "Loading…",
+  "loadError": "Could not load this section.",
+  "models": {
+    "add": "Add model",
+    "refresh": "Refresh",
+    "empty": "No models are registered yet.",
+    "emptyHint": "Add a model so it can be picked wherever a language model is chosen.",
+    "tableLabel": "Registered models table",
+    "noun_one": "model",
+    "noun_other": "models",
+    "columns": {
+      "modelKey": "Model id",
+      "provider": "Provider",
+      "displayName": "Display name",
+      "tokens": "Output tokens",
+      "vision": "Vision",
+      "audio": "Audio",
+      "active": "Active",
+      "order": "Order",
+      "actions": "Actions"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "activeState": "Active",
+    "inactiveState": "Inactive",
+    "activeSwitch": "Active: {{name}}",
+    "edit": "Edit",
+    "editFor": "Edit {{name}}",
+    "delete": "Delete",
+    "deleteFor": "Delete {{name}}",
+    "test": "Test",
+    "testFor": "Test {{name}}",
+    "testing": "Testing…",
+    "toggleFailed": "Could not change {{name}}.",
+    "deleted": "{{name}} was deleted.",
+    "saved": "{{name}} was saved.",
+    "created": "{{name}} was added."
+  },
+  "form": {
+    "addTitle": "Add model",
+    "editTitle": "Edit {{name}}",
+    "modelKey": "Model id",
+    "modelKeyHint": "Pick from the provider's list or type an id.",
+    "provider": "Provider",
+    "displayName": "Display name",
+    "maxOutputTokens": "Output token limit",
+    "displayOrder": "Display order",
+    "supportsVision": "Understands images",
+    "supportsAudio": "Understands audio",
+    "active": "Active",
+    "vendorLoading": "Loading the provider's model list…",
+    "vendorFailed": "The provider's model list could not be loaded ({{code}}). Type the model id instead.",
+    "vendorNone": "The provider listed no models. Type the model id instead.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "errors": {
+      "required": "This field is required.",
+      "tokens": "Enter a whole number from 1 to 8192.",
+      "order": "Enter a whole number from 0 to 32767.",
+      "tooLong": "Use at most {{max}} characters.",
+      "generic": "Could not save the model. Try again."
+    }
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "description": "The entry {{modelKey}} is removed from the registry. Nothing else is changed.",
+    "confirm": "Delete model",
+    "working": "Deleting…",
+    "cancel": "Cancel",
+    "error": "Could not delete the model. Try again."
+  },
+  "overview": {
+    "empty": "No providers are registered.",
+    "category": {
+      "text": "Language models"
+    },
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "missing": "Missing settings:",
+    "liveCheck": "Free live check",
+    "noLiveCheck": "No free live check",
+    "slots": "Model slots",
+    "noSlots": "No model slots are configured.",
+    "test": "Test provider",
+    "testFor": "Test {{key}}",
+    "testing": "Testing…",
+    "state": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "unregistered": "Not registered",
+      "not_applicable": "Not applicable"
+    }
+  },
+  "probe": {
+    "ok": "Answered in {{ms}} ms ({{tokens}} output tokens)",
+    "reachable": "Reachable in {{ms}} ms",
+    "notTested": "Configured; this provider has no free live check, so nothing was sent.",
+    "failedIn": "{{reason}} ({{ms}} ms)",
+    "unknown": "The check failed ({{code}}).",
+    "requestFailed": "The check could not be run. Try again.",
+    "missingSettings": "{{reason}} {{names}}",
+    "code": {
+      "missing_config": "The provider has no key configured:",
+      "quota_exceeded": "The provider's quota is exhausted.",
+      "rejected": "The provider refused the request: the key or the model id is not accepted.",
+      "blocked": "The provider blocked the request.",
+      "timeout": "The provider did not answer in time.",
+      "unreachable": "The provider could not be reached.",
+      "upstream": "The provider answered with an error.",
+      "unusable": "The provider answered, but not with a usable result."
+    }
+  }
+}

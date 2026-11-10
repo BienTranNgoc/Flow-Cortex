@@ -13,6 +13,7 @@ import { useMeQuery } from './features/auth/useAuth';
 import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { ProvidersPage } from './features/providers/ProvidersPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
@@ -28,6 +29,7 @@ const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
+  '/providers': <ProvidersPage />,
   '/sms-outbox': <SmsOutboxPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
