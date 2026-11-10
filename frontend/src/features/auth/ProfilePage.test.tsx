@@ -104,6 +104,20 @@ describe('ProfilePage', () => {
     expect(put?.body).toEqual({ name: 'Renamed', firstName: 'Mem', lastName: '' });
   });
 
+  it('offers no name form, only Retry, when the own profile fails to load', async () => {
+    stubApi({
+      ...OWN_ROUTES,
+      'GET /api/v1/auth/profile': { status: 500, body: { status: 500, detail: 'boom' } },
+    });
+
+    renderProfile();
+
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Display name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+  });
+
   it('shows the server detail when saving fails', async () => {
     stubApi({
       ...OWN_ROUTES,

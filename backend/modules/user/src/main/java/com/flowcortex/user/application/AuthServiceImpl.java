@@ -181,11 +181,11 @@ class AuthServiceImpl implements AuthService {
      */
     private Registered saveRegistration(NewRegistration details) {
         return transaction.execute(status -> {
+            Optional<AppUser> existing = userRepository.findIdByEmail(details.email())
+                    .flatMap(userRepository::findByIdForUpdate);
             if (details.username() != null) {
                 usernameRules.assertAllowedForNewAccount(details.username(), Instant.now(clock));
             }
-            Optional<AppUser> existing = userRepository.findIdByEmail(details.email())
-                    .flatMap(userRepository::findByIdForUpdate);
             if (existing.isPresent()) {
                 AppUser account = existing.get();
                 if (account.isEmailConfirmed()) {

@@ -18,8 +18,8 @@ interface SyncProps {
 }
 
 /**
- * Renders nothing. The first preferences answer after sign-in replaces any device choice that
- * differs from it; later cache writes (this device's own saves) are never re-applied.
+ * Renders nothing. The first preferences answer of a signed-in session replaces any device choice
+ * that differs from it; later answers (token refreshes, this device's own saves) are never re-applied.
  */
 export function AccountPreferencesSync({
   theme,
@@ -30,11 +30,15 @@ export function AccountPreferencesSync({
   const { i18n } = useTranslation();
   const token = useAuthToken();
   const { data } = useAccountPreferencesQuery();
-  const appliedFor = useRef<string | null>(null);
+  const applied = useRef(false);
 
   useEffect(() => {
-    if (!data || !token || appliedFor.current === token) return;
-    appliedFor.current = token;
+    if (!token) {
+      applied.current = false;
+      return;
+    }
+    if (!data || applied.current) return;
+    applied.current = true;
 
     const locale = accountChoiceToApply(data.locale, localeOf(i18n), SUPPORTED_LOCALES);
     if (locale) switchLocale(i18n, locale);

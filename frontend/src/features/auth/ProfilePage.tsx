@@ -74,7 +74,9 @@ export function ProfilePage() {
     reset,
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    ...(meQuery.data ? { values: savedNames(meQuery.data.name, ownProfile.data) } : {}),
+    ...(meQuery.data && ownProfile.data
+      ? { values: savedNames(meQuery.data.name, ownProfile.data) }
+      : {}),
   });
 
   const updateMutation = useUpdateNames();
@@ -112,6 +114,14 @@ export function ProfilePage() {
   const initials = initialsFrom(me.name, me.email);
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));
   const onCancel = () => reset(savedNames(me.name, ownProfile.data));
+  const ownProfileError = ownProfile.isError && (
+    <p role="alert" className="form-error">
+      {t('auth.profile.loadError')}{' '}
+      <button type="button" onClick={() => void ownProfile.refetch()}>
+        {t('auth.profile.retry')}
+      </button>
+    </p>
+  );
   const serverError = failureMessage(updateMutation, t);
 
   return (
@@ -201,64 +211,59 @@ export function ProfilePage() {
           <h2 className="profile-card__title">{t('auth.profile.editTitle')}</h2>
           <p className="profile-card__hint">{t('auth.profile.editHint')}</p>
 
-          <form onSubmit={onSubmit} noValidate>
-            {NAME_FIELDS.map(({ name, id, label, placeholder }) => (
-              <div className="field" key={name}>
-                <label htmlFor={id}>{t(`auth.profile.${label}`)}</label>
-                <input
-                  id={id}
-                  {...register(name)}
-                  aria-invalid={Boolean(errors[name]) || undefined}
-                  placeholder={t(`auth.profile.${placeholder}`)}
-                />
-                {errors[name]?.message && (
-                  <p role="alert" className="form-error">
-                    {t(errors[name].message)}
-                  </p>
-                )}
+          {!ownProfile.data && (ownProfileError || <output>{t('auth.profile.loading')}</output>)}
+          {ownProfile.data && (
+            <form onSubmit={onSubmit} noValidate>
+              {NAME_FIELDS.map(({ name, id, label, placeholder }) => (
+                <div className="field" key={name}>
+                  <label htmlFor={id}>{t(`auth.profile.${label}`)}</label>
+                  <input
+                    id={id}
+                    {...register(name)}
+                    aria-invalid={Boolean(errors[name]) || undefined}
+                    placeholder={t(`auth.profile.${placeholder}`)}
+                  />
+                  {errors[name]?.message && (
+                    <p role="alert" className="form-error">
+                      {t(errors[name].message)}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              {serverError && (
+                <p role="alert" className="form-error">
+                  {serverError}
+                </p>
+              )}
+              {updateMutation.isSuccess && (
+                <p className="profile-saved" role="status">
+                  {t('auth.profile.saved')}
+                </p>
+              )}
+
+              <div className="profile-form__actions">
+                <button
+                  type="button"
+                  className="cortex-btn cortex-btn--ghost"
+                  onClick={onCancel}
+                  disabled={updateMutation.isPending}
+                >
+                  {t('auth.profile.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="cortex-btn cortex-btn--primary"
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
+                </button>
               </div>
-            ))}
-
-            {serverError && (
-              <p role="alert" className="form-error">
-                {serverError}
-              </p>
-            )}
-            {updateMutation.isSuccess && (
-              <p className="profile-saved" role="status">
-                {t('auth.profile.saved')}
-              </p>
-            )}
-
-            <div className="profile-form__actions">
-              <button
-                type="button"
-                className="cortex-btn cortex-btn--ghost"
-                onClick={onCancel}
-                disabled={updateMutation.isPending}
-              >
-                {t('auth.profile.cancel')}
-              </button>
-              <button
-                type="submit"
-                className="cortex-btn cortex-btn--primary"
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
-              </button>
-            </div>
-          </form>
+            </form>
+          )}
 
           <hr className="profile-card__divider" />
 
-          {ownProfile.isError && (
-            <p role="alert" className="form-error">
-              {t('auth.profile.loadError')}{' '}
-              <button type="button" onClick={() => void ownProfile.refetch()}>
-                {t('auth.profile.retry')}
-              </button>
-            </p>
-          )}
           {ownProfile.data && (
             <UsernameField
               username={ownProfile.data.username}
@@ -285,7 +290,9 @@ export function ProfilePage() {
             <div>
               <dt>{t('auth.profile.statusLabel')}</dt>
               <dd>
-                {me.status === 'ACTIVE' && <span className="profile-status-dot" aria-hidden="true" />}
+                {me.status === 'ACTIVE' && (
+                  <span className="profile-status-dot" aria-hidden="true" />
+                )}
                 {statusLabel(t, me.status) || '—'}
               </dd>
             </div>

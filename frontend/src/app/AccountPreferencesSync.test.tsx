@@ -50,6 +50,27 @@ describe('AccountPreferencesSync in the shell', () => {
     );
   });
 
+  it('aTokenRotationDuringTheSessionDoesNotApplyTheAccountValuesAgain', async () => {
+    const calls = stubApi({
+      [PREFERENCES]: preferences('dark'),
+      [SAVE_UI]: { status: 500, body: { status: 500, detail: 'boom' } },
+    });
+    const { queryClient } = renderRoute('/', '/', <Layout />);
+
+    fireEvent.click(await screen.findByRole('button', TO_LIGHT));
+    expect(await screen.findByRole('button', TO_DARK)).toBeInTheDocument();
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+
+    act(() => setToken('t2', true));
+    await waitFor(() =>
+      expect(calls.filter((call) => call.path.endsWith('/preferences'))).toHaveLength(2),
+    );
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+
+    expect(screen.getByRole('button', TO_DARK)).toBeInTheDocument();
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
   it('aSaveMadeBeforeTheLoadAnswersIsNotUndoneByIt', async () => {
     let answerLoad: (reply: FakeReply) => void = () => {};
     const load = new Promise<FakeReply>((resolve) => {

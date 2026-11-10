@@ -6,6 +6,7 @@ import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,7 +45,8 @@ public class UsernameRules {
      * @throws RegistrationConflictException  when another account holds the name or has it on hold
      */
     public void change(AppUser lockedUser, String next, Instant now) {
-        users.lockUsername(next);
+        String stored = lockedUser.getUsername();
+        lockNames(stored != null && !stored.equals(next) ? new String[] {stored, next} : new String[] {next});
         UsernamePolicy.Decision decision = UsernamePolicy.decide(new UsernamePolicy.Change(
                 lockedUser.getUsername(), next, lockedUser.getUsernameChangedAt(), now));
         switch (decision) {
@@ -63,6 +65,11 @@ public class UsernameRules {
         if (holds.findActive(name, now).isPresent()) {
             throw RegistrationConflictException.usernameTaken();
         }
+    }
+
+    /** Locks in sorted order so two changes touching the same names cannot deadlock each other. */
+    private void lockNames(String... names) {
+        Arrays.stream(names).distinct().sorted().forEach(users::lockUsername);
     }
 
     private void apply(AppUser user, String next, Instant now, UsernamePolicy.Decision.Proceed proceed) {

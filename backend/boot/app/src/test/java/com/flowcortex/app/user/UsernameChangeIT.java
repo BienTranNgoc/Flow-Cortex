@@ -3,6 +3,9 @@ package com.flowcortex.app.user;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.domain.AppUser;
+import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.profile.UsernameRules;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -10,6 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +37,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -61,6 +66,15 @@ class UsernameChangeIT extends AbstractUserModuleIT {
 
     @Autowired
     private CapturingMailSender mail;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private AppUserRepository appUsers;
+
+    @Autowired
+    private UsernameRules usernameRules;
 
     private TestRestTemplate client;
 
@@ -207,6 +221,42 @@ class UsernameChangeIT extends AbstractUserModuleIT {
         }
         return HttpStatus.valueOf(
                 put(PATH, member.token(), new UsernameRequest(name), String.class).getStatusCode().value());
+    }
+
+    @Test
+    void registrationOfTheReleasedNameWaitsForTheChangeAndIsRefusedByItsHold() throws Exception {
+        String old = freshName();
+        Member former = newMember(old);
+        String email = uniqueEmail("reg-race");
+        CountDownLatch holdWritten = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+
+        CompletableFuture<Void> change = CompletableFuture.runAsync(() -> transactionTemplate.executeWithoutResult(status -> {
+            AppUser locked = appUsers.findByIdForUpdate(former.id()).orElseThrow();
+            usernameRules.change(locked, freshName(), Instant.now());
+            holdWritten.countDown();
+            await(commit);
+        }));
+        assertThat(holdWritten.await(10, TimeUnit.SECONDS)).isTrue();
+
+        CompletableFuture<ResponseEntity<ProblemView>> registration = CompletableFuture.supplyAsync(() ->
+                postFromNewClient("/api/v1/auth/register",
+                        new RegisterRequest("An", "Tran", old, email, PASSWORD), ProblemView.class));
+        Thread.sleep(1000);
+        commit.countDown();
+        change.get(10, TimeUnit.SECONDS);
+
+        assertThat(registration.get(10, TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ownerOf(old)).isNull();
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ex);
+        }
     }
 
     @Test
