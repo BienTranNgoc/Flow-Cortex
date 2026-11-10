@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -16,7 +15,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * ({@code getRemoteAddr()}, which honours the forwarded-header strategy) and refuses it under enforce.
  * The mode binds at startup.
  */
-@Component
 class PaymentsRegionInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final PaymentsRegionService service;
