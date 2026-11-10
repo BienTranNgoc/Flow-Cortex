@@ -388,6 +388,46 @@ describe('LoginPage', () => {
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
+
+    describe('inactive account', () => {
+      const flags = (supportWidget: boolean): Record<string, FakeReply> => ({
+        'GET /api/v1/features': {
+          status: 200,
+          body: {
+            emailConfirmation: false,
+            phoneVerification: false,
+            uploadContentCheck: false,
+            runCancellation: false,
+            credits: false,
+            passwordReset: false,
+            supportWidget,
+            supportAssistant: false,
+          },
+        },
+      });
+
+      it('links "contact support" to the help panel while the Help Center is on', async () => {
+        stubApi(flags(true));
+        renderLogin(null, '?oauth_error=account_inactive');
+
+        const link = await screen.findByRole('link', { name: 'contact support' });
+        expect(link).toHaveAttribute('href', expect.stringContaining('help=home'));
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'This account is not active. Please contact support.',
+        );
+      });
+
+      it('keeps the sentence as plain text while the Help Center is off', async () => {
+        stubApi(flags(false));
+        const { queryClient } = renderLogin(null, '?oauth_error=account_inactive');
+
+        await settled(queryClient);
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'This account is not active. Please contact support.',
+        );
+        expect(screen.queryByRole('link', { name: 'contact support' })).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe('in Vietnamese', () => {
@@ -1032,6 +1072,28 @@ describe('LoginPage', () => {
         renderLogin(null, `?oauth_error=${code}`);
 
         expect(screen.getByRole('alert')).toHaveTextContent(message);
+      });
+
+      it('links "liên hệ bộ phận hỗ trợ" to the help panel for an inactive account', async () => {
+        stubApi({
+          'GET /api/v1/features': {
+            status: 200,
+            body: {
+              emailConfirmation: false,
+              phoneVerification: false,
+              uploadContentCheck: false,
+              runCancellation: false,
+              credits: false,
+              passwordReset: false,
+              supportWidget: true,
+              supportAssistant: false,
+            },
+          },
+        });
+        renderLogin(null, '?oauth_error=account_inactive');
+
+        const link = await screen.findByRole('link', { name: 'liên hệ bộ phận hỗ trợ' });
+        expect(link).toHaveAttribute('href', expect.stringContaining('help=home'));
       });
 
       it('drops the Google message after the first submit, even once the failure is edited away', async () => {
