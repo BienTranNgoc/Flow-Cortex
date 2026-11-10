@@ -972,6 +972,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/onboarding/reset:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: resetOnboarding
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResetResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/quiz:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveOnboardingQuiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingQuizBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSaveResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - onboarding-controller
+      operationId: patchOnboardingQuiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingQuizBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSaveResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/progress:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveOnboardingProgress
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingProgressBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingProgressResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: the journey is closed or switched off; nothing was changed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/builder/progress:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveBuilderOnboardingProgress
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuilderProgressBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderOnboardingResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors.state)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/builder/complete:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: completeBuilderOnboarding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuilderCompleteBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderOnboardingResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors.reason)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -2118,6 +2290,42 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: stream-limit-reached
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/status:
+    get:
+      tags:
+      - onboarding-controller
+      operationId: getOnboardingStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingStatusResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/result:
+    get:
+      tags:
+      - onboarding-controller
+      operationId: getOnboardingResult
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResultResponse"
+        "401":
+          description: unauthorized
           content:
             application/problem+json:
               schema:
@@ -3487,6 +3695,188 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    OnboardingResetResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+      required:
+      - completed
+    OnboardingQuizBody:
+      type: object
+      properties:
+        purposes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing_content
+            - automation
+            - documents_reports
+            - customer_care
+            - research
+            - other
+        source:
+          type:
+          - string
+          - "null"
+          enum:
+          - facebook
+          - tiktok
+          - linkedin
+          - google
+          - referral
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        industries:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing
+            - sales
+            - finance
+            - hr
+            - tech
+            - other
+        contentTypes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - text
+            - image
+            - audio
+            - video
+            - spreadsheet
+            - document
+            - slide
+        usageType:
+          type:
+          - string
+          - "null"
+          enum:
+          - personal
+          - team
+        finished:
+          type: boolean
+        skipped:
+          type: boolean
+    QuizSaveResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        skipped:
+          type: boolean
+      required:
+      - completed
+      - completedAt
+    OnboardingProgressBody:
+      type: object
+      properties:
+        step:
+          type: string
+          enum:
+          - welcome
+          - tour:home
+          - survey-intro
+          - quiz
+          - done
+        question:
+          type: integer
+          format: int32
+          maximum: 6
+          minimum: 1
+        surveyDeferred:
+          type: boolean
+        finished:
+          type: boolean
+    OnboardingProgress:
+      type: object
+      properties:
+        v:
+          type: integer
+          format: int32
+        step:
+          type: string
+          enum:
+          - welcome
+          - tour:home
+          - survey-intro
+          - quiz
+          - done
+        question:
+          type: integer
+          format: int32
+          maximum: 6
+          minimum: 1
+        surveyDeferredAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OnboardingProgressResponse:
+      type: object
+      properties:
+        progress:
+          $ref: "#/components/schemas/OnboardingProgress"
+        completedAt:
+          type: string
+          format: date-time
+      required:
+      - progress
+    BuilderProgressBody:
+      type: object
+      properties:
+        state:
+          type: string
+      required:
+      - state
+    BuilderOnboardingResponse:
+      type: object
+      properties:
+        state:
+          type: string
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - completedAt
+      - state
+    BuilderCompleteBody:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+          - skipped
+          - finished
     VerifyCodeRequest:
       type: object
       properties:
@@ -3904,6 +4294,151 @@ components:
       required:
       - expiresAt
       - url
+    OnboardingStatusResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        purposes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing_content
+            - automation
+            - documents_reports
+            - customer_care
+            - research
+            - other
+        source:
+          type:
+          - string
+          - "null"
+          enum:
+          - facebook
+          - tiktok
+          - linkedin
+          - google
+          - referral
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        industries:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing
+            - sales
+            - finance
+            - hr
+            - tech
+            - other
+        contentTypes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - text
+            - image
+            - audio
+            - video
+            - spreadsheet
+            - document
+            - slide
+        usageType:
+          type:
+          - string
+          - "null"
+          enum:
+          - personal
+          - team
+        progress:
+          $ref: "#/components/schemas/OnboardingProgress"
+        firstRunDone:
+          type: boolean
+        open:
+          type: boolean
+        entry:
+          type:
+          - string
+          - "null"
+          enum:
+          - first
+      required:
+      - aiLevel
+      - completed
+      - completedAt
+      - contentTypes
+      - entry
+      - firstRunDone
+      - industries
+      - open
+      - progress
+      - purposes
+      - source
+      - usageType
+    OnboardingResultResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        industry:
+          type: string
+          enum:
+          - marketing
+          - sales
+          - finance
+          - hr
+          - tech
+          - other
+        track:
+          type: string
+          enum:
+          - marketing
+          - sales
+          - finance
+          - hr
+          - tech
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        usageType:
+          type: string
+          enum:
+          - personal
+          - team
+      required:
+      - aiLevel
+      - completed
+      - industry
+      - track
+      - usageType
     HealthResponse:
       type: object
       properties:
@@ -3934,9 +4469,12 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        onboarding:
+          type: boolean
       required:
       - credits
       - emailConfirmation
+      - onboarding
       - passwordReset
       - phoneVerification
       - runCancellation

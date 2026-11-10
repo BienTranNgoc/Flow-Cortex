@@ -13,6 +13,7 @@ include(
     ":modules:support",
     ":modules:space",
     ":modules:realtime",
+    ":modules:onboarding",
     ":shared:web",
     ":shared:security",
 )

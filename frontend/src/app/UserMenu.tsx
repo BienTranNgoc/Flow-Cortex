@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { setToken, signOut } from '@flow-cortex/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { requestReplay } from '../features/onboarding/onboardingSession';
+import { useOnboardingStatus } from '../features/onboarding/useOnboarding';
 import { formatNumber } from '../lib/format';
 import { activeLocale } from '../lib/i18n';
 import { accountStatsEnabled, demoPagesEnabled } from './featureFlags';
@@ -18,7 +20,10 @@ const DEMO_GPU_MINUTES_USED = 120;
 const DEMO_GPU_MINUTES_TOTAL = 240;
 const DEMO_TOKEN_BALANCE = 84_500;
 
-function initialsFrom(name: string | string[] | null | undefined, email: string | null | undefined): string {
+function initialsFrom(
+  name: string | string[] | null | undefined,
+  email: string | null | undefined,
+): string {
   const source = (typeof name === 'string' ? name : '').trim() || (email ?? '');
   const parts = source.split(/[\s@.]+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -39,6 +44,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
   const queryClient = useQueryClient();
 
   const initials = initialsFrom(name, email);
+  const canReplay = useOnboardingStatus().data?.entry === null;
 
   useEffect(() => {
     if (!open) return;
@@ -94,7 +100,10 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
       {open && (
         <div id={panelId} className="cortex-user-menu__panel">
           <div className="cortex-user-menu__identity">
-            <span className="cortex-user-menu__avatar cortex-user-menu__avatar--lg" aria-hidden="true">
+            <span
+              className="cortex-user-menu__avatar cortex-user-menu__avatar--lg"
+              aria-hidden="true"
+            >
               {initials}
             </span>
             <div className="cortex-user-menu__identity-text">
@@ -136,6 +145,18 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
             >
               <span>{t('common.userMenu.connectedServices')}</span>
             </Link>
+          )}
+          {canReplay && (
+            <button
+              type="button"
+              className="cortex-user-menu__item"
+              onClick={() => {
+                setOpen(false);
+                requestReplay();
+              }}
+            >
+              <span>{t('onboarding.menu.replay')}</span>
+            </button>
           )}
           <Link to="/docs" className="cortex-user-menu__item" onClick={() => setOpen(false)}>
             <span>{t('common.userMenu.helpDocs')}</span>

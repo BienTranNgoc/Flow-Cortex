@@ -13,6 +13,7 @@ const ALL_OFF = {
   passwordReset: false,
   supportWidget: false,
   supportAssistant: false,
+  onboarding: false,
 };
 
 function setup() {

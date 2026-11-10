@@ -285,6 +285,9 @@ flowcortex:
   # Personal spaces: off means the session space answers 503; spaces are still provisioned at activation.
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
+  # Member onboarding journey: off means no entry is offered and progress writes answer 409; the quiz routes keep working.
+  onboarding:
+    enabled: ${FLOWCORTEX_ONBOARDING_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
   # Every registered step type needs a cost here, or startup fails.
   credits:

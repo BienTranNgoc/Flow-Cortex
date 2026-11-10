@@ -1,0 +1,234 @@
+.onboarding-dialog {
+  box-sizing: border-box;
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.onboarding-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: onboarding-enter var(--dur-standard) var(--ease-standard);
+}
+
+.onboarding-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.onboarding-dialog__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.5rem 1.5rem 0.5rem;
+}
+
+.onboarding-dialog__title {
+  margin: 0 var(--hit-min) 0.75rem 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.onboarding-dialog__title:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.onboarding-dialog__body p {
+  margin: 0 0 0.75rem;
+  color: var(--ink-2);
+}
+
+.onboarding-dialog__body .onboarding-counter {
+  color: var(--ink-4);
+  font-size: 0.85rem;
+}
+
+.onboarding-dialog__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.onboarding-dialog__close:hover {
+  background: var(--chrome-hover);
+  color: var(--ink);
+}
+
+.onboarding-dialog__footer,
+.onboarding-tip__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.onboarding-dialog__footer {
+  flex: 0 0 auto;
+  padding: 0.75rem 1.5rem 1.25rem;
+}
+
+.onboarding-dialog__footer button,
+.onboarding-tip__actions button {
+  margin-right: 0;
+}
+
+.onboarding-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+}
+
+.onboarding-primary:not(:disabled, [aria-disabled='true']):hover,
+.onboarding-primary:not(:disabled, [aria-disabled='true']):active {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+}
+
+.onboarding-dialog button[aria-disabled='true'],
+.onboarding-tip button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.onboarding-dialog button[aria-busy='true'] {
+  cursor: progress;
+}
+
+.onboarding-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--target-min);
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-full);
+  background: var(--btn-bg);
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+label.onboarding-chip {
+  position: relative;
+}
+
+label.onboarding-chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.onboarding-chip:hover {
+  background: var(--btn-bg-hover);
+}
+
+.onboarding-chip[aria-pressed='true'],
+.onboarding-chip[data-checked='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--teal-deep);
+  font-weight: 600;
+}
+
+.onboarding-chip:has(input:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.onboarding-chip[aria-disabled='true'],
+.onboarding-chip:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.onboarding-steps {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  color: var(--ink-2);
+}
+
+.onboarding-ring {
+  position: fixed;
+  z-index: 190;
+  box-sizing: border-box;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+.onboarding-tip {
+  position: fixed;
+  z-index: 200;
+  box-sizing: border-box;
+  width: min(20rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+}
+
+.onboarding-tip .onboarding-dialog__title {
+  margin-right: 0;
+}
+
+.onboarding-tip p {
+  margin: 0 0 0.75rem;
+  color: var(--ink-2);
+}
+
+@keyframes onboarding-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-dialog[open] {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .onboarding-dialog__footer {
+    flex-direction: column-reverse;
+  }
+
+  .onboarding-dialog__footer button {
+    width: 100%;
+  }
+}
