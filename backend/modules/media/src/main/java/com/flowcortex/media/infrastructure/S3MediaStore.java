@@ -47,7 +47,9 @@ public class S3MediaStore implements AutoCloseable {
     /** Signed, but set by the browser itself; a script may not set them. */
     private static final Set<String> SET_BY_THE_BROWSER = Set.of("host", "content-length");
     private static final String RETENTION_TAG_KEY = "flowcortex-retention";
-    static final String RUN_INPUT_TAG = RETENTION_TAG_KEY + "=run-input";
+    /** Retention value of a run input's copy; the media bucket's lifecycle rule keys on it. */
+    public static final String RUN_INPUT_RETENTION = "run-input";
+    static final String RUN_INPUT_TAG = RETENTION_TAG_KEY + "=" + RUN_INPUT_RETENTION;
 
     private final S3Client client;
     private final S3Presigner presigner;
@@ -113,6 +115,39 @@ public class S3MediaStore implements AutoCloseable {
     public void put(String bucket, String key, String contentType, byte[] bytes) {
         client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType),
                 RequestBody.fromBytes(bytes));
+    }
+
+    /**
+     * As {@link #put(String, String, String, byte[])}, but the object carries only
+     * {@code flowcortex-retention=<retention>}. Bounded by the copy timeout like {@link #copy}: moving
+     * an image of several megabytes outlasts the client's default per-attempt timeout.
+     * @throws software.amazon.awssdk.core.exception.SdkException if the store does not take the write
+     */
+    public void put(String bucket, String key, String contentType, byte[] bytes, String retention) {
+        client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType)
+                        .tagging(RETENTION_TAG_KEY + "=" + retention)
+                        .overrideConfiguration(timeouts -> timeouts
+                                .apiCallTimeout(copyTimeout)
+                                .apiCallAttemptTimeout(copyTimeout)),
+                RequestBody.fromBytes(bytes));
+    }
+
+    /**
+     * At most the first {@code maxBytes + 1} bytes of the object, so a caller can tell an object over its
+     * cap from one at it without reading the rest. Bounded by the copy timeout like {@link #copy}.
+     * @throws UploadRejectedException on field {@code uploadIds} if there is no object at {@code key}
+     */
+    public byte[] read(String bucket, String key, int maxBytes) {
+        try {
+            return client.getObjectAsBytes(request -> request.bucket(bucket).key(key)
+                    .range("bytes=0-" + maxBytes)
+                    .overrideConfiguration(timeouts -> timeouts
+                            .apiCallTimeout(copyTimeout)
+                            .apiCallAttemptTimeout(copyTimeout))).asByteArray();
+        } catch (NoSuchKeyException e) {
+            LOG.info("Upload refused at run start: bucket={} key={} reason=gone before read", bucket, key);
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        }
     }
 
     /** @throws software.amazon.awssdk.core.exception.SdkException if the bucket cannot be reached or does not exist */

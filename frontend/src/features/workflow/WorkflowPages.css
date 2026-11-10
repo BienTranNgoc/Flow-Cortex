@@ -94,6 +94,91 @@
   margin: 0;
 }
 
+.run-inputs {
+  margin: 1rem 0;
+  min-width: 0;
+}
+
+.run-inputs-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.run-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-input {
+  min-width: 0;
+}
+
+.run-input-audio {
+  grid-column: 1 / -1;
+}
+
+.run-input-media {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+
+.run-input-image {
+  height: auto;
+  max-height: 12rem;
+  object-fit: cover;
+}
+
+.run-input-video {
+  max-height: 16rem;
+}
+
+.run-input-media:hover {
+  border-color: var(--line-2);
+}
+
+.run-input-media:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.run-input-gone,
+.run-inputs-status {
+  margin: 0;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.run-input-gone {
+  padding: 0.75rem;
+  border: 1px dashed var(--line-3);
+  border-radius: var(--radius-md);
+}
+
+.run-inputs-error {
+  color: var(--red);
+}
+
+.run-inputs-status {
+  display: block;
+  margin: 1rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-input-media {
+    transition: none;
+  }
+}
+
 .run-step-failure .run-step-code {
   display: block;
   margin-top: 0.25rem;

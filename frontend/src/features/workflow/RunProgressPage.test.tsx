@@ -15,7 +15,7 @@ import viWorkflow from '../../locales/vi/workflow.json';
 import {
   renderRoute as renderRouteBare,
   settled,
-  stubApi,
+  stubApi as stubApiWithoutInputs,
   type FakeReply,
   type Handler,
 } from '../../test/fakeApi';
@@ -59,6 +59,15 @@ function push(event = 'run.updated') {
     throw new Error('the page holds no open stream');
   }
   act(() => stream.options.onEvent({ id: null, event, data: '{"runId":"r1"}' }));
+}
+
+/** Every run here has no uploaded files unless a test says otherwise. */
+function stubApi(routes: Record<string, Handler>) {
+  return stubApiWithoutInputs({
+    'GET /api/v1/runs/r1/inputs': { status: 200, body: [] },
+    'GET /api/v1/runs/R1/inputs': { status: 200, body: [] },
+    ...routes,
+  });
 }
 
 function runReads(calls: Array<{ path: string }>): number {
@@ -237,7 +246,10 @@ describe('RunProgressPage', () => {
       screen.getByText('The media engine was too busy to start this in time. Try running again.'),
     ).toBeInTheDocument();
     await settled(queryClient);
-    expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
+    expect(calls.map((call) => call.path).sort()).toEqual([
+      '/api/v1/runs/r1',
+      '/api/v1/runs/r1/inputs',
+    ]);
   });
 
   it('shows no file line for a run whose first step is inline', async () => {
@@ -1400,7 +1412,10 @@ describe('RunProgressPage', () => {
         '/workflows/w1',
       );
       await settled(queryClient);
-      expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
+      expect(calls.map((call) => call.path).sort()).toEqual([
+        '/api/v1/runs/r1',
+        '/api/v1/runs/r1/inputs',
+      ]);
     });
 
     it('announces the step the page selects after a pushed update, and nothing on first render', async () => {

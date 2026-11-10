@@ -8,6 +8,7 @@ import {
   getReviewTasks,
   getRevisions,
   getRun,
+  getRunInputs,
   getWorkflow,
   listWorkflows,
   rejectTask,
@@ -87,6 +88,27 @@ export function useRunQuery(runId: string | undefined) {
   });
   useRunEvents(runId, query.data?.status, query.refetch);
   return query;
+}
+
+const INPUT_URL_REFRESH_LEAD_MS = 60_000;
+// A stale timer longer than ~24.8 days overflows setTimeout and fires at once.
+const MAX_INPUT_STALE_MS = 24 * 60 * 60 * 1000;
+
+/** The run's uploaded files with signed links, kept fresh until shortly before the first expires. */
+export function useRunInputsQuery(runId: string) {
+  return useQuery({
+    queryKey: ['runs', runId, 'inputs'],
+    queryFn: () => unwrap(getRunInputs(runId, authHeaders())),
+    enabled: Boolean(runId),
+    staleTime: (query) => {
+      const expiries = (query.state.data ?? []).map((input) => Date.parse(input.expiresAt));
+      if (expiries.length === 0 || expiries.some(Number.isNaN)) {
+        return 0;
+      }
+      const untilRefresh = Math.min(...expiries) - INPUT_URL_REFRESH_LEAD_MS - Date.now();
+      return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
+    },
+  });
 }
 
 /**

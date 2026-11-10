@@ -51,6 +51,13 @@ public interface WorkflowRunService {
     RunOutputUrlView getOutputUrl(UUID currentUserId, UUID runId, int stepOrder, String name);
 
     /**
+     * The inputs the run was started with, in start order, each with a time-limited URL to the run's stored
+     * copy; empty for a run without uploads. Always owner-scoped.
+     * @throws NotFoundException if the run is not {@code currentUserId}'s or does not exist
+     */
+    List<RunInputView> getRunInputs(UUID currentUserId, UUID runId);
+
+    /**
      * Every user's runs, newest first, for the admin console — not owner-scoped, so callers must
      * be ADMIN-only. {@code status} is a lowercase run status, or {@code null} for all.
      */

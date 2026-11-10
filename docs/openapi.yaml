@@ -1639,6 +1639,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutputUrlResponse"
+  /api/v1/runs/{id}/inputs:
+    get:
+      tags:
+      - runs-controller
+      operationId: getRunInputs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunInputResponse"
   /api/v1/realtime/stream:
     get:
       tags:
@@ -3392,6 +3413,26 @@ components:
           format: date-time
       required:
       - expiresAt
+      - url
+    RunInputResponse:
+      type: object
+      properties:
+        bindingKey:
+          type: string
+        kind:
+          type: string
+        mimeType:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - bindingKey
+      - expiresAt
+      - kind
+      - mimeType
       - url
     HealthResponse:
       type: object

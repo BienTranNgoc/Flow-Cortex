@@ -72,6 +72,13 @@
     "loadError": "Không tải được lượt chạy này."
   },
   "file": "Tệp: {{name}}",
+  "inputs": {
+    "heading": "Đầu vào",
+    "imageAlt": "Ảnh đầu vào {{number}}",
+    "loading": "Đang tải các tệp đầu vào…",
+    "loadError": "Không tải được các tệp đầu vào của lượt chạy này.",
+    "expired": "Tệp này không còn được lưu"
+  },
   "download": {
     "summary": "Tải bản tóm tắt (.txt)",
     "technical": "Tải chi tiết kỹ thuật (tệp JSON)",

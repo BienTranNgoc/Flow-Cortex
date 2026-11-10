@@ -892,6 +892,14 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export interface RunInputResponse {
+  bindingKey: string;
+  kind: string;
+  mimeType: string;
+  url: string;
+  expiresAt: string;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -3936,6 +3944,30 @@ export const getOutputUrl = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getOutputUrlResponse> => {
   return customFetch<getOutputUrlResponse>(getGetOutputUrlUrl(id, order, name), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getRunInputsResponse200 = {
+  data: RunInputResponse[];
+  status: 200;
+};
+
+export type getRunInputsResponseSuccess = getRunInputsResponse200 & {
+  headers: Headers;
+};
+export type getRunInputsResponse = getRunInputsResponseSuccess;
+
+export const getGetRunInputsUrl = (id: string) => {
+  return `/api/v1/runs/${id}/inputs`;
+};
+
+export const getRunInputs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunInputsResponse> => {
+  return customFetch<getRunInputsResponse>(getGetRunInputsUrl(id), {
     ...options,
     method: 'GET',
   });
