@@ -41,7 +41,8 @@ final class WorkflowMapper {
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
-                wire(workflow.getStatus().name()), publishedVersionId, servedVersion);
+                wire(workflow.getStatus().name()), publishedVersionId, servedVersion, workflow.isAllowFork(),
+                workflow.getForkCount(), workflow.getForkedFromId());
     }
 
     /** The same view with every step reduced to what a reader who does not own the workflow may see. */
@@ -52,7 +53,8 @@ final class WorkflowMapper {
                         .map(step -> new WorkflowStepView(step.id(), step.stepOrder(), step.name(), step.type(),
                                 step.mode(), null, null))
                         .toList(),
-                view.available(), view.status(), view.publishedVersionId(), view.servedVersion());
+                view.available(), view.status(), view.publishedVersionId(), view.servedVersion(), view.allowFork(),
+                view.forkCount(), view.forkedFromId());
     }
 
     static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {

@@ -147,6 +147,9 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         if (update.shared() != null && update.shared() != workflow.isShared()) {
             workflow.setShared(update.shared());
         }
+        if (update.allowFork() != null && update.allowFork() != workflow.isAllowFork()) {
+            workflow.setAllowFork(update.allowFork());
+        }
         if (update.status() != null) {
             WorkflowStatus status = WorkflowStatus.valueOf(update.status().toUpperCase(Locale.ROOT));
             if (status != workflow.getStatus()) {

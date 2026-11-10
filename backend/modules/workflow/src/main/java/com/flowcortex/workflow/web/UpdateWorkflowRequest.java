@@ -8,5 +8,6 @@ import jakarta.validation.constraints.Size;
 record UpdateWorkflowRequest(
         @Size(max = 255) @Pattern(regexp = "(?s)\\s*\\S.*", message = "must not be blank") String name,
         Boolean shared,
-        @Schema(allowableValues = {"draft", "published"}) @Pattern(regexp = "draft|published") String status) {
+        @Schema(allowableValues = {"draft", "published"}) @Pattern(regexp = "draft|published") String status,
+        Boolean allowFork) {
 }

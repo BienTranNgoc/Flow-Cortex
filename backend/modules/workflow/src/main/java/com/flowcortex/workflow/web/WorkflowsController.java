@@ -6,6 +6,8 @@ import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.application.WorkflowForkService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,9 +44,12 @@ class WorkflowsController {
     private final WorkflowRunService workflowRunService;
     private final CurrentUserResolver currentUserResolver;
     private final CreditAccounts creditAccounts;
+    private final WorkflowForkService workflowForkService;
 
     WorkflowsController(WorkflowService workflowService, WorkflowRunService workflowRunService,
-            CurrentUserResolver currentUserResolver, CreditAccounts creditAccounts) {
+            CurrentUserResolver currentUserResolver, CreditAccounts creditAccounts,
+            WorkflowForkService workflowForkService) {
+        this.workflowForkService = workflowForkService;
         this.workflowService = workflowService;
         this.workflowRunService = workflowRunService;
         this.currentUserResolver = currentUserResolver;
@@ -150,6 +155,23 @@ class WorkflowsController {
         UUID currentUserId = currentUserResolver.require(jwt);
         return ResponseEntity.ok(WorkflowStepResponse.from(
                 workflowService.updateStep(currentUserId, id, stepId, AuthoringRequests.stepEdit(request))));
+    }
+
+    @ApiResponse(responseCode = "403", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @Operation(operationId = "forkWorkflow")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping(value = "/{id}/fork", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<WorkflowResponse> forkWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        UUID currentUserId = currentUserResolver.require(jwt);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                WorkflowResponse.from(workflowForkService.fork(currentUserId, id), creditAccounts));
     }
 
     // @ResponseStatus documents 200 for springdoc/orval explicitly, rather than relying on
