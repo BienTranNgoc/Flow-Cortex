@@ -12,6 +12,9 @@ gradlew           text eol=lf
 .githooks/*       text eol=lf
 **/Dockerfile     text eol=lf
 
+# Vendored font licences ship byte-identical to upstream (some use CRLF).
+worker/fonts/** -text
+
 # Binaries — never touch.
 *.jar   binary
 *.png   binary
