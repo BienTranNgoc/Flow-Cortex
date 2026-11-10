@@ -510,3 +510,81 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+---
+
+## ADR-0013 — Payment gateway
+
+- **Context:** Nodi will take payments through third-party providers that
+  charge the payer on their own page and report the result later. Nothing in
+  the stack touches a payment yet. A provider's result reaches us twice: the
+  payer's browser comes back to a return URL, and the provider calls us. Only
+  the second is something the provider vouches for. Callbacks are retried and
+  can arrive out of order, so a "last write wins" handler can double-credit or
+  move a settled payment backwards. ADR-0007 sends our own worker's results
+  over the broker instead of an HMAC callback; a third-party provider cannot
+  publish to our broker, so that rule does not carry over. Payments open only
+  in Vietnam (the region gate), so the only currency is VND.
+- **Decision:** one gateway shape for every provider.
+  - **Where adapters live:** in the backend, in `:modules:billing`, behind one
+    provider port. No provider type crosses the port. Money state and the
+    credit ledger change in one database transaction, which a separate process
+    cannot join.
+  - **Opening a payment:** the backend mints the order reference and the
+    request reference and records the operation before it calls the provider
+    through the port. A retry of the same operation reuses the same request
+    reference, so the provider deduplicates it. The browser receives only the
+    provider's pay URL. The return URL carries only our order reference and is
+    observation-only: it feeds a journey event, never a state change.
+  - **Outbound calls:** through `egress-proxy` and its allowlist (ADR-0010).
+    Each adapter's change adds its provider host to `infra/egress-proxy/acl.yaml`.
+  - **Inbound results:** a provider's asynchronous result arrives as an HTTPS
+    callback on a backend route. The signature is verified over the raw request
+    bytes before any JSON binding, because a binding step that drops unknown
+    fields removes fields the provider signed. The verified payload is then
+    normalised into the provider event of
+    `contracts/payment-provider-event.schema.json`.
+  - **Callback for an order that is not ours:** a verified callback whose order
+    reference is not of our shape, or was never minted, is refused before
+    normalisation, answered as the provider's protocol requires (so it stops
+    retrying), logged without its payload and counted. Examples are a
+    misconfigured merchant, a sandbox, or a replay from another environment.
+  - **State authority:** only a verified provider callback or a
+    server-initiated status query changes a payment's state. A journey event or
+    a return URL never does. A verified callback is applied idempotently on
+    (provider, request reference) or (provider, provider transaction id),
+    changes state only when its amount equals the amount recorded at opening,
+    and events are ordered by the provider's timestamp, not by the time we
+    received them.
+  - **Journey events:** the payer's page reports what the browser saw through
+    `contracts/payment-journey-event.schema.json`. They are observations: not
+    trusted, not tied to a member in the log, and no caller-chosen string
+    reaches the log stream.
+  - **Shapes:** the order reference is `fc_` plus 32 lowercase hex digits (35
+    characters, within the 64-byte order-id ceiling providers set); the request
+    reference is a UUID; amounts are integers in đồng.
+  - **Off until contracted:** every adapter has its own enable property,
+    default false, and the backend starts with every adapter off. The merchant
+    contract and fees are signed by the operator before an adapter is turned on.
+- **Alternatives:**
+  - **A separate payment-gateway process that receives callbacks and relays
+    them over the broker:** rejected. It adds a second public ingress and a
+    second place for provider keys, and the state change still has to land in
+    the backend's transaction.
+  - **Polling-only settlement:** rejected. The payer usually returns before the
+    provider has settled, and polling every open payment grows with traffic.
+    A status query stays as the server-initiated way to settle a payment whose
+    callback never arrived.
+- **Consequences:**
+  - **ADR-0007 is scoped, not reversed:** "results over the broker instead of
+    an HMAC callback" governs our own worker, which can publish to our broker.
+    A third-party provider cannot, so provider results come in as a signed
+    callback.
+  - **A new public route per provider:** each adapter exposes a callback route
+    that must be reachable by the provider and must read raw bytes; its change
+    owns the signature scheme and any source-address check.
+  - **Foreign references are dropped, not stored:** the ledger can join on the
+    order reference because every event carries one of our shape.
+  - **A two-way door for now:** the two schemas have no consumer yet. Once an
+    adapter, the checkout pages and the transaction ledger use them, an edit
+    goes through the changes that consume them.

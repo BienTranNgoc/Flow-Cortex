@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/payment-provider-event.schema.json",
+  "title": "PaymentProviderEvent",
+  "description": "What one interaction with a payment provider produced, normalised by the adapter: the provider's own result code and message verbatim, never a status of ours. A null field means the provider stated nothing. Callbacks are retried and arrive out of order, so events are ordered by providerTimestamp, not receivedAt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "provider",
+    "kind",
+    "reference",
+    "resultCode",
+    "resultMessage",
+    "amount",
+    "providerTimestamp",
+    "providerPayType",
+    "receivedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$",
+      "description": "Which provider produced the event, as the adapter names itself."
+    },
+    "kind": {
+      "enum": [
+        "payment_initiation",
+        "mandate_enrolment_exchange",
+        "mandate_enrolment_token_query",
+        "mandate_charge",
+        "mandate_management",
+        "transaction_query",
+        "refund",
+        "refund_query",
+        "inbound_payment_callback",
+        "inbound_mandate_callback"
+      ]
+    },
+    "reference": { "$ref": "#/$defs/reference" },
+    "resultCode": {
+      "type": ["string", "null"],
+      "maxLength": 32,
+      "description": "The provider's code, verbatim."
+    },
+    "resultMessage": {
+      "type": ["string", "null"],
+      "maxLength": 512,
+      "description": "The provider's message, verbatim."
+    },
+    "amount": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Integer đồng the provider reported."
+    },
+    "providerTimestamp": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "The provider's clock, null when the payload carries none."
+    },
+    "providerPayType": {
+      "type": ["string", "null"],
+      "maxLength": 32
+    },
+    "receivedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this backend received the interaction's answer."
+    }
+  },
+  "$defs": {
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationRef", "requestRef", "providerTransactionId"],
+      "properties": {
+        "operationRef": {
+          "type": "string",
+          "pattern": "^fc_[0-9a-f]{32}$",
+          "description": "Our order reference. A callback naming any other reference is refused before it becomes an event."
+        },
+        "requestRef": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "Our idempotency key for the logical operation, stable across retries."
+        },
+        "providerTransactionId": {
+          "type": ["string", "null"],
+          "maxLength": 64,
+          "description": "The provider's own transaction id, when it has issued one."
+        }
+      }
+    }
+  }
+}
