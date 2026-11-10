@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.LocaleResolver;
 
@@ -80,6 +81,9 @@ class AdminWorkflowTransferController {
                 .body(exported.artifact().toString());
     }
 
+    @ResponseStatus(HttpStatus.OK)
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ImportReviewResponse.class)))
     @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "413", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,

@@ -926,6 +926,42 @@ export interface WorkflowArtifact {
   steps: WorkflowArtifactStep[];
 }
 
+export type ImportIssueResponseSeverity =
+  (typeof ImportIssueResponseSeverity)[keyof typeof ImportIssueResponseSeverity];
+
+export const ImportIssueResponseSeverity = {
+  blocking: 'blocking',
+  advisory: 'advisory',
+} as const;
+
+export interface ImportIssueResponse {
+  code: string;
+  severity: ImportIssueResponseSeverity;
+  /** @nullable */
+  stepOrder?: number | null;
+  /** @nullable */
+  field?: string | null;
+  message: string;
+}
+
+export interface OutboundTargetResponse {
+  stepOrder: number;
+  type: string;
+  field: string;
+  value: string;
+}
+
+export interface ImportReviewResponse {
+  token: string;
+  expiresAt: string;
+  workflowName: string;
+  stepCount: number;
+  blocked: boolean;
+  outbound: boolean;
+  issues: ImportIssueResponse[];
+  outboundTargets: OutboundTargetResponse[];
+}
+
 export type AdminSupportRequestReplyStatus =
   (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
 
@@ -4314,6 +4350,11 @@ export const importAdminWorkflow = async (
   });
 };
 
+export type reviewAdminWorkflowImportResponse200 = {
+  data: ImportReviewResponse;
+  status: 200;
+};
+
 export type reviewAdminWorkflowImportResponse400 = {
   data: ProblemDetail;
   status: 400;
@@ -4334,6 +4375,9 @@ export type reviewAdminWorkflowImportResponse429 = {
   status: 429;
 };
 
+export type reviewAdminWorkflowImportResponseSuccess = reviewAdminWorkflowImportResponse200 & {
+  headers: Headers;
+};
 export type reviewAdminWorkflowImportResponseError = (
   | reviewAdminWorkflowImportResponse400
   | reviewAdminWorkflowImportResponse413
@@ -4343,7 +4387,8 @@ export type reviewAdminWorkflowImportResponseError = (
   headers: Headers;
 };
 
-export type reviewAdminWorkflowImportResponse = reviewAdminWorkflowImportResponseError;
+export type reviewAdminWorkflowImportResponse =
+  reviewAdminWorkflowImportResponseSuccess | reviewAdminWorkflowImportResponseError;
 
 export const getReviewAdminWorkflowImportUrl = () => {
   return `/api/v1/admin/workflows/import/review`;
