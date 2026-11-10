@@ -1,8 +1,12 @@
 package com.flowcortex.app.support.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
+import com.flowcortex.support.request.SupportReplyMailRequested;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import jakarta.mail.MessagingException;
@@ -11,11 +15,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +40,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -63,12 +64,13 @@ import software.amazon.awssdk.services.s3.model.Tag;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.support.enabled=true",
         "flowcortex.media.upload.content-check.enabled=true",
-        "flowcortex.support.mail.interval=PT24H",
         "flowcortex.support.retention.interval=PT24H"})
 @AutoConfigureTestRestTemplate
-@Import(SupportRequestIT.MailAndClock.class)
+@Import(SupportRequestIT.Mail.class)
 @ExtendWith(OutputCaptureExtension.class)
 class SupportRequestIT extends AbstractPostgresBootTest {
+
+    private static final String REPLY_MAIL = "support.reply-mail";
 
     private static final URI PROBLEMS = URI.create("https://flow-cortex.dev/problems/");
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D,
@@ -90,10 +92,10 @@ class SupportRequestIT extends AbstractPostgresBootTest {
     private ScriptedMailSender mail;
 
     @Autowired
-    private MovableClock clock;
+    private ApplicationEventPublisher publisher;
 
     @Autowired
-    private com.flowcortex.support.request.SupportMailJob mailJob;
+    private FailedPublicationResubmitter resubmitter;
 
     private UserView admin;
     private String adminToken;
@@ -164,17 +166,17 @@ class SupportRequestIT extends AbstractPostgresBootTest {
 
     @BeforeEach
     void emptyRequests() {
+        awaitNoReplyMailInFlight();
         jdbcTemplate.update("DELETE FROM support_request");
         jdbcTemplate.update("DELETE FROM support_idempotency");
+        jdbcTemplate.update("DELETE FROM event_publication WHERE listener_id = ?", REPLY_MAIL);
         mail.reset();
-        clock.reset();
         admin = userService.createInitialAdmin(uniqueEmail("req-admin"), "password123", "Admin");
         adminToken = login(admin.email());
     }
 
     @AfterEach
-    void resetClock() {
-        clock.reset();
+    void resetMail() {
         mail.reset();
     }
 
@@ -416,10 +418,11 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         long number = file(token, "credit").number();
 
         adminReply(number, "Đã kiểm tra.", "waiting_member");
-        mailJob.sendDue();
-        mailJob.sendDue();
+        awaitMailsSentTo(member, 1);
+        awaitPublications(0);
+        resubmitter.run();
 
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_mail_outbox", Long.class)).isEqualTo(1);
+        assertThat(mail.attempts()).isEqualTo(1);
         assertThat(mail.sentTo(member.email())).singleElement()
                 .satisfies(body -> assertThat(body).startsWith("Xin chào,")
                         .contains("http://localhost:5173/?help=request-" + number));
@@ -439,7 +442,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
                 headers), DetailView.class).getBody().number();
 
         adminReply(number, "Checked.", "waiting_member");
-        mailJob.sendDue();
+        awaitMailsSentTo(member, 1);
 
         assertThat(jdbcTemplate.queryForObject("SELECT locale FROM support_request WHERE number = ?", String.class,
                 number)).isEqualTo("en");
@@ -453,49 +456,59 @@ class SupportRequestIT extends AbstractPostgresBootTest {
             CapturedOutput output) {
         UserView member = member("req-mail-down");
         long number = file(login(member.email()), "technical").number();
-        adminReply(number, "Bạn xem lại giúp.", "waiting_member");
         mail.failNext(6);
 
-        mailJob.sendDue();
-        assertThat(attempts()).isEqualTo(1);
+        adminReply(number, "Bạn xem lại giúp.", "waiting_member");
+        awaitFailedAttempt(1);
         for (long minutes : new long[] {1, 5, 15, 60, 240}) {
-            int before = attempts();
-            clock.advance(Duration.ofMinutes(minutes).minusSeconds(30));
-            mailJob.sendDue();
-            assertThat(attempts()).as("no attempt before %d minutes", minutes).isEqualTo(before);
-            clock.advance(Duration.ofSeconds(31));
-            mailJob.sendDue();
-            assertThat(attempts()).as("attempt after %d minutes", minutes).isEqualTo(before + 1);
+            retryAfter(Duration.ofMinutes(minutes), true);
         }
-        clock.advance(Duration.ofDays(1));
-        mailJob.sendDue();
+        resubmitter.run();
 
-        assertThat(attempts()).isEqualTo(6);
+        assertThat(mail.attempts()).isEqualTo(6);
+        awaitPublications(0);
         assertThat(mail.sentTo(member.email())).isEmpty();
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_message WHERE author_kind = 'admin'",
                 Long.class)).isEqualTo(1);
-        assertThat(output.getOut()).contains("support.reply.mail outcome=failed attempt=1 request=" + number)
-                .contains("support.reply.mail outcome=gave_up attempt=6 request=" + number)
-                .doesNotContain(member.email());
+        assertThat(output.getAll().lines()
+                .filter(line -> line.contains("support.reply.mail outcome=failed request=" + number
+                        + " error=MailSendException")).count()).isEqualTo(6);
+        assertThat(output.getAll()).contains("outbox outcome=gave_up").doesNotContain(member.email());
     }
 
     @Test
     void aMailThatGetsThroughOnTheThirdAttemptIsSentExactlyOnce() {
         UserView member = member("req-mail-back");
         long number = file(login(member.email()), "credit").number();
-        adminReply(number, "Đã xử lý.", "resolved");
         mail.failNext(2);
 
-        mailJob.sendDue();
-        clock.advance(Duration.ofMinutes(1).plusSeconds(1));
-        mailJob.sendDue();
-        clock.advance(Duration.ofMinutes(5).plusSeconds(1));
-        mailJob.sendDue();
-        clock.advance(Duration.ofDays(1));
-        mailJob.sendDue();
+        adminReply(number, "Đã xử lý.", "resolved");
+        awaitFailedAttempt(1);
+        retryAfter(Duration.ofMinutes(1), true);
+        retryAfter(Duration.ofMinutes(5), false);
+        awaitMailsSentTo(member, 1);
+        awaitPublications(0);
+        resubmitter.run();
 
-        assertThat(attempts()).isEqualTo(3);
+        assertThat(mail.attempts()).isEqualTo(3);
         assertThat(mail.sentTo(member.email())).hasSize(1);
+    }
+
+    @Test
+    void aReplyWhoseTransactionRollsBackLeavesNoPublicationAndSendsNoMail() {
+        UserView member = member("req-mail-rollback");
+        SupportReplyMailRequested event = new SupportReplyMailRequested(UUID.randomUUID(), UUID.randomUUID(),
+                member.id(), 4242, "vi");
+
+        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            publisher.publishEvent(event);
+            throw new IllegalStateException("rolled back");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication WHERE listener_id = ? "
+                + "AND serialized_event LIKE ?", Long.class, REPLY_MAIL, "%" + event.requestId() + "%")).isZero();
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(mail.attempts()).isZero());
     }
 
     @Test
@@ -743,8 +756,51 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         }
     }
 
-    private int attempts() {
-        return jdbcTemplate.queryForObject("SELECT attempts FROM support_mail_outbox", Integer.class);
+    private void awaitMailsSentTo(UserView member, int count) {
+        await().atMost(Duration.ofSeconds(15))
+                .untilAsserted(() -> assertThat(mail.sentTo(member.email())).hasSize(count));
+    }
+
+    /** Earlier tests reply too; their mails must be done before a test counts sends or scripts failures. */
+    private void awaitNoReplyMailInFlight() {
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM event_publication WHERE listener_id = ? AND status IS DISTINCT FROM 'FAILED'",
+                Long.class, REPLY_MAIL)).isZero());
+    }
+
+    private void awaitPublications(long count) {
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM event_publication WHERE listener_id = ?", Long.class, REPLY_MAIL))
+                .isEqualTo(count));
+    }
+
+    /** The reply-mail publication has failed its {@code attempt}th attempt and waits for the resubmitter. */
+    private void awaitFailedAttempt(int attempt) {
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(jdbcTemplate.queryForList(
+                "SELECT completion_attempts FROM event_publication WHERE listener_id = ? AND status = 'FAILED'",
+                Integer.class, REPLY_MAIL)).containsExactly(attempt));
+    }
+
+    private void backDate(Duration age) {
+        Timestamp at = Timestamp.from(Instant.now().minus(age));
+        jdbcTemplate.update("UPDATE event_publication SET publication_date = ?, last_resubmission_date = "
+                + "CASE WHEN last_resubmission_date IS NULL THEN NULL ELSE CAST(? AS timestamptz) END WHERE listener_id = ?",
+                at, at, REPLY_MAIL);
+    }
+
+    /** A second short of the delay the resubmitter leaves the mail alone; a second past it, it sends again. */
+    private void retryAfter(Duration delay, boolean failsAgain) {
+        int before = mail.attempts();
+        backDate(delay.minusSeconds(1));
+        resubmitter.run();
+        assertThat(mail.attempts()).as("no attempt a second before %s", delay).isEqualTo(before);
+        backDate(delay.plusSeconds(1));
+        resubmitter.run();
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(mail.attempts())
+                .as("attempt after %s", delay).isEqualTo(before + 1));
+        if (failsAgain) {
+            awaitFailedAttempt(before + 1);
+        }
     }
 
     private Timestamp seenAt(long number) {
@@ -823,6 +879,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
 
         private final List<MimeMessage> sent = new CopyOnWriteArrayList<>();
         private final AtomicInteger failures = new AtomicInteger();
+        private final AtomicInteger attempts = new AtomicInteger();
 
         void failNext(int count) {
             failures.set(count);
@@ -831,6 +888,12 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         void reset() {
             sent.clear();
             failures.set(0);
+            attempts.set(0);
+        }
+
+        /** Sends tried so far, refused ones included. */
+        int attempts() {
+            return attempts.get();
         }
 
         List<String> sentTo(String address) {
@@ -849,6 +912,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
 
         @Override
         protected void doSend(MimeMessage[] mimeMessages, Object[] originalMessages) throws MailException {
+            attempts.incrementAndGet();
             if (failures.getAndUpdate(left -> Math.max(0, left - 1)) > 0) {
                 throw new MailSendException("Connection refused");
             }
@@ -856,47 +920,12 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         }
     }
 
-    /** System time plus an offset a test can move; every reader of the app's Clock sees it. */
-    static class MovableClock extends Clock {
-
-        private final AtomicReference<Duration> offset = new AtomicReference<>(Duration.ZERO);
-
-        void advance(Duration by) {
-            offset.updateAndGet(current -> current.plus(by));
-        }
-
-        void reset() {
-            offset.set(Duration.ZERO);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            throw new UnsupportedOperationException("fixed to UTC");
-        }
-
-        @Override
-        public Instant instant() {
-            return Instant.now().plus(offset.get());
-        }
-    }
-
     @TestConfiguration(proxyBeanMethods = false)
-    static class MailAndClock {
+    static class Mail {
 
         @Bean
         ScriptedMailSender scriptedMailSender() {
             return new ScriptedMailSender();
-        }
-
-        @Bean
-        @Primary
-        MovableClock movableClock() {
-            return new MovableClock();
         }
     }
 }
