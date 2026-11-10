@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -39,6 +40,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Global exception -&gt; {@link ProblemDetail} mapping, uniform across every module.
@@ -188,6 +191,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         detail.setProperty("errors",
                 Map.of(name == null ? "request" : name, message("validation.wrongType", locale)));
         return ResponseEntity.status(status).headers(headers).body(detail);
+    }
+
+    /**
+     * A body field whose JSON type cannot be read ({@code {"flag":"yes"}}): {@code errors} names the first property
+     * of the failing path. Any other unreadable body keeps the plain 400.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String field = ex.getCause() instanceof MismatchedInputException mismatch ? firstProperty(mismatch) : null;
+        if (field == null) {
+            return super.handleHttpMessageNotReadable(ex, headers, status, request);
+        }
+        Locale locale = locale(request);
+        ProblemDetail detail = createProblemDetail(ex, status, message("problem.validationFailed", locale), null, null,
+                request);
+        detail.setType(PROBLEM_BASE.resolve("validation-failed"));
+        detail.setProperty("errors", Map.of(field, message("validation.wrongType", locale)));
+        return ResponseEntity.status(status).headers(headers).body(detail);
+    }
+
+    private static String firstProperty(MismatchedInputException mismatch) {
+        return mismatch.getPath().stream().map(JacksonException.Reference::getPropertyName)
+                .filter(name -> name != null && !name.isEmpty()).findFirst().orElse(null);
     }
 
     /** Resolves a {@link LocalizedStatusException}'s detail key in the request's language, not the thread's. */
