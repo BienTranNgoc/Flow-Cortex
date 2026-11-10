@@ -95,6 +95,8 @@ export const MeResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  paymentsettingview: 'payment.setting.view',
+  paymentsettingupdate: 'payment.setting.update',
 } as const;
 
 export interface MeResponse {
@@ -315,7 +317,7 @@ export interface AdminSupportKbArticle {
 }
 
 export interface AdminSettingUpdate {
-  value: boolean | number;
+  value: string | boolean | number;
 }
 
 export type AdminSettingType = (typeof AdminSettingType)[keyof typeof AdminSettingType];
@@ -323,6 +325,7 @@ export type AdminSettingType = (typeof AdminSettingType)[keyof typeof AdminSetti
 export const AdminSettingType = {
   SWITCH: 'SWITCH',
   INTEGER: 'INTEGER',
+  ENUM: 'ENUM',
 } as const;
 
 export type AdminSettingSource = (typeof AdminSettingSource)[keyof typeof AdminSettingSource];
@@ -339,15 +342,16 @@ export interface AdminSetting {
   key: string;
   group: string;
   type: AdminSettingType;
-  value: boolean | number;
-  decidedValue: boolean | number;
+  value: string | boolean | number;
+  decidedValue: string | boolean | number;
   source: AdminSettingSource;
   /** @nullable */
-  storedValue?: boolean | number | null;
+  storedValue?: string | boolean | number | null;
   /** @nullable */
-  configuredValue?: boolean | number | null;
+  configuredValue?: string | boolean | number | null;
   /** @nullable */
-  defaultValue?: boolean | number | null;
+  defaultValue?: string | boolean | number | null;
+  options: string[];
   /** @nullable */
   min?: number | null;
   /** @nullable */
@@ -356,6 +360,56 @@ export interface AdminSetting {
   updatedBy?: string | null;
   /** @nullable */
   updatedAt?: string | null;
+}
+
+export interface PaymentSettingUpdate {
+  value: string | boolean | number;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   * @nullable
+   */
+  reason?: string | null;
+}
+
+export type PaymentSettingViewType =
+  (typeof PaymentSettingViewType)[keyof typeof PaymentSettingViewType];
+
+export const PaymentSettingViewType = {
+  SWITCH: 'SWITCH',
+  INTEGER: 'INTEGER',
+  ENUM: 'ENUM',
+} as const;
+
+export type PaymentSettingViewSource =
+  (typeof PaymentSettingViewSource)[keyof typeof PaymentSettingViewSource];
+
+export const PaymentSettingViewSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface PaymentSettingView {
+  key: string;
+  group: string;
+  type: PaymentSettingViewType;
+  value: string | boolean | number;
+  source: PaymentSettingViewSource;
+  /** @nullable */
+  storedValue?: string | boolean | number | null;
+  /** @nullable */
+  configuredValue?: string | boolean | number | null;
+  /** @nullable */
+  defaultValue?: string | boolean | number | null;
+  dangerous: boolean;
+  options: string[];
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
 }
 
 export interface CreateWorkflowRequest {
@@ -1166,11 +1220,13 @@ export interface AdminSettingList {
 
 export interface AdminSettingChange {
   /** @nullable */
-  previousValue?: boolean | number | null;
+  previousValue?: string | boolean | number | null;
   /** @nullable */
-  newValue?: boolean | number | null;
+  newValue?: string | boolean | number | null;
   /** @nullable */
   changedBy?: string | null;
+  /** @nullable */
+  reason?: string | null;
   changedAt: string;
 }
 
@@ -1223,6 +1279,8 @@ export const RoleResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  paymentsettingview: 'payment.setting.view',
+  paymentsettingupdate: 'payment.setting.update',
 } as const;
 
 export interface RoleResponse {
@@ -1230,6 +1288,29 @@ export interface RoleResponse {
   staff: boolean;
   superAdmin: boolean;
   permissions: RoleResponsePermissionsItem[];
+}
+
+export interface PaymentSettingChangeView {
+  id: string;
+  key: string;
+  /** @nullable */
+  previousValue?: string | null;
+  /** @nullable */
+  newValue?: string | null;
+  /** @nullable */
+  actorId?: string | null;
+  /** @nullable */
+  actorEmail?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  changedAt: string;
+}
+
+export interface PageViewPaymentSettingChangeView {
+  items: PaymentSettingChangeView[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface MediaJobResponse {
@@ -1368,6 +1449,20 @@ export const ListAdminRunsStatus = {
   cancelling: 'cancelling',
   cancelled: 'cancelled',
 } as const;
+
+export type ListPaymentSettingHistoryParams = {
+  key?: string;
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
 
 export type ListAdminMediaJobsParams = {
   /**
@@ -2128,6 +2223,82 @@ export const resetAdminSetting = async (
   return customFetch<resetAdminSettingResponse>(getResetAdminSettingUrl(key), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type updatePaymentSettingResponse200 = {
+  data: PaymentSettingView;
+  status: 200;
+};
+
+export type updatePaymentSettingResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updatePaymentSettingResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updatePaymentSettingResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updatePaymentSettingResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updatePaymentSettingResponseSuccess = updatePaymentSettingResponse200 & {
+  headers: Headers;
+};
+export type updatePaymentSettingResponseError = (
+  | updatePaymentSettingResponse400
+  | updatePaymentSettingResponse403
+  | updatePaymentSettingResponse404
+  | updatePaymentSettingResponse422
+) & {
+  headers: Headers;
+};
+
+export type updatePaymentSettingResponse =
+  updatePaymentSettingResponseSuccess | updatePaymentSettingResponseError;
+
+export const getUpdatePaymentSettingUrl = (key: string) => {
+  return `/api/v1/admin/payment-settings/${key}`;
+};
+
+export const updatePaymentSetting = async (
+  key: string,
+  paymentSettingUpdate: PaymentSettingUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updatePaymentSettingResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updatePaymentSettingResponse>(getUpdatePaymentSettingUrl(key), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentSettingUpdate),
   });
 };
 
@@ -5607,6 +5778,82 @@ export const listAdminRoles = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminRolesResponse> => {
   return customFetch<listAdminRolesResponse>(getListAdminRolesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listPaymentSettingsResponse200 = {
+  data: PaymentSettingView[];
+  status: 200;
+};
+
+export type listPaymentSettingsResponseSuccess = listPaymentSettingsResponse200 & {
+  headers: Headers;
+};
+export type listPaymentSettingsResponse = listPaymentSettingsResponseSuccess;
+
+export const getListPaymentSettingsUrl = () => {
+  return `/api/v1/admin/payment-settings`;
+};
+
+export const listPaymentSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listPaymentSettingsResponse> => {
+  return customFetch<listPaymentSettingsResponse>(getListPaymentSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listPaymentSettingHistoryResponse200 = {
+  data: PageViewPaymentSettingChangeView;
+  status: 200;
+};
+
+export type listPaymentSettingHistoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listPaymentSettingHistoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listPaymentSettingHistoryResponseSuccess = listPaymentSettingHistoryResponse200 & {
+  headers: Headers;
+};
+export type listPaymentSettingHistoryResponseError = (
+  listPaymentSettingHistoryResponse400 | listPaymentSettingHistoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type listPaymentSettingHistoryResponse =
+  listPaymentSettingHistoryResponseSuccess | listPaymentSettingHistoryResponseError;
+
+export const getListPaymentSettingHistoryUrl = (params?: ListPaymentSettingHistoryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/payment-settings/history?${stringifiedParams}`
+    : `/api/v1/admin/payment-settings/history`;
+};
+
+export const listPaymentSettingHistory = async (
+  params?: ListPaymentSettingHistoryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listPaymentSettingHistoryResponse> => {
+  return customFetch<listPaymentSettingHistoryResponse>(getListPaymentSettingHistoryUrl(params), {
     ...options,
     method: 'GET',
   });
