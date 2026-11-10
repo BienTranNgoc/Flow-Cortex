@@ -201,7 +201,8 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
         assertThat(jobSchema().validate(body)).isEmpty();
         String voiceKey = "runs/" + probe.runId() + "/steps/2/" + StoringStepTestConfig.OBJECT_NAME;
         assertThat(body.get("inputs")).isEqualTo(JSON.readTree("["
-                + "{\"key\":\"media\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + objectKey + "\"},"
+                + "{\"key\":\"media\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/" + probe.runId()
+                + "/inputs/media\"},"
                 + "{\"key\":\"details\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\"runs/" + probe.runId()
                 + "/steps/1/attempts/1/video-details.json\"},"
                 + "{\"key\":\"voice\",\"bucket\":\"" + UPLOAD_BUCKET + "\",\"objectKey\":\"" + voiceKey + "\"}]"));
