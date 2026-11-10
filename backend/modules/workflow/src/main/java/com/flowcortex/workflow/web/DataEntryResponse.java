@@ -12,7 +12,7 @@ record DataEntryResponse(
         String dataType, int sizeBytes, Instant createdAt, Instant updatedAt) {
 
     static DataEntryResponse from(WorkflowDataStore.Entry entry) {
-        return new DataEntryResponse(entry.key(), DataStoreJson.toWire(entry.value()), entry.dataType(), entry.sizeBytes(),
+        return new DataEntryResponse(entry.key(), DataStoreWire.toWire(entry.value()), entry.dataType(), entry.sizeBytes(),
                 entry.createdAt(), entry.updatedAt());
     }
 }

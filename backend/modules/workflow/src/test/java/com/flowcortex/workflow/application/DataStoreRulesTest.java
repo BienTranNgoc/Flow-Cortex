@@ -114,6 +114,34 @@ class DataStoreRulesTest {
     }
 
     @Test
+    void aNumberUpToNineHundredDigitsWhenWrittenOutPasses() throws Exception {
+        JsonNode value = DataStoreJson.mapper().readTree("{\"a\":[1e400,1e899,1e-900,3.141592653589793238462643]}");
+
+        assertThat(check("k", null, value, false, 0)).isNull();
+    }
+
+    @Test
+    void aNumberLongerWhenWrittenOutIsRefusedWhereverItSits() throws Exception {
+        for (String text : new String[] {"1e900", "1e-901", "{\"a\":[{\"b\":1e5000}]}", "1e999999999", "-1.5e-999999999"}) {
+            JsonNode value = DataStoreJson.mapper().readTree(text);
+
+            Fault fault = check("k", null, value, false, 0);
+
+            assertThat(fault).as("value %s", text).isNotNull();
+            assertThat(fault.code()).isEqualTo("DATA_STORE_NUMBER_TOO_LONG");
+            assertThat(fault.field()).isEqualTo("value");
+            assertThat(fault.message().code()).isEqualTo("workflow.dataStore.numberTooLong");
+        }
+    }
+
+    @Test
+    void sizeKeepsADecimalsDigits() throws Exception {
+        assertThat(DataStoreRules.sizeOf(DataStoreJson.mapper().readTree("3.141592653589793238462643")))
+                .isEqualTo(26);
+        assertThat(DataStoreRules.sizeOf(DataStoreJson.mapper().readTree("1.00"))).isEqualTo(4);
+    }
+
+    @Test
     void aValueAtTheSizeLimitPassesAndOneByteOverIsTooLarge() {
         assertThat(check("k", null, stringOfCompactSize(524_288), false, 0)).isNull();
 

@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -79,10 +78,15 @@ class WorkflowDataStoreController {
     @PutMapping(value = "/{key}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<DataEntryResponse> putWorkflowData(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-            @PathVariable String key, @Valid @RequestBody PutDataEntryRequest request) {
+            @PathVariable String key,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            schema = @Schema(implementation = PutDataEntryRequest.class)))
+            @RequestBody String body) {
         Caller caller = Caller.member(currentUserResolver.require(jwt));
+        PutDataEntryRequest request = PutDataEntryRequest.parse(body);
         return ResponseEntity.ok(DataEntryResponse.from(
-                dataStore.put(caller, id, key, DataStoreJson.toStore(request.value()), request.dataType())));
+                dataStore.put(caller, id, key, request.value(), request.dataType())));
     }
 
     @Operation(operationId = "deleteWorkflowData")

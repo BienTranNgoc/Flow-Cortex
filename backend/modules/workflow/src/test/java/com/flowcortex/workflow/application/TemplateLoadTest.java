@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +131,23 @@ class TemplateLoadTest {
         JsonNode out = loaded(TemplateLoad.load("{\"template\":\"t\",\"x\":1}", store(Map.of("t", template))));
 
         assertThat(out).isEqualTo(JSON.readTree("{\"brief\":\"Spring sale\",\"n\":1}"));
+    }
+
+    @Test
+    void decimalsInTheTemplateAndTheInputReachTheOutputWithTheirDigits() throws Exception {
+        String template = "{\"data\":{\"pi\":3.141592653589793238462643,\"price\":1.00,\"huge\":1e400},"
+                + "\"inputs\":{\"fields\":{\"amount\":{}}}}";
+
+        TemplateLoad.Result result = TemplateLoad.load(
+                "{\"template\":\"t\",\"amount\":0.1000000000000000055511151231257827}", store(Map.of("t", template)));
+
+        assertThat(result).isInstanceOf(TemplateLoad.Loaded.class);
+        JsonNode out = DataStoreJson.mapper().readTree(((TemplateLoad.Loaded) result).json());
+        assertThat(out.get("pi").decimalValue()).isEqualTo(new BigDecimal("3.141592653589793238462643"));
+        assertThat(out.get("price").decimalValue()).isEqualTo(new BigDecimal("1.00"));
+        assertThat(out.get("huge").decimalValue()).isEqualTo(new BigDecimal("1e400"));
+        assertThat(out.get("amount").decimalValue())
+                .isEqualTo(new BigDecimal("0.1000000000000000055511151231257827"));
     }
 
     @Test

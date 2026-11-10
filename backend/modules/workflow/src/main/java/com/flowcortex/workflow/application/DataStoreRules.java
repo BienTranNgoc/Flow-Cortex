@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.shared.web.LocalizedMessage;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Predicate;
@@ -20,12 +21,18 @@ final class DataStoreRules {
     static final int MAX_KEYS = 100;
     static final int MAX_VALUE_BYTES = 524_288;
 
+    /**
+     * PostgreSQL writes a {@code jsonb} number out in plain digits ({@code 1e400} comes back as 401 of them) and
+     * Jackson refuses to read a number longer than 1000 characters, so a longer one would stay stored but never read.
+     */
+    static final int MAX_NUMBER_DIGITS = 900;
+
     /** Same expression as the table's key CHECK. */
     private static final Pattern KEY = Pattern.compile("^(?!\\.{1,2}$)[A-Za-z0-9._-]{1,100}$");
 
     private static final Pattern TYPE = Pattern.compile("^[a-z0-9_-]{1,32}$");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = DataStoreJson.mapper();
 
     record Fault(String code, String field, LocalizedMessage message) {}
 
@@ -47,6 +54,9 @@ final class DataStoreRules {
             new Rule(c -> c.value() == null || holdsNul(c.value()),
                     "DATA_STORE_VALUE_INVALID", "value",
                     () -> new LocalizedMessage("workflow.dataStore.valueInvalid")),
+            new Rule(c -> holdsLongNumber(c.value()),
+                    "DATA_STORE_NUMBER_TOO_LONG", "value",
+                    () -> new LocalizedMessage("workflow.dataStore.numberTooLong", MAX_NUMBER_DIGITS)),
             new Rule(c -> sizeOf(c.value()) > MAX_VALUE_BYTES,
                     "DATA_STORE_VALUE_TOO_LARGE", "value",
                     () -> new LocalizedMessage("workflow.dataStore.valueTooLarge", MAX_VALUE_BYTES)),
@@ -78,6 +88,22 @@ final class DataStoreRules {
                 .findFirst()
                 .map(Rule::fault)
                 .orElse(null);
+    }
+
+    /** Judged on the unscaled digits and the scale, never by expanding the number: {@code 1e999999999} is tiny as text. */
+    private static boolean holdsLongNumber(JsonNode node) {
+        if (node.isBigDecimal()) {
+            BigDecimal number = node.decimalValue();
+            long precision = number.precision();
+            long scale = number.scale();
+            return Math.max(precision, Math.max(precision - scale, scale)) > MAX_NUMBER_DIGITS;
+        }
+        for (JsonNode child : node) {
+            if (holdsLongNumber(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean holdsNul(JsonNode node) {

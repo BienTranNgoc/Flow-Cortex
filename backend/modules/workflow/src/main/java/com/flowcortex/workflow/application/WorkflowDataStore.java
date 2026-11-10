@@ -25,7 +25,7 @@ public class WorkflowDataStore {
 
     private static final String DEFAULT_TYPE = "json";
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = DataStoreJson.mapper();
 
     /** An entry with its value. */
     public record Entry(String key, JsonNode value, String dataType, int sizeBytes, Instant createdAt,

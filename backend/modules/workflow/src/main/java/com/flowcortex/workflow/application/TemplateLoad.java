@@ -16,7 +16,7 @@ import java.util.function.Function;
  * fixed sentences: they never repeat the stored template, which a caller who only chooses the
  * key must not be able to read back.
  *
- * <p>Builds its own plain {@link ObjectMapper}, as {@code InputResolver} does.
+ * <p>Reads with the data store's own mapper, so a number in a template reaches the step output with its digits.
  */
 final class TemplateLoad {
 
@@ -25,7 +25,7 @@ final class TemplateLoad {
     static final String INVALID_TEMPLATE = "load_template_invalid_template";
     static final String MISSING_INPUT = "load_template_missing_input";
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = DataStoreJson.mapper();
 
     sealed interface Result permits Loaded, Failed {}
 

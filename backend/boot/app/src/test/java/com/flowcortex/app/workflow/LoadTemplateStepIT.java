@@ -78,6 +78,20 @@ class LoadTemplateStepIT extends AbstractWorkflowModuleIT {
     }
 
     @Test
+    void decimalsOfTheTemplateReachTheOutputWithTheirDigits() {
+        UserView owner = memberWithBalance("decimals", 10);
+        WorkflowView workflow = newWorkflow(owner.id(), false, new NewWorkflowStep("load", "load_template", null));
+        putEntry(workflow.id(), "promo", "template",
+                "{\"data\":{\"pi\":3.141592653589793238462643,\"price\":1.00,\"huge\":1e400}}");
+
+        RunView run = runToEnd(owner, workflow, "{\"template\":\"promo\"}");
+
+        assertThat(run.status()).isEqualTo("completed");
+        assertThat(run.steps().get(0).output()).isEqualTo(
+                "{\"pi\":3.141592653589793238462643,\"huge\":1" + "0".repeat(400) + ",\"price\":1.00}");
+    }
+
+    @Test
     void anUnknownKeyFailsTheRunWithTheNotFoundCode() {
         UserView owner = memberWithBalance("unknown", 10);
         WorkflowView workflow = newWorkflow(owner.id(), false, new NewWorkflowStep("load", "load_template", null));
