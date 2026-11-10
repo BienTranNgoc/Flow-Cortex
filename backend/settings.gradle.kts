@@ -16,4 +16,5 @@ include(
     ":modules:billing",
     ":shared:web",
     ":shared:security",
+    ":shared:ratelimit",
 )
