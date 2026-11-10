@@ -278,6 +278,15 @@ class WorkflowReviewEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(call(HttpMethod.POST, reviews + "/" + benReview + "/report", chiToken, Map.of("reason", "rude"))
                 .getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
 
+        ResponseEntity<Map> nulDetails = call(HttpMethod.POST, reviews + "/" + benReview + "/report",
+                loginAs(dan), Map.of("reason", "spam", "details", "a\u0000b"));
+        assertThat(nulDetails.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat((Map<String, ?>) nulDetails.getBody().get("errors")).containsKey("details");
+        ResponseEntity<Map> nulBody = call(HttpMethod.PUT, reviews + "/mine", chiToken,
+                Map.of("rating", 4, "body", "a\u0000b"));
+        assertThat(nulBody.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat((Map<String, ?>) nulBody.getBody().get("errors")).containsKey("body");
+
         for (String query : List.of("sort=oldest", "rating=6", "size=0", "size=51")) {
             assertThat(call(HttpMethod.GET, reviews + "?" + query, chiToken, null).getStatusCode()).as(query)
                     .isEqualTo(HttpStatus.BAD_REQUEST);

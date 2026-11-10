@@ -38,7 +38,7 @@ class ReviewRulesTest {
         assertThat(ReviewRules.rating(new BigDecimal("4.0"))).isEqualTo(4);
         assertRefused(() -> ReviewRules.rating(new BigDecimal("4.0000000000000000001")), "rating",
                 "workflow.review.ratingInvalid");
-        assertRefused(() -> ReviewRules.rating(Double.NaN),"rating", "workflow.review.ratingInvalid");
+        assertRefused(() -> ReviewRules.rating(Double.NaN), "rating", "workflow.review.ratingInvalid");
         assertRefused(() -> ReviewRules.rating(Long.MAX_VALUE), "rating", "workflow.review.ratingInvalid");
     }
 
@@ -48,6 +48,13 @@ class ReviewRulesTest {
         assertThat(ReviewRules.body("")).isNull();
         assertThat(ReviewRules.body(" \n\t ")).isNull();
         assertThat(ReviewRules.body("  Fast and accurate \n")).isEqualTo("Fast and accurate");
+    }
+
+    @Test
+    void aNullCharacterInABodyOrReportDetailsIsRefusedBecausePostgresCannotStoreIt() {
+        assertRefused(() -> ReviewRules.body("a\u0000b"), "body", "workflow.review.textInvalid");
+        assertRefused(() -> ReviewRules.body("\u0000"), "body", "workflow.review.textInvalid");
+        assertRefused(() -> ReviewRules.report("spam", "a\u0000b"), "details", "workflow.review.textInvalid");
     }
 
     @Test

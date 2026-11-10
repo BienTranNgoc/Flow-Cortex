@@ -312,6 +312,70 @@ class WorkflowReviewRepositoriesIT {
     }
 
     @Test
+    void lockingAReviewByIdFindsOnlyItsOwnWorkflowsReview() {
+        UUID workflow = publicWorkflow();
+        UUID other = publicWorkflow();
+        UUID review = insertReview(workflow, UUID.randomUUID(), 4, null, 0, now());
+
+        assertThat(inTx(() -> reviewRepository.lockByIdAndWorkflowId(review, workflow))).isPresent();
+        assertThat(inTx(() -> reviewRepository.lockByIdAndWorkflowId(review, other))).isEmpty();
+        assertThat(inTx(() -> reviewRepository.lockByIdAndWorkflowId(UUID.randomUUID(), workflow))).isEmpty();
+    }
+
+    @Test
+    void aHeldReviewLockHoldsBackADeleteButNotAHelpfulCountUpdate() throws Exception {
+        UUID workflow = publicWorkflow();
+        UUID review = insertReview(workflow, UUID.randomUUID(), 4, null, 0, now());
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            inTx(() -> {
+                assertThat(reviewRepository.lockByIdAndWorkflowId(review, workflow)).isPresent();
+                Future<Throwable> blockedDelete = pool.submit(() -> failureOf(() -> inTx(() -> {
+                    jdbc().execute("SET LOCAL lock_timeout = '500ms'");
+                    return jdbc().update("DELETE FROM workflow_review WHERE id = ?", review);
+                })));
+                Future<Integer> update = pool.submit(() -> inTx(() -> {
+                    jdbc().execute("SET LOCAL lock_timeout = '5s'");
+                    return reviewRepository.addHelpful(review, 1);
+                }));
+                try {
+                    assertThat(blockedDelete.get(20, TimeUnit.SECONDS)).hasMessageContaining("lock timeout");
+                    assertThat(update.get(20, TimeUnit.SECONDS)).isEqualTo(1);
+                } catch (Exception e) {
+                    throw new AssertionError(e);
+                }
+                return null;
+            });
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc().update("DELETE FROM workflow_review WHERE id = ?", review)).isEqualTo(1);
+    }
+
+    @Test
+    void twoMembersHoldingTheReviewLockCanBothMarkItHelpful() throws Exception {
+        UUID workflow = publicWorkflow();
+        UUID review = insertReview(workflow, UUID.randomUUID(), 4, null, 0, now());
+        CyclicBarrier bothLocked = new CyclicBarrier(2);
+
+        int marked = together(2, () -> inTx(() -> {
+            assertThat(reviewRepository.lockByIdAndWorkflowId(review, workflow)).isPresent();
+            try {
+                bothLocked.await(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new AssertionError(e);
+            }
+            int written = helpfulRepository.insertIfAbsent(review, UUID.randomUUID(), now());
+            reviewRepository.addHelpful(review, written);
+            return written;
+        }));
+
+        assertThat(marked).isEqualTo(2);
+        assertThat(reviewRepository.findById(review).orElseThrow().getHelpfulCount()).isEqualTo(2);
+    }
+
+    @Test
     void aRepeatedHelpfulMarkChangesNothing() {
         UUID workflow = publicWorkflow();
         UUID review = insertReview(workflow, UUID.randomUUID(), 4, null, 0, now());
@@ -497,6 +561,19 @@ class WorkflowReviewRepositoriesIT {
         assertThat(reviewRepository.findById(review).orElseThrow().getHelpfulCount()).isZero();
         assertThat(reviewers).allSatisfy(reviewer ->
                 assertThat(reviewRepository.findByWorkflowIdAndUserId(workflow, reviewer)).isEmpty());
+    }
+
+    private static Throwable failureOf(Runnable work) {
+        try {
+            work.run();
+        } catch (RuntimeException e) {
+            Throwable root = e;
+            while (root.getCause() != null) {
+                root = root.getCause();
+            }
+            return root;
+        }
+        throw new AssertionError("expected the call to fail");
     }
 
     /** Runs {@code work} on {@code threads} threads released together and returns the sum of their results. */

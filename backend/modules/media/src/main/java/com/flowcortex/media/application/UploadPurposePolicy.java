@@ -3,13 +3,13 @@ package com.flowcortex.media.application;
 import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * The only arbiter of what an upload may be for each {@link UploadPurpose}: accepted extensions, per-kind
@@ -97,14 +97,11 @@ final class UploadPurposePolicy {
     }
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
-        List<String> extensions = new ArrayList<>();
-        switch (purpose) {
-            case RUN_INPUT -> {
-                extensions.addAll(upload.mediaExtensions());
-                extensions.addAll(upload.productImageExtensions());
-            }
-            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> extensions.addAll(IMAGE_MIME_TYPES.keySet());
-        }
+        List<String> extensions = switch (purpose) {
+            case RUN_INPUT -> Stream.concat(upload.mediaExtensions().stream(),
+                    upload.productImageExtensions().stream()).toList();
+            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> List.copyOf(IMAGE_MIME_TYPES.keySet());
+        };
         List<String> dotted = extensions.stream().map(e -> "." + e).toList();
         return dotted.size() == 1
                 ? new LocalizedMessage("upload.typeOne", dotted.getFirst())

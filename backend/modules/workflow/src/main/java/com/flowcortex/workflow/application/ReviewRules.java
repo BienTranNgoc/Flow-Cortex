@@ -54,10 +54,18 @@ final class ReviewRules {
         if (trimmed.isEmpty()) {
             return null;
         }
+        requireStorable("body", trimmed);
         if (trimmed.codePointCount(0, trimmed.length()) > MAX_BODY_CODE_POINTS) {
             throw refusal("body", new LocalizedMessage("workflow.review.bodyTooLong"));
         }
         return trimmed;
+    }
+
+    /** Postgres cannot store U+0000 in a text column, so it is refused here rather than failing the insert. */
+    private static void requireStorable(String field, String text) {
+        if (text.indexOf('\u0000') >= 0) {
+            throw refusal(field, new LocalizedMessage("workflow.review.textInvalid"));
+        }
     }
 
     /** A null request keeps the current images; an id of a current image is kept, any other is an upload. */
@@ -89,6 +97,9 @@ final class ReviewRules {
         String trimmed = details == null ? null : details.strip();
         if (trimmed != null && trimmed.isEmpty()) {
             trimmed = null;
+        }
+        if (trimmed != null) {
+            requireStorable("details", trimmed);
         }
         if (trimmed != null && trimmed.codePointCount(0, trimmed.length()) > MAX_DETAILS_LENGTH) {
             throw refusal("details", new LocalizedMessage("workflow.review.detailsTooLong"));

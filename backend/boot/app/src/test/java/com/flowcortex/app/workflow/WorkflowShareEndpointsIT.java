@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
-import com.flowcortex.workflow.api.WorkflowView;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

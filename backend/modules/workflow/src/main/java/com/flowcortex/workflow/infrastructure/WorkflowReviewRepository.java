@@ -45,6 +45,15 @@ public interface WorkflowReviewRepository extends JpaRepository<WorkflowReview, 
 
     Optional<WorkflowReview> findByIdAndWorkflowId(UUID id, UUID workflowId);
 
+    /**
+     * Loads the review and holds a key-share row lock until the transaction ends, so a concurrent delete waits
+     * while rows referencing the review are inserted. Unlike a share lock it does not conflict with
+     * {@link #addHelpful}, so two members marking one review cannot deadlock.
+     */
+    @Query(value = "SELECT * FROM workflow_review WHERE id = :id AND workflow_id = :workflowId FOR KEY SHARE",
+            nativeQuery = true)
+    Optional<WorkflowReview> lockByIdAndWorkflowId(@Param("id") UUID id, @Param("workflowId") UUID workflowId);
+
     /** Adds {@code delta} to the helpful count in the database; never computed from a read. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE WorkflowReview r SET r.helpfulCount = r.helpfulCount + :delta WHERE r.id = :id")

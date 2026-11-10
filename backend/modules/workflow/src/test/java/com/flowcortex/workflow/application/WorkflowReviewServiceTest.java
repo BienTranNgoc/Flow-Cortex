@@ -171,7 +171,7 @@ class WorkflowReviewServiceTest {
     @Test
     void markingOrReportingOnesOwnReviewIsForbidden() {
         WorkflowReview review = existingReview();
-        when(reviews.findByIdAndWorkflowId(review.getId(), workflow.getId())).thenReturn(Optional.of(review));
+        when(reviews.lockByIdAndWorkflowId(review.getId(), workflow.getId())).thenReturn(Optional.of(review));
 
         assertThatThrownBy(() -> service.setHelpful(BEN, workflow.getId(), review.getId(), true))
                 .satisfies(thrown -> assertForbidden(thrown, "workflow.review.helpfulOwn"));

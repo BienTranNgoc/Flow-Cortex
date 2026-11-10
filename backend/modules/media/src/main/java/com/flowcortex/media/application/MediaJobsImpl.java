@@ -54,6 +54,7 @@ class MediaJobsImpl implements MediaJobs {
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
+
     /** Retention tag values the media bucket's lifecycle rules key on: pending expires, kept stays. */
     private record RetentionTags(String pending, String kept) {
     }

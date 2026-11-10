@@ -40,7 +40,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -196,20 +195,15 @@ public class WorkflowReviewService {
     @Transactional
     public HelpfulResult setHelpful(UUID callerId, UUID workflowId, UUID reviewId, boolean mark) {
         requireVisible(callerId, workflowId);
-        WorkflowReview review = reviews.findByIdAndWorkflowId(reviewId, workflowId)
+        WorkflowReview review = reviews.lockByIdAndWorkflowId(reviewId, workflowId)
                 .orElseThrow(WorkflowReviewService::reviewNotFound);
         if (review.getUserId().equals(callerId)) {
             throw forbidden(new LocalizedMessage("workflow.review.helpfulOwn"));
         }
-        try {
-            int changed = mark ? helpful.insertIfAbsent(reviewId, callerId, clock.instant())
-                    : helpful.deleteMark(reviewId, callerId);
-            if (changed > 0) {
-                reviews.addHelpful(reviewId, mark ? changed : -changed);
-            }
-        } catch (DataIntegrityViolationException e) {
-            // The review was deleted between the lookup and the insert.
-            throw reviewNotFound();
+        int changed = mark ? helpful.insertIfAbsent(reviewId, callerId, clock.instant())
+                : helpful.deleteMark(reviewId, callerId);
+        if (changed > 0) {
+            reviews.addHelpful(reviewId, mark ? changed : -changed);
         }
         int count = reviews.findByIdAndWorkflowId(reviewId, workflowId)
                 .orElseThrow(WorkflowReviewService::reviewNotFound).getHelpfulCount();
@@ -220,17 +214,13 @@ public class WorkflowReviewService {
     @Transactional
     public void report(UUID callerId, UUID workflowId, UUID reviewId, String reason, String details) {
         requireVisible(callerId, workflowId);
-        WorkflowReview review = reviews.findByIdAndWorkflowId(reviewId, workflowId)
+        WorkflowReview review = reviews.lockByIdAndWorkflowId(reviewId, workflowId)
                 .orElseThrow(WorkflowReviewService::reviewNotFound);
         if (review.getUserId().equals(callerId)) {
             throw forbidden(new LocalizedMessage("workflow.review.reportOwn"));
         }
         ReviewRules.Report report = ReviewRules.report(reason, details);
-        try {
-            reports.insertIfAbsent(reviewId, callerId, report.reason().code(), report.details(), clock.instant());
-        } catch (DataIntegrityViolationException e) {
-            throw reviewNotFound();
-        }
+        reports.insertIfAbsent(reviewId, callerId, report.reason().code(), report.details(), clock.instant());
     }
 
     private Written persist(Workflow workflow, UUID callerId, int stars, String text, ReviewRules.ImagePlan plan,
