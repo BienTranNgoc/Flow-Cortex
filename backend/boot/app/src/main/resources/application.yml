@@ -10,12 +10,14 @@ spring:
     url: jdbc:postgresql://localhost:5432/flowcortex
     username: flowcortex
     driver-class-name: org.postgresql.Driver
-    # Each async task can hold two connections at once (a listener's REQUIRES_NEW plus the
-    # step transition it opens), so the pool is at least 2 x task.execution.pool.max-size (16)
-    # plus headroom for HTTP requests, the reaper and heartbeats. Idle connections stay few:
-    # Hikari otherwise holds all 40 open per instance even when nothing runs.
+    # An async task can hold up to 4 connections at once (listener + advance + claim + workflow.call
+    # fact reads), so the pool is at least 4 x task.execution.pool.max-size (16) = 64 plus headroom
+    # for HTTP requests, the reaper and heartbeats; the workflow module refuses to start below the
+    # 4 x product. Each backend instance opens up to this many, so instances x this must fit in
+    # Postgres max_connections (100 by default; compose runs one backend). Idle connections stay few:
+    # Hikari otherwise holds all 80 open per instance even when nothing runs.
     hikari:
-      maximum-pool-size: 40
+      maximum-pool-size: 80
       minimum-idle: 5
 
   jpa:

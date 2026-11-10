@@ -55,7 +55,7 @@ class WorkflowCallStepExecutorTest {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
     }
 
-    private final UUID owner =UUID.randomUUID();
+    private final UUID owner = UUID.randomUUID();
     private final UUID parentWorkflowId = UUID.randomUUID();
     private final UUID childWorkflowId = UUID.randomUUID();
     private final UUID parentRunId = UUID.randomUUID();

@@ -25,11 +25,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * {@code workflow.call} — starts another workflow as a child run, for the step's owner, inside the step's claim.
- * The step stays running until the child ends; its result arrives as an event. Every refusal throws a
- * {@link StepFailedException} before any child row is written, so the claim never rolls back on a fact-gathering
- * error. The facts are read in their own read-only transaction, so an exception from a transactional repository
- * or service marks only that one rollback-only and the claim can still fail the step. The registry and the start guards are resolved when the step runs: the registry takes this bean at
- * construction and the credit guard takes the registry.
+ * The facts are read in their own read-only transaction, so a failing read cannot mark the claim rollback-only
+ * and every refusal can still fail the step.
  */
 @Component
 class WorkflowCallStepExecutor implements StepExecutor {
@@ -53,7 +50,8 @@ class WorkflowCallStepExecutor implements StepExecutor {
 
     WorkflowCallStepExecutor(WorkflowRunRepository runs, WorkflowRepository workflows, ServedDefinitions served,
             ObjectProvider<RunStartGuards> guards, ObjectProvider<StepExecutorRegistry> registry, MediaJobs mediaJobs,
-            RunCreation creation, TransactionTemplate transactionTemplate, @Value("${flowcortex.workflow.enabled:true}") boolean workflowsEnabled,
+            RunCreation creation, TransactionTemplate transactionTemplate,
+            @Value("${flowcortex.workflow.enabled:true}") boolean workflowsEnabled,
             @Value("${flowcortex.workflow.call.max-runtime}") Duration maxRuntime) {
         this.runs = runs;
         this.workflows = workflows;
