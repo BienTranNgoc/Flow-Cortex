@@ -13,6 +13,7 @@
     "load_template_not_found": "No template with that name exists in this workflow's data store.",
     "load_template_invalid_template": "The stored template is not valid. Check its data and inputs.",
     "load_template_missing_input": "Some required inputs for the template are missing.",
+    "load_template_missing_input_fields": "Missing required template inputs: {{fields}}.",
     "reapedInline": "This step stopped before it finished. Try running again.",
     "noMessage": "This step stopped with an error."
   },

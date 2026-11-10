@@ -29,6 +29,25 @@ const REAPED_INLINE = 'workflow.stepError.reapedInline';
 /** Codes whose server message is written for members and carries specifics the sentence lacks. */
 const MEMBER_MESSAGE_CODES: ReadonlySet<string> = new Set(['speech_too_long']);
 
+/**
+ * Codes whose server message names specifics (identifiers, the same in every language) that belong in
+ * the sentence. `parse` returns the sentence's values, or null when the message is not in the shape
+ * the server writes; the plain sentence then applies. Keep `parse` in step with the backend `TemplateLoad`.
+ */
+const MESSAGE_DETAILS: Record<
+  string,
+  { key: string; parse: (message: string) => Record<string, string> | null }
+> = {
+  load_template_missing_input: {
+    key: 'workflow.stepError.load_template_missing_input_fields',
+    parse: (message) => {
+      const match = /^Required input missing: (.+)\.$/.exec(message);
+      const fields = match?.[1];
+      return fields ? { fields } : null;
+    },
+  },
+};
+
 export const NO_MESSAGE = 'workflow.stepError.noMessage';
 
 /**
@@ -47,6 +66,12 @@ export function stepErrorSentence(
   }
   if (code && MEMBER_MESSAGE_CODES.has(code) && message && locale === 'en') {
     return message;
+  }
+  const detail = code && message ? MESSAGE_DETAILS[code] : undefined;
+  const values = detail?.parse(message as string);
+  if (detail && values) {
+    // React escapes text nodes, so i18next escaping would only show entities for names like `a&b`.
+    return t(detail.key, { ...values, interpolation: { escapeValue: false } });
   }
   const key = code ? SENTENCE_KEYS[code] : undefined;
   if (key) {

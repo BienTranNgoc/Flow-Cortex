@@ -13,6 +13,7 @@
     "load_template_not_found": "Kho dữ liệu của quy trình này không có mẫu nào mang tên đó.",
     "load_template_invalid_template": "Mẫu đã lưu không hợp lệ. Hãy kiểm tra dữ liệu và các trường đầu vào của mẫu.",
     "load_template_missing_input": "Còn thiếu một số đầu vào bắt buộc của mẫu.",
+    "load_template_missing_input_fields": "Còn thiếu đầu vào bắt buộc của mẫu: {{fields}}.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
   },

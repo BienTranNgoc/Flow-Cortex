@@ -118,9 +118,9 @@ class TemplateLoadTest {
                 TemplateLoad.load("{\"template\":\"t\",\"productName\":\" \"}", store(Map.of("t", template)));
 
         assertFailed(result, "load_template_missing_input");
-        String message = ((TemplateLoad.Failed) result).message();
-        assertThat(message).contains("productName", "productImage");
-        assertThat(message.indexOf("productName")).isLessThan(message.indexOf("productImage"));
+        // The frontend parses this exact shape to name the fields in the member's language.
+        assertThat(((TemplateLoad.Failed) result).message())
+                .isEqualTo("Required input missing: productName, productImage.");
     }
 
     @Test
