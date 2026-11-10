@@ -1,0 +1,36 @@
+{
+  "id": "load-template",
+  "pattern": "load-template",
+  "title": {
+    "en": "Fill a template, review, use a field",
+    "vi": "Điền mẫu, duyệt, dùng một trường"
+  },
+  "description": {
+    "en": "The first step loads the stored template promo-brief and fills it from the run input, the run pauses for your review, and the last step uses the brief field.",
+    "vi": "Bước đầu nạp mẫu promo-brief đã lưu và điền theo dữ liệu đầu vào của lượt chạy, lượt chạy dừng lại chờ bạn duyệt, rồi bước cuối dùng trường brief."
+  },
+  "sampleInput": "{\"template\":\"promo-brief\",\"productName\":\"Nodi Mug\"}",
+  "steps": [
+    { "name": "load_template", "type": "load_template" },
+    { "name": "review", "type": "APPROVAL_CHECKPOINT" },
+    { "name": "brief", "type": "echo", "inputRef": "{step:1.brief}" }
+  ],
+  "dataStore": [
+    {
+      "key": "promo-brief",
+      "dataType": "template",
+      "value": {
+        "data": {
+          "brief": "Spring sale: 20% off every mug this week.",
+          "defaults": { "tone": "friendly" }
+        },
+        "inputs": {
+          "fields": {
+            "productName": { "required": true },
+            "tone": { "required": false }
+          }
+        }
+      }
+    }
+  ]
+}
