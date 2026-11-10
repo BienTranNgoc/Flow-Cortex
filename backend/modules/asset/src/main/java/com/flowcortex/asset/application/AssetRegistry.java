@@ -116,8 +116,13 @@ public class AssetRegistry {
         }
     }
 
-    /** Processes a claimed row and ends it as done, skipped or retried; never throws. */
-    public void process(RegistrationRow row) {
+    /**
+     * Processes a claimed row and ends it as done, skipped or retried; never throws.
+     *
+     * @return true when the object store was unavailable during the pass, so a caller working through
+     *         a batch can stop instead of waiting on the store once per row
+     */
+    public boolean process(RegistrationRow row) {
         Tally tally = new Tally();
         try {
             if (row.sourceType() == SourceType.RUN_OUTPUTS) {
@@ -136,6 +141,7 @@ public class AssetRegistry {
             tally.transientFailure(UNEXPECTED);
         }
         finishRow(row, tally);
+        return tally.storeUnavailable;
     }
 
     private void finishRow(RegistrationRow row, Tally tally) {
@@ -238,7 +244,9 @@ public class AssetRegistry {
             }
             if (assets.existsByMediaAssetId(input.mediaAssetId())) {
                 tally.skipOne(EXISTS);
-                releaseUnlessAssetCopy(run.runId(), input, tally);
+                if (!releaseUnlessAssetCopy(run.runId(), input, tally)) {
+                    return;
+                }
                 continue;
             }
             OptionalLong copyBytes;
@@ -247,7 +255,7 @@ public class AssetRegistry {
             } catch (MediaStoreUnavailableException e) {
                 LOG.warn("asset.registry keep failed runId={} mediaAssetId={}", run.runId(), input.mediaAssetId(), e);
                 tally.transientFailure(STORE_UNAVAILABLE);
-                continue;
+                return;
             }
             if (copyBytes.isEmpty()) {
                 tally.skipOne(OBJECT_MISSING);
@@ -259,8 +267,8 @@ public class AssetRegistry {
                     input.mediaAssetId(), SOURCE_UPLOAD, input.kind(), title, title, 1, input.bucket(),
                     input.objectKey(), input.mimeType(), copyBytes.getAsLong(), run.runId(), null, run.workflowId(),
                     run.workflowName()), tally);
-            if (result == InsertResult.EXISTS) {
-                releaseUnlessAssetCopy(run.runId(), input, tally);
+            if (result == InsertResult.EXISTS && !releaseUnlessAssetCopy(run.runId(), input, tally)) {
+                return;
             }
         }
     }
@@ -269,16 +277,21 @@ public class AssetRegistry {
      * An input that ends as {@code exists} must not keep a copy the lifecycle rule no longer expires: an
      * earlier attempt of this run may have kept it before its insert failed or lost. The copy an asset
      * already points at (a retry after this run's own insert) stays kept.
+     *
+     * @return false when the store is unavailable: the failure is on the tally and the caller stops, because
+     *         the store is down for every remaining input too and the whole row is retried
      */
-    private void releaseUnlessAssetCopy(UUID runId, BoundRunInput input, Tally tally) {
+    private boolean releaseUnlessAssetCopy(UUID runId, BoundRunInput input, Tally tally) {
         if (assets.pointsAtObject(input.bucket(), input.objectKey())) {
-            return;
+            return true;
         }
         try {
             media.releaseRunInput(input.bucket(), input.objectKey());
+            return true;
         } catch (MediaStoreUnavailableException e) {
             LOG.warn("asset.registry release failed runId={} mediaAssetId={}", runId, input.mediaAssetId(), e);
             tally.transientFailure(STORE_UNAVAILABLE);
+            return false;
         }
     }
 
@@ -311,6 +324,7 @@ public class AssetRegistry {
         String lastSkipCode;
         String wholeSourceSkipCode;
         String transientCode;
+        boolean storeUnavailable;
 
         void skipOne(String code) {
             skipped++;
@@ -322,6 +336,7 @@ public class AssetRegistry {
         }
 
         void transientFailure(String code) {
+            storeUnavailable |= STORE_UNAVAILABLE.equals(code);
             if (transientCode == null) {
                 transientCode = code;
             }

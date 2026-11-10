@@ -1,17 +1,26 @@
 package com.flowcortex.app.asset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.asset.application.AssetRegistrationSweep;
 import com.flowcortex.asset.domain.SourceType;
 import com.flowcortex.asset.infrastructure.AssetRegistrationStore;
+import com.flowcortex.media.api.MediaStoreUnavailableException;
+import com.flowcortex.media.api.RegistrableMedia;
 import com.flowcortex.space.api.PersonalSpaces;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -42,6 +52,9 @@ class AssetRegistrationSweepIT extends AbstractPostgresBootTest {
     @Autowired
     private PersonalSpaces spaces;
 
+    @MockitoSpyBean
+    private RegistrableMedia media;
+
     private final List<UUID> owners = new ArrayList<>();
 
     @BeforeEach
@@ -54,6 +67,8 @@ class AssetRegistrationSweepIT extends AbstractPostgresBootTest {
         jdbc.update("DELETE FROM space_asset_registration");
         for (UUID owner : owners) {
             jdbc.update("DELETE FROM space_asset WHERE owner_id = ?", owner);
+            jdbc.update("DELETE FROM media_asset_binding WHERE run_id IN (SELECT id FROM workflow_run WHERE owner_id = ?)",
+                    owner);
             jdbc.update("DELETE FROM media_asset WHERE owner_id = ?", owner);
             jdbc.update("DELETE FROM run_step WHERE run_id IN (SELECT id FROM workflow_run WHERE owner_id = ?)", owner);
             jdbc.update("DELETE FROM workflow_run WHERE owner_id = ?", owner);
@@ -109,6 +124,36 @@ class AssetRegistrationSweepIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void aStoreOutageStopsThePassAfterOneCallAndReturnsTheOtherRowsUntried() {
+        UUID owner = newOwner();
+        for (int i = 0; i < 3; i++) {
+            queue.upsertPending(SourceType.RUN_INPUTS, runWithBoundUploads(owner, 2), owner);
+        }
+        doThrow(new MediaStoreUnavailableException("down", new RuntimeException("boom")))
+                .when(media).keepRunInput(any(), any());
+
+        sweep.run();
+
+        verify(media, times(1)).keepRunInput(any(), any());
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT status, attempts, last_error_code, lease_until, "
+                + "lease_token FROM space_asset_registration ORDER BY attempts DESC");
+        assertThat(rows).hasSize(3);
+        assertThat(rows).extracting(row -> row.get("status")).containsOnly("pending");
+        assertThat(rows).extracting(row -> row.get("lease_until")).containsOnlyNulls();
+        assertThat(rows).extracting(row -> row.get("lease_token")).containsOnlyNulls();
+        assertThat(rows).extracting(row -> row.get("attempts")).containsExactly(1, 0, 0);
+        assertThat(rows.get(0).get("last_error_code")).isEqualTo("store_unavailable");
+        assertThat(rows.get(1).get("last_error_code")).isNull();
+
+        doReturn(OptionalLong.empty()).when(media).keepRunInput(any(), any());
+        jdbc.update("UPDATE space_asset_registration SET next_attempt_at = now()");
+
+        sweep.run();
+
+        assertThat(count("status = 'done'")).isEqualTo(3);
+    }
+
+    @Test
     void aPassDeletesFinishedRowsOlderThan30DaysAndKeepsPendingOnes() {
         UUID owner = UUID.randomUUID();
         UUID oldDone = queueRow(owner, "done", 31, null);
@@ -154,6 +199,24 @@ class AssetRegistrationSweepIT extends AbstractPostgresBootTest {
         owners.add(owner);
         spaces.personalSpaceOf(owner);
         return owner;
+    }
+
+    private UUID runWithBoundUploads(UUID owner, int uploads) {
+        UUID workflow = UUID.randomUUID();
+        jdbc.update("INSERT INTO workflow (id, owner_id, name, is_shared, created_at, updated_at) "
+                + "VALUES (?, ?, 'Dub', false, now(), now())", workflow, owner);
+        UUID run = UUID.randomUUID();
+        jdbc.update("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at) "
+                + "VALUES (?, ?, ?, 'running', 'sweep input', now())", run, workflow, owner);
+        for (int i = 0; i < uploads; i++) {
+            UUID upload = UUID.randomUUID();
+            jdbc.update("INSERT INTO media_asset (id, owner_id, space_id, kind, bucket, object_key, mime_type, bytes, "
+                    + "status, created_at) VALUES (?, ?, ?, 'image', ?, ?, 'image/png', 50, 'ready', now())",
+                    upload, owner, spaces.personalSpaceOf(owner), UPLOAD_BUCKET, owner + "/" + upload);
+            jdbc.update("INSERT INTO media_asset_binding (run_id, binding_key, asset_id, position, created_at) "
+                    + "VALUES (?, ?, ?, ?, now())", run, "image_" + (i + 1), upload, i);
+        }
+        return run;
     }
 
     private UUID completedRunWithVideo(UUID owner) {

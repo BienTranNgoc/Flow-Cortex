@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.flowcortex.AbstractPostgresBootTest;
@@ -278,6 +279,52 @@ class AssetRegistryIT extends AbstractPostgresBootTest {
         assertThat(titles(run)).isEmpty();
         assertThat(jdbc.queryForObject("SELECT status FROM workflow_run WHERE id = ?", String.class, run))
                 .isEqualTo("running");
+    }
+
+    @Test
+    void aStoreFailureOnOneInputStopsTheRowWithoutCallingTheStoreForTheOthers() {
+        UUID owner = newOwner();
+        UUID run = run(owner, workflow(owner, "Dub"), "running", "text");
+        step(run, 1, "tts");
+        bindUpload(owner, run, "image_1", "image/png", 0);
+        bindUpload(owner, run, "image_2", "image/png", 1);
+        bindUpload(owner, run, "image_3", "image/png", 2);
+        doThrow(new MediaStoreUnavailableException("down", new RuntimeException("boom")))
+                .when(media).keepRunInput(any(), any());
+        queue.upsertPending(SourceType.RUN_INPUTS, run, owner);
+        RegistrationRow row = queue.claim(SourceType.RUN_INPUTS, run).orElseThrow();
+
+        boolean storeUnavailable = registry.process(row);
+
+        assertThat(storeUnavailable).isTrue();
+        verify(media, times(1)).keepRunInput(any(), any());
+        assertThat(jdbc.queryForObject("SELECT last_error_code FROM space_asset_registration "
+                + "WHERE source_type = 'run_inputs' AND source_id = ?", String.class, run))
+                .isEqualTo("store_unavailable");
+    }
+
+    @Test
+    void aStoreFailureOnReleaseStopsTheRowWithoutReleasingTheOtherCopies() {
+        UUID owner = newOwner();
+        UUID workflow = workflow(owner, "Dub");
+        UUID first = run(owner, workflow, "running", "text");
+        step(first, 1, "tts");
+        UUID second = run(owner, workflow, "running", "text");
+        step(second, 1, "tts");
+        UUID uploadOne = upload(owner, "image/png");
+        UUID uploadTwo = upload(owner, "image/png");
+        bind(first, "image_1", uploadOne, 0);
+        bind(first, "image_2", uploadTwo, 1);
+        bind(second, "image_1", uploadOne, 0);
+        bind(second, "image_2", uploadTwo, 1);
+        process(SourceType.RUN_INPUTS, first, owner);
+        doThrow(new MediaStoreUnavailableException("down", new RuntimeException("boom")))
+                .when(media).releaseRunInput(any(), any());
+
+        process(SourceType.RUN_INPUTS, second, owner);
+
+        verify(media, times(1)).releaseRunInput(any(), any());
+        assertThat(rowStatus(SourceType.RUN_INPUTS, second)).isEqualTo("pending");
     }
 
     @Test

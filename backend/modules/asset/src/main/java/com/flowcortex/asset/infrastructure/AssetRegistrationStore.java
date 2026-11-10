@@ -87,6 +87,23 @@ public class AssetRegistrationStore {
     }
 
     /**
+     * Hands claimed rows back untried: the lease is cleared by token and neither the attempts nor the retry time
+     * change, so the next pass takes them as if they had never been claimed.
+     *
+     * @return how many rows were released; a row whose token is no longer the claimant's is left alone
+     */
+    public int release(List<RegistrationRow> rows) {
+        if (rows.isEmpty()) {
+            return 0;
+        }
+        return jdbc.update("UPDATE space_asset_registration "
+                + "SET lease_until = NULL, lease_token = NULL, updated_at = :now "
+                + "WHERE lease_token IN (:tokens)",
+                new MapSqlParameterSource("now", now())
+                        .addValue("tokens", rows.stream().map(RegistrationRow::leaseToken).toList()));
+    }
+
+    /**
      * Ends the row as {@code DONE} or {@code SKIPPED}, clearing its lease.
      *
      * @return false when the row's token is no longer the claimant's, in which case nothing changed
