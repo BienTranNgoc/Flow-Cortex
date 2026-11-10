@@ -70,6 +70,7 @@
         "providers": "Nhà cung cấp mô hình",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
+        "settings": "Cài đặt",
         "features": "Công tắc tính năng",
         "auditLog": "Nhật ký kiểm toán",
         "mediaJobs": "Tác vụ media",

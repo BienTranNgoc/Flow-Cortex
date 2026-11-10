@@ -116,7 +116,7 @@ export interface AdminSupportSettingsUpdate {
 export interface AdminSupportSettings {
   assistantEnabled: boolean;
   updatedBy?: string;
-  updatedAt: string;
+  updatedAt?: string;
   envEnabled: boolean;
   ceilingReachedToday: boolean;
   /** @minimum 1 */
@@ -312,6 +312,50 @@ export interface AdminSupportKbArticle {
   featuredPosition?: number;
   publishedAt?: string;
   updatedAt: string;
+}
+
+export interface AdminSettingUpdate {
+  value: boolean | number;
+}
+
+export type AdminSettingType = (typeof AdminSettingType)[keyof typeof AdminSettingType];
+
+export const AdminSettingType = {
+  SWITCH: 'SWITCH',
+  INTEGER: 'INTEGER',
+} as const;
+
+export type AdminSettingSource = (typeof AdminSettingSource)[keyof typeof AdminSettingSource];
+
+export const AdminSettingSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface AdminSetting {
+  key: string;
+  group: string;
+  type: AdminSettingType;
+  value: boolean | number;
+  decidedValue: boolean | number;
+  source: AdminSettingSource;
+  /** @nullable */
+  storedValue?: boolean | number | null;
+  /** @nullable */
+  configuredValue?: boolean | number | null;
+  /** @nullable */
+  defaultValue?: boolean | number | null;
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
 }
 
 export interface CreateWorkflowRequest {
@@ -1116,6 +1160,27 @@ export interface SmsOutboxEntryResponse {
   createdAt: string;
 }
 
+export interface AdminSettingList {
+  items: AdminSetting[];
+}
+
+export interface AdminSettingChange {
+  /** @nullable */
+  previousValue?: boolean | number | null;
+  /** @nullable */
+  newValue?: boolean | number | null;
+  /** @nullable */
+  changedBy?: string | null;
+  changedAt: string;
+}
+
+export interface PageViewAdminSettingChange {
+  items: AdminSettingChange[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface AdminRunResponse {
   id: string;
   workflowName: string;
@@ -1261,6 +1326,19 @@ export type ListAdminSmsOutboxParams = {
    * @maximum 200
    */
   limit?: number;
+};
+
+export type ListAdminSettingHistoryParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
 };
 
 export type ListAdminRunsParams = {
@@ -1953,6 +2031,103 @@ export const updateAdminSupportKbArticle = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminSupportKbArticleRequest),
+  });
+};
+
+export type updateAdminSettingResponse200 = {
+  data: AdminSetting;
+  status: 200;
+};
+
+export type updateAdminSettingResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminSettingResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminSettingResponseSuccess = updateAdminSettingResponse200 & {
+  headers: Headers;
+};
+export type updateAdminSettingResponseError = (
+  updateAdminSettingResponse404 | updateAdminSettingResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateAdminSettingResponse =
+  updateAdminSettingResponseSuccess | updateAdminSettingResponseError;
+
+export const getUpdateAdminSettingUrl = (key: string) => {
+  return `/api/v1/admin/settings/${key}`;
+};
+
+export const updateAdminSetting = async (
+  key: string,
+  adminSettingUpdate: AdminSettingUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminSettingResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminSettingResponse>(getUpdateAdminSettingUrl(key), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSettingUpdate),
+  });
+};
+
+export type resetAdminSettingResponse200 = {
+  data: AdminSetting;
+  status: 200;
+};
+
+export type resetAdminSettingResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resetAdminSettingResponseSuccess = resetAdminSettingResponse200 & {
+  headers: Headers;
+};
+export type resetAdminSettingResponseError = resetAdminSettingResponse404 & {
+  headers: Headers;
+};
+
+export type resetAdminSettingResponse =
+  resetAdminSettingResponseSuccess | resetAdminSettingResponseError;
+
+export const getResetAdminSettingUrl = (key: string) => {
+  return `/api/v1/admin/settings/${key}`;
+};
+
+export const resetAdminSetting = async (
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetAdminSettingResponse> => {
+  return customFetch<resetAdminSettingResponse>(getResetAdminSettingUrl(key), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -5300,6 +5475,79 @@ export const listAdminSmsOutbox = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminSmsOutboxResponse> => {
   return customFetch<listAdminSmsOutboxResponse>(getListAdminSmsOutboxUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminSettingsResponse200 = {
+  data: AdminSettingList;
+  status: 200;
+};
+
+export type listAdminSettingsResponseSuccess = listAdminSettingsResponse200 & {
+  headers: Headers;
+};
+export type listAdminSettingsResponse = listAdminSettingsResponseSuccess;
+
+export const getListAdminSettingsUrl = () => {
+  return `/api/v1/admin/settings`;
+};
+
+export const listAdminSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSettingsResponse> => {
+  return customFetch<listAdminSettingsResponse>(getListAdminSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminSettingHistoryResponse200 = {
+  data: PageViewAdminSettingChange;
+  status: 200;
+};
+
+export type listAdminSettingHistoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listAdminSettingHistoryResponseSuccess = listAdminSettingHistoryResponse200 & {
+  headers: Headers;
+};
+export type listAdminSettingHistoryResponseError = listAdminSettingHistoryResponse404 & {
+  headers: Headers;
+};
+
+export type listAdminSettingHistoryResponse =
+  listAdminSettingHistoryResponseSuccess | listAdminSettingHistoryResponseError;
+
+export const getListAdminSettingHistoryUrl = (
+  key: string,
+  params?: ListAdminSettingHistoryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/settings/${key}/history?${stringifiedParams}`
+    : `/api/v1/admin/settings/${key}/history`;
+};
+
+export const listAdminSettingHistory = async (
+  key: string,
+  params?: ListAdminSettingHistoryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminSettingHistoryResponse> => {
+  return customFetch<listAdminSettingHistoryResponse>(getListAdminSettingHistoryUrl(key, params), {
     ...options,
     method: 'GET',
   });

@@ -11,6 +11,7 @@ include(
     ":modules:credit",
     ":modules:llm",
     ":modules:support",
+    ":modules:settings",
     ":modules:space",
     ":modules:realtime",
     ":shared:web",

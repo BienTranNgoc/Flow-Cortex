@@ -11,6 +11,7 @@ import {
   Play,
   Pulse,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkle,
   SquaresFour,
   Stack,
@@ -116,6 +117,12 @@ export const NAV: NavGroup[] = [
         path: '/sms-outbox',
         icon: ChatText,
         key: 'platform.sms_outbox.view',
+      },
+      {
+        label: 'common.shell.nav.items.settings',
+        path: '/settings',
+        icon: SlidersHorizontal,
+        key: 'platform.setting.view',
       },
       {
         label: 'common.shell.nav.items.features',

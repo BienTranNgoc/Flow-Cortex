@@ -7,6 +7,8 @@ import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.llm.api.LlmClient;
 import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.settings.api.SettingKey;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import io.micrometer.core.instrument.Counter;
@@ -24,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -76,6 +79,9 @@ class AssistantIT extends AbstractPostgresBootTest {
     private static final String REFUSAL = "Mình không thể trả lời câu hỏi này";
     private static final String CREDIT_QUESTION = "Làm sao nạp credit?";
     private static final AtomicInteger NETWORKS = new AtomicInteger();
+    private static final SettingKey<Integer> MEMBER_QUOTA =
+            SettingKey.integerKey("support.assistant.member_daily_quota");
+    private static final SettingKey<Integer> CEILING = SettingKey.integerKey("support.assistant.daily_ceiling");
 
     /** Each case asks from its own address, so the per-network minute cap never carries over between cases. */
     private static volatile String network = "198.51.100.1";
@@ -91,6 +97,9 @@ class AssistantIT extends AbstractPostgresBootTest {
 
     @Autowired
     private FakeLlm fakeLlm;
+
+    @Autowired
+    private Settings settings;
 
     @Autowired
     private MeterRegistry meters;
@@ -154,7 +163,8 @@ class AssistantIT extends AbstractPostgresBootTest {
         jdbcTemplate.update("DELETE FROM support_quota_usage");
         jdbcTemplate.update("DELETE FROM support_article");
         jdbcTemplate.update("DELETE FROM support_topic_group");
-        jdbcTemplate.update("UPDATE support_settings SET assistant_enabled = true, updated_by = NULL WHERE id = 1");
+        jdbcTemplate.update("DELETE FROM app_setting WHERE key LIKE 'support.%'");
+        jdbcTemplate.update("DELETE FROM app_setting_change WHERE key LIKE 'support.%'");
         fakeLlm.reset();
         admin = userService.createInitialAdmin(uniqueEmail("as-admin"), "password123", "Assistant Admin");
         adminToken = login(admin.email());
@@ -379,6 +389,67 @@ class AssistantIT extends AbstractPostgresBootTest {
         assertThat(settings.updatedAt()).isCloseTo(Instant.now(), within(1, ChronoUnit.MINUTES));
         assertThat(settings.envEnabled()).isTrue();
         assertThat(settings.ceilingReachedToday()).isFalse();
+    }
+
+    @Test
+    void aMemberQuotaLoweredDuringTheDayRefusesTheNextQuestion() {
+        UserView asked = member("as-quota-lowered");
+        UserView fresh = member("as-quota-fresh");
+        String askedToken = login(asked.email());
+        String freshToken = login(fresh.email());
+        jdbcTemplate.update("INSERT INTO support_quota_usage (subject_key, day, count) VALUES (?, ?, 20)",
+                "member:" + asked.id(), today());
+        jdbcTemplate.update("INSERT INTO support_quota_usage (subject_key, day, count) VALUES (?, ?, 5)",
+                "member:" + fresh.id(), today());
+
+        settings.set(MEMBER_QUOTA, 20, admin.id());
+        ResponseEntity<Problem> refused = askForProblem(askedToken, CREDIT_QUESTION);
+        ResponseEntity<Reply> answered = ask(freshToken, null, CREDIT_QUESTION);
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(refused.getBody().type()).isEqualTo(PROBLEMS.resolve("assistant-quota"));
+        assertThat(answered.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(answered.getBody().quota().remaining()).isEqualTo(14);
+    }
+
+    @Test
+    void raisingTheCeilingResumesAPausedAssistant() {
+        jdbcTemplate.update("INSERT INTO support_quota_usage (subject_key, day, count) VALUES ('global', ?, 2000)",
+                today());
+        String member = memberToken("as-ceiling-raised");
+        assertThat(askForProblem(member, CREDIT_QUESTION).getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(adminSettings().ceilingReachedToday()).isTrue();
+
+        settings.set(CEILING, 2500, admin.id());
+        ResponseEntity<Reply> response = ask(member, null, CREDIT_QUESTION);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        AdminSettings view = adminSettings();
+        assertThat(view.ceilingReachedToday()).isFalse();
+        assertThat(view.dailyCeiling()).isEqualTo(2500);
+    }
+
+    @Test
+    void aNeverFlippedSwitchShowsNoChangeLine() {
+        AdminSettings view = adminSettings();
+
+        assertThat(view.assistantEnabled()).isTrue();
+        assertThat(view.updatedBy()).isNull();
+        assertThat(view.updatedAt()).isNull();
+    }
+
+    @Test
+    void aConsoleFlipLandsInTheKeyHistory() {
+        restTemplate.exchange("/api/v1/admin/support/settings", HttpMethod.PUT,
+                new HttpEntity<>(new SettingsUpdate(false), bearer(adminToken)), AdminSettings.class);
+
+        List<Map<String, Object>> history = jdbcTemplate.queryForList(
+                "SELECT previous_value, new_value, changed_by FROM app_setting_change "
+                        + "WHERE key = 'support.assistant.enabled'");
+
+        assertThat(history).hasSize(1);
+        assertThat(history.getFirst()).containsEntry("new_value", "false").containsEntry("changed_by", admin.id());
+        assertThat(history.getFirst().get("previous_value")).isNull();
     }
 
     @Test

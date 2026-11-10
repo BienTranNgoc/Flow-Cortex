@@ -135,8 +135,9 @@ class AssistantService {
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-disabled",
                     new LocalizedMessage("support.assistant.disabled"));
         }
+        int ceiling;
         try {
-            quotas.refuseWhenPaused();
+            ceiling = quotas.refuseWhenPaused();
         } catch (SupportProblemException e) {
             telemetry.record("paused", 0, 0, started);
             throw e;
@@ -156,7 +157,7 @@ class AssistantService {
         }
         QuotaService.Charge charge;
         try {
-            charge = quotas.charge(asker);
+            charge = quotas.charge(asker, ceiling);
         } catch (SupportProblemException e) {
             telemetry.record("assistant-paused".equals(e.code()) ? "paused" : "quota", 0, length(question), started);
             throw e;
