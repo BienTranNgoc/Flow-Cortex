@@ -298,7 +298,7 @@ class MediaContractSchemaTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"duration_exceeded", "no_audio_stream"})
+    @ValueSource(strings = {"duration_exceeded", "no_audio_stream", "separation_failed", "no_beats_detected"})
     void dubErrorCodesConformToTheResultSchema(String code) {
         MediaError.Code parsed = Arrays.stream(MediaError.Code.values())
                 .filter(c -> c.value().equals(code)).findFirst().orElseThrow();
@@ -306,6 +306,17 @@ class MediaContractSchemaTest {
                 MediaResult.Status.ERROR, null, null, new MediaError(parsed, "limit", false), AT, "worker-1");
 
         assertThat(errors(resultSchema, failed)).isEmpty();
+    }
+
+    @Test
+    void separateAudioCapabilityConformsToTheJobSchema() {
+        MediaJob source = job();
+        MediaJob separate = new MediaJob(source.schemaVersion(), source.jobId(), source.runId(),
+                source.correlationId(), source.stepOrder(), MediaCapability.SEPARATE_AUDIO,
+                source.inputs(), source.params(), source.outputPrefix(), source.attempt(),
+                source.maxRuntimeSeconds(), source.maxInputBytes(), source.issuedAt());
+
+        assertThat(errors(jobSchema, separate)).isEmpty();
     }
 
     @Test

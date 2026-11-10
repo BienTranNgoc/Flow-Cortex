@@ -103,11 +103,12 @@ class WorkflowServiceImplTest {
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
                                         + "echo, extract_audio, fail, generate_script, generate_speech, "
-                                        + "generate_storyboard, generate_video, probe, render_video",
+                                        + "generate_storyboard, generate_video, probe, render_video, "
+                                        + "separate_audio",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
                                         + "align_audio, echo, extract_audio, fail, generate_script, "
                                         + "generate_speech, generate_storyboard, generate_video, probe, "
-                                        + "render_video"));
+                                        + "render_video, separate_audio"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());

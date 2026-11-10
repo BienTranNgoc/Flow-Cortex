@@ -15,6 +15,10 @@ ErrorCode = Literal[
     "run_timeout",
     "duration_exceeded",
     "no_audio_stream",
+    "separation_failed",
+    "diarization_failed",
+    "beat_detection_failed",
+    "no_beats_detected",
     ]
 
 

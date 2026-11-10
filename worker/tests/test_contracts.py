@@ -242,6 +242,28 @@ def test_extract_audio_contract_values_validate() -> None:
     )
 
 
+def test_separate_audio_capability_validates() -> None:
+    MediaJob.model_validate(job() | {"capability": "separate_audio"})
+
+
+@pytest.mark.parametrize("capability", ["transcribe", "compose_dub"])
+def test_removed_capabilities_are_rejected(capability: str) -> None:
+    with pytest.raises(ValidationError):
+        MediaJob.model_validate(job() | {"capability": capability})
+
+
+def test_removed_error_code_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        MediaResult.model_validate(
+            result()
+            | {
+                "status": "error",
+                "outputs": [],
+                "error": {"code": "compose_failed", "message": "x", "retryable": False},
+            }
+        )
+
+
 def test_the_worker_error_codes_are_exactly_the_schemas() -> None:
     assert set(get_args(ErrorCode)) == set(get_args(MediaError.model_fields["code"].annotation))
 
@@ -251,6 +273,10 @@ def test_the_worker_error_codes_are_exactly_the_schemas() -> None:
     [
         "duration_exceeded",
         "no_audio_stream",
+        "separation_failed",
+        "diarization_failed",
+        "beat_detection_failed",
+        "no_beats_detected",
     ],
 )
 def test_dub_error_codes_validate(code: str) -> None:

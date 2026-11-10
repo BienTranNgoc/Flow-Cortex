@@ -48,8 +48,11 @@ class MediaTopologyConfig {
     static final String PROGRESS = "media.progress";
     /** Mirrored by {@code MEDIA_QUEUES} in {@code worker/src/flowcortex_worker/roles.py}. */
     static final String RENDER_JOBS = "media.render.jobs";
+    /** Mirrored by {@code MEDIA_QUEUES} in {@code worker/src/flowcortex_worker/roles.py}. */
+    static final String AUDIO_JOBS = "media.audio.jobs";
     static final String JOB_KEY = "job";
     static final String RENDER_JOB_KEY = "render.job";
+    static final String AUDIO_JOB_KEY = "audio.job";
     static final String RESULT_KEY = "result";
     static final String PROGRESS_KEY = "progress";
     static final String PROVIDER_EXCHANGE = "provider";
@@ -67,6 +70,8 @@ class MediaTopologyConfig {
     private static final String VIDEO_CAPABILITY = "generate_video";
     /** Capabilities that run for minutes and so travel on the render lane, not the default queue. */
     private static final Set<MediaCapability> RENDER_LANE = EnumSet.of(MediaCapability.RENDER_VIDEO);
+    /** CPU-bound audio analysis runs on its own worker pool, apart from the default and render lanes. */
+    private static final Set<MediaCapability> AUDIO_LANE = EnumSet.of(MediaCapability.SEPARATE_AUDIO);
     /**
      * Returns of a job the broker counts before it dead-letters it. A constant, not a setting: queue
      * arguments are immutable once the queue exists, so a new value means re-creating the job queues.
@@ -92,11 +97,17 @@ class MediaTopologyConfig {
                 .deadLetterExchange(DEAD_LETTER_EXCHANGE)
                 .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
                 .build();
+        Queue audioJobs = QueueBuilder.durable(AUDIO_JOBS).quorum()
+                .deliveryLimit(JOB_DELIVERY_LIMIT)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
+                .build();
         Queue results = QueueBuilder.durable(RESULTS).quorum().deadLetterExchange(DEAD_LETTER_EXCHANGE).build();
         Queue progress = QueueBuilder.durable(PROGRESS).quorum().deadLetterExchange(DEAD_LETTER_EXCHANGE).build();
         Queue jobsDlq = QueueBuilder.durable(JOBS + ".dlq").quorum().build();
         Queue renderJobsDlq = QueueBuilder.durable(RENDER_JOBS + ".dlq").quorum().build();
-        Queue resultsDlq = QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
+        Queue audioJobsDlq = QueueBuilder.durable(AUDIO_JOBS + ".dlq").quorum().build();
+        Queue resultsDlq =QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
         Queue progressDlq = QueueBuilder.durable(PROGRESS + ".dlq").quorum().build();
         DirectExchange provider = ExchangeBuilder.directExchange(PROVIDER_EXCHANGE).durable(true)
                 .alternate(PROVIDER_UNROUTED).build();
@@ -141,11 +152,17 @@ class MediaTopologyConfig {
                 bind(providerVideoJobsDlq, providerDeadLetters, VIDEO_JOB_KEY),
                 renderJobs, renderJobsDlq,
                 bind(renderJobs, media, RENDER_JOB_KEY),
-                bind(renderJobsDlq, deadLetters, RENDER_JOB_KEY));
+                bind(renderJobsDlq, deadLetters, RENDER_JOB_KEY),
+                audioJobs, audioJobsDlq,
+                bind(audioJobs, media, AUDIO_JOB_KEY),
+                bind(audioJobsDlq, deadLetters, AUDIO_JOB_KEY));
     }
 
     /** The routing key a media job of {@code capability} is published with. */
     static String mediaJobKey(MediaCapability capability) {
+        if (AUDIO_LANE.contains(capability)) {
+            return AUDIO_JOB_KEY;
+        }
         return RENDER_LANE.contains(capability) ? RENDER_JOB_KEY : JOB_KEY;
     }
 
