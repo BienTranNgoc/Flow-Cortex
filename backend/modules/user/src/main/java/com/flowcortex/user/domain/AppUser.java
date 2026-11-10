@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * An application user, scoped by {@code owner_id} rather than a tenant id: an ADMIN row is
@@ -18,6 +19,7 @@ import java.util.UUID;
  * com.flowcortex.user.api.CurrentUser}, {@link com.flowcortex.user.api.UserView}) don't carry it.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "app_user")
 public class AppUser {
 

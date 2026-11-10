@@ -103,8 +103,18 @@ class AdminAccountService {
         return AdminAccountResponse.from(target);
     }
 
+    /**
+     * Row-locked, so role and deactivation writes on one account serialize and each one decides from
+     * the state the previous one committed. A super admin target is locked through the invariant's
+     * id-ordered lock first, so two requests on different super admins never wait on each other's rows.
+     */
     private AppUser requireAccount(UUID id) {
-        return users.findById(id)
+        Role current = users.findRoleById(id)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
+        if (current.isSuperAdmin()) {
+            users.lockActiveSuperAdmins();
+        }
+        return users.findByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
     }
 

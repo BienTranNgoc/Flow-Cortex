@@ -42,6 +42,10 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     @Query("SELECT u FROM AppUser u WHERE u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);
 
+    /** The role alone, read without loading the entity, so a later locked read still sees the row's own state. */
+    @Query("SELECT u.role FROM AppUser u WHERE u.id = :id")
+    Optional<Role> findRoleById(@Param("id") UUID id);
+
     /**
      * Row-locks every active super admin in id order (so two removals never wait on each other in
      * opposite orders); the second of two concurrent removals re-reads the set the first shrank.
