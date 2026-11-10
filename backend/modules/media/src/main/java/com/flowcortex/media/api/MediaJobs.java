@@ -92,7 +92,8 @@ public interface MediaJobs {
      * @throws UploadRejectedException on field {@code uploadIds} if an upload is not an image, is larger than
      *         {@code maxBytes} (checked before any read), vanished, is not the image it was declared as, or has
      *         more than 25 million pixels
-     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/}, or there are not 1-10 inputs
+     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/} or
+     *         {@code workflow-review/}, or there are not 1-10 inputs
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes);
@@ -100,7 +101,8 @@ public interface MediaJobs {
     /**
      * Re-tags kept attachments pending again, so the media bucket's lifecycle rule expires them: for copies whose
      * request or message was never saved. Tries every object, then rethrows the first failure.
-     * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
+     * @throws IllegalArgumentException if an attachment is not under {@code support/} or
+     *         {@code workflow-review/} of the media bucket
      */
     void releaseAttachments(List<StoredAttachment> attachments);
 

@@ -18,10 +18,11 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String REVIEW_IMAGE_PREFIX = "review-image/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
-    private static final Map<String, String> SUPPORT_MIME_TYPES = supportMimeTypes();
+    private static final Map<String, String> IMAGE_MIME_TYPES = imageMimeTypes();
 
     /** What a granted upload may be: its canonical content type, kind and the byte cap of that kind. */
     record Allowed(String contentType, String kind, long maxBytes) {
@@ -33,7 +34,7 @@ final class UploadPurposePolicy {
         this.upload = upload;
     }
 
-    private static Map<String, String> supportMimeTypes() {
+    private static Map<String, String> imageMimeTypes() {
         Map<String, String> types = new LinkedHashMap<>();
         types.put("png", "image/png");
         types.put("jpg", "image/jpeg");
@@ -60,7 +61,11 @@ final class UploadPurposePolicy {
     }
 
     String objectKey(UploadPurpose purpose, UUID ownerId, UUID uploadId) {
-        String prefix = purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_ATTACHMENT_PREFIX : "";
+        String prefix = switch (purpose) {
+            case RUN_INPUT -> "";
+            case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case REVIEW_IMAGE -> REVIEW_IMAGE_PREFIX;
+        };
         return prefix + ownerId + "/" + uploadId;
     }
 
@@ -69,6 +74,7 @@ final class UploadPurposePolicy {
         return switch (purpose) {
             case RUN_INPUT -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
+            case REVIEW_IMAGE -> "image".equals(kind) ? UploadPurpose.REVIEW_IMAGE_MAX_BYTES : 0L;
         };
     }
 
@@ -79,7 +85,10 @@ final class UploadPurposePolicy {
 
     /** Extension to canonical content type, in the order formats are listed to the member. */
     Map<String, String> mimeTypes(UploadPurpose purpose) {
-        return purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_MIME_TYPES : upload.mimeTypes();
+        return switch (purpose) {
+            case RUN_INPUT -> upload.mimeTypes();
+            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> IMAGE_MIME_TYPES;
+        };
     }
 
     private static String extensionOf(String fileName) {
@@ -89,11 +98,12 @@ final class UploadPurposePolicy {
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
         List<String> extensions = new ArrayList<>();
-        if (purpose == UploadPurpose.SUPPORT_ATTACHMENT) {
-            extensions.addAll(SUPPORT_MIME_TYPES.keySet());
-        } else {
-            extensions.addAll(upload.mediaExtensions());
-            extensions.addAll(upload.productImageExtensions());
+        switch (purpose) {
+            case RUN_INPUT -> {
+                extensions.addAll(upload.mediaExtensions());
+                extensions.addAll(upload.productImageExtensions());
+            }
+            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> extensions.addAll(IMAGE_MIME_TYPES.keySet());
         }
         List<String> dotted = extensions.stream().map(e -> "." + e).toList();
         return dotted.size() == 1
@@ -103,9 +113,10 @@ final class UploadPurposePolicy {
     }
 
     private LocalizedMessage sizeDetail(UploadPurpose purpose, String kind, long cap) {
-        List<String> extensions = purpose == UploadPurpose.SUPPORT_ATTACHMENT
-                ? List.copyOf(SUPPORT_MIME_TYPES.keySet())
-                : upload.extensionsOf(kind);
+        List<String> extensions = switch (purpose) {
+            case RUN_INPUT -> upload.extensionsOf(kind);
+            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> List.copyOf(IMAGE_MIME_TYPES.keySet());
+        };
         String formats = String.join(", ", extensions.stream().map(e -> "." + e).toList());
         return cap % MEGABYTE == 0
                 ? new LocalizedMessage("upload.sizeMegabytes", cap / MEGABYTE, formats)

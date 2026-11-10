@@ -111,6 +111,48 @@ class UploadPurposePolicyTest {
     }
 
     @Test
+    void reviewImageAcceptsPngJpgJpegWebpExactlyAtFiveMegabytesUnderItsOwnPrefix() {
+        for (String fileName : List.of("a.png", "a.JPG", "a.jpeg", "a.webp")) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.REVIEW_IMAGE, fileName, SUPPORT_CAP);
+            assertThat(allowed.kind()).as(fileName).isEqualTo("image");
+            assertThat(allowed.maxBytes()).isEqualTo(SUPPORT_CAP);
+        }
+        assertThat(policy.maxBytes(UploadPurpose.REVIEW_IMAGE, "image")).isEqualTo(SUPPORT_CAP);
+        assertThat(policy.maxBytes(UploadPurpose.REVIEW_IMAGE, "video")).isZero();
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+        assertThat(policy.objectKey(UploadPurpose.REVIEW_IMAGE, owner, upload))
+                .isEqualTo("review-image/" + owner + "/" + upload);
+    }
+
+    @Test
+    void reviewImageRefusesAVideoOnFileNameAndOneByteOverOnSize() {
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "clip.mp4", 2_097_152L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("fileName");
+                    assertThat(e.detail().code()).isEqualTo("upload.typeMany");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "anh.jpg", SUPPORT_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().code()).isEqualTo("upload.sizeMegabytes");
+                    assertThat(e.detail().args()[0]).isEqualTo(5L);
+                });
+    }
+
+    @Test
+    void reviewImageTypeSentenceListsOnlyPngJpgJpegWebp() {
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "clip.mp4", 10L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.detail().args()[0]).isEqualTo(".png, .jpg, .jpeg");
+                    assertThat(e.detail().args()[1]).isEqualTo(".webp");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "a.png", SUPPORT_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(e.detail().args()[1]).isEqualTo(".png, .jpg, .jpeg, .webp"));
+    }
+
+    @Test
     void noPurposeAcceptsASizeBelowOneByte() {
         for (UploadPurpose purpose : UploadPurpose.values()) {
             for (long size : new long[] {0L, -1L}) {
