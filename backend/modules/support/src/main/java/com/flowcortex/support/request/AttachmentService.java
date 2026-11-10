@@ -5,11 +5,11 @@ import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.StoredAttachment;
 import com.flowcortex.media.api.UploadGrant;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.web.SupportProblemException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -18,19 +18,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
- * Images on request messages: PNG, JPG or WebP, at most 5 MB and 3 per message. The grant checks the name and
- * size; on submit the upload is re-checked by the media engine and its copy sniffed before it is kept.
+ * Images on request messages: PNG, JPG or WebP, at most 5 MB and 3 per message. The media engine's
+ * support-attachment purpose checks the name and size of the grant; on submit it re-checks the upload and
+ * strips the image's metadata before keeping it.
  */
 @Service
 class AttachmentService {
 
-    static final long MAX_BYTES = 5L * 1024 * 1024;
+    static final long MAX_BYTES = UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES;
     static final int MAX_PER_MESSAGE = 3;
     static final String REJECTED = "attachment-rejected";
 
     private static final Logger LOG = LoggerFactory.getLogger(AttachmentService.class);
-    private static final Map<String, String> EXTENSIONS = Map.of(
-            "png", "png", "jpg", "jpg", "jpeg", "jpg", "webp", "webp");
+    private static final String IMAGE_TOO_LARGE = "upload.imageTooLarge";
     private static final Map<String, String> FILE_EXTENSION_OF_TYPE = Map.of(
             "image/png", "png", "image/jpeg", "jpg", "image/webp", "webp");
 
@@ -42,17 +42,12 @@ class AttachmentService {
 
     UploadGrant grant(UUID ownerId, String fileName, long size) {
         requireMediaOn();
-        int dot = fileName.lastIndexOf('.');
-        String extension = dot < 0 ? "" : fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
-        if (!EXTENSIONS.containsKey(extension)) {
-            throw rejected(new LocalizedMessage("support.attachment.typeNotAllowed"));
-        }
-        if (size < 1 || size > MAX_BYTES) {
-            throw rejected(new LocalizedMessage("support.attachment.tooLarge"));
-        }
         try {
-            return mediaJobs.prepareUpload(ownerId, fileName, size);
+            return mediaJobs.prepareUpload(UploadPurpose.SUPPORT_ATTACHMENT, ownerId, fileName, size);
         } catch (UploadRejectedException e) {
+            if ("size".equals(e.field())) {
+                throw rejected(new LocalizedMessage("support.attachment.tooLarge"));
+            }
             throw rejected(new LocalizedMessage("support.attachment.typeNotAllowed"));
         }
     }
@@ -79,10 +74,14 @@ class AttachmentService {
         }
         requireMediaOn();
         try {
-            List<MediaAssetInput> inputs = mediaJobs.resolveImageUploads(ownerId, uploadIds);
+            List<MediaAssetInput> inputs = mediaJobs.resolveImageUploads(UploadPurpose.SUPPORT_ATTACHMENT, ownerId,
+                    uploadIds);
             return mediaJobs.keepAttachments("support/" + requestId + "/" + messageId, inputs, MAX_BYTES);
         } catch (UploadRejectedException e) {
             LOG.info("support.attachment outcome=rejected field={}", e.field());
+            if (IMAGE_TOO_LARGE.equals(e.detail().code())) {
+                throw rejected(new LocalizedMessage("support.attachment.tooManyPixels"));
+            }
             throw rejected(new LocalizedMessage("support.attachment.notImage"));
         }
     }

@@ -8,6 +8,7 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -18,6 +19,7 @@ import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
+import com.flowcortex.workflow.api.RunInputView;
 import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
@@ -38,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -130,6 +133,19 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName, RunOptions options, boolean acknowledgeCost) {
+        return start(currentUserId, workflowId, input, uploadId, uploadIds, originalName, options, acknowledgeCost,
+                null);
+    }
+
+    @Override
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost, String requestKey) {
+        return start(currentUserId, workflowId, input, uploadId, uploadIds, originalName, null, acknowledgeCost,
+                requestKey);
+    }
+
+    private RunView start(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, RunOptions options, boolean acknowledgeCost, String requestKey) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -143,6 +159,22 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        // A retried start answers with its run before any cost guard or object copy runs again.
+        Optional<RunView> started = RunRequestKeys.existing(workflowRunRepository, runStepRepository, registry,
+                mediaJobs::isDownloadable, currentUserId, requestKey);
+        if (started.isPresent()) {
+            return started.get();
+        }
+        return RunRequestKeys.orWinner(
+                () -> startNew(currentUserId, workflow, input, uploadId, uploadIds, originalName, options,
+                        acknowledgeCost, requestKey),
+                workflowRunRepository, runStepRepository, registry,
+                mediaJobs::isDownloadable, currentUserId, requestKey);
+    }
+
+    private RunView startNew(UUID currentUserId, Workflow workflow, String input, UUID uploadId,
+            List<UUID> uploadIds, String originalName, RunOptions options, boolean acknowledgeCost,
+            String requestKey) {
         List<WorkflowStep> stepDefs = workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId());
         // Refused up front: a run whose remote step would only fail media_disabled later.
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
@@ -159,7 +191,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         List<MediaAssetInput> assetInputs = List.of();
         if (mediaWorkflow) {
             if (uploadIds != null && !uploadIds.isEmpty()) {
-                assetInputs = mediaJobs.resolveImageUploads(currentUserId, uploadIds);
+                assetInputs = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, currentUserId, uploadIds);
             } else if (uploadId != null) {
                 assetInputs = List.of(mediaJobs.resolveUpload(currentUserId, uploadId));
                 singleUpload = true;
@@ -179,7 +211,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(runId, workflow.getId(),
-                    currentUserId, displayedInput, runOptions, Instant.now()));
+                    currentUserId, displayedInput, runOptions, Instant.now(), requestKey));
             if (!copies.isEmpty()) {
                 mediaJobs.bindRunInputs(run.getId(), copies);
             }
@@ -232,6 +264,17 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
         return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RunInputView> getRunInputs(UUID currentUserId, UUID runId) {
+        workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        return mediaJobs.runInputs(runId).stream()
+                .map(input -> new RunInputView(input.bindingKey(), input.kind(), input.mimeType(), input.url(),
+                        input.expiresAt()))
+                .toList();
     }
 
     @Override

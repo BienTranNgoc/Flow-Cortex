@@ -7,6 +7,7 @@ import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
+import { RunInputs } from './RunInputs';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
 import {
@@ -217,6 +218,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
         </p>
       )}
       {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
+      <RunInputs runId={runId} />
       {selected && (
         <div className="run-layout">
           <div className="run-layout-pipeline">

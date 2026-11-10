@@ -18,6 +18,9 @@ public class MediaAsset {
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
+    @Column(name = "space_id", nullable = false, updatable = false)
+    private UUID spaceId;
+
     @Column(name = "kind", nullable = false, updatable = false)
     private String kind;
 
@@ -54,15 +57,17 @@ public class MediaAsset {
     protected MediaAsset() {
     }
 
-    public MediaAsset(UUID id, UUID ownerId, String kind, String bucket, String objectKey, String mimeType,
-            long bytes, String checksum, Instant createdAt) {
-        this(id, ownerId, kind, bucket, objectKey, mimeType, bytes, checksum, null, null, createdAt);
+    public MediaAsset(UUID id, UUID ownerId, UUID spaceId, String kind, String bucket, String objectKey,
+            String mimeType, long bytes, String checksum, Instant createdAt) {
+        this(id, ownerId, spaceId, kind, bucket, objectKey, mimeType, bytes, checksum, null, null, createdAt);
     }
 
-    public MediaAsset(UUID id, UUID ownerId, String kind, String bucket, String objectKey, String mimeType,
-            long bytes, String checksum, UUID sourceRunStepId, Short sourceAttempt, Instant createdAt) {
+    public MediaAsset(UUID id, UUID ownerId, UUID spaceId, String kind, String bucket, String objectKey,
+            String mimeType, long bytes, String checksum, UUID sourceRunStepId, Short sourceAttempt,
+            Instant createdAt) {
         this.id = id;
         this.ownerId = ownerId;
+        this.spaceId = spaceId;
         this.kind = kind;
         this.bucket = bucket;
         this.objectKey = objectKey;

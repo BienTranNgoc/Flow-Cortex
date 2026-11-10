@@ -38,6 +38,14 @@ public interface WorkflowRunService {
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName, RunOptions options, boolean acknowledgeCost);
 
+    /**
+     * {@link #startRun(UUID, UUID, String, UUID, List, String, RunOptions, boolean)} with default options, made
+     * idempotent per owner by {@code requestKey} ({@code null}: not idempotent). A key {@code currentUserId} already used returns that run
+     * unchanged, before any cost guard or upload copy; two racing starts with one key create one run.
+     */
+    RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost, String requestKey);
+
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input);
 
@@ -49,6 +57,13 @@ public interface WorkflowRunService {
      * @throws NotFoundException if the run is not {@code currentUserId}'s, or the step or the output does not exist
      */
     RunOutputUrlView getOutputUrl(UUID currentUserId, UUID runId, int stepOrder, String name);
+
+    /**
+     * The inputs the run was started with, in start order, each with a time-limited URL to the run's stored
+     * copy; empty for a run without uploads. Always owner-scoped.
+     * @throws NotFoundException if the run is not {@code currentUserId}'s or does not exist
+     */
+    List<RunInputView> getRunInputs(UUID currentUserId, UUID runId);
 
     /**
      * Every user's runs, newest first, for the admin console — not owner-scoped, so callers must
