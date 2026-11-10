@@ -16,6 +16,7 @@ import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
@@ -73,6 +74,7 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
           </Route>
           <Route
             element={

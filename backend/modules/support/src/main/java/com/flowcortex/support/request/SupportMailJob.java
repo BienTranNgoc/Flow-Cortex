@@ -1,5 +1,9 @@
 package com.flowcortex.support.request;
 
+import com.flowcortex.mail.api.MailKey;
+import com.flowcortex.mail.api.MailOutcome;
+import com.flowcortex.mail.api.Mailer;
+import com.flowcortex.mail.api.OutgoingMail;
 import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.support.request.MailOutboxRepository.OutboxRow;
 import com.flowcortex.user.api.UserDirectory;
@@ -11,11 +15,7 @@ import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -38,14 +38,11 @@ public class SupportMailJob {
 
     private final MailOutboxRepository outbox;
     private final UserDirectory users;
-    private final ObjectProvider<JavaMailSender> mailSender;
-    private final SupportProperties properties;
-    private final MessageSource messages;
+    private final Mailer mailer;
     private final String publicUrl;
     private final Clock clock;
 
-    SupportMailJob(MailOutboxRepository outbox, UserDirectory users, ObjectProvider<JavaMailSender> mailSender,
-            SupportProperties properties, MessageSource messages,
+    SupportMailJob(MailOutboxRepository outbox, UserDirectory users, Mailer mailer, SupportProperties properties,
             @Value("${flowcortex.app.public-url:}") String publicUrl, Clock clock) {
         if (properties.enabled() && (publicUrl == null || publicUrl.isBlank())) {
             throw new IllegalStateException("flowcortex.support.enabled is true but flowcortex.app.public-url "
@@ -53,9 +50,7 @@ public class SupportMailJob {
         }
         this.outbox = outbox;
         this.users = users;
-        this.mailSender = mailSender;
-        this.properties = properties;
-        this.messages = messages;
+        this.mailer = mailer;
         this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
         this.clock = clock;
     }
@@ -78,38 +73,40 @@ public class SupportMailJob {
             return;
         }
         try {
-            JavaMailSender sender = mailSender.getIfAvailable();
-            if (sender == null) {
-                throw new IllegalStateException("No mail sender is configured");
-            }
-            sender.send(message(email, row));
-            outbox.markSent(row.id(), attempt, Instant.now(clock));
-            LOG.info("support.reply.mail outcome=sent attempt={} request={}", attempt, row.requestNumber());
-        } catch (RuntimeException e) {
-            Instant failedAt = Instant.now(clock);
-            // Only the class name: a send exception can carry the message and its recipient.
-            String error = e.getClass().getSimpleName();
-            if (attempt >= MailOutboxRepository.MAX_ATTEMPTS) {
-                outbox.markFailed(row.id(), attempt, failedAt, error, failedAt);
-                LOG.warn("support.reply.mail outcome=gave_up attempt={} request={} error={}", attempt,
-                        row.requestNumber(), error);
+            MailOutcome outcome = mailer.send(mail(email, row));
+            if (outcome == MailOutcome.SENT) {
+                outbox.markSent(row.id(), attempt, Instant.now(clock));
+                LOG.info("support.reply.mail outcome=sent attempt={} request={}", attempt, row.requestNumber());
+            } else if (outcome == MailOutcome.SUPPRESSED) {
+                Instant now = Instant.now(clock);
+                outbox.markFailed(row.id(), MailOutboxRepository.MAX_ATTEMPTS, now, "suppressed", now);
+                LOG.info("support.reply.mail outcome=suppressed request={}", row.requestNumber());
             } else {
-                outbox.markFailed(row.id(), attempt, failedAt.plus(RETRY_DELAYS.get(attempt - 1)), error, failedAt);
-                LOG.warn("support.reply.mail outcome=failed attempt={} request={} error={}", attempt,
-                        row.requestNumber(), error);
+                retryOrGiveUp(row, attempt, "send_failed");
             }
+        } catch (RuntimeException e) {
+            // Only the class name: an exception can carry the message and its recipient.
+            retryOrGiveUp(row, attempt, e.getClass().getSimpleName());
         }
     }
 
-    private SimpleMailMessage message(String email, OutboxRow row) {
+    private void retryOrGiveUp(OutboxRow row, int attempt, String error) {
+        Instant failedAt = Instant.now(clock);
+        if (attempt >= MailOutboxRepository.MAX_ATTEMPTS) {
+            outbox.markFailed(row.id(), attempt, failedAt, error, failedAt);
+            LOG.warn("support.reply.mail outcome=gave_up attempt={} request={} error={}", attempt,
+                    row.requestNumber(), error);
+        } else {
+            outbox.markFailed(row.id(), attempt, failedAt.plus(RETRY_DELAYS.get(attempt - 1)), error, failedAt);
+            LOG.warn("support.reply.mail outcome=failed attempt={} request={} error={}", attempt,
+                    row.requestNumber(), error);
+        }
+    }
+
+    private OutgoingMail mail(String email, OutboxRow row) {
         Locale locale = "en".equals(row.locale()) ? Locale.ENGLISH : VIETNAMESE;
         long number = row.requestNumber();
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(properties.mail().from());
-        message.setTo(email);
-        message.setSubject(messages.getMessage("support.mail.subject", new Object[] {number}, locale));
-        message.setText(messages.getMessage("support.mail.body",
-                new Object[] {number, publicUrl + "/?help=request-" + number}, locale));
-        return message;
+        return new OutgoingMail(MailKey.SUPPORT_REQUEST_REPLIED, row.recipientUserId(), email, locale,
+                List.of(number, publicUrl + "/?help=request-" + number));
     }
 }

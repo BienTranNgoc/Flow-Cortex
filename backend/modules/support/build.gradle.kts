@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":modules:user"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:media"))
+    implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -14,7 +15,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
-    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
     implementation("org.commonmark:commonmark:${providers.gradleProperty("commonmarkVersion").get()}")
     implementation("com.github.ben-manes.caffeine:caffeine")

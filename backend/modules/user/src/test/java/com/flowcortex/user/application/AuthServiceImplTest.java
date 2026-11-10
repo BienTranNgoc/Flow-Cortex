@@ -95,7 +95,7 @@ class AuthServiceImplTest {
                 registrationRateLimiter, googleOAuthClient, audit,
                 new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
-                new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
+                new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24),
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 mock(PasswordResetRateLimiter.class), mock(PasswordResetService.class),
                 mock(PasswordResetSubmitLimiter.class));
@@ -960,7 +960,7 @@ class AuthServiceImplTest {
                 registrationRateLimiter, googleOAuthClient, audit,
                 new RegistrationProperties(OWNER_EMAIL, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
-                new EmailConfirmationProperties(false, Duration.ofHours(24), "no-reply@flow-cortex.dev",
+                new EmailConfirmationProperties(false, Duration.ofHours(24),
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 mock(PasswordResetRateLimiter.class), resets, mock(PasswordResetSubmitLimiter.class));
     }

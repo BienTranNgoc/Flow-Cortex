@@ -3,6 +3,7 @@ package com.flowcortex.app.support.request;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.app.MailParts;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import jakarta.mail.MessagingException;
@@ -802,7 +803,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
             for (MimeMessage message : sent) {
                 try {
                     if (message.getAllRecipients()[0].toString().equals(address)) {
-                        bodies.add(String.valueOf(message.getContent()));
+                        bodies.add(MailParts.textOf(message));
                     }
                 } catch (MessagingException | IOException e) {
                     throw new IllegalStateException("Could not read a captured message", e);

@@ -65,7 +65,7 @@ class AssistantServiceTest {
     @BeforeEach
     void setUp() {
         SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+                "gemini-test", 2000, 50, 10, 100));
         service = new AssistantService(assistantSwitch, properties, conversations, quotas, minuteLimiter, retriever,
                 llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         when(assistantSwitch.available()).thenReturn(true);
@@ -288,7 +288,7 @@ class AssistantServiceTest {
     void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
         MinuteLimiter real = new MinuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
         SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+                "gemini-test", 2000, 50, 10, 100));
         AssistantService limited = new AssistantService(assistantSwitch, properties, conversations, quotas, real,
                 retriever, llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         GuestKeys keys = new GuestKeys(properties, "support-hash-secret-for-unit-tests-0123456789");

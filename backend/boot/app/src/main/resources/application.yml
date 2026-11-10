@@ -169,6 +169,16 @@ flowcortex:
   # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:
     public-url: ${FLOWCORTEX_APP_PUBLIC_URL:}
+  # The one sender of every mail. link-secret (>= 32 bytes) signs unsubscribe links and, together with
+  # flowcortex.app.public-url, becomes required once the catalog holds a care or promotional key.
+  mail:
+    from: ${FLOWCORTEX_MAIL_FROM:no-reply@flow-cortex.dev}
+    from-name: ${FLOWCORTEX_MAIL_FROM_NAME:Nodi}
+    link-secret: ${FLOWCORTEX_MAIL_LINK_SECRET:}
+    links:
+      rate-limit:
+        capacity: ${FLOWCORTEX_MAIL_LINK_RATE_LIMIT:10}
+        period: ${FLOWCORTEX_MAIL_LINK_RATE_WINDOW:60s}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -394,8 +404,6 @@ flowcortex:
       member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
       guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
-    mail:
-      from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store
