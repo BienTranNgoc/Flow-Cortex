@@ -4,13 +4,14 @@
  * <p>
  * This is a Spring Modulith application module. Inter-module dependencies are
  * declared explicitly below: only the shared libraries (shared :: web,
- * shared :: security) may be used from outside this module's own packages.
+ * shared :: security, shared :: ratelimit) may be used from outside this module's own packages.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "User",
         allowedDependencies = {
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.user;
