@@ -124,7 +124,7 @@ export function AdminList<T>({
   );
 }
 
-function Pager({
+export function Pager({
   page,
   size,
   total,

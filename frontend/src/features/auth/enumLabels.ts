@@ -1,6 +1,14 @@
 import type { TFunction } from 'i18next';
 
-const ROLES: readonly string[] = ['ADMIN', 'MEMBER', 'CREATOR'];
+const ROLES: readonly string[] = [
+  'ADMIN',
+  'MEMBER',
+  'CREATOR',
+  'OPERATION_MANAGER',
+  'CUSTOMER_SUPPORT',
+  'CONTENT_EDITOR',
+  'PLATFORM_OPERATOR',
+];
 const STATUSES: readonly string[] = ['ACTIVE', 'SUSPENDED'];
 
 /** The role's label in the active language; a code this app does not know is shown as sent. */
