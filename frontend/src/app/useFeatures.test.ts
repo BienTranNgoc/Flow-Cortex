@@ -14,6 +14,7 @@ const ALL_OFF = {
   supportWidget: false,
   supportAssistant: false,
   chat: false,
+  personalAccessTokens: false,
 };
 
 function setup() {

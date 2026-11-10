@@ -12,6 +12,8 @@ reader cannot infer from the name.
 erDiagram
   app_user ||--o{ workflow : "owner_id (no FK)"
   app_user ||--o{ workflow_run : "owner_id (no FK)"
+  app_user ||--o{ step_up_proof : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ personal_access_token : "user_id, ON DELETE CASCADE"
   workflow ||--|{ workflow_step : "workflow_id"
   workflow ||--o{ workflow_run : "workflow_id"
   workflow_run ||--|{ run_step : "run_id"
@@ -140,6 +142,25 @@ erDiagram
     uuid created_by "NULL for revision 1, which the provider wrote"
     timestamptz created_at
   }
+  step_up_proof {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar purpose "closed list in code (StepUpPurpose), no CHECK"
+    varchar token_hash UK "SHA-256 hex of the proof; the proof itself is never stored"
+    timestamptz created_at
+    timestamptz expires_at "index — retention scan"
+    timestamptz consumed_at "set once by a conditional UPDATE; NULL = unspent"
+  }
+  personal_access_token {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar name "1-128 characters, chosen by the owner"
+    varchar token_hash UK "SHA-256 hex of the fc_pat_ token; the token itself is never stored"
+    timestamptz created_at
+    timestamptz expires_at "1-365 days after creation"
+    timestamptz last_used_at "NULL until first use; written at most once a minute"
+    timestamptz revoked_at "NULL = not revoked; soft, the retention job deletes the row"
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -157,7 +178,8 @@ Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_own
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
 the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
-`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
+`idx_step_up_proof_expires_at`, `idx_pat_user_live` (partial, `WHERE revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
+`idx_event_publication_completion_date`.
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is

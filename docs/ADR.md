@@ -510,3 +510,50 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+---
+
+## ADR-0022 — Personal access tokens: decoder dispatch, role-less principal, route allowlist
+
+Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
+
+- **Context:** Admin accounts need to call the API from scripts without a
+  browser session. Every bearer chain is a resource server over one `JwtDecoder`
+  bean and every controller reads the caller as a `Jwt`, so a second credential
+  type must arrive as a `Jwt` or each chain and controller changes.
+- **Decision:**
+  - **Resolved inside the shared JWT decoder.** `PatAwareJwtDecoder` sends a
+    bearer starting with `fc_pat_` to the user module's authenticator and
+    everything else to the HS256 decoder unchanged. The authenticator builds a
+    `Jwt` with the owner's id as `sub`, the claim `fc_auth = "pat"` and **no
+    `role` claim**, so a token carries no authority of its own; an unknown,
+    expired, revoked or ineligible token is a `BadJwtException` (401) and no
+    other credential is tried. No chain configuration and no controller changed.
+  - **The route allowlist decides where a token may act**, independent of how
+    admin routes authorize. `PatRouteInterceptor` matches the route pattern
+    Spring resolved against `PatRoutePolicy` (workflows, runs, review tasks,
+    uploads, product videos, credits, and `GET /api/v1/auth/me`) and answers
+    403 `PAT_NOT_ALLOWED` for anything else, whatever the owner's role. A token
+    cannot mint a step-up proof or another token. A role-guarded route that
+    denies the role-less principal first is answered with the same code.
+  - **The throttle runs before authentication.** `PatRateLimitFilter` counts
+    every `fc_pat_` bearer, valid or not, against registry limiters keyed on
+    the SHA-256 of the token (60 per minute, 1000 per day), so a replayed
+    revoked or mistyped token is limited and nothing raw reaches the store.
+  - **A switch.** `flowcortex.auth.personal-access-tokens.enabled` defaults to
+    off: the token routes answer 503, every `fc_pat_` bearer answers 401, rows
+    are kept and work again when it is turned back on.
+  - **Stored form.** The token is `fc_pat_` plus 32 random bytes in base64url;
+    only its SHA-256 hex is stored (`personal_access_token.token_hash`), and the
+    raw value is shown once in the create response. Creating needs a single-use
+    step-up proof minted by re-entering the password.
+- **Consequences:**
+  - **A database read per token request:** the decoder looks the token up and
+    reads the owner row, so a demoted or suspended admin's tokens stop on the
+    next request. The per-token budget bounds this per value, not across many
+    distinct unknown values; a per-IP failed-token limiter is a follow-up.
+  - **A login lockout does not stop issued tokens**, because anyone who knows an
+    admin's email can cause one; revoke, suspension, demotion and the switch do.
+  - **A route added under an allowlisted prefix is reachable by tokens
+    automatically**, so a reviewer adding one checks it against this table.
+  - **Changing the prefix or the hash** means revoking every issued token.

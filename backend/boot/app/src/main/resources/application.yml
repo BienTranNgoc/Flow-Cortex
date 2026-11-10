@@ -235,9 +235,32 @@ flowcortex:
       submit-per-ip:
         capacity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_CAPACITY:10}
         period: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_PERIOD:1h}
+    # Step-up: each signed-in user gets `capacity` password attempts per `period` at
+    # POST /api/v1/me/step-up, every attempt counted; over it answers 429 with Retry-After before the
+    # password is compared. Shared by every backend instance through the rate-limit registry.
+    step-up:
+      per-user:
+        capacity: ${FLOWCORTEX_AUTH_STEP_UP_PER_USER_CAPACITY:5}
+        period: ${FLOWCORTEX_AUTH_STEP_UP_PER_USER_PERIOD:1m}
+    # Personal access tokens (fc_pat_...) for scripted API calls by admin accounts. Off answers 503 on
+    # the /api/v1/me/api-tokens routes and 401 to any fc_pat_ bearer; rows are kept. Each token value
+    # gets `per-minute` and `per-day` requests, counted before authentication; over either answers 429
+    # with Retry-After. A user holds at most `max-live-per-user` live tokens. Limits are registry
+    # limiters, shared by every backend instance. Env var + restart.
+    personal-access-tokens:
+      enabled: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_ENABLED:false}
+      max-live-per-user: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_MAX_LIVE_PER_USER:10}
+      default-lifetime: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_DEFAULT_LIFETIME:90d}
+      per-minute:
+        capacity: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_CAPACITY:60}
+        period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_PERIOD:1m}
+      per-day:
+        capacity: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_CAPACITY:1000}
+        period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD:1d}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
-    # `audit-events`, refresh-token rows that expired or were revoked, and reset-link rows that
-    # were used or expired, every `interval`.
+    # `audit-events`, refresh-token rows that expired or were revoked, reset-link rows that were
+    # used or expired, spent step-up proofs, and revoked access tokens or ones expired longer ago
+    # than `audit-events`, every `interval`.
     retention:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}

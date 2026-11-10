@@ -177,6 +177,12 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Card: `paper-2` fill, `card-edge` edge, `shadow-sm`.
 - Icons: Phosphor, one weight family. `ThemeToggle` keeps its own sun and moon glyphs as the one exception.
 
+### Password re-check and API tokens
+
+- Step-up dialog: a native modal `dialog`, `min(26rem, 100vw − 2rem)` wide, `paper-3` fill, `line` edge, `md` radius, `shadow`, over a `shadow-color` backdrop; it enters with `opacity` and an 8px rise over `dur-standard`. Focus starts on the password field, Escape or Cancel closes it and focus returns to the opener. A wrong password shows a `red` message, clears the field and refocuses it. Below 480px the buttons stack full width.
+- API tokens section (profile, admins only): a title and `ink-3` hint, a create form (name field, lifetime select 30/90/180/365 days), then rows separated by `line-soft` rules. A row wraps a long name, shows `ink-3` dates beneath it and a `red` on `red-soft` expired badge when expired. Revoke opens an inline confirmation naming the token, with focus on "Keep token".
+- Reveal: a `paper-3` panel with a read-only token field, a copy button announced by a polite `green` status line, and the one-time warning in `ink-2`; closing it drops the token from the page.
+
 ### Help Center
 
 - Launcher: a 56px button fixed bottom-right (20px from the edges, safe-area aware), `paper-3` fill, `line-2` outline, fully rounded, `shadow`. It holds the headset mascot, painted only from the `nodi-*` tokens (`nodi-headset` and `nodi-earcup` belong to the launcher alone); from 640px up the label "Trợ giúp" shows beside it in `ink`. Its accessible name is "Trợ giúp" at every width, and it reports `aria-expanded`.
