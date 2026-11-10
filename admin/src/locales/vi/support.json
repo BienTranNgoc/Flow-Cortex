@@ -214,6 +214,7 @@
     "pickStatus": "Chọn trạng thái mới",
     "transitionNotAllowed": "Không thể chuyển {{from}} → {{to}}",
     "stateChanged": "Yêu cầu vừa được cập nhật — tải lại để xem",
+    "closedRequest": "Yêu cầu #{{number}} đã đóng",
     "reload": "Tải lại",
     "notFound": "Không tìm thấy yêu cầu này.",
     "eyebrow": "Hỗ trợ",

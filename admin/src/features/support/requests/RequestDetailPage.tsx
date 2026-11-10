@@ -317,7 +317,11 @@ function AssigneePicker({
         if (status === 400) {
           setError(problem?.errors?.assigneeId ?? t('support.requests.assigneeFailed'));
         } else if (status === 409) {
-          setError(problem?.detail ?? t('support.requests.stateChanged'));
+          setError(
+            supportProblemCode(failure) === 'request-closed'
+              ? t('support.requests.closedRequest', { number: request.number })
+              : t('support.requests.stateChanged'),
+          );
           setPicked(null);
           void refresh();
         } else {

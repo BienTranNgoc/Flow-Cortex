@@ -214,6 +214,7 @@
     "pickStatus": "Choose a new status",
     "transitionNotAllowed": "Cannot change from {{from}} to {{to}}",
     "stateChanged": "The request was just updated — reload to see it",
+    "closedRequest": "Request #{{number}} is closed",
     "reload": "Reload",
     "notFound": "This request was not found.",
     "eyebrow": "Support",

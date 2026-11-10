@@ -67,6 +67,36 @@
           "label": "Questions per guest network per day",
           "help": "How many questions all guests behind one network address may ask each day."
         }
+      },
+      "auto_close": {
+        "enabled": {
+          "label": "Auto-close resolved requests",
+          "help": "Closes a resolved request when the member neither replies nor confirms it in time."
+        },
+        "resolved_days": {
+          "label": "Days before a resolved request closes",
+          "help": "Counted from when the member first opened the resolved request. 1 to 90 days."
+        }
+      },
+      "reply_mail": {
+        "enabled": {
+          "label": "Email members about replies",
+          "help": "Sends the member one email when an admin replies. While it is off, replies wait and are mailed once it is turned back on."
+        },
+        "window_minutes": {
+          "label": "Minutes to group replies into one email",
+          "help": "Replies sent within this window reach the member as one email. 0 sends right away; at most 1440 minutes."
+        }
+      },
+      "retention": {
+        "enabled": {
+          "label": "Delete old closed requests",
+          "help": "Permanently deletes closed requests, with their messages and images, once they are older than the retention period. Other statuses are never deleted."
+        },
+        "closed_request_months": {
+          "label": "Months to keep a closed request",
+          "help": "Counted from the request's last activity. 6 to 120 months."
+        }
       }
     }
   }

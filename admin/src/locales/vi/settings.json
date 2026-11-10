@@ -67,6 +67,36 @@
           "label": "Số câu hỏi mỗi mạng của khách mỗi ngày",
           "help": "Số câu hỏi tất cả khách dùng chung một địa chỉ mạng được hỏi mỗi ngày."
         }
+      },
+      "auto_close": {
+        "enabled": {
+          "label": "Tự đóng yêu cầu đã giải quyết",
+          "help": "Đóng yêu cầu đã giải quyết khi thành viên không trả lời hoặc xác nhận đúng hạn."
+        },
+        "resolved_days": {
+          "label": "Số ngày trước khi đóng yêu cầu đã giải quyết",
+          "help": "Tính từ lần đầu thành viên mở yêu cầu đã giải quyết. Từ 1 đến 90 ngày."
+        }
+      },
+      "reply_mail": {
+        "enabled": {
+          "label": "Gửi email báo trả lời cho thành viên",
+          "help": "Gửi cho thành viên một email khi quản trị viên trả lời. Khi tắt, các trả lời được giữ lại và gửi khi bật lại."
+        },
+        "window_minutes": {
+          "label": "Số phút gộp các trả lời vào một email",
+          "help": "Các trả lời gửi trong khoảng này đến thành viên trong một email. 0 là gửi ngay; tối đa 1440 phút."
+        }
+      },
+      "retention": {
+        "enabled": {
+          "label": "Xoá yêu cầu đã đóng quá hạn",
+          "help": "Xoá vĩnh viễn yêu cầu đã đóng, cùng tin nhắn và ảnh, khi quá thời hạn lưu. Yêu cầu ở trạng thái khác không bao giờ bị xoá."
+        },
+        "closed_request_months": {
+          "label": "Số tháng lưu yêu cầu đã đóng",
+          "help": "Tính từ hoạt động cuối của yêu cầu. Từ 6 đến 120 tháng."
+        }
       }
     }
   }
