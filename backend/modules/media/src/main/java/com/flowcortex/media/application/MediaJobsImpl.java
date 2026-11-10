@@ -50,6 +50,8 @@ class MediaJobsImpl implements MediaJobs {
     /** The key of the one input a job built from an upload carries. */
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
+    /** The attempt directory a step's key carries below its step prefix, absent on keys written before attempts. */
+    private static final Pattern ATTEMPT_SEGMENT = Pattern.compile("^attempts/[1-9][0-9]*/(?=.)");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
     private static final String ATTACHMENT_PREFIX = "support/";
@@ -227,6 +229,48 @@ class MediaJobsImpl implements MediaJobs {
                     new MediaJobInput(source.key(), properties.s3().bucket(), targetKey)));
         }
         return List.copyOf(copies);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MediaAssetInput> boundRunInputs(UUID runId) {
+        String bucket = properties.s3().bucket();
+        return bindings.findByRunIdOrderByPositionAsc(runId).stream()
+                .map(binding -> new MediaAssetInput(binding.getAssetId(), new MediaJobInput(
+                        binding.getBindingKey(), bucket, runInputKey(runId, binding.getBindingKey()))))
+                .toList();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public List<MediaOutput> copyStepOutputs(UUID fromRunId, UUID toRunId, int stepOrder,
+            List<MediaOutput> outputs) {
+        String sourcePrefix = MediaJob.outputPrefix(fromRunId, stepOrder);
+        String targetPrefix = MediaJob.outputPrefix(toRunId, stepOrder, 1);
+        List<String> targetKeys = new java.util.ArrayList<>();
+        for (MediaOutput output : outputs) {
+            if (!MediaJob.isBelow(sourcePrefix, output.objectKey())) {
+                throw new IllegalArgumentException("Output is not below the source step: " + output.objectKey());
+            }
+            targetKeys.add(targetPrefix + ATTEMPT_SEGMENT.matcher(output.objectKey()
+                    .substring(sourcePrefix.length())).replaceFirst(""));
+        }
+        List<MediaOutput> copies = new java.util.ArrayList<>();
+        for (int index = 0; index < outputs.size(); index++) {
+            MediaOutput output = outputs.get(index);
+            store.copyKeepingTags(output.bucket(), output.objectKey(), output.bucket(), targetKeys.get(index));
+            copies.add(new MediaOutput(output.name(), output.bucket(), targetKeys.get(index), output.mime(),
+                    output.bytes(), output.meta()));
+        }
+        return List.copyOf(copies);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean runInputsStored(UUID runId) {
+        String bucket = properties.s3().bucket();
+        return bindings.findByRunIdOrderByPositionAsc(runId).stream()
+                .allMatch(binding -> store.head(bucket, runInputKey(runId, binding.getBindingKey())).isPresent());
     }
 
     @Override

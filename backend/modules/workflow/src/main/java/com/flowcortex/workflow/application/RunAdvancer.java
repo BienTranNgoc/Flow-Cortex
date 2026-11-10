@@ -163,6 +163,11 @@ class RunAdvancer {
     }
 
     @ApplicationModuleListener
+    void onResumed(WorkflowRunResumedEvent event) {
+        inRun(event.runId(), () -> advance(event.runId()));
+    }
+
+    @ApplicationModuleListener
     void onRemoteCompleted(MediaJobCompleted event) {
         MediaResult result = event.result();
         inRun(result.runId(), () -> {

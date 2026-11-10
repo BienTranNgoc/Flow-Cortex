@@ -5,6 +5,25 @@
  * OpenAPI spec version: v1.0
  */
 import { customFetch } from '../customFetch';
+export interface ReorderStepsRequest {
+  /**
+   * @minItems 0
+   * @maxItems 32767
+   */
+  stepIds: string[];
+}
+
+export type ProblemDetailProperties = { [key: string]: unknown };
+
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  properties?: ProblemDetailProperties;
+}
+
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
@@ -47,17 +66,6 @@ export interface SetPasswordRequest {
   lastName: string;
   /** @pattern ^[a-z0-9_]{3,20}$ */
   username?: string;
-}
-
-export type ProblemDetailProperties = { [key: string]: unknown };
-
-export interface ProblemDetail {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  properties?: ProblemDetailProperties;
 }
 
 export interface AccessTokenResponse {
@@ -316,7 +324,8 @@ export interface WorkflowStepResponse {
   name?: string;
   type?: string;
   mode: WorkflowStepResponseMode;
-  inputRef?: string;
+  /** @nullable */
+  inputRef?: string | null;
   /** @nullable */
   config?: string | null;
 }
@@ -603,6 +612,11 @@ export interface SupportAssistantReply {
   quota: SupportAssistantQuota;
 }
 
+export interface RetryRunRequest {
+  fromStepOrder?: number;
+  acknowledgeCost?: boolean;
+}
+
 export interface CreateScriptRevisionRequest {
   /**
    * @minLength 0
@@ -817,14 +831,6 @@ export interface AdminSupportRequestReply {
   /** @maxItems 3 */
   uploadIds?: string[];
   status: AdminSupportRequestReplyStatus;
-}
-
-export interface ReorderStepsRequest {
-  /**
-   * @minItems 0
-   * @maxItems 32767
-   */
-  stepIds: string[];
 }
 
 /**
@@ -1236,6 +1242,79 @@ export const ListAdminMediaJobsStatus = {
   error: 'error',
 } as const;
 
+export type reorderWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderWorkflowStepsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type reorderWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderWorkflowStepsResponseError = (
+  | reorderWorkflowStepsResponse400
+  | reorderWorkflowStepsResponse403
+  | reorderWorkflowStepsResponse404
+  | reorderWorkflowStepsResponse409
+  | reorderWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderWorkflowStepsResponse = reorderWorkflowStepsResponseError;
+
+export const getReorderWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/steps/order`;
+};
+
+export const reorderWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderWorkflowStepsResponse>(getReorderWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
 export type getResponse200 = {
   data: UserResponse;
   status: 200;
@@ -1431,6 +1510,73 @@ export const updateProfile = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(profileUpdateRequest),
+  });
+};
+
+export type reorderAdminWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderAdminWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderAdminWorkflowStepsResponseError = (
+  | reorderAdminWorkflowStepsResponse400
+  | reorderAdminWorkflowStepsResponse404
+  | reorderAdminWorkflowStepsResponse409
+  | reorderAdminWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminWorkflowStepsResponse = reorderAdminWorkflowStepsResponseError;
+
+export const getReorderAdminWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/order`;
+};
+
+export const reorderAdminWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminWorkflowStepsResponse>(getReorderAdminWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
   });
 };
 
@@ -1856,166 +2002,6 @@ export const updateAdminSupportKbArticle = async (
   });
 };
 
-export type reorderWorkflowStepsResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
-};
-
-export type reorderWorkflowStepsResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type reorderWorkflowStepsResponse403 = {
-  data: ProblemDetail;
-  status: 403;
-};
-
-export type reorderWorkflowStepsResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type reorderWorkflowStepsResponse409 = {
-  data: ProblemDetail;
-  status: 409;
-};
-
-export type reorderWorkflowStepsResponse422 = {
-  data: ProblemDetail;
-  status: 422;
-};
-
-export type reorderWorkflowStepsResponseSuccess = reorderWorkflowStepsResponse200 & {
-  headers: Headers;
-};
-export type reorderWorkflowStepsResponseError = (
-  | reorderWorkflowStepsResponse400
-  | reorderWorkflowStepsResponse403
-  | reorderWorkflowStepsResponse404
-  | reorderWorkflowStepsResponse409
-  | reorderWorkflowStepsResponse422
-) & {
-  headers: Headers;
-};
-
-export type reorderWorkflowStepsResponse =
-  | reorderWorkflowStepsResponseSuccess
-  | reorderWorkflowStepsResponseError;
-
-export const getReorderWorkflowStepsUrl = (id: string) => {
-  return `/api/v1/workflows/${id}/steps/order`;
-};
-
-export const reorderWorkflowSteps = async (
-  id: string,
-  reorderStepsRequest: ReorderStepsRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<reorderWorkflowStepsResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<reorderWorkflowStepsResponse>(getReorderWorkflowStepsUrl(id), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(reorderStepsRequest),
-  });
-};
-
-export type reorderAdminWorkflowStepsResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
-};
-
-export type reorderAdminWorkflowStepsResponse400 = {
-  data: ProblemDetail;
-  status: 400;
-};
-
-export type reorderAdminWorkflowStepsResponse404 = {
-  data: ProblemDetail;
-  status: 404;
-};
-
-export type reorderAdminWorkflowStepsResponse409 = {
-  data: ProblemDetail;
-  status: 409;
-};
-
-export type reorderAdminWorkflowStepsResponse422 = {
-  data: ProblemDetail;
-  status: 422;
-};
-
-export type reorderAdminWorkflowStepsResponseSuccess = reorderAdminWorkflowStepsResponse200 & {
-  headers: Headers;
-};
-export type reorderAdminWorkflowStepsResponseError = (
-  | reorderAdminWorkflowStepsResponse400
-  | reorderAdminWorkflowStepsResponse404
-  | reorderAdminWorkflowStepsResponse409
-  | reorderAdminWorkflowStepsResponse422
-) & {
-  headers: Headers;
-};
-
-export type reorderAdminWorkflowStepsResponse =
-  | reorderAdminWorkflowStepsResponseSuccess
-  | reorderAdminWorkflowStepsResponseError;
-
-export const getReorderAdminWorkflowStepsUrl = (id: string) => {
-  return `/api/v1/admin/workflows/${id}/steps/order`;
-};
-
-export const reorderAdminWorkflowSteps = async (
-  id: string,
-  reorderStepsRequest: ReorderStepsRequest,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<reorderAdminWorkflowStepsResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit['headers']>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return customFetch<reorderAdminWorkflowStepsResponse>(getReorderAdminWorkflowStepsUrl(id), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(reorderStepsRequest),
-  });
-};
-
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -2044,10 +2030,39 @@ export type createWorkflowResponse201 = {
   status: 201;
 };
 
+export type createWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type createWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
   headers: Headers;
 };
-export type createWorkflowResponse = createWorkflowResponseSuccess;
+export type createWorkflowResponseError = (
+  | createWorkflowResponse400
+  | createWorkflowResponse403
+  | createWorkflowResponse404
+  | createWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createWorkflowResponse = createWorkflowResponseSuccess | createWorkflowResponseError;
 
 export const getCreateWorkflowUrl = () => {
   return `/api/v1/workflows`;
@@ -2089,10 +2104,36 @@ export type addStepResponse201 = {
   status: 201;
 };
 
+export type addStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type addStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
-export type addStepResponse = addStepResponseSuccess;
+export type addStepResponseError = (
+  addStepResponse400 | addStepResponse403 | addStepResponse404 | addStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addStepResponse = addStepResponseSuccess | addStepResponseError;
 
 export const getAddStepUrl = (id: string) => {
   return `/api/v1/workflows/${id}/steps`;
@@ -2770,6 +2811,253 @@ export const askSupportAssistantAsGuest = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(supportAssistantQuestion),
+  });
+};
+
+export type retryRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type retryRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryRunStepResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryRunStepResponseSuccess = retryRunStepResponse200 & {
+  headers: Headers;
+};
+export type retryRunStepResponseError = (
+  | retryRunStepResponse401
+  | retryRunStepResponse404
+  | retryRunStepResponse409
+  | retryRunStepResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryRunStepResponse = retryRunStepResponseSuccess | retryRunStepResponseError;
+
+export const getRetryRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/retry`;
+};
+
+export const retryRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryRunStepResponse> => {
+  return customFetch<retryRunStepResponse>(getRetryRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resetRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type resetRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type resetRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resetRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type resetRunStepResponseSuccess = resetRunStepResponse200 & {
+  headers: Headers;
+};
+export type resetRunStepResponseError = (
+  resetRunStepResponse401 | resetRunStepResponse404 | resetRunStepResponse409
+) & {
+  headers: Headers;
+};
+
+export type resetRunStepResponse = resetRunStepResponseSuccess | resetRunStepResponseError;
+
+export const getResetRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/reset`;
+};
+
+export const resetRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetRunStepResponse> => {
+  return customFetch<resetRunStepResponse>(getResetRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type executeRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type executeRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type executeRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type executeRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type executeRunStepResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type executeRunStepResponseSuccess = executeRunStepResponse200 & {
+  headers: Headers;
+};
+export type executeRunStepResponseError = (
+  | executeRunStepResponse401
+  | executeRunStepResponse404
+  | executeRunStepResponse409
+  | executeRunStepResponse503
+) & {
+  headers: Headers;
+};
+
+export type executeRunStepResponse = executeRunStepResponseSuccess | executeRunStepResponseError;
+
+export const getExecuteRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/execute`;
+};
+
+export const executeRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<executeRunStepResponse> => {
+  return customFetch<executeRunStepResponse>(getExecuteRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type retryRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type retryRunResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type retryRunResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryRunResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type retryRunResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryRunResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryRunResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryRunResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryRunResponseSuccess = retryRunResponse200 & {
+  headers: Headers;
+};
+export type retryRunResponseError = (
+  | retryRunResponse400
+  | retryRunResponse401
+  | retryRunResponse402
+  | retryRunResponse404
+  | retryRunResponse409
+  | retryRunResponse422
+  | retryRunResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryRunResponse = retryRunResponseSuccess | retryRunResponseError;
+
+export const getRetryRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}/retry`;
+};
+
+export const retryRun = async (
+  id: string,
+  retryRunRequest?: RetryRunRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<retryRunResponse>(getRetryRunUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(retryRunRequest),
   });
 };
 
@@ -3494,10 +3782,40 @@ export type createAdminWorkflowResponse201 = {
   status: 201;
 };
 
+export type createAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type createAdminWorkflowResponseSuccess = createAdminWorkflowResponse201 & {
   headers: Headers;
 };
-export type createAdminWorkflowResponse = createAdminWorkflowResponseSuccess;
+export type createAdminWorkflowResponseError = (
+  | createAdminWorkflowResponse400
+  | createAdminWorkflowResponse404
+  | createAdminWorkflowResponse409
+  | createAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminWorkflowResponse =
+  createAdminWorkflowResponseSuccess | createAdminWorkflowResponseError;
 
 export const getCreateAdminWorkflowUrl = () => {
   return `/api/v1/admin/workflows`;
@@ -3539,10 +3857,40 @@ export type addAdminWorkflowStepResponse201 = {
   status: 201;
 };
 
+export type addAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type addAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type addAdminWorkflowStepResponseSuccess = addAdminWorkflowStepResponse201 & {
   headers: Headers;
 };
-export type addAdminWorkflowStepResponse = addAdminWorkflowStepResponseSuccess;
+export type addAdminWorkflowStepResponseError = (
+  | addAdminWorkflowStepResponse400
+  | addAdminWorkflowStepResponse404
+  | addAdminWorkflowStepResponse409
+  | addAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addAdminWorkflowStepResponse =
+  addAdminWorkflowStepResponseSuccess | addAdminWorkflowStepResponseError;
 
 export const getAddAdminWorkflowStepUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}/steps`;
@@ -3932,10 +4280,39 @@ export type deleteWorkflowResponse204 = {
   status: 204;
 };
 
+export type deleteWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
   headers: Headers;
 };
-export type deleteWorkflowResponse = deleteWorkflowResponseSuccess;
+export type deleteWorkflowResponseError = (
+  | deleteWorkflowResponse400
+  | deleteWorkflowResponse403
+  | deleteWorkflowResponse404
+  | deleteWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowResponse = deleteWorkflowResponseSuccess | deleteWorkflowResponseError;
 
 export const getDeleteWorkflowUrl = (id: string) => {
   return `/api/v1/workflows/${id}`;
@@ -3951,15 +4328,36 @@ export const deleteWorkflow = async (
   });
 };
 
-export type updateWorkflowResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
+export type updateWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateWorkflowResponseSuccess = updateWorkflowResponse200 & {
+export type updateWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateWorkflowResponseError = (
+  | updateWorkflowResponse400
+  | updateWorkflowResponse403
+  | updateWorkflowResponse404
+  | updateWorkflowResponse422
+) & {
   headers: Headers;
 };
-export type updateWorkflowResponse = updateWorkflowResponseSuccess;
+
+export type updateWorkflowResponse = updateWorkflowResponseError;
 
 export const getUpdateWorkflowUrl = (id: string) => {
   return `/api/v1/workflows/${id}`;
@@ -4041,8 +4439,7 @@ export type deleteWorkflowStepResponseError = (
 };
 
 export type deleteWorkflowStepResponse =
-  | deleteWorkflowStepResponseSuccess
-  | deleteWorkflowStepResponseError;
+  deleteWorkflowStepResponseSuccess | deleteWorkflowStepResponseError;
 
 export const getDeleteWorkflowStepUrl = (id: string, stepId: string) => {
   return `/api/v1/workflows/${id}/steps/${stepId}`;
@@ -4059,15 +4456,33 @@ export const deleteWorkflowStep = async (
   });
 };
 
-export type updateStepResponse200 = {
-  data: WorkflowStepResponse;
-  status: 200;
+export type updateStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateStepResponseSuccess = updateStepResponse200 & {
+export type updateStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateStepResponseError = (
+  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
+) & {
   headers: Headers;
 };
-export type updateStepResponse = updateStepResponseSuccess;
+
+export type updateStepResponse = updateStepResponseError;
 
 export const getUpdateStepUrl = (id: string, stepId: string) => {
   return `/api/v1/workflows/${id}/steps/${stepId}`;
@@ -4111,10 +4526,40 @@ export type deleteAdminWorkflowResponse204 = {
   status: 204;
 };
 
+export type deleteAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type deleteAdminWorkflowResponseSuccess = deleteAdminWorkflowResponse204 & {
   headers: Headers;
 };
-export type deleteAdminWorkflowResponse = deleteAdminWorkflowResponseSuccess;
+export type deleteAdminWorkflowResponseError = (
+  | deleteAdminWorkflowResponse400
+  | deleteAdminWorkflowResponse404
+  | deleteAdminWorkflowResponse409
+  | deleteAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowResponse =
+  deleteAdminWorkflowResponseSuccess | deleteAdminWorkflowResponseError;
 
 export const getDeleteAdminWorkflowUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}`;
@@ -4130,15 +4575,36 @@ export const deleteAdminWorkflow = async (
   });
 };
 
-export type updateAdminWorkflowResponse200 = {
-  data: WorkflowResponse;
-  status: 200;
+export type updateAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateAdminWorkflowResponseSuccess = updateAdminWorkflowResponse200 & {
+export type updateAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowResponseError = (
+  | updateAdminWorkflowResponse400
+  | updateAdminWorkflowResponse404
+  | updateAdminWorkflowResponse409
+  | updateAdminWorkflowResponse422
+) & {
   headers: Headers;
 };
-export type updateAdminWorkflowResponse = updateAdminWorkflowResponseSuccess;
+
+export type updateAdminWorkflowResponse = updateAdminWorkflowResponseError;
 
 export const getUpdateAdminWorkflowUrl = (id: string) => {
   return `/api/v1/admin/workflows/${id}`;
@@ -4214,8 +4680,7 @@ export type deleteAdminWorkflowStepResponseError = (
 };
 
 export type deleteAdminWorkflowStepResponse =
-  | deleteAdminWorkflowStepResponseSuccess
-  | deleteAdminWorkflowStepResponseError;
+  deleteAdminWorkflowStepResponseSuccess | deleteAdminWorkflowStepResponseError;
 
 export const getDeleteAdminWorkflowStepUrl = (id: string, stepId: string) => {
   return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
@@ -4232,15 +4697,36 @@ export const deleteAdminWorkflowStep = async (
   });
 };
 
-export type updateAdminWorkflowStepResponse200 = {
-  data: WorkflowStepResponse;
-  status: 200;
+export type updateAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
 };
 
-export type updateAdminWorkflowStepResponseSuccess = updateAdminWorkflowStepResponse200 & {
+export type updateAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowStepResponseError = (
+  | updateAdminWorkflowStepResponse400
+  | updateAdminWorkflowStepResponse404
+  | updateAdminWorkflowStepResponse409
+  | updateAdminWorkflowStepResponse422
+) & {
   headers: Headers;
 };
-export type updateAdminWorkflowStepResponse = updateAdminWorkflowStepResponseSuccess;
+
+export type updateAdminWorkflowStepResponse = updateAdminWorkflowStepResponseError;
 
 export const getUpdateAdminWorkflowStepUrl = (id: string, stepId: string) => {
   return `/api/v1/admin/workflows/${id}/steps/${stepId}`;

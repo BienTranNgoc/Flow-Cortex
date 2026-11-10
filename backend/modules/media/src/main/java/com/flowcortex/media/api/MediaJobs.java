@@ -77,6 +77,31 @@ public interface MediaJobs {
     void bindRunInputs(UUID runId, List<MediaAssetInput> copies);
 
     /**
+     * The inputs {@code runId} was bound to, in binding order, each pointing at its copy under
+     * {@code runs/<runId>/inputs/} of the media bucket; empty when the run bound none. Feed them to
+     * {@link #copyRunInputs} to give another run its own copies.
+     */
+    List<MediaAssetInput> boundRunInputs(UUID runId);
+
+    /**
+     * Copies stored step outputs of run {@code fromRunId}, step {@code stepOrder}, server-side and keeping the
+     * source tags, to {@code runs/<toRunId>/steps/<stepOrder>/attempts/1/<name>} of the same bucket; a source's
+     * {@code attempts/<n>/} segment is dropped from the name. Call it outside any transaction: a copy can take minutes.
+     * @return the outputs as stored under the new run, name, type, size and meta unchanged
+     * @throws IllegalArgumentException if an output is not an object below {@code runs/<fromRunId>/steps/<stepOrder>/};
+     *         nothing is copied
+     * @throws UploadRejectedException if a source object is gone
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    List<MediaOutput> copyStepOutputs(UUID fromRunId, UUID toRunId, int stepOrder, List<MediaOutput> outputs);
+
+    /**
+     * Whether every input {@code runId} was bound to is still in the media bucket (its lifecycle rule expires
+     * run inputs); true when the run bound none. Stops at the first missing copy.
+     */
+    boolean runInputsStored(UUID runId);
+
+    /**
      * Keeps owner-verified image uploads as attachments at {@code <keyPrefix>/1..N} of the media bucket. Each
      * copy is tagged pending and sniffed (content check on); all are re-tagged kept only once every copy passed,
      * and a refused copy expires by the media bucket's lifecycle rule. Call it outside any transaction.

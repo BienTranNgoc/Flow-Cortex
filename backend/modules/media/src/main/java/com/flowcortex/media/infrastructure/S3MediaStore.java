@@ -156,6 +156,26 @@ public class S3MediaStore implements AutoCloseable {
         copyTagged(sourceBucket, sourceKey, targetBucket, targetKey, RETENTION_TAG_KEY + "=" + retention);
     }
 
+    /**
+     * A server-side copy that keeps the source's tags, so a worker output copied into another run does not
+     * pick up the run-input expiry tag. Bounded by the copy timeout like {@link #copy(String, String, String, String)}.
+     * @throws UploadRejectedException on field {@code uploadIds} if the source object is gone
+     */
+    public void copyKeepingTags(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        try {
+            client.copyObject(request -> request
+                    .sourceBucket(sourceBucket).sourceKey(sourceKey)
+                    .destinationBucket(targetBucket).destinationKey(targetKey)
+                    .taggingDirective(TaggingDirective.COPY)
+                    .overrideConfiguration(timeouts -> timeouts
+                            .apiCallTimeout(copyTimeout)
+                            .apiCallAttemptTimeout(copyTimeout)));
+        } catch (NoSuchKeyException e) {
+            LOG.info("Copy refused: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        }
+    }
+
     /** Replaces every tag of the object with {@code flowcortex-retention=<retention>}. */
     public void retag(String bucket, String key, String retention) {
         client.putObjectTagging(request -> request.bucket(bucket).key(key)

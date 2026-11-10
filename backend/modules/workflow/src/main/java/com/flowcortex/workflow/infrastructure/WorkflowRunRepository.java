@@ -58,6 +58,14 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
             + "com.flowcortex.workflow.domain.RunStatus.WAITING_APPROVAL)")
     int requestCancel(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
 
+    /** {@code error} -> {@code running} for the owner's run, clearing its failure; {@code 0} otherwise. */
+    @Modifying
+    @Query("UPDATE WorkflowRun r SET r.status = com.flowcortex.workflow.domain.RunStatus.RUNNING, "
+            + "r.errorMessage = NULL, r.finishedAt = NULL "
+            + "WHERE r.id = :id AND r.ownerId = :ownerId "
+            + "AND r.status = com.flowcortex.workflow.domain.RunStatus.ERROR")
+    int reopen(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
+
     /** {@code cancelling} -> {@code cancelled} once none of the run's steps is running; {@code 0} otherwise. */
     @Modifying
     @Query("UPDATE WorkflowRun r SET r.status = com.flowcortex.workflow.domain.RunStatus.CANCELLED, "
