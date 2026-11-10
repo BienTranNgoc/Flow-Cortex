@@ -1,0 +1,81 @@
+{
+  "recordedWith": "JDK 25.0.4 java.net.http.HttpClient with ProxySelector.of(...) against a local stub proxy that answers CONNECT with the listed status, closes, stalls or resets; no URL or token is stored",
+  "rows": [
+    {
+      "name": "proxy denies the host (403 on CONNECT)",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 403"},
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 403"}
+      ]
+    },
+    {
+      "name": "proxy blocks the host (503 on CONNECT)",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 503"},
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 503"}
+      ]
+    },
+    {
+      "name": "proxy cannot reach the upstream (502 on CONNECT)",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 502"},
+        {"class": "java.io.IOException", "message": "Tunnel failed, got: 502"}
+      ]
+    },
+    {
+      "name": "proxy port closed",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.net.ConnectException", "message": null},
+        {"class": "java.net.ConnectException", "message": null},
+        {"class": "java.nio.channels.ClosedChannelException", "message": null}
+      ]
+    },
+    {
+      "name": "tunnel accepted, handshake never completes within the connect timeout",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.net.http.HttpConnectTimeoutException", "message": "HTTP connect timed out"},
+        {"class": "java.net.http.HttpConnectTimeoutException", "message": "HTTP connect timed out"},
+        {"class": "java.net.ConnectException", "message": "HTTP connect timed out"}
+      ]
+    },
+    {
+      "name": "tunnel accepted, then reset during the TLS handshake",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "javax.net.ssl.SSLHandshakeException", "message": "Remote host closed the channel"},
+        {"class": "javax.net.ssl.SSLHandshakeException", "message": "Remote host closed the channel"},
+        {"class": "java.net.SocketException", "message": "Connection reset"}
+      ]
+    },
+    {
+      "name": "proxy closes without answering CONNECT (same text as a reset after a write)",
+      "expectedPhase": "AFTER_WRITE",
+      "chain": [
+        {"class": "java.io.IOException", "message": "HTTP/1.1 header parser received no bytes"},
+        {"class": "java.io.IOException", "message": "HTTP/1.1 header parser received no bytes"},
+        {"class": "java.io.EOFException", "message": "EOF reached while reading"}
+      ]
+    },
+    {
+      "name": "host does not resolve (no proxy)",
+      "expectedPhase": "CONNECT_PHASE",
+      "chain": [
+        {"class": "java.net.ConnectException", "message": null},
+        {"class": "java.net.ConnectException", "message": null},
+        {"class": "java.nio.channels.UnresolvedAddressException", "message": null}
+      ]
+    },
+    {
+      "name": "request written, no answer within the read timeout",
+      "expectedPhase": "AFTER_WRITE",
+      "chain": [
+        {"class": "java.net.http.HttpTimeoutException", "message": "request timed out"}
+      ]
+    }
+  ]
+}

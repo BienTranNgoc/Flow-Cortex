@@ -250,7 +250,9 @@ What to know about the media path:
     `SEEDANCE_BASE_URL`; list the exact host, because `*.example.com` does not match
     `example.com` itself): add it to the file `EGRESS_ACL_FILE` names, then run
     `docker compose up -d --force-recreate egress-proxy`. No image is rebuilt and the
-    backend and workers are not restarted. `compose.aws.yaml` refuses to start until
+    backend and workers are not restarted. A member's HTTP connector reaches only hosts on
+    this list: until its host is added, its calls fail with `connector.upstreamUnavailable`.
+    `compose.aws.yaml` refuses to start until
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
     host to it.
   - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
