@@ -173,6 +173,30 @@ forward, never overwrites one. Approval names a revision id and the task `versio
 tab holding older text loses the approval with a 409 instead of approving something it never showed. The
 payload `generate_speech` consumes is the approved revision's content, not whatever sits in the task.
 
+## Runtime settings (`V2026.11.11.180`, `V2026.11.11.320`)
+
+```mermaid
+erDiagram
+  app_setting {
+    varchar key PK "declared in code; a row exists only while an admin value is stored"
+    text value "canonical text; the type lives in the key's declaration"
+    uuid updated_by "no FK — deleting an account keeps the history"
+    timestamptz updated_at
+  }
+  app_setting_change {
+    uuid id PK
+    varchar key "no FK; index idx_app_setting_change_key_at (key, changed_at DESC, id DESC)"
+    text previous_value "NULL = no stored value before"
+    text new_value "NULL = the stored value was reset"
+    uuid changed_by "no FK"
+    timestamptz changed_at
+    varchar reason "NULL; varchar(2000), trimmed, NULL when blank — written by the payment console only"
+  }
+```
+
+`app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
+the value, and a write of the value already stored records none.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
@@ -180,5 +204,4 @@ payload `generate_speech` consumes is the approved revision's content, not whate
 | `provider` | provider catalogue + fallback order per capability | Providers page / first real capability |
 | `usage_event` | per-step provider units and cost | first paid provider |
 | `audit_log` | admin actions with before/after | first admin write beyond Users |
-| `app_setting`, `settings_audit` | DB-backed runtime settings (override > env > default) | Settings page |
 | `channel_account` | publish targets with encrypted tokens | Publish step |

@@ -3,7 +3,10 @@ package com.flowcortex.app.settings;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.billing.settings.PaymentSettingGroup;
+import com.flowcortex.billing.settings.PaymentSettingMeta;
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingScope;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import java.net.URI;
@@ -43,6 +46,9 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
     private static final String LIMIT = "itapi.admin.c_limit";
     private static final String PAGE_LIMIT = "itapi.admin.d_paged";
     private static final String UNSET_LIMIT = "itapi.admin.e_other";
+    private static final String GENERAL_MODE = "itenum.admin.mode";
+    private static final String PAYMENT_MODE = "payment.test.mode";
+    private static final String UNDECLARED = "support.assistant.colour";
     private static final URI PROBLEMS = URI.create("https://flow-cortex.dev/problems/");
 
     @TestConfiguration
@@ -72,6 +78,23 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
         SettingDefinition<Integer> itApiOther() {
             return SettingDefinition.integerKey(UNSET_LIMIT, 1, Integer.MAX_VALUE, () -> 5);
         }
+
+        @Bean
+        SettingDefinition<String> itApiMode() {
+            return SettingDefinition.enumKey(GENERAL_MODE, List.of("off", "shadow", "enforce"), "shadow",
+                    () -> "off");
+        }
+
+        @Bean
+        SettingDefinition<String> itPaymentMode() {
+            return SettingDefinition.enumKey(PAYMENT_MODE, List.of("a", "b", "c"), "a", () -> "a")
+                    .inScope(SettingScope.PAYMENT_OPS);
+        }
+
+        @Bean
+        PaymentSettingMeta itPaymentModeMeta() {
+            return new PaymentSettingMeta(PAYMENT_MODE, PaymentSettingGroup.REGION, false);
+        }
     }
 
     record LoginRequest(String email, String password) {
@@ -81,14 +104,14 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
     }
 
     record Setting(String key, String group, String type, Object value, Object decidedValue, String source,
-            Object storedValue, Object configuredValue, Object defaultValue, Integer min, Integer max,
-            String updatedBy, Instant updatedAt) {
+            Object storedValue, Object configuredValue, Object defaultValue, List<String> options, Integer min,
+            Integer max, String updatedBy, Instant updatedAt) {
     }
 
     record SettingList(List<Setting> items) {
     }
 
-    record Change(Object previousValue, Object newValue, String changedBy, Instant changedAt) {
+    record Change(Object previousValue, Object newValue, String changedBy, String reason, Instant changedAt) {
     }
 
     record ChangePage(List<Change> items, int page, int size, long total) {
@@ -112,8 +135,10 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
 
     @BeforeEach
     void seed() {
-        jdbc.update("DELETE FROM app_setting WHERE key LIKE 'itapi.%'");
-        jdbc.update("DELETE FROM app_setting_change WHERE key LIKE 'itapi.%'");
+        jdbc.update("DELETE FROM app_setting WHERE key LIKE 'itapi.%' OR key LIKE 'itenum.%' OR key = ?",
+                PAYMENT_MODE);
+        jdbc.update("DELETE FROM app_setting_change WHERE key LIKE 'itapi.%' OR key LIKE 'itenum.%' OR key = ?",
+                PAYMENT_MODE);
         owner = userService.createInitialAdmin(email("settings-owner"), PASSWORD, "Owner");
         operator = userService.createUser(owner.id(), email("settings-operator"), PASSWORD, "Operator",
                 "PLATFORM_OPERATOR");
@@ -334,6 +359,82 @@ class AdminSettingsEndpointsIT extends AbstractPostgresBootTest {
         assertThat(sameValue.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(sameValue.getBody().updatedBy()).isNull();
         assertThat(sameValue.getBody().updatedAt()).isNotNull();
+    }
+
+    @Test
+    void aPaymentScopedKeyIsUnknownOnTheGeneralSurface() {
+        UUID changeId = UUID.randomUUID();
+        jdbc.update("INSERT INTO app_setting (key, value, updated_by, updated_at) VALUES (?, 'b', ?, now())",
+                PAYMENT_MODE, operator.id());
+        jdbc.update("""
+                INSERT INTO app_setting_change (id, key, previous_value, new_value, changed_by, changed_at, reason)
+                VALUES (?, ?, NULL, 'b', ?, now(), 'seeded')
+                """, changeId, PAYMENT_MODE, operator.id());
+
+        ResponseEntity<SettingList> list = get(BASE, operatorToken, SettingList.class);
+        ResponseEntity<Problem> update = put(PAYMENT_MODE, "{\"value\":\"c\"}", operatorToken, Problem.class);
+        ResponseEntity<Problem> reset = exchange(HttpMethod.DELETE, BASE + "/" + PAYMENT_MODE, operatorToken, null,
+                null, Problem.class);
+        ResponseEntity<Problem> history = get(BASE + "/" + PAYMENT_MODE + "/history", operatorToken, Problem.class);
+        ResponseEntity<Problem> undeclaredUpdate = put(UNDECLARED, "{\"value\":\"c\"}", operatorToken,
+                Problem.class);
+
+        assertThat(list.getBody().items()).extracting(Setting::key).doesNotContain(PAYMENT_MODE);
+        for (ResponseEntity<Problem> response : List.of(update, reset, history)) {
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody().type()).isEqualTo(PROBLEMS.resolve("not-found"));
+            assertThat(response.getBody().detail()).isEqualTo("Setting not found: " + PAYMENT_MODE);
+        }
+        assertThat(undeclaredUpdate.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(undeclaredUpdate.getBody().detail().replace(UNDECLARED, PAYMENT_MODE))
+                .isEqualTo(update.getBody().detail());
+        assertThat(undeclaredUpdate.getBody().type()).isEqualTo(update.getBody().type());
+        assertThat(jdbc.queryForObject("SELECT value FROM app_setting WHERE key = ?", String.class, PAYMENT_MODE))
+                .isEqualTo("b");
+        assertThat(jdbc.queryForList("SELECT id FROM app_setting_change WHERE key = ?", UUID.class, PAYMENT_MODE))
+                .containsExactly(changeId);
+    }
+
+    @Test
+    void generalChangesRecordANullReason() {
+        put(LIMIT, "{\"value\":12}", operatorToken, Setting.class);
+        exchange(HttpMethod.DELETE, BASE + "/" + LIMIT, operatorToken, null, null, Setting.class);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_setting_change WHERE key = ? AND reason IS NULL",
+                Long.class, LIMIT)).isEqualTo(2);
+    }
+
+    @Test
+    void historyShowsTheReasonOfARow() {
+        jdbc.update("""
+                INSERT INTO app_setting_change (id, key, previous_value, new_value, changed_by, changed_at, reason)
+                VALUES (?, ?, NULL, '12', ?, now(), 'contract')
+                """, UUID.randomUUID(), LIMIT, operator.id());
+
+        ChangePage history = get(BASE + "/" + LIMIT + "/history", operatorToken, ChangePage.class).getBody();
+
+        assertThat(history.items()).hasSize(1);
+        assertThat(history.items().get(0).reason()).isEqualTo("contract");
+    }
+
+    @Test
+    void anEnumKeyIsListedWithItsOptionsAndWritten() {
+        Setting listed = get(BASE, operatorToken, SettingList.class).getBody().items().stream()
+                .filter(item -> GENERAL_MODE.equals(item.key())).findFirst().orElseThrow();
+        ResponseEntity<Setting> written = put(GENERAL_MODE, "{\"value\":\"enforce\"}", operatorToken, Setting.class);
+        ResponseEntity<Problem> refused = put(GENERAL_MODE, "{\"value\":\"OFF\"}", operatorToken, Problem.class);
+
+        assertThat(listed.type()).isEqualTo("ENUM");
+        assertThat(listed.options()).containsExactly("off", "shadow", "enforce");
+        assertThat(listed.value()).isEqualTo("off");
+        assertThat(listed.source()).isEqualTo("CONFIGURED");
+        assertThat(listed.defaultValue()).isEqualTo("shadow");
+        assertThat(listed.min()).isNull();
+        assertThat(written.getBody().value()).isEqualTo("enforce");
+        assertThat(written.getBody().source()).isEqualTo("STORED");
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(refused.getBody().code()).isEqualTo("setting.invalidValue");
+        assertThat(refused.getBody().errors().get("value")).isEqualTo("Must be one of: off, shadow, enforce");
     }
 
     private static List<Setting> ownKeys(SettingList list) {

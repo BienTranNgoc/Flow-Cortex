@@ -14,6 +14,7 @@ include(
     ":modules:settings",
     ":modules:space",
     ":modules:realtime",
+    ":modules:billing",
     ":shared:web",
     ":shared:security",
 )

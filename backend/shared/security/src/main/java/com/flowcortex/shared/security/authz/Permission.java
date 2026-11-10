@@ -33,7 +33,9 @@ public enum Permission {
     PLATFORM_SMS_OUTBOX_VIEW("platform.sms_outbox.view", false),
     SYSTEM_ROLE_VIEW("system.role.view", true),
     SYSTEM_ADMIN_ACCOUNT_VIEW("system.admin_account.view", true),
-    SYSTEM_ADMIN_ACCOUNT_MANAGE("system.admin_account.manage", true);
+    SYSTEM_ADMIN_ACCOUNT_MANAGE("system.admin_account.manage", true),
+    PAYMENT_SETTING_VIEW("payment.setting.view", false),
+    PAYMENT_SETTING_UPDATE("payment.setting.update", false);
 
     private static final Map<String, Permission> BY_KEY =
             Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(Permission::key, Function.identity()));
