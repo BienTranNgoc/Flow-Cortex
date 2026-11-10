@@ -176,7 +176,8 @@ class SupportWebTest {
     private static SupportProperties properties(boolean enabled, boolean assistantEnabled, String contact) {
         return new SupportProperties(enabled, contact,
                 new SupportProperties.Assistant(assistantEnabled, "gemini-3.5-flash-lite", 2000, 50, 10, 100),
-                new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+                new SupportProperties.Mail("no-reply@flow-cortex.dev"),
+                new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
     }
 
     private static CurrentUser user(UUID id, String role) {

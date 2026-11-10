@@ -3,6 +3,8 @@ package com.flowcortex.app.support.request;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.settings.api.Settings;
+import com.flowcortex.support.config.SupportLifecycleSettings;
 import com.flowcortex.support.request.RequestAutoCloseJob;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -14,16 +16,23 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** The hourly job: a resolution closes 7 days after the member first saw it, never before they see it. */
+/**
+ * The auto-close job: a resolution closes after the configured days (7 unless an admin changed them) once the
+ * member first saw it, never before they see it, and not at all while auto-close is off.
+ */
 @SpringBootTest(properties = {
         "flowcortex.support.enabled=true",
         "flowcortex.support.retention.interval=PT24H"})
+@ExtendWith(OutputCaptureExtension.class)
 class RequestAutoCloseJobIT extends AbstractPostgresBootTest {
 
     @Autowired
@@ -35,10 +44,44 @@ class RequestAutoCloseJobIT extends AbstractPostgresBootTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private Settings settings;
+
     @BeforeEach
     void emptyRequests() {
         jdbcTemplate.update("DELETE FROM support_request");
         jdbcTemplate.update("DELETE FROM support_idempotency");
+        jdbcTemplate.update("DELETE FROM app_setting WHERE key LIKE 'support.auto_close.%'");
+        jdbcTemplate.update("DELETE FROM app_setting_change WHERE key LIKE 'support.auto_close.%'");
+    }
+
+    @Test
+    void aShorterClosePeriodSetByAnAdminClosesEarlier() {
+        settings.set(SupportLifecycleSettings.AUTO_CLOSE_RESOLVED_DAYS, 3, UUID.randomUUID());
+        Instant now = Instant.now();
+        UUID seenFourDaysAgo = resolved(now.minus(Duration.ofDays(5)), now.minus(Duration.ofDays(4)));
+        UUID seenTwoDaysAgo = resolved(now.minus(Duration.ofDays(5)), now.minus(Duration.ofDays(2)));
+
+        job.run();
+
+        assertThat(state(seenFourDaysAgo)).containsEntry("status", "closed").containsEntry("closed_reason", "auto");
+        assertThat(state(seenTwoDaysAgo)).containsEntry("status", "resolved");
+    }
+
+    @Test
+    void withAutoCloseOffNothingClosesButOldIdempotencyKeysArePurged(CapturedOutput output) {
+        settings.set(SupportLifecycleSettings.AUTO_CLOSE_ENABLED, false, UUID.randomUUID());
+        Instant now = Instant.now();
+        UUID seenTenDaysAgo = resolved(now.minus(Duration.ofDays(11)), now.minus(Duration.ofDays(10)));
+        jdbcTemplate.update("INSERT INTO support_idempotency (requester_id, idem_key, kind, result_id, created_at) "
+                + "VALUES (?, 'old', 'request', ?, ?)", UUID.randomUUID(), UUID.randomUUID(),
+                Timestamp.from(now.minus(Duration.ofHours(25))));
+
+        job.run();
+
+        assertThat(state(seenTenDaysAgo)).containsEntry("status", "resolved");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_idempotency", Long.class)).isZero();
+        assertThat(output.getAll()).contains("closed=0 skipped=disabled");
     }
 
     @Test
