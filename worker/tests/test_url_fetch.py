@@ -422,6 +422,25 @@ def test_error_statuses_are_classified_with_the_hint(
         assert error.retry_after_seconds == 7
 
 
+def test_absurdly_long_retry_after_is_ignored_not_crashed_on(dest: Path) -> None:
+    with proxy(serving("503 Service Unavailable", {"Retry-After": "1" * 5000})) as (proxy_url, _s):
+        error = refuse("http://cdn.example.com/a.mp4", dest, proxy_url)
+    assert isinstance(error, TransientError)
+    assert error.retry_after_seconds is None
+
+
+def test_absurdly_long_content_length_is_a_permanent_rejection(dest: Path) -> None:
+    def behaviour(h: BaseHTTPRequestHandler) -> None:
+        reply(h, headers={"Content-Length": "1" * 5000}, length=False)
+
+    with proxy(behaviour) as (proxy_url, _seen):
+        error = refuse("http://h/x", dest, proxy_url, max_bytes=1000)
+    assert isinstance(error, PermanentError)
+    assert error.code == "input_rejected"
+    assert "over the" in str(error)
+    assert not dest.exists()
+
+
 def test_presigned_url_is_not_echoed(dest: Path) -> None:
     with proxy(serving("403 Forbidden")) as (proxy_url, _seen):
         error = refuse("http://cdn.example.com/a.mp4?X-Amz-Signature=deadbeef", dest, proxy_url)

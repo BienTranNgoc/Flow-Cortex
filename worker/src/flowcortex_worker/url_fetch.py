@@ -15,6 +15,7 @@ import os
 import re
 import socket
 import ssl
+import sys
 import threading
 import time
 from contextlib import suppress
@@ -118,13 +119,19 @@ def parse_target(url: str) -> Target:
     )
 
 
+MAX_HINT_DIGITS = 9
+MAX_LENGTH_DIGITS = 18
+
+
 def classify_status(status: int, retry_after: str | None) -> PermanentError | TransientError | None:
     """None for the one success (200); otherwise how the failure is retried."""
     if status == 200:
         return None
     if status in (408, 429) or 500 <= status <= 599:
         hint = retry_after.strip() if retry_after else ""
-        seconds = float(int(hint)) if hint.isascii() and hint.isdigit() else None
+        # int() refuses digit strings past 4300 characters, and no usable hint is that long.
+        usable = hint.isascii() and hint.isdigit() and len(hint) <= MAX_HINT_DIGITS
+        seconds = float(int(hint)) if usable else None
         return TransientError(f"the server answered status {status}", retry_after_seconds=seconds)
     if 300 <= status <= 399:
         return _rejected(f"the server answered status {status}: redirects are not followed")
@@ -377,4 +384,7 @@ def _deadline(label: str, seconds: float) -> PermanentError:
 
 def _declared_length(value: str | None) -> int | None:
     text = (value or "").strip()
-    return int(text) if text.isascii() and text.isdigit() else None
+    if not (text.isascii() and text.isdigit()):
+        return None
+    # A value this long exceeds every cap, and int() refuses it past 4300 digits.
+    return int(text) if len(text) <= MAX_LENGTH_DIGITS else sys.maxsize
