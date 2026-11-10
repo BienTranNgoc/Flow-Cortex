@@ -23,7 +23,10 @@ export function WalletBadge({ wallet }: Readonly<{ wallet: Wallet }>) {
       })}
     >
       <span className="wallet-badge__dot" aria-hidden="true" />
-      <span>{t('common.nav.credits', { amount })}</span>
+      <span className="wallet-badge__full">{t('common.nav.credits', { amount })}</span>
+      <span className="wallet-badge__short" aria-hidden="true">
+        {amount}
+      </span>
     </Link>
   );
 }

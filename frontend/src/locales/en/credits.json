@@ -13,5 +13,15 @@
       "critical": "balance critically low",
       "exhausted": "no credits left"
     }
+  },
+  "banner": {
+    "title": "Credits",
+    "balance": "{{amount}} credits",
+    "used": "{{used}} of {{granted}} credits used",
+    "warning": {
+      "low": "Your balance is running low. Top up before your next run.",
+      "critical": "Your balance is critically low. Runs may be refused soon.",
+      "exhausted": "You have no credits left. Runs are refused until you get more."
+    }
   }
 }

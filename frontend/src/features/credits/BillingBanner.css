@@ -1,0 +1,69 @@
+.billing-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.billing-banner__figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-banner__balance {
+  color: var(--ink);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.billing-banner__tier {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.billing-banner__used {
+  color: var(--ink-4);
+  font-size: 0.88rem;
+}
+
+.billing-banner__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.billing-banner__warning svg {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.billing-banner[data-tier='low'] {
+  border-color: var(--warning);
+}
+
+.billing-banner[data-tier='low'] .billing-banner__warning {
+  color: var(--warning);
+}
+
+.billing-banner[data-tier='critical'],
+.billing-banner[data-tier='exhausted'] {
+  border-color: var(--red);
+}
+
+.billing-banner[data-tier='critical'] .billing-banner__warning,
+.billing-banner[data-tier='exhausted'] .billing-banner__warning {
+  color: var(--red);
+}

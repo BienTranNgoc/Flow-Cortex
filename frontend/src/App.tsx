@@ -25,6 +25,8 @@ import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
+import { NotificationsPage } from './features/notifications/NotificationsPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -91,6 +93,8 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />

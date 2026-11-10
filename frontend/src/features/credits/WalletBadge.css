@@ -46,9 +46,27 @@
   background: var(--red);
 }
 
+.wallet-badge__short {
+  display: none;
+}
+
 @media (max-width: 480px) {
   .wallet-badge {
     gap: 0.4rem;
+    min-width: 0;
     padding-inline: 0.5rem;
+  }
+
+  /* The unit is dropped on narrow screens; the link's accessible name still carries it. */
+  .wallet-badge__full {
+    display: none;
+  }
+
+  .wallet-badge__short {
+    display: inline;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

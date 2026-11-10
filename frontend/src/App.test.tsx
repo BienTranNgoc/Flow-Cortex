@@ -41,6 +41,7 @@ const MEMBER_ME = {
     status: 200,
     body: { id: 'u1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' },
   },
+  'GET /api/v1/notifications/unread-count': { status: 200, body: { unreadCount: 0 } },
 };
 
 const FEATURES_OFF = {

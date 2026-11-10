@@ -9,6 +9,7 @@ import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { BillingBanner } from '../credits/BillingBanner';
 import { useBalance } from '../credits/useBalance';
 import { roleLabel, statusLabel } from './enumLabels';
 import { PhoneVerification } from './PhoneVerification';
@@ -86,6 +87,8 @@ export function ProfilePage() {
   return (
     <div className="profile-page">
       <PageHeading title={t('auth.profile.headline')} lede={t('auth.profile.subtitle')} />
+
+      <BillingBanner />
 
       <div className="profile-grid">
         {/* Left card — identity */}
