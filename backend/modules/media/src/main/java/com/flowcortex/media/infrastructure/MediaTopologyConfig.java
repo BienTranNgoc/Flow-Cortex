@@ -107,7 +107,7 @@ class MediaTopologyConfig {
         Queue jobsDlq = QueueBuilder.durable(JOBS + ".dlq").quorum().build();
         Queue renderJobsDlq = QueueBuilder.durable(RENDER_JOBS + ".dlq").quorum().build();
         Queue audioJobsDlq = QueueBuilder.durable(AUDIO_JOBS + ".dlq").quorum().build();
-        Queue resultsDlq =QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
+        Queue resultsDlq = QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
         Queue progressDlq = QueueBuilder.durable(PROGRESS + ".dlq").quorum().build();
         DirectExchange provider = ExchangeBuilder.directExchange(PROVIDER_EXCHANGE).durable(true)
                 .alternate(PROVIDER_UNROUTED).build();
