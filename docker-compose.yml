@@ -64,6 +64,47 @@ x-provider-worker-env: &provider-worker-env
   OTEL_LOGS_EXPORTER: none
   OTEL_METRICS_EXPORTER: none
 
+# What worker and render-worker share: one image, one broker and store identity, the same
+# health and shutdown handling. Each service adds the queue it consumes and its identity.
+x-media-worker: &media-worker
+  build:
+    context: ./worker
+    target: media-runtime
+  image: flow-cortex-worker:local
+  networks: [internal]
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    minio-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
+  stop_grace_period: 40s
+  restart: unless-stopped
+
+x-media-worker-env: &media-worker-env
+  # The credentials must be URL-safe; they are placed in the URL as is.
+  AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_PATH_STYLE: 'true'
+  S3_UPLOAD_BUCKET: flowcortex-uploads
+  S3_BUCKET: flowcortex-media
+  S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
+  S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  # Spans and trace ids still exist without a collector; the observability
+  # overlay turns the exporters on.
+  OTEL_TRACES_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+
 services:
   # The only route out for the backend and the provider workers: refuses every
   # host not in the ACL file and every private, loopback, link-local or CGNAT
@@ -395,44 +436,27 @@ services:
   # the internet; it makes no outbound call, so it has no proxy settings. No
   # published ports.
   worker:
-    build:
-      context: ./worker
-      target: media-runtime
-    image: flow-cortex-worker:local
+    <<: *media-worker
     environment:
-      # The credentials must be URL-safe; they are placed in the URL as is.
-      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
-      S3_UPLOAD_BUCKET: flowcortex-uploads
-      S3_BUCKET: flowcortex-media
-      S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
-      S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+      <<: *media-worker-env
       WORKER_ID: ${WORKER_ID:-flow-worker-1}
       OTEL_SERVICE_NAME: flow-worker
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      # Spans and trace ids still exist without a collector; the observability
-      # overlay turns the exporters on.
-      OTEL_TRACES_EXPORTER: none
-      OTEL_LOGS_EXPORTER: none
-      OTEL_METRICS_EXPORTER: none
-    networks: [internal]
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
-    stop_grace_period: 40s
-    restart: unless-stopped
+
+  # Render pool: consumes media.render.jobs (render_video), so an encode never waits
+  # behind probe or audio jobs and the pool is sized on its own. One job per
+  # container: the broker connection is not thread-safe, so the pool size is the
+  # replica count. A capability added to the backend's render lane is added to
+  # WORKER_CAPABILITIES in the same change. No WORKER_ID: each replica reports its
+  # own container hostname.
+  render-worker:
+    <<: *media-worker
+    environment:
+      <<: *media-worker-env
+      MEDIA_QUEUE: media.render.jobs
+      WORKER_CAPABILITIES: render_video
+      OTEL_SERVICE_NAME: render-worker
+    deploy:
+      replicas: ${MEDIA_RENDER_WORKERS:-1}
 
   # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:

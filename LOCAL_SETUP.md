@@ -167,7 +167,8 @@ line for any shared or deployed stack.
 | `api-publish` | a socat relay that publishes `backend` on `127.0.0.1:8080`, because a service on internal networks only cannot publish a port | <http://localhost:8080> |
 | `egress-proxy` | the forward proxy with the domain allowlist: the only way the backend and the provider workers reach third parties | not published |
 | `egress-fetch` | the open-policy proxy tier for URL downloads, on the `fetch` network; idle until a URL-fetch service joins it | not published |
-| `worker` | the Python media worker (internal network only, no proxy) | none — and no internet access |
+| `worker` | the Python media worker on `media.jobs` (internal network only, no proxy): probe, audio and caption jobs | none — and no internet access |
+| `render-worker` | the same image on `media.render.jobs`: `render_video` only. `MEDIA_RENDER_WORKERS` replicas (default 1), one encode each, so a render never waits behind a probe or audio job | none — and no internet access |
 | `provider-worker` | the Python provider worker, on `provider.jobs`: script, storyboard and speech — `SCRIPT_PROVIDER` (fixture or openai) and `SPEECH_PROVIDER` (fixture or edge). Edge TTS is demo-only — it calls Microsoft's undocumented Edge Read Aloud endpoint (no SLA, it has broken before) and sends the approved script there; keep the pinned `edge-tts` current and move production speech to a contracted provider | none |
 | `provider-video-worker` | the same image on `provider.video.jobs`: the video clips — `VIDEO_PROVIDER` (fixture, seedance, veo or wan). `PROVIDER_VIDEO_WORKERS` replicas (default 2), one clip each, so a clip that runs for minutes never delays another run's script or speech. Seedance, Veo and Wan receive the storyboard scene prompts and the run's first product image | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
@@ -337,17 +338,18 @@ fix named in each case, when:
   changing `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` (or the delivery limit in code) on an
   existing broker makes the backend stay not-ready and log one ERROR naming the
   queue and the differing argument. Delete **every** job queue — `media.jobs`,
-  `provider.jobs` and `provider.video.jobs` — and restart the backend, or `down -v`:
+  `media.render.jobs`, `provider.jobs` and `provider.video.jobs` — and restart the backend, or `down -v`:
 
   ```bash
   docker compose exec rabbitmq rabbitmqctl delete_queue media.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.render.jobs
   docker compose exec rabbitmq rabbitmqctl delete_queue provider.jobs
   docker compose exec rabbitmq rabbitmqctl delete_queue provider.video.jobs
   docker compose up -d backend
   ```
 
   Deleting a queue drops the messages still waiting in it, so stop the workers first
-  (`docker compose stop worker provider-worker provider-video-worker`) if any run is in flight. The queues
+  (`docker compose stop worker render-worker provider-worker provider-video-worker`) if any run is in flight. The queues
   are recreated by the backend at startup with the new argument.
 - **A store key was rotated.** `minio-init` creates a user for the new
   `BACKEND_S3_ACCESS_KEY` / `WORKER_S3_ACCESS_KEY` but leaves the old one in place.

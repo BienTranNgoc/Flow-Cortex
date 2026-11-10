@@ -12,10 +12,12 @@ from typing import Any
 
 import pika
 
-from . import telemetry
+from . import roles, telemetry
 from .config import Settings
 from .consumer import Consumer
+from .handlers.registry import HANDLER_MODULES, Registry, load_handlers
 from .healthcheck import prepare_state_dir
+from .roles import RoleError
 from .runtime import Supervisor
 from .storage import Storage, client_from, remove_leftovers
 
@@ -27,6 +29,15 @@ JOB_THREAD_PREFIX = "job"
 
 def main() -> int:
     telemetry.configure_logging()
+    try:
+        queue = roles.media_queue(os.environ.get("MEDIA_QUEUE"))
+        accepted = roles.accepted_capabilities(
+            os.environ.get("WORKER_CAPABILITIES"), HANDLER_MODULES
+        )
+        registry = Registry(load_handlers(accepted), accepted)
+    except RoleError as invalid:
+        log.error("invalid worker role: %s", invalid)
+        return 2
     settings = Settings()
     prepare_state_dir(settings.worker_state_dir)
     liveness_file = settings.liveness_file
@@ -58,6 +69,8 @@ def main() -> int:
             stop=stop,
             executor=executor,
             liveness_file=liveness_file,
+            queue=queue,
+            resolve=registry.resolve,
         )
 
     def wait_alive(seconds: float) -> None:
@@ -67,7 +80,14 @@ def main() -> int:
             liveness_file.touch()
             stop.wait(min(left, 1.0))
 
-    log.info("worker starting", extra={"workerId": settings.worker_id})
+    log.info(
+        "worker starting",
+        extra={
+            "workerId": settings.worker_id,
+            "queue": queue,
+            "capabilities": sorted(accepted or HANDLER_MODULES),
+        },
+    )
     remove_leftovers()
     liveness_file.touch()
     Supervisor(
