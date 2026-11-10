@@ -33,10 +33,12 @@ class AdminAuditInterceptor implements HandlerInterceptor, WebMvcConfigurer {
     private static final Logger LOG = LoggerFactory.getLogger(AdminAuditInterceptor.class);
 
     private final JdbcAdminAuditWriter writer;
+    private final AdminAuditActorReader actorReader;
     private final JsonMapper mapper;
 
-    AdminAuditInterceptor(JdbcAdminAuditWriter writer, JsonMapper mapper) {
+    AdminAuditInterceptor(JdbcAdminAuditWriter writer, AdminAuditActorReader actorReader, JsonMapper mapper) {
         this.writer = writer;
+        this.actorReader = actorReader;
         this.mapper = mapper;
     }
 
@@ -54,7 +56,7 @@ class AdminAuditInterceptor implements HandlerInterceptor, WebMvcConfigurer {
         UUID actor = annotation == null ? null : actorId();
         if (actor != null) {
             request.setAttribute(PendingAudit.ATTRIBUTE, new PendingAudit(
-                    annotation, actor, request.getRemoteAddr(), cut(request.getHeader("User-Agent")),
+                    annotation, actor, actorReader.read(actor), request.getRemoteAddr(), cut(request.getHeader("User-Agent")),
                     pathVariables(request)));
         }
         return true;
@@ -91,6 +93,7 @@ class AdminAuditInterceptor implements HandlerInterceptor, WebMvcConfigurer {
                 annotation.resourceParam(), pending.pathVariables(), pending.responseBody(), mapper);
         writer.write(new AdminAuditEntry(
                 pending.actorUserId(),
+                pending.actor(),
                 annotation.value(),
                 resourceType(annotation.value()),
                 resource.id(),

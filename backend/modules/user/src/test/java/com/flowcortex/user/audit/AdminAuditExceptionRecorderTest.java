@@ -30,7 +30,7 @@ class AdminAuditExceptionRecorderTest {
     void storesTheExceptionInThePendingAudit() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         AdminAudit annotation = getClass().getDeclaredMethod("annotated").getAnnotation(AdminAudit.class);
-        PendingAudit pending = new PendingAudit(annotation, UUID.randomUUID(), "1.2.3.4", "ua", Map.of());
+        PendingAudit pending = new PendingAudit(annotation, UUID.randomUUID(), ActorSnapshot.UNKNOWN, "1.2.3.4", "ua", Map.of());
         request.setAttribute(PendingAudit.ATTRIBUTE, pending);
         IllegalStateException failure = new IllegalStateException("boom");
 

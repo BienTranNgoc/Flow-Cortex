@@ -102,6 +102,20 @@ class AdminAuditUserRoutesIT extends AbstractUserModuleIT {
     }
 
     @Test
+    void aSelfEditRecordsTheActorAsTheyWereBeforeTheChange() {
+        UserView admin = seedAdmin("audit-self-edit");
+        String newEmail = uniqueEmail("self-renamed");
+
+        ResponseEntity<String> response = put("/api/v1/users/" + admin.id(), login(admin.email(), PASSWORD),
+                new UpdateUserRequestView(newEmail, "Tên Sau Khi Đổi", null, null), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> row = onlyRow(admin, "user.update");
+        assertThat(row.get("actor_email")).isEqualTo(admin.email());
+        assertThat(row.get("actor_name")).isEqualTo(admin.name());
+    }
+
+    @Test
     void idFromTheResponse() {
         UserView admin = seedAdmin("audit-user-create");
         String email = uniqueEmail("created");

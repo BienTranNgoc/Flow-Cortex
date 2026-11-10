@@ -3,8 +3,6 @@ package com.flowcortex.user.audit;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Inserts one {@code admin_audit_event} row in its own transaction. The actor's email and name are
- * snapshotted best-effort, and any failure is logged and swallowed so recording never fails the
+ * Inserts one {@code admin_audit_event} row in its own transaction. The actor's email and name arrive
+ * with the entry, and any failure is logged and swallowed so recording never fails the
  * admin's request.
  */
 @Component
@@ -42,7 +40,7 @@ public class JdbcAdminAuditWriter {
 
     public void write(AdminAuditEntry entry) {
         try {
-            Actor actor = lookupActor(entry.actorUserId());
+            ActorSnapshot actor = entry.actor();
             MapSqlParameterSource params = new MapSqlParameterSource()
                     .addValue("id", UUID.randomUUID())
                     .addValue("actor_user_id", entry.actorUserId())
@@ -73,22 +71,4 @@ public class JdbcAdminAuditWriter {
         }
     }
 
-    private Actor lookupActor(UUID actorUserId) {
-        try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT email, name FROM app_user WHERE id = :id", Map.of("id", actorUserId));
-            if (rows == null || rows.isEmpty()) {
-                return Actor.UNKNOWN;
-            }
-            Map<String, Object> row = rows.get(0);
-            return new Actor((String) row.get("email"), (String) row.get("name"));
-        } catch (RuntimeException ex) {
-            LOG.warn("Admin audit actor snapshot for {} failed; the row is written without it", actorUserId, ex);
-            return Actor.UNKNOWN;
-        }
-    }
-
-    private record Actor(String email, String name) {
-        static final Actor UNKNOWN = new Actor(null, null);
-    }
 }

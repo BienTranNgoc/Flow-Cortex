@@ -11,6 +11,7 @@ final class PendingAudit {
 
     private final AdminAudit annotation;
     private final UUID actorUserId;
+    private final ActorSnapshot actor;
     private final String ip;
     private final String userAgent;
     private final Map<String, String> pathVariables;
@@ -18,10 +19,11 @@ final class PendingAudit {
     private Object responseBody;
     private Throwable exception;
 
-    PendingAudit(AdminAudit annotation, UUID actorUserId, String ip, String userAgent,
+    PendingAudit(AdminAudit annotation, UUID actorUserId, ActorSnapshot actor, String ip, String userAgent,
             Map<String, String> pathVariables) {
         this.annotation = annotation;
         this.actorUserId = actorUserId;
+        this.actor = actor;
         this.ip = ip;
         this.userAgent = userAgent;
         this.pathVariables = pathVariables;
@@ -33,6 +35,10 @@ final class PendingAudit {
 
     UUID actorUserId() {
         return actorUserId;
+    }
+
+    ActorSnapshot actor() {
+        return actor;
     }
 
     String ip() {

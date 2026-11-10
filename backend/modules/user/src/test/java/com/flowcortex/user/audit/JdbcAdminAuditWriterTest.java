@@ -3,7 +3,6 @@ package com.flowcortex.user.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -17,7 +16,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +53,12 @@ class JdbcAdminAuditWriterTest {
     }
 
     private AdminAuditEntry entry(String json) {
-        return new AdminAuditEntry(ACTOR, "support_kb_article.publish", "support_kb_article", "a-42", "How to pay",
+        return entry(json, ActorSnapshot.UNKNOWN);
+    }
+
+    private AdminAuditEntry entry(String json, ActorSnapshot actor) {
+        return new AdminAuditEntry(ACTOR, actor, "support_kb_article.publish", "support_kb_article", "a-42",
+                "How to pay",
                 json == null ? null : JsonMapper.builder().build().readTree(json),
                 AdminAuditEntry.Status.SUCCESS, null, "10.0.0.1", "agent");
     }
@@ -74,9 +77,7 @@ class JdbcAdminAuditWriterTest {
     }
 
     @Test
-    void aFailedActorLookupStillWritesTheRow() {
-        when(jdbc.queryForList(anyString(), anyMap())).thenThrow(new DataAccessResourceFailureException("no"));
-
+    void anUnknownActorStillWritesTheRowWithEmptySnapshot() {
         writer.write(entry(null));
 
         ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
@@ -87,22 +88,8 @@ class JdbcAdminAuditWriterTest {
     }
 
     @Test
-    void anActorWithNoRowStillWritesTheRowWithEmptySnapshot() {
-        when(jdbc.queryForList(anyString(), anyMap())).thenReturn(List.of());
-
-        writer.write(entry(null));
-
-        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
-        verify(jdbc).update(anyString(), params.capture());
-        assertThat(params.getValue().getValue("actor_email")).isNull();
-    }
-
-    @Test
     void writesTheEntryWithOriginHttpAndTheSnapshot() {
-        when(jdbc.queryForList(anyString(), anyMap()))
-                .thenReturn(List.of(Map.of("email", "admin@x.io", "name", "Ada")));
-
-        writer.write(entry("{\"role\":\"CREATOR\"}"));
+        writer.write(entry("{\"role\":\"CREATOR\"}", new ActorSnapshot("admin@x.io", "Ada")));
 
         ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
         verify(jdbc).update(anyString(), params.capture());

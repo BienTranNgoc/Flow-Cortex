@@ -7,6 +7,7 @@ import tools.jackson.databind.JsonNode;
 /** One admin write to record; {@code changeSummary} is the already-reduced snapshot or null. */
 public record AdminAuditEntry(
         UUID actorUserId,
+        ActorSnapshot actor,
         String action,
         String resourceType,
         String resourceId,
