@@ -3,5 +3,15 @@
   "runAnyway": "Run anyway",
   "estimatedCost": "Estimated cost: {{amount}} credits",
   "chargedSoFarOne": "Charged for this run so far: {{amount}} credit",
-  "chargedSoFarOther": "Charged for this run so far: {{amount}} credits"
+  "chargedSoFarOther": "Charged for this run so far: {{amount}} credits",
+  "wallet": {
+    "aria": "{{amount}} credits, {{tier}}. Open your profile",
+    "used": "{{used}} of {{granted}} credits used",
+    "tier": {
+      "ok": "balance healthy",
+      "low": "balance low",
+      "critical": "balance critically low",
+      "exhausted": "no credits left"
+    }
+  }
 }
