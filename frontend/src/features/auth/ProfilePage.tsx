@@ -10,6 +10,7 @@ import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useBalance } from '../credits/useBalance';
+import { ApiTokensSection } from './ApiTokensSection';
 import { roleLabel, statusLabel } from './enumLabels';
 import { PhoneVerification } from './PhoneVerification';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
@@ -28,7 +29,7 @@ function initialsFrom(name: string | null | undefined, email: string | null | un
 export function ProfilePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
-  const { phoneVerification } = useFeatures();
+  const { phoneVerification, personalAccessTokens } = useFeatures();
   const credits = useBalance();
   const queryClient = useQueryClient();
   const {
@@ -216,6 +217,13 @@ export function ProfilePage() {
             <>
               <hr className="profile-card__divider" />
               <PhoneVerification />
+            </>
+          )}
+
+          {personalAccessTokens && me.role === 'ADMIN' && (
+            <>
+              <hr className="profile-card__divider" />
+              <ApiTokensSection />
             </>
           )}
 
