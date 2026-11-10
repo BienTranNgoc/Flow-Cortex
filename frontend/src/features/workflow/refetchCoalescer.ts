@@ -11,18 +11,18 @@ export function createRefetchCoalescer(refetch: () => Promise<unknown>): Refetch
   let dirty = false;
   let stopped = false;
 
-  function start(): void {
+  async function start(): Promise<void> {
     inFlight = true;
     dirty = false;
-    new Promise((resolve) => resolve(refetch()))
+    try {
+      await refetch();
+    } catch {
       // The query keeps a failed refetch in its own error state; the next event tries again.
-      .catch(() => undefined)
-      .then(() => {
-        inFlight = false;
-        if (dirty && !stopped) {
-          start();
-        }
-      });
+    }
+    inFlight = false;
+    if (dirty && !stopped) {
+      void start();
+    }
   }
 
   return {
@@ -33,7 +33,7 @@ export function createRefetchCoalescer(refetch: () => Promise<unknown>): Refetch
       if (inFlight) {
         dirty = true;
       } else {
-        start();
+        void start();
       }
     },
     stop() {
