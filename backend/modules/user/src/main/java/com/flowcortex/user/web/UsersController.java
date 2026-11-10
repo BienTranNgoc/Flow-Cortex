@@ -2,6 +2,7 @@ package com.flowcortex.user.web;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import jakarta.validation.Valid;
@@ -58,6 +59,7 @@ class UsersController {
     // ResponseEntity-returning method (actual 201 comes from ResponseEntity.status() below).
     @ResponseStatus(HttpStatus.CREATED)
     @RequirePermission(Permission.USER_ACCOUNT_CREATE)
+    @AdminAudit(value = "user.create", capture = "role")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> create(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateUserRequest request) {
@@ -73,6 +75,7 @@ class UsersController {
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_UPDATE)
+    @AdminAudit(value = "user.update", capture = {"role", "status"})
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
@@ -83,6 +86,7 @@ class UsersController {
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_DELETE)
+    @AdminAudit("user.delete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

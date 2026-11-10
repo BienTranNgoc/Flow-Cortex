@@ -237,6 +237,11 @@ flowcortex:
     retention:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}
+  # Admin audit rows are kept; only their client address and user agent are cleared after
+  # `origin-retention`, checked every `retention-interval`.
+  admin-audit:
+    origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
+    retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
   # gradually; over it answers 429 with Retry-After before the password is checked. Limits are per
   # backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
