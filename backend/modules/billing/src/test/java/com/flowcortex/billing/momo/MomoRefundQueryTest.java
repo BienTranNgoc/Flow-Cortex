@@ -28,10 +28,18 @@ class MomoRefundQueryTest {
     }
 
     @Test
-    void theOnlyEntryIsUsedEvenWhenItNamesAnotherOrder() {
+    void aSoleEntryNamingAnotherOrderIsNotOurs() {
         JsonNode answer = json("""
                 {"resultCode":0,"refundTrans":[{"orderId":"%s","transId":9,"amount":5000,"resultCode":0}]}"""
                 .formatted(OTHER));
+
+        assertThat(MomoRefundQuery.interpret(answer, ORDER)).isEqualTo(new RefundQueryOutcome.Unknown("0"));
+    }
+
+    @Test
+    void aSoleEntryWithoutAnOrderIdIsUsed() {
+        JsonNode answer = json("""
+                {"resultCode":0,"refundTrans":[{"transId":9,"amount":5000,"resultCode":0}]}""");
 
         assertThat(MomoRefundQuery.interpret(answer, ORDER)).isEqualTo(new RefundQueryOutcome.Settled("9", 5000, "0"));
     }

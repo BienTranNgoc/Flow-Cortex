@@ -629,8 +629,15 @@ Format per entry: **Context → Decision → Consequences**.
     with no wider transaction. The ledger reads accepted rows; no Modulith
     event or broker message is involved.
   - **Off by default:** `flowcortex.billing.momo.enabled` is false. When it is
-    true, startup fails fast on a missing partner code, key, URL or an
-    unreadable source allowlist, rather than at the first payment.
+    true, startup fails fast on a missing partner code or key, a base,
+    redirect or IPN URL that is not absolute https with a host, or an
+    unreadable source allowlist, rather than at the first payment. The sandbox
+    host default lives only in `application.yml` and `.env.example`, so an
+    explicitly blank base URL is reported instead of silently using it.
+  - **Refund query matching:** a refund-query entry counts as ours when it
+    names our order id, or when it is the only entry and names no order id.
+    Deviation from Xood's `refund-query-outcome.ts`, which also accepts a sole
+    entry naming another order: that would settle a refund MoMo never saw.
 - **Alternatives:**
   - **Resilience4j for the breaker:** rejected. A new dependency whose
     count-based window needs a failure-rate setting to mimic "consecutive

@@ -36,7 +36,6 @@ public record MomoProperties(
     }
 
     public MomoProperties {
-        baseUrl = baseUrl == null || baseUrl.isBlank() ? "https://test-payment.momo.vn" : baseUrl;
         offeredInstruments = offeredInstruments == null ? List.of("wallet") : List.copyOf(offeredInstruments);
         circuit = circuit == null ? new Circuit(null, null, null) : circuit;
     }

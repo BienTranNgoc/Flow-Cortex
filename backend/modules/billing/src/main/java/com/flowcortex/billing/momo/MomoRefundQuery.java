@@ -38,7 +38,7 @@ final class MomoRefundQuery {
         return new RefundQueryOutcome.Unknown(queryCode);
     }
 
-    /** The entry whose order id is ours, else the only entry there is. */
+    /** The entry whose order id is ours, else the only entry when it names no order id; never another order's. */
     private static JsonNode entryFor(JsonNode entries, String orderRef) {
         if (entries == null || !entries.isArray()) {
             return null;
@@ -48,7 +48,10 @@ final class MomoRefundQuery {
                 return candidate;
             }
         }
-        return entries.size() == 1 && entries.get(0).isObject() ? entries.get(0) : null;
+        if (entries.size() == 1 && entries.get(0).isObject() && text(entries.get(0).get("orderId")) == null) {
+            return entries.get(0);
+        }
+        return null;
     }
 
     private static String text(JsonNode node) {

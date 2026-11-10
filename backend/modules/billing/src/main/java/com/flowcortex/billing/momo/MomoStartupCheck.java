@@ -22,7 +22,8 @@ final class MomoStartupCheck {
         required(problems, "partner-code", properties.partnerCode());
         required(problems, "access-key", properties.accessKey());
         required(problems, "secret-key", properties.secretKey());
-        required(problems, "redirect-url", properties.redirectUrl());
+        absoluteHttpsUrl(problems, "base-url", properties.baseUrl());
+        absoluteHttpsUrl(problems, "redirect-url", properties.redirectUrl());
         callbackUrl(problems, properties.ipnUrl());
         instruments(problems, properties.offeredInstruments());
         allowlist(problems, properties.callbackSourceAllowlist());
@@ -45,20 +46,30 @@ final class MomoStartupCheck {
         }
     }
 
-    private static void callbackUrl(List<String> problems, String value) {
+    /** Reports a missing or unusable URL by property name; returns the URI only when it is absolute https. */
+    private static URI absoluteHttpsUrl(List<String> problems, String name, String value) {
         if (value == null || value.isBlank()) {
-            problems.add(PREFIX + "ipn-url is required when MoMo is enabled");
-            return;
+            problems.add(PREFIX + name + " is required when MoMo is enabled");
+            return null;
         }
-        String path;
+        URI uri;
         try {
-            path = URI.create(value.trim()).getPath();
+            uri = URI.create(value.trim());
         } catch (IllegalArgumentException e) {
-            problems.add(PREFIX + "ipn-url is not a valid URL");
-            return;
+            problems.add(PREFIX + name + " is not a valid URL");
+            return null;
         }
-        if (!MomoCallbackRoute.PATH.equals(path)) {
-            problems.add(PREFIX + "ipn-url path is '" + path + "' but the receiver route is "
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getHost().isBlank()) {
+            problems.add(PREFIX + name + " must be an absolute https URL with a host");
+            return null;
+        }
+        return uri;
+    }
+
+    private static void callbackUrl(List<String> problems, String value) {
+        URI uri = absoluteHttpsUrl(problems, "ipn-url", value);
+        if (uri != null && !MomoCallbackRoute.PATH.equals(uri.getPath())) {
+            problems.add(PREFIX + "ipn-url path is '" + uri.getPath() + "' but the receiver route is "
                     + MomoCallbackRoute.PATH);
         }
     }

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 class MomoStartupCheckTest {
 
     private static final String SECRET = "very-secret-value-0001";
+    private static final String BASE = "https://payment.momo.vn";
     private static final String CALLBACK = "https://app.example.com" + MomoCallbackRoute.PATH;
 
     private static MomoProperties complete() {
@@ -17,7 +18,7 @@ class MomoStartupCheckTest {
 
     private static MomoProperties props(String partner, String access, String secret, String redirect, String ipn,
             List<String> instruments, String allowlist) {
-        return new MomoProperties(true, null, partner, access, secret, redirect, ipn, instruments, allowlist, null);
+        return new MomoProperties(true, BASE, partner, access, secret, redirect, ipn, instruments, allowlist, null);
     }
 
     @Test
@@ -68,6 +69,24 @@ class MomoStartupCheckTest {
     }
 
     @Test
+    void aBaseUrlThatIsBlankSchemelessOrPlainHttpIsAProblem() {
+        for (String base : new String[] {null, "", "payment.momo.vn", "http://payment.momo.vn"}) {
+            MomoProperties bad = new MomoProperties(true, base, "P", "A", SECRET, "https://r", CALLBACK,
+                    List.of("wallet"), "1.2.3.4", null);
+
+            assertThat(MomoStartupCheck.problems(bad, true)).singleElement().asString()
+                    .contains("flowcortex.billing.momo.base-url");
+        }
+    }
+
+    @Test
+    void aRelativeCallbackUrlIsAProblem() {
+        assertThat(MomoStartupCheck.problems(
+                props("P", "A", SECRET, "https://r", MomoCallbackRoute.PATH, List.of("wallet"), "1.2.3.4"), true))
+                .singleElement().asString().contains("flowcortex.billing.momo.ipn-url").contains("https");
+    }
+
+    @Test
     void emptyOrUnknownInstrumentsAreAProblem() {
         assertThat(MomoStartupCheck.problems(
                 props("P", "A", SECRET, "https://r", CALLBACK, List.of(), "1.2.3.4"), true))
@@ -108,7 +127,7 @@ class MomoStartupCheckTest {
 
     @Test
     void anUnusableCircuitSettingIsAProblem() {
-        MomoProperties zero = new MomoProperties(true, null, "P", "A", SECRET, "https://r", CALLBACK,
+        MomoProperties zero = new MomoProperties(true, BASE, "P", "A", SECRET, "https://r", CALLBACK,
                 List.of("wallet"), "1.2.3.4", new MomoProperties.Circuit(true, 0, java.time.Duration.ZERO));
 
         assertThat(MomoStartupCheck.problems(zero, true)).hasSize(2);
