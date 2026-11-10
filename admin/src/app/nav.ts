@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ChatsCircle,
   ChatText,
   ClipboardText,
   Coins,
@@ -206,6 +207,18 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.supportSettings',
         path: '/support/settings',
         icon: Sparkle,
+        key: 'platform.setting.view',
+      },
+    ],
+  },
+  {
+    id: 'chat',
+    label: 'common.shell.nav.groups.chat',
+    items: [
+      {
+        label: 'common.shell.nav.items.chatSettings',
+        path: '/chat/settings',
+        icon: ChatsCircle,
         key: 'platform.setting.view',
       },
     ],

@@ -65,6 +65,18 @@ export interface AccessTokenResponse {
   expiresIn?: number;
 }
 
+export interface ChatConversationTitle {
+  /** @maxLength 80 */
+  title?: string;
+}
+
+export interface ChatConversation {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+}
+
 export interface ProfileUpdateRequest {
   /** @minLength 1 */
   name: string;
@@ -410,6 +422,16 @@ export interface PaymentSettingView {
   min?: number | null;
   /** @nullable */
   max?: number | null;
+}
+
+export interface AdminChatSettingsUpdate {
+  enabled: boolean;
+}
+
+export interface AdminChatSettings {
+  enabled: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
 }
 
 export interface CreateWorkflowRequest {
@@ -838,6 +860,92 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export interface Attachment {
+  uploadId?: string;
+  fileName?: string;
+}
+
+export interface ChatFirstMessage {
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   */
+  text?: string;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatConversationCreate {
+  /** @maxLength 80 */
+  title?: string;
+  firstMessage: ChatFirstMessage;
+}
+
+/**
+ * Card or run payload; shape depends on kind
+ * @nullable
+ */
+export type ChatMessagePayload = { [key: string]: unknown } | null;
+
+export interface ChatMessage {
+  id?: string;
+  seq?: number;
+  role?: string;
+  kind?: string;
+  body?: string;
+  /**
+   * Card or run payload; shape depends on kind
+   * @nullable
+   */
+  payload?: ChatMessagePayload;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface ChatConversationCreated {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+  userMessage?: ChatMessage;
+  assistantMessageId?: string;
+}
+
+export interface ChatSendMessage {
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   */
+  text?: string;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatMessageSent {
+  userMessage?: ChatMessage;
+  assistantMessageId?: string;
+}
+
+export interface ChatCardProductVideo {
+  productName?: string;
+  description?: string;
+  cta?: string;
+  price?: string;
+  promotion?: string;
+}
+
+export interface ChatCardConfirm {
+  acknowledgeCost?: boolean;
+  productVideo?: ChatCardProductVideo;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatCardConfirmed {
+  runId?: string;
+  card?: ChatMessage;
+}
+
 export interface ResetPasswordRequest {
   /**
    * @minLength 0
@@ -1129,10 +1237,16 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  chat: boolean;
 }
 
 export interface BalanceResponse {
   balance?: number;
+}
+
+export interface ChatConversationList {
+  items?: ChatConversation[];
+  chatEnabled?: boolean;
 }
 
 export interface CapabilitiesResponse {
@@ -1659,6 +1773,103 @@ export const setPassword = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(setPasswordRequest),
+  });
+};
+
+export type renameChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type renameChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameChatConversationResponseSuccess = renameChatConversationResponse200 & {
+  headers: Headers;
+};
+export type renameChatConversationResponseError = (
+  renameChatConversationResponse400 | renameChatConversationResponse404
+) & {
+  headers: Headers;
+};
+
+export type renameChatConversationResponse =
+  renameChatConversationResponseSuccess | renameChatConversationResponseError;
+
+export const getRenameChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}`;
+};
+
+export const renameChatConversation = async (
+  id: string,
+  chatConversationTitle: ChatConversationTitle,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameChatConversationResponse>(getRenameChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationTitle),
+  });
+};
+
+export type deleteChatConversationResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteChatConversationResponseSuccess = deleteChatConversationResponse204 & {
+  headers: Headers;
+};
+export type deleteChatConversationResponseError = deleteChatConversationResponse404 & {
+  headers: Headers;
+};
+
+export type deleteChatConversationResponse =
+  deleteChatConversationResponseSuccess | deleteChatConversationResponseError;
+
+export const getDeleteChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}`;
+};
+
+export const deleteChatConversation = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteChatConversationResponse> => {
+  return customFetch<deleteChatConversationResponse>(getDeleteChatConversationUrl(id), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -2299,6 +2510,84 @@ export const updatePaymentSetting = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(paymentSettingUpdate),
+  });
+};
+
+export type getAdminChatSettingsResponse200 = {
+  data: AdminChatSettings;
+  status: 200;
+};
+
+export type getAdminChatSettingsResponseSuccess = getAdminChatSettingsResponse200 & {
+  headers: Headers;
+};
+export type getAdminChatSettingsResponse = getAdminChatSettingsResponseSuccess;
+
+export const getGetAdminChatSettingsUrl = () => {
+  return `/api/v1/admin/chat/settings`;
+};
+
+export const getAdminChatSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminChatSettingsResponse> => {
+  return customFetch<getAdminChatSettingsResponse>(getGetAdminChatSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateAdminChatSettingsResponse200 = {
+  data: AdminChatSettings;
+  status: 200;
+};
+
+export type updateAdminChatSettingsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminChatSettingsResponseSuccess = updateAdminChatSettingsResponse200 & {
+  headers: Headers;
+};
+export type updateAdminChatSettingsResponseError = updateAdminChatSettingsResponse400 & {
+  headers: Headers;
+};
+
+export type updateAdminChatSettingsResponse =
+  updateAdminChatSettingsResponseSuccess | updateAdminChatSettingsResponseError;
+
+export const getUpdateAdminChatSettingsUrl = () => {
+  return `/api/v1/admin/chat/settings`;
+};
+
+export const updateAdminChatSettings = async (
+  adminChatSettingsUpdate: AdminChatSettingsUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminChatSettingsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminChatSettingsResponse>(getUpdateAdminChatSettingsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminChatSettingsUpdate),
   });
 };
 
@@ -3410,6 +3699,368 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type listChatConversationsResponse200 = {
+  data: ChatConversationList;
+  status: 200;
+};
+
+export type listChatConversationsResponseSuccess = listChatConversationsResponse200 & {
+  headers: Headers;
+};
+export type listChatConversationsResponse = listChatConversationsResponseSuccess;
+
+export const getListChatConversationsUrl = () => {
+  return `/api/v1/chat/conversations`;
+};
+
+export const listChatConversations = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatConversationsResponse> => {
+  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createChatConversationResponse201 = {
+  data: ChatConversationCreated;
+  status: 201;
+};
+
+export type createChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createChatConversationResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createChatConversationResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type createChatConversationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type createChatConversationResponseSuccess = createChatConversationResponse201 & {
+  headers: Headers;
+};
+export type createChatConversationResponseError = (
+  | createChatConversationResponse400
+  | createChatConversationResponse422
+  | createChatConversationResponse429
+  | createChatConversationResponse503
+) & {
+  headers: Headers;
+};
+
+export type createChatConversationResponse =
+  createChatConversationResponseSuccess | createChatConversationResponseError;
+
+export const getCreateChatConversationUrl = () => {
+  return `/api/v1/chat/conversations`;
+};
+
+export const createChatConversation = async (
+  chatConversationCreate?: ChatConversationCreate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createChatConversationResponse>(getCreateChatConversationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationCreate),
+  });
+};
+
+export type sendChatMessageResponse202 = {
+  data: ChatMessageSent;
+  status: 202;
+};
+
+export type sendChatMessageResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type sendChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type sendChatMessageResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type sendChatMessageResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type sendChatMessageResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type sendChatMessageResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type sendChatMessageResponseSuccess = sendChatMessageResponse202 & {
+  headers: Headers;
+};
+export type sendChatMessageResponseError = (
+  | sendChatMessageResponse400
+  | sendChatMessageResponse404
+  | sendChatMessageResponse409
+  | sendChatMessageResponse422
+  | sendChatMessageResponse429
+  | sendChatMessageResponse503
+) & {
+  headers: Headers;
+};
+
+export type sendChatMessageResponse = sendChatMessageResponseSuccess | sendChatMessageResponseError;
+
+export const getSendChatMessageUrl = (conversationId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages`;
+};
+
+export const sendChatMessage = async (
+  conversationId: string,
+  chatSendMessage: ChatSendMessage,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sendChatMessageResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<sendChatMessageResponse>(getSendChatMessageUrl(conversationId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatSendMessage),
+  });
+};
+
+export type stopChatMessageResponse202 = {
+  data: void;
+  status: 202;
+};
+
+export type stopChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type stopChatMessageResponseSuccess = stopChatMessageResponse202 & {
+  headers: Headers;
+};
+export type stopChatMessageResponseError = stopChatMessageResponse404 & {
+  headers: Headers;
+};
+
+export type stopChatMessageResponse = stopChatMessageResponseSuccess | stopChatMessageResponseError;
+
+export const getStopChatMessageUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages/${messageId}/stop`;
+};
+
+export const stopChatMessage = async (
+  conversationId: string,
+  messageId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<stopChatMessageResponse> => {
+  return customFetch<stopChatMessageResponse>(getStopChatMessageUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type retryChatMessageResponse202 = {
+  data: ChatMessageSent;
+  status: 202;
+};
+
+export type retryChatMessageResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type retryChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryChatMessageResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryChatMessageResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryChatMessageResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type retryChatMessageResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryChatMessageResponseSuccess = retryChatMessageResponse202 & {
+  headers: Headers;
+};
+export type retryChatMessageResponseError = (
+  | retryChatMessageResponse400
+  | retryChatMessageResponse404
+  | retryChatMessageResponse409
+  | retryChatMessageResponse422
+  | retryChatMessageResponse429
+  | retryChatMessageResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryChatMessageResponse =
+  retryChatMessageResponseSuccess | retryChatMessageResponseError;
+
+export const getRetryChatMessageUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages/${messageId}/retry`;
+};
+
+export const retryChatMessage = async (
+  conversationId: string,
+  messageId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryChatMessageResponse> => {
+  return customFetch<retryChatMessageResponse>(getRetryChatMessageUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type confirmChatCardResponse200 = {
+  data: ChatCardConfirmed;
+  status: 200;
+};
+
+export type confirmChatCardResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type confirmChatCardResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type confirmChatCardResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type confirmChatCardResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type confirmChatCardResponseSuccess = confirmChatCardResponse200 & {
+  headers: Headers;
+};
+export type confirmChatCardResponseError = (
+  | confirmChatCardResponse400
+  | confirmChatCardResponse402
+  | confirmChatCardResponse404
+  | confirmChatCardResponse409
+) & {
+  headers: Headers;
+};
+
+export type confirmChatCardResponse = confirmChatCardResponseSuccess | confirmChatCardResponseError;
+
+export const getConfirmChatCardUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/cards/${messageId}/confirm`;
+};
+
+export const confirmChatCard = async (
+  conversationId: string,
+  messageId: string,
+  chatCardConfirm?: ChatCardConfirm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<confirmChatCardResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<confirmChatCardResponse>(getConfirmChatCardUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatCardConfirm),
   });
 };
 
@@ -5384,6 +6035,40 @@ export const balance = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<balanceResponse> => {
   return customFetch<balanceResponse>(getBalanceUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listChatMessagesResponse200 = {
+  data: ChatMessage[];
+  status: 200;
+};
+
+export type listChatMessagesResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listChatMessagesResponseSuccess = listChatMessagesResponse200 & {
+  headers: Headers;
+};
+export type listChatMessagesResponseError = listChatMessagesResponse404 & {
+  headers: Headers;
+};
+
+export type listChatMessagesResponse =
+  listChatMessagesResponseSuccess | listChatMessagesResponseError;
+
+export const getListChatMessagesUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/messages`;
+};
+
+export const listChatMessages = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatMessagesResponse> => {
+  return customFetch<listChatMessagesResponse>(getListChatMessagesUrl(id), {
     ...options,
     method: 'GET',
   });

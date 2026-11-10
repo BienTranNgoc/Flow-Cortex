@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Queue;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -36,6 +37,7 @@ import org.testcontainers.containers.RabbitMQContainer;
  * one resync, with the instance's queue redeclared under the same name. The broker is stopped and
  * started inside its container so its published port stays the same.
  */
+@Tag("multi-instance")
 class RealtimeFanoutIT extends AbstractPostgresBootTest {
 
     private static final RabbitMQContainer BROKER = new RabbitMQContainer("rabbitmq:4.3.6-management");
