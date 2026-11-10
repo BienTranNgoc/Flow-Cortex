@@ -20,3 +20,5 @@ default:
     - ftp.ripe.net
     - ftp.lacnic.net
     - ftp.afrinic.net
+    - payment.momo.vn
+    - test-payment.momo.vn

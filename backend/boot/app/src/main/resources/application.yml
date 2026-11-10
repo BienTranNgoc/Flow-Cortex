@@ -329,6 +329,22 @@ flowcortex:
       mode: ${FLOWCORTEX_BILLING_REGION_GATE_MODE:shadow}
       refresh-interval: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INTERVAL:PT24H}
       refresh-initial-delay: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INITIAL_DELAY:PT10M}
+    # MoMo: off until the merchant contract is signed. Enabling it fails startup on a missing credential or URL,
+    # a callback URL off the receiver route, or an empty or unreadable source allowlist.
+    momo:
+      enabled: ${FLOWCORTEX_BILLING_MOMO_ENABLED:false}
+      base-url: ${FLOWCORTEX_BILLING_MOMO_BASE_URL:https://test-payment.momo.vn}
+      partner-code: ${FLOWCORTEX_BILLING_MOMO_PARTNER_CODE:}
+      access-key: ${FLOWCORTEX_BILLING_MOMO_ACCESS_KEY:}
+      secret-key: ${FLOWCORTEX_BILLING_MOMO_SECRET_KEY:}
+      redirect-url: ${FLOWCORTEX_BILLING_MOMO_REDIRECT_URL:}
+      ipn-url: ${FLOWCORTEX_BILLING_MOMO_IPN_URL:}
+      offered-instruments: ${FLOWCORTEX_BILLING_MOMO_OFFERED_INSTRUMENTS:wallet}
+      callback-source-allowlist: ${FLOWCORTEX_BILLING_MOMO_CALLBACK_SOURCE_ALLOWLIST:}
+      circuit:
+        enabled: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_ENABLED:true}
+        failure-threshold: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_FAILURE_THRESHOLD:5}
+        open-duration: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_OPEN_DURATION:PT30S}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.

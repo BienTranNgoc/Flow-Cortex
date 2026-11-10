@@ -588,3 +588,76 @@ Format per entry: **Context → Decision → Consequences**.
   - **A two-way door for now:** the two schemas have no consumer yet. Once an
     adapter, the checkout pages and the transaction ledger use them, an edit
     goes through the changes that consume them.
+
+## ADR-0028 — MoMo payment provider
+
+- **Context:** ADR-0013 defines one gateway shape for every provider and
+  leaves each adapter to its own change. MoMo is the first adapter. It opens a
+  payment on its own page, then reports the result twice: the payer returns to
+  our return URL, and MoMo posts an IPN to a backend route. Outbound calls
+  must go through `egress-proxy` and its allowlist (ADR-0010). No contract with
+  MoMo is signed yet, so the adapter has to start switched off. The IPN is
+  retried by MoMo and can be forged by anyone who can reach the route, so what
+  is checked, in what order, and what is stored must be fixed before a payment
+  can settle on it.
+- **Decision:**
+  - **Scope:** one-time payments. Recurring payments are added by
+    `billing-recurring-mandates-a` on the same port.
+  - **Where it lives:** the provider port and the MoMo adapter are in
+    `:modules:billing`. No MoMo type crosses the port.
+  - **Signing:** HMAC-SHA256, hex, over the field list MoMo declares for each
+    request and callback kind, taken from the raw bytes parsed as strict JSON
+    (duplicate keys, an absent signed field or a signed value that is neither
+    a string nor an integral number are refused). Signatures compare in constant time. A signature failure is
+    answered and counted without echoing any received value.
+  - **Amount range:** 1,000 to 50,000,000 đồng, checked before anything is
+    signed or sent, so an amount MoMo would refuse never leaves the process.
+  - **Failures:** every outbound call is bounded by a timeout. A transport
+    failure, a timeout or an unreadable answer is reported as unresolved: the
+    payment is neither failed nor settled by it, because MoMo may have created
+    it. A per-instance circuit breaker opens after 5 consecutive failures for
+    30 s, then lets one probe through; a call it refuses says that nothing was
+    sent, so that operation is not in doubt.
+  - **Callback admission, in this order:** source allowlist (everything else
+    is answered 403 before the body is read or the database touched) ->
+    signature verification over the raw bytes -> reference check (our order
+    reference shape and a minted order) -> cross-check of the order and amount
+    through the order-lookup port -> one accepted inbox row per request id.
+    Answers carry status only. A repeated request id is answered 204 and adds
+    no accepted row; each rejected callback writes its own evidence row.
+  - **Hand-off:** the callback only writes an inbox row, in a single insert
+    with no wider transaction. The ledger reads accepted rows; no Modulith
+    event or broker message is involved.
+  - **Off by default:** `flowcortex.billing.momo.enabled` is false. When it is
+    true, startup fails fast on a missing partner code, key, URL or an
+    unreadable source allowlist, rather than at the first payment.
+- **Alternatives:**
+  - **Resilience4j for the breaker:** rejected. A new dependency whose
+    count-based window needs a failure-rate setting to mimic "consecutive
+    failures" and whose half-open state admits several calls; a small
+    state machine over an injected clock is unit-testable.
+  - **A Modulith event or a RabbitMQ message to hand the callback to the
+    ledger:** rejected. The durable row is the hand-off; an event adds a
+    delivery that can be lost between the row and the consumer.
+  - **Record first, then verify:** rejected for the admission path. It costs a
+    body read and a row per forged request; the allowlist and the signature
+    check come first and only a request that passes them is stored, except the
+    reference-check evidence row below.
+  - **A runtime check instead of a startup check:** rejected. Configuration is
+    static at startup, so the fault is knowable before the first payment.
+- **Consequences:**
+  - **ADR-0013 is refined in one sentence:** "foreign references are not
+    stored" covers the provider event and payment state. A verified callback
+    for an order that is not ours is still kept as a rejected
+    `reference_not_ours` evidence row with its raw bytes and no event, so it is
+    never read by the ledger yet remains evidence for a dispute or a
+    misconfigured merchant. Logs still carry no payload value.
+  - **The source allowlist assumes the current trusted ingress chain** (Caddy
+    -> frontend nginx -> Tomcat) resolving the real caller. It must be revisited
+    if a CDN or a public load balancer is added, or every callback becomes 403.
+  - **The ledger consumes accepted rows** and owns turning them into payment
+    state; this change stops at the durable row.
+  - **MoMo cannot be enabled before an order lookup exists**, because the
+    cross-check has nothing to ask.
+  - **Settings move to runtime** with `payment-admin-settings`; until then
+    they are application properties read at startup.

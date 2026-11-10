@@ -300,6 +300,21 @@ the member app reads it once per session.
   `shadow`. A change needs a backend restart. `..._REFRESH_INTERVAL` and `..._REFRESH_INITIAL_DELAY`
   set the pace of the registry download (ISO-8601, default `PT24H` and `PT10M`).
 
+- **MoMo payments.** `FLOWCORTEX_BILLING_MOMO_ENABLED` (default `false`) switches the MoMo provider on;
+  while off, no MoMo bean exists, the callback route answers 404 and nothing leaves for MoMo. Turn it on
+  only with a signed merchant contract: the backend then refuses to start, naming the property, unless
+  `..._PARTNER_CODE`, `..._ACCESS_KEY`, `..._SECRET_KEY`, `..._REDIRECT_URL` and `..._IPN_URL` are set,
+  `..._OFFERED_INSTRUMENTS` lists `wallet` and/or `domestic_card`, an order lookup is provided and
+  `..._CALLBACK_SOURCE_ALLOWLIST` is a comma-separated list of the addresses or CIDR blocks MoMo calls
+  back from (for example `118.69.210.244,118.68.171.0/24`; a space instead of a comma is refused).
+  `..._IPN_URL` is the public callback URL and must end in `/api/v1/billing/webhooks/momo`.
+  `..._BASE_URL` defaults to the sandbox (`https://test-payment.momo.vn`); production is
+  `https://payment.momo.vn`. MoMo calls leave through the egress proxy, so a host-side
+  `EGRESS_ACL_FILE` copy of `infra/egress-proxy/acl.yaml` must list both `payment.momo.vn` and
+  `test-payment.momo.vn`. The source allowlist sees the public caller only through Caddy, the frontend
+  nginx and Tomcat, each trusting the private hop before it; a CDN or public load balancer in front
+  makes every callback look like it comes from the proxy and be refused with 403.
+
 - **Email.** Every email the backend sends lands in Mailpit at
   <http://localhost:8025>; open the confirmation link from there. The link points
   at `FLOWCORTEX_APP_PUBLIC_URL` (compose default `http://localhost:5173`) and signs
