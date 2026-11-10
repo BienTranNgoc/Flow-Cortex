@@ -8,7 +8,7 @@ import { customFetch } from '../customFetch';
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
-  /** @pattern ADMIN|MEMBER|CREATOR */
+  /** @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR */
   role?: string;
   /** @pattern ACTIVE|SUSPENDED */
   status?: string;
@@ -70,6 +70,33 @@ export interface ProfileUpdateRequest {
   name: string;
 }
 
+export type MeResponsePermissionsItem =
+  (typeof MeResponsePermissionsItem)[keyof typeof MeResponsePermissionsItem];
+
+export const MeResponsePermissionsItem = {
+  useraccountview: 'user.account.view',
+  useraccountcreate: 'user.account.create',
+  useraccountupdate: 'user.account.update',
+  useraccountchange_role: 'user.account.change_role',
+  useraccountsuspend: 'user.account.suspend',
+  useraccountdelete: 'user.account.delete',
+  workflowrunview: 'workflow.run.view',
+  workflowworkflowmanage: 'workflow.workflow.manage',
+  supportticketview: 'support.ticket.view',
+  supportticketreply: 'support.ticket.reply',
+  supportticketclose: 'support.ticket.close',
+  contenthelp_topicview: 'content.help_topic.view',
+  contenthelp_topicmanage: 'content.help_topic.manage',
+  contenthelp_articleview: 'content.help_article.view',
+  contenthelp_articlemanage: 'content.help_article.manage',
+  platformsettingview: 'platform.setting.view',
+  platformsettingupdate: 'platform.setting.update',
+  platformsms_outboxview: 'platform.sms_outbox.view',
+  systemroleview: 'system.role.view',
+  systemadmin_accountview: 'system.admin_account.view',
+  systemadmin_accountmanage: 'system.admin_account.manage',
+} as const;
+
 export interface MeResponse {
   id?: string;
   email?: string;
@@ -78,6 +105,8 @@ export interface MeResponse {
   status?: string;
   hasPassword?: boolean;
   passwordSetupRequired?: boolean;
+  permissions: MeResponsePermissionsItem[];
+  adminDisabled: boolean;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -443,7 +472,7 @@ export interface CreateUserRequest {
   name: string;
   /**
    * @minLength 1
-   * @pattern ADMIN|MEMBER|CREATOR
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
    */
   role: string;
 }
@@ -820,6 +849,17 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface AdminAccountResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  adminDisabled: boolean;
+  adminDisabledAt?: string;
+  createdAt: string;
+}
+
 /**
  * @pattern draft|published
  */
@@ -855,6 +895,14 @@ export interface UpdateStepRequest {
    */
   inputRef?: string;
   config?: string;
+}
+
+export interface ChangeRoleRequest {
+  /**
+   * @minLength 1
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   */
+  role: string;
 }
 
 export interface SupportSettings {
@@ -1085,6 +1133,40 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+export type RoleResponsePermissionsItem =
+  (typeof RoleResponsePermissionsItem)[keyof typeof RoleResponsePermissionsItem];
+
+export const RoleResponsePermissionsItem = {
+  useraccountview: 'user.account.view',
+  useraccountcreate: 'user.account.create',
+  useraccountupdate: 'user.account.update',
+  useraccountchange_role: 'user.account.change_role',
+  useraccountsuspend: 'user.account.suspend',
+  useraccountdelete: 'user.account.delete',
+  workflowrunview: 'workflow.run.view',
+  workflowworkflowmanage: 'workflow.workflow.manage',
+  supportticketview: 'support.ticket.view',
+  supportticketreply: 'support.ticket.reply',
+  supportticketclose: 'support.ticket.close',
+  contenthelp_topicview: 'content.help_topic.view',
+  contenthelp_topicmanage: 'content.help_topic.manage',
+  contenthelp_articleview: 'content.help_article.view',
+  contenthelp_articlemanage: 'content.help_article.manage',
+  platformsettingview: 'platform.setting.view',
+  platformsettingupdate: 'platform.setting.update',
+  platformsms_outboxview: 'platform.sms_outbox.view',
+  systemroleview: 'system.role.view',
+  systemadmin_accountview: 'system.admin_account.view',
+  systemadmin_accountmanage: 'system.admin_account.manage',
+} as const;
+
+export interface RoleResponse {
+  code: string;
+  staff: boolean;
+  superAdmin: boolean;
+  permissions: RoleResponsePermissionsItem[];
+}
+
 export interface MediaJobResponse {
   jobId: string;
   runId: string;
@@ -1106,6 +1188,13 @@ export interface MediaJobResponse {
 
 export interface PageViewMediaJobResponse {
   items: MediaJobResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface PageViewAdminAccountResponse {
+  items: AdminAccountResponse[];
   page: number;
   size: number;
   total: number;
@@ -1228,6 +1317,24 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type ListAdminAccountsParams = {
+  /**
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   */
+  role?: string;
+  q?: string;
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
 
 export type getResponse200 = {
   data: UserResponse;
@@ -3851,6 +3958,54 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
+export type deactivateAdminAccountResponse200 = {
+  data: AdminAccountResponse;
+  status: 200;
+};
+
+export type deactivateAdminAccountResponseSuccess = deactivateAdminAccountResponse200 & {
+  headers: Headers;
+};
+export type deactivateAdminAccountResponse = deactivateAdminAccountResponseSuccess;
+
+export const getDeactivateAdminAccountUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/deactivate`;
+};
+
+export const deactivateAdminAccount = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deactivateAdminAccountResponse> => {
+  return customFetch<deactivateAdminAccountResponse>(getDeactivateAdminAccountUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type activateAdminAccountResponse200 = {
+  data: AdminAccountResponse;
+  status: 200;
+};
+
+export type activateAdminAccountResponseSuccess = activateAdminAccountResponse200 & {
+  headers: Headers;
+};
+export type activateAdminAccountResponse = activateAdminAccountResponseSuccess;
+
+export const getActivateAdminAccountUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/activate`;
+};
+
+export const activateAdminAccount = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<activateAdminAccountResponse> => {
+  return customFetch<activateAdminAccountResponse>(getActivateAdminAccountUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type getWorkflowResponse200 = {
   data: WorkflowResponse;
   status: 200;
@@ -4246,6 +4401,52 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type changeAdminAccountRoleResponse200 = {
+  data: AdminAccountResponse;
+  status: 200;
+};
+
+export type changeAdminAccountRoleResponseSuccess = changeAdminAccountRoleResponse200 & {
+  headers: Headers;
+};
+export type changeAdminAccountRoleResponse = changeAdminAccountRoleResponseSuccess;
+
+export const getChangeAdminAccountRoleUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/role`;
+};
+
+export const changeAdminAccountRole = async (
+  id: string,
+  changeRoleRequest: ChangeRoleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeAdminAccountRoleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<changeAdminAccountRoleResponse>(getChangeAdminAccountRoleUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(changeRoleRequest),
   });
 };
 
@@ -5140,6 +5341,29 @@ export const listAdminRuns = async (
   });
 };
 
+export type listAdminRolesResponse200 = {
+  data: RoleResponse[];
+  status: 200;
+};
+
+export type listAdminRolesResponseSuccess = listAdminRolesResponse200 & {
+  headers: Headers;
+};
+export type listAdminRolesResponse = listAdminRolesResponseSuccess;
+
+export const getListAdminRolesUrl = () => {
+  return `/api/v1/admin/roles`;
+};
+
+export const listAdminRoles = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminRolesResponse> => {
+  return customFetch<listAdminRolesResponse>(getListAdminRolesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminMediaJobsResponse200 = {
   data: PageViewMediaJobResponse;
   status: 200;
@@ -5171,6 +5395,42 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAccountsResponse200 = {
+  data: PageViewAdminAccountResponse;
+  status: 200;
+};
+
+export type listAdminAccountsResponseSuccess = listAdminAccountsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAccountsResponse = listAdminAccountsResponseSuccess;
+
+export const getListAdminAccountsUrl = (params?: ListAdminAccountsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/accounts?${stringifiedParams}`
+    : `/api/v1/admin/accounts`;
+};
+
+export const listAdminAccounts = async (
+  params?: ListAdminAccountsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAccountsResponse> => {
+  return customFetch<listAdminAccountsResponse>(getListAdminAccountsUrl(params), {
     ...options,
     method: 'GET',
   });

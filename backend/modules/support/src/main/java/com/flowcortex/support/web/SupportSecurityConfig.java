@@ -16,8 +16,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
  * Who may call the Help Center routes. Articles, the settings and the guest assistant answer
- * without a token; everything else needs one, and the admin routes the ADMIN role. The admin chain
- * ({@code /api/v1/admin/**}, order 2) matches the admin routes first and applies the same rule.
+ * without a token; everything else needs one. Whether a signed-in caller may use an admin route is
+ * decided per handler by the admin authorization interceptor, which reads the caller's keys on each
+ * request. The admin chain ({@code /api/v1/admin/**}, order 2) matches the admin routes first.
  */
 @Configuration(proxyBeanMethods = false)
 class SupportSecurityConfig {
@@ -38,7 +39,7 @@ class SupportSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/support/kb/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/support/settings").permitAll()
                         .requestMatchers("/api/v1/support/assistant/guest/**").permitAll()
-                        .requestMatchers("/api/v1/admin/support/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin/support/**").authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                         .accessDeniedHandler((request, response, ex) ->

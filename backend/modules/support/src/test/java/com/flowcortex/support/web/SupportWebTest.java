@@ -31,7 +31,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.LocaleResolver;
@@ -97,17 +96,13 @@ class SupportWebTest {
     }
 
     @Test
-    void theCallerIsReadFromTheRowAndOnlyAnAdminRowPassesTheAdminCheck() {
+    void theCallerIsReadFromTheRowAndAMissingRowIsNotFound() {
         UserDirectory directory = mock(UserDirectory.class);
         SupportCaller caller = new SupportCaller(directory);
         UUID memberId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
         when(directory.findById(memberId)).thenReturn(Optional.of(user(memberId, "MEMBER")));
-        when(directory.findById(adminId)).thenReturn(Optional.of(user(adminId, "ADMIN")));
 
         assertThat(caller.require(jwt(memberId)).id()).isEqualTo(memberId);
-        assertThat(caller.requireAdmin(jwt(adminId)).id()).isEqualTo(adminId);
-        assertThatThrownBy(() -> caller.requireAdmin(jwt(memberId))).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> caller.require(jwt(UUID.randomUUID()))).isInstanceOf(NotFoundException.class);
     }
 

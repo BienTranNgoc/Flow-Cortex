@@ -59,6 +59,27 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void staffWithoutTheWorkflowManageKeyAreRefusedOnEveryAdminWorkflowRoute() {
+        UserView admin = newUser("admin-wf-staff");
+        UUID workflowId = insertWorkflow(admin.id(), "draft", false);
+        UUID stepId = insertStep(workflowId);
+
+        for (String role : List.of("OPERATION_MANAGER", "CUSTOMER_SUPPORT")) {
+            UserView staff = userService.createUser(admin.id(), uniqueEmail("staff-wf"), "password123", "Staff",
+                    role);
+            String token = loginAs(staff);
+            for (Route route : routes(workflowId, stepId)) {
+                assertThat(send(route, token).getStatusCode()).as(role + " " + route).isEqualTo(HttpStatus.FORBIDDEN);
+            }
+        }
+
+        assertThat(jdbc.queryForObject("SELECT name FROM workflow WHERE id = ?", String.class, workflowId))
+                .isEqualTo("Fixture");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_step WHERE workflow_id = ?", Integer.class,
+                workflowId)).isEqualTo(1);
+    }
+
+    @Test
     void anAdminEditsPublishesAndDeletesAnotherOwnersWorkflow() {
         UserView admin = newUser("admin-wf-edit");
         UserView owner = newUser("owner-wf-edit");

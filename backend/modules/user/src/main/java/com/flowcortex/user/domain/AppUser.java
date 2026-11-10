@@ -75,6 +75,14 @@ public class AppUser {
     @Column(name = "oauth_provider")
     private String oauthProvider;
 
+    /** When the account's admin console access was deactivated; {@code null} while it is in force. */
+    @Column(name = "admin_disabled_at")
+    private Instant adminDisabledAt;
+
+    /** The account that deactivated the admin access; {@code null} while it is in force. */
+    @Column(name = "admin_disabled_by")
+    private UUID adminDisabledBy;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -215,6 +223,18 @@ public class AppUser {
         return oauthProvider;
     }
 
+    public Instant getAdminDisabledAt() {
+        return adminDisabledAt;
+    }
+
+    public UUID getAdminDisabledBy() {
+        return adminDisabledBy;
+    }
+
+    public boolean isAdminDisabled() {
+        return adminDisabledAt != null;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -300,8 +320,32 @@ public class AppUser {
         touch();
     }
 
+    /** A change to an end-user role clears the admin deactivation, so a later promotion starts active. */
     public void changeRole(Role role) {
         this.role = role;
+        if (!role.isStaff() && !role.isSuperAdmin()) {
+            this.adminDisabledAt = null;
+            this.adminDisabledBy = null;
+        }
+        touch();
+    }
+
+    /** Deactivates the admin access; a second call keeps the first time and the first actor. */
+    public void deactivateAdmin(UUID by, Instant at) {
+        if (this.adminDisabledAt != null) {
+            return;
+        }
+        this.adminDisabledAt = at;
+        this.adminDisabledBy = by;
+        touch();
+    }
+
+    public void activateAdmin() {
+        if (this.adminDisabledAt == null) {
+            return;
+        }
+        this.adminDisabledAt = null;
+        this.adminDisabledBy = null;
         touch();
     }
 

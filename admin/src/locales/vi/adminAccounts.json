@@ -1,0 +1,68 @@
+{
+  "title": "Tài khoản quản trị",
+  "eyebrow": "Quản trị",
+  "description": "Nhân viên và quản trị viên cấp cao. Đổi vai trò của tài khoản hoặc tắt, bật lại quyền quản trị.",
+  "noun_one": "tài khoản quản trị",
+  "noun_other": "tài khoản quản trị",
+  "tableLabel": "Bảng tài khoản quản trị",
+  "refresh": "Làm mới",
+  "retry": "Thử lại",
+  "loading": "Đang tải tài khoản quản trị…",
+  "empty": "Chưa có tài khoản quản trị nào.",
+  "noMatch": "Không có tài khoản quản trị nào khớp bộ lọc.",
+  "stale": "Đang hiển thị kết quả đã tải trước lỗi này.",
+  "filters": {
+    "role": "Vai trò",
+    "allRoles": "Tất cả vai trò",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Tên hoặc email"
+  },
+  "columns": {
+    "name": "Tên",
+    "email": "Email",
+    "role": "Vai trò",
+    "status": "Trạng thái",
+    "created": "Ngày tạo",
+    "actions": "Thao tác"
+  },
+  "status": {
+    "deactivated": "Đã vô hiệu hóa"
+  },
+  "actions": {
+    "changeRole": "Đổi vai trò",
+    "changeRoleFor": "Đổi vai trò của {{name}}",
+    "deactivate": "Vô hiệu hóa",
+    "deactivateFor": "Vô hiệu hóa {{name}}",
+    "activate": "Kích hoạt",
+    "activateFor": "Kích hoạt {{name}}"
+  },
+  "dialog": {
+    "cancel": "Hủy",
+    "working": "Đang lưu…",
+    "role": {
+      "title": "Đổi vai trò của {{name}}",
+      "description": "{{email}} nhận quyền của vai trò bạn chọn ở lần gọi API quản trị tiếp theo.",
+      "label": "Vai trò",
+      "confirm": "Đổi vai trò"
+    },
+    "deactivate": {
+      "title": "Vô hiệu hóa {{name}}?",
+      "description": "{{email}} mất quyền vào trang quản trị nhưng vẫn dùng được ứng dụng thành viên. Bạn có thể kích hoạt lại sau.",
+      "confirm": "Vô hiệu hóa"
+    },
+    "activate": {
+      "title": "Kích hoạt {{name}}?",
+      "description": "{{email}} được vào lại trang quản trị với quyền của vai trò hiện tại.",
+      "confirm": "Kích hoạt"
+    }
+  },
+  "notice": {
+    "roleChanged": "{{name}} hiện là {{role}}.",
+    "deactivated": "{{name}} đã bị vô hiệu hóa.",
+    "activated": "{{name}} đã được kích hoạt lại."
+  },
+  "errors": {
+    "load": "Không tải được tài khoản quản trị.",
+    "generic": "Không lưu được thay đổi. Hãy thử lại."
+  }
+}

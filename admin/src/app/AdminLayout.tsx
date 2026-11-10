@@ -36,7 +36,7 @@ function readCollapsed(): boolean {
  */
 export function AdminLayout() {
   const me = useMeQuery().data;
-  const nav = useLiveNav(me?.role);
+  const nav = useLiveNav(me);
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -258,7 +258,7 @@ export function AdminLayout() {
         </div>
       </header>
       <Sidebar
-        role={me?.role}
+        me={me}
         collapsed={collapsed}
         onToggle={() => setCollapsed((value) => !value)}
         drawerOpen={drawerOpen}

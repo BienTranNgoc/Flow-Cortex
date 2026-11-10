@@ -82,9 +82,9 @@ class DevDataSeeder {
         }
     }
 
-    private static void seedMember(UserService userService, UUID ownerId) {
+    private static void seedMember(UserService userService, UUID adminId) {
         try {
-            UserView member = userService.createUser(ownerId, MEMBER_1_EMAIL, MEMBER_PASSWORD, "Demo Member One",
+            UserView member = userService.createUser(adminId, MEMBER_1_EMAIL, MEMBER_PASSWORD, "Demo Member One",
                     "MEMBER");
             LOG.info("[dev-seed] created MEMBER {} under owner scope {}", MEMBER_1_EMAIL, member.ownerId());
         } catch (ConflictException e) {
