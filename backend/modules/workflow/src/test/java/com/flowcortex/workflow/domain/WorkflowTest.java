@@ -35,4 +35,29 @@ class WorkflowTest {
         assertThat(workflow.getDeletedAt()).isNotNull();
         assertThat(workflow.getUpdatedAt()).isAfter(workflow.getCreatedAt());
     }
+
+    @Test
+    void aNewDraftAndAForkStartWithForkingOff() {
+        assertThat(new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Demo", true).isAllowFork()).isFalse();
+        Workflow draft = Workflow.draft(UUID.randomUUID(), UUID.randomUUID(), "Demo", true);
+        assertThat(draft.isAllowFork()).isFalse();
+        assertThat(draft.getForkCount()).isZero();
+        assertThat(draft.getForkedFromId()).isNull();
+    }
+
+    @Test
+    void forkOfRecordsTheSourceAndIsAnUnsharedDraft() {
+        UUID source = UUID.randomUUID();
+        UUID owner = UUID.randomUUID();
+
+        Workflow fork = Workflow.forkOf(UUID.randomUUID(), owner, "Copy", source);
+
+        assertThat(fork.getForkedFromId()).isEqualTo(source);
+        assertThat(fork.getOwnerId()).isEqualTo(owner);
+        assertThat(fork.getName()).isEqualTo("Copy");
+        assertThat(fork.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
+        assertThat(fork.isShared()).isFalse();
+        assertThat(fork.isAllowFork()).isFalse();
+        assertThat(fork.getForkCount()).isZero();
+    }
 }
