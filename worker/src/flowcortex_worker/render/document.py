@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from ..captions.fonts import ALLOWED_FONTS
+
 PROJECT_PROFILES: tuple[str, ...] = ("draft", "final")
+JOB_MODES: tuple[str, ...] = ("plan", "render")
 PROJECT_INPUT = "project"
 ASSET_PREFIX = "asset:"
 
@@ -92,6 +95,34 @@ _POSITIONS = ("bottom", "middle", "top")
 _OUTLINE_WIDTHS = ("none", "thin", "medium", "thick")
 _BACKDROPS = ("none", "dark_soft", "dark_solid", "light_solid", "custom")
 _LANES = ("captions", "voice", "music", "overlays")
+_CAPTION_PRESETS = (
+    "movie_sub",
+    "tiktok_bold",
+    "sales_punch",
+    "dark_box",
+    "lecture",
+    "gold_karaoke",
+)
+_ASSET_ROLES = (
+    "upload",
+    "run",
+    "take",
+    "dub",
+    "music",
+    "stem",
+    "character_ref",
+    "clay",
+    "render",
+    "voice_sample",
+)
+_OVERLAY_BACKGROUNDS = ("none", "dark", "accent", "custom")
+_TEXT_ANIMATIONS = ("none", "fade", "slide_up", "zoom_in")
+_IMAGE_ANIMATIONS = ("none", "fade")
+_ALIGNS = ("left", "center", "right")
+_ANCHORS = ("top", "middle", "bottom")
+_FIT_POLICIES = ("ripple", "trim_tail", "rewrite")
+_MAX_LINES = 4
+_MAX_SAFE_INT = 2**53 - 1
 
 
 @dataclass(frozen=True)
@@ -171,7 +202,94 @@ class CaptionTrack:
 
 
 @dataclass(frozen=True)
+class AssetInfo:
+    """What the renderer reads of an asset: its kind, role, sheet layout and declared probe."""
+
+    kind: str
+    role: str | None = None
+    animation: Mapping[str, int] | None = None
+    probe: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TextOverlay:
+    """A text overlay kept on an active lane. `style` holds exactly the optional style leaves the
+    document carries, so an absent leaf and an explicit null stay different."""
+
+    id: str
+    index: int
+    row_index: int | None
+    text: Mapping[str, str]
+    x: float
+    y: float
+    size_pct: float
+    color: str
+    bg: str
+    anim: str
+    start_ms: int
+    end_ms: int
+    style: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class ImageOverlay:
+    id: str
+    index: int
+    row_index: int | None
+    asset_id: str
+    x: float
+    y: float
+    width_pct: float
+    opacity: float
+    anim: str
+    start_ms: int
+    end_ms: int
+
+
+@dataclass(frozen=True)
+class VoiceTrack:
+    id: str
+    caption_track_id: str | None
+    rows: tuple[Row, ...]
+
+
+@dataclass(frozen=True)
+class VoiceClip:
+    id: str
+    index: int
+    asset_id: str
+    cue_id: str | None
+    src_in_ms: int
+    src_out_ms: int
+    at_ms: int
+    dur_ms: int
+    gain_db: float
+    fade_in_ms: int
+    fade_out_ms: int
+    fit_policy: str
+    rate: float
+
+
+@dataclass(frozen=True)
+class MusicClip:
+    id: str
+    index: int
+    asset_id: str
+    src_in_ms: int
+    src_out_ms: int
+    at_ms: int
+    dur_ms: int
+    gain_db: float
+    fade_in_ms: int
+    fade_out_ms: int
+    loop: bool
+
+
+@dataclass(frozen=True)
 class Document:
+    """The checked project. `overlays`, `voice_clips` and `music_clips` hold only what the lane
+    switches and the hidden / muted rows leave in the render, in document order."""
+
     canvas: Canvas
     scenes: tuple[Scene, ...]
     caption_lane: bool
@@ -179,11 +297,24 @@ class Document:
     caption_style: Mapping[str, Any]
     caption_styles: Mapping[str, Mapping[str, Any]]
     caption_tracks: Mapping[str, CaptionTrack] = field(default_factory=dict)
+    lanes: Mapping[str, bool] = field(default_factory=dict)
+    voice_track_id: str | None = None
+    overlay_lang: str | None = None
+    overlays: tuple[TextOverlay | ImageOverlay, ...] = ()
+    overlay_rows_text: tuple[Row, ...] = ()
+    overlay_rows_image: tuple[Row, ...] = ()
+    voice_tracks: Mapping[str, VoiceTrack] = field(default_factory=dict)
+    voice_clips: tuple[VoiceClip, ...] = ()
+    music_clips: tuple[MusicClip, ...] = ()
+    music_rows: tuple[Row, ...] = ()
+    duck_enabled: bool = False
+    assets: Mapping[str, AssetInfo] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class JobSpec:
     profile: str
+    mode: str
     asset_ids: tuple[str, ...]
 
 
@@ -219,15 +350,28 @@ def _bool(value: Any, path: str) -> bool:
     return value
 
 
-def _int(value: Any, path: str, *, minimum: int = 0) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
-        raise ValueError(f"{path}: must be an integer >= {minimum}, got {value!r}")
+def _int(value: Any, path: str, *, minimum: int = 0, maximum: int = _MAX_SAFE_INT) -> int:
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or not minimum <= value <= maximum
+    ):
+        bound = f">= {minimum}" if maximum == _MAX_SAFE_INT else f"within {minimum} to {maximum}"
+        raise ValueError(f"{path}: must be an integer {bound}, got {value!r}")
     return value
 
 
 def _number(value: Any, path: str, low: float, high: float) -> float:
     if not _is_number(value) or not low <= value <= high:
         raise ValueError(f"{path}: must be a number within {low:g} to {high:g}, got {value!r}")
+    return float(value)
+
+
+def _number_above(value: Any, path: str, low: float, high: float = math.inf) -> float:
+    """A number strictly above `low` and at most `high`."""
+    if not _is_number(value) or not low < value <= high:
+        bound = f"above {low:g}" if high == math.inf else f"above {low:g} up to {high:g}"
+        raise ValueError(f"{path}: must be a number {bound}, got {value!r}")
     return float(value)
 
 
@@ -298,10 +442,15 @@ def _check_style(raw: Any, path: str) -> Mapping[str, Any]:
         "position": _POSITIONS,
         "outlineWidth": _OUTLINE_WIDTHS,
         "backdrop": _BACKDROPS,
+        "fontFamily": ALLOWED_FONTS,
+        "preset": _CAPTION_PRESETS,
     }
     for key, allowed in enums.items():
         if key in style:
             _choice(style[key], f"{path}.{key}", allowed)
+    if style.get("shadow") is not None:
+        shadow = _mapping(style["shadow"], f"{path}.shadow")
+        _hex(shadow.get("color"), f"{path}.shadow.color")
     for key in ("x", "y"):
         if key in style:
             _number(style[key], f"{path}.{key}", 0, 1)
@@ -474,63 +623,410 @@ def _check_scene(raw: Any, index: int, assets: Mapping[str, str]) -> Scene:
     )
 
 
-def _item_rows(items: list[Any], path: str) -> list[object]:
-    return [_mapping(item, f"{path}[{i}]").get("row") for i, item in enumerate(items)]
+Check = Callable[[Any, str], Any]
 
 
-def _reject_unsupported_lanes(
-    timeline: Mapping[str, Any], lanes: Mapping[str, bool], voice_track_id: str | None
-) -> None:
-    """Refuse a lane that is on and still has content once muted and hidden rows are dropped."""
-    content: dict[str, bool] = {}
+def _present(box: Mapping[str, Any], path: str, spec: Mapping[str, Check]) -> dict[str, Any]:
+    """Check every leaf of `spec` that `box` carries; an absent leaf is not an error here."""
+    return {key: check(box[key], f"{path}.{key}") for key, check in spec.items() if key in box}
 
-    voice_clips: list[Any] = []
-    voice_rows: tuple[Row, ...] = ()
-    if voice_track_id is not None:
-        voice = _mapping(timeline.get("voice", {}), "timeline.voice")
-        tracks = _mapping(voice.get("tracks", {}), "timeline.voice.tracks")
-        if voice_track_id not in tracks:
-            raise ValueError(
-                f"output.voiceTrackId: {voice_track_id!r} is not in timeline.voice.tracks"
+
+def _need(found: Mapping[str, Any], path: str, keys: Sequence[str]) -> None:
+    for key in keys:
+        if key not in found:
+            raise ValueError(f"{path}.{key}: required")
+
+
+def _nullable(check: Check) -> Check:
+    return lambda value, path: None if value is None else check(value, path)
+
+
+def _ms(value: Any, path: str) -> int:
+    return _int(value, path)
+
+
+def _unit(value: Any, path: str) -> float:
+    return _number(value, path, 0, 1)
+
+
+def _gain(value: Any, path: str) -> float:
+    return _number(value, path, -60, 12)
+
+
+def _name(value: Any, path: str) -> str:
+    return _string(value, path, minimum=1)
+
+
+def _font(value: Any, path: str) -> str:
+    return _choice(value, path, ALLOWED_FONTS)
+
+
+def _object(spec: Mapping[str, Check], required: Sequence[str]) -> Check:
+    def check(value: Any, path: str) -> dict[str, Any]:
+        found = _present(_mapping(value, path), path, spec)
+        _need(found, path, required)
+        return found
+
+    return check
+
+
+_OUTLINE = _object(
+    {"color": _hex, "widthPct": lambda v, p: _number(v, p, 0, 25)}, ("color", "widthPct")
+)
+_SHADOW = _object(
+    {
+        "color": _hex,
+        "distancePct": lambda v, p: _number(v, p, 0, 30),
+        "angle": lambda v, p: _number(v, p, -180, 180),
+        "blurPct": lambda v, p: _number(v, p, 0, 30),
+        "opacity": _unit,
+    },
+    ("color",),
+)
+_GLOW = _object(
+    {
+        "color": _hex,
+        "blurPct": lambda v, p: _number(v, p, 1, 40),
+        "spreadPct": lambda v, p: _number(v, p, 0, 15),
+        "strength": lambda v, p: _int(v, p, minimum=1, maximum=3),
+    },
+    ("color", "blurPct", "spreadPct", "strength"),
+)
+_ACCENT = _object({"color": _hex, "outlineColor": _hex}, ("color",))
+_LINE = _object(
+    {"font": _font, "sizeScale": lambda v, p: _number(v, p, 0.4, 2.5), "color": _hex},
+    ("sizeScale",),
+)
+
+
+def _lines(value: Any, path: str) -> list[dict[str, Any]]:
+    items = _list(value, path)
+    if len(items) > _MAX_LINES:
+        raise ValueError(f"{path}: at most {_MAX_LINES} lines, got {len(items)}")
+    return [_LINE(item, f"{path}[{i}]") for i, item in enumerate(items)]
+
+
+def _text_map(value: Any, path: str) -> dict[str, str]:
+    texts = _mapping(value, path)
+    for lang, text in texts.items():
+        if not isinstance(lang, str) or _LANG_RE.match(lang) is None:
+            raise ValueError(f"{path}.{lang}: must be a BCP-47 language tag such as vi or en-US")
+        _string(text, f"{path}.{lang}")
+    return dict(texts)
+
+
+_OVERLAY_COMMON: dict[str, Check] = {
+    "id": _name,
+    "x": _unit,
+    "y": _unit,
+    "startMs": _ms,
+    "endMs": _ms,
+    "row": _name,
+    "opacity": _unit,
+}
+_TEXT_STYLE_LEAVES: dict[str, Check] = {
+    "font": _font,
+    "bold": _bool,
+    "italic": _bool,
+    "underline": _bool,
+    "align": lambda v, p: _choice(v, p, _ALIGNS),
+    "anchor": lambda v, p: _choice(v, p, _ANCHORS),
+    "outline": _nullable(_OUTLINE),
+    "bgColor": _hex,
+    "shadow": _nullable(_SHADOW),
+    "glow": _nullable(_GLOW),
+    "accent": _nullable(_ACCENT),
+    "lines": _lines,
+    "opacity": _unit,
+    "rotate": lambda v, p: _number(v, p, -180, 180),
+    "letterSpacingPct": lambda v, p: _number(v, p, -20, 100),
+}
+_TEXT_OVERLAY: dict[str, Check] = {
+    **_OVERLAY_COMMON,
+    **_TEXT_STYLE_LEAVES,
+    "text": _text_map,
+    "sizePct": lambda v, p: _number_above(v, p, 0, 50),
+    "color": _hex,
+    "bg": lambda v, p: _choice(v, p, _OVERLAY_BACKGROUNDS),
+    "anim": lambda v, p: _choice(v, p, _TEXT_ANIMATIONS),
+}
+_TEXT_REQUIRED = ("id", "text", "x", "y", "sizePct", "color", "bg", "anim", "startMs", "endMs")
+_IMAGE_OVERLAY: dict[str, Check] = {
+    **_OVERLAY_COMMON,
+    "assetId": _name,
+    "widthPct": lambda v, p: _number(v, p, 2, 100),
+    "anim": lambda v, p: _choice(v, p, _IMAGE_ANIMATIONS),
+}
+_IMAGE_REQUIRED = (
+    "id",
+    "assetId",
+    "x",
+    "y",
+    "widthPct",
+    "opacity",
+    "anim",
+    "startMs",
+    "endMs",
+)
+_VOICE_CLIP: dict[str, Check] = {
+    "id": _name,
+    "cueId": _nullable(lambda v, p: _string(v, p)),
+    "assetId": _name,
+    "srcInMs": _ms,
+    "srcOutMs": _ms,
+    "atMs": _ms,
+    "durMs": lambda v, p: _int(v, p, minimum=1),
+    "gainDb": _gain,
+    "fadeInMs": _ms,
+    "fadeOutMs": _ms,
+    "fitPolicy": lambda v, p: _choice(v, p, _FIT_POLICIES),
+    "row": _name,
+    "rate": lambda v, p: _number(v, p, 0.5, 2),
+}
+_VOICE_REQUIRED = (
+    "id",
+    "assetId",
+    "srcInMs",
+    "srcOutMs",
+    "atMs",
+    "durMs",
+    "gainDb",
+    "fadeInMs",
+    "fadeOutMs",
+    "fitPolicy",
+    "rate",
+)
+_MUSIC_CLIP: dict[str, Check] = {
+    "id": _name,
+    "assetId": _name,
+    "srcInMs": _ms,
+    "srcOutMs": _ms,
+    "atMs": _ms,
+    "durMs": lambda v, p: _int(v, p, minimum=1),
+    "gainDb": _gain,
+    "fadeInMs": _ms,
+    "fadeOutMs": _ms,
+    "loop": _bool,
+    "row": _name,
+}
+_MUSIC_REQUIRED = (
+    "id",
+    "assetId",
+    "srcInMs",
+    "srcOutMs",
+    "atMs",
+    "durMs",
+    "gainDb",
+    "fadeInMs",
+    "fadeOutMs",
+    "loop",
+)
+_PROBE: dict[str, Check] = {
+    "durationMs": _ms,
+    "width": lambda v, p: _int(v, p, minimum=1),
+    "height": lambda v, p: _int(v, p, minimum=1),
+    "fps": lambda v, p: _number_above(v, p, 0),
+    "hasAudio": _bool,
+    "rotation": lambda v, p: _int(v, p, minimum=-_MAX_SAFE_INT),
+    "pixFmt": lambda v, p: _string(v, p),
+    "colorTransfer": lambda v, p: _string(v, p),
+    "sha256": lambda v, p: _sha256(v, p),
+    "bytes": _ms,
+}
+_ANIMATION: dict[str, Check] = {
+    "frameCount": lambda v, p: _int(v, p, minimum=1, maximum=600),
+    "cols": lambda v, p: _int(v, p, minimum=1, maximum=32),
+    "frameW": lambda v, p: _int(v, p, minimum=1, maximum=2048),
+    "frameH": lambda v, p: _int(v, p, minimum=1, maximum=2048),
+    "frameMs": lambda v, p: _int(v, p, minimum=1, maximum=10000),
+}
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _sha256(value: Any, path: str) -> str:
+    if not isinstance(value, str) or _SHA256_RE.match(value) is None:
+        raise ValueError(f"{path}: must be 64 lowercase hex characters, got {value!r}")
+    return value
+
+
+def _check_asset(asset_id: str, raw: Any) -> AssetInfo:
+    path = f"assets.{asset_id}"
+    asset = _mapping(raw, path)
+    kind = _choice(asset.get("kind"), f"{path}.kind", ASSET_KINDS)
+    role = asset.get("role")
+    if "role" in asset:
+        role = _choice(role, f"{path}.role", _ASSET_ROLES)
+    animation = None
+    if "animation" in asset:
+        animation = _object(_ANIMATION, tuple(_ANIMATION))(asset["animation"], f"{path}.animation")
+    probe: dict[str, Any] = {}
+    if "probe" in asset:
+        probe = _present(_mapping(asset["probe"], f"{path}.probe"), f"{path}.probe", _PROBE)
+    return AssetInfo(kind=kind, role=role, animation=animation, probe=probe)
+
+
+def _referenced_asset(assets: Mapping[str, AssetInfo], asset_id: str, path: str) -> None:
+    if asset_id not in assets:
+        raise ValueError(f"{path}.assetId: asset {asset_id!r} is not in assets")
+
+
+def _check_overlays(
+    timeline: Mapping[str, Any], lane_on: bool, assets: Mapping[str, AssetInfo]
+) -> tuple[tuple[TextOverlay | ImageOverlay, ...], tuple[Row, ...], tuple[Row, ...]]:
+    rows = _mapping(timeline.get("overlayRows", {}), "timeline.overlayRows")
+    text_rows = _rows(rows.get("text"), "timeline.overlayRows.text")
+    image_rows = _rows(rows.get("image"), "timeline.overlayRows.image")
+    raw = _list(timeline.get("overlays", []), "timeline.overlays")
+
+    found: list[tuple[bool, dict[str, Any]]] = []
+    for i, item in enumerate(raw):
+        path = f"timeline.overlays[{i}]"
+        box = _mapping(item, path)
+        if "kind" in box and box["kind"] != "image":
+            raise ValueError(f"{path}.kind: must be image when present, got {box['kind']!r}")
+        is_image = "kind" in box
+        found.append((is_image, _present(box, path, _IMAGE_OVERLAY if is_image else _TEXT_OVERLAY)))
+
+    kept: list[TextOverlay | ImageOverlay] = []
+    if not lane_on:
+        return (), text_rows, image_rows
+    for i, (is_image, leaves) in enumerate(found):
+        path = f"timeline.overlays[{i}]"
+        visible = kept_by_row([leaves.get("row")], image_rows if is_image else text_rows, "hidden")
+        if not visible:
+            continue
+        row_idx = visible[0][1]
+        if is_image:
+            _need(leaves, path, _IMAGE_REQUIRED)
+            _referenced_asset(assets, leaves["assetId"], path)
+            kept.append(
+                ImageOverlay(
+                    id=leaves["id"],
+                    index=i,
+                    row_index=row_idx,
+                    asset_id=leaves["assetId"],
+                    x=leaves["x"],
+                    y=leaves["y"],
+                    width_pct=leaves["widthPct"],
+                    opacity=leaves["opacity"],
+                    anim=leaves["anim"],
+                    start_ms=leaves["startMs"],
+                    end_ms=leaves["endMs"],
+                )
             )
-        path = f"timeline.voice.tracks.{voice_track_id}"
-        track = _mapping(tracks[voice_track_id], path)
-        voice_clips = _list(track.get("clips", []), f"{path}.clips")
-        voice_rows = _rows(track.get("rows"), f"{path}.rows")
-    content["voice"] = bool(
-        kept_by_row(_item_rows(voice_clips, "timeline.voice.clips"), voice_rows, "muted")
-    )
+            continue
+        _need(leaves, path, _TEXT_REQUIRED)
+        kept.append(
+            TextOverlay(
+                id=leaves["id"],
+                index=i,
+                row_index=row_idx,
+                text=leaves["text"],
+                x=leaves["x"],
+                y=leaves["y"],
+                size_pct=leaves["sizePct"],
+                color=leaves["color"],
+                bg=leaves["bg"],
+                anim=leaves["anim"],
+                start_ms=leaves["startMs"],
+                end_ms=leaves["endMs"],
+                style={k: leaves[k] for k in _TEXT_STYLE_LEAVES if k in leaves},
+            )
+        )
+    return tuple(kept), text_rows, image_rows
 
+
+def _check_voice(
+    timeline: Mapping[str, Any],
+    lane_on: bool,
+    chosen: str | None,
+    assets: Mapping[str, AssetInfo],
+) -> tuple[dict[str, VoiceTrack], tuple[VoiceClip, ...]]:
+    voice = _mapping(timeline.get("voice", {}), "timeline.voice")
+    raw_tracks = _mapping(voice.get("tracks", {}), "timeline.voice.tracks")
+    if chosen is not None and chosen not in raw_tracks:
+        raise ValueError(f"output.voiceTrackId: {chosen!r} is not in timeline.voice.tracks")
+
+    tracks: dict[str, VoiceTrack] = {}
+    clips: tuple[VoiceClip, ...] = ()
+    for track_id, raw in raw_tracks.items():
+        path = f"timeline.voice.tracks.{track_id}"
+        box = _mapping(raw, path)
+        link = _present(box, path, {"captionTrackId": _nullable(_name)})
+        rows = _rows(box.get("rows"), f"{path}.rows")
+        tracks[track_id] = VoiceTrack(track_id, link.get("captionTrackId"), rows)
+        found = [
+            _present(_mapping(clip, f"{path}.clips[{i}]"), f"{path}.clips[{i}]", _VOICE_CLIP)
+            for i, clip in enumerate(_list(box.get("clips", []), f"{path}.clips"))
+        ]
+        if not lane_on or track_id != chosen:
+            continue
+        built: list[VoiceClip] = []
+        for index, _ in kept_by_row([leaves.get("row") for leaves in found], rows, "muted"):
+            leaves = found[index]
+            here = f"{path}.clips[{index}]"
+            _need(leaves, here, _VOICE_REQUIRED)
+            _referenced_asset(assets, leaves["assetId"], here)
+            built.append(
+                VoiceClip(
+                    id=leaves["id"],
+                    index=index,
+                    asset_id=leaves["assetId"],
+                    cue_id=leaves.get("cueId"),
+                    src_in_ms=leaves["srcInMs"],
+                    src_out_ms=leaves["srcOutMs"],
+                    at_ms=leaves["atMs"],
+                    dur_ms=leaves["durMs"],
+                    gain_db=leaves["gainDb"],
+                    fade_in_ms=leaves["fadeInMs"],
+                    fade_out_ms=leaves["fadeOutMs"],
+                    fit_policy=leaves["fitPolicy"],
+                    rate=leaves["rate"],
+                )
+            )
+        clips = tuple(built)
+    return tracks, clips
+
+
+def _check_music(
+    timeline: Mapping[str, Any], lane_on: bool, assets: Mapping[str, AssetInfo]
+) -> tuple[tuple[MusicClip, ...], tuple[Row, ...], bool]:
     music = _mapping(timeline.get("music", {}), "timeline.music")
-    music_clips = _list(music.get("clips", []), "timeline.music.clips")
-    content["music"] = bool(
-        kept_by_row(
-            _item_rows(music_clips, "timeline.music.clips"),
-            _rows(music.get("rows"), "timeline.music.rows"),
-            "muted",
-        )
+    rows = _rows(music.get("rows"), "timeline.music.rows")
+    duck = _present(
+        _mapping(music.get("duck", {}), "timeline.music.duck"),
+        "timeline.music.duck",
+        {"enabled": _bool},
     )
-
-    overlays = _list(timeline.get("overlays", []), "timeline.overlays")
-    overlay_rows = _mapping(timeline.get("overlayRows", {}), "timeline.overlayRows")
-    text_rows = _rows(overlay_rows.get("text"), "timeline.overlayRows.text")
-    image_rows = _rows(overlay_rows.get("image"), "timeline.overlayRows.image")
-    row_names = _item_rows(overlays, "timeline.overlays")
-    content["overlays"] = any(
-        kept_by_row(
-            [row_names[i]],
-            image_rows if overlay.get("kind") == "image" else text_rows,
-            "hidden",
+    found = [
+        _present(
+            _mapping(clip, f"timeline.music.clips[{i}]"), f"timeline.music.clips[{i}]", _MUSIC_CLIP
         )
-        for i, overlay in enumerate(overlays)
-    )
-
-    for lane, has_content in content.items():
-        if lanes[lane] and has_content:
-            raise ValueError(
-                f"output.lanes.{lane}: the {lane} lane is on and has content, "
-                "which this renderer does not support; switch the lane off or empty it"
+        for i, clip in enumerate(_list(music.get("clips", []), "timeline.music.clips"))
+    ]
+    built: list[MusicClip] = []
+    if lane_on:
+        for index, _ in kept_by_row([leaves.get("row") for leaves in found], rows, "muted"):
+            leaves = found[index]
+            here = f"timeline.music.clips[{index}]"
+            _need(leaves, here, _MUSIC_REQUIRED)
+            _referenced_asset(assets, leaves["assetId"], here)
+            built.append(
+                MusicClip(
+                    id=leaves["id"],
+                    index=index,
+                    asset_id=leaves["assetId"],
+                    src_in_ms=leaves["srcInMs"],
+                    src_out_ms=leaves["srcOutMs"],
+                    at_ms=leaves["atMs"],
+                    dur_ms=leaves["durMs"],
+                    gain_db=leaves["gainDb"],
+                    fade_in_ms=leaves["fadeInMs"],
+                    fade_out_ms=leaves["fadeOutMs"],
+                    loop=leaves["loop"],
+                )
             )
+    return tuple(built), rows, bool(duck.get("enabled", False))
 
 
 def parse_document(doc: Any) -> Document:
@@ -539,48 +1035,66 @@ def parse_document(doc: Any) -> Document:
     canvas = _check_canvas(root.get("canvas"))
 
     raw_assets = _mapping(root.get("assets", {}), "assets")
-    assets = {
-        asset_id: _choice(
-            _mapping(asset, f"assets.{asset_id}").get("kind"),
-            f"assets.{asset_id}.kind",
-            ASSET_KINDS,
-        )
-        for asset_id, asset in raw_assets.items()
-    }
+    assets = {asset_id: _check_asset(asset_id, asset) for asset_id, asset in raw_assets.items()}
+    kinds = {asset_id: info.kind for asset_id, info in assets.items()}
 
     timeline = _mapping(root.get("timeline"), "timeline")
     raw_scenes = _list(timeline.get("scenes"), "timeline.scenes")
     if not raw_scenes:
         raise ValueError("timeline.scenes: at least one scene is required")
-    scenes = tuple(_check_scene(raw, i, assets) for i, raw in enumerate(raw_scenes))
+    scenes = tuple(_check_scene(raw, i, kinds) for i, raw in enumerate(raw_scenes))
 
     output = _mapping(root.get("output"), "output")
     raw_lanes = _mapping(output.get("lanes"), "output.lanes")
     lanes = {lane: _bool(raw_lanes.get(lane), f"output.lanes.{lane}") for lane in _LANES}
     caption_track_id = _optional_string(output.get("captionTrackId"), "output.captionTrackId")
     voice_track_id = _optional_string(output.get("voiceTrackId"), "output.voiceTrackId")
+    overlay_lang = output.get("overlayLang")
+    if "overlayLang" in output and (
+        not isinstance(overlay_lang, str) or _LANG_RE.match(overlay_lang) is None
+    ):
+        raise ValueError(
+            f"output.overlayLang: must be a BCP-47 language tag such as vi or en-US, "
+            f"got {overlay_lang!r}"
+        )
 
     captions = _mapping(timeline.get("captions", {}), "timeline.captions")
     style = captions.get("style")
     styles = _mapping(captions.get("styles", {}), "timeline.captions.styles")
     tracks = _mapping(captions.get("tracks", {}), "timeline.captions.tracks")
 
-    parsed = Document(
+    caption_style = {} if style is None else _check_style(style, "timeline.captions.style")
+    caption_styles = {
+        style_id: _check_style(spec, f"timeline.captions.styles.{style_id}")
+        for style_id, spec in styles.items()
+    }
+    caption_tracks = {track_id: _check_track(track_id, spec) for track_id, spec in tracks.items()}
+
+    overlays, rows_text, rows_image = _check_overlays(timeline, lanes["overlays"], assets)
+    voice_tracks, voice_clips = _check_voice(timeline, lanes["voice"], voice_track_id, assets)
+    music_clips, music_rows, duck_enabled = _check_music(timeline, lanes["music"], assets)
+
+    return Document(
         canvas=canvas,
         scenes=scenes,
         caption_lane=lanes["captions"],
         caption_track_id=caption_track_id,
-        caption_style={} if style is None else _check_style(style, "timeline.captions.style"),
-        caption_styles={
-            style_id: _check_style(spec, f"timeline.captions.styles.{style_id}")
-            for style_id, spec in styles.items()
-        },
-        caption_tracks={
-            track_id: _check_track(track_id, spec) for track_id, spec in tracks.items()
-        },
+        caption_style=caption_style,
+        caption_styles=caption_styles,
+        caption_tracks=caption_tracks,
+        lanes=lanes,
+        voice_track_id=voice_track_id,
+        overlay_lang=overlay_lang if isinstance(overlay_lang, str) else None,
+        overlays=overlays,
+        overlay_rows_text=rows_text,
+        overlay_rows_image=rows_image,
+        voice_tracks=voice_tracks,
+        voice_clips=voice_clips,
+        music_clips=music_clips,
+        music_rows=music_rows,
+        duck_enabled=duck_enabled,
+        assets=assets,
     )
-    _reject_unsupported_lanes(timeline, lanes, voice_track_id)
-    return parsed
 
 
 def parse_job(params: Mapping[str, Any], input_keys: Sequence[str], document: Document) -> JobSpec:
@@ -597,9 +1111,7 @@ def parse_job(params: Mapping[str, Any], input_keys: Sequence[str], document: Do
         if key not in params:
             raise ValueError(f"params.{key}: required")
     profile = _choice(params["profile"], "params.profile", PROJECT_PROFILES)
-    if params["mode"] == "plan":
-        raise ValueError("params.mode: plan mode is not supported by this renderer")
-    _choice(params["mode"], "params.mode", ("render",))
+    mode = _choice(params["mode"], "params.mode", JOB_MODES)
 
     seen: set[str] = set()
     for key in input_keys:
@@ -607,14 +1119,33 @@ def parse_job(params: Mapping[str, Any], input_keys: Sequence[str], document: Do
             raise ValueError(f"inputs: duplicate input {key!r}")
         seen.add(key)
 
-    asset_ids = tuple(
-        dict.fromkeys(scene.clip_id for scene in document.scenes if scene.clip_id is not None)
-    )
+    if mode == "plan":
+        asset_ids: tuple[str, ...] = ()
+    else:
+        asset_ids = render_asset_ids(document)
     expected = (PROJECT_INPUT, *(f"{ASSET_PREFIX}{asset_id}" for asset_id in asset_ids))
     for key in expected:
         if key not in seen:
             raise ValueError(f"inputs: missing input {key!r}")
     for key in input_keys:
         if key not in expected:
-            raise ValueError(f"inputs: extra input {key!r} is not read by any rendered scene")
-    return JobSpec(profile=profile, asset_ids=asset_ids)
+            reason = (
+                "a plan job reads only the project"
+                if mode == "plan"
+                else "it is not read by any scene, overlay, voice or music clip of this render"
+            )
+            raise ValueError(f"inputs: extra input {key!r}: {reason}")
+    return JobSpec(profile=profile, mode=mode, asset_ids=asset_ids)
+
+
+def render_asset_ids(document: Document) -> tuple[str, ...]:
+    """Assets a render reads, deduplicated: scenes, image overlays, voice clips, music clips.
+
+    A clip or overlay the plan later drops (trim, shorter than a frame) still counts: only the
+    lane switch and the row filter decide, so the set needs no plan.
+    """
+    ids = [scene.clip_id for scene in document.scenes if scene.clip_id is not None]
+    ids += [o.asset_id for o in document.overlays if isinstance(o, ImageOverlay)]
+    ids += [c.asset_id for c in document.voice_clips]
+    ids += [c.asset_id for c in document.music_clips]
+    return tuple(dict.fromkeys(ids))

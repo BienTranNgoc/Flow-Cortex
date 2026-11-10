@@ -21,6 +21,13 @@ from ..captions.line_breaks import (
     resolve_font_key,
 )
 from ..captions.style import CaptionStyle, resolve_style
+from .overlays import (
+    ass_escape,
+    inline_colour,
+    sticker_events,
+    sticker_style_lines,
+    text_overlays_in_draw_order,
+)
 from .timeline import KaraokeSpan, PlannedCue, TimelinePlan
 
 # Must equal the tiers the member app previews with, or the burnt text differs from what was seen.
@@ -167,12 +174,6 @@ def timecode(ms: float) -> str:
     minutes, rest = divmod(rest, 6000)
     seconds, centis = divmod(rest, 100)
     return f"{hours}:{minutes:02d}:{seconds:02d}.{centis:02d}"
-
-
-def ass_escape(text: str) -> str:
-    escaped = text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
-    # libass ends a script line at a bare CR, so none may reach the file.
-    return escaped.replace("\r\n", "\\N").replace("\r", "\\N").replace("\n", "\\N")
 
 
 def _is_syllable(token: str) -> bool:
@@ -375,11 +376,6 @@ def caption_lead(
     return f"{{{tags}}}" if tags else ""
 
 
-def _inline_colour(hex_rgb: str) -> str:
-    """`#RRGGBB` as the `&HBBGGRR&` of a `\\1c` tag (which carries no alpha)."""
-    return f"&H{hex_rgb[5:7]}{hex_rgb[3:5]}{hex_rgb[1:3]}&".upper()
-
-
 def _style_line(style: RenderStyle) -> str:
     c = style.caption
     return (
@@ -394,6 +390,8 @@ def ass_document(plan: TimelinePlan, styles: CaptionStyles, start_ms: float, dur
     it dropped. PlayRes is the canvas whatever the output size."""
     width, height = plan.canvas.width, plan.canvas.height
     end_ms = start_ms + dur_ms
+    base_font = styles.base.caption.font
+    text_overlays = text_overlays_in_draw_order(plan.overlays)
     lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
@@ -406,6 +404,11 @@ def ass_document(plan: TimelinePlan, styles: CaptionStyles, start_ms: float, dur
         "Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,"
         "Bold,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,BorderStyle",
         *(_style_line(s) for s in styles.all()),
+        *(
+            line
+            for position, overlay in text_overlays
+            for line in sticker_style_lines(overlay, height, base_font, name=f"Ov{position}")
+        ),
         "",
         "[Events]",
         "Format: Layer,Start,End,Style,Text",
@@ -423,10 +426,24 @@ def ass_document(plan: TimelinePlan, styles: CaptionStyles, start_ms: float, dur
         else:
             # Without word times there is no \k tag, and libass would fill the whole cue with
             # PrimaryColour (the highlight), so the text colour is set back explicitly.
-            text = f"{{\\1c{_inline_colour(style.text_hex)}}}{caption_text(cue.text, style)}"
+            text = f"{{\\1c{inline_colour(style.text_hex)}}}{caption_text(cue.text, style)}"
         lead = caption_lead(style, cue.start_ms >= start_ms, stacked.get(index))
         lines.append(
             f"Dialogue: 0,{timecode(low - start_ms)},{timecode(high - start_ms)},"
             f"{style.name},{lead}{text}"
+        )
+    for position, overlay in text_overlays:
+        low, high = max(overlay.start_ms, start_ms), min(overlay.end_ms, end_ms)
+        if high <= low:
+            continue
+        lines += sticker_events(
+            overlay,
+            width,
+            height,
+            base_font,
+            f"{timecode(low - start_ms)},{timecode(high - start_ms)}",
+            overlay.start_ms >= start_ms,
+            overlay.end_ms <= end_ms,
+            name=f"Ov{position}",
         )
     return "\n".join(lines) + "\n"

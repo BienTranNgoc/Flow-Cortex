@@ -1,8 +1,9 @@
 """Plans a project render from the checked document and the measured assets.
 
 Pure: no process runs here. Scene marks are snapped to the frame grid, transitions get their
-handles, scenes are cut into encode chunks, and the caption cues of the chosen track are picked.
-Anything the plan cannot honour raises `ValueError("<path>: <reason>")`.
+handles, scenes are cut into encode chunks, and the caption cues, overlays, voice clips and
+music clips the lanes leave in are picked. Anything the plan cannot honour raises
+`ValueError("<path>: <reason>")`.
 """
 
 from __future__ import annotations
@@ -13,13 +14,31 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .document import Canvas, CaptionWord, Document, Motion, Scene, kept_by_row
+from .document import (
+    Canvas,
+    CaptionWord,
+    Document,
+    ImageOverlay,
+    Motion,
+    Scene,
+    TextOverlay,
+    VoiceClip,
+    kept_by_row,
+)
 
 MAX_CHAIN_SCENES = 12
 # Peak RSS of one ffmpeg grows about 340 MiB per chained scene (3 scenes 1178 MiB, 6 scenes
 # 2212 MiB); a 60 s 1080x1920 render with 4-scene chunks peaked at 1761 MiB.
 MAX_CHUNK_SCENES = 4
 CAPTION_GRID_MS = 10
+VOICE_TRIM_FADE_MS = 60
+DURATION_TOLERANCE_MS = 50
+MIX_DEFAULTS: Mapping[str, Any] = {
+    "targetLufs": -14.0,
+    "truePeakDb": -1.0,
+    "lra": 11.0,
+    "duck": {"threshold": 0.02, "ratio": 6, "attack": 20, "release": 400},
+}
 PROBE_KEYS = (
     "durationMs",
     "width",
@@ -116,6 +135,85 @@ class PlannedCue:
 
 
 @dataclass(frozen=True)
+class PlannedTextOverlay:
+    """`style` keeps only the style leaves the document carries (absent differs from null)."""
+
+    id: str
+    text: str
+    x: float
+    y: float
+    size_pct: float
+    color: str
+    bg: str
+    anim: str
+    start_ms: float
+    end_ms: float
+    style: Mapping[str, Any]
+    row_index: int | None
+    kind: str = "text"
+
+
+@dataclass(frozen=True)
+class PlannedImageOverlay:
+    """`animation` is the asset's sheet layout, None for a still. An overlay whose snapped end
+    is not after its start stays in the plan and is never drawn."""
+
+    id: str
+    asset_id: str
+    x: float
+    y: float
+    width_pct: float
+    opacity: float
+    anim: str
+    start_ms: float
+    end_ms: float
+    animation: Mapping[str, int] | None
+    row_index: int | None
+    kind: str = "image"
+
+
+@dataclass(frozen=True)
+class TrimPlan:
+    """A voice clip cut at the end of its cue: only `play_ms` of timeline time is heard."""
+
+    cue_id: str
+    to_ms: int
+    play_ms: int
+    fade_ms: int
+
+
+@dataclass(frozen=True)
+class PlannedVoiceClip:
+    id: str
+    asset_id: str
+    src_in_ms: int
+    src_out_ms: int
+    at_ms: int
+    dur_ms: int
+    gain_db: float
+    fade_in_ms: int
+    fade_out_ms: int
+    fit_policy: str
+    rate: float
+    trim: TrimPlan | None
+    stem: bool
+
+
+@dataclass(frozen=True)
+class PlannedMusicClip:
+    id: str
+    asset_id: str
+    src_in_ms: int
+    src_out_ms: int
+    at_ms: int
+    dur_ms: int
+    gain_db: float
+    fade_in_ms: int
+    fade_out_ms: int
+    loop: bool
+
+
+@dataclass(frozen=True)
 class TimelinePlan:
     canvas: Canvas
     profile: str
@@ -131,6 +229,13 @@ class TimelinePlan:
     snapped: tuple[dict[str, Any], ...]
     handles: tuple[dict[str, str], ...]
     warnings: tuple[str, ...]
+    lanes: Mapping[str, bool]
+    voice_track_id: str | None
+    overlay_lang: str | None
+    overlays: tuple[PlannedTextOverlay | PlannedImageOverlay, ...]
+    voice: tuple[PlannedVoiceClip, ...]
+    music: tuple[PlannedMusicClip, ...]
+    duck_enabled: bool
 
 
 def output_size(width: int, height: int, profile: str) -> tuple[int, int]:
@@ -219,18 +324,23 @@ def karaoke_spans(text: str, words: Sequence[CaptionWord]) -> list[str] | None:
 
 
 def _scene_probe(
-    scene: Scene, path: str, probes: Mapping[str, Mapping[str, Any]]
+    scene: Scene, path: str, probes: Mapping[str, Mapping[str, Any]], measured: bool
 ) -> dict[str, Any]:
+    """The probe values a scene is planned with. A plan from declared values (`measured` false)
+    treats an absent asset or value as unknown; a render needs every value it reads."""
     if scene.clip_id is None:
         return {}
-    measured = probes.get(scene.clip_id)
-    if measured is None:
-        raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} was not measured")
-    probe = {key: measured.get(key) for key in PROBE_KEYS}
-    if _is_finite_clip(scene) and not isinstance(probe["durationMs"], int | float):
-        raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} has no measured duration")
-    if scene.asset_kind == "video" and not isinstance(probe["hasAudio"], bool):
-        raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} has no measured audio flag")
+    given = probes.get(scene.clip_id)
+    if given is None:
+        if measured:
+            raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} was not measured")
+        given = {}
+    probe = {key: given.get(key) for key in PROBE_KEYS}
+    if measured:
+        if _is_finite_clip(scene) and not isinstance(probe["durationMs"], int | float):
+            raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} has no measured duration")
+        if scene.asset_kind == "video" and not isinstance(probe["hasAudio"], bool):
+            raise ValueError(f"{path}.clipId: asset {scene.clip_id!r} has no measured audio flag")
     return probe
 
 
@@ -241,6 +351,7 @@ def _plan_scenes(
     fps: int,
     snapped: list[dict[str, Any]],
     warnings: list[str],
+    measured: bool,
 ) -> list[PlannedScene]:
     scenes: list[PlannedScene] = []
     count = len(document.scenes)
@@ -273,10 +384,10 @@ def _plan_scenes(
             length = _snap(raw.dur_ms, frame, f"{path}.transitionOut.durMs", snapped)
             transition = PlannedTransition(raw.kind, max(frame, length), raw.mode)
 
-        probe = _scene_probe(scene, path, probes)
+        probe = _scene_probe(scene, path, probes, measured)
         clamp = None
-        if _is_finite_clip(scene) and scene.src_out_ms > probe["durationMs"]:
-            known = probe["durationMs"]
+        known = probe.get("durationMs")
+        if _is_finite_clip(scene) and known is not None and scene.src_out_ms > known:
             over = scene.src_out_ms - known
             if over > frame:
                 raise ValueError(
@@ -332,8 +443,12 @@ def _plan_scenes(
     return scenes
 
 
-def _plan_handles(scenes: Sequence[PlannedScene]) -> list[dict[str, str]]:
-    """Check the source an `extend` transition borrows on both sides; list every transition."""
+def _plan_handles(scenes: Sequence[PlannedScene], warnings: list[str]) -> list[dict[str, str]]:
+    """Check the source an `extend` transition borrows on both sides; list every transition.
+
+    A tail handle whose clip duration is unknown (a plan from declared values) is reported as
+    not measured and warned about, never guessed.
+    """
     handles: list[dict[str, str]] = []
     for i, scene in enumerate(scenes[:-1]):
         transition = scene.transition_out
@@ -351,11 +466,16 @@ def _plan_handles(scenes: Sequence[PlannedScene]) -> list[dict[str, str]]:
             continue
         half = math.ceil(transition.dur_ms / 2)
         tail_finite = _is_finite_clip(scene)
-        tail = _handle_state(
-            tail_finite,
-            (scene.probe["durationMs"] - scene.src_out_ms) if tail_finite else 0.0,
-            half,
-        )
+        known = scene.probe.get("durationMs")
+        if tail_finite and known is None:
+            tail = "not measured"
+            warnings.append(
+                f"timeline.scenes[{i}]: clip {scene.clip_id} of scene {scene.id} has no declared "
+                "duration; the tail handle of its extend transition is not measured"
+            )
+        else:
+            available = known - scene.src_out_ms if known is not None else 0.0
+            tail = _handle_state(tail_finite, available, half)
         head = _handle_state(_is_finite_clip(following), following.src_in_ms, half)
         state = f"tail of {scene.id}: {tail}, head of {following.id}: {head}"
         if "short" in (tail, head):
@@ -483,13 +603,246 @@ def _plan_cues(
     return cues, style, track.lang
 
 
+def declared_probes(document: Document) -> dict[str, dict[str, Any]]:
+    """The probe values the document declares per asset, the input of a plan job."""
+    return {asset_id: dict(info.probe) for asset_id, info in document.assets.items()}
+
+
+def _plan_overlays(
+    document: Document, frame: float, snapped: list[dict[str, Any]], warnings: list[str]
+) -> list[PlannedTextOverlay | PlannedImageOverlay]:
+    planned: list[PlannedTextOverlay | PlannedImageOverlay] = []
+    for overlay in document.overlays:
+        path = f"timeline.overlays[{overlay.index}]"
+        if isinstance(overlay, ImageOverlay):
+            asset = document.assets[overlay.asset_id]
+            if asset.kind != "image":
+                raise ValueError(
+                    f"{path}.assetId: asset {overlay.asset_id!r} is of kind {asset.kind}; "
+                    "an image overlay needs an image asset"
+                )
+            start = _snap(overlay.start_ms, frame, f"{path}.startMs", snapped)
+            end = _snap(overlay.end_ms, frame, f"{path}.endMs", snapped)
+            if end <= start:
+                warnings.append(
+                    f"{path}: image overlay {overlay.id} is shorter than a frame and is not drawn"
+                )
+            planned.append(
+                PlannedImageOverlay(
+                    id=overlay.id,
+                    asset_id=overlay.asset_id,
+                    x=overlay.x,
+                    y=overlay.y,
+                    width_pct=overlay.width_pct,
+                    opacity=overlay.opacity,
+                    anim=overlay.anim,
+                    start_ms=start,
+                    end_ms=end,
+                    animation=asset.animation,
+                    row_index=overlay.row_index,
+                )
+            )
+            continue
+        text = _overlay_text(overlay, document.overlay_lang)
+        if text is None:
+            language = (
+                f"language {document.overlay_lang} (output.overlayLang)"
+                if document.overlay_lang is not None
+                else "any language: output.overlayLang is not set"
+            )
+            warnings.append(
+                f"{path}: text overlay {overlay.id} has no text for {language}; skipped"
+            )
+            continue
+        planned.append(
+            PlannedTextOverlay(
+                id=overlay.id,
+                text=text,
+                x=overlay.x,
+                y=overlay.y,
+                size_pct=overlay.size_pct,
+                color=overlay.color,
+                bg=overlay.bg,
+                anim=overlay.anim,
+                start_ms=_snap(overlay.start_ms, CAPTION_GRID_MS, f"{path}.startMs", snapped),
+                end_ms=_snap(overlay.end_ms, CAPTION_GRID_MS, f"{path}.endMs", snapped),
+                style=overlay.style,
+                row_index=overlay.row_index,
+            )
+        )
+    return planned
+
+
+def _overlay_text(overlay: TextOverlay, lang: str | None) -> str | None:
+    return None if lang is None else overlay.text.get(lang)
+
+
+def _trim_cues(document: Document) -> tuple[dict[str, int], str]:
+    """End of every cue of the caption track the voice track is linked to, and the reason a cue
+    would be missing. The linked track, not the one printed, is the source of the cue ends."""
+    track_id = document.voice_track_id
+    voice = document.voice_tracks.get(track_id) if track_id is not None else None
+    if voice is None:
+        return {}, ""
+    if voice.caption_track_id is None:
+        return {}, f"voice track {voice.id} is linked to no caption track"
+    track = document.caption_tracks.get(voice.caption_track_id)
+    if track is None:
+        return {}, (
+            f"caption track {voice.caption_track_id} linked by voice track {voice.id} "
+            "is not in the project"
+        )
+    return {cue.id: cue.end_ms for cue in track.cues}, (
+        f"caption track {track.id} has no such cue"
+    )
+
+
+def voice_trim(
+    clip: VoiceClip, cue_end: Mapping[str, int], why_missing: str, path: str, warnings: list[str]
+) -> TrimPlan | None:
+    """The `trim_tail` rule: a clip longer than its cue is cut at the cue end.
+
+    None plays the clip whole (other policy, no cue linked, or already inside its cue); a cue
+    that cannot be found also plays whole, with a warning. `play_ms` 0 means the clip starts
+    after the cue ended and is not played. The closing fade ends exactly at the cut, and every
+    figure is timeline time (`durMs` is already after the speed change).
+    """
+    if clip.fit_policy != "trim_tail" or clip.cue_id is None:
+        return None
+    end = cue_end.get(clip.cue_id)
+    if end is None:
+        warnings.append(
+            f"{path}: voice clip {clip.id} is linked to cue {clip.cue_id} but {why_missing}; "
+            f"played whole for {clip.dur_ms} ms, not trimmed"
+        )
+        return None
+    play = end - clip.at_ms
+    if play >= clip.dur_ms:
+        return None
+    if play <= 0:
+        warnings.append(
+            f"{path}: voice clip {clip.id} starts at {clip.at_ms} ms, after its cue "
+            f"{clip.cue_id} ended ({end} ms); cut entirely, not played"
+        )
+        return TrimPlan(clip.cue_id, end, 0, 0)
+    return TrimPlan(clip.cue_id, end, play, min(play, max(VOICE_TRIM_FADE_MS, clip.fade_out_ms)))
+
+
+def _plan_voice(
+    document: Document,
+    probes: Mapping[str, Mapping[str, Any]],
+    frame: float,
+    warnings: list[str],
+) -> list[PlannedVoiceClip]:
+    cue_end, why_missing = _trim_cues(document)
+    planned: list[PlannedVoiceClip] = []
+    for clip in document.voice_clips:
+        path = f"timeline.voice.tracks.{document.voice_track_id}.clips[{clip.index}]"
+        expected = math.floor((clip.src_out_ms - clip.src_in_ms) / clip.rate + 0.5)
+        if abs(clip.dur_ms - expected) > frame:
+            raise ValueError(
+                f"{path}.durMs: {clip.dur_ms} differs from round((srcOutMs - srcInMs) / rate) = "
+                f"{expected} by more than one frame ({frame:.1f} ms) at rate {clip.rate:g}"
+            )
+        known = probes.get(clip.asset_id, {}).get("durationMs")
+        if isinstance(known, int | float) and known < clip.src_out_ms - 1e-6:
+            effect = (
+                "the tail is cut"
+                if clip.fit_policy == "trim_tail"
+                else f"policy {clip.fit_policy} is handled before the render"
+            )
+            warnings.append(
+                f"{path}: asset {clip.asset_id} is {known} ms long, shorter than srcOutMs "
+                f"{clip.src_out_ms}; {effect}"
+            )
+        trim = voice_trim(clip, cue_end, why_missing, path, warnings)
+        if trim is not None and trim.play_ms <= 0:
+            continue
+        planned.append(
+            PlannedVoiceClip(
+                id=clip.id,
+                asset_id=clip.asset_id,
+                src_in_ms=clip.src_in_ms,
+                src_out_ms=clip.src_out_ms,
+                at_ms=clip.at_ms,
+                dur_ms=clip.dur_ms,
+                gain_db=clip.gain_db,
+                fade_in_ms=clip.fade_in_ms,
+                fade_out_ms=clip.fade_out_ms,
+                fit_policy=clip.fit_policy,
+                rate=clip.rate,
+                trim=trim,
+                stem=document.assets[clip.asset_id].role == "stem",
+            )
+        )
+    return planned
+
+
+def _plan_music(
+    document: Document, probes: Mapping[str, Mapping[str, Any]], warnings: list[str]
+) -> list[PlannedMusicClip]:
+    planned: list[PlannedMusicClip] = []
+    for clip in document.music_clips:
+        known = probes.get(clip.asset_id, {}).get("durationMs")
+        if isinstance(known, int | float) and known < clip.src_out_ms - 1e-6:
+            effect = (
+                "the looped segment shortens to the file"
+                if clip.loop
+                else "the tail of the clip is silent"
+            )
+            warnings.append(
+                f"timeline.music.clips[{clip.index}]: asset {clip.asset_id} is {known} ms long, "
+                f"shorter than srcOutMs {clip.src_out_ms}; {effect}"
+            )
+        planned.append(
+            PlannedMusicClip(
+                id=clip.id,
+                asset_id=clip.asset_id,
+                src_in_ms=clip.src_in_ms,
+                src_out_ms=clip.src_out_ms,
+                at_ms=clip.at_ms,
+                dur_ms=clip.dur_ms,
+                gain_db=clip.gain_db,
+                fade_in_ms=clip.fade_in_ms,
+                fade_out_ms=clip.fade_out_ms,
+                loop=clip.loop,
+            )
+        )
+    return planned
+
+
+def _compare_declared_durations(
+    document: Document, probes: Mapping[str, Mapping[str, Any]], warnings: list[str]
+) -> None:
+    for asset_id, measured in probes.items():
+        info = document.assets.get(asset_id)
+        claimed = info.probe.get("durationMs") if info is not None else None
+        actual = measured.get("durationMs")
+        if (
+            claimed is not None
+            and isinstance(actual, int | float)
+            and abs(claimed - actual) > DURATION_TOLERANCE_MS
+        ):
+            warnings.append(
+                f"assets.{asset_id}.probe.durationMs: declared {claimed} ms but measured "
+                f"{actual} ms"
+            )
+
+
 def plan_timeline(
     document: Document,
     probes: Mapping[str, Mapping[str, Any]],
     profile: str,
     max_chunk_scenes: int = MAX_CHUNK_SCENES,
+    *,
+    measured: bool = True,
 ) -> TimelinePlan:
-    """Plan the whole render. `probes` maps an asset id to its measured values (`PROBE_KEYS`)."""
+    """Plan the whole render. `probes` maps an asset id to its probe values (`PROBE_KEYS`).
+
+    `measured` true is a render: every value a check reads must be there, and a declared
+    duration far from the measured one is warned about. False is a plan from declared values:
+    an absent value skips its check and is reported as not measured.
+    """
     if profile not in PROFILES:
         raise ValueError(f"params.profile: must be one of {', '.join(PROFILES)}, got {profile!r}")
     if max_chunk_scenes < 1:
@@ -499,10 +852,15 @@ def plan_timeline(
     snapped: list[dict[str, Any]] = []
     warnings: list[str] = []
 
-    scenes = _plan_scenes(document, probes, frame, canvas.fps, snapped, warnings)
-    handles = _plan_handles(scenes)
+    scenes = _plan_scenes(document, probes, frame, canvas.fps, snapped, warnings, measured)
+    handles = _plan_handles(scenes, warnings)
     chunks = _plan_chunks(scenes, frame, max_chunk_scenes)
     cues, style, lang = _plan_cues(document, snapped, warnings)
+    overlays = _plan_overlays(document, frame, snapped, warnings)
+    voice = _plan_voice(document, probes, frame, warnings)
+    music = _plan_music(document, probes, warnings)
+    if measured:
+        _compare_declared_durations(document, probes, warnings)
     out_width, out_height = output_size(canvas.width, canvas.height, profile)
     last = scenes[-1]
     return TimelinePlan(
@@ -520,4 +878,11 @@ def plan_timeline(
         snapped=tuple(snapped),
         handles=tuple(handles),
         warnings=tuple(warnings),
+        lanes=document.lanes,
+        voice_track_id=document.voice_track_id,
+        overlay_lang=document.overlay_lang,
+        overlays=tuple(overlays),
+        voice=tuple(voice),
+        music=tuple(music),
+        duck_enabled=document.duck_enabled,
     )

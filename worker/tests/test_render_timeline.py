@@ -6,13 +6,28 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from test_render_document import project, scene
+from test_render_document import (
+    image_overlay,
+    music_clip,
+    project,
+    scene,
+    text_overlay,
+    voice_clip,
+    with_music,
+    with_overlays,
+    with_voice,
+)
 
 from flowcortex_worker.render.document import Document, parse_document
 from flowcortex_worker.render.timeline import (
     MAX_CHAIN_SCENES,
     MAX_CHUNK_SCENES,
+    MIX_DEFAULTS,
+    PlannedImageOverlay,
+    PlannedTextOverlay,
     TimelinePlan,
+    TrimPlan,
+    declared_probes,
     karaoke_spans,
     output_size,
     plan_timeline,
@@ -33,9 +48,10 @@ PROBES: dict[str, dict[str, Any]] = {
 }
 
 
-def doc_of(
-    scenes: list[dict[str, Any]], mutate: Callable[[dict[str, Any]], None] | None = None
-) -> Document:
+Mutate = Callable[[dict[str, Any]], Any]
+
+
+def doc_of(scenes: list[dict[str, Any]], mutate: Mutate | None = None) -> Document:
     raw = project()
     raw["timeline"]["scenes"] = scenes
     if mutate is not None:
@@ -48,16 +64,22 @@ def plan(
     *,
     probes: dict[str, dict[str, Any]] | None = None,
     profile: str = "final",
-    mutate: Callable[[dict[str, Any]], None] | None = None,
+    mutate: Mutate | None = None,
+    measured: bool = True,
 ) -> TimelinePlan:
-    return plan_timeline(doc_of(scenes, mutate), PROBES if probes is None else probes, profile)
+    return plan_timeline(
+        doc_of(scenes, mutate),
+        PROBES if probes is None else probes,
+        profile,
+        measured=measured,
+    )
 
 
 def refused(
     scenes: list[dict[str, Any]],
     *needles: str,
     probes: dict[str, dict[str, Any]] | None = None,
-    mutate: Callable[[dict[str, Any]], None] | None = None,
+    mutate: Mutate | None = None,
 ) -> None:
     with pytest.raises(ValueError) as caught:
         plan(scenes, probes=probes, mutate=mutate)
@@ -433,3 +455,321 @@ def test_karaoke_spans_function_on_leading_punctuation_and_case() -> None:
     words = doc.caption_tracks["ct_main"].cues[0].words
     assert karaoke_spans("(XIN", words) == ["(XIN"]
     assert karaoke_spans("anything", ()) is None
+
+
+def plan_one(mutate: Mutate | None = None, **kwargs: Any) -> TimelinePlan:
+    return plan([scene(0)], mutate=mutate, **kwargs)
+
+
+def first_text(planned: TimelinePlan) -> PlannedTextOverlay:
+    overlay = planned.overlays[0]
+    assert isinstance(overlay, PlannedTextOverlay)
+    return overlay
+
+
+def first_image(planned: TimelinePlan) -> PlannedImageOverlay:
+    overlay = planned.overlays[0]
+    assert isinstance(overlay, PlannedImageOverlay)
+    return overlay
+
+
+def first_trim(planned: TimelinePlan) -> TrimPlan:
+    trim = planned.voice[0].trim
+    assert trim is not None
+    return trim
+
+
+def test_plan_mode_tolerates_a_clip_without_a_declared_duration() -> None:
+    planned = plan(
+        [scene(0, transitionOut=transition("extend")), scene(1, clipId="a2")],
+        probes={"a1": {}},
+        measured=False,
+    )
+    assert "not measured" in planned.handles[0]["reason"]
+    assert any("scene sc0" in w and "not measured" in w for w in planned.warnings)
+
+
+def test_plan_mode_refuses_a_declared_duration_that_is_too_short() -> None:
+    with pytest.raises(ValueError) as caught:
+        plan(
+            [scene(0, srcOutMs=8000, durMs=8000)],
+            probes={"a1": {"durationMs": 5000}},
+            measured=False,
+        )
+    assert "8000" in str(caught.value)
+    assert "5000" in str(caught.value)
+
+
+def test_measured_mode_still_wants_every_probe() -> None:
+    refused([scene(0)], "timeline.scenes[0].clipId", probes={"a1": {}})
+
+
+def test_declared_probes_come_from_the_document() -> None:
+    def declare(raw: dict[str, Any]) -> None:
+        raw["assets"]["a1"]["probe"] = {"durationMs": 7000, "hasAudio": False}
+
+    declared = declared_probes(doc_of([scene(0)], declare))
+    assert declared["a1"] == {"durationMs": 7000, "hasAudio": False}
+    assert declared["a2"] == {}
+
+
+@pytest.mark.parametrize(("claimed", "warned"), [(6000, True), (5030, False), (4950, False)])
+def test_declared_and_measured_duration_are_compared(claimed: int, warned: bool) -> None:
+    def declare(raw: dict[str, Any]) -> None:
+        raw["assets"]["a1"]["probe"] = {"durationMs": claimed}
+
+    probes = {**PROBES, "a1": {**PROBES["a1"], "durationMs": 5000}}
+    planned = plan([scene(0)], probes=probes, mutate=declare)
+    flagged = [w for w in planned.warnings if "assets.a1.probe.durationMs" in w]
+    assert bool(flagged) is warned
+    if warned:
+        assert "6000" in flagged[0]
+        assert "5000" in flagged[0]
+
+
+def test_declared_duration_is_not_compared_in_plan_mode() -> None:
+    def declare(raw: dict[str, Any]) -> None:
+        raw["assets"]["a1"]["probe"] = {"durationMs": 6000}
+
+    planned = plan_one(declare, probes={"a1": {"durationMs": 6000}}, measured=False)
+    assert [w for w in planned.warnings if "assets.a1" in w] == []
+
+
+def test_mix_defaults_are_fixed() -> None:
+    assert MIX_DEFAULTS == {
+        "targetLufs": -14.0,
+        "truePeakDb": -1.0,
+        "lra": 11.0,
+        "duck": {"threshold": 0.02, "ratio": 6, "attack": 20, "release": 400},
+    }
+
+
+def test_plan_carries_the_lanes_and_the_chosen_languages() -> None:
+    planned = plan_one()
+    assert planned.lanes == {"captions": True, "voice": False, "music": False, "overlays": False}
+    assert planned.voice_track_id is None
+    assert planned.overlay_lang == "vi"
+    assert (planned.overlays, planned.voice, planned.music) == ((), (), ())
+
+
+def test_voice_lane_without_a_chosen_track_plays_nothing() -> None:
+    planned = plan_one(lambda raw: with_voice(raw, voice_clip(), chosen=False))
+    assert planned.voice == ()
+
+
+def test_an_unknown_voice_track_is_refused() -> None:
+    refused(
+        [scene(0)],
+        "output.voiceTrackId",
+        mutate=lambda raw: raw["output"].update(voiceTrackId="vt_x"),
+    )
+
+
+def test_lanes_that_are_off_plan_no_content() -> None:
+    def off(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay(), image_overlay(), lane=False)
+        with_voice(raw, voice_clip(), lane=False)
+        with_music(raw, music_clip(), lane=False)
+
+    planned = plan_one(off)
+    assert (planned.overlays, planned.voice, planned.music) == ((), (), ())
+    assert planned.duck_enabled is True
+
+
+def test_muted_rows_drop_voice_and_music_clips() -> None:
+    def rows(raw: dict[str, Any]) -> None:
+        with_voice(
+            raw,
+            voice_clip(row="rw1"),
+            voice_clip(id="vc2", row="rw2"),
+            rows=[{"id": "rw1", "muted": True}, {"id": "rw2"}],
+        )
+        with_music(
+            raw,
+            music_clip(row="rw1"),
+            music_clip(id="mu2", row="rw2"),
+            rows=[{"id": "rw1", "muted": True}, {"id": "rw2"}],
+        )
+
+    planned = plan_one(rows)
+    assert [c.id for c in planned.voice] == ["vc2"]
+    assert [c.id for c in planned.music] == ["mu2"]
+
+
+def test_a_hidden_image_row_keeps_a_text_overlay_with_the_same_row_id() -> None:
+    def hidden(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay(row="rw1"), image_overlay(row="rw1"))
+        raw["timeline"]["overlayRows"] = {
+            "text": [{"id": "rw1"}],
+            "image": [{"id": "rw1", "hidden": True}],
+        }
+
+    assert [o.id for o in plan_one(hidden).overlays] == ["ov1"]
+
+
+def test_text_overlay_is_planned_in_the_overlay_language() -> None:
+    overlay = first_text(plan_one(lambda raw: with_overlays(raw, text_overlay())))
+    assert overlay.text == "Xin chào"
+    assert overlay.row_index is None
+
+    def english(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay())
+        raw["output"]["overlayLang"] = "en"
+
+    assert first_text(plan_one(english)).text == "Hello"
+
+
+def test_text_overlay_without_the_language_is_skipped_with_a_warning() -> None:
+    def french(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay())
+        raw["output"]["overlayLang"] = "fr"
+
+    planned = plan_one(french)
+    assert planned.overlays == ()
+    assert any("ov1" in w and "fr" in w for w in planned.warnings)
+
+
+def test_text_overlay_marks_snap_to_ten_milliseconds_and_rows_are_indexed() -> None:
+    def odd(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay(startMs=1004, endMs=2007, row="rw2"))
+        raw["timeline"]["overlayRows"] = {"text": [{"id": "rw1"}, {"id": "rw2"}], "image": []}
+
+    planned = plan_one(odd)
+    overlay = first_text(planned)
+    assert (overlay.start_ms, overlay.end_ms) == (1000, 2010)
+    assert overlay.row_index == 1
+    paths = {s["path"]: s for s in planned.snapped}
+    assert paths["timeline.overlays[0].startMs"]["toMs"] == 1000
+    assert paths["timeline.overlays[0].endMs"]["fromMs"] == 2007
+
+
+def test_image_overlay_marks_snap_to_the_frame_grid_and_carry_the_sheet() -> None:
+    sheet = {"frameCount": 4, "cols": 2, "frameW": 64, "frameH": 64, "frameMs": 100}
+
+    def animated(raw: dict[str, Any]) -> None:
+        with_overlays(raw, image_overlay(startMs=1020, endMs=2000))
+        raw["assets"]["a2"]["animation"] = sheet
+
+    planned = plan_one(animated)
+    overlay = first_image(planned)
+    assert overlay.start_ms == pytest.approx(1033.333, abs=1e-3)
+    assert overlay.end_ms == pytest.approx(2000, abs=1e-3)
+    assert overlay.animation == sheet
+    assert any(s["path"] == "timeline.overlays[0].startMs" for s in planned.snapped)
+    still = first_image(plan_one(lambda raw: with_overlays(raw, image_overlay())))
+    assert still.animation is None
+
+
+def test_image_overlay_on_a_video_asset_is_refused() -> None:
+    refused(
+        [scene(0)],
+        "timeline.overlays[0].assetId",
+        "a1",
+        "video",
+        mutate=lambda raw: with_overlays(raw, image_overlay(assetId="a1")),
+    )
+
+
+def test_image_overlay_shorter_than_a_frame_is_not_drawn() -> None:
+    planned = plan_one(lambda raw: with_overlays(raw, image_overlay(startMs=1000, endMs=1010)))
+    overlay = first_image(planned)
+    assert overlay.end_ms <= overlay.start_ms
+    assert any("ov2" in w and "shorter than a frame" in w for w in planned.warnings)
+
+
+def test_voice_speed_and_length_must_agree() -> None:
+    def clip(**over: Any) -> Mutate:
+        return lambda raw: with_voice(raw, voice_clip(srcOutMs=3000, **over))
+
+    refused([scene(0)], "durMs", "2000", "2500", mutate=clip(rate=1.5, durMs=2500))
+    assert plan_one(clip(rate=1.5, durMs=2000)).voice[0].rate == 1.5
+    assert plan_one(clip(rate=1.5, durMs=2030)).voice[0].dur_ms == 2030
+
+
+def test_voice_asset_shorter_than_its_segment_is_a_warning() -> None:
+    probes = {**PROBES, "v1": {"durationMs": 2000}}
+    planned = plan_one(lambda raw: with_voice(raw, voice_clip()), probes=probes)
+    assert any(
+        "timeline.voice.tracks.vt_one.clips[0]" in w and "2000" in w for w in planned.warnings
+    )
+
+
+def cue_to(end_ms: int) -> Callable[[dict[str, Any]], None]:
+    def edit(raw: dict[str, Any]) -> None:
+        raw["timeline"]["captions"]["tracks"]["ct_main"]["cues"][0]["endMs"] = end_ms
+
+    return edit
+
+
+def trimmed(
+    *, at: int = 1000, fade_out: int = 0, policy: str = "trim_tail", cue: str = "cu1", **track: Any
+) -> Callable[[dict[str, Any]], None]:
+    def build(raw: dict[str, Any]) -> None:
+        cue_to(3500)(raw)
+        with_voice(
+            raw,
+            voice_clip(atMs=at, fadeOutMs=fade_out, fitPolicy=policy, cueId=cue),
+            **track,
+        )
+
+    return build
+
+
+def test_trim_tail_cuts_at_the_cue_end_with_a_short_fade() -> None:
+    planned = plan_one(trimmed())
+    trim = first_trim(planned)
+    assert (trim.cue_id, trim.to_ms, trim.play_ms, trim.fade_ms) == ("cu1", 3500, 2500, 60)
+    assert [w for w in planned.warnings if "vc1" in w] == []
+
+
+def test_trim_tail_fade_follows_the_longer_user_fade_but_never_the_whole_play() -> None:
+    assert first_trim(plan_one(trimmed(fade_out=200))).fade_ms == 200
+    assert first_trim(plan_one(trimmed(at=3470))).fade_ms == 30
+
+
+def test_trim_tail_clip_starting_after_the_cue_end_is_dropped() -> None:
+    planned = plan_one(trimmed(at=4000))
+    assert planned.voice == ()
+    assert any("vc1" in w and "3500" in w for w in planned.warnings)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [trimmed(cue="ghost"), trimmed(captionTrackId=None), trimmed(captionTrackId="ct_gone")],
+)
+def test_trim_tail_without_its_cue_plays_whole_with_a_warning(
+    build: Callable[[dict[str, Any]], None],
+) -> None:
+    planned = plan_one(build)
+    assert planned.voice[0].trim is None
+    assert any("vc1" in w for w in planned.warnings)
+
+
+def test_ripple_and_a_clip_inside_its_cue_play_whole() -> None:
+    assert plan_one(trimmed(policy="ripple")).voice[0].trim is None
+    assert plan_one(trimmed(at=0)).voice[0].trim is None
+
+
+def test_stem_assets_are_flagged() -> None:
+    def stem(raw: dict[str, Any]) -> None:
+        raw["assets"]["v1"]["role"] = "stem"
+        with_voice(raw, voice_clip())
+
+    assert plan_one(stem).voice[0].stem is True
+    assert plan_one(lambda raw: with_voice(raw, voice_clip())).voice[0].stem is False
+
+
+@pytest.mark.parametrize(("loop", "word"), [(True, "loop"), (False, "silent")])
+def test_music_asset_shorter_than_its_segment_is_a_warning(loop: bool, word: str) -> None:
+    probes = {**PROBES, "m1": {"durationMs": 1000}}
+    planned = plan_one(lambda raw: with_music(raw, music_clip(loop=loop)), probes=probes)
+    flagged = [w for w in planned.warnings if "timeline.music.clips[0]" in w]
+    assert flagged
+    assert word in flagged[0]
+
+
+def test_music_clip_is_planned_as_written() -> None:
+    planned = plan_one(lambda raw: with_music(raw, music_clip(gainDb=-9, loop=True)))
+    clip = planned.music[0]
+    assert (clip.id, clip.asset_id, clip.gain_db, clip.loop) == ("mu1", "m1", -9, True)
+    assert planned.duck_enabled is True
