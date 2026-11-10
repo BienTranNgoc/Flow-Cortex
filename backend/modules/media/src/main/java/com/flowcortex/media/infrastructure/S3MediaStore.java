@@ -117,11 +117,12 @@ public class S3MediaStore implements AutoCloseable {
     }
 
     /**
-     * The object's bytes as a stream the caller must close; closing before the end drops the connection.
+     * The object's bytes as a stream the caller must close; closing before the end aborts the
+     * connection instead of downloading the rest of the object.
      * @throws software.amazon.awssdk.core.exception.SdkException if the object cannot be opened
      */
     public InputStream open(String bucket, String key) {
-        return client.getObject(request -> request.bucket(bucket).key(key));
+        return new AbortingOnEarlyClose(client.getObject(request -> request.bucket(bucket).key(key)));
     }
 
     /** @throws software.amazon.awssdk.core.exception.SdkException if the bucket cannot be reached or does not exist */
