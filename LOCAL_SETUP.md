@@ -518,7 +518,7 @@ docker compose -f docker-compose.yml -f compose.observability.yaml up -d --build
   without credentials on <http://127.0.0.1:9000/minio/v2/metrics/cluster>. That is
   loopback-only here; a shared or deployed host needs a bearer token instead.
 
-Turning the overlay on recreates `backend`, `worker` and `minio`, which take their
+Turning the overlay on recreates `backend`, `worker`, `render-worker` and `minio`, which take their
 exporter and metrics settings from it, and they come back healthy.
 
 **Trace a failed job.** In the admin SPA (<http://127.0.0.1:5174>), open
@@ -526,10 +526,10 @@ exporter and metrics settings from it, and they come back healthy.
 **Explore → Loki** and run:
 
 ```
-{service_name=~"flow-cortex|flow-worker"} | jobId="<job id>"
+{service_name=~"flow-cortex|flow-worker|render-worker"} | jobId="<job id>"
 ```
 
-Both services' lines for that job appear: dispatch, pickup, the worker's
+Render jobs log as `render-worker`; the API's and the workers' lines for that job appear: dispatch, pickup, the worker's
 `input downloaded` / `job answered`, and the API's `Job result applied` with the
 error code. Expand a line and follow its `trace_id` link to Tempo. The trace runs
 from the run's HTTP request through the job publication, the worker's processing
@@ -568,7 +568,7 @@ it, then recreate the core from the core file alone:
 docker compose --env-file .env up -d --remove-orphans
 ```
 
-That removes the overlay containers and recreates `backend`, `worker` and `minio`
+That removes the overlay containers and recreates `backend`, `worker`, `render-worker` and `minio`
 with their core settings: exporters `none`, and minio metrics behind auth again.
 Do not use `docker compose -f docker-compose.yml -f compose.observability.yaml down`,
 which stops the core too. Removing only the overlay services is not enough either,
