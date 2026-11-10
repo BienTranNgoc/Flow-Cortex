@@ -29,6 +29,11 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
             + " AND t.revokedAt IS NULL")
     int revoke(@Param("id") UUID id, @Param("userId") UUID userId, @Param("now") Instant now);
 
+    /** Revokes every unrevoked token of the user; returns how many. */
+    @Modifying
+    @Query("UPDATE PersonalAccessToken t SET t.revokedAt = :now WHERE t.userId = :userId AND t.revokedAt IS NULL")
+    int revokeAllByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
     /** Writes last use only when it is unset or more than a minute old, so a burst of calls writes once. */
     @Modifying
     @Query(value = """
