@@ -18,6 +18,7 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String PROFILE_IMAGE_PREFIX = "profile-image/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
@@ -60,7 +61,11 @@ final class UploadPurposePolicy {
     }
 
     String objectKey(UploadPurpose purpose, UUID ownerId, UUID uploadId) {
-        String prefix = purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_ATTACHMENT_PREFIX : "";
+        String prefix = switch (purpose) {
+            case RUN_INPUT -> "";
+            case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case PROFILE_IMAGE -> PROFILE_IMAGE_PREFIX;
+        };
         return prefix + ownerId + "/" + uploadId;
     }
 
@@ -69,6 +74,7 @@ final class UploadPurposePolicy {
         return switch (purpose) {
             case RUN_INPUT -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
+            case PROFILE_IMAGE -> "image".equals(kind) ? upload.maxBytesOf(kind) : 0L;
         };
     }
 
@@ -79,7 +85,12 @@ final class UploadPurposePolicy {
 
     /** Extension to canonical content type, in the order formats are listed to the member. */
     Map<String, String> mimeTypes(UploadPurpose purpose) {
-        return purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_MIME_TYPES : upload.mimeTypes();
+        return imageOnly(purpose) ? SUPPORT_MIME_TYPES : upload.mimeTypes();
+    }
+
+    /** Purposes that take only png, jpg, jpeg and webp images. */
+    private static boolean imageOnly(UploadPurpose purpose) {
+        return purpose != UploadPurpose.RUN_INPUT;
     }
 
     private static String extensionOf(String fileName) {
@@ -89,7 +100,7 @@ final class UploadPurposePolicy {
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
         List<String> extensions = new ArrayList<>();
-        if (purpose == UploadPurpose.SUPPORT_ATTACHMENT) {
+        if (imageOnly(purpose)) {
             extensions.addAll(SUPPORT_MIME_TYPES.keySet());
         } else {
             extensions.addAll(upload.mediaExtensions());
@@ -103,7 +114,7 @@ final class UploadPurposePolicy {
     }
 
     private LocalizedMessage sizeDetail(UploadPurpose purpose, String kind, long cap) {
-        List<String> extensions = purpose == UploadPurpose.SUPPORT_ATTACHMENT
+        List<String> extensions = imageOnly(purpose)
                 ? List.copyOf(SUPPORT_MIME_TYPES.keySet())
                 : upload.extensionsOf(kind);
         String formats = String.join(", ", extensions.stream().map(e -> "." + e).toList());

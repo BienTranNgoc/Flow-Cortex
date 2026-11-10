@@ -20,11 +20,9 @@ import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocaleConfig;
 import com.flowcortex.shared.web.LocalizedMessage;
-import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.ConfirmedEmailSession;
-import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OAuthFailure;
 import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
@@ -38,6 +36,7 @@ import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.passwordreset.PasswordResetService;
+import com.flowcortex.user.profile.UsernameRules;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -98,7 +97,7 @@ class AuthServiceImplTest {
                 new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 mock(PasswordResetRateLimiter.class), mock(PasswordResetService.class),
-                mock(PasswordResetSubmitLimiter.class));
+                mock(PasswordResetSubmitLimiter.class), mock(UsernameRules.class));
     }
 
     private AppUser unconfirmedMember(String email) {
@@ -918,28 +917,6 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void updateOwnProfileChangesNameOnly() {
-        UUID id = UUID.randomUUID();
-        AppUser user = activeUser(id, Role.MEMBER);
-        when(repository.findById(id)).thenReturn(Optional.of(user));
-
-        CurrentUser updated = service.updateOwnProfile(id, "New Display Name");
-
-        assertThat(updated.name()).isEqualTo("New Display Name");
-        assertThat(updated.email()).isEqualTo("person@example.com");
-        assertThat(updated.role()).isEqualTo("MEMBER");
-    }
-
-    @Test
-    void updateOwnProfileUnknownUserThrowsNotFound() {
-        UUID id = UUID.randomUUID();
-        when(repository.findById(id)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.updateOwnProfile(id, "New Name"))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
     void aResetWithATokenThatMatchesNoOpenLinkIsRefusedWithoutHashingThePassword() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         PasswordResetService resets = mock(PasswordResetService.class);
@@ -962,7 +939,8 @@ class AuthServiceImplTest {
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
                 new EmailConfirmationProperties(false, Duration.ofHours(24), "no-reply@flow-cortex.dev",
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
-                mock(PasswordResetRateLimiter.class), resets, mock(PasswordResetSubmitLimiter.class));
+                mock(PasswordResetRateLimiter.class), resets, mock(PasswordResetSubmitLimiter.class),
+                mock(UsernameRules.class));
     }
 
     private static String english(MessageSourceResolvable message) {

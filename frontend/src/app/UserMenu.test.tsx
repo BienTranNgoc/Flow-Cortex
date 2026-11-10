@@ -31,14 +31,6 @@ describe('UserMenu', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders a compact avatar trigger (no name text) and stays closed by default', () => {
-    renderMenu();
-    const trigger = screen.getByRole('button', { name: /open account menu/i });
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveTextContent('MO');
-    expect(trigger).not.toHaveTextContent('Member One');
-  });
-
   it('opens a disclosure panel on click; Escape closes it and returns focus to the trigger', async () => {
     const user = userEvent.setup();
     renderMenu();

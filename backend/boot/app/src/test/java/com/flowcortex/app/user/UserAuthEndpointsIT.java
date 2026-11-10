@@ -205,7 +205,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
     }
 
     @Test
-    void updateProfileChangesOwnNameOnlyMeReflectsIt() {
+    void updateProfileChangesOwnNamesMeAndProfileReflectThem() {
         String email = uniqueEmail("member-profile");
         UserView admin = userService.createInitialAdmin(uniqueEmail("admin-for-member"), "correct-password-1",
                 "Owning Admin");
@@ -213,14 +213,20 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         String token = login(email, "correct-password-1");
 
         ResponseEntity<MeView> updateResponse =
-                put("/api/v1/auth/profile", token, new ProfileUpdateRequest("New Display Name"), MeView.class);
+                put("/api/v1/auth/profile", token,
+                        new ProfileUpdateRequest("  New Display Name ", " An ", "   "), MeView.class);
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(updateResponse.getBody().name()).isEqualTo("New Display Name");
-        // email is unchanged by a profile update (name-only).
+        // email is unchanged by a profile update.
         assertThat(updateResponse.getBody().email()).isEqualTo(email);
 
         ResponseEntity<MeView> meAfter = get("/api/v1/auth/me", token, MeView.class);
         assertThat(meAfter.getBody().name()).isEqualTo("New Display Name");
+        OwnProfileView profile = get("/api/v1/auth/profile", token, OwnProfileView.class).getBody();
+        assertThat(profile.name()).isEqualTo("New Display Name");
+        assertThat(profile.firstName()).isEqualTo("An");
+        assertThat(profile.lastName()).as("a blank last name clears it").isNull();
+        assertThat(profile.username()).isNull();
     }
 
     @Test
@@ -409,7 +415,13 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         assertThat(response.getBody()).contains("\"password\"");
     }
 
-    record ProfileUpdateRequest(String name) {
+    record ProfileUpdateRequest(String name, String firstName, String lastName) {
+        ProfileUpdateRequest(String name) {
+            this(name, null, null);
+        }
+    }
+
+    record OwnProfileView(String name, String firstName, String lastName, String username) {
     }
 
     record RegisterRequest(String email, String password, String firstName, String lastName) {

@@ -7,6 +7,7 @@ import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
+import com.flowcortex.user.api.OwnProfiles;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -40,8 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
  * confirmation ({@code confirm-email}, {@code resend-confirmation}), password reset by emailed
  * link ({@code forgot-password}, {@code reset-password}), Google OAuth callback
  * (authorize lives in {@link OAuthController}), refresh, logout, the caller's own profile
- * ({@code me}), and self-service name update
- * ({@code profile}). Email/role/status are admin-mediated only.
+ * ({@code me}), and self-service names update
+ * ({@code profile}: display, first and last name). Email/role/status are admin-mediated only.
  *
  * <p>Responses carry the access token only; the refresh token lives in an HttpOnly cookie that
  * refresh and logout read back (never a request body).
@@ -52,11 +53,14 @@ class AuthController {
 
     private final AuthService authService;
     private final UserDirectory userDirectory;
+    private final OwnProfiles ownProfiles;
     private final RefreshCookieSupport cookieSupport;
 
-    AuthController(AuthService authService, UserDirectory userDirectory, RefreshCookieSupport cookieSupport) {
+    AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
+            RefreshCookieSupport cookieSupport) {
         this.authService = authService;
         this.userDirectory = userDirectory;
+        this.ownProfiles = ownProfiles;
         this.cookieSupport = cookieSupport;
     }
 
@@ -212,7 +216,10 @@ class AuthController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<MeResponse> updateProfile(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ProfileUpdateRequest request) {
-        CurrentUser user = authService.updateOwnProfile(subjectId(jwt), request.name());
+        UUID id = subjectId(jwt);
+        ownProfiles.updateNames(id, request.name(), request.firstName(), request.lastName());
+        CurrentUser user = userDirectory.findById(id)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
         return ResponseEntity.ok(MeResponse.from(user));
     }
 
@@ -277,7 +284,9 @@ class AuthController {
         static final String RESET = "password_reset";
     }
 
-    record ProfileUpdateRequest(@NotBlank String name) {
+    /** The service stores the names trimmed; a blank first or last name clears it. */
+    record ProfileUpdateRequest(@NotBlank @Size(max = 255) String name, @Size(max = 100) String firstName,
+            @Size(max = 100) String lastName) {
     }
 
     /**

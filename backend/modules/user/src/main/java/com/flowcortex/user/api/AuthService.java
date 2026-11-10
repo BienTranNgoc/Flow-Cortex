@@ -100,11 +100,6 @@ public interface AuthService {
     AuthSession login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
 
     /**
-     * Updates the caller's own display name only — email/role/status are admin-mediated, not self-service.
-     */
-    CurrentUser updateOwnProfile(UUID userId, String name);
-
-    /**
      * Exchanges a Google authorization code (with its PKCE verifier and the nonce the id_token must
      * carry) and signs the Google account in. The account is matched by Google subject; a new email is
      * registered through the same gate as {@link #register} (owner + rate limit). An email whose account

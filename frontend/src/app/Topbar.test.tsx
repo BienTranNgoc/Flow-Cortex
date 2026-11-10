@@ -24,7 +24,13 @@ function renderTopbar() {
   return renderRoute(
     '/',
     '/',
-    <Topbar showMenuButton={false} drawerOpen={false} onOpenMenu={() => {}} />,
+    <Topbar
+      showMenuButton={false}
+      drawerOpen={false}
+      onOpenMenu={() => {}}
+      theme="light"
+      onToggleTheme={() => {}}
+    />,
   );
 }
 

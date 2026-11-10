@@ -28,8 +28,8 @@ public interface UserService {
     List<UserView> listUsers(UUID ownerId);
 
     /**
-     * Partial update: a {@code null} argument leaves that field unchanged. Unlike {@link AuthService#updateOwnProfile}
-     * (self-service, name only), this admin op can also edit {@code email}/{@code role}/{@code status}.
+     * Partial update: a {@code null} argument leaves that field unchanged. Unlike {@link OwnProfiles}
+     * (self-service, names and username), this admin op can also edit {@code email}/{@code role}/{@code status}.
      * @throws NotFoundException if {@code id} does not exist within {@code ownerId}'s scope
      * @throws ConflictException if {@code email} is supplied and already taken
      */

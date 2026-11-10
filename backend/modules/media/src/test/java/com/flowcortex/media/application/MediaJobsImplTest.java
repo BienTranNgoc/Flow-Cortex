@@ -15,6 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.media.api.KeptImage;
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaDownload;
@@ -796,6 +797,146 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.releaseAttachments(List.of(
                     new StoredAttachment("flowcortex-uploads", "support/r/m/1", "image/png", 40L))))
                     .isInstanceOf(IllegalArgumentException.class);
+        });
+    }
+
+    private static String givenProfileUpload(org.springframework.context.ApplicationContext context, UUID ownerId,
+            UUID uploadId, byte[] bytes) {
+        String key = "profile-image/" + ownerId + "/" + uploadId;
+        when(context.getBean(S3MediaStore.class).head("flowcortex-uploads", key))
+                .thenReturn(Optional.of(new S3MediaStore.StoredObject(bytes.length, "image/png")));
+        when(context.getBean(MediaAssetRepository.class).findById(uploadId)).thenReturn(Optional.empty(),
+                Optional.of(new MediaAsset(uploadId, ownerId, SPACE_ID, "image", "flowcortex-uploads", key,
+                        "image/png", bytes.length, null, Instant.now())));
+        when(context.getBean(S3MediaStore.class).read(eq("flowcortex-uploads"), eq(key), anyInt()))
+                .thenReturn(bytes);
+        return key;
+    }
+
+    @Test
+    void aProfileImageIsResolvedOnlyUnderItsPurpose() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            when(store.head("flowcortex-uploads", "support-attachment/" + ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId,
+                    "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.again"));
+            verify(store).head("flowcortex-uploads", "profile-image/" + ownerId + "/" + uploadId);
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void aKeptProfileImageIsTheStrippedBytesWithItsDimensions() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            byte[] original = pngWithText(40, 30, "GPS 10.77,106.69");
+            givenProfileUpload(context, ownerId, uploadId, original);
+
+            KeptImage kept = context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId,
+                    "profile/u/avatar/1");
+
+            org.mockito.ArgumentCaptor<byte[]> written = org.mockito.ArgumentCaptor.forClass(byte[].class);
+            verify(store).put(eq("flowcortex-media"), eq("profile/u/avatar/1"), eq("image/png"), written.capture(),
+                    eq("profile-released"));
+            assertThat(written.getValue()).isEqualTo(png(40, 30)).hasSizeLessThan(original.length);
+            assertThat(kept).isEqualTo(new KeptImage("flowcortex-media", "profile/u/avatar/1", "image/png",
+                    png(40, 30).length, 40, 30));
+        });
+    }
+
+    @Test
+    void aKeptProfileImageStaysPendingUntilConfirmed() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            givenProfileUpload(context, ownerId, uploadId, png(40, 30));
+
+            context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId, "profile/u/avatar/1");
+
+            verify(store).put(eq("flowcortex-media"), eq("profile/u/avatar/1"), eq("image/png"),
+                    any(byte[].class), eq("profile-released"));
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void aProfileImageThatIsNotTheImageItWasDeclaredAsOrIsOverThePixelCapIsRefusedAndNothingIsWritten() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID text = UUID.randomUUID();
+            UUID huge = UUID.randomUUID();
+            givenProfileUpload(context, ownerId, text, "not an image".getBytes());
+            givenProfileUpload(context, ownerId, huge, png(5001, 5000));
+
+            assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, text, "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.attachmentNotImage"));
+            assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, huge, "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.imageTooLarge"));
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void confirmingProfileImagesRetagsThemKept() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            context.getBean(MediaJobs.class).confirmProfileImages(List.of("profile/u/avatar/1", "profile/u/cover/2"));
+
+            verify(store).retag("flowcortex-media", "profile/u/avatar/1", "profile-image");
+            verify(store).retag("flowcortex-media", "profile/u/cover/2", "profile-image");
+        });
+    }
+
+    @Test
+    void aProfileImageOutsideTheProfilePrefixIsRefused() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            List<String> outside = List.of("support/r/m/1", "runs/r/inputs/a", "profile/", "profile/../runs/x",
+                    "profile/u/");
+
+            for (String key : outside) {
+                assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, uploadId, key)).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> jobs.confirmProfileImages(List.of("profile/u/avatar/1", key))).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> jobs.releaseProfileImages(List.of(key))).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(store, never()).head(anyString(), anyString());
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void releasingProfileImagesRetagsThemReleasedAndOneFailureStillReleasesTheRest() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            doThrow(new IllegalStateException("store down")).when(store)
+                    .retag("flowcortex-media", "profile/u/avatar/1", "profile-released");
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .releaseProfileImages(List.of("profile/u/avatar/1", "profile/u/avatar/2")))
+                    .hasMessage("store down");
+            verify(store).retag("flowcortex-media", "profile/u/avatar/2", "profile-released");
         });
     }
 

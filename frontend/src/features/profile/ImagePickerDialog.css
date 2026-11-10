@@ -1,0 +1,83 @@
+.image-picker {
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.image-picker::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.image-picker h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.image-picker h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.image-picker__stage {
+  position: relative;
+  width: 100%;
+  height: 18rem;
+  background: var(--paper-2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.image-picker__zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.image-picker__zoom input {
+  flex: 1;
+}
+
+.image-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.image-picker__grid button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--paper-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.image-picker__grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.image-picker__empty {
+  color: var(--ink-3);
+}
+
+.image-picker__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
