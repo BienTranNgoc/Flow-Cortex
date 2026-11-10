@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,8 +20,12 @@ public class SettingStore {
     }
 
     /** One history row, values as the text that was stored. */
-    public record StoredChange(String previousValue, String newValue, UUID changedBy, Instant changedAt) {
+    public record StoredChange(UUID id, String key, String previousValue, String newValue, UUID changedBy,
+            String reason, Instant changedAt) {
     }
+
+    private static final String CHANGE_COLUMNS =
+            "id, key, previous_value, new_value, changed_by, reason, changed_at";
 
     private final JdbcTemplate jdbc;
 
@@ -53,26 +58,51 @@ public class SettingStore {
         jdbc.update("DELETE FROM app_setting WHERE key = ?", key);
     }
 
-    public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at) {
+    /** {@code reason} is stored as given; the caller has already trimmed it and bounded its length. */
+    public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at,
+            String reason) {
         jdbc.update("""
-                INSERT INTO app_setting_change (id, key, previous_value, new_value, changed_by, changed_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, id, key, previous, next, actor, Timestamp.from(at));
+                INSERT INTO app_setting_change (id, key, previous_value, new_value, changed_by, changed_at, reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, id, key, previous, next, actor, Timestamp.from(at), reason);
     }
 
     /** Newest first; ties on the time fall back to the id so the order is total. */
     public List<StoredChange> history(String key, int page, int size) {
-        return jdbc.query("""
-                SELECT previous_value, new_value, changed_by, changed_at FROM app_setting_change
+        return jdbc.query("SELECT " + CHANGE_COLUMNS + """
+                 FROM app_setting_change
                 WHERE key = ? ORDER BY changed_at DESC, id DESC LIMIT ? OFFSET ?
-                """, (rs, row) -> new StoredChange(rs.getString("previous_value"), rs.getString("new_value"),
-                uuid(rs, "changed_by"), rs.getTimestamp("changed_at").toInstant()),
-                key, size, (long) page * size);
+                """, SettingStore::change, key, size, (long) page * size);
     }
 
     public long countHistory(String key) {
         Long total = jdbc.queryForObject("SELECT count(*) FROM app_setting_change WHERE key = ?", Long.class, key);
         return total == null ? 0 : total;
+    }
+
+    /** The changes of any of the keys, newest first with the same total order as {@link #history}. */
+    public List<StoredChange> historyForKeys(Collection<String> keys, int page, int size) {
+        return jdbc.query("SELECT " + CHANGE_COLUMNS + """
+                 FROM app_setting_change
+                WHERE key = ANY(?) ORDER BY changed_at DESC, id DESC LIMIT ? OFFSET ?
+                """, ps -> {
+                    ps.setArray(1, ps.getConnection().createArrayOf("text", keys.toArray()));
+                    ps.setInt(2, size);
+                    ps.setLong(3, (long) page * size);
+                }, SettingStore::change);
+    }
+
+    public long countHistoryForKeys(Collection<String> keys) {
+        Long total = jdbc.query("SELECT count(*) FROM app_setting_change WHERE key = ANY(?)",
+                ps -> ps.setArray(1, ps.getConnection().createArrayOf("text", keys.toArray())),
+                rs -> rs.next() ? rs.getLong(1) : 0L);
+        return total == null ? 0 : total;
+    }
+
+    private static StoredChange change(ResultSet rs, int row) throws SQLException {
+        return new StoredChange(uuid(rs, "id"), rs.getString("key"), rs.getString("previous_value"),
+                rs.getString("new_value"), uuid(rs, "changed_by"), rs.getString("reason"),
+                rs.getTimestamp("changed_at").toInstant());
     }
 
     private static UUID uuid(ResultSet rs, String column) throws SQLException {

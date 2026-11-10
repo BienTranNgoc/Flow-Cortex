@@ -2,7 +2,7 @@ package com.flowcortex.settings.web;
 
 import com.flowcortex.settings.api.SettingActors;
 import com.flowcortex.settings.api.SettingChange;
-import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingDescription;
 import com.flowcortex.settings.api.SettingSource;
 import com.flowcortex.settings.api.SettingType;
 import com.flowcortex.settings.application.SettingHistoryEntry;
@@ -60,31 +60,35 @@ class AdminSettingsController {
         this.actors = actors;
     }
 
-    /** A JSON boolean for a SWITCH key, a JSON integer for an INTEGER key. */
+    /** A JSON boolean for a SWITCH key, a JSON integer for an INTEGER key, a JSON string for an ENUM key. */
     @Schema(name = "AdminSettingUpdate")
     record AdminSettingUpdate(
-            @Schema(requiredMode = RequiredMode.REQUIRED, implementation = Object.class, oneOf = {Boolean.class, Integer.class})
+            @Schema(requiredMode = RequiredMode.REQUIRED, implementation = Object.class,
+                    oneOf = {String.class, Boolean.class, Integer.class})
             @NotNull JsonNode value) {
     }
 
     /**
-     * Values are JSON booleans or integers by {@code type}. {@code storedValue}, {@code updatedBy} and
-     * {@code updatedAt} are null when nothing is stored; {@code defaultValue} is null for an integer;
-     * {@code configuredValue} is null for a switch whose configured value is unset; {@code updatedBy} is
-     * the admin's email, null when that account is gone.
+     * Values are JSON strings, booleans or integers by {@code type}. {@code storedValue}, {@code updatedBy}
+     * and {@code updatedAt} are null when nothing is stored; {@code defaultValue} is null for an integer;
+     * {@code configuredValue} is null for a switch or enum whose configured value is unset; {@code options}
+     * lists an enum's options and is empty for any other type; {@code updatedBy} is the admin's email, null
+     * when that account is gone.
      */
     @Schema(name = "AdminSetting")
     record AdminSetting(
             @Schema(requiredMode = RequiredMode.REQUIRED) String key,
             @Schema(requiredMode = RequiredMode.REQUIRED) String group,
             @Schema(requiredMode = RequiredMode.REQUIRED) SettingType type,
-            @Schema(requiredMode = RequiredMode.REQUIRED, oneOf = {Boolean.class, Integer.class}) Object value,
-            @Schema(requiredMode = RequiredMode.REQUIRED, oneOf = {Boolean.class, Integer.class})
+            @Schema(requiredMode = RequiredMode.REQUIRED, oneOf = {String.class, Boolean.class, Integer.class})
+            Object value,
+            @Schema(requiredMode = RequiredMode.REQUIRED, oneOf = {String.class, Boolean.class, Integer.class})
             Object decidedValue,
             @Schema(requiredMode = RequiredMode.REQUIRED) SettingSource source,
-            @Schema(nullable = true, oneOf = {Boolean.class, Integer.class}) Object storedValue,
-            @Schema(nullable = true, oneOf = {Boolean.class, Integer.class}) Object configuredValue,
-            @Schema(nullable = true, oneOf = {Boolean.class, Integer.class}) Object defaultValue,
+            @Schema(nullable = true, oneOf = {String.class, Boolean.class, Integer.class}) Object storedValue,
+            @Schema(nullable = true, oneOf = {String.class, Boolean.class, Integer.class}) Object configuredValue,
+            @Schema(nullable = true, oneOf = {String.class, Boolean.class, Integer.class}) Object defaultValue,
+            @Schema(requiredMode = RequiredMode.REQUIRED) List<String> options,
             @Schema(nullable = true) Integer min,
             @Schema(nullable = true) Integer max,
             @Schema(nullable = true) String updatedBy,
@@ -97,13 +101,14 @@ class AdminSettingsController {
 
     /**
      * {@code previousValue} is null for the first write, {@code newValue} for a reset, and
-     * {@code changedBy} (an email) when that account is gone.
+     * {@code changedBy} (an email) when that account is gone; {@code reason} is null when none was given.
      */
     @Schema(name = "AdminSettingChange")
     record AdminSettingChange(
-            @Schema(nullable = true, oneOf = {Boolean.class, Integer.class}) Object previousValue,
-            @Schema(nullable = true, oneOf = {Boolean.class, Integer.class}) Object newValue,
+            @Schema(nullable = true, oneOf = {String.class, Boolean.class, Integer.class}) Object previousValue,
+            @Schema(nullable = true, oneOf = {String.class, Boolean.class, Integer.class}) Object newValue,
             @Schema(nullable = true) String changedBy,
+            @Schema(nullable = true) String reason,
             @Schema(requiredMode = RequiredMode.REQUIRED) Instant changedAt) {
     }
 
@@ -155,7 +160,8 @@ class AdminSettingsController {
         PageView<SettingHistoryEntry> entries = settings.history(key, page, size);
         Map<UUID, String> emails = emailsOf(entries.items().stream().map(SettingHistoryEntry::changedBy).toList());
         return entries.map(entry -> new AdminSettingChange(entry.previousValue(), entry.newValue(),
-                entry.changedBy() == null ? null : emails.get(entry.changedBy()), entry.changedAt()));
+                entry.changedBy() == null ? null : emails.get(entry.changedBy()), entry.reason(),
+                entry.changedAt()));
     }
 
     private AdminSetting single(SettingView view) {
@@ -174,12 +180,13 @@ class AdminSettingsController {
     }
 
     private static AdminSetting toResponse(SettingView view, Map<UUID, String> emails) {
-        SettingDefinition<?> definition = view.definition();
+        SettingDescription description = view.description();
         SettingChange change = view.change();
-        String name = definition.name();
-        return new AdminSetting(name, name.substring(0, name.indexOf('.')), definition.type(),
-                view.read().effective(), view.read().decided(), view.read().source(), view.storedValue(),
-                definition.configuredValue(), definition.codeDefault(), definition.min(), definition.max(),
-                change == null || change.actor() == null ? null : emails.get(change.actor()), change == null ? null : change.at());
+        String name = description.name();
+        return new AdminSetting(name, name.substring(0, name.indexOf('.')), description.type(),
+                description.effective(), description.decided(), description.source(), description.stored(),
+                description.configured(), description.codeDefault(), description.options(), description.min(),
+                description.max(), change == null || change.actor() == null ? null : emails.get(change.actor()),
+                change == null ? null : change.at());
     }
 }

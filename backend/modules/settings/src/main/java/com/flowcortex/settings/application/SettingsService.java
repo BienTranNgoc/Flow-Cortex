@@ -1,9 +1,12 @@
 package com.flowcortex.settings.application;
 
 import com.flowcortex.settings.api.SettingChange;
+import com.flowcortex.settings.api.SettingChangeEntry;
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingDescription;
 import com.flowcortex.settings.api.SettingKey;
 import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingScope;
 import com.flowcortex.settings.api.SettingSource;
 import com.flowcortex.settings.api.SettingType;
 import com.flowcortex.settings.api.Settings;
@@ -20,7 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -39,6 +44,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 public class SettingsService implements Settings {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
+    private static final int MAX_REASON_LENGTH = 2000;
 
     private final SettingStore store;
     private final SettingsRegistry registry;
@@ -77,51 +83,99 @@ public class SettingsService implements Settings {
     @Override
     public <T> void set(SettingKey<T> key, T value, UUID actor) {
         SettingDefinition<T> definition = definitionOf(key);
-        JsonNode node = value instanceof Boolean flag
-                ? JsonNodeFactory.instance.booleanNode(flag)
-                : value instanceof Integer number ? JsonNodeFactory.instance.numberNode(number) : null;
+        JsonNode node = switch (value) {
+            case Boolean flag -> JsonNodeFactory.instance.booleanNode(flag);
+            case Integer number -> JsonNodeFactory.instance.numberNode(number);
+            case String text -> JsonNodeFactory.instance.stringNode(text);
+            case null, default -> null;
+        };
         if (!(SettingValues.parseRequest(definition, node) instanceof SettingValues.Accepted accepted)) {
             throw new IllegalArgumentException("Value " + value + " is not allowed for setting " + key.name());
         }
-        write(definition.name(), accepted.text(), actor);
+        commit(definition.name(), accepted.text(), actor, null);
     }
 
-    /** Stores a request value for the named key; unknown key is a 404, a refused value a 422. */
+    /** Stores a request value for the named general key; unknown key is a 404, a refused value a 422. */
     public SettingView setRaw(String name, JsonNode value, UUID actor) {
-        SettingDefinition<?> definition = require(name);
+        SettingDefinition<?> definition = requireGeneral(name);
         if (!(SettingValues.parseRequest(definition, value) instanceof SettingValues.Accepted accepted)) {
             throw refusal(SettingValues.parseRequest(definition, value));
         }
-        write(name, accepted.text(), actor);
+        commit(name, accepted.text(), actor, null);
         return view(name);
     }
 
     /** Removes the stored value so the layers beneath decide again; a key with nothing stored changes nothing. */
     public SettingView reset(String name, UUID actor) {
-        require(name);
-        write(name, null, actor);
+        requireGeneral(name);
+        commit(name, null, actor, null);
         return view(name);
     }
 
-    /** Every declared key, in key order. */
+    /** Every general key, in key order. */
     public List<SettingView> views() {
-        return registry.all().stream().map(this::viewOf).toList();
+        return registry.all(SettingScope.GENERAL).stream().map(this::viewOf).toList();
     }
 
     public SettingView view(String name) {
-        return viewOf(require(name));
+        return viewOf(requireGeneral(name));
     }
 
-    /** A page of a key's changes, newest first. */
+    /** A page of a general key's changes, newest first. */
     public PageView<SettingHistoryEntry> history(String name, int page, int size) {
-        SettingDefinition<?> definition = require(name);
+        SettingDefinition<?> definition = requireGeneral(name);
         List<StoredChange> rows = store.history(name, page, size);
         long total = store.countHistory(name);
         List<SettingHistoryEntry> items = rows.stream()
                 .map(row -> new SettingHistoryEntry(typed(definition, row.previousValue()),
-                        typed(definition, row.newValue()), row.changedBy(), row.changedAt()))
+                        typed(definition, row.newValue()), row.changedBy(), row.reason(), row.changedAt()))
                 .toList();
         return new PageView<>(items, page, size, total);
+    }
+
+    @Override
+    public Set<String> declaredKeys(SettingScope scope) {
+        return registry.all(scope).stream().map(SettingDefinition::name)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public List<SettingDescription> describe(SettingScope scope) {
+        return registry.all(scope).stream().map(definition -> viewOf(definition).description()).toList();
+    }
+
+    @Override
+    public Optional<SettingDescription> describe(String name, SettingScope scope) {
+        return registry.definition(name).filter(definition -> definition.scope() == scope)
+                .map(definition -> viewOf(definition).description());
+    }
+
+    @Override
+    public SettingDescription write(String name, SettingScope scope, JsonNode value, UUID actor, String reason) {
+        SettingDefinition<?> definition = requireIn(name, scope);
+        String trimmed = reason == null || reason.isBlank() ? null : reason.strip();
+        if (trimmed != null && trimmed.length() > MAX_REASON_LENGTH) {
+            throw new IllegalArgumentException("A reason is at most " + MAX_REASON_LENGTH + " characters");
+        }
+        SettingValues.RequestValue outcome = SettingValues.parseRequest(definition, value);
+        if (!(outcome instanceof SettingValues.Accepted accepted)) {
+            throw refusal(outcome);
+        }
+        commit(name, accepted.text(), actor, trimmed);
+        return viewOf(definition).description();
+    }
+
+    @Override
+    public PageView<SettingChangeEntry> history(SettingScope scope, Optional<String> name, int page, int size) {
+        Set<String> keys = name.isPresent() ? Set.of(requireIn(name.get(), scope).name()) : declaredKeys(scope);
+        if (keys.isEmpty()) {
+            return new PageView<>(List.of(), page, size, 0);
+        }
+        List<SettingChangeEntry> items = store.historyForKeys(keys, page, size).stream()
+                .map(row -> new SettingChangeEntry(row.id(), row.key(), row.previousValue(), row.newValue(),
+                        row.changedBy(), row.reason(), row.changedAt()))
+                .toList();
+        return new PageView<>(items, page, size, store.countHistoryForKeys(keys));
     }
 
     private SettingView viewOf(SettingDefinition<?> definition) {
@@ -157,7 +211,8 @@ public class SettingsService implements Settings {
         return new Snapshot<>(definition, read, storedValue, change);
     }
 
-    private void write(String name, String newText, UUID actor) {
+    /** The one write path: lock the key, skip an unchanged value, store it and its history row, or neither. */
+    private void commit(String name, String newText, UUID actor, String reason) {
         writes.executeWithoutResult(status -> {
             store.lockKey(name);
             String previous = store.find(name).map(StoredSetting::value).orElse(null);
@@ -170,13 +225,18 @@ public class SettingsService implements Settings {
             } else {
                 store.upsert(name, newText, actor, now);
             }
-            store.insertChange(UUID.randomUUID(), name, previous, newText, actor, now);
+            store.insertChange(UUID.randomUUID(), name, previous, newText, actor, now, reason);
             log.info("settings.write outcome={} key={}", newText == null ? "reset" : "updated", name);
         });
     }
 
-    private SettingDefinition<?> require(String name) {
-        return registry.definition(name)
+    private SettingDefinition<?> requireGeneral(String name) {
+        return requireIn(name, SettingScope.GENERAL);
+    }
+
+    /** A key of another scope is answered exactly as an undeclared one. */
+    private SettingDefinition<?> requireIn(String name, SettingScope scope) {
+        return registry.definition(name).filter(definition -> definition.scope() == scope)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("settings.notFound", name)));
     }
 
@@ -197,9 +257,11 @@ public class SettingsService implements Settings {
 
     private static UnprocessableEntityException refusal(SettingValues.RequestValue outcome) {
         SettingValues.Refused refused = (SettingValues.Refused) outcome;
-        LocalizedMessage reason = refused.type() == SettingType.SWITCH
-                ? new LocalizedMessage("settings.value.switch")
-                : new LocalizedMessage("settings.value.integerRange", refused.min(), refused.max());
+        LocalizedMessage reason = switch (refused.type()) {
+            case SWITCH -> new LocalizedMessage("settings.value.switch");
+            case INTEGER -> new LocalizedMessage("settings.value.integerRange", refused.min(), refused.max());
+            case ENUM -> new LocalizedMessage("settings.value.enumOptions", String.join(", ", refused.options()));
+        };
         return new UnprocessableEntityException(new LocalizedMessage("settings.invalidValue"), "setting.invalidValue",
                 Map.of("value", reason));
     }

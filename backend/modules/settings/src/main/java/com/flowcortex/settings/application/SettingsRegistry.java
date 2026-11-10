@@ -1,12 +1,15 @@
 package com.flowcortex.settings.application;
 
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingScope;
 import com.flowcortex.settings.api.SettingType;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +46,8 @@ public class SettingsRegistry {
             }
             if (definition.type() == SettingType.INTEGER) {
                 requireConfiguredWithinBounds(definition);
+            } else if (definition.type() == SettingType.ENUM) {
+                requireWellFormedEnum(definition);
             }
         }
         this.byName = Map.copyOf(names);
@@ -56,6 +61,29 @@ public class SettingsRegistry {
     /** All declarations, ordered by key. */
     public List<SettingDefinition<?>> all() {
         return sorted;
+    }
+
+    /** The declarations of one scope, ordered by key. */
+    public List<SettingDefinition<?>> all(SettingScope scope) {
+        return sorted.stream().filter(definition -> definition.scope() == scope).toList();
+    }
+
+    private static void requireWellFormedEnum(SettingDefinition<?> definition) {
+        String name = definition.name();
+        List<String> options = definition.options();
+        if (options.isEmpty()) {
+            throw new IllegalStateException("Setting " + name + " is an enum with no options");
+        }
+        Set<String> seen = new HashSet<>();
+        for (String option : options) {
+            if (!seen.add(option)) {
+                throw new IllegalStateException("Setting " + name + " has a duplicate option " + option);
+            }
+        }
+        if (!options.contains(definition.codeDefault())) {
+            throw new IllegalStateException("Setting " + name + " has code default " + definition.codeDefault()
+                    + ", which is not one of its options " + options);
+        }
     }
 
     private static void requireWellFormed(String name) {

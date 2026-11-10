@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingScope;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -110,5 +111,62 @@ class SettingsRegistryTest {
                 "support.assistant.member_daily_quota");
         assertThat(registry.definition("support.assistant.enabled")).isPresent();
         assertThat(registry.definition("support.assistant.colour")).isEmpty();
+    }
+
+    @Test
+    void anEnumWithNoOptionsIsRefused() {
+        SettingDefinition<String> mode = SettingDefinition.enumKey("payment.test.mode", List.of(), "off", () -> "off");
+
+        assertThatThrownBy(() -> new SettingsRegistry(List.of(mode)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("payment.test.mode")
+                .hasMessageContaining("options");
+    }
+
+    @Test
+    void anEnumWithADuplicateOptionIsRefused() {
+        SettingDefinition<String> mode = SettingDefinition.enumKey("payment.test.mode",
+                List.of("off", "on", "off"), "off", () -> "off");
+
+        assertThatThrownBy(() -> new SettingsRegistry(List.of(mode)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("payment.test.mode")
+                .hasMessageContaining("duplicate");
+    }
+
+    @Test
+    void anEnumWhoseDefaultIsNotAnOptionIsRefused() {
+        SettingDefinition<String> mode = SettingDefinition.enumKey("payment.test.mode",
+                List.of("off", "on"), "auto", () -> "off");
+
+        assertThatThrownBy(() -> new SettingsRegistry(List.of(mode)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("payment.test.mode")
+                .hasMessageContaining("auto");
+    }
+
+    @Test
+    void aWellFormedEnumIsAccepted() {
+        SettingDefinition<String> mode = SettingDefinition.enumKey("payment.test.mode",
+                List.of("off", "shadow", "enforce"), "shadow", () -> "shadow");
+
+        assertThat(new SettingsRegistry(List.of(mode)).all()).containsExactly(mode);
+        assertThat(mode.options()).containsExactly("off", "shadow", "enforce");
+    }
+
+    @Test
+    void aDeclarationIsGeneralUnlessScoped() {
+        SettingDefinition<Boolean> general = aSwitch("support.assistant.enabled");
+        SettingDefinition<String> scoped = SettingDefinition.enumKey("payment.test.mode", List.of("off", "on"),
+                "off", () -> "off").inScope(SettingScope.PAYMENT_OPS);
+
+        assertThat(general.scope()).isEqualTo(SettingScope.GENERAL);
+        assertThat(general.inScope(SettingScope.PAYMENT_OPS).scope()).isEqualTo(SettingScope.PAYMENT_OPS);
+        assertThat(general.scope()).isEqualTo(SettingScope.GENERAL);
+        assertThat(scoped.name()).isEqualTo("payment.test.mode");
+        assertThat(scoped.options()).containsExactly("off", "on");
+        assertThat(general.inScope(SettingScope.GENERAL).scope()).isEqualTo(SettingScope.GENERAL);
+        assertThat(new SettingsRegistry(List.of(general, scoped)).definition("payment.test.mode"))
+                .get().extracting(SettingDefinition::scope).isEqualTo(SettingScope.PAYMENT_OPS);
     }
 }

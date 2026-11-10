@@ -7,6 +7,7 @@ import com.flowcortex.settings.api.SettingType;
 import com.flowcortex.settings.application.SettingValues.Accepted;
 import com.flowcortex.settings.application.SettingValues.Refused;
 import com.flowcortex.settings.application.SettingValues.RequestValue;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -18,6 +19,9 @@ class SettingValuesTest {
             SettingDefinition.switchKey("a.b.enabled", true, () -> null);
     private static final SettingDefinition<Integer> INTEGER =
             SettingDefinition.integerKey("a.b.limit", 1, Integer.MAX_VALUE, () -> 5);
+
+    private static final SettingDefinition<String> MODE = SettingDefinition.enumKey("a.b.mode",
+            List.of("off", "shadow", "enforce"), "shadow", () -> "shadow");
 
     private static RequestValue request(SettingDefinition<?> definition, String json) {
         JsonNode node = JSON.readTree(json);
@@ -83,5 +87,33 @@ class SettingValuesTest {
         assertThat(SettingValues.parseStored(SWITCH, "TRUE ")).isEmpty();
         assertThat(SettingValues.parseStored(SWITCH, "1")).isEmpty();
         assertThat(SettingValues.parseStored(SWITCH, "")).isEmpty();
+    }
+
+    @Test
+    void anEnumAcceptsOnlyAStringEqualToAnOption() {
+        assertAccepted(MODE, "\"enforce\"", "enforce");
+        assertAccepted(MODE, "\"off\"", "off");
+        assertRefused(MODE, "\"OFF\"");
+        assertRefused(MODE, "\"enforce \"");
+        assertRefused(MODE, "\"\"");
+        assertRefused(MODE, "true");
+        assertRefused(MODE, "2");
+        assertRefused(MODE, "null");
+        assertRefused(MODE, "[]");
+    }
+
+    @Test
+    void anEnumRefusalNamesTheOptions() {
+        assertThat(request(MODE, "\"OFF\"")).isEqualTo(
+                new Refused(SettingType.ENUM, null, null, List.of("off", "shadow", "enforce")));
+    }
+
+    @Test
+    void parseStoredReadsAnOptionAndRefusesAnythingElse() {
+        assertThat(SettingValues.parseStored(MODE, "shadow")).contains("shadow");
+        assertThat(SettingValues.parseStored(MODE, "ENFORCE")).isEmpty();
+        assertThat(SettingValues.parseStored(MODE, "enforce ")).isEmpty();
+        assertThat(SettingValues.parseStored(MODE, "")).isEmpty();
+        assertThat(SettingValues.parseStored(MODE, null)).isEmpty();
     }
 }

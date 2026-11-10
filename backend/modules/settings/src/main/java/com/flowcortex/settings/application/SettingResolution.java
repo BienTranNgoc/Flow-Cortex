@@ -8,8 +8,9 @@ import java.util.Optional;
 
 /**
  * The one arbiter of every read, in this order: a failed or unparseable stored value degrades; a
- * switch configured off is vetoed; a stored value wins; an integer takes its configured value; a
- * switch takes its configured on, else its code default.
+ * switch configured off is vetoed; a stored value wins; an integer takes its configured value; an
+ * enum takes its configured value, else its code default; a switch takes its configured on, else its
+ * code default.
  */
 public final class SettingResolution {
 
@@ -23,6 +24,11 @@ public final class SettingResolution {
         if (readFailed || unparseable) {
             T safe = degradedValue(definition);
             return new SettingRead<>(safe, safe, SettingSource.DEGRADED);
+        }
+        if (definition.type() == SettingType.ENUM) {
+            return stored
+                    .map(value -> new SettingRead<>(value, value, SettingSource.STORED))
+                    .orElseGet(() -> unstoredEnum(definition));
         }
         if (definition.type() == SettingType.INTEGER) {
             return stored
@@ -45,10 +51,21 @@ public final class SettingResolution {
                 configured == null ? SettingSource.DEFAULT : SettingSource.CONFIGURED);
     }
 
-    /** A switch fails closed (off); an integer falls back to its configured value. */
+    /** The configured value of an enum, else its code default when the configuration leaves it unset. */
+    private static <T> SettingRead<T> unstoredEnum(SettingDefinition<T> definition) {
+        T configured = definition.configuredValue();
+        return configured == null
+                ? new SettingRead<>(definition.codeDefault(), definition.codeDefault(), SettingSource.DEFAULT)
+                : new SettingRead<>(configured, configured, SettingSource.CONFIGURED);
+    }
+
+    /** A switch fails closed (off); an integer or enum falls back to its configured value. */
     private static <T> T degradedValue(SettingDefinition<T> definition) {
         if (definition.type() == SettingType.SWITCH) {
             return definition.key().type().cast(Boolean.FALSE);
+        }
+        if (definition.type() == SettingType.ENUM) {
+            return unstoredEnum(definition).effective();
         }
         return definition.configuredValue();
     }
