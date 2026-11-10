@@ -79,10 +79,7 @@ class RegistrableMediaImpl implements RegistrableMedia {
 
     @Override
     public OptionalLong keepRunInput(String bucket, String objectKey) {
-        if (!properties.s3().bucket().equals(bucket) || objectKey == null
-                || !RUN_INPUT_KEY.matcher(objectKey).matches()) {
-            throw new IllegalArgumentException("Only a run's input copy can be kept: " + bucket + "/" + objectKey);
-        }
+        requireRunInputKey(bucket, objectKey);
         try {
             Optional<S3MediaStore.StoredObject> copy = store.head(bucket, objectKey);
             if (copy.isEmpty()) {
@@ -95,6 +92,27 @@ class RegistrableMediaImpl implements RegistrableMedia {
         } catch (SdkException e) {
             LOG.warn("Keeping a run input failed: bucket={} key={}", bucket, objectKey, e);
             throw new MediaStoreUnavailableException("The object store did not keep the run input", e);
+        }
+    }
+
+    @Override
+    public void releaseRunInput(String bucket, String objectKey) {
+        requireRunInputKey(bucket, objectKey);
+        try {
+            store.retag(bucket, objectKey, S3MediaStore.RUN_INPUT_RETENTION);
+        } catch (NoSuchKeyException e) {
+            LOG.debug("Run input already gone, nothing to release: bucket={} key={}", bucket, objectKey);
+        } catch (SdkException e) {
+            LOG.warn("Releasing a run input failed: bucket={} key={}", bucket, objectKey, e);
+            throw new MediaStoreUnavailableException("The object store did not release the run input", e);
+        }
+    }
+
+    private void requireRunInputKey(String bucket, String objectKey) {
+        if (!properties.s3().bucket().equals(bucket) || objectKey == null
+                || !RUN_INPUT_KEY.matcher(objectKey).matches()) {
+            throw new IllegalArgumentException("Only a run's input copy can be kept or released: " + bucket + "/"
+                    + objectKey);
         }
     }
 }

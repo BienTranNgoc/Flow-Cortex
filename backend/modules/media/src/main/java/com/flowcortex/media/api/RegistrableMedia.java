@@ -21,4 +21,12 @@ public interface RegistrableMedia {
      * @throws IllegalArgumentException when the key is not {@code runs/<uuid>/inputs/<binding key>} of the media bucket
      */
     OptionalLong keepRunInput(String bucket, String objectKey);
+
+    /**
+     * Retags a run's input copy back to the run-input retention, so the lifecycle rule expires it again.
+     * Idempotent; a copy that is already gone is not an error.
+     * @throws MediaStoreUnavailableException when the object store fails
+     * @throws IllegalArgumentException when the key is not {@code runs/<uuid>/inputs/<binding key>} of the media bucket
+     */
+    void releaseRunInput(String bucket, String objectKey);
 }

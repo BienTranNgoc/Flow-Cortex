@@ -56,6 +56,13 @@ public class SpaceAssetStore {
                 new MapSqlParameterSource("id", mediaAssetId), Boolean.class));
     }
 
+    /** Whether an asset points at this very object, as opposed to another copy of the same stored file. */
+    public boolean pointsAtObject(String bucket, String objectKey) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM space_asset WHERE bucket = :bucket AND object_key = :key)",
+                new MapSqlParameterSource("bucket", bucket).addValue("key", objectKey), Boolean.class));
+    }
+
     /** The title version of an output asset this run already wrote, or empty when it wrote none. */
     public OptionalInt runTitleVersion(UUID runId) {
         List<Integer> versions = jdbc.queryForList(

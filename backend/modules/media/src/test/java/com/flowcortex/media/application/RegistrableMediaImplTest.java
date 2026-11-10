@@ -115,6 +115,43 @@ class RegistrableMediaImplTest {
     }
 
     @Test
+    void releaseRetagsARunInputCopyBackToRunInput() {
+        String key = copyKey(UUID.randomUUID(), "media");
+
+        media.releaseRunInput(BUCKET, key);
+
+        verify(store).retag(BUCKET, key, "run-input");
+    }
+
+    @Test
+    void releaseIgnoresACopyThatIsAlreadyGone() {
+        String key = copyKey(UUID.randomUUID(), "media");
+        doThrow(NoSuchKeyException.builder().build()).when(store).retag(BUCKET, key, "run-input");
+
+        media.releaseRunInput(BUCKET, key);
+    }
+
+    @Test
+    void releaseTurnsAnyOtherStoreFailureIntoStoreUnavailable() {
+        String key = copyKey(UUID.randomUUID(), "media");
+        doThrow(AwsServiceException.builder().message("slow down").build()).when(store).retag(BUCKET, key,
+                "run-input");
+
+        assertThatThrownBy(() -> media.releaseRunInput(BUCKET, key))
+                .isInstanceOf(MediaStoreUnavailableException.class);
+    }
+
+    @Test
+    void releaseRefusesAKeyOutsideARunsInputs() {
+        UUID runId = UUID.randomUUID();
+        assertThatThrownBy(() -> media.releaseRunInput(BUCKET, "runs/" + runId + "/steps/1/x.mp4"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> media.releaseRunInput("flowcortex-uploads", copyKey(runId, "media")))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(store, never()).retag(anyString(), anyString(), anyString());
+    }
+
+    @Test
     void stepOutputsFlagObjectsOutsideTheMediaBucket() {
         UUID stepId = UUID.randomUUID();
         UUID owner = UUID.randomUUID();

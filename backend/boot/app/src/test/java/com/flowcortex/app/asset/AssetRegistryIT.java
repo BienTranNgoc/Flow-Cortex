@@ -18,6 +18,7 @@ import com.flowcortex.asset.domain.RegistrationRow;
 import com.flowcortex.asset.domain.RegistrationStatus;
 import com.flowcortex.asset.domain.SourceType;
 import com.flowcortex.asset.infrastructure.AssetRegistrationStore;
+import com.flowcortex.asset.infrastructure.SpaceAssetStore;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.media.api.RegistrableMedia;
 import com.flowcortex.media.api.RunInputsBound;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.RejectedExecutionException;
 import org.junit.jupiter.api.AfterEach;
@@ -83,9 +85,23 @@ class AssetRegistryIT extends AbstractPostgresBootTest {
 
     private final List<UUID> owners = new ArrayList<>();
 
+    @MockitoSpyBean
+    private SpaceAssetStore assets;
+
+    /** The retention tag each copy carries in the stubbed object store, keyed by object key. */
+    private final Map<String, String> tags = new ConcurrentHashMap<>();
+
     @BeforeEach
     void keepEverythingByDefault() {
-        doReturn(OptionalLong.of(COPY_BYTES)).when(media).keepRunInput(any(), any());
+        tags.clear();
+        doAnswer(call -> {
+            tags.put(call.getArgument(1), "asset");
+            return OptionalLong.of(COPY_BYTES);
+        }).when(media).keepRunInput(any(), any());
+        doAnswer(call -> {
+            tags.put(call.getArgument(1), "run-input");
+            return null;
+        }).when(media).releaseRunInput(any(), any());
     }
 
     @AfterEach
@@ -299,6 +315,92 @@ class AssetRegistryIT extends AbstractPostgresBootTest {
 
         verify(media, never()).keepRunInput(MEDIA_BUCKET, "runs/" + second + "/inputs/image_1");
         assertThat(rowStatus(SourceType.RUN_INPUTS, second)).isEqualTo("done");
+    }
+
+    @Test
+    void aCopyKeptByAnEarlierAttemptIsReleasedWhenAnotherRunAlreadyRegisteredTheUpload() {
+        UUID owner = newOwner();
+        UUID workflow = workflow(owner, "Dub");
+        UUID first = run(owner, workflow, "running", "text");
+        step(first, 1, "tts");
+        UUID second = run(owner, workflow, "running", "text");
+        step(second, 1, "tts");
+        UUID upload = upload(owner, "image/png");
+        bind(first, "image_1", upload, 0);
+        bind(second, "image_1", upload, 0);
+        String secondCopy = "runs/" + second + "/inputs/image_1";
+        tags.put(secondCopy, "asset");
+
+        process(SourceType.RUN_INPUTS, first, owner);
+        process(SourceType.RUN_INPUTS, second, owner);
+
+        assertThat(assetMediaIds(owner)).containsExactly(upload);
+        assertThat(tags).containsEntry("runs/" + first + "/inputs/image_1", "asset")
+                .containsEntry(secondCopy, "run-input");
+        assertThat(rowStatus(SourceType.RUN_INPUTS, second)).isEqualTo("done");
+    }
+
+    @Test
+    void aCopyKeptBeforeALostInsertRaceIsReleased() {
+        UUID owner = newOwner();
+        UUID workflow = workflow(owner, "Dub");
+        UUID first = run(owner, workflow, "running", "text");
+        step(first, 1, "tts");
+        UUID second = run(owner, workflow, "running", "text");
+        step(second, 1, "tts");
+        UUID upload = upload(owner, "image/png");
+        bind(first, "image_1", upload, 0);
+        bind(second, "image_1", upload, 0);
+        process(SourceType.RUN_INPUTS, first, owner);
+        doReturn(false).doCallRealMethod().when(assets).existsByMediaAssetId(upload);
+
+        process(SourceType.RUN_INPUTS, second, owner);
+
+        String secondCopy = "runs/" + second + "/inputs/image_1";
+        verify(media).keepRunInput(MEDIA_BUCKET, secondCopy);
+        assertThat(assetMediaIds(owner)).containsExactly(upload);
+        assertThat(tags).containsEntry(secondCopy, "run-input");
+        assertThat(rowStatus(SourceType.RUN_INPUTS, second)).isEqualTo("done");
+    }
+
+    @Test
+    void aFailedReleaseLeavesTheRowPendingWithStoreUnavailable() {
+        UUID owner = newOwner();
+        UUID workflow = workflow(owner, "Dub");
+        UUID first = run(owner, workflow, "running", "text");
+        step(first, 1, "tts");
+        UUID second = run(owner, workflow, "running", "text");
+        step(second, 1, "tts");
+        UUID upload = upload(owner, "image/png");
+        bind(first, "image_1", upload, 0);
+        bind(second, "image_1", upload, 0);
+        process(SourceType.RUN_INPUTS, first, owner);
+        doThrow(new MediaStoreUnavailableException("down", new RuntimeException("boom")))
+                .when(media).releaseRunInput(any(), any());
+
+        process(SourceType.RUN_INPUTS, second, owner);
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT status, last_error_code FROM space_asset_registration "
+                        + "WHERE source_type = 'run_inputs' AND source_id = ?", second);
+        assertThat(row.get("status")).isEqualTo("pending");
+        assertThat(row.get("last_error_code")).isEqualTo("store_unavailable");
+    }
+
+    @Test
+    void theCopyAnAssetPointsAtIsNeverReleasedWhenItsRunIsProcessedAgain() {
+        UUID owner = newOwner();
+        UUID run = run(owner, workflow(owner, "Dub"), "running", "text");
+        step(run, 1, "tts");
+        bindUpload(owner, run, "image_1", "image/png", 0);
+        process(SourceType.RUN_INPUTS, run, owner);
+        jdbc.update("UPDATE space_asset_registration SET status = 'pending', next_attempt_at = now() "
+                + "WHERE source_type = 'run_inputs' AND source_id = ?", run);
+
+        process(SourceType.RUN_INPUTS, run, owner);
+
+        verify(media, never()).releaseRunInput(any(), any());
+        assertThat(tags).containsEntry("runs/" + run + "/inputs/image_1", "asset");
     }
 
     @Test

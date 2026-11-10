@@ -238,6 +238,7 @@ public class AssetRegistry {
             }
             if (assets.existsByMediaAssetId(input.mediaAssetId())) {
                 tally.skipOne(EXISTS);
+                releaseUnlessAssetCopy(run.runId(), input, tally);
                 continue;
             }
             OptionalLong copyBytes;
@@ -254,25 +255,49 @@ public class AssetRegistry {
             }
             String title = AssetNaming.uploadTitle(run.inputFileName(), inputs.size(), run.workflowName(),
                     input.bindingKey());
-            insert(new NewSpaceAsset(UUID.randomUUID(), spaceId, run.ownerId(), input.mediaAssetId(),
-                    SOURCE_UPLOAD, input.kind(), title, title, 1, input.bucket(), input.objectKey(),
-                    input.mimeType(), copyBytes.getAsLong(), run.runId(), null, run.workflowId(), run.workflowName()),
-                    tally);
+            InsertResult result = insert(new NewSpaceAsset(UUID.randomUUID(), spaceId, run.ownerId(),
+                    input.mediaAssetId(), SOURCE_UPLOAD, input.kind(), title, title, 1, input.bucket(),
+                    input.objectKey(), input.mimeType(), copyBytes.getAsLong(), run.runId(), null, run.workflowId(),
+                    run.workflowName()), tally);
+            if (result == InsertResult.EXISTS) {
+                releaseUnlessAssetCopy(run.runId(), input, tally);
+            }
         }
     }
 
-    private void insert(NewSpaceAsset asset, Tally tally) {
+    /**
+     * An input that ends as {@code exists} must not keep a copy the lifecycle rule no longer expires: an
+     * earlier attempt of this run may have kept it before its insert failed or lost. The copy an asset
+     * already points at (a retry after this run's own insert) stays kept.
+     */
+    private void releaseUnlessAssetCopy(UUID runId, BoundRunInput input, Tally tally) {
+        if (assets.pointsAtObject(input.bucket(), input.objectKey())) {
+            return;
+        }
+        try {
+            media.releaseRunInput(input.bucket(), input.objectKey());
+        } catch (MediaStoreUnavailableException e) {
+            LOG.warn("asset.registry release failed runId={} mediaAssetId={}", runId, input.mediaAssetId(), e);
+            tally.transientFailure(STORE_UNAVAILABLE);
+        }
+    }
+
+    private InsertResult insert(NewSpaceAsset asset, Tally tally) {
         try {
             if (assets.insertIfAbsent(asset)) {
                 tally.registered++;
-            } else {
-                tally.skipOne(EXISTS);
+                return InsertResult.INSERTED;
             }
+            tally.skipOne(EXISTS);
+            return InsertResult.EXISTS;
         } catch (DataAccessException e) {
             LOG.warn("asset.registry insert failed runId={} mediaAssetId={}", asset.runId(), asset.mediaAssetId(), e);
             tally.transientFailure(INSERT_FAILED);
+            return InsertResult.FAILED;
         }
     }
+
+    private enum InsertResult { INSERTED, EXISTS, FAILED }
 
     private static OutputCandidate candidateOf(UUID stepId, StoredMediaFile file) {
         return new OutputCandidate(file.mediaAssetId(), file.ownerId(), stepId, file.kind(), file.bucket(),
