@@ -117,6 +117,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "forbidden", message("problem.forbidden", locale(request)));
     }
 
+    @ExceptionHandler(AdminDisabledException.class)
+    public ProblemDetail handleAdminDisabled(AdminDisabledException ex, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "admin-disabled", message("problem.adminDisabled", locale(request)));
+    }
+
     @ExceptionHandler(AccountLockedException.class)
     public ProblemDetail handleAccountLocked(AccountLockedException ex, HttpServletRequest request) {
         ProblemDetail detail = problem(HttpStatus.LOCKED, "account-locked",

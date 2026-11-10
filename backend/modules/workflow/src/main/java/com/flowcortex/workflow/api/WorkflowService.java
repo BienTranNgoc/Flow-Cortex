@@ -21,4 +21,22 @@ public interface WorkflowService {
      *         violation per such step at {@code steps[i].type}; nothing is saved
      */
     WorkflowView createWorkflow(UUID ownerId, String name, boolean shared, List<NewWorkflowStep> steps);
+
+    /** Creates an empty draft owned by {@code ownerId}. */
+    WorkflowView createDraft(UUID ownerId, String name, boolean shared);
+
+    /**
+     * Changes a workflow the caller owns: 403 when the caller can see it but does not own it, 404 when it is
+     * unknown, deleted or hidden from the caller.
+     */
+    WorkflowView updateWorkflow(UUID callerId, UUID workflowId, UpdateWorkflow update);
+
+    /** Soft-deletes a workflow the caller owns; refusals as for {@link #updateWorkflow}. */
+    void deleteWorkflow(UUID callerId, UUID workflowId);
+
+    /** Appends a step at the next position; refusals as for {@link #updateWorkflow}, plus 400 and 422 on the step. */
+    WorkflowStepView addStep(UUID callerId, UUID workflowId, NewStep step);
+
+    /** Edits name, config and input reference of a step of the workflow; the type and position never change. */
+    WorkflowStepView updateStep(UUID callerId, UUID workflowId, UUID stepId, StepEdit edit);
 }
