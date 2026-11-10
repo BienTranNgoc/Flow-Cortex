@@ -15,4 +15,5 @@ include(
     ":modules:realtime",
     ":shared:web",
     ":shared:security",
+    ":shared:ratelimit",
 )

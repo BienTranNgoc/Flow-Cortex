@@ -28,8 +28,12 @@ dependencies {
     implementation(project(":modules:realtime"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
+    // The limiter store builds its own Hikari pool from Boot's JdbcConnectionDetails.
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
     // Boot 4 moved the MVC test slice out of spring-boot-starter-test.
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(platform("org.testcontainers:testcontainers-bom:${providers.gradleProperty("testcontainersVersion").get()}"))
