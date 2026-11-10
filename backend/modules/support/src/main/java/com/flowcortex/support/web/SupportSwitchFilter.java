@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -26,7 +25,6 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * switch. The admin routes live elsewhere and stay up. Runs before the security chain, so a
  * switched-off route answers 503 whoever calls it.
  */
-@Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 class SupportSwitchFilter extends OncePerRequestFilter {
 

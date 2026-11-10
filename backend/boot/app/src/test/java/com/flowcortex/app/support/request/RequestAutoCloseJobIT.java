@@ -23,7 +23,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** The hourly job: a resolution closes 7 days after the member first saw it, never before they see it. */
 @SpringBootTest(properties = {
         "flowcortex.support.enabled=true",
-        "flowcortex.support.mail.interval=PT24H",
         "flowcortex.support.retention.interval=PT24H"})
 class RequestAutoCloseJobIT extends AbstractPostgresBootTest {
 
