@@ -12,6 +12,10 @@ const SENTENCE_KEYS: Record<string, string> = {
   contract_violation: 'workflow.stepError.contract_violation',
   speech_too_long: 'workflow.stepError.speech_too_long',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
+  load_template_invalid_input: 'workflow.stepError.load_template_invalid_input',
+  load_template_not_found: 'workflow.stepError.load_template_not_found',
+  load_template_invalid_template: 'workflow.stepError.load_template_invalid_template',
+  load_template_missing_input: 'workflow.stepError.load_template_missing_input',
 };
 
 /** The reaper closes inline steps with these codes too, and those never reached the media engine. */

@@ -9,6 +9,10 @@
     "contract_violation": "The media engine rejected this job. Try again later.",
     "speech_too_long": "The approved script is too long for the 10-second video. Start a new run with a shorter script.",
     "APPROVAL_REJECTED": "You rejected this content, so the run stopped.",
+    "load_template_invalid_input": "The input for this step must be JSON with a \"template\" field naming the template to load.",
+    "load_template_not_found": "No template with that name exists in this workflow's data store.",
+    "load_template_invalid_template": "The stored template is not valid. Check its data and inputs.",
+    "load_template_missing_input": "Some required inputs for the template are missing.",
     "reapedInline": "This step stopped before it finished. Try running again.",
     "noMessage": "This step stopped with an error."
   },
@@ -25,7 +29,8 @@
     "label": {
       "probe": "Inspect the file",
       "extract_audio": "Extract source audio",
-      "review": "Review"
+      "review": "Review",
+      "load_template": "Load a template"
     },
     "fallback": "Step {{order}}",
     "progress": "Step {{order}} progress",
@@ -173,6 +178,20 @@
     "shared": "Shared with every member.",
     "loadError": "Could not load this workflow. Try again, or pick another one.",
     "loading": "Loading workflow…"
+  },
+  "examples": {
+    "heading": "Start from an example",
+    "use": "Use this example",
+    "busy": "Creating…",
+    "stepCount_one": "{{n}} step",
+    "stepCount_other": "{{n}} steps",
+    "credits": "About {{n}} credits",
+    "sampleInput": "Sample input",
+    "copy": "Copy",
+    "copied": "Copied",
+    "loading": "Loading examples…",
+    "loadError": "Could not load the examples.",
+    "createError": "Could not create a workflow from this example."
   },
   "list": {
     "heading": "Workflows",

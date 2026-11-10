@@ -9,6 +9,10 @@
     "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
+    "load_template_invalid_input": "Đầu vào của bước này phải là JSON có trường \"template\" ghi tên mẫu cần tải.",
+    "load_template_not_found": "Kho dữ liệu của quy trình này không có mẫu nào mang tên đó.",
+    "load_template_invalid_template": "Mẫu đã lưu không hợp lệ. Hãy kiểm tra dữ liệu và các trường đầu vào của mẫu.",
+    "load_template_missing_input": "Còn thiếu một số đầu vào bắt buộc của mẫu.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
   },
@@ -25,7 +29,8 @@
     "label": {
       "probe": "Kiểm tra tệp",
       "extract_audio": "Tách âm thanh gốc",
-      "review": "Bước duyệt"
+      "review": "Bước duyệt",
+      "load_template": "Tải mẫu"
     },
     "fallback": "Bước {{order}}",
     "progress": "Tiến độ bước {{order}}",
@@ -173,6 +178,20 @@
     "shared": "Được chia sẻ với mọi thành viên.",
     "loadError": "Không tải được quy trình này. Hãy thử lại hoặc chọn quy trình khác.",
     "loading": "Đang tải quy trình…"
+  },
+  "examples": {
+    "heading": "Bắt đầu từ một ví dụ",
+    "use": "Dùng ví dụ này",
+    "busy": "Đang tạo…",
+    "stepCount_one": "{{n}} bước",
+    "stepCount_other": "{{n}} bước",
+    "credits": "Khoảng {{n}} tín dụng",
+    "sampleInput": "Đầu vào mẫu",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "loading": "Đang tải các ví dụ…",
+    "loadError": "Không tải được các ví dụ.",
+    "createError": "Không thể tạo quy trình từ ví dụ này."
   },
   "list": {
     "heading": "Quy trình",
