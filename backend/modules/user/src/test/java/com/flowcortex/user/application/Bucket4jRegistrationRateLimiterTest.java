@@ -4,17 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
 class Bucket4jRegistrationRateLimiterTest {
 
-    private final Bucket4jRegistrationRateLimiter limiter = new Bucket4jRegistrationRateLimiter(
-            new RegistrationProperties(null,
-                    new RateLimit(3, Duration.ofHours(1)),
-                    new RateLimit(2, Duration.ofHours(1))));
+    private static final RegistrationProperties PROPERTIES = new RegistrationProperties(null,
+            new RateLimit(3, Duration.ofHours(1)),
+            new RateLimit(2, Duration.ofHours(1)));
+
+    private final Bucket4jRegistrationRateLimiter limiter = new Bucket4jRegistrationRateLimiter(new RateLimiters(
+            List.of(new UserRateLimits().registrationIp(PROPERTIES),
+                    new UserRateLimits().registrationEmail(PROPERTIES)),
+            new InMemoryRateLimitStore(), new RateLimitTelemetry(new SimpleMeterRegistry(), Clock.systemUTC())));
 
     @Test
     void theFourthAttemptFromOneIpIsRefusedWhileAnotherIpIsNot() {

@@ -1150,6 +1150,8 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
+
 export type SearchSupportKbParams = {
   /**
    * @minLength 2
@@ -3005,6 +3007,76 @@ export const sendCode = async (
   });
 };
 
+export type reportClientErrorResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type reportClientErrorResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reportClientErrorResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reportClientErrorResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reportClientErrorResponseSuccess = reportClientErrorResponse204 & {
+  headers: Headers;
+};
+export type reportClientErrorResponseError = (
+  reportClientErrorResponse400 | reportClientErrorResponse413 | reportClientErrorResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportClientErrorResponse =
+  reportClientErrorResponseSuccess | reportClientErrorResponseError;
+
+export const getReportClientErrorUrl = () => {
+  return `/api/v1/client-errors`;
+};
+
+/**
+ * @summary Report an error the web app contained
+ */
+export const reportClientError = async (
+  reportClientErrorBody: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportClientErrorResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportClientErrorResponse>(getReportClientErrorUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', ...getHeaders(options?.headers) },
+    body: reportClientErrorBody,
+  });
+};
+
 export type listChatConversationsResponse200 = {
   data: ChatConversationList;
   status: 200;
@@ -3364,6 +3436,85 @@ export const confirmChatCard = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(chatCardConfirm),
+  });
+};
+
+export type recordPaymentJourneyEventResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type recordPaymentJourneyEventResponse400 = {
+  data: void;
+  status: 400;
+};
+
+export type recordPaymentJourneyEventResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type recordPaymentJourneyEventResponse415 = {
+  data: void;
+  status: 415;
+};
+
+export type recordPaymentJourneyEventResponse429 = {
+  data: void;
+  status: 429;
+};
+
+export type recordPaymentJourneyEventResponseSuccess = recordPaymentJourneyEventResponse204 & {
+  headers: Headers;
+};
+export type recordPaymentJourneyEventResponseError = (
+  | recordPaymentJourneyEventResponse400
+  | recordPaymentJourneyEventResponse401
+  | recordPaymentJourneyEventResponse415
+  | recordPaymentJourneyEventResponse429
+) & {
+  headers: Headers;
+};
+
+export type recordPaymentJourneyEventResponse =
+  recordPaymentJourneyEventResponseSuccess | recordPaymentJourneyEventResponseError;
+
+export const getRecordPaymentJourneyEventUrl = () => {
+  return `/api/v1/billing/journey-events`;
+};
+
+/**
+ * Records one observation a payment page made. Never changes a payment.
+ * @summary Record a payment journey observation
+ */
+export const recordPaymentJourneyEvent = async (
+  recordPaymentJourneyEventBody: RecordPaymentJourneyEventBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<recordPaymentJourneyEventResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<recordPaymentJourneyEventResponse>(getRecordPaymentJourneyEventUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recordPaymentJourneyEventBody),
   });
 };
 

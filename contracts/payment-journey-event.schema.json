@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/payment-journey-event.schema.json",
+  "title": "PaymentJourneyEvent",
+  "description": "What a payment page reports it saw: one of two observations, never the truth about a payment. Posted to POST /api/v1/billing/journey-events. The endpoint refuses any other body whole, and also refuses a body over 2048 bytes, a duplicated key and content after the one JSON value, none of which a schema can state.",
+  "oneOf": [
+    { "$ref": "#/$defs/paymentOpened" },
+    { "$ref": "#/$defs/payerReturned" }
+  ],
+  "$defs": {
+    "paymentOpened": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "orderRef", "transactionId", "replayed"],
+      "properties": {
+        "event": { "const": "billing.payment_opened" },
+        "orderRef": {
+          "type": "string",
+          "pattern": "^fc_[0-9a-f]{32}$",
+          "description": "Our order reference; at most 64 bytes by construction."
+        },
+        "transactionId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "replayed": { "type": "boolean" },
+        "planId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,20}$"
+        },
+        "packageId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "oneOf": [
+        { "required": ["planId"] },
+        { "required": ["packageId"] }
+      ]
+    },
+    "payerReturned": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "outcome", "orderRef"],
+      "properties": {
+        "event": { "const": "billing.payer_returned" },
+        "outcome": {
+          "enum": [
+            "paid",
+            "not_paid",
+            "settled_other",
+            "waiting",
+            "stopped_waiting",
+            "missing",
+            "unreadable",
+            "unidentified"
+          ]
+        },
+        "orderRef": {
+          "type": ["string", "null"],
+          "description": "The reference on the return URL, any string or null. The endpoint keeps it only when it is ours (fc_ and 32 hex digits, at most 64 bytes) and records the rest as not_ours or absent."
+        }
+      }
+    }
+  }
+}

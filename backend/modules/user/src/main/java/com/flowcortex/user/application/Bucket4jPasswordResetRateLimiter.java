@@ -1,6 +1,6 @@
 package com.flowcortex.user.application;
 
-import com.flowcortex.user.passwordreset.PasswordResetProperties;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,8 +13,9 @@ class Bucket4jPasswordResetRateLimiter implements PasswordResetRateLimiter {
 
     private final PerIpAndEmailBuckets buckets;
 
-    Bucket4jPasswordResetRateLimiter(PasswordResetProperties properties) {
-        this.buckets = new PerIpAndEmailBuckets(properties.perIp(), properties.perEmail());
+    Bucket4jPasswordResetRateLimiter(RateLimiters rateLimiters) {
+        this.buckets = new PerIpAndEmailBuckets(rateLimiters.named(UserRateLimits.PASSWORD_RESET_IP),
+                rateLimiters.named(UserRateLimits.PASSWORD_RESET_EMAIL));
     }
 
     @Override

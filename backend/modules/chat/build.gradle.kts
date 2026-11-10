@@ -10,14 +10,13 @@ dependencies {
     implementation(project(":modules:realtime"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
-    implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
-    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
     implementation("io.micrometer:micrometer-core")
     implementation("io.micrometer:context-propagation")
@@ -26,4 +25,5 @@ dependencies {
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
 }

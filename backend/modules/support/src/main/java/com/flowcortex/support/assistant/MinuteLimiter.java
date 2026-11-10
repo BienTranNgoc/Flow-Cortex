@@ -1,19 +1,15 @@
 package com.flowcortex.support.assistant;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.ConsumptionProbe;
+import com.flowcortex.shared.ratelimit.RateLimiter;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
 /**
- * At most ten questions a minute per asker and, for guests, per network, as in-memory token buckets.
- * Per instance: with N backend replicas an asker could reach N times the rate; the daily quotas stay
- * exact. A bucket is dropped one window after it was made, so the size bound only guards memory.
- * Network buckets sit in their own cache: a flood of client-minted session keys cannot evict them,
+ * At most ten questions a minute per asker and, for guests, per network. The budgets live in the
+ * shared rate-limit store, so every backend instance draws from the same ones. Network and asker
+ * limits are separate limiters: a flood of client-minted session keys cannot touch a network's budget,
  * and the network cap is what stops that flood.
  */
 @Component
@@ -21,38 +17,29 @@ class MinuteLimiter {
 
     static final int PER_MINUTE = 10;
 
-    private static final Duration PERIOD = Duration.ofMinutes(1);
-    private static final long MAX_TRACKED_KEYS = 100_000;
-
-    private final Cache<String, Bucket> buckets = newCache();
-    private final Cache<String, Bucket> networkBuckets = newCache();
+    private final RateLimiter askers;
+    private final RateLimiter networks;
     private final Clock clock;
 
-    MinuteLimiter(Clock clock) {
+    MinuteLimiter(RateLimiters limiters, Clock clock) {
+        this.askers = limiters.named(AssistantRateLimits.ASKER);
+        this.networks = limiters.named(AssistantRateLimits.NETWORK);
         this.clock = clock;
     }
 
-    /** Takes one question from the asker's bucket, or refuses with 429 and the time of the next allowed one. */
+    /** Takes one question from the asker's budget, or refuses with 429 and the time of the next allowed one. */
     void acquire(String subjectKey) {
-        take(buckets, subjectKey);
+        take(askers, subjectKey);
     }
 
-    /** Takes one question from the network's bucket, or refuses like {@link #acquire}. */
+    /** Takes one question from the network's budget, or refuses like {@link #acquire}. */
     void acquireNetwork(String networkKey) {
-        take(networkBuckets, networkKey);
+        take(networks, networkKey);
     }
 
-    private void take(Cache<String, Bucket> cache, String key) {
-        Bucket bucket = cache.get(key, ignored -> Bucket.builder()
-                .addLimit(limit -> limit.capacity(PER_MINUTE).refillGreedy(PER_MINUTE, PERIOD))
-                .build());
-        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-        if (!probe.isConsumed()) {
-            throw QuotaService.exhausted(Instant.now(clock).plusNanos(probe.getNanosToWaitForRefill()));
-        }
-    }
-
-    private static Cache<String, Bucket> newCache() {
-        return Caffeine.newBuilder().expireAfterWrite(PERIOD).maximumSize(MAX_TRACKED_KEYS).build();
+    private void take(RateLimiter limiter, String key) {
+        limiter.tryAcquire(key).ifPresent(wait -> {
+            throw QuotaService.exhausted(Instant.now(clock).plus(wait));
+        });
     }
 }

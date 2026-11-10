@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: unknown): void {
-    reportClientError(error);
+    reportClientError(error, 'render');
   }
 
   override render() {
