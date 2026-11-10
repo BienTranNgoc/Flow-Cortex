@@ -12,6 +12,7 @@ include(
     ":modules:llm",
     ":modules:support",
     ":modules:space",
+    ":modules:drive",
     ":modules:realtime",
     ":shared:web",
     ":shared:security",

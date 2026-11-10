@@ -105,6 +105,33 @@ public interface MediaJobs {
     void releaseAttachments(List<StoredAttachment> attachments);
 
     /**
+     * Keeps the owner's {@link UploadPurpose#DRIVE_ITEM} upload {@code uploadId} at
+     * {@code drive/<spaceId>/<itemId>} of the media bucket, tagged pending: an image is read, checked (format,
+     * pixel cap) and written without its metadata, any other kind is copied server-side, and with the content
+     * check on the copy must match its kind. Call {@link #confirmDriveFile} once the item row is saved and
+     * {@link #releaseDriveFile} if saving fails. Call it outside any transaction.
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of another purpose or
+     *         owner, too large, not the type it was declared as or over the pixel cap; on field
+     *         {@code contentType} if its kind differs from {@code contentType}, before anything is copied
+     * @throws MediaStoreUnavailableException if media is switched off
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    StoredDriveFile keepDriveFile(UUID ownerId, UUID uploadId, String contentType, UUID spaceId, UUID itemId);
+
+    /**
+     * Keeps a pending Drive file for good, so the media bucket's lifecycle rule no longer expires it.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void confirmDriveFile(StoredDriveFile file);
+
+    /**
+     * Marks a Drive file pending again, so the media bucket's lifecycle rule expires it: for a copy whose item
+     * was never saved or has been deleted.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void releaseDriveFile(StoredDriveFile file);
+
+    /**
      * The inputs bound to {@code runId} in start order, each with a signed URL to the run's own copy under
      * {@code runs/<runId>/inputs/}. The caller must have verified that the run belongs to the reader. A run
      * with no bound input yields an empty list.

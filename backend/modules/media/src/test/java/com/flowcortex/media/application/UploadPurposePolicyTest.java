@@ -101,6 +101,48 @@ class UploadPurposePolicyTest {
     }
 
     @Test
+    void driveItemAcceptsEveryRunInputKindAtItsCapUnderTheDriveItemPrefix() {
+        record Row(String file, String type, String kind, long cap) {
+        }
+        List<Row> rows = List.of(
+                new Row("a.mp4", "video/mp4", "video", VIDEO_CAP),
+                new Row("a.mkv", "video/x-matroska", "video", VIDEO_CAP),
+                new Row("a.m4a", "audio/mp4", "audio", AUDIO_CAP),
+                new Row("a.wav", "audio/wav", "audio", AUDIO_CAP),
+                new Row("a.JPG", "image/jpeg", "image", IMAGE_CAP),
+                new Row("a.png", "image/png", "image", IMAGE_CAP),
+                new Row("a.webp", "image/webp", "image", IMAGE_CAP));
+
+        for (Row row : rows) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.DRIVE_ITEM, row.file(), row.cap());
+            assertThat(allowed.contentType()).as(row.file()).isEqualTo(row.type());
+            assertThat(allowed.kind()).as(row.file()).isEqualTo(row.kind());
+            assertThat(allowed.maxBytes()).as(row.file()).isEqualTo(row.cap());
+            assertThat(policy.maxBytes(UploadPurpose.DRIVE_ITEM, row.kind())).isEqualTo(row.cap());
+        }
+        assertThat(policy.mimeTypes(UploadPurpose.DRIVE_ITEM)).isEqualTo(policy.mimeTypes(UploadPurpose.RUN_INPUT));
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+        assertThat(policy.objectKey(UploadPurpose.DRIVE_ITEM, owner, upload))
+                .isEqualTo("drive-item/" + owner + "/" + upload);
+    }
+
+    @Test
+    void driveItemRefusesOneByteOverTheKindCap() {
+        for (String[] row : new String[][] {{"clip.mp4", "video"}, {"voice.mp3", "audio"}, {"logo.png", "image"}}) {
+            long cap = policy.maxBytes(UploadPurpose.DRIVE_ITEM, row[1]);
+            assertThatThrownBy(() -> policy.grant(UploadPurpose.DRIVE_ITEM, row[0], cap + 1))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).as(row[0]).isEqualTo("size");
+                        assertThat(e.detail().code()).isEqualTo("upload.sizeMegabytes");
+                    });
+        }
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.DRIVE_ITEM, "notes.pdf", 16L))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(e.field()).isEqualTo("fileName"));
+    }
+
+    @Test
     void runInputKeyIsOwnerSlashUploadAndSupportKeyCarriesItsPrefix() {
         UUID owner = UUID.randomUUID();
         UUID upload = UUID.randomUUID();
