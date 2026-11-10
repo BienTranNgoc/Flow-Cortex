@@ -120,14 +120,20 @@ describe('resume', () => {
     ...over,
   });
   const resume = (step: string, question: number | null | undefined, ctx = first()) =>
-    reduce(CLOSED, { type: 'resume', step, question }, ctx);
+    reduce(CLOSED, { type: 'resume', step, question, surveyDeferred: false }, ctx);
 
   it('restores each stored step', () => {
     expect(resume('welcome', null)).toEqual(WELCOME);
     expect(resume('tour:home', null)).toEqual(TOUR);
     expect(resume('survey-intro', null)).toEqual(SURVEY);
     expect(resume('quiz', 4)).toEqual(quiz(4));
-    expect(resume('done', null)).toEqual(DONE);
+  });
+
+  it('restores Done with the survey line only when the survey was not deferred', () => {
+    const resumeDone = (surveyDeferred: boolean) =>
+      reduce(CLOSED, { type: 'resume', step: 'done', surveyDeferred }, first());
+    expect(resumeDone(true)).toEqual(DONE_DEFERRED);
+    expect(resumeDone(false)).toEqual(DONE);
   });
 
   it('falls back to question 1 when the stored question is invalid', () => {
@@ -147,7 +153,9 @@ describe('resume', () => {
 
   it('never resumes in replay mode or from an open screen', () => {
     expect(resume('quiz', 3, first({ mode: 'replay' }))).toEqual(CLOSED);
-    expect(reduce(TOUR, { type: 'resume', step: 'quiz', question: 3 }, first())).toEqual(TOUR);
+    expect(
+      reduce(TOUR, { type: 'resume', step: 'quiz', question: 3, surveyDeferred: false }, first()),
+    ).toEqual(TOUR);
   });
 });
 

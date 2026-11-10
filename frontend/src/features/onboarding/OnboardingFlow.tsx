@@ -175,6 +175,8 @@ export function OnboardingFlow() {
 
   const entry = status.data?.entry;
   const progress = status.data?.progress;
+  // The server never clears the stamp, so a member who deferred and then answered everything is not deferred.
+  const surveyDeferred = progress?.surveyDeferredAt != null && replaySurvey;
   const onboarding = useFeatures().onboarding;
 
   useEffect(() => {
@@ -193,8 +195,17 @@ export function OnboardingFlow() {
       type: 'resume',
       step: progress?.step ?? '',
       question: progress?.question,
+      surveyDeferred,
     });
-  }, [onboarding, pathname, entry, progress, session.exitedThisSession, session.replayRequested]);
+  }, [
+    onboarding,
+    pathname,
+    entry,
+    progress,
+    surveyDeferred,
+    session.exitedThisSession,
+    session.replayRequested,
+  ]);
 
   useEffect(() => {
     if (!isDesktop && flowRef.current.screen === 'tour') dispatchRef.current({ type: 'narrow' });

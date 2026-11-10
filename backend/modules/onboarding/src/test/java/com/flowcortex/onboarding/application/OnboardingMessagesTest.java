@@ -30,7 +30,7 @@ class OnboardingMessagesTest {
         keys.addAll(refused(() -> BuilderState.merge(JSON.createObjectNode(), JSON.readTree("[1]"))));
         keys.addAll(refused(() -> BuilderState.merge(JSON.createObjectNode(),
                 JSON.readTree("{\"blob\":\"" + "x".repeat(BuilderState.MAX_STATE_CHARS) + "\"}"))));
-        keys.addAll(refused(() -> BuilderState.withReason(JSON.createObjectNode(), JSON.readTree("{\"reason\":\"x\"}"))));
+        keys.addAll(refused(() -> BuilderState.reason(JSON.readTree("{\"reason\":\"x\"}"))));
 
         assertThat(keys).containsExactlyInAnyOrder(
                 "onboarding.field.unknownValue", "onboarding.field.emptyList", "onboarding.field.duplicate",

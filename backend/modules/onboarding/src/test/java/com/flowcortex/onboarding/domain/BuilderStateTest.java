@@ -67,19 +67,22 @@ class BuilderStateTest {
         ObjectNode number = object("{\"reason\":3}");
 
         assertThat(catchThrowableOfType(InvalidOnboardingRequest.class,
-                () -> BuilderState.withReason(object("{}"), later)).errors())
+                () -> BuilderState.reason(later)).errors())
                 .containsEntry("reason", "onboarding.builder.reason.unknown");
         assertThat(catchThrowableOfType(InvalidOnboardingRequest.class,
-                () -> BuilderState.withReason(object("{}"), number)).errors())
+                () -> BuilderState.reason(number)).errors())
                 .containsKey("reason");
     }
 
     @Test
     void reasonIsRecordedInState() {
-        assertThat(BuilderState.withReason(object("{\"a\":1}"), object("{\"reason\":\"skipped\"}")).toString())
+        assertThat(BuilderState.withReason(object("{\"a\":1}"),
+                BuilderState.reason(object("{\"reason\":\"skipped\"}"))).toString())
                 .isEqualTo("{\"a\":1,\"reason\":\"skipped\"}");
-        assertThat(BuilderState.withReason(object("{\"a\":1}"), object("{}")).toString()).isEqualTo("{\"a\":1}");
-        assertThat(BuilderState.withReason(object("{\"a\":1}"), object("{\"reason\":null}")).toString())
+        assertThat(BuilderState.withReason(object("{\"a\":1}"), BuilderState.reason(object("{}"))).toString())
+                .isEqualTo("{\"a\":1}");
+        assertThat(BuilderState.withReason(object("{\"a\":1}"),
+                BuilderState.reason(object("{\"reason\":null}"))).toString())
                 .isEqualTo("{\"a\":1}");
     }
 }

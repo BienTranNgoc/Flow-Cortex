@@ -152,4 +152,32 @@ class OnboardingServiceTest {
                         e -> assertThat(e.getErrors()).containsOnlyKeys("reason"));
         verify(repository, never()).completeBuilder(any(), any(), any());
     }
+
+    private static OnboardingRecord completedBuilder(ObjectNode state, Instant completedAt) {
+        OnboardingRecord empty = OnboardingRecord.empty();
+        return new OnboardingRecord(empty.answers(), null, empty.progress(), state, completedAt);
+    }
+
+    @Test
+    void aRepeatBuilderCompletionOverANearCapStateReturnsTheStoredStateUnchanged() {
+        ObjectNode nearCap = JSON.createObjectNode().put("pad", "x".repeat(8_160));
+        Instant first = Instant.parse("2026-11-10T08:00:00Z");
+        when(repository.findForUpdate(userId)).thenReturn(Optional.of(completedBuilder(nearCap, first)));
+
+        OnboardingService.Builder builder = service(true).completeBuilder(userId,
+                JSON.readTree("{\"reason\":\"finished\"}"));
+
+        assertThat(builder.state()).isEqualTo(nearCap);
+        assertThat(builder.completedAt()).isEqualTo(first);
+        verify(repository, never()).completeBuilder(any(), any(), any());
+    }
+
+    @Test
+    void aRepeatBuilderCompletionStillRefusesAnUnknownReason() {
+        when(repository.findForUpdate(userId)).thenReturn(Optional.of(
+                completedBuilder(JSON.createObjectNode(), Instant.parse("2026-11-10T08:00:00Z"))));
+
+        assertThatThrownBy(() -> service(true).completeBuilder(userId, JSON.readTree("{\"reason\":\"later\"}")))
+                .isInstanceOf(UnprocessableEntityException.class);
+    }
 }

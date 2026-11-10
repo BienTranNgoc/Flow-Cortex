@@ -141,7 +141,11 @@ public class OnboardingService {
         Instant now = clock.instant();
         repository.ensureRow(userId, now);
         OnboardingRecord stored = lock(userId);
-        ObjectNode state = parsed(() -> BuilderState.withReason(stored.builderState(), body));
+        String reason = parsed(() -> BuilderState.reason(body));
+        if (stored.builderCompletedAt() != null) {
+            return new Builder(stored.builderState(), stored.builderCompletedAt());
+        }
+        ObjectNode state = parsed(() -> BuilderState.withReason(stored.builderState(), reason));
         OnboardingRecord completed = repository.completeBuilder(userId, state, now);
         return new Builder(completed.builderState(), completed.builderCompletedAt());
     }

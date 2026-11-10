@@ -152,6 +152,36 @@ describe('OnboardingFlow', () => {
     ).toBeVisible();
   });
 
+  it('resumes a deferred Done without the survey line and Back opens the survey intro', async () => {
+    const user = userEvent.setup();
+    renderFlow({
+      'GET /api/v1/onboarding/status': {
+        status: 200,
+        body: status({
+          progress: { v: 2, step: 'done', surveyDeferredAt: '2026-11-10T09:00:00Z' },
+        }),
+      },
+    });
+    expect(await screen.findByRole('dialog', { name: "You're all set" })).toBeVisible();
+    expect(screen.queryByText('Answered the survey')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByRole('dialog', { name: 'Tell us about your work' })).toBeVisible();
+  });
+
+  it('resumes Done listing the survey when it was deferred but every core answer is stored', async () => {
+    renderFlow({
+      'GET /api/v1/onboarding/status': {
+        status: 200,
+        body: status({
+          ...ANSWERED,
+          progress: { v: 2, step: 'done', surveyDeferredAt: '2026-11-10T09:00:00Z' },
+        }),
+      },
+    });
+    expect(await screen.findByRole('dialog', { name: "You're all set" })).toBeVisible();
+    expect(screen.getByText('Answered the survey')).toBeVisible();
+  });
+
   it('closes on Escape without a write and stays closed for the session', async () => {
     const user = userEvent.setup();
     const calls = renderFlow({

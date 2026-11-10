@@ -31,21 +31,32 @@ public final class BuilderState {
     }
 
     /**
-     * Returns {@code state} with the body's optional {@code reason} recorded; an absent or null
-     * reason changes nothing.
+     * Reads the body's optional {@code reason}; absent or null yields {@code null}.
      *
      * @throws InvalidOnboardingRequest naming {@code reason} when it is not skipped or finished
      */
-    public static ObjectNode withReason(ObjectNode state, JsonNode body) {
+    public static String reason(JsonNode body) {
         JsonNode reason = body == null ? null : body.get("reason");
         if (reason == null || reason.isNull()) {
-            return state;
+            return null;
         }
         if (!reason.isString() || !OnboardingVocabulary.BUILDER_REASONS.contains(reason.asString())) {
             throw new InvalidOnboardingRequest("reason", UNKNOWN_REASON);
         }
+        return reason.asString();
+    }
+
+    /**
+     * Returns {@code state} with {@code reason} recorded; a null reason changes nothing.
+     *
+     * @throws InvalidOnboardingRequest naming {@code state} when the result is over the cap
+     */
+    public static ObjectNode withReason(ObjectNode state, String reason) {
+        if (reason == null) {
+            return state;
+        }
         ObjectNode recorded = state.deepCopy();
-        recorded.put("reason", reason.asString());
+        recorded.put("reason", reason);
         return capped(recorded);
     }
 

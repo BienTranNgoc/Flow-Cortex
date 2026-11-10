@@ -36,7 +36,13 @@ export type FlowEvent =
   | { type: 'survey-later' }
   | { type: 'quiz-saved' }
   | { type: 'quiz-save-failed' }
-  | { type: 'resume'; step: string; question?: number | null | undefined };
+  | {
+      type: 'resume';
+      step: string;
+      question?: number | null | undefined;
+      /** The survey was deferred and a core answer is still missing. */
+      surveyDeferred: boolean;
+    };
 
 export type JourneyStep = 'interface' | 'survey';
 
@@ -63,7 +69,11 @@ const quiz = (question: QuizQuestion, error = false): FlowState => ({
 const afterIntro = (ctx: FlowContext): FlowState => (hasSurvey(ctx) ? SURVEY_INTRO : done(false));
 const beforeSurvey = (ctx: FlowContext): FlowState => (hasTour(ctx) ? TOUR : WELCOME);
 
-function resumeAt(step: string, question: number | null | undefined, ctx: FlowContext): FlowState {
+function resumeAt(
+  event: Extract<FlowEvent, { type: 'resume' }>,
+  ctx: FlowContext,
+): FlowState {
+  const { step, question } = event;
   switch (step) {
     case 'tour:home':
       return hasTour(ctx) ? TOUR : SURVEY_INTRO;
@@ -72,7 +82,7 @@ function resumeAt(step: string, question: number | null | undefined, ctx: FlowCo
     case 'quiz':
       return quiz(isQuizQuestion(question) ? question : 1);
     case 'done':
-      return done(false);
+      return done(event.surveyDeferred);
     default:
       return WELCOME;
   }
@@ -86,7 +96,7 @@ export function onboardingFlowReducer(
   if (state.screen === 'closed') {
     if (event.type === 'start') return WELCOME;
     if (event.type === 'resume' && ctx.mode === 'first') {
-      return resumeAt(event.step, event.question, ctx);
+      return resumeAt(event, ctx);
     }
     return state;
   }
