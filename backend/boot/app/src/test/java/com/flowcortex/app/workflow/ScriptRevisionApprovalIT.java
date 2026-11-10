@@ -2,6 +2,7 @@ package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import java.nio.charset.StandardCharsets;
@@ -294,12 +295,12 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
 
     private UUID uploadProductImage(UserView owner) {
         ResponseEntity<UploadResponseView> grant = post("/api/v1/uploads", loginAs(owner),
-                new UploadRequestView("product.png", 16L), UploadResponseView.class);
+                new UploadRequestView("product.png", (long) ImageFixtures.png().length), UploadResponseView.class);
         assertThat(grant.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UploadResponseView body = grant.getBody();
         try (S3Client store = objectStore()) {
             store.putObject(o -> o.bucket(UPLOAD_BUCKET).key(owner.id() + "/" + body.uploadId())
-                    .contentType("image/png"), RequestBody.fromBytes("sixteen bytes!!!".getBytes()));
+                    .contentType("image/png"), RequestBody.fromBytes(ImageFixtures.png()));
         } catch (RuntimeException e) {
             throw new IllegalStateException("could not stage the product image", e);
         }

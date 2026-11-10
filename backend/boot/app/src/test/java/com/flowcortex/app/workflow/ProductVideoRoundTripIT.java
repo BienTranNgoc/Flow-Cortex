@@ -2,6 +2,7 @@ package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import java.nio.charset.StandardCharsets;
@@ -203,17 +204,21 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     private UUID uploadImage(UserView owner) {
         String token = loginAs(owner);
         ResponseEntity<UploadView> grant = post("/api/v1/uploads", token,
-                new UploadRequestView("product.png", 16L), UploadView.class);
+                new UploadRequestView("product.png", (long) ImageFixtures.png().length), UploadView.class);
         assertThat(grant.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID uploadId = grant.getBody().uploadId();
-        put(UPLOAD_BUCKET, owner.id() + "/" + uploadId, "image/png", "sixteen bytes!!!");
+        put(UPLOAD_BUCKET, owner.id() + "/" + uploadId, "image/png", ImageFixtures.png());
         return uploadId;
     }
 
     private static void put(String bucket, String key, String mime, String body) {
+        put(bucket, key, mime, body.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void put(String bucket, String key, String mime, byte[] body) {
         try (S3Client store = objectStore()) {
             store.putObject(request -> request.bucket(bucket).key(key).contentType(mime),
-                    RequestBody.fromBytes(body.getBytes(StandardCharsets.UTF_8)));
+                    RequestBody.fromBytes(body));
         }
     }
 

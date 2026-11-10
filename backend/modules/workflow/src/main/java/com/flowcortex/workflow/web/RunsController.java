@@ -3,6 +3,7 @@ package com.flowcortex.workflow.web;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.application.RunCancellation;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +51,15 @@ class RunsController {
     ResponseEntity<RunResponse> cancelRun(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID currentUserId = currentUserResolver.require(jwt);
         return ResponseEntity.ok(RunResponse.from(runCancellation.cancelRun(currentUserId, id), creditAccounts));
+    }
+
+    /** The run's inputs in start order, each with a time-limited URL; 404 if the run is not the caller's. */
+    @GetMapping(value = "/{id}/inputs", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<List<RunInputResponse>> getRunInputs(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        UUID currentUserId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(workflowRunService.getRunInputs(currentUserId, id).stream()
+                .map(RunInputResponse::from)
+                .toList());
     }
 
     @GetMapping(value = "/{id}/steps/{order}/outputs/{name}/url", produces = MediaType.APPLICATION_JSON_VALUE)
