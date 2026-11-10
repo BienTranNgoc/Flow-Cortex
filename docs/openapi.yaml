@@ -7,6 +7,137 @@ servers:
 security:
 - BearerAuth: []
 paths:
+  /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
+    put:
+      tags:
+      - workflow-reviews-controller
+      operationId: setWorkflowReviewHelpful
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpfulRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpfulResponse"
+  /api/v1/workflows/{id}/reviews/mine:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: getMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+    put:
+      tags:
+      - workflow-reviews-controller
+      operationId: putMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+    delete:
+      tags:
+      - workflow-reviews-controller
+      operationId: deleteMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/v1/workflows/{id}/bookmark:
+    get:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: getWorkflowBookmark
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkResponse"
+    put:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: setWorkflowBookmark
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookmarkRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkResponse"
   /api/v1/users/{id}:
     get:
       tags:
@@ -492,6 +623,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/workflows/{id}/reviews/{reviewId}/report:
+    post:
+      tags:
+      - workflow-reviews-controller
+      operationId: reportWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportedResponse"
+  /api/v1/workflows/{id}/reviews/image-uploads:
+    post:
+      tags:
+      - workflow-review-image-uploads-controller
+      operationId: createReviewImageUpload
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
   /api/v1/workflows/{id}/regenerate-key:
     post:
       tags:
@@ -2043,6 +2230,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+  /api/v1/workflows/{id}/reviews:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: listWorkflowReviews
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - helpful
+          pattern: newest|helpful
+      - name: rating
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+      - name: withComment
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: withImages
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewPageResponse"
+  /api/v1/workflows/{id}/reviews/summary:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: getWorkflowReviewSummary
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSummaryResponse"
   /api/v1/workflows/{id}/link-grants:
     get:
       tags:
@@ -2207,6 +2480,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SharedWorkflowResponse"
+  /api/v1/workflows/bookmarked:
+    get:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: listBookmarkedWorkflows
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkedWorkflowPageResponse"
   /api/v1/support/settings:
     get:
       tags:
@@ -2944,6 +3248,105 @@ paths:
                 $ref: "#/components/schemas/RevokedResponse"
 components:
   schemas:
+    HelpfulRequest:
+      type: object
+      properties:
+        helpful:
+          type: boolean
+      required:
+      - helpful
+    HelpfulResponse:
+      type: object
+      properties:
+        helpful:
+          type: boolean
+        helpfulCount:
+          type: integer
+          format: int32
+      required:
+      - helpful
+      - helpfulCount
+    ReviewRequest:
+      type: object
+      properties:
+        rating:
+          type: string
+          maximum: 5
+          minimum: 1
+        body:
+          type:
+          - string
+          - "null"
+          maxLength: 5000
+        images:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            format: uuid
+    ReviewImageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - id
+      - url
+    ReviewResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          format: int32
+        body:
+          type:
+          - string
+          - "null"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewImageResponse"
+        helpfulCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - helpfulCount
+      - id
+      - images
+      - rating
+      - updatedAt
+    BookmarkRequest:
+      type: object
+      properties:
+        bookmarked:
+          type: boolean
+      required:
+      - bookmarked
+    BookmarkResponse:
+      type: object
+      properties:
+        bookmarked:
+          type: boolean
+      required:
+      - bookmarked
     UpdateUserRequest:
       type: object
       properties:
@@ -3585,6 +3988,72 @@ components:
       - deliveryCount
       - mode
       - outputs
+    ReportRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+          - spam
+          - scam
+          - harmful
+          - harassment
+          - misinformation
+          - copyright
+          - nsfw
+          - other
+        details:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    ReportedResponse:
+      type: object
+      properties:
+        reported:
+          type: boolean
+      required:
+      - reported
+    UploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    UploadResponse:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+      required:
+      - expiresAt
+      - headers
+      - maxBytes
+      - method
+      - uploadId
+      - url
     ShareSettingsResponse:
       type: object
       properties:
@@ -3633,46 +4102,6 @@ components:
       - name
       - password
       - role
-    UploadRequest:
-      type: object
-      properties:
-        fileName:
-          type: string
-          maxLength: 255
-          minLength: 0
-        size:
-          type: integer
-          format: int64
-      required:
-      - fileName
-      - size
-    UploadResponse:
-      type: object
-      properties:
-        uploadId:
-          type: string
-          format: uuid
-        url:
-          type: string
-        method:
-          type: string
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-        expiresAt:
-          type: string
-          format: date-time
-        maxBytes:
-          type: integer
-          format: int64
-      required:
-      - expiresAt
-      - headers
-      - maxBytes
-      - method
-      - uploadId
-      - url
     SupportUploadRequest:
       type: object
       properties:
@@ -4313,6 +4742,79 @@ components:
             $ref: "#/components/schemas/Entry"
         meta:
           $ref: "#/components/schemas/Meta"
+    ReviewListItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          format: int32
+        body:
+          type:
+          - string
+          - "null"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewImageResponse"
+        helpfulCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        helpfulByMe:
+          type: boolean
+        mine:
+          type: boolean
+        authorName:
+          type:
+          - string
+          - "null"
+      required:
+      - createdAt
+      - helpfulByMe
+      - helpfulCount
+      - id
+      - images
+      - mine
+      - rating
+      - updatedAt
+    ReviewPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewListItemResponse"
+        meta:
+          $ref: "#/components/schemas/Meta"
+      required:
+      - data
+      - meta
+    ReviewSummaryResponse:
+      type: object
+      properties:
+        average:
+          type:
+          - number
+          - "null"
+        total:
+          type: integer
+          format: int64
+        distribution:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+      required:
+      - distribution
+      - total
     Grant:
       type: object
       properties:
@@ -4370,6 +4872,29 @@ components:
           type: string
         type:
           type: string
+    BookmarkedWorkflowPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        meta:
+          $ref: "#/components/schemas/Meta"
+      required:
+      - data
+      - meta
+    Item:
+      type: object
+      properties:
+        workflow:
+          $ref: "#/components/schemas/WorkflowResponse"
+        bookmarkedAt:
+          type: string
+          format: date-time
+      required:
+      - bookmarkedAt
+      - workflow
     SupportSettings:
       type: object
       properties:
