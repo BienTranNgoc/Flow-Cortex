@@ -6,9 +6,9 @@ import { getToken } from './tokenStore';
 const STREAM_PATH = '/api/v1/realtime/stream';
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30_000;
-let nextStreamId = 0;
 /** Three missed server heartbeats (the hub pings every 15 s). */
 const IDLE_TIMEOUT_MS = 45_000;
+let nextStreamId = 0;
 
 type Outcome = 'retry' | 'reauth' | 'stop';
 
@@ -119,6 +119,7 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
   const streamId = (nextStreamId += 1);
   let down = false;
 
@@ -135,8 +136,6 @@ export function openEventStream(options: EventStreamOptions): EventStream {
       emitNetworkSignal({ type: 'stream-up', streamId });
     }
   }
-
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const clearIdle = () => {
     if (idleTimer !== null) {
