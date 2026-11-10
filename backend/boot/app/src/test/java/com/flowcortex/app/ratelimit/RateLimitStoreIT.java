@@ -2,6 +2,7 @@ package com.flowcortex.app.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.shared.ratelimit.PostgresRateLimitStore;
@@ -49,7 +50,8 @@ class RateLimitStoreIT extends AbstractPostgresBootTest {
 
     private RateLimitStorePool openPool(int maxPoolSize) {
         RateLimitStoreProperties properties =
-                new RateLimitStoreProperties(maxPoolSize, Duration.ofMillis(250), Duration.ofMillis(200));
+                new RateLimitStoreProperties(maxPoolSize, Duration.ofMillis(250), Duration.ofMillis(200),
+                        Duration.ofMillis(300));
         RateLimitStorePool pool = RateLimitStorePool.open(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword(), properties);
         pools.add(pool);
@@ -122,6 +124,26 @@ class RateLimitStoreIT extends AbstractPostgresBootTest {
         assertThat(store.tryConsume(key, 2, period)).isEmpty();
         assertThat(store.tryConsume(key, 2, period)).isEmpty();
         assertThat(store.tryConsume(key, 2, period)).isPresent();
+    }
+
+    @Test
+    void aStatementThatStallsAfterConnectingIsCancelledByTheServer() throws SQLException {
+        RateLimitStorePool pool = openPool(2);
+        try (Connection connection = pool.dataSource().getConnection(); Statement statement = connection.createStatement()) {
+            try (ResultSet shown = statement.executeQuery("SHOW statement_timeout")) {
+                shown.next();
+                assertThat(shown.getString(1)).isEqualTo("300ms");
+            }
+            long started = System.nanoTime();
+            assertThatThrownBy(() -> statement.execute("SELECT pg_sleep(5)"))
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("statement timeout");
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
+        }
+
+        RateLimiter limiter = new RateLimiter(FIVE_PER_HOUR, new PostgresRateLimitStore(pool.dataSource()),
+                new RateLimitTelemetry(new SimpleMeterRegistry(), Clock.systemUTC()));
+        assertThat(limiter.tryAcquire("203.0.113.8")).isEmpty();
     }
 
     @Test

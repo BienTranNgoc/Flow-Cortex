@@ -28,7 +28,12 @@ final class RateLimitStorePool implements AutoCloseable {
         config.setMinimumIdle(1);
         config.setConnectionTimeout(properties.connectionTimeout().toMillis());
         config.setInitializationFailTimeout(-1);
-        config.setConnectionInitSql("SET lock_timeout = " + properties.lockTimeout().toMillis());
+        config.setConnectionInitSql("SET lock_timeout = " + properties.lockTimeout().toMillis()
+                + "; SET statement_timeout = " + properties.statementTimeout().toMillis());
+        // statement_timeout cannot reach a dead network; socketTimeout (whole seconds) is only the backstop.
+        long socketSeconds =
+                Math.max(1, (properties.statementTimeout().plus(properties.lockTimeout()).toMillis() + 999) / 1000);
+        config.addDataSourceProperty("socketTimeout", String.valueOf(socketSeconds));
         return new RateLimitStorePool(new HikariDataSource(config));
     }
 

@@ -248,7 +248,7 @@ flowcortex:
       period: ${FLOWCORTEX_CLIENT_ERRORS_PER_IP_PERIOD:1m}
   # Rate-limit budgets live in the database (table rate_limit_bucket) so every backend instance
   # shares them. The store has its own small connection pool: a stalled store admits the request
-  # after `connection-timeout` or `lock-timeout` instead of holding it. Full buckets are swept
+  # after `connection-timeout`, `lock-timeout` or `statement-timeout` instead of holding it. Full buckets are swept
   # every `sweep-interval`.
   rate-limit:
     sweep-interval: ${FLOWCORTEX_RATE_LIMIT_SWEEP_INTERVAL:PT10M}
@@ -256,6 +256,7 @@ flowcortex:
       max-pool-size: ${FLOWCORTEX_RATE_LIMIT_STORE_MAX_POOL_SIZE:8}
       connection-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_CONNECTION_TIMEOUT:250ms}
       lock-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_LOCK_TIMEOUT:200ms}
+      statement-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_STATEMENT_TIMEOUT:500ms}
   # Kill switch for the admin console's API (/api/v1/admin/**): off answers 503 there, after the
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
