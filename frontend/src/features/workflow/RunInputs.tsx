@@ -1,7 +1,7 @@
 import type { RunInputResponse } from '@flow-cortex/api-client';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useRunInputsQuery } from './useWorkflows';
+import { inputUrlNeedsRenewal, useRunInputsQuery } from './useWorkflows';
 
 interface RunInputsProps {
   runId: string;
@@ -10,16 +10,22 @@ interface RunInputsProps {
 interface InputItemProps {
   input: RunInputResponse;
   imageNumber: number;
+  /** Called when the file fails to load; returns true when it is renewing the link instead. */
+  onLoadError: (input: RunInputResponse) => boolean;
 }
 
-function InputItem({ input, imageNumber }: Readonly<InputItemProps>) {
+function InputItem({ input, imageNumber, onLoadError }: Readonly<InputItemProps>) {
   const { t } = useTranslation();
   const [gone, setGone] = useState(false);
 
   if (gone) {
     return <p className="run-input-gone">{t('workflow.inputs.expired')}</p>;
   }
-  const onError = () => setGone(true);
+  const onError = () => {
+    if (!onLoadError(input)) {
+      setGone(true);
+    }
+  };
   if (input.kind === 'video') {
     return (
       <video
@@ -73,6 +79,16 @@ export function RunInputs({ runId }: Readonly<RunInputsProps>) {
     return null;
   }
 
+  // An expired link fails like a deleted file; renew it first, and only a link that still fails
+  // while unexpired means the file is gone.
+  const onLoadError = (input: RunInputResponse) => {
+    if (!inputUrlNeedsRenewal(input.expiresAt)) {
+      return false;
+    }
+    void query.refetch();
+    return true;
+  };
+
   let imageNumber = 0;
   return (
     <section className="run-inputs" aria-labelledby={headingId}>
@@ -86,10 +102,10 @@ export function RunInputs({ runId }: Readonly<RunInputsProps>) {
           }
           return (
             <li
-              key={input.bindingKey}
+              key={`${input.bindingKey}:${input.url}`}
               className={`run-input run-input-${input.kind === 'audio' ? 'audio' : 'visual'}`}
             >
-              <InputItem input={input} imageNumber={imageNumber} />
+              <InputItem input={input} imageNumber={imageNumber} onLoadError={onLoadError} />
             </li>
           );
         })}
