@@ -180,3 +180,49 @@ def test_bounds_of_another_clip_name_both_frame_counts(tmp_path: Path) -> None:
     assert "120" in error.message
     assert "96" in error.message
     assert runner.middle_frame_runs() == []
+
+
+@needs_ffmpeg
+def test_a_short_audio_track_does_not_cut_the_picture(tmp_path: Path) -> None:
+    clip = render(
+        tmp_path / "input",
+        "-f", "lavfi", "-i", "testsrc=duration=6:size=160x90:rate=24",
+        "-f", "lavfi", "-i", "sine=duration=1",
+        "-c:v", "libx264", "-c:a", "aac",
+    )  # fmt: skip
+
+    outcome = scene_frames.handle(job(), {"video": clip}, ProcessRunner())
+
+    assert outcome.data["durationSec"] == 6.0
+    normalized = outcome.files[0].body
+    assert isinstance(normalized, Path)
+    counted = subprocess.run(
+        [
+            "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", str(normalized),
+        ],
+        check=True,
+        capture_output=True,
+    )  # fmt: skip
+    assert counted.stdout.decode().strip() == "144"
+
+
+@needs_ffmpeg
+def test_a_long_audio_track_is_cut_to_the_picture(tmp_path: Path) -> None:
+    clip = render(
+        tmp_path / "input",
+        "-f", "lavfi", "-i", "testsrc=duration=4:size=160x90:rate=24",
+        "-f", "lavfi", "-i", "sine=duration=9",
+        "-c:v", "libx264", "-c:a", "aac",
+    )  # fmt: skip
+
+    assert scene_frames.handle(job(), {"video": clip}, ProcessRunner()).data["durationSec"] == 4.0
+
+
+@pytest.mark.parametrize("threshold", [0.5, 0.0001, 0.9999, 1 / 3])
+def test_thresholds_inside_the_open_range_are_accepted(threshold: float) -> None:
+    assert scene_frames._threshold({"sceneThreshold": threshold}) == threshold
+
+
+def test_a_missing_or_null_threshold_means_the_default() -> None:
+    assert scene_frames._threshold({}) == scene_frames._threshold({"sceneThreshold": None}) == 0.3

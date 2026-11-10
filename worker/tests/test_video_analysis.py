@@ -132,6 +132,25 @@ def test_audio_only_has_no_stream() -> None:
     assert streams.read_streams(report(audio, duration="2.5")) == (2500, None)
 
 
+@pytest.mark.parametrize(("value", "number"), [(0, 0.0), (3, 3.0), (0.25, 0.25), (-1.5, -1.5)])
+def test_finite_param_reads_a_number(value: Any, number: float) -> None:
+    assert streams.finite_param({"k": value}, "k") == number
+
+
+@pytest.mark.parametrize(
+    "value", [True, "0.5", None, [1], float("nan"), float("inf"), -float("inf"), 10**400]
+)
+def test_finite_param_refuses_anything_else_naming_the_key(value: Any) -> None:
+    error = refused(lambda: streams.finite_param({"k": value}, "k"))
+
+    assert error.code == "contract_violation"
+    assert "'k'" in error.message
+
+
+def test_finite_param_refuses_a_missing_key() -> None:
+    assert refused(lambda: streams.finite_param({}, "k")).code == "contract_violation"
+
+
 def test_ms_rounds_half_up() -> None:
     assert streams.ms(2.0005) == 2001
     assert streams.ms(2.0) == 2000

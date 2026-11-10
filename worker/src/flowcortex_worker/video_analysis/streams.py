@@ -68,6 +68,22 @@ def finite_float(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def finite_param(params: Mapping[str, Any], key: str) -> float:
+    """The finite number in job param `key`; a boolean, string, missing or non-finite is refused."""
+    value = params.get(key)
+    number = math.nan
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        try:
+            number = float(value)
+        except OverflowError:  # an int beyond the float range is not finite either
+            number = math.nan
+    if not math.isfinite(number):
+        raise PermanentError(
+            "contract_violation", f"param {key!r} must be a finite number (got {value!r})"
+        )
+    return number
+
+
 def tool_failure(tool: str, detail: str) -> PermanentError:
     return PermanentError("probe_failed", f"{tool}: {detail}")
 

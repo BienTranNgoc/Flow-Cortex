@@ -21,7 +21,7 @@ from ..video_analysis.scenes import (
     given_bounds,
     middle_frame,
 )
-from ..video_analysis.streams import finite_float, last_line, probe_video, tool_failure
+from ..video_analysis.streams import finite_param, last_line, probe_video, tool_failure
 from . import HandlerOutcome, OutputFile
 
 NORMALIZED_NAME = "normalized.mp4"
@@ -31,14 +31,13 @@ _QUIET = ["-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist
 
 
 def _threshold(params: Mapping[str, Any]) -> float:
-    raw = params.get("sceneThreshold")
-    if raw is None:
+    if params.get("sceneThreshold") is None:
         return DEFAULT_SCENE_THRESHOLD
-    value = None if isinstance(raw, bool | str) else finite_float(raw)
-    if value is None or not 0 < value < 1:
+    value = finite_param(params, "sceneThreshold")
+    if not 0 < value < 1:
         raise PermanentError(
             "contract_violation",
-            f"sceneThreshold must be a number above 0 and below 1 (got {raw!r})",
+            f"param 'sceneThreshold' must be above 0 and below 1 (got {value!r})",
         )
     return value
 
@@ -131,13 +130,14 @@ def handle(
             "-vf", f"scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
             f"crop={out_w}:{out_h},fps={FPS},setsar=1",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
+            "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
             str(normalized),
         ],
         "normalising the clip",
     )  # fmt: skip
 
-    # Counted on the normalised file: the container length can follow a longer audio track.
+    # `apad` lets the picture set the length (a short audio track is padded, a long one is cut by
+    # `-shortest`); counted on the normalised file, since the source container can follow the audio.
     total = _count_frames(normalized, processes)
     if given is None:
         bounds = _detected_bounds(normalized, threshold, total, processes)

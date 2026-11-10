@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from ..contracts.media_job import MediaJob
 from ..errors import PermanentError
 from ..runtime import ProcessRunner
 from ..video_analysis import frame_metadata
-from ..video_analysis.streams import last_line, ms, probe_video, tool_failure
+from ..video_analysis.streams import finite_param, last_line, ms, probe_video, tool_failure
 from . import HandlerOutcome
 
 # scdet's threshold is a percentage of the maximum change.
@@ -21,8 +20,8 @@ SCENES_NAME = "scdet.txt"
 def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
     if set(inputs) != {"video"}:
         raise PermanentError("contract_violation", "detect_shots needs exactly one input, 'video'")
-    src_in = _number(job, "srcInMs")
-    src_out = _number(job, "srcOutMs")
+    src_in = finite_param(job.params, "srcInMs")
+    src_out = finite_param(job.params, "srcOutMs")
     if src_in < 0:
         raise PermanentError(
             "contract_violation", f"param 'srcInMs' must be 0 or more, got {src_in}"
@@ -31,7 +30,7 @@ def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) 
         raise PermanentError(
             "contract_violation", f"param 'srcOutMs' ({src_out}) must be above 'srcInMs' ({src_in})"
         )
-    threshold = _number(job, "threshold")
+    threshold = finite_param(job.params, "threshold")
     low, high = THRESHOLD_RANGE
     if not low <= threshold <= high:
         raise PermanentError(
@@ -41,9 +40,21 @@ def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) 
     start, end = int(src_in), int(src_out)
 
     video = inputs["video"]
-    _, stream = probe_video(video, processes)
+    duration_ms, stream = probe_video(video, processes)
     if stream is None:
         raise tool_failure("ffprobe", "the input has no moving-picture stream")
+    if start >= duration_ms:
+        raise PermanentError(
+            "contract_violation",
+            f"param 'srcInMs' ({start}) must be before the end of the video "
+            f"(durationMs {duration_ms})",
+        )
+    end = min(end, duration_ms)
+    if end <= start:
+        raise PermanentError(
+            "contract_violation",
+            f"params 'srcInMs' ({src_in}) and 'srcOutMs' ({src_out}) span less than 1 ms",
+        )
 
     scores_file = video.parent / SCENES_NAME
     completed = processes.run(
@@ -87,15 +98,6 @@ def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) 
         },
         files=[],
     )
-
-
-def _number(job: MediaJob, field: str) -> float:
-    value = job.params.get(field)
-    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
-        raise PermanentError(
-            "contract_violation", f"detect_shots param {field!r} must be a finite number"
-        )
-    return value
 
 
 def _ffmpeg_version(processes: ProcessRunner) -> str | None:

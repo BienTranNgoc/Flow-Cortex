@@ -163,3 +163,87 @@ def test_a_stream_without_an_average_frame_rate_is_still_scanned(tmp_path: Path)
     data = detect_shots.handle(job(), {"video": tmp_path / "input"}, Scripted()).data
 
     assert data["sourceCutsMs"] == []
+
+
+class ThreeSeconds(ProcessRunner):
+    """Answers ffprobe with a 3 s clip and records the ffmpeg scans."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scans: list[list[str]] = []
+
+    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+        if argv[0] == "ffprobe":
+            body = (
+                b'{"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0"},'
+                b'"streams":[{"index":0,"codec_type":"video","width":320,"height":240}]}'
+            )
+            return subprocess.CompletedProcess(argv, 0, body, b"")
+        if "-vf" in argv:
+            self.scans.append(argv)
+        return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+
+@pytest.mark.parametrize("src_in", [3000, 5000])
+def test_window_at_or_after_the_end_is_a_contract_violation(src_in: int, tmp_path: Path) -> None:
+    runner = ThreeSeconds()
+
+    error = refused(
+        lambda: detect_shots.handle(
+            job(srcInMs=src_in, srcOutMs=9000), {"video": tmp_path / "input"}, runner
+        )
+    )
+
+    assert error.code == "contract_violation"
+    assert "srcInMs" in error.message
+    assert "durationMs 3000" in error.message
+    assert runner.scans == []
+
+
+@pytest.mark.parametrize("src_out", [9000, 1e300])
+def test_window_past_the_end_is_clamped_and_reported_as_scanned(
+    src_out: float, tmp_path: Path
+) -> None:
+    runner = ThreeSeconds()
+
+    data = detect_shots.handle(
+        job(srcInMs=1000, srcOutMs=src_out), {"video": tmp_path / "input"}, runner
+    ).data
+
+    [scan] = runner.scans
+    assert scan[scan.index("-ss") + 1] == "1.000"
+    assert scan[scan.index("-t") + 1] == "2.000"
+    assert data["detector"]["srcOutMs"] == 3000
+
+
+def test_window_inside_the_clip_is_reported_as_given(tmp_path: Path) -> None:
+    data = detect_shots.handle(
+        job(srcInMs=500, srcOutMs=2500), {"video": tmp_path / "input"}, ThreeSeconds()
+    ).data
+
+    assert (data["detector"]["srcInMs"], data["detector"]["srcOutMs"]) == (500, 2500)
+
+
+def test_window_shorter_than_a_millisecond_is_a_contract_violation(tmp_path: Path) -> None:
+    runner = ThreeSeconds()
+
+    error = refused(
+        lambda: detect_shots.handle(
+            job(srcInMs=0.2, srcOutMs=0.7), {"video": tmp_path / "input"}, runner
+        )
+    )
+
+    assert error.code == "contract_violation"
+    assert "srcOutMs" in error.message
+    assert runner.scans == []
+
+
+def test_an_integer_beyond_the_float_range_is_a_contract_violation(tmp_path: Path) -> None:
+    error = refused(
+        lambda: detect_shots.handle(
+            job(srcOutMs=10**400), {"video": tmp_path / "input"}, ThreeSeconds()
+        )
+    )
+
+    assert error.code == "contract_violation"
+    assert "srcOutMs" in error.message
