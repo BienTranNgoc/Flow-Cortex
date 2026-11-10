@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import job_body
+from conftest import job_body, understated_duration_clip
 
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError
@@ -112,6 +112,34 @@ def test_three_second_clip_is_input_rejected(tmp_path: Path) -> None:
 def test_sixty_one_second_clip_is_duration_exceeded(tmp_path: Path) -> None:
     clip = plain_clip(tmp_path / "input", seconds=61)
     assert refused(ProcessRunner(), clip).code == "duration_exceeded"
+
+
+@needs_ffmpeg
+def test_a_container_that_understates_its_length_is_encoded_only_to_the_gate(
+    tmp_path: Path,
+) -> None:
+    clip = understated_duration_clip(
+        tmp_path / "input.mkv", real_seconds=40, declared_ms=5000, rate=5
+    )
+    outcome = scene_frames.handle(job(), {"video": clip}, ProcessRunner())
+
+    assert outcome.data["durationSec"] <= 5.0
+
+
+class OvercountingRunner(ProcessRunner):
+    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+        completed = super().run(argv)
+        if "stream=nb_read_frames" in argv:
+            return subprocess.CompletedProcess(argv, 0, stdout=b"1441\n", stderr=b"")
+        return completed
+
+
+@needs_ffmpeg
+def test_a_normalised_clip_over_the_length_cap_is_duration_exceeded(tmp_path: Path) -> None:
+    clip = plain_clip(tmp_path / "input", seconds=5)
+    error = refused(OvercountingRunner(), clip)
+    assert error.code == "duration_exceeded"
+    assert "1441" in error.message
 
 
 @needs_ffmpeg

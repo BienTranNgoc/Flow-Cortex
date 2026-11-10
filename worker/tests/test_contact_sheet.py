@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import job_body
+from conftest import job_body, understated_duration_clip
 from PIL import Image
 
 from flowcortex_worker.contracts.media_job import MediaJob
@@ -95,6 +95,19 @@ def test_clip_over_the_frame_budget_is_refused_before_decoding(tmp_path: Path) -
     assert "6" in caught.value.message
     assert "4" in caught.value.message
     assert [argv[0] for argv in runner.argvs] == ["ffprobe"]
+
+
+@needs_ffmpeg
+def test_a_container_that_understates_its_length_is_decoded_only_to_the_budget(
+    tmp_path: Path,
+) -> None:
+    clip = understated_duration_clip(
+        tmp_path / "input.mkv", real_seconds=60, declared_ms=3000, rate=5
+    )
+    outcome = contact_sheet.handle(job(stepMs=500, maxFrames=6), {"video": clip}, ProcessRunner())
+
+    assert outcome.data["frames"] == 6
+    assert len(list((tmp_path / "sheet-tiles").iterdir())) <= 6
 
 
 @needs_ffmpeg

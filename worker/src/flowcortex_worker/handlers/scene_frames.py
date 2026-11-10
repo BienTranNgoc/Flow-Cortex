@@ -130,7 +130,8 @@ def handle(
             "-vf", f"scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
             f"crop={out_w}:{out_h},fps={FPS},setsar=1",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-            "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart",
+            "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest",
+            "-t", f"{duration_ms / 1000:.3f}", "-movflags", "+faststart",
             str(normalized),
         ],
         "normalising the clip",
@@ -139,6 +140,10 @@ def handle(
     # `apad` lets the picture set the length (a short audio track is padded, a long one is cut by
     # `-shortest`); counted on the normalised file, since the source container can follow the audio.
     total = _count_frames(normalized, processes)
+    if total > MAX_SEC * FPS:
+        raise PermanentError(
+            "duration_exceeded", f"the clip holds {total} frames at {FPS} fps, over {MAX_SEC:g} s"
+        )
     if given is None:
         bounds = _detected_bounds(normalized, threshold, total, processes)
     elif given[-1] != total:

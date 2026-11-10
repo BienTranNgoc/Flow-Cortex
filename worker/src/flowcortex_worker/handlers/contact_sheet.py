@@ -70,6 +70,7 @@ def handle(
     tile_w, tile_h = tile_size(stream.width, stream.height)
     tiles_dir = video_path.parent / "sheet-tiles"
     tiles_dir.mkdir(exist_ok=True)
+    # The budget was checked against the container length; stop after the last slot read back.
     completed = processes.run(
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-loglevel", "error",
@@ -77,6 +78,7 @@ def handle(
             "-i", str(video_path),
             "-map", f"0:{stream.index}",
             "-vf", f"fps=1000/{step_ms}:round=up,scale={tile_w}:{tile_h}:flags=area",
+            "-frames:v", str(needed),
             "-start_number", "0",
             str(tiles_dir / "tile_%04d.png"),
         ]
