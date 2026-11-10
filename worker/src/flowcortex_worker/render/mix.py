@@ -74,6 +74,8 @@ def _clip_chain(
     if stages:
         chain += "".join(f",atempo={stage:.6g}" for stage in stages)
         chain += f",atrim=duration={_sec(play_ms)}"
+    if not loop and not stages:
+        chain += f",atrim=duration={_sec(play_ms)}"
     if loop:
         segment = max(1, round((clip.src_out_ms - clip.src_in_ms) * SAMPLE_RATE / 1000))
         chain += (
@@ -82,7 +84,7 @@ def _clip_chain(
     if clip.fade_in_ms > 0:
         chain += f",afade=t=in:st=0:d={_sec(clip.fade_in_ms)}"
     if fade_out_ms > 0:
-        chain += f",afade=t=out:st={_sec(play_ms - fade_out_ms)}:d={_sec(fade_out_ms)}"
+        chain += f",afade=t=out:st={_sec(max(0.0, play_ms - fade_out_ms))}:d={_sec(fade_out_ms)}"
     # `adelay` can leave the first frame without a timestamp after `atempo`, and later filters
     # then drop the inserted silence; counting samples keeps the start independent of scheduling.
     delay = round(clip.at_ms)

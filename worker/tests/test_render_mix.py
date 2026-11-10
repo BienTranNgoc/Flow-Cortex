@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -12,6 +13,7 @@ from test_render_timeline import Mutate, plan
 from flowcortex_worker.render.mix import (
     ATEMPO_STAGE_MAX,
     ATEMPO_STAGE_MIN,
+    _clip_chain,
     atempo_stages,
     final_mux_command,
     loudness_measure_command,
@@ -120,6 +122,30 @@ def test_music_is_not_looped_unless_asked() -> None:
     argv, _ = mixed(lambda raw: with_music(raw, music_clip()))
     assert "aloop" not in graph_of(argv)
     assert "[scene][voice][music]amix=inputs=3" in graph_of(argv)
+
+
+@pytest.mark.parametrize("fade", [0, 500])
+def test_non_loop_music_is_cut_to_its_timeline_length_with_or_without_a_fade(fade: int) -> None:
+    argv, _ = mixed(
+        lambda raw: with_music(raw, music_clip(srcOutMs=60000, durMs=10000, fadeOutMs=fade))
+    )
+    assert ",atrim=duration=10.0000" in graph_of(argv)
+
+
+def test_a_fade_longer_than_the_clip_renders_a_valid_fade_in_both_modes() -> None:
+    for measured in (True, False):
+        clip = voice_clip(srcOutMs=2000, durMs=2000, fadeOutMs=3000)
+        pl = plan([scene(0)], mutate=voices(clip), measured=measured)
+        argv, _ = mix_command(pl, "/work/base.mp4", FILES, "/work")
+        assert ",afade=t=out:st=0.0000:d=2.0000," in graph_of(argv)
+    assert "st=-" not in graph_of(argv)
+
+
+def test_the_fade_out_start_never_goes_negative_in_the_chain() -> None:
+    pl = planned(voices(voice_clip(srcOutMs=2000, durMs=2000)))
+    clip = replace(pl.voice[0], fade_out_ms=3000)
+    chain = _clip_chain(1, clip, "[vo0]", "3.0000", loop=False, rate=1.0)
+    assert "afade=t=out:st=0.0000:d=3.0000" in chain
 
 
 def test_narration_ducks_the_music() -> None:

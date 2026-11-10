@@ -686,6 +686,37 @@ def test_voice_speed_and_length_must_agree() -> None:
     assert plan_one(clip(rate=1.5, durMs=2030)).voice[0].dur_ms == 2030
 
 
+@pytest.mark.parametrize("measured", [True, False])
+def test_voice_fades_longer_than_the_clip_are_clamped_with_a_warning(measured: bool) -> None:
+    planned = plan_one(
+        lambda raw: with_voice(
+            raw, voice_clip(srcOutMs=2000, durMs=2000, fadeInMs=2500, fadeOutMs=3000)
+        ),
+        measured=measured,
+    )
+    clip = planned.voice[0]
+    assert (clip.fade_in_ms, clip.fade_out_ms) == (2000, 2000)
+    base = "timeline.voice.tracks.vt_one.clips[0]"
+    assert any(f"{base}.fadeOutMs" in w and "3000" in w for w in planned.warnings)
+    assert any(f"{base}.fadeInMs" in w for w in planned.warnings)
+
+
+@pytest.mark.parametrize("measured", [True, False])
+def test_music_fades_longer_than_the_clip_are_clamped_with_a_warning(measured: bool) -> None:
+    planned = plan_one(
+        lambda raw: with_music(raw, music_clip(durMs=3000, fadeOutMs=5000)), measured=measured
+    )
+    clip = planned.music[0]
+    assert (clip.fade_in_ms, clip.fade_out_ms) == (0, 3000)
+    assert any("timeline.music.clips[0].fadeOutMs" in w for w in planned.warnings)
+
+
+def test_fades_inside_the_clip_are_untouched_and_silent() -> None:
+    planned = plan_one(lambda raw: with_music(raw, music_clip(fadeInMs=500, fadeOutMs=3000)))
+    assert (planned.music[0].fade_in_ms, planned.music[0].fade_out_ms) == (500, 3000)
+    assert not any("clamped" in w for w in planned.warnings)
+
+
 def test_voice_asset_shorter_than_its_segment_is_a_warning() -> None:
     probes = {**PROBES, "v1": {"durationMs": 2000}}
     planned = plan_one(lambda raw: with_voice(raw, voice_clip()), probes=probes)

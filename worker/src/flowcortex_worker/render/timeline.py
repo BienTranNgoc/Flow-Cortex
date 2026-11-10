@@ -728,6 +728,20 @@ def voice_trim(
     return TrimPlan(clip.cue_id, end, play, min(play, max(VOICE_TRIM_FADE_MS, clip.fade_out_ms)))
 
 
+def _clamp_fades(
+    path: str, play_ms: float, fade_in_ms: int, fade_out_ms: int, warnings: list[str]
+) -> tuple[int, int]:
+    """Fades cannot outlast the played length; the planned values are what the mix applies."""
+    limit = max(0, math.floor(play_ms))
+    for name, value in (("fadeInMs", fade_in_ms), ("fadeOutMs", fade_out_ms)):
+        if value > limit:
+            warnings.append(
+                f"{path}.{name}: {value} ms is longer than the {play_ms:g} ms the clip plays; "
+                f"clamped to {limit} ms"
+            )
+    return min(fade_in_ms, limit), min(fade_out_ms, limit)
+
+
 def _plan_voice(
     document: Document,
     probes: Mapping[str, Mapping[str, Any]],
@@ -758,6 +772,13 @@ def _plan_voice(
         trim = voice_trim(clip, cue_end, why_missing, path, warnings)
         if trim is not None and trim.play_ms <= 0:
             continue
+        fade_in_ms, fade_out_ms = _clamp_fades(
+            path,
+            trim.play_ms if trim is not None else clip.dur_ms,
+            clip.fade_in_ms,
+            clip.fade_out_ms,
+            warnings,
+        )
         planned.append(
             PlannedVoiceClip(
                 id=clip.id,
@@ -767,8 +788,8 @@ def _plan_voice(
                 at_ms=clip.at_ms,
                 dur_ms=clip.dur_ms,
                 gain_db=clip.gain_db,
-                fade_in_ms=clip.fade_in_ms,
-                fade_out_ms=clip.fade_out_ms,
+                fade_in_ms=fade_in_ms,
+                fade_out_ms=fade_out_ms,
                 fit_policy=clip.fit_policy,
                 rate=clip.rate,
                 trim=trim,
@@ -794,6 +815,13 @@ def _plan_music(
                 f"timeline.music.clips[{clip.index}]: asset {clip.asset_id} is {known} ms long, "
                 f"shorter than srcOutMs {clip.src_out_ms}; {effect}"
             )
+        fade_in_ms, fade_out_ms = _clamp_fades(
+            f"timeline.music.clips[{clip.index}]",
+            clip.dur_ms,
+            clip.fade_in_ms,
+            clip.fade_out_ms,
+            warnings,
+        )
         planned.append(
             PlannedMusicClip(
                 id=clip.id,
@@ -803,8 +831,8 @@ def _plan_music(
                 at_ms=clip.at_ms,
                 dur_ms=clip.dur_ms,
                 gain_db=clip.gain_db,
-                fade_in_ms=clip.fade_in_ms,
-                fade_out_ms=clip.fade_out_ms,
+                fade_in_ms=fade_in_ms,
+                fade_out_ms=fade_out_ms,
                 loop=clip.loop,
             )
         )
