@@ -127,6 +127,24 @@ class TelemetryRedactionTest extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void aShareKeyInARequestPathIsRedactedWithOrWithoutAQuery() {
+        List<Observation.Context> stopped = stoppedObservations("test.redaction.path");
+
+        Observation.createNotStarted("test.redaction.path", observations)
+                .highCardinalityKeyValue("http.url", "/api/v1/workflows/by-key/K")
+                .highCardinalityKeyValue("url.full", "http://api:8080/api/v1/workflows/by-key/K?x=1")
+                .highCardinalityKeyValue("http.target", "/api/v1/email-links/tok")
+                .start()
+                .stop();
+
+        assertThat(stopped).hasSize(1);
+        Observation.Context context = stopped.getFirst();
+        assertThat(value(context, "http.url")).isEqualTo("/api/v1/workflows/by-key/[redacted]");
+        assertThat(value(context, "url.full")).isEqualTo("http://api:8080/api/v1/workflows/by-key/[redacted]");
+        assertThat(value(context, "http.target")).isEqualTo("/api/v1/email-links/[redacted]");
+    }
+
+    @Test
     void theLogsOfAnUploadGrantAndADownloadUrlNameTheObjectButNeverTheSignedUrl(CapturedOutput output) {
         UserView user = newUser("redaction-logs");
         String token = loginAs(user);

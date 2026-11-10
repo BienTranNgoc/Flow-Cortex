@@ -39,7 +39,9 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Who can reach a workflow beyond its owner: the visibility tier and the share key that follows it, key
@@ -61,11 +63,14 @@ public class WorkflowSharingService {
     private final WorkflowAccessLog accessLog;
     private final UserDirectory userDirectory;
     private final Clock clock;
+    private final TransactionTemplate readWrite;
+    private final TransactionTemplate readOnly;
 
     WorkflowSharingService(WorkflowServiceImpl arbiter, WorkflowRepository workflowRepository,
             WorkflowStepRepository workflowStepRepository, WorkflowLinkGrantRepository grantRepository,
             WorkflowAccessLogRepository accessLogRepository, WorkflowVisibilityAuditRepository auditRepository,
-            WorkflowAccessLog accessLog, UserDirectory userDirectory, Clock clock) {
+            WorkflowAccessLog accessLog, UserDirectory userDirectory, Clock clock,
+            PlatformTransactionManager transactionManager) {
         this.arbiter = arbiter;
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -75,6 +80,9 @@ public class WorkflowSharingService {
         this.accessLog = accessLog;
         this.userDirectory = userDirectory;
         this.clock = clock;
+        this.readWrite = new TransactionTemplate(transactionManager);
+        this.readOnly = new TransactionTemplate(transactionManager);
+        this.readOnly.setReadOnly(true);
     }
 
     /**
@@ -141,36 +149,49 @@ public class WorkflowSharingService {
 
     /**
      * Admits a signed-in non-owner to the workflow through its key: records the grant, then the access-log entry.
-     * The owner presenting the key and an anonymous caller get no grant.
+     * The owner presenting the key and an anonymous caller get no grant. The entry is written after the grant
+     * transaction has released its connection: the entry has its own transaction, and nesting it would hold two
+     * pooled connections per request.
      * @throws NotFoundException for an unknown key, a key of another workflow, a draft or a deleted workflow
      * @throws LocalizedStatusException with 410 for an expired key
      */
-    @Transactional
     public void admitByKey(UUID callerId, UUID workflowId, String key, ShareOrigin origin) {
-        Instant now = clock.instant();
-        Workflow workflow = resolveKey(workflowId, key, now);
-        if (workflow.getOwnerId().equals(callerId)) {
-            return;
+        UUID admitted = readWrite.execute(status -> {
+            Instant now = clock.instant();
+            Workflow workflow = resolveKey(workflowId, key, now);
+            if (workflow.getOwnerId().equals(callerId)) {
+                return null;
+            }
+            if (callerId != null) {
+                grantRepository.admit(workflow.getId(), callerId, key, now);
+            }
+            return workflow.getId();
+        });
+        if (admitted != null) {
+            accessLog.record(admitted, callerId, origin);
         }
-        if (callerId != null) {
-            grantRepository.admit(workflow.getId(), callerId, key, now);
-        }
-        accessLog.record(workflow.getId(), callerId, origin);
     }
 
-    /** The narrowed view a share link opens; records the access-log entry and writes no grant. */
-    @Transactional(readOnly = true)
+    /**
+     * The narrowed view a share link opens; records the access-log entry after the read transaction has returned
+     * its connection, and writes no grant.
+     */
     public SharedWorkflowView sharedView(UUID callerIdOrNull, String key, ShareOrigin origin) {
-        Workflow workflow = resolveKey(null, key, clock.instant());
-        if (!workflow.getOwnerId().equals(callerIdOrNull)) {
-            accessLog.record(workflow.getId(), callerIdOrNull, origin);
+        OpenedLink opened = readOnly.execute(status -> {
+            Workflow workflow = resolveKey(null, key, clock.instant());
+            String authorName = userDirectory.findNamesByIds(List.of(workflow.getOwnerId()))
+                    .get(workflow.getOwnerId());
+            List<SharedWorkflowView.Step> steps = workflowStepRepository
+                    .findByWorkflowIdOrderByStepOrderAsc(workflow.getId()).stream()
+                    .map(step -> new SharedWorkflowView.Step(step.getStepOrder(), step.getName(), step.getType()))
+                    .toList();
+            return new OpenedLink(workflow.getOwnerId(),
+                    new SharedWorkflowView(workflow.getId(), workflow.getName(), authorName, steps));
+        });
+        if (!opened.ownerId().equals(callerIdOrNull)) {
+            accessLog.record(opened.view().id(), callerIdOrNull, origin);
         }
-        String authorName = userDirectory.findNamesByIds(List.of(workflow.getOwnerId())).get(workflow.getOwnerId());
-        List<SharedWorkflowView.Step> steps = workflowStepRepository
-                .findByWorkflowIdOrderByStepOrderAsc(workflow.getId()).stream()
-                .map(step -> new SharedWorkflowView.Step(step.getStepOrder(), step.getName(), step.getType()))
-                .toList();
-        return new SharedWorkflowView(workflow.getId(), workflow.getName(), authorName, steps);
+        return opened.view();
     }
 
     @Transactional(readOnly = true)
@@ -335,6 +356,9 @@ public class WorkflowSharingService {
     private static LocalizedStatusException pageInvalid(String parameter) {
         return new LocalizedStatusException(HttpStatus.BAD_REQUEST,
                 new LocalizedMessage("workflow.share.pageInvalid", parameter));
+    }
+
+    private record OpenedLink(UUID ownerId, SharedWorkflowView view) {
     }
 
     private record PageStart(Instant at, UUID id) {
