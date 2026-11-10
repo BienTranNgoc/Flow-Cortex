@@ -22,11 +22,13 @@ dependencies {
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
+    implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
     implementation(project(":modules:settings"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:chat"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -55,6 +57,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-resttestclient")
     testImplementation("org.springframework.boot:spring-boot-restclient")
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // The publication ITs declare their own @ApplicationModuleListener probes.
+    testImplementation("org.springframework.modulith:spring-modulith-events-api")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.flywaydb:flyway-database-postgresql")
@@ -62,9 +66,10 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    // Every distinct @SpringBootTest property set is its own cached context; past ~20 of them the
-    // default 512 MB heap runs out. Evicting the least recently used keeps the run inside 1 GB.
-    maxHeapSize = "1g"
+    // Every distinct @SpringBootTest property set is its own cached context, each a full application.
+    // Evicting the least recently used keeps at most 8 alive. 1 GB was enough for this suite alone
+    // but ran out in CI once a branch added more contexts, so the heap is 2 GB (one test JVM, 16 GB runners).
+    maxHeapSize = "2g"
     systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")
@@ -82,4 +87,27 @@ tasks.withType<Test> {
     inputs.dir(rootProject.projectDir.parentFile.resolve("contracts"))
         .withPropertyName("contracts")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+// ITs tagged multi-instance boot extra full app contexts of their own; sharing the main suite's
+// heap with its context cache runs it out of memory, so they get a JVM of their own.
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("multi-instance")
+    }
+}
+
+val multiInstanceTest by tasks.registering(Test::class) {
+    description = "Runs the ITs tagged multi-instance in their own JVM."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("multi-instance")
+    }
+    shouldRunAfter(tasks.test)
+}
+
+tasks.check {
+    dependsOn(multiInstanceTest)
 }

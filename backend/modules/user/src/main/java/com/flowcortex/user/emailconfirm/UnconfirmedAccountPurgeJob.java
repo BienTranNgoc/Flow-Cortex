@@ -1,15 +1,18 @@
 package com.flowcortex.user.emailconfirm;
 
+import com.flowcortex.jobs.api.ClusterJob;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -19,12 +22,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * EmailConfirmationProperties#unconfirmedAccountRetention()} ago and holding no link that could still
  * confirm them. A confirmed account is never touched. Their links, sessions and phone rows go with
  * them (ON DELETE CASCADE); audit rows keep the id until their own retention. Such an account never
- * received the signup grant, so the credit tables hold nothing for it. Runs in every instance; the
- * delete is idempotent. Works in batches of {@link EmailConfirmationProperties#purgeBatchSize()}, each
+ * received the signup grant, so the credit tables hold nothing for it. Runs on one instance at a time through
+ * the cluster runner; the delete stays idempotent. Works in batches of {@link EmailConfirmationProperties#purgeBatchSize()}, each
  * in its own transaction, until a batch comes back short.
  */
 @Component
-public class UnconfirmedAccountPurgeJob {
+public class UnconfirmedAccountPurgeJob implements ClusterJob {
 
     private static final Logger LOG = LoggerFactory.getLogger(UnconfirmedAccountPurgeJob.class);
 
@@ -49,20 +52,38 @@ public class UnconfirmedAccountPurgeJob {
     private final EmailConfirmationProperties properties;
     private final Clock clock;
     private final TransactionTemplate transaction;
+    private final Duration interval;
 
+    @Autowired
     UnconfirmedAccountPurgeJob(NamedParameterJdbcTemplate jdbc, EmailConfirmationProperties properties, Clock clock,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            @Value("${flowcortex.auth.retention.interval}") Duration interval) {
         this.jdbc = jdbc;
         this.properties = properties;
         this.clock = clock;
         this.transaction = new TransactionTemplate(transactionManager);
+        this.interval = interval;
+    }
+
+    @Override
+    public String name() {
+        return "user.unconfirmed-account-purge";
+    }
+
+    @Override
+    public Duration interval() {
+        return interval;
+    }
+
+    @Override
+    public void run() {
+        purge();
     }
 
     /**
      * A batch that locked fewer rows than its size ends the run. An account a batch locked but kept (a
      * link arrived) no longer matches, and a held one is skipped, so no batch repeats the last.
      */
-    @Scheduled(fixedDelayString = "${flowcortex.auth.retention.interval}")
     public void purge() {
         Instant now = Instant.now(clock);
         int batchSize = properties.purgeBatchSize();

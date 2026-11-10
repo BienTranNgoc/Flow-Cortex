@@ -29,14 +29,15 @@ class RequestRepository {
 
     private static final String REQUEST_COLUMNS = "id, number, requester_id, type, subject, status, "
             + "ai_conversation_id, ai_conversation_linked, member_unread, last_activity_at, resolved_at, "
-            + "resolved_seen_at, closed_reason, created_at, assignee_id";
+            + "resolved_seen_at, closed_reason, created_at, assignee_id, locale";
     private static final RowMapper<RequestRow> REQUEST = (rs, n) -> new RequestRow(
             rs.getObject("id", UUID.class), rs.getLong("number"), rs.getObject("requester_id", UUID.class),
             rs.getString("type"), rs.getString("subject"), RequestStatus.of(rs.getString("status")),
             rs.getObject("ai_conversation_id", UUID.class), rs.getBoolean("ai_conversation_linked"),
             rs.getBoolean("member_unread"),
             instant(rs, "last_activity_at"), instant(rs, "resolved_at"), instant(rs, "resolved_seen_at"),
-            rs.getString("closed_reason"), instant(rs, "created_at"), rs.getObject("assignee_id", UUID.class));
+            rs.getString("closed_reason"), instant(rs, "created_at"), rs.getObject("assignee_id", UUID.class),
+            rs.getString("locale"));
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -48,10 +49,12 @@ class RequestRepository {
      * @param aiConversationLinked whether the request was filed with a conversation; it stays true once the
      *        retention job deletes that conversation and {@code aiConversationId} becomes null
      * @param assigneeId the staff account the request is assigned to, or null
+     * @param locale the language the member filed the request in
      */
     record RequestRow(UUID id, long number, UUID requesterId, String type, String subject, RequestStatus status,
             UUID aiConversationId, boolean aiConversationLinked, boolean memberUnread, Instant lastActivityAt,
-            Instant resolvedAt, Instant resolvedSeenAt, String closedReason, Instant createdAt, UUID assigneeId) {
+            Instant resolvedAt, Instant resolvedSeenAt, String closedReason, Instant createdAt, UUID assigneeId,
+            String locale) {
     }
 
     /** Raw inbox counts: only the options that have requests appear; {@code people} are the largest groups. */

@@ -59,7 +59,8 @@
         "creditsBilling": "Credits & Billing",
         "administration": "Administration",
         "system": "System",
-        "support": "Support"
+        "support": "Support",
+        "chat": "Chat"
       },
       "items": {
         "dashboard": "Dashboard",
@@ -80,7 +81,8 @@
         "supportGroups": "Topics",
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
-        "adminAccounts": "Admin accounts"
+        "adminAccounts": "Admin accounts",
+        "chatSettings": "Settings"
       }
     },
     "noAccess": {

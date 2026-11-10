@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":modules:jobs"))
     implementation(project(":modules:user"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:media"))
@@ -16,8 +17,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // The convention plugin brings only the Modulith core starter, which has no events API.
+    implementation("org.springframework.modulith:spring-modulith-starter-jpa")
     implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
-    implementation("org.commonmark:commonmark:${providers.gradleProperty("commonmarkVersion").get()}")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
     implementation("io.micrometer:micrometer-core")

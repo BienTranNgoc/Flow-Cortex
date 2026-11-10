@@ -9,11 +9,13 @@ include(
     ":modules:workflow",
     ":modules:media",
     ":modules:credit",
+    ":modules:jobs",
     ":modules:llm",
     ":modules:support",
     ":modules:settings",
     ":modules:space",
     ":modules:realtime",
+    ":modules:chat",
     ":shared:web",
     ":shared:security",
 )
