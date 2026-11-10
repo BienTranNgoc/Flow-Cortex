@@ -26,9 +26,10 @@ class RunCancellationTest {
     private final RunStepRepository steps = mock(RunStepRepository.class);
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
+    private final ChildRuns childRuns = mock(ChildRuns.class);
     private final RunCancellation cancellation = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, true);
+            runUpdates, childRuns, true);
 
     private final UUID ownerId = UUID.randomUUID();
     private final UUID runId = UUID.randomUUID();
@@ -43,6 +44,52 @@ class RunCancellationTest {
         cancellation.cancelRun(ownerId, runId);
 
         verify(runUpdates).touched(runId);
+    }
+
+    @Test
+    void cancellingARunStopsItsChildren() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(1);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        verify(childRuns).stopChildrenOf(runId);
+    }
+
+    @Test
+    void aRunSettledAtOnceSignalsIt() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(1);
+        when(runs.settleCancelled(runId, NOW)).thenReturn(1);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void aRunLeftCancellingSignalsNothingFinished() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(1);
+        when(runs.settleCancelled(runId, NOW)).thenReturn(0);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        verify(childRuns, never()).finished(any());
+    }
+
+    @Test
+    void aStopOnARunAlreadyStoppingStopsNoChildren() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(0);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        verify(childRuns, never()).stopChildrenOf(any());
     }
 
     @Test

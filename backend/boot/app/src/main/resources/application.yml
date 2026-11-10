@@ -29,6 +29,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    postgresql:
+      # The default transaction-scoped migration lock keeps a snapshot open for the whole run, which
+      # makes CREATE INDEX CONCURRENTLY wait on Flyway itself forever; a session lock does not.
+      transactional-lock: false
 
   # Bounds Boot's own applicationTaskExecutor, which runs every @Async and
   # @ApplicationModuleListener and the engine's inline steps. Declaring an
@@ -321,6 +325,10 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    call:
+      # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
+      # child is stopped. Covers a child of four media steps at their queue and run bounds.
+      max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,

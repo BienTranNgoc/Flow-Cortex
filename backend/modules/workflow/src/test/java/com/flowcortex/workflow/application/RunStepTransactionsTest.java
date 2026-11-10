@@ -33,8 +33,9 @@ class RunStepTransactionsTest {
     private final RunStepRepository runStepRepository = mock(RunStepRepository.class);
     private final WorkflowRunRepository workflowRunRepository = mock(WorkflowRunRepository.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
-    private final RunStepTransactions transactions =
-            new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class), runUpdates);
+    private final ChildRuns childRuns = mock(ChildRuns.class);
+    private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository,
+            workflowRunRepository, mock(CreditAccounts.class), runUpdates, childRuns);
 
     private final UUID runId = UUID.randomUUID();
     private final UUID stepId = UUID.randomUUID();
@@ -236,6 +237,67 @@ class RunStepTransactionsTest {
                 NOW.plusSeconds(300));
 
         verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void completingTheLastStepSignalsTheRunFinished() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void completingAStepWhileAnotherIsOpenSignalsNothingFinished() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
+        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+
+        verify(childRuns, never()).finished(any());
+    }
+
+    @Test
+    void aFailureThatErrorsTheRunSignalsIt() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void aFailureThatSettlesACancellingRunSignalsItFinished() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
+        when(workflowRunRepository.settleCancelled(runId, NOW)).thenReturn(1);
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void aWinningFailureStopsTheStepsChild() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "run_timeout", "late", NOW)).thenReturn(1);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.fail(runId, stepId, (short) 1, "run_timeout", "late", NOW);
+
+        verify(childRuns).stopChildOfStep(stepId);
+    }
+
+    @Test
+    void aLostFailureStopsNothing() {
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+
+        transactions.fail(runId, stepId, (short) 1, "run_timeout", "late", NOW);
+
+        verify(childRuns, never()).stopChildOfStep(any());
+        verify(childRuns, never()).finished(any());
     }
 
     @Test

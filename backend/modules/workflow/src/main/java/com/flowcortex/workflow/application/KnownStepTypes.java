@@ -92,7 +92,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
-            return fault;
+            return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

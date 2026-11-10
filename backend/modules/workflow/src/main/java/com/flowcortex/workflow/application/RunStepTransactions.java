@@ -48,13 +48,15 @@ class RunStepTransactions {
     private final WorkflowRunRepository workflowRunRepository;
     private final CreditAccounts creditAccounts;
     private final RunUpdates runUpdates;
+    private final ChildRuns childRuns;
 
     RunStepTransactions(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            CreditAccounts creditAccounts, RunUpdates runUpdates) {
+            CreditAccounts creditAccounts, RunUpdates runUpdates, ChildRuns childRuns) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.creditAccounts = creditAccounts;
         this.runUpdates = runUpdates;
+        this.childRuns = childRuns;
     }
 
     /**
@@ -173,6 +175,7 @@ class RunStepTransactions {
         }
         runUpdates.touched(runId);
         creditAccounts.refundStep(runId, stepId, code);
+        childRuns.stopChildOfStep(stepId);
         if (settleIfCancelling(runId, now)) {
             return true;
         }
@@ -180,6 +183,7 @@ class RunStepTransactions {
         if (run.markError(message, now)) {
             workflowRunRepository.save(run);
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
         }
         return true;
@@ -198,6 +202,7 @@ class RunStepTransactions {
             run.markCompleted(now);
             workflowRunRepository.save(run);
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
     }
@@ -208,6 +213,7 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
+        childRuns.finished(runId);
         LOG.info("Workflow run finished: runId={} status=cancelled", runId);
         return true;
     }
