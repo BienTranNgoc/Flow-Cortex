@@ -33,6 +33,10 @@ class BaseUrlPinTest {
             "https://api.example.com#frag",
             "https://api.example.com/v1/../x",
             "https://api.example.com/v1/%2e%2e/x",
+            "https://api.example.com/v1/..;/x",
+            "https://api.example.com/v1/..%2Fx",
+            "https://api.example.com/v1/%2e%2e%2fx",
+            "https://api.example.com/v1/..%5Cx",
             "/relative/path",
             "",
             "not a url"})
@@ -67,6 +71,11 @@ class BaseUrlPinTest {
             "https://api.notion.com/v1/%2e%2e/admin",
             "https://api.notion.com/v1/%2E%2E/admin",
             "https://api.notion.com/v1/./pages",
+            "https://api.notion.com/v1/..;/admin",
+            "https://api.notion.com/v1/..%2F..%2Fadmin",
+            "https://api.notion.com/v1/%2e%2e%2fadmin",
+            "https://api.notion.com/v1/..%5Cadmin",
+            "https://api.notion.com/v1/%2f%2e%2e/admin",
             "https://api.notion.com:8443/v1/pages",
             "http://api.notion.com/v1/pages",
             "https://api.notion.com/other",
@@ -75,6 +84,12 @@ class BaseUrlPinTest {
             ""})
     void aTargetOutsideTheBaseIsRefused(String target) {
         assertThat(BaseUrlPin.allows(NOTION, target)).isFalse();
+    }
+
+    @Test
+    void aMatrixParameterOnAnOrdinarySegmentIsAllowed() {
+        assertThat(BaseUrlPin.allows(NOTION, "https://api.notion.com/v1/items;v=2/pages")).isTrue();
+        assertThat(BaseUrlPin.normalize("https://api.example.com/v1;x=1/items")).isNotEmpty();
     }
 
     @Test

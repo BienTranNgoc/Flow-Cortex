@@ -2,6 +2,8 @@ package com.flowcortex.connector.application;
 
 import com.flowcortex.connector.api.ConnectorConnection;
 import com.flowcortex.connector.api.ConnectorCredentials;
+import com.flowcortex.connector.api.ConnectorCredentials.ActiveCredential;
+import com.flowcortex.connector.api.ConnectorCredentials.SealedTokens;
 import com.flowcortex.connector.api.ConnectorException;
 import com.flowcortex.connector.api.ConnectorException.Reason;
 import com.flowcortex.connector.api.ConnectorTokens;
@@ -19,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * The only door through which a connector service reads a stored credential: it resolves the member,
- * runs {@link ConnectorUseGate}, and reads tokens only after the gate allowed the call.
+ * runs {@link ConnectorUseGate} on the connection view, and decrypts tokens only after the gate allowed the call.
  */
 @Service
 public class ConnectorAccess {
@@ -54,13 +56,20 @@ public class ConnectorAccess {
     private Granted acquire(UUID memberId, String provider, boolean switchOn, Operation operation,
             boolean withTokens) {
         boolean suspended = isSuspended(memberId);
-        Optional<ConnectorConnection> connection = suspended || !switchOn
-                ? Optional.empty() : credentials.find(memberId, provider);
+        boolean reachable = !suspended && switchOn;
+        Optional<ConnectorConnection> connection = Optional.empty();
+        SealedTokens sealed = null;
+        if (reachable && withTokens) {
+            Optional<ActiveCredential> active = credentials.readActive(memberId, provider);
+            connection = active.map(ActiveCredential::connection);
+            sealed = active.map(ActiveCredential::tokens).orElse(null);
+        } else if (reachable) {
+            connection = credentials.find(memberId, provider);
+        }
         boolean connected = connection.map(ConnectorConnection::active).orElse(false);
         boolean usageEnabled = connection.map(ConnectorConnection::usageEnabled).orElse(false);
         enforce(ConnectorUseGate.decide(new GateInput(suspended, switchOn, connected, usageEnabled, operation)));
-        ConnectorTokens tokens = withTokens ? readTokens(memberId, provider) : null;
-        return new Granted(connection.orElseThrow(), tokens);
+        return new Granted(connection.orElseThrow(), sealed == null ? null : open(sealed));
     }
 
     private boolean isSuspended(UUID memberId) {
@@ -73,10 +82,9 @@ public class ConnectorAccess {
         }
     }
 
-    private ConnectorTokens readTokens(UUID memberId, String provider) {
+    private static ConnectorTokens open(SealedTokens sealed) {
         try {
-            return credentials.readTokens(memberId, provider)
-                    .orElseThrow(() -> ConnectorException.of(Reason.NOT_CONNECTED));
+            return sealed.open();
         } catch (CredentialUnreadableException ex) {
             throw ConnectorException.of(Reason.CREDENTIAL_UNREADABLE);
         }

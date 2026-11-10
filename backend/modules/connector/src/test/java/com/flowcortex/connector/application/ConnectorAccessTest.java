@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.connector.api.ConnectorConnection;
 import com.flowcortex.connector.api.ConnectorCredentials;
+import com.flowcortex.connector.api.ConnectorCredentials.ActiveCredential;
 import com.flowcortex.connector.api.ConnectorException;
 import com.flowcortex.connector.api.ConnectorTokens;
 import com.flowcortex.connector.api.CredentialUnreadableException;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -78,13 +80,15 @@ class ConnectorAccessTest {
     void useReturnsTheConnectionAndTheTokens() {
         memberExists();
         ConnectorTokens tokens = new ConnectorTokens("secret", null, null, List.of());
-        when(credentials.find(member, PROVIDER)).thenReturn(Optional.of(connection(true, true)));
-        when(credentials.readTokens(member, PROVIDER)).thenReturn(Optional.of(tokens));
+        ConnectorConnection view = connection(true, true);
+        when(credentials.readActive(member, PROVIDER)).thenReturn(Optional.of(new ActiveCredential(view, () -> tokens)));
 
         ConnectorAccess.Granted granted = access.use(member, PROVIDER, true);
 
         assertThat(granted.tokens()).isSameAs(tokens);
-        assertThat(granted.connection().provider()).isEqualTo(PROVIDER);
+        assertThat(granted.connection()).isSameAs(view);
+        verify(credentials, never()).find(any(), any());
+        verify(credentials, never()).readTokens(any(), any());
     }
 
     @Test
@@ -101,32 +105,65 @@ class ConnectorAccessTest {
     @Test
     void anInactiveConnectionIsNotConnected() {
         memberExists();
-        when(credentials.find(member, PROVIDER)).thenReturn(Optional.of(connection(false, true)));
+        when(credentials.readActive(member, PROVIDER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> access.manage(member, PROVIDER, true, true))
                 .isInstanceOfSatisfying(ConnectorException.class,
                         e -> assertThat(e.reason()).isEqualTo(ConnectorException.Reason.NOT_CONNECTED));
-        verify(credentials, never()).readTokens(any(), any());
+    }
+
+    private static ConnectorCredentials.SealedTokens unreadable(AtomicInteger opened) {
+        return () -> {
+            opened.incrementAndGet();
+            throw new CredentialUnreadableException("bad");
+        };
     }
 
     @Test
-    void anUnreadableCredentialAsksForAReconnect() {
+    void anAllowedCallOnAnUnreadableCredentialAsksForAReconnect() {
         memberExists();
-        when(credentials.find(member, PROVIDER)).thenReturn(Optional.of(connection(true, true)));
-        when(credentials.readTokens(member, PROVIDER)).thenThrow(new CredentialUnreadableException("bad"));
+        AtomicInteger opened = new AtomicInteger();
+        when(credentials.readActive(member, PROVIDER))
+                .thenReturn(Optional.of(new ActiveCredential(connection(true, true), unreadable(opened))));
 
         assertThatThrownBy(() -> access.use(member, PROVIDER, true))
                 .isInstanceOfSatisfying(ConnectorException.class, e -> {
                     assertThat(e.reason()).isEqualTo(ConnectorException.Reason.CREDENTIAL_UNREADABLE);
                     assertThat(e.detail().code()).isEqualTo("connector.credentialUnreadable");
                 });
+        assertThat(opened).hasValue(1);
+    }
+
+    @Test
+    void usageOffWithAnUnreadableCredentialAnswersUsageDisabledWithoutDecrypting() {
+        memberExists();
+        AtomicInteger opened = new AtomicInteger();
+        when(credentials.readActive(member, PROVIDER))
+                .thenReturn(Optional.of(new ActiveCredential(connection(true, false), unreadable(opened))));
+
+        assertThatThrownBy(() -> access.use(member, PROVIDER, true))
+                .isInstanceOfSatisfying(ConnectorException.class,
+                        e -> assertThat(e.reason()).isEqualTo(ConnectorException.Reason.USAGE_DISABLED));
+        assertThat(opened).hasValue(0);
+    }
+
+    @Test
+    void manageWithTokensOnAnUnreadableCredentialAsksForAReconnectWhenUsageIsOff() {
+        memberExists();
+        AtomicInteger opened = new AtomicInteger();
+        when(credentials.readActive(member, PROVIDER))
+                .thenReturn(Optional.of(new ActiveCredential(connection(true, false), unreadable(opened))));
+
+        assertThatThrownBy(() -> access.manage(member, PROVIDER, true, true))
+                .isInstanceOfSatisfying(ConnectorException.class,
+                        e -> assertThat(e.reason()).isEqualTo(ConnectorException.Reason.CREDENTIAL_UNREADABLE));
+        assertThat(opened).hasValue(1);
     }
 
     @Test
     void aRowRevokedBetweenTheChecksIsNotConnected() {
         memberExists();
-        when(credentials.find(member, PROVIDER)).thenReturn(Optional.of(connection(true, true)));
-        when(credentials.readTokens(member, PROVIDER)).thenReturn(Optional.empty());
+        when(credentials.readActive(member, PROVIDER)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> access.use(member, PROVIDER, true))
                 .isInstanceOfSatisfying(ConnectorException.class,

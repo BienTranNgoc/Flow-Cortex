@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Encrypts on the way in, decrypts only in {@link #readTokens}; logs the provider and the outcome, never a token. */
+/** Encrypts on the way in, decrypts only in {@link #readTokens} and in the handle {@link #readActive} returns; logs the provider and the outcome, never a token. */
 @Service
 class ConnectorCredentialsImpl implements ConnectorCredentials {
 
@@ -69,17 +69,28 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
         requireProvider(provider);
         return repository.findByUserIdAndProvider(userId, provider)
                 .filter(ConnectorAuth::isActive)
-                .map(row -> {
-                    try {
-                        String refresh = row.getRefreshToken();
-                        return new ConnectorTokens(cipher.decrypt(userId, provider, row.getAccessToken()),
-                                refresh == null ? null : cipher.decrypt(userId, provider, refresh),
-                                row.getExpiresAt(), List.copyOf(row.getScopes()));
-                    } catch (RuntimeException ex) {
-                        LOG.warn("Connector {} credential unreadable", provider);
-                        throw ex;
-                    }
-                });
+                .map(row -> decrypt(userId, provider, row));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ActiveCredential> readActive(UUID userId, String provider) {
+        requireProvider(provider);
+        return repository.findByUserIdAndProvider(userId, provider)
+                .filter(ConnectorAuth::isActive)
+                .map(row -> new ActiveCredential(view(row), () -> decrypt(userId, provider, row)));
+    }
+
+    private ConnectorTokens decrypt(UUID userId, String provider, ConnectorAuth row) {
+        try {
+            String refresh = row.getRefreshToken();
+            return new ConnectorTokens(cipher.decrypt(userId, provider, row.getAccessToken()),
+                    refresh == null ? null : cipher.decrypt(userId, provider, refresh),
+                    row.getExpiresAt(), List.copyOf(row.getScopes()));
+        } catch (RuntimeException ex) {
+            LOG.warn("Connector {} credential unreadable", provider);
+            throw ex;
+        }
     }
 
     @Override

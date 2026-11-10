@@ -88,10 +88,19 @@ final class BaseUrlPin {
                 && !host.equals("localhost") && !host.endsWith(".localhost");
     }
 
-    /** A {@code .} or {@code ..} segment, literal or percent-encoded. */
+    /**
+     * A segment an upstream may resolve as a traversal: {@code .} or {@code ..} (literal, percent-encoded or
+     * followed by a {@code ;} path parameter), or any segment hiding an encoded slash or backslash.
+     * Refused rather than normalised because the backend cannot know how the upstream reads the path.
+     */
     private static boolean hasDotSegment(String rawPath) {
         for (String segment : rawPath.split("/", -1)) {
-            String decoded = decode(segment);
+            String lower = segment.toLowerCase(Locale.ROOT);
+            if (lower.contains("%2f") || lower.contains("%5c")) {
+                return true;
+            }
+            int param = segment.indexOf(';');
+            String decoded = decode(param < 0 ? segment : segment.substring(0, param));
             if (decoded.equals(".") || decoded.equals("..")) {
                 return true;
             }

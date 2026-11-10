@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * connection that belongs to someone else answers exactly like one that does not exist (empty
  * or {@code false}). {@code provider} must match {@code [a-z][a-z0-9_-]{0,63}}, otherwise
  * {@link IllegalArgumentException}. The implementation never logs or returns a token except
- * through {@link #readTokens}.
+ * through {@link #readTokens} and {@link #readActive}.
  */
 public interface ConnectorCredentials {
 
@@ -32,6 +32,29 @@ public interface ConnectorCredentials {
      * @throws CredentialUnreadableException when the active connection's ciphertext fails authentication
      */
     Optional<ConnectorTokens> readTokens(UUID userId, String provider);
+
+    /**
+     * The connection view and a handle that decrypts the tokens of that same row, read in one transaction so the
+     * two can never come from different saves; empty when inactive or absent. Nothing is decrypted here, so an
+     * unreadable ciphertext surfaces only when the handle is opened.
+     */
+    Optional<ActiveCredential> readActive(UUID userId, String provider);
+
+    /** A connection view together with a decrypt-later handle on the tokens of the same stored row. */
+    record ActiveCredential(ConnectorConnection connection, SealedTokens tokens) {
+    }
+
+    /** Still-encrypted tokens of one stored row. */
+    @FunctionalInterface
+    interface SealedTokens {
+
+        /**
+         * Decrypts the tokens.
+         *
+         * @throws CredentialUnreadableException when the ciphertext fails authentication
+         */
+        ConnectorTokens open();
+    }
 
     /**
      * Stores new tokens on an active connection; a {@code null} {@code refreshToken} or {@code scopes}

@@ -188,7 +188,20 @@ class ConnectorCredentialsIT extends AbstractPostgresBootTest {
         assertThat(after.get("is_active")).isEqualTo(false);
         assertThat(after.get("usage_enabled")).isEqualTo(true);
         assertThat(credentials.readTokens(member, "google")).isEmpty();
+        assertThat(credentials.readActive(member, "google")).isEmpty();
         assertThat(credentials.find(member, "google").orElseThrow().active()).isFalse();
+    }
+
+    @Test
+    void readActiveReturnsTheViewAndTheTokensOfTheSameRow() {
+        UUID member = UUID.randomUUID();
+        credentials.connect(member, "http-crm", tokens("acc-1", "ref-1", List.of("s")), Map.of("baseUrl", "https://a"));
+
+        ConnectorCredentials.ActiveCredential active = credentials.readActive(member, "http-crm").orElseThrow();
+
+        assertThat(active.connection().metadata()).containsEntry("baseUrl", "https://a");
+        assertThat(active.tokens().open().accessToken()).isEqualTo("acc-1");
+        assertThat(credentials.readActive(UUID.randomUUID(), "http-crm")).isEmpty();
     }
 
     @Test

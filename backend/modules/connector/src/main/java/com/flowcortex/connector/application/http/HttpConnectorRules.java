@@ -169,7 +169,7 @@ final class HttpConnectorRules {
         Map<String, String> headers = new LinkedHashMap<>(secret.extraHeaders());
         Set<String> taken = new HashSet<>();
         secret.extraHeaders().keySet().forEach(name -> taken.add(lower(name)));
-        boolean contentType = false;
+        boolean contentType = taken.contains("content-type");
         if (request.headers() != null) {
             for (Map.Entry<String, String> entry : request.headers().entrySet()) {
                 String name = entry.getKey() == null ? "" : entry.getKey().trim();

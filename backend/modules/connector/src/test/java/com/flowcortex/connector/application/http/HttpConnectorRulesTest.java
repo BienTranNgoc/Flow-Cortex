@@ -304,6 +304,17 @@ class HttpConnectorRulesTest {
     }
 
     @Test
+    void aSavedExtraContentTypeSurvivesAnObjectBody() {
+        HttpSecret.Decoded saved = new HttpSecret.Decoded("t", Map.of("content-type", "application/vnd.api+json"));
+
+        Prepared prepared = HttpConnectorRules.prepare(BEARER, saved,
+                call("POST", BASE + "/x", null, Map.of("title", "x")));
+
+        assertThat(prepared.headers()).containsEntry("content-type", "application/vnd.api+json")
+                .doesNotContainKey("Content-Type");
+    }
+
+    @Test
     void noBodyMeansNoContentType() {
         assertThat(HttpConnectorRules.prepare(BEARER, secret("t"), call("POST", BASE + "/x", null, null)).headers())
                 .doesNotContainKey("Content-Type");
