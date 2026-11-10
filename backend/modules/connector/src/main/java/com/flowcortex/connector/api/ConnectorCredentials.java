@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * The per-member store of provider credentials. Every call is scoped to {@code userId}: a
@@ -14,6 +15,9 @@ import java.util.UUID;
  * through {@link #readTokens}.
  */
 public interface ConnectorCredentials {
+
+    /** The slug every {@code provider} argument must match. */
+    Pattern PROVIDER_PATTERN = Pattern.compile("[a-z][a-z0-9_-]{0,63}");
 
     /** Creates or replaces the connection: active, usage enabled, not revoked; scopes come from {@code tokens}. */
     void connect(UUID userId, String provider, ConnectorTokens tokens, Map<String, Object> metadata);
@@ -41,6 +45,17 @@ public interface ConnectorCredentials {
 
     /** Sets (not toggles) the usage flag of an active connection; {@code false} when nothing changed. */
     boolean setUsageEnabled(UUID userId, String provider, boolean enabled);
+
+    /**
+     * Merges {@code patch} into the metadata of an active connection at the top level: keys of the patch
+     * replace the stored ones, every other key is kept, and the usage flag is untouched. When
+     * {@code requires} is not {@code null}, the stored metadata must contain it (jsonb containment, so a
+     * list matches when one of its elements contains the required element), otherwise nothing changes.
+     * The metadata is readable by any caller of {@link #find}, so it must hold no secret.
+     *
+     * @return {@code false} when the connection is absent, inactive, not the member's, or {@code requires} failed
+     */
+    boolean mergeMetadata(UUID userId, String provider, Map<String, Object> patch, Map<String, Object> requires);
 
     /** Deletes the connection; {@code false} when none existed. */
     boolean disconnect(UUID userId, String provider);

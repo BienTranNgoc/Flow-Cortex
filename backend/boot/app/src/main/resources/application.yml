@@ -282,6 +282,13 @@ flowcortex:
   connectors:
     encryption:
       current: ${FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT:}
+    # Off means every Telegram route and send answers 503 and no request leaves for Telegram.
+    # api.telegram.org must also be on the egress proxy's allowlist.
+    telegram:
+      enabled: ${FLOWCORTEX_CONNECTORS_TELEGRAM_ENABLED:false}
+      api-base-url: https://api.telegram.org
+      read-timeout: 8s
+      send-timeout: 15s
   # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:

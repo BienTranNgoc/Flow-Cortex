@@ -646,6 +646,90 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export interface TelegramRefreshChatsRequest {
+  chatId?: number;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  title?: string;
+  /** @pattern private|group|supergroup|channel */
+  type?: string;
+}
+
+export interface Chat {
+  id?: number;
+  title?: string;
+  type?: string;
+}
+
+export interface TelegramChatList {
+  chats?: Chat[];
+}
+
+export interface TelegramConnectRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  botToken: string;
+}
+
+export interface TelegramConnection {
+  provider?: string;
+  botUsername?: string;
+  botId?: number;
+  state?: string;
+  chats?: Chat[];
+  defaultChatId?: number;
+  usageEnabled?: boolean;
+}
+
+export type SaveRequestExtraHeaders = { [key: string]: string };
+
+export interface SaveRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  key?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  label?: string;
+  /** @pattern bearer|header|query */
+  authType: string;
+  /**
+   * @minLength 0
+   * @maxLength 4096
+   */
+  token?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  baseUrl?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  headerName?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  paramName?: string;
+  extraHeaders?: SaveRequestExtraHeaders;
+}
+
+export interface Saved {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+}
+
 export interface ResetPasswordRequest {
   /**
    * @minLength 0
@@ -753,6 +837,15 @@ export interface AdminSupportRequestReply {
   /** @maxItems 3 */
   uploadIds?: string[];
   status: AdminSupportRequestReplyStatus;
+}
+
+export interface TelegramDefaultChatRequest {
+  chatId: number;
+}
+
+export interface TelegramDefaultChat {
+  state?: string;
+  defaultChatId?: number;
 }
 
 export type WorkflowStepResponseMode =
@@ -912,6 +1005,23 @@ export interface FeaturesResponse {
 
 export interface BalanceResponse {
   balance?: number;
+}
+
+export interface TelegramHealth {
+  valid?: boolean;
+  provider?: string;
+  botUsername?: string;
+  reason?: string;
+}
+
+export interface Summary {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+  headerName?: string;
+  paramName?: string;
+  extraHeaderNames?: string[];
 }
 
 export interface CapabilitiesResponse {
@@ -2716,6 +2826,164 @@ export const sendCode = async (
   });
 };
 
+export type refreshChatsResponse200 = {
+  data: TelegramChatList;
+  status: 200;
+};
+
+export type refreshChatsResponseSuccess = refreshChatsResponse200 & {
+  headers: Headers;
+};
+export type refreshChatsResponse = refreshChatsResponseSuccess;
+
+export const getRefreshChatsUrl = () => {
+  return `/api/v1/connectors/telegram/refresh-chats`;
+};
+
+export const refreshChats = async (
+  telegramRefreshChatsRequest?: TelegramRefreshChatsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<refreshChatsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<refreshChatsResponse>(getRefreshChatsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramRefreshChatsRequest),
+  });
+};
+
+export type connectResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type connectResponseSuccess = connectResponse200 & {
+  headers: Headers;
+};
+export type connectResponse = connectResponseSuccess;
+
+export const getConnectUrl = () => {
+  return `/api/v1/connectors/telegram/connect`;
+};
+
+export const connect = async (
+  telegramConnectRequest: TelegramConnectRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<connectResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<connectResponse>(getConnectUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramConnectRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: Summary[];
+  status: 200;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1Response = list1ResponseSuccess;
+
+export const getList1Url = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveResponse200 = {
+  data: Saved;
+  status: 200;
+};
+
+export type saveResponseSuccess = saveResponse200 & {
+  headers: Headers;
+};
+export type saveResponse = saveResponseSuccess;
+
+export const getSaveUrl = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const save = async (
+  saveRequest: SaveRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveResponse>(getSaveUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveRequest),
+  });
+};
+
 export type resetPasswordResponse200 = {
   data: PasswordResetResponse;
   status: 200;
@@ -3456,6 +3724,51 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
+export type setDefaultChatResponse200 = {
+  data: TelegramDefaultChat;
+  status: 200;
+};
+
+export type setDefaultChatResponseSuccess = setDefaultChatResponse200 & {
+  headers: Headers;
+};
+export type setDefaultChatResponse = setDefaultChatResponseSuccess;
+
+export const getSetDefaultChatUrl = () => {
+  return `/api/v1/connectors/telegram/default-chat`;
+};
+
+export const setDefaultChat = async (
+  telegramDefaultChatRequest: TelegramDefaultChatRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setDefaultChatResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setDefaultChatResponse>(getSetDefaultChatUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramDefaultChatRequest),
+  });
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -4096,6 +4409,50 @@ export const balance = async (
   });
 };
 
+export type readResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type readResponseSuccess = readResponse200 & {
+  headers: Headers;
+};
+export type readResponse = readResponseSuccess;
+
+export const getReadUrl = () => {
+  return `/api/v1/connectors/telegram`;
+};
+
+export const read = async (options?: Parameters<typeof customFetch>[1]): Promise<readResponse> => {
+  return customFetch<readResponse>(getReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type health1Response200 = {
+  data: TelegramHealth;
+  status: 200;
+};
+
+export type health1ResponseSuccess = health1Response200 & {
+  headers: Headers;
+};
+export type health1Response = health1ResponseSuccess;
+
+export const getHealth1Url = () => {
+  return `/api/v1/connectors/telegram/health`;
+};
+
+export const health1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<health1Response> => {
+  return customFetch<health1Response>(getHealth1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type capabilitiesResponse200 = {
   data: CapabilitiesResponse;
   status: 200;
@@ -4427,5 +4784,29 @@ export const listAdminMediaJobs = async (
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type disconnectResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type disconnectResponseSuccess = disconnectResponse200 & {
+  headers: Headers;
+};
+export type disconnectResponse = disconnectResponseSuccess;
+
+export const getDisconnectUrl = (provider: string) => {
+  return `/api/v1/connectors/${provider}`;
+};
+
+export const disconnect = async (
+  provider: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<disconnectResponse> => {
+  return customFetch<disconnectResponse>(getDisconnectUrl(provider), {
+    ...options,
+    method: 'DELETE',
   });
 };

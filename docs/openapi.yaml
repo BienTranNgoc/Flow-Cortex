@@ -904,6 +904,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/connectors/telegram/refresh-chats:
+    post:
+      tags:
+      - telegram-connector-controller
+      operationId: refreshChats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramRefreshChatsRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramChatList"
+  /api/v1/connectors/telegram/connect:
+    post:
+      tags:
+      - telegram-connector-controller
+      operationId: connect
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramConnectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramConnection"
+  /api/v1/connectors/http:
+    get:
+      tags:
+      - http-connector-controller
+      operationId: list_1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Summary"
+    post:
+      tags:
+      - http-connector-controller
+      operationId: save
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Saved"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -1297,6 +1363,24 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/telegram/default-chat:
+    patch:
+      tags:
+      - telegram-connector-controller
+      operationId: setDefaultChat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramDefaultChatRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramDefaultChat"
   /api/v1/workflows:
     get:
       tags:
@@ -1731,6 +1815,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceResponse"
+  /api/v1/connectors/telegram:
+    get:
+      tags:
+      - telegram-connector-controller
+      operationId: read
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramConnection"
+  /api/v1/connectors/telegram/health:
+    get:
+      tags:
+      - telegram-connector-controller
+      operationId: health_1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramHealth"
   /api/v1/capabilities:
     get:
       tags:
@@ -2001,6 +2109,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/connectors/{provider}:
+    delete:
+      tags:
+      - connector-controller
+      operationId: disconnect
+      parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
     UpdateUserRequest:
@@ -3005,6 +3127,113 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    TelegramRefreshChatsRequest:
+      type: object
+      properties:
+        chatId:
+          type: integer
+          format: int64
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        type:
+          type: string
+          pattern: private|group|supergroup|channel
+    Chat:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          type: string
+    TelegramChatList:
+      type: object
+      properties:
+        chats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chat"
+    TelegramConnectRequest:
+      type: object
+      properties:
+        botToken:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - botToken
+    TelegramConnection:
+      type: object
+      properties:
+        provider:
+          type: string
+        botUsername:
+          type: string
+        botId:
+          type: integer
+          format: int64
+        state:
+          type: string
+        chats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chat"
+        defaultChatId:
+          type: integer
+          format: int64
+        usageEnabled:
+          type: boolean
+    SaveRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 100
+          minLength: 0
+        label:
+          type: string
+          maxLength: 100
+          minLength: 0
+        authType:
+          type: string
+          pattern: bearer|header|query
+        token:
+          type: string
+          maxLength: 4096
+          minLength: 0
+        baseUrl:
+          type: string
+          maxLength: 2048
+          minLength: 0
+        headerName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        paramName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        extraHeaders:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - authType
+    Saved:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        authType:
+          type: string
+        baseUrl:
+          type: string
     ResetPasswordRequest:
       type: object
       properties:
@@ -3152,6 +3381,22 @@ components:
       required:
       - body
       - status
+    TelegramDefaultChatRequest:
+      type: object
+      properties:
+        chatId:
+          type: integer
+          format: int64
+      required:
+      - chatId
+    TelegramDefaultChat:
+      type: object
+      properties:
+        state:
+          type: string
+        defaultChatId:
+          type: integer
+          format: int64
     WorkflowResponse:
       type: object
       properties:
@@ -3438,6 +3683,36 @@ components:
         balance:
           type: integer
           format: int64
+    TelegramHealth:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        provider:
+          type: string
+        botUsername:
+          type: string
+        reason:
+          type: string
+    Summary:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        authType:
+          type: string
+        baseUrl:
+          type: string
+        headerName:
+          type: string
+        paramName:
+          type: string
+        extraHeaderNames:
+          type: array
+          items:
+            type: string
     CapabilitiesResponse:
       type: object
       properties:

@@ -294,6 +294,85 @@ class ConnectorCredentialsIT extends AbstractPostgresBootTest {
         assertThat(credentials.find(member, "google")).isPresent();
     }
 
+    private static Map<String, Object> chat(long id) {
+        return Map.of("id", id, "title", "Team", "type", "group");
+    }
+
+    private UUID telegramMember() {
+        UUID member = UUID.randomUUID();
+        credentials.connect(member, "telegram", tokens("bot-token", null, List.of()),
+                Map.of("botUsername", "nodi_bot", "chats", List.of(chat(42L)), "defaultChatId", 42));
+        return member;
+    }
+
+    @Test
+    void mergeMetadataKeepsEveryOtherKey() {
+        UUID member = telegramMember();
+
+        boolean merged = credentials.mergeMetadata(member, "telegram",
+                Map.of("chats", List.of(chat(42L), chat(-1001L))), null);
+
+        assertThat(merged).isTrue();
+        Map<String, Object> metadata = credentials.find(member, "telegram").orElseThrow().metadata();
+        assertThat(metadata).containsEntry("botUsername", "nodi_bot").containsEntry("defaultChatId", 42);
+        assertThat((List<?>) metadata.get("chats")).hasSize(2);
+        assertThat(credentials.readTokens(member, "telegram").orElseThrow().accessToken()).isEqualTo("bot-token");
+    }
+
+    @Test
+    void mergeMetadataLeavesUsageOffAndRevocationAlone() {
+        UUID member = telegramMember();
+        assertThat(credentials.setUsageEnabled(member, "telegram", false)).isTrue();
+
+        assertThat(credentials.mergeMetadata(member, "telegram", Map.of("defaultChatId", 7), null)).isTrue();
+
+        ConnectorConnection view = credentials.find(member, "telegram").orElseThrow();
+        assertThat(view.usageEnabled()).isFalse();
+        assertThat(view.active()).isTrue();
+        assertThat(view.metadata()).containsEntry("defaultChatId", 7);
+    }
+
+    @Test
+    void mergeMetadataOnARevokedRowChangesNothing() {
+        UUID member = telegramMember();
+        assertThat(credentials.markRevoked(member, "telegram")).isTrue();
+        String before = snapshot(member, "telegram");
+
+        assertThat(credentials.mergeMetadata(member, "telegram", Map.of("defaultChatId", 7), null)).isFalse();
+
+        assertThat(snapshot(member, "telegram")).isEqualTo(before);
+    }
+
+    @Test
+    void mergeMetadataForAnotherMembersProviderOrAnAbsentRowIsFalse() {
+        UUID owner = telegramMember();
+        UUID other = UUID.randomUUID();
+        String before = snapshot(owner, "telegram");
+
+        assertThat(credentials.mergeMetadata(other, "telegram", Map.of("defaultChatId", 7), null)).isFalse();
+        assertThat(credentials.mergeMetadata(owner, "notion-main", Map.of("defaultChatId", 7), null)).isFalse();
+
+        assertThat(snapshot(owner, "telegram")).isEqualTo(before);
+        assertThat(rows(other, "telegram")).isZero();
+    }
+
+    @Test
+    void mergeMetadataWithARequirementPatchesOnlyWhenTheStoredMetadataContainsIt() {
+        UUID member = telegramMember();
+        Map<String, Object> requires = Map.of("chats", List.of(Map.of("id", 42L)));
+
+        assertThat(credentials.mergeMetadata(member, "telegram", Map.of("defaultChatId", 42), requires)).isTrue();
+
+        credentials.connect(member, "telegram", tokens("bot-token", null, List.of()),
+                Map.of("botUsername", "nodi_bot", "chats", List.of(chat(-1001L))));
+        String before = snapshot(member, "telegram");
+
+        assertThat(credentials.mergeMetadata(member, "telegram", Map.of("defaultChatId", 42), requires)).isFalse();
+
+        assertThat(snapshot(member, "telegram")).isEqualTo(before);
+        assertThat(credentials.find(member, "telegram").orElseThrow().metadata()).doesNotContainKey("defaultChatId");
+    }
+
     @Test
     void invalidProviderSlugIsRejected() {
         UUID member = UUID.randomUUID();

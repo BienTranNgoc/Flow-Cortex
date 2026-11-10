@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,7 +23,6 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectorCredentialsImpl implements ConnectorCredentials {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConnectorCredentialsImpl.class);
-    private static final Pattern PROVIDER = Pattern.compile("[a-z][a-z0-9_-]{0,63}");
     private static final TypeReference<Map<String, Object>> METADATA = new TypeReference<>() { };
 
     private final ConnectorAuthRepository repository;
@@ -116,6 +114,20 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
 
     @Override
     @Transactional
+    public boolean mergeMetadata(UUID userId, String provider, Map<String, Object> patch,
+            Map<String, Object> requires) {
+        requireProvider(provider);
+        if (patch == null) {
+            throw new IllegalArgumentException("patch must not be null");
+        }
+        boolean changed = repository.mergeMetadata(userId, provider, serialize(patch),
+                requires == null ? null : serialize(requires), Instant.now(clock)) > 0;
+        LOG.info("Connector {} metadata merge {}", provider, changed ? "applied" : "ignored");
+        return changed;
+    }
+
+    @Override
+    @Transactional
     public boolean disconnect(UUID userId, String provider) {
         requireProvider(provider);
         boolean deleted = repository.deleteByUserAndProvider(userId, provider) > 0;
@@ -141,8 +153,9 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
     }
 
     private static void requireProvider(String provider) {
-        if (provider == null || !PROVIDER.matcher(provider).matches()) {
-            throw new IllegalArgumentException("provider must match " + PROVIDER.pattern());
+        if (provider == null || !ConnectorCredentials.PROVIDER_PATTERN.matcher(provider).matches()) {
+            throw new IllegalArgumentException(
+                    "provider must match " + ConnectorCredentials.PROVIDER_PATTERN.pattern());
         }
     }
 
