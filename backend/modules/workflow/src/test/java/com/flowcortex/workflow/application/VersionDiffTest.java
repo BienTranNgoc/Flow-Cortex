@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flowcortex.workflow.application.VersionDiff.Status;
 import com.flowcortex.workflow.application.VersionDiff.StepChange;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -159,6 +161,28 @@ class VersionDiffTest {
         StepChange change = only(VersionDiff.between(from, to));
 
         assertThat(change.stepId()).isEqualTo("a");
+        assertThat(change.status()).isEqualTo(Status.MOVED);
+    }
+
+    @Test
+    void aLargeSnapshotWithOneMoveIsDiffedQuickly() {
+        int count = 20_000;
+        ObjectNode[] before = new ObjectNode[count];
+        ObjectNode[] after = new ObjectNode[count];
+        for (int i = 0; i < count; i++) {
+            before[i] = step("s" + i, i + 1, "S" + i, null);
+        }
+        // s0 moves to the end.
+        for (int i = 1; i < count; i++) {
+            after[i - 1] = step("s" + i, i, "S" + i, null);
+        }
+        after[count - 1] = step("s0", count, "S0", null);
+
+        VersionDiff diff = assertTimeoutPreemptively(Duration.ofSeconds(5),
+                () -> VersionDiff.between(snapshot("W", before), snapshot("W", after)));
+
+        StepChange change = only(diff);
+        assertThat(change.stepId()).isEqualTo("s0");
         assertThat(change.status()).isEqualTo(Status.MOVED);
     }
 

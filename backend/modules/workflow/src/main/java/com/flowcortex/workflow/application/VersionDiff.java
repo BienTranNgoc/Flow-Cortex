@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -95,30 +96,39 @@ public record VersionDiff(NameChange name, List<StepChange> steps) {
     private static Set<String> movedIds(Map<String, JsonNode> source, Map<String, JsonNode> target) {
         List<String> from = source.keySet().stream().filter(target::containsKey).toList();
         List<String> to = target.keySet().stream().filter(source::containsKey).toList();
-        int[][] lcs = new int[from.size() + 1][to.size() + 1];
-        for (int i = from.size() - 1; i >= 0; i--) {
-            for (int j = to.size() - 1; j >= 0; j--) {
-                lcs[i][j] = from.get(i).equals(to.get(j))
-                        ? lcs[i + 1][j + 1] + 1
-                        : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
-            }
+        // Step ids are unique per side, so the common ids form a permutation and their LCS is the longest
+        // increasing run of target positions in source order. The scan runs from the end of the source with
+        // negated positions so each overwrite of a tail favours an earlier source step.
+        int n = from.size();
+        Map<String, Integer> targetPosition = new HashMap<>();
+        for (int j = 0; j < to.size(); j++) {
+            targetPosition.put(to.get(j), j);
         }
-        Set<String> kept = new LinkedHashSet<>();
-        int i = 0;
-        int j = 0;
-        while (i < from.size() && j < to.size()) {
-            if (from.get(i).equals(to.get(j))) {
-                kept.add(from.get(i));
-                i++;
-                j++;
-            } else if (lcs[i][j + 1] >= lcs[i + 1][j]) {
-                j++;
-            } else {
-                i++;
+        int[] tails = new int[n];
+        int[] previous = new int[n];
+        int length = 0;
+        for (int i = n - 1; i >= 0; i--) {
+            int key = -targetPosition.get(from.get(i));
+            int low = 0;
+            int high = length;
+            while (low < high) {
+                int mid = (low + high) >>> 1;
+                if (-targetPosition.get(from.get(tails[mid])) < key) {
+                    low = mid + 1;
+                } else {
+                    high = mid;
+                }
+            }
+            previous[i] = low > 0 ? tails[low - 1] : -1;
+            tails[low] = i;
+            if (low == length) {
+                length++;
             }
         }
         Set<String> moved = new LinkedHashSet<>(from);
-        moved.removeAll(kept);
+        for (int i = length > 0 ? tails[length - 1] : -1; i >= 0; i = previous[i]) {
+            moved.remove(from.get(i));
+        }
         return moved;
     }
 
