@@ -102,6 +102,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void unprocessableCarriesTheMachineReasonOfEachFieldBesideItsMessage() throws Exception {
+        mockMvc.perform(get("/test/unprocessable-reasons"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.errors['steps[1].config']").value("is missing"))
+                .andExpect(jsonPath("$.reasons['steps[1].config']").value("missing_key"));
+        mockMvc.perform(get("/test/unprocessable"))
+                .andExpect(jsonPath("$.reasons").doesNotExist());
+    }
+
+    @Test
     void aLostOptimisticLockReturns409() throws Exception {
         mockMvc.perform(get("/test/optimistic-lock"))
                 .andExpect(status().isConflict())

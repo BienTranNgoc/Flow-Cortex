@@ -124,7 +124,9 @@ class WorkflowTransferEndpointsIT extends AbstractWorkflowHttpIT {
                 + "\"workflow\":{\"name\":\"X\"},\"steps\":[],\"ownerId\":\"x\"}", "vi");
         assertThat(invalid.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(invalid.getBody()).containsEntry("code", "ARTIFACT_INVALID");
-        assertThat(String.valueOf(invalid.getBody().get("detail"))).contains("Tệp quy trình không hợp lệ");
+        assertThat(String.valueOf(invalid.getBody().get("detail"))).isEqualTo("Tệp quy trình không hợp lệ");
+        assertThat(invalid.getBody().get("errors")).isEqualTo(Map.of("ownerId", "Trường không được hỗ trợ"));
+        assertThat(invalid.getBody().get("reasons")).isEqualTo(Map.of("ownerId", "unknown_key"));
     }
 
     @Test

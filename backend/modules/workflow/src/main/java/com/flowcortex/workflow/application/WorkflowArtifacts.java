@@ -81,6 +81,9 @@ public final class WorkflowArtifacts {
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
             .configure(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES, false);
 
+    private static final Instant EARLIEST_EXPORTED_AT = Instant.parse("0000-01-01T00:00:00Z");
+    private static final Instant LATEST_EXPORTED_AT = Instant.parse("9999-12-31T23:59:59.999999999Z");
+
     private static final Set<String> ROOT_KEYS = Set.of("formatVersion", "exportedAt", "workflow", "steps");
     private static final Set<String> WORKFLOW_KEYS = Set.of("name");
 
@@ -222,16 +225,29 @@ public final class WorkflowArtifacts {
     }
 
     private static Instant exportedAt(JsonNode node, Map<String, String> faults) {
-        if (node.isTextual()) {
-            try {
-                return OffsetDateTime.parse(node.asText()).toInstant();
-            } catch (DateTimeParseException e) {
-                fault(faults, "exportedAt", Reason.NOT_A_TIMESTAMP);
-                return null;
-            }
+        Instant instant = node.isTextual() ? rfc3339Instant(node.asText()) : null;
+        if (instant == null) {
+            fault(faults, "exportedAt", Reason.NOT_A_TIMESTAMP);
         }
-        fault(faults, "exportedAt", Reason.NOT_A_TIMESTAMP);
-        return null;
+        return instant;
+    }
+
+    /**
+     * The instant of a timestamp whose written year and UTC instant both fall in 0000-9999 (the RFC 3339 range), else
+     * {@code null}. The file is stored through {@link Instant#toString()}, which outside that range cannot always be
+     * read back, so what is accepted here must be inside it.
+     */
+    private static Instant rfc3339Instant(String text) {
+        OffsetDateTime written;
+        try {
+            written = OffsetDateTime.parse(text);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+        Instant instant = written.toInstant();
+        boolean inRange = written.getYear() >= 0 && written.getYear() <= 9999
+                && !instant.isBefore(EARLIEST_EXPORTED_AT) && !instant.isAfter(LATEST_EXPORTED_AT);
+        return inRange ? instant : null;
     }
 
     private static String workflowName(JsonNode workflow, Map<String, String> faults) {

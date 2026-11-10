@@ -222,12 +222,38 @@ public class WorkflowTransferService {
             case WorkflowArtifacts.Parsed parsed -> parsed.artifact();
             case WorkflowArtifacts.Invalid invalid -> {
                 Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
-                new TreeMap<>(invalid.faults()).entrySet().stream().limit(MAX_REPORTED_FAULTS)
-                        .forEach(fault -> errors.put(fault.getKey(),
-                                new LocalizedMessage("workflow.artifact.invalid", fault.getValue())));
-                throw new UnprocessableEntityException(new LocalizedMessage("workflow.artifact.invalid", "$"),
-                        "ARTIFACT_INVALID", errors);
+                Map<String, String> reasons = new LinkedHashMap<>();
+                new TreeMap<>(invalid.faults()).entrySet().stream().limit(MAX_REPORTED_FAULTS).forEach(fault -> {
+                    errors.put(fault.getKey(), reasonMessage(fault.getValue()));
+                    reasons.put(fault.getKey(), fault.getValue());
+                });
+                throw new UnprocessableEntityException(new LocalizedMessage("workflow.artifact.invalid"),
+                        "ARTIFACT_INVALID", errors, reasons);
             }
+        };
+    }
+
+    /** One literal per reason, so the bundle parity check can see every key this class names. */
+    static LocalizedMessage reasonMessage(String reason) {
+        return switch (reason) {
+            case WorkflowArtifacts.Reason.NOT_JSON -> new LocalizedMessage("workflow.artifact.reason.not_json");
+            case WorkflowArtifacts.Reason.NOT_OBJECT -> new LocalizedMessage("workflow.artifact.reason.not_object");
+            case WorkflowArtifacts.Reason.DUPLICATE_KEY ->
+                    new LocalizedMessage("workflow.artifact.reason.duplicate_key");
+            case WorkflowArtifacts.Reason.UNKNOWN_KEY -> new LocalizedMessage("workflow.artifact.reason.unknown_key");
+            case WorkflowArtifacts.Reason.MISSING_KEY -> new LocalizedMessage("workflow.artifact.reason.missing_key");
+            case WorkflowArtifacts.Reason.WRONG_TYPE -> new LocalizedMessage("workflow.artifact.reason.wrong_type");
+            case WorkflowArtifacts.Reason.UNSUPPORTED_FORMAT_VERSION ->
+                    new LocalizedMessage("workflow.artifact.reason.unsupported_format_version");
+            case WorkflowArtifacts.Reason.NOT_A_TIMESTAMP ->
+                    new LocalizedMessage("workflow.artifact.reason.not_a_timestamp");
+            case WorkflowArtifacts.Reason.BLANK -> new LocalizedMessage("workflow.artifact.reason.blank");
+            case WorkflowArtifacts.Reason.TOO_LONG -> new LocalizedMessage("workflow.artifact.reason.too_long");
+            case WorkflowArtifacts.Reason.TOO_MANY_STEPS ->
+                    new LocalizedMessage("workflow.artifact.reason.too_many_steps");
+            case WorkflowArtifacts.Reason.NOT_POSITION -> new LocalizedMessage("workflow.artifact.reason.not_position");
+            case WorkflowArtifacts.Reason.INVALID_TEXT -> new LocalizedMessage("workflow.artifact.reason.invalid_text");
+            default -> throw new IllegalArgumentException("no message for artifact reason " + reason);
         };
     }
 

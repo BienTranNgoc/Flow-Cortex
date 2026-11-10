@@ -223,6 +223,34 @@ class WorkflowTransferServiceTest {
     }
 
     @Test
+    void anInvalidArtifactNamesEachFaultByItsOwnMessageKeyAndKeepsTheMachineReason() {
+        String body = "{\"formatVersion\":1,\"exportedAt\":\"yesterday\",\"workflow\":{\"name\":\"X\"},"
+                + "\"steps\":[{\"stepOrder\":1,\"name\":null,\"type\":\"echo\",\"inputRef\":null,\"config\":null,"
+                + "\"ownerId\":\"x\"}]}";
+
+        assertThatThrownBy(() -> service.review(ADMIN, body.getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getDetail().code()).isEqualTo("workflow.artifact.invalid");
+                    assertThat(e.getDetail().args()).isEmpty();
+                    assertThat(e.getErrors().get("exportedAt").code()).isEqualTo("workflow.artifact.reason.not_a_timestamp");
+                    assertThat(e.getErrors().get("steps[0].ownerId").code())
+                            .isEqualTo("workflow.artifact.reason.unknown_key");
+                    assertThat(e.getErrors().values()).allSatisfy(message -> assertThat(message.args()).isEmpty());
+                    assertThat(e.getReasons()).containsEntry("exportedAt", "not_a_timestamp")
+                            .containsEntry("steps[0].ownerId", "unknown_key");
+                });
+    }
+
+    @Test
+    void everyReasonTheReaderCanReportHasAMessageKey() throws Exception {
+        for (java.lang.reflect.Field field : WorkflowArtifacts.Reason.class.getFields()) {
+            String reason = (String) field.get(null);
+            assertThat(WorkflowTransferService.reasonMessage(reason).code())
+                    .isEqualTo("workflow.artifact.reason." + reason);
+        }
+    }
+
+    @Test
     void theSixthOpenReviewIs429() {
         when(reviewRepository.countByUserIdAndWorkflowIdIsNullAndExpiresAtAfter(ADMIN, NOW)).thenReturn(5L);
 

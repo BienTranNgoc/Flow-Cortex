@@ -93,6 +93,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex.getErrors().forEach((field, reason) -> errors.put(field, messages.getMessage(reason, locale)));
             detail.setProperty("errors", errors);
         }
+        if (!ex.getReasons().isEmpty()) {
+            detail.setProperty("reasons", ex.getReasons());
+        }
         return detail;
     }
 

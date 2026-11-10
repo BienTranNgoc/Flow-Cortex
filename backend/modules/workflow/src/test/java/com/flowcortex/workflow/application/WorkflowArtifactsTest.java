@@ -207,6 +207,31 @@ class WorkflowArtifactsTest {
     }
 
     @Test
+    void anExportedAtOutsideYears0000To9999InUtcIsInvalid() {
+        for (String outside : List.of("-999999999-01-01T00:00:00+18:00", "+999999999-12-31T23:59:59-18:00",
+                "+10000-01-01T00:00:00Z", "9999-12-31T23:59:59-01:00", "0000-01-01T00:00:00+01:00")) {
+            assertThat(faults(document("\"a\"", step(1, ECHO)).replace("2026-11-09T10:00:00Z", outside)))
+                    .as(outside).containsOnlyKeys("exportedAt").containsValue("not_a_timestamp");
+        }
+    }
+
+    @Test
+    void everyExportedAtTheReaderAcceptsReadsBackAfterBeingWritten() {
+        for (String edge : List.of("0000-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z",
+                "0000-01-01T00:00:00-05:00", "9999-12-31T23:59:59+14:00", "2026-11-09T10:00+07:00")) {
+            ReadResult first = read(document("\"a\"", step(1, ECHO)).replace("2026-11-09T10:00:00Z", edge));
+            assertThat(first).as(edge).isInstanceOf(Parsed.class);
+            Instant exportedAt = ((Parsed) first).artifact().exportedAt();
+
+            ReadResult second = WorkflowArtifacts.read(WorkflowArtifacts.write("a",
+                    ((Parsed) first).artifact().steps(), exportedAt).toString().getBytes(StandardCharsets.UTF_8));
+
+            assertThat(second).as(edge).isInstanceOf(Parsed.class);
+            assertThat(((Parsed) second).artifact().exportedAt()).as(edge).isEqualTo(exportedAt);
+        }
+    }
+
+    @Test
     void textTheDatabaseCannotStoreIsInvalid() {
         assertThat(faults(document("\"a\\u0000b\"", step(1, ECHO)))).containsOnlyKeys("workflow.name");
         assertThat(faults(document("\"\\ud800\"", step(1, ECHO)))).containsOnlyKeys("workflow.name");
