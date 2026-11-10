@@ -82,19 +82,147 @@ function DeleteDialog({
   );
 }
 
+interface ModelRowProps {
+  readonly entry: AiModel;
+  readonly canUpdate: boolean;
+  readonly columns: Record<string, string>;
+  readonly onEdit: (entry: AiModel) => void;
+  readonly onDelete: (entry: AiModel) => void;
+  readonly onToggleStart: () => void;
+  readonly onToggleFailed: (entry: AiModel) => void;
+}
+
+/** One model row; it owns its test and active-switch mutations so concurrent rows never share state. */
+function ModelRow({
+  entry,
+  canUpdate,
+  columns,
+  onEdit,
+  onDelete,
+  onToggleStart,
+  onToggleFailed,
+}: Readonly<ModelRowProps>) {
+  const { t } = useTranslation();
+  const toggle = useReplaceModelMutation();
+  const test = useTestModelMutation();
+  const [outcome, setOutcome] = useState<TestOutcome | undefined>();
+  const yesNo = (value: boolean) => t(value ? 'providers.models.yes' : 'providers.models.no');
+
+  const flipActive = () => {
+    onToggleStart();
+    toggle.mutate(
+      {
+        modelKey: entry.modelKey,
+        providerKey: entry.providerKey,
+        displayName: entry.displayName,
+        maxOutputTokens: entry.maxOutputTokens,
+        displayOrder: entry.displayOrder,
+        supportsVision: entry.supportsVision,
+        supportsAudio: entry.supportsAudio,
+        active: !entry.active,
+      },
+      { onError: () => onToggleFailed(entry) },
+    );
+  };
+
+  const runTest = () => {
+    test.mutate(entry.modelKey, {
+      onSuccess: setOutcome,
+      onError: () => setOutcome('failed'),
+    });
+  };
+
+  return (
+    <tr>
+      <td data-label={columns.modelKey}>
+        <code className="cortex-admin-table-job-id">{entry.modelKey}</code>
+      </td>
+      <td data-label={columns.provider} className="providers-col-extra">
+        {entry.providerKey}
+      </td>
+      <td data-label={columns.displayName} className="providers-col-extra">
+        {entry.displayName}
+      </td>
+      <td data-label={columns.tokens} className="providers-col-extra">
+        {entry.maxOutputTokens}
+      </td>
+      <td data-label={columns.vision} className="providers-col-extra">
+        {yesNo(entry.supportsVision)}
+      </td>
+      <td data-label={columns.audio} className="providers-col-extra">
+        {yesNo(entry.supportsAudio)}
+      </td>
+      <td data-label={columns.active}>
+        {canUpdate ? (
+          <label className="providers-switch">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={entry.active}
+              disabled={toggle.isPending}
+              aria-label={t('providers.models.activeSwitch', { name: entry.displayName })}
+              onChange={flipActive}
+            />
+          </label>
+        ) : (
+          <StatusPill
+            tone={entry.active ? 'success' : 'muted'}
+            label={t(
+              entry.active ? 'providers.models.activeState' : 'providers.models.inactiveState',
+            )}
+          />
+        )}
+      </td>
+      <td data-label={columns.order} className="providers-col-extra">
+        {entry.displayOrder}
+      </td>
+      {canUpdate && (
+        <td data-label={columns.actions}>
+          <div className="cortex-admin-row-actions">
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--sm"
+              aria-label={t('providers.models.editFor', { name: entry.displayName })}
+              onClick={() => onEdit(entry)}
+            >
+              {t('providers.models.edit')}
+            </button>
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--sm"
+              aria-label={t('providers.models.testFor', { name: entry.displayName })}
+              disabled={test.isPending}
+              onClick={runTest}
+            >
+              {test.isPending ? t('providers.models.testing') : t('providers.models.test')}
+            </button>
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--sm cortex-admin-btn--danger"
+              aria-label={t('providers.models.deleteFor', { name: entry.displayName })}
+              onClick={() => onDelete(entry)}
+            >
+              {t('providers.models.delete')}
+            </button>
+          </div>
+          <ProbeOutcome
+            result={outcome === 'failed' ? undefined : outcome}
+            failed={outcome === 'failed'}
+          />
+        </td>
+      )}
+    </tr>
+  );
+}
+
 /** Paged table of registered models with the add, edit, delete, active-switch and test controls. */
 export function ModelsTab({ canUpdate, providerKeys }: ModelsTabProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState('');
-  const [results, setResults] = useState<Record<string, TestOutcome>>({});
   const query = useAiModels(page);
-  const toggle = useReplaceModelMutation();
-  const test = useTestModelMutation();
   const data = query.data;
-  const togglingKey = toggle.isPending ? toggle.variables?.modelKey : undefined;
-  const testingKey = test.isPending ? test.variables : undefined;
 
   const columns = {
     modelKey: t('providers.models.columns.modelKey'),
@@ -107,38 +235,10 @@ export function ModelsTab({ canUpdate, providerKeys }: ModelsTabProps) {
     order: t('providers.models.columns.order'),
     actions: t('providers.models.columns.actions'),
   };
-  const yesNo = (value: boolean) => t(value ? 'providers.models.yes' : 'providers.models.no');
-  const showActions = canUpdate;
 
   const open = (next: DialogState) => {
     setNotice('');
     setDialog(next);
-  };
-
-  const flipActive = (entry: AiModel) => {
-    setNotice('');
-    toggle.mutate(
-      {
-        modelKey: entry.modelKey,
-        providerKey: entry.providerKey,
-        displayName: entry.displayName,
-        maxOutputTokens: entry.maxOutputTokens,
-        displayOrder: entry.displayOrder,
-        supportsVision: entry.supportsVision,
-        supportsAudio: entry.supportsAudio,
-        active: !entry.active,
-      },
-      {
-        onError: () => setNotice(t('providers.models.toggleFailed', { name: entry.displayName })),
-      },
-    );
-  };
-
-  const runTest = (entry: AiModel) => {
-    test.mutate(entry.modelKey, {
-      onSuccess: (result) => setResults((current) => ({ ...current, [entry.modelKey]: result })),
-      onError: () => setResults((current) => ({ ...current, [entry.modelKey]: 'failed' })),
-    });
   };
 
   return (
@@ -213,102 +313,24 @@ export function ModelsTab({ canUpdate, providerKeys }: ModelsTabProps) {
                 <th scope="col" className="providers-col-extra">
                   {columns.order}
                 </th>
-                {showActions && <th scope="col">{columns.actions}</th>}
+                {canUpdate && <th scope="col">{columns.actions}</th>}
               </tr>
             </thead>
             <tbody>
-              {data.items.map((entry) => {
-                const outcome = results[entry.modelKey];
-                return (
-                  <tr key={entry.modelKey}>
-                    <td data-label={columns.modelKey}>
-                      <code className="cortex-admin-table-job-id">{entry.modelKey}</code>
-                    </td>
-                    <td data-label={columns.provider} className="providers-col-extra">
-                      {entry.providerKey}
-                    </td>
-                    <td data-label={columns.displayName} className="providers-col-extra">
-                      {entry.displayName}
-                    </td>
-                    <td data-label={columns.tokens} className="providers-col-extra">
-                      {entry.maxOutputTokens}
-                    </td>
-                    <td data-label={columns.vision} className="providers-col-extra">
-                      {yesNo(entry.supportsVision)}
-                    </td>
-                    <td data-label={columns.audio} className="providers-col-extra">
-                      {yesNo(entry.supportsAudio)}
-                    </td>
-                    <td data-label={columns.active}>
-                      {canUpdate ? (
-                        <label className="providers-switch">
-                          <input
-                            type="checkbox"
-                            role="switch"
-                            checked={entry.active}
-                            disabled={togglingKey === entry.modelKey}
-                            aria-label={t('providers.models.activeSwitch', {
-                              name: entry.displayName,
-                            })}
-                            onChange={() => flipActive(entry)}
-                          />
-                        </label>
-                      ) : (
-                        <StatusPill
-                          tone={entry.active ? 'success' : 'muted'}
-                          label={t(
-                            entry.active
-                              ? 'providers.models.activeState'
-                              : 'providers.models.inactiveState',
-                          )}
-                        />
-                      )}
-                    </td>
-                    <td data-label={columns.order} className="providers-col-extra">
-                      {entry.displayOrder}
-                    </td>
-                    {showActions && (
-                      <td data-label={columns.actions}>
-                        <div className="cortex-admin-row-actions">
-                          <button
-                            type="button"
-                            className="cortex-admin-btn cortex-admin-btn--sm"
-                            aria-label={t('providers.models.editFor', { name: entry.displayName })}
-                            onClick={() => open({ kind: 'edit', entry })}
-                          >
-                            {t('providers.models.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            className="cortex-admin-btn cortex-admin-btn--sm"
-                            aria-label={t('providers.models.testFor', { name: entry.displayName })}
-                            disabled={testingKey === entry.modelKey}
-                            onClick={() => runTest(entry)}
-                          >
-                            {testingKey === entry.modelKey
-                              ? t('providers.models.testing')
-                              : t('providers.models.test')}
-                          </button>
-                          <button
-                            type="button"
-                            className="cortex-admin-btn cortex-admin-btn--sm cortex-admin-btn--danger"
-                            aria-label={t('providers.models.deleteFor', {
-                              name: entry.displayName,
-                            })}
-                            onClick={() => open({ kind: 'delete', entry })}
-                          >
-                            {t('providers.models.delete')}
-                          </button>
-                        </div>
-                        <ProbeOutcome
-                          result={outcome === 'failed' ? undefined : outcome}
-                          failed={outcome === 'failed'}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
+              {data.items.map((entry) => (
+                <ModelRow
+                  key={entry.modelKey}
+                  entry={entry}
+                  canUpdate={canUpdate}
+                  columns={columns}
+                  onEdit={(next) => open({ kind: 'edit', entry: next })}
+                  onDelete={(next) => open({ kind: 'delete', entry: next })}
+                  onToggleStart={() => setNotice('')}
+                  onToggleFailed={(failed) =>
+                    setNotice(t('providers.models.toggleFailed', { name: failed.displayName }))
+                  }
+                />
+              ))}
             </tbody>
           </table>
         </TableRegion>
@@ -328,7 +350,6 @@ export function ModelsTab({ canUpdate, providerKeys }: ModelsTabProps) {
           entry={dialog.entry}
           onDeleted={() => {
             setNotice(t('providers.models.deleted', { name: dialog.entry.displayName }));
-            setResults(({ [dialog.entry.modelKey]: _removed, ...rest }) => rest);
             setDialog(null);
           }}
           onClose={() => setDialog(null)}

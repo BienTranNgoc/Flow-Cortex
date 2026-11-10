@@ -33,18 +33,19 @@ interface ProvidersTabProps {
 function ProviderCard({
   provider,
   canUpdate,
-  testing,
-  outcome,
-  onTest,
-}: Readonly<{
-  provider: AiProviderView;
-  canUpdate: boolean;
-  testing: boolean;
-  outcome: TestOutcome | undefined;
-  onTest: () => void;
-}>) {
+}: Readonly<{ provider: AiProviderView; canUpdate: boolean }>) {
   const { t } = useTranslation();
+  const test = useTestProviderMutation();
+  const [outcome, setOutcome] = useState<TestOutcome | undefined>();
   const key = provider.key ?? '';
+  const testing = test.isPending;
+  const onTest = () => {
+    if (!provider.key) return;
+    test.mutate(provider.key, {
+      onSuccess: setOutcome,
+      onError: () => setOutcome('failed'),
+    });
+  };
   const missing = provider.missingSettings ?? [];
   const slots = provider.slots ?? [];
 
@@ -122,16 +123,7 @@ function ProviderCard({
 function CategorySection({
   group,
   canUpdate,
-  testingKey,
-  results,
-  onTest,
-}: Readonly<{
-  group: AiProviderCategory;
-  canUpdate: boolean;
-  testingKey: string | undefined;
-  results: Record<string, TestOutcome>;
-  onTest: (key: string) => void;
-}>) {
+}: Readonly<{ group: AiProviderCategory; canUpdate: boolean }>) {
   const { t } = useTranslation();
   const category = group.category ?? '';
   const heading = t(`providers.overview.category.${category}`, { defaultValue: category });
@@ -140,14 +132,7 @@ function CategorySection({
       <h2>{heading}</h2>
       <div className="providers-grid">
         {(group.providers ?? []).map((provider) => (
-          <ProviderCard
-            key={provider.key}
-            provider={provider}
-            canUpdate={canUpdate}
-            testing={testingKey === provider.key}
-            outcome={provider.key ? results[provider.key] : undefined}
-            onTest={() => provider.key && onTest(provider.key)}
-          />
+          <ProviderCard key={provider.key} provider={provider} canUpdate={canUpdate} />
         ))}
       </div>
     </section>
@@ -163,17 +148,7 @@ export function ProvidersTab({
   canUpdate,
 }: ProvidersTabProps) {
   const { t } = useTranslation();
-  const [results, setResults] = useState<Record<string, TestOutcome>>({});
-  const test = useTestProviderMutation();
-  const testingKey = test.isPending ? test.variables : undefined;
   const categories = overview?.categories ?? [];
-
-  const runTest = (key: string) => {
-    test.mutate(key, {
-      onSuccess: (result) => setResults((current) => ({ ...current, [key]: result })),
-      onError: () => setResults((current) => ({ ...current, [key]: 'failed' })),
-    });
-  };
 
   return (
     <div className="providers-tab">
@@ -188,14 +163,7 @@ export function ProvidersTab({
       {isPending && <output className="cortex-admin-loading">{t('providers.loading')}</output>}
       {overview && categories.length === 0 && <EmptyState title={t('providers.overview.empty')} />}
       {categories.map((group) => (
-        <CategorySection
-          key={group.category}
-          group={group}
-          canUpdate={canUpdate}
-          testingKey={testingKey}
-          results={results}
-          onTest={runTest}
-        />
+        <CategorySection key={group.category} group={group} canUpdate={canUpdate} />
       ))}
     </div>
   );

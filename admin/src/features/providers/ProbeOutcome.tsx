@@ -25,7 +25,7 @@ function describe(t: TFunction, result: ProbeResult): { tone: StatusTone; text: 
   const ms = result.latencyMs ?? 0;
   if (result.ok) {
     if (!result.tested) return { tone: 'info', text: t('providers.probe.notTested') };
-    return result.outputTokens === undefined
+    return result.outputTokens == null
       ? { tone: 'success', text: t('providers.probe.reachable', { ms }) }
       : { tone: 'success', text: t('providers.probe.ok', { ms, tokens: result.outputTokens }) };
   }

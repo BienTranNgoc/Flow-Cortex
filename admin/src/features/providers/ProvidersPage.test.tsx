@@ -219,6 +219,53 @@ describe('ProvidersPage', () => {
     );
   });
 
+  it('keeps the result of every row when two model tests overlap', async () => {
+    const release: Array<() => void> = [];
+    const slow = (latencyMs: number) => () =>
+      new Promise<{ status: number; body: unknown }>((resolve) => {
+        release.push(() =>
+          resolve({
+            status: 200,
+            body: {
+              ok: true,
+              tested: true,
+              code: null,
+              latencyMs,
+              outputTokens: 7,
+              missingSettings: [],
+            },
+          }),
+        );
+      });
+    renderPage({
+      [MODELS]: {
+        status: 200,
+        body: page([
+          model(),
+          model({ modelKey: 'gemini-3.5-flash-lite', displayName: 'Gemini 3.5 Flash Lite' }),
+        ]),
+      },
+      'POST /api/v1/admin/ai/models/gemini-3.8-flash/test': slow(111),
+      'POST /api/v1/admin/ai/models/gemini-3.5-flash-lite/test': slow(222),
+    });
+    const user = userEvent.setup();
+
+    const first = await screen.findByRole('button', { name: 'Test Gemini 3.8 Flash' });
+    const second = screen.getByRole('button', { name: 'Test Gemini 3.5 Flash Lite' });
+    await user.click(first);
+    await user.click(second);
+    await waitFor(() => expect(release).toHaveLength(2));
+    expect(first).toBeDisabled();
+    expect(second).toBeDisabled();
+
+    for (const resolve of release) resolve();
+
+    expect(await screen.findByText(/111 ms/)).toBeInTheDocument();
+    expect(await screen.findByText(/222 ms/)).toBeInTheDocument();
+    expect(first).toBeEnabled();
+    expect(second).toBeEnabled();
+  });
+
   it('shows the Vietnamese failure text for the same result', async () => {
     await i18n.changeLanguage('vi');
     try {
@@ -281,7 +328,14 @@ describe('ProvidersPage', () => {
       [MODELS]: { status: 200, body: page([]) },
       'POST /api/v1/admin/ai/providers/gemini/test': {
         status: 200,
-        body: { ok: true, tested: true, latencyMs: 90, missingSettings: [] },
+        body: {
+          ok: true,
+          tested: true,
+          code: null,
+          latencyMs: 90,
+          outputTokens: null,
+          missingSettings: [],
+        },
       },
     });
     const user = userEvent.setup();
