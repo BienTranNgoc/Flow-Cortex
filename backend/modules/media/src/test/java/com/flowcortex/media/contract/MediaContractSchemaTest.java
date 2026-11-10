@@ -9,10 +9,13 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.media.api.VendorTaskReport;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.provider.ProviderScriptData;
 import com.flowcortex.media.api.provider.ProviderSpeechData;
 import com.flowcortex.media.api.provider.ProviderStoryboardData;
+import com.flowcortex.media.api.provider.ProviderVideoData;
+import com.flowcortex.media.api.provider.VendorLedger;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
@@ -64,6 +67,9 @@ class MediaContractSchemaTest {
     private static JsonNode jobTree;
     private static JsonNode resultTree;
     private static JsonNode progressTree;
+    private static JsonNode providerJobTree;
+    private static JsonNode providerVideoTree;
+    private static Schema providerVideoSchema;
     private static Schema jobSchema;
     private static Schema resultSchema;
     private static Schema progressSchema;
@@ -80,7 +86,9 @@ class MediaContractSchemaTest {
         jobTree = read(Path.of(dir, "media-job.schema.json"));
         resultTree = read(Path.of(dir, "media-result.schema.json"));
         progressTree = read(Path.of(dir, "media-progress.schema.json"));
-        JsonNode providerJobTree = read(Path.of(dir, "provider-job.schema.json"));
+        providerJobTree = read(Path.of(dir, "provider-job.schema.json"));
+        providerVideoTree = read(Path.of(dir, "provider-video-result.schema.json"));
+        providerVideoSchema = registry.getSchema(providerVideoTree);
         jobSchema = registry.getSchema(jobTree);
         resultSchema = registry.getSchema(resultTree);
         progressSchema = registry.getSchema(progressTree);
@@ -243,6 +251,147 @@ class MediaContractSchemaTest {
 
         assertThat(providerJobSchema.validate(MAPPER.valueToTree(escaped))).isNotEmpty();
         assertThat(VALIDATOR.validate(escaped)).isNotEmpty();
+    }
+
+    private static final String FINGERPRINT = "b".repeat(64);
+    private static final String REQUEST_KEY = "c".repeat(64);
+
+    private static VendorLedger.Candidate candidate(int n) {
+        return new VendorLedger.Candidate(UUID.randomUUID(), "seedance", "seedance-1", FINGERPRINT,
+                "job-" + n, Map.of());
+    }
+
+    private static ProviderJob generateVideoJob(VendorLedger ledger) {
+        return new ProviderJob("1", JOB_ID, RUN_ID, RUN_ID, 1, "generate_video",
+                Map.of("profile", "vertical_ad_clip_v1", "payload", Map.of(
+                        "prompt", "Cinematic water pour", "sourceRevisionId", REVISION_ID)),
+                List.of(), MediaJob.outputPrefix(RUN_ID, 1, 1), 1, 900, AT, ledger);
+    }
+
+    private static MediaProgress vendorTaskProgress(VendorTaskReport report) {
+        return new MediaProgress("1", JOB_ID, RUN_ID, 1, 0, MediaProgress.Kind.VENDOR_TASK, null, null, AT, report);
+    }
+
+    private static VendorTaskReport newSubmit() {
+        return new VendorTaskReport(null, "seedance", "seedance-1", FINGERPRINT, REQUEST_KEY, "job-1", Map.of(),
+                VendorTaskReport.Status.RUNNING, AT);
+    }
+
+    @Test
+    void generateVideoJobWithAFiveCandidateLedgerConformsToSchemaAndRecord() {
+        ProviderJob job = generateVideoJob(new VendorLedger(REQUEST_KEY,
+                List.of(candidate(1), candidate(2), candidate(3), candidate(4), candidate(5))));
+
+        assertThat(errors(providerJobSchema, job)).isEmpty();
+        assertThat(VALIDATOR.validate(job)).isEmpty();
+    }
+
+    @Test
+    void generateVideoJobWithSixCandidatesIsRejectedBySchemaAndRecord() {
+        ProviderJob job = generateVideoJob(new VendorLedger(REQUEST_KEY,
+                List.of(candidate(1), candidate(2), candidate(3), candidate(4), candidate(5), candidate(6))));
+
+        assertThat(errors(providerJobSchema, job)).isNotEmpty();
+        assertThat(VALIDATOR.validate(job)).isNotEmpty();
+    }
+
+    @Test
+    void generateVideoJobWithoutALedgerStillConformsAndOmitsTheBlock() {
+        ProviderJob job = generateVideoJob(null);
+
+        assertThat(errors(providerJobSchema, job)).isEmpty();
+        assertThat(VALIDATOR.validate(job)).isEmpty();
+        assertThat(MAPPER.valueToTree(job).has("vendorLedger")).isFalse();
+    }
+
+    @Test
+    void ledgerCandidateWithAHandleOfFourKilobytesIsRejectedByTheRecord() {
+        VendorLedger.Candidate big = new VendorLedger.Candidate(UUID.randomUUID(), "fal", "m", FINGERPRINT, "j",
+                Map.of("statusUrl", "x".repeat(4096)));
+        ProviderJob job = generateVideoJob(new VendorLedger(REQUEST_KEY, List.of(big)));
+
+        assertThat(VALIDATOR.validate(job)).isNotEmpty();
+    }
+
+    @Test
+    void vendorTaskProgressConformsToSchemaAndRecord() {
+        MediaProgress progress = vendorTaskProgress(newSubmit());
+
+        assertThat(errors(progressSchema, progress)).isEmpty();
+        assertThat(VALIDATOR.validate(progress)).isEmpty();
+    }
+
+    @Test
+    void vendorTaskVerdictWithoutSubmitFieldsConformsToSchemaAndRecord() {
+        MediaProgress progress = vendorTaskProgress(new VendorTaskReport(UUID.randomUUID(), "seedance",
+                "seedance-1", null, null, "job-1", null, VendorTaskReport.Status.GONE, null));
+
+        assertThat(errors(progressSchema, progress)).isEmpty();
+        assertThat(VALIDATOR.validate(progress)).isEmpty();
+    }
+
+    @Test
+    void vendorTaskVerdictNamedByVendorJobIdConformsToSchemaAndRecord() {
+        MediaProgress progress = vendorTaskProgress(new VendorTaskReport(null, "seedance", "seedance-1", null, null,
+                "job-1", null, VendorTaskReport.Status.FAILED, null));
+
+        assertThat(errors(progressSchema, progress)).isEmpty();
+        assertThat(VALIDATOR.validate(progress)).isEmpty();
+    }
+
+    @Test
+    void vendorTaskKindWithoutTheBlockIsRejectedBySchemaAndRecord() {
+        MediaProgress progress = vendorTaskProgress(null);
+
+        assertThat(errors(progressSchema, progress)).isNotEmpty();
+        assertThat(VALIDATOR.validate(progress)).isNotEmpty();
+    }
+
+    @Test
+    void heartbeatCarryingTheBlockIsRejectedBySchemaAndRecord() {
+        MediaProgress progress = new MediaProgress("1", JOB_ID, RUN_ID, 1, 0, MediaProgress.Kind.HEARTBEAT, null,
+                null, AT, newSubmit());
+
+        assertThat(errors(progressSchema, progress)).isNotEmpty();
+        assertThat(VALIDATOR.validate(progress)).isNotEmpty();
+    }
+
+    @Test
+    void newSubmitReportWithoutAFingerprintIsRejectedByTheRecord() {
+        VendorTaskReport report = new VendorTaskReport(null, "seedance", "seedance-1", null, REQUEST_KEY, "job-1",
+                Map.of(), VendorTaskReport.Status.RUNNING, AT);
+
+        assertThat(VALIDATOR.validate(vendorTaskProgress(report))).isNotEmpty();
+    }
+
+    @Test
+    void reportWithAHandleOfFourKilobytesIsRejectedByTheRecord() {
+        VendorTaskReport report = new VendorTaskReport(null, "fal", "m", FINGERPRINT, REQUEST_KEY, "job-1",
+                Map.of("statusUrl", "x".repeat(4096)), VendorTaskReport.Status.RUNNING, AT);
+
+        assertThat(VALIDATOR.validate(vendorTaskProgress(report))).isNotEmpty();
+    }
+
+    @Test
+    void videoResultConformsWithAndWithoutTheLedgerFields() {
+        ProviderVideoData with = new ProviderVideoData("vertical_ad_clip_v1", 5, "seedance", "seedance-1", "9:16",
+                "720p", REVISION_ID, IDEMPOTENCY_KEY, "task-1", "mp4", FINGERPRINT, REQUEST_KEY);
+        ProviderVideoData without = new ProviderVideoData("vertical_ad_clip_v1", 5, "seedance", "seedance-1",
+                "9:16", "720p", REVISION_ID, IDEMPOTENCY_KEY, "task-1", "mp4");
+
+        assertThat(providerVideoSchema.validate(MAPPER.valueToTree(with))).isEmpty();
+        assertThat(VALIDATOR.validate(with)).isEmpty();
+        assertThat(providerVideoSchema.validate(MAPPER.valueToTree(without))).isEmpty();
+        assertThat(VALIDATOR.validate(without)).isEmpty();
+        assertThat(MAPPER.valueToTree(without).has("fingerprint")).isFalse();
+    }
+
+    @Test
+    void providerTimeoutErrorCodeConformsToTheResultSchema() {
+        MediaResult failed = new MediaResult("1", JOB_ID, RUN_ID, 1, 0, MediaResult.Status.ERROR, null, null,
+                new MediaError(MediaError.Code.PROVIDER_TIMEOUT, "vendor too slow", true), AT, "worker-1");
+
+        assertThat(errors(resultSchema, failed)).isEmpty();
     }
 
     private static List<Error> errors(Schema schema, Object record) {
@@ -414,7 +563,15 @@ class MediaContractSchemaTest {
                         propertyNames(defs.path("completedResult"), defs.path("errorResult")), MediaResult.class),
                 Arguments.of("result output", propertyNames(defs.path("output")), MediaOutput.class),
                 Arguments.of("result error", propertyNames(defs.path("error")), MediaError.class),
-                Arguments.of("progress", propertyNames(progressTree), MediaProgress.class));
+                Arguments.of("progress", propertyNames(progressTree), MediaProgress.class),
+                Arguments.of("vendor task report",
+                        propertyNames(progressTree.path("properties").path("vendorTask")), VendorTaskReport.class),
+                Arguments.of("vendor ledger", propertyNames(providerJobTree.path("$defs").path("vendorLedger")),
+                        VendorLedger.class),
+                Arguments.of("vendor candidate",
+                        propertyNames(providerJobTree.path("$defs").path("vendorCandidate")),
+                        VendorLedger.Candidate.class),
+                Arguments.of("video result", propertyNames(providerVideoTree), ProviderVideoData.class));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -440,7 +597,9 @@ class MediaContractSchemaTest {
                 Arguments.of("error code", strings(defs.path("error").path("properties").path("code").path("enum")),
                         MediaError.Code.class),
                 Arguments.of("progress kind", strings(progressTree.path("properties").path("kind").path("enum")),
-                        MediaProgress.Kind.class));
+                        MediaProgress.Kind.class),
+                Arguments.of("vendor task status", strings(progressTree.path("properties").path("vendorTask")
+                        .path("properties").path("status").path("enum")), VendorTaskReport.Status.class));
     }
 
     @ParameterizedTest(name = "{0}")

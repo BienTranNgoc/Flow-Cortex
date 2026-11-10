@@ -20,12 +20,22 @@ from .adapter import (
     SpeechRequest,
     StoryboardArtifact,
     StoryboardRequest,
+    VendorProbe,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
     VideoRequest,
 )
 from .contracts.provider_job import ProductAdPayload
+from .vendor_jobs import (
+    RESULT_GONE_STATUSES,
+    VendorJobEnded,
+    VendorJobTimeout,
+    VendorResultGone,
+    probe_json,
+    probe_media,
+    vendor_scope,
+)
 
 log = logging.getLogger("flowcortex_provider_worker.wan")
 
@@ -133,10 +143,10 @@ class WanAdapter:
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         deadline = time.monotonic() + self.config.poll_timeout_seconds
-        task_url = f"{self.config.base_url.rstrip('/')}/predictions/{urllib.parse.quote(task_id)}"
+        task_url = self._task_url(task_id)
         while True:
             abort.check()
-            response = self._json_request(task_url, method="GET")
+            response = self._json_request(task_url, method="GET", task_lookup=True)
             status = (_string(response, "status") or "").lower()
             if status == "succeeded":
                 output = response.get("output")
@@ -150,20 +160,49 @@ class WanAdapter:
                 # Replicate's `error` is free text with no machine code; it can echo paths,
                 # prompts or tokens, so only the fixed status reaches logs and members.
                 log.warning("Wan prediction failed", extra={"taskStatus": status})
-                raise PermanentError(
-                    "provider_request_failed", f"Wan prediction ended with status {status}"
-                )
+                raise VendorJobEnded("failed", f"Wan prediction ended with status {status}")
             if status not in {"starting", "processing"}:
                 raise PermanentError(
                     "provider_response_invalid", "Wan returned an unknown prediction status"
                 )
             if time.monotonic() >= deadline:
-                raise TransientError("Wan prediction polling timed out")
+                raise VendorJobTimeout(PROVIDER_WAN, task_id)
             remaining = max(0.0, deadline - time.monotonic())
             time.sleep(min(self.config.poll_interval_seconds, remaining))
 
+    def probe_video(self, task_id: str) -> VendorProbe:
+        body = probe_json(
+            self._task_url(task_id),
+            {"Authorization": f"Bearer {self.config.api_key}"},
+            self.config.request_timeout_seconds,
+        )
+        if body is None:
+            return "gone"
+        status = (_string(body, "status") or "").lower()
+        if status in {"starting", "processing"}:
+            return "running"
+        if status in _TERMINAL_FAILURES:
+            return "failed"
+        if status == "succeeded":
+            output = body.get("output")
+            if not isinstance(output, str) or not _is_replicate_delivery(output):
+                return "gone"
+            return probe_media(output, {}, self.config.request_timeout_seconds)
+        raise TransientError("Wan probe read an unknown prediction status")
+
+    def vendor_scope(self) -> dict[str, str]:
+        return vendor_scope(self.config.base_url, self.config.api_key)
+
+    def _task_url(self, task_id: str) -> str:
+        return f"{self.config.base_url.rstrip('/')}/predictions/{urllib.parse.quote(task_id)}"
+
     def _json_request(
-        self, url: str, *, method: str, body: bytes | None = None
+        self,
+        url: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+        task_lookup: bool = False,
     ) -> dict[str, Any]:
         request = urllib.request.Request(
             url,
@@ -180,7 +219,7 @@ class WanAdapter:
             ) as response:
                 response_body = response.read()
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=frozenset({404}) if task_lookup else frozenset())
         except (urllib.error.URLError, TimeoutError) as exc:
             log.warning("Wan connection failed", extra={"errorType": type(exc).__name__})
             raise TransientError(f"Wan connection failed: {type(exc).__name__}") from exc
@@ -197,11 +236,7 @@ class WanAdapter:
         return parsed
 
     def _download_video(self, url: str) -> bytes:
-        parsed = urllib.parse.urlparse(url)
-        hostname = parsed.hostname or ""
-        if parsed.scheme != "https" or not (
-            hostname == "replicate.delivery" or hostname.endswith(".replicate.delivery")
-        ):
+        if not _is_replicate_delivery(url):
             raise PermanentError(
                 "provider_response_invalid", "Wan video URL is outside Replicate"
             )
@@ -240,7 +275,7 @@ class WanAdapter:
             ) as response:
                 return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
         except (urllib.error.URLError, TimeoutError) as exc:
             raise TransientError(f"Wan video download failed: {type(exc).__name__}") from exc
 
@@ -250,10 +285,22 @@ def _string(value: dict[str, Any], field: str) -> str | None:
     return result if isinstance(result, str) and result else None
 
 
-def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
+def _is_replicate_delivery(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    hostname = parsed.hostname or ""
+    return parsed.scheme == "https" and (
+        hostname == "replicate.delivery" or hostname.endswith(".replicate.delivery")
+    )
+
+
+def _raise_http_error(
+    exc: urllib.error.HTTPError, *, gone: frozenset[int] = frozenset()
+) -> NoReturn:
     log.warning("Wan HTTP request failed", extra={"status": exc.code})
     if exc.code in (408, 429) or 500 <= exc.code < 600:
         raise TransientError(f"Wan HTTP {exc.code}") from exc
+    if exc.code in gone:
+        raise VendorResultGone(f"Wan rejected the request with HTTP {exc.code}") from exc
     raise PermanentError(
         "provider_request_failed", f"Wan rejected the request with HTTP {exc.code}"
     ) from exc

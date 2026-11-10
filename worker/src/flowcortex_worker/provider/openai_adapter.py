@@ -29,6 +29,7 @@ from .adapter import (
     SpeechRequest,
     StoryboardArtifact,
     StoryboardRequest,
+    VendorProbe,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -311,6 +312,16 @@ class OpenAIProviderAdapter:
         )
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def probe_video(self, task_id: str) -> VendorProbe:
+        raise PermanentError(
+            "provider_capability_unavailable", "OpenAI video generation is not implemented"
+        )
+
+    def vendor_scope(self) -> dict[str, str]:
         raise PermanentError(
             "provider_capability_unavailable", "OpenAI video generation is not implemented"
         )

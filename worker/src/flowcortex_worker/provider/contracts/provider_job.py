@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 
@@ -188,6 +188,36 @@ class GenerateStoryboardJob(BaseModel):
     issuedAt: AwareDatetime
 
 
+class VendorCandidate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    vendorTaskId: UUID
+    vendor: Annotated[StrictStr, Field(max_length=32, min_length=1)]
+    model: Annotated[StrictStr, Field(max_length=200, min_length=1)]
+    fingerprint: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
+    vendorJobId: Annotated[StrictStr, Field(max_length=200, min_length=1)]
+    handle: Annotated[
+        dict[str, Any],
+        Field(
+            description="Vendor job identifiers only, at most 2048 bytes serialized; never a credential or signed URL.",
+            max_length=16,
+        ),
+    ]
+
+
+class VendorLedger(BaseModel):
+    """
+    Vendor jobs the backend ledger holds for this ask. Optional: a worker given none submits a new vendor job.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    requestKey: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
+    candidates: Annotated[list[VendorCandidate], Field(max_length=5)]
+
+
 class GenerateVideoJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -221,6 +251,7 @@ class GenerateVideoJob(BaseModel):
     attempt: Annotated[StrictInt, Field(ge=1)]
     maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
     issuedAt: AwareDatetime
+    vendorLedger: VendorLedger | None = None
 
 
 class ProviderJob(

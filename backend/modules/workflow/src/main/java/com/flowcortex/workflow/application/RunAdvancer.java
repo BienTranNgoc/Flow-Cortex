@@ -15,6 +15,7 @@ import com.flowcortex.media.api.provider.ProviderVideoData;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.application.provider.ProviderStepPool;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -80,6 +81,7 @@ class RunAdvancer {
     private static final String RUN_OBSERVATION = "workflow.run";
     private static final Duration HEARTBEAT = Duration.ofSeconds(30);
     private static final String PROVIDER_BUSY = "provider_busy";
+    private static final int CONSUME_TRIES = 2;
     /** Inline steps have no broker, so no redeliveries to count. */
     private static final short INLINE_DELIVERY = 0;
 
@@ -102,6 +104,7 @@ class RunAdvancer {
     private final ReviewCheckpointTransactions checkpointTransactions;
     private final MediaJobs mediaJobs;
     private final Validator validator;
+    private final VendorJobLedger vendorLedger;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -110,11 +113,12 @@ class RunAdvancer {
             TaskScheduler scheduler,
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
-            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator) {
+            ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator,
+            VendorJobLedger vendorLedger) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, providerPool, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator);
+                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator, vendorLedger);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -125,7 +129,7 @@ class RunAdvancer {
             Validator validator) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
-                validator);
+                validator, null);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -133,7 +137,18 @@ class RunAdvancer {
             TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
             ObservationRegistry observations,
             MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
-            MediaJobs mediaJobs, Validator validator) {
+            Validator validator, VendorJobLedger vendorLedger) {
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
+                taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
+                validator, vendorLedger);
+    }
+
+    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
+            ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            MediaJobs mediaJobs, Validator validator, VendorJobLedger vendorLedger) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.transactions = transactions;
@@ -155,6 +170,7 @@ class RunAdvancer {
         this.checkpointTransactions = checkpointTransactions;
         this.mediaJobs = mediaJobs;
         this.validator = validator;
+        this.vendorLedger = vendorLedger;
     }
 
     @ApplicationModuleListener
@@ -459,6 +475,7 @@ class RunAdvancer {
                 LOG.info("Job result applied: runId={} jobId={} capability={} attempt={} deliveryCount={} "
                         + "outcome=completed durationMs={} worker={}", result.runId(), result.jobId(), capability,
                         attempt, result.deliveryCount(), durationMs, result.workerId());
+                consumeVendorJob(result, capability);
                 advance(result.runId());
                 return;
             }
@@ -477,6 +494,27 @@ class RunAdvancer {
 
     /** Why a completed provider result fails its step: the step error code and its message. */
     private record Rejection(String code, String message) {
+    }
+
+    /**
+     * Marks the vendor job a delivered clip came from as consumed. The step is already completed, so a
+     * ledger failure is retried once and then logged: it must never fail a step the member paid for.
+     */
+    private void consumeVendorJob(MediaResult result, String capability) {
+        if (vendorLedger == null || !"generate_video".equals(capability)) {
+            return;
+        }
+        for (int attempt = 1; attempt <= CONSUME_TRIES; attempt++) {
+            try {
+                vendorLedger.consume(result.runId(), result.jobId(), capability, result.data());
+                return;
+            } catch (RuntimeException e) {
+                if (attempt == CONSUME_TRIES) {
+                    LOG.warn("vendor_job outcome=consume_failed run={} step={} vendor={} job={}", result.runId(),
+                            result.jobId(), result.data().get("provider"), result.data().get("providerTaskId"), e);
+                }
+            }
+        }
     }
 
     /** Returns the rejection of a completed provider step's {@code data} payload, or {@code null}

@@ -25,6 +25,7 @@ import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.application.provider.ProviderStepPool;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
@@ -109,6 +110,11 @@ class RunAdvancerTest {
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
+
+    private final VendorJobLedger ledger = mock(VendorJobLedger.class);
+    private final RunAdvancer withLedger = new RunAdvancer(workflowRunRepository, runStepRepository, transactions,
+            new InputResolver(), registry, Runnable::run, Runnable::run, scheduler, Tracer.NOOP,
+            ObservationRegistry.NOOP, meters, LEASE, clock, checkpoints, validator, ledger);
 
     private final UUID runId = UUID.randomUUID();
     private final UUID workflowId = UUID.randomUUID();
@@ -797,6 +803,74 @@ class RunAdvancerTest {
         verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "speech_too_long",
                 "The approved script reads for 13.4 s, longer than the 10 s video. "
                         + "Start a new run with a shorter script.", NOW);
+    }
+
+    @Test
+    void aCompletedVideoResultConsumesItsLedgerRowOnceAfterTheStepCompleted() {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        Map<String, Object> data = videoData();
+
+        withLedger.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null, data,
+                null)));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(runStepRepository, ledger);
+        order.verify(runStepRepository).completeIfRunning(eq(step.getId()), eq(runId), eq((short) 1), any(), any(),
+                eq(NOW));
+        order.verify(ledger).consume(runId, step.getId(), "generate_video", data);
+        verify(ledger, org.mockito.Mockito.times(1)).consume(any(), any(), any(), any());
+    }
+
+    @Test
+    void aVideoResultThatLostTheCasNeverConsumes() {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+
+        withLedger.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                videoData(), null)));
+
+        verify(ledger, never()).consume(any(), any(), any(), any());
+    }
+
+    @Test
+    void aConsumeThatFailsTwiceLeavesTheStepCompleted(CapturedOutput output) {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"))
+                .when(ledger).consume(any(), any(), any(), any());
+
+        assertThatCode(() -> withLedger.onRemoteCompleted(new MediaJobCompleted(result(step,
+                MediaResult.Status.COMPLETED, null, videoData(), null)))).doesNotThrowAnyException();
+
+        verify(ledger, org.mockito.Mockito.times(2)).consume(any(), any(), any(), any());
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+        assertThat(output).contains("outcome=consume_failed");
+    }
+
+    private RunStep videoStep() {
+        givenMediaEnabled();
+        RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "generate_video", "{}");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(step));
+        givenTiming(step);
+        return step;
+    }
+
+    private static Map<String, Object> videoData() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("profile", "vertical_ad_clip_v1");
+        data.put("durationSeconds", 5);
+        data.put("provider", "seedance");
+        data.put("model", "seedance-1");
+        data.put("aspectRatio", "9:16");
+        data.put("resolution", "720p");
+        data.put("sourceRevisionId", UUID.randomUUID());
+        data.put("idempotencyKey", "a".repeat(64));
+        data.put("providerTaskId", "cgt-1");
+        data.put("format", "mp4");
+        data.put("fingerprint", "b".repeat(64));
+        data.put("requestKey", "c".repeat(64));
+        return data;
     }
 
     private RunStep speechStep(String input) {

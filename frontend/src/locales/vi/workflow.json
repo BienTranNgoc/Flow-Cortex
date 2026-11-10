@@ -8,6 +8,7 @@
     "media_disabled": "Bộ xử lý media hiện đang tắt.",
     "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
+    "provider_timeout": "Nhà cung cấp xử lý quá lâu. Tác vụ vẫn được giữ, thử lại sau sẽ không bị tạo lại từ đầu nếu nội dung giống hệt.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
