@@ -11,11 +11,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.core:jackson-annotations")
     implementation("tools.jackson.core:jackson-databind")
+    // The region gate counts each verdict.
+    implementation("io.micrometer:micrometer-core")
     // @RequestBody / @ApiResponse document the raw-body journey route; :boot:app brings springdoc at
     // runtime, so compile-only here.
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
-    // The region gate counts each verdict.
-    implementation("io.micrometer:micrometer-core")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(testFixtures(project(":shared:ratelimit")))

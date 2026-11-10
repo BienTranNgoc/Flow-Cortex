@@ -59,15 +59,19 @@ function post(reportingApp: ClientErrorApp, kind: ClientErrorKind, name: string,
     route,
     ...(lang ? { lang } : {}),
   });
+  void deliver(body);
+}
+
+async function deliver(body: string): Promise<void> {
   try {
-    void fetch(ENDPOINT, {
+    await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body,
       credentials: 'omit',
       keepalive: true,
       referrerPolicy: 'no-referrer',
-    }).catch(() => {});
+    });
   } catch {
     // Best-effort delivery: a failed post must never become a new page error.
   }
