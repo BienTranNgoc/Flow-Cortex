@@ -1,7 +1,7 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { renderRoute, stubApi, type RecordedCall } from '../../test/fakeApi';
 import { NotificationPreferencesPage } from './NotificationPreferencesPage';
 
 const ALL_ON = { inApp: true, careEmail: true, marketingEmail: true };
@@ -31,6 +31,44 @@ describe('NotificationPreferencesPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved');
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+  });
+
+  it('sends quick toggles in click order and never shows the older value', async () => {
+    let saved = ALL_ON;
+    let releaseFirst: () => void = () => undefined;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let patchCount = 0;
+    const calls: RecordedCall[] = stubApi({
+      'GET /api/v1/notifications/preferences': () => ({ status: 200, body: saved }),
+      'PATCH /api/v1/notifications/preferences': async () => {
+        patchCount += 1;
+        const body = calls[calls.length - 1]?.body as object;
+        if (patchCount === 1) await firstGate;
+        saved = { ...saved, ...body };
+        return { status: 200, body: saved };
+      },
+    });
+    const user = userEvent.setup();
+
+    renderPage();
+    const toggle = await screen.findByRole('switch', { name: 'News and offers by email' });
+    await user.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
+    await user.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+
+    const patches = () => calls.filter((call) => call.method === 'PATCH');
+    expect(patches().map((call) => call.body)).toEqual([{ marketingEmail: false }]);
+
+    releaseFirst();
+    await waitFor(() =>
+      expect(patches().map((call) => call.body)).toEqual([{ marketingEmail: false }, { marketingEmail: true }]),
+    );
+    await waitFor(() => expect(calls.filter((call) => call.method === 'GET')).toHaveLength(2));
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(saved.marketingEmail).toBe(true);
   });
 
   it('toggles with Space and saves only the changed field', async () => {
