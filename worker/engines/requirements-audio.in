@@ -1,0 +1,13 @@
+# Direct pins of the audio engines; compiled into requirements-audio.txt (see its header).
+# Versions are the set Xood resolved and runs together with numpy 1.26.4 and torch 2.4.0+cpu.
+-c requirements-torch-cpu.txt
+demucs==4.0.1
+soundfile>=0.12
+scipy==1.13.1
+scikit-learn==1.5.2
+joblib==1.4.2
+threadpoolctl==3.5.0
+sherpa-onnx==1.13.8
+beat-this==1.1.0
+rotary-embedding-torch==0.9.1
+librosa==0.11.0

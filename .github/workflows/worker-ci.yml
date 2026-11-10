@@ -43,3 +43,40 @@ jobs:
 
       - name: Test
         run: uv run --frozen --no-build pytest -rs
+
+  audio-engines:
+    # Builds the audio image (hash-pinned packages, digest-checked models) and runs the engine
+    # tests inside it with no network, so a model fetched at run time fails here, not in prod.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.21'
+          python-version: '3.12'
+
+      - name: Build the audio image
+        run: docker build --target audio-runtime -t flowcortex-audio-worker:ci .
+
+      - name: Collect the locked pytest packages
+        # Pure-Python wheels at the versions uv.lock pins; the image itself carries no test tools.
+        run: |
+          uv export --frozen --no-emit-project --only-group dev --no-hashes \
+            | grep -E '^(pytest|pluggy|iniconfig|packaging|pygments)==' > "$RUNNER_TEMP/pytest-pins.txt"
+          uv pip install --quiet --target "$RUNNER_TEMP/pytest-libs" --no-deps -r "$RUNNER_TEMP/pytest-pins.txt"
+
+      - name: Engine tests, offline
+        run: |
+          docker run --rm --network none \
+            -v "$PWD/tests/engines:/work/tests/engines:ro" \
+            -v "$PWD/eval:/work/eval:ro" \
+            -v "$RUNNER_TEMP/pytest-libs:/pytest-libs:ro" \
+            -e PYTHONPATH=/pytest-libs -w /work --entrypoint python \
+            flowcortex-audio-worker:ci \
+            -m pytest -m engines -o "markers=engines: needs the audio image" -p no:cacheprovider -rs tests/engines
