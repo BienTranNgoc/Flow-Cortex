@@ -59,7 +59,8 @@
         "creditsBilling": "Credit & thanh toán",
         "administration": "Quản trị",
         "system": "Hệ thống",
-        "support": "Hỗ trợ"
+        "support": "Hỗ trợ",
+        "chat": "Trò chuyện"
       },
       "items": {
         "dashboard": "Tổng quan",
@@ -79,7 +80,8 @@
         "supportGroups": "Chủ đề",
         "supportRequests": "Yêu cầu",
         "supportSettings": "Cài đặt trợ lý",
-        "onboardingSample": "Mẫu làm quen"
+        "onboardingSample": "Mẫu làm quen",
+        "chatSettings": "Cài đặt"
       }
     },
     "noAccess": {

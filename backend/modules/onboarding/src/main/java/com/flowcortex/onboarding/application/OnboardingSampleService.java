@@ -140,6 +140,7 @@ public class OnboardingSampleService {
                 samples.upsertTranslation(sourceHash, locale, input, adminId, clock.instant());
                 SampleAuditLog.translation(Outcome.SAVED, adminId, locale, null);
             }
+            default -> throw new IllegalStateException("Unhandled translation edit for locale " + locale);
         }
         return view();
     }

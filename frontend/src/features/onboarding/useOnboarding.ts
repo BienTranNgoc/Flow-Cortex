@@ -77,7 +77,7 @@ export function useOnboardingStatus() {
   const { onboarding } = useFeatures();
   const member = useAuthToken() !== null;
   const queryClient = useQueryClient();
-  const enabled = onboarding && member;
+  const enabled = onboarding === true && member;
 
   // The served sample input follows the request language, so a language switch refetches it.
   useEffect(() => {

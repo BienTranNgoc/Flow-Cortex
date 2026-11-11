@@ -29,7 +29,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
     record FeaturesView(Boolean emailConfirmation, Boolean phoneVerification, Boolean uploadContentCheck,
             Boolean runCancellation, Boolean credits, Boolean passwordReset, Boolean supportWidget,
-            Boolean supportAssistant, Boolean onboarding) {
+            Boolean supportAssistant, Boolean onboarding, Boolean chat) {
     }
 
     record LoginRequest(String email, String password) {
@@ -53,7 +53,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody())
-                .isEqualTo(new FeaturesView(false, false, true, false, false, false, false, false, false));
+                .isEqualTo(new FeaturesView(false, false, true, false, false, false, false, false, false, false));
     }
 
     @Nested
@@ -70,7 +70,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody())
-                    .isEqualTo(new FeaturesView(false, false, true, false, false, true, false, false, false));
+                    .isEqualTo(new FeaturesView(false, false, true, false, false, true, false, false, false, false));
         }
     }
 
@@ -111,7 +111,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody())
-                    .isEqualTo(new FeaturesView(false, false, true, false, true, false, false, false, false));
+                    .isEqualTo(new FeaturesView(false, false, true, false, true, false, false, false, false, false));
         }
     }
 
@@ -129,7 +129,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody())
-                    .isEqualTo(new FeaturesView(false, false, true, false, false, false, true, true, false));
+                    .isEqualTo(new FeaturesView(false, false, true, false, false, false, true, true, false, false));
         }
     }
 
@@ -147,7 +147,7 @@ class FeaturesEndpointIT extends AbstractPostgresBootTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody())
-                    .isEqualTo(new FeaturesView(false, false, true, false, false, false, false, false, true));
+                    .isEqualTo(new FeaturesView(false, false, true, false, false, false, false, false, true, false));
         }
     }
 }
