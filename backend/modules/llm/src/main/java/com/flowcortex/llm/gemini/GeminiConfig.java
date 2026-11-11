@@ -1,8 +1,10 @@
 package com.flowcortex.llm.gemini;
 
+import com.flowcortex.llm.api.LlmChatClient;
 import com.flowcortex.llm.api.LlmClient;
 import com.flowcortex.llm.api.LlmTimeouts;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.net.http.HttpClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,5 +26,12 @@ class GeminiConfig {
         requests.setConnectTimeout(properties.connectTimeout());
         requests.setReadTimeout(properties.readTimeout());
         return new GeminiLlmClient(properties, RestClient.builder().requestFactory(requests).build(), meters);
+    }
+
+    @Bean
+    LlmChatClient llmChatClient(GeminiProperties properties, MeterRegistry meters) {
+        HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(properties.connectTimeout()).build();
+        return new GeminiChatClient(properties, http, meters);
     }
 }
