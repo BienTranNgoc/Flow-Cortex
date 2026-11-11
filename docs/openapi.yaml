@@ -1148,6 +1148,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/phone/change/verify:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeVerify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/start:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeStart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeStartRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendCodeResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/cancel:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeCancel
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/api-tokens:
     get:
       tags:
@@ -3119,6 +3221,18 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RoleResponse"
+  /api/v1/admin/phone-verification/status:
+    get:
+      tags:
+      - admin-phone-verification-controller
+      operationId: getAdminPhoneVerificationStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPhoneVerificationStatus"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -3400,9 +3514,12 @@ components:
             - system.admin_account.manage
         adminDisabled:
           type: boolean
+        phoneVerificationRequired:
+          type: boolean
       required:
       - adminDisabled
       - permissions
+      - phoneVerificationRequired
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -4363,6 +4480,7 @@ components:
           type: string
           enum:
           - PAT_CREATE
+          - PHONE_CHANGE
       required:
       - password
       - purpose
@@ -4397,6 +4515,11 @@ components:
           type: string
           description: The verified number as shown to the member (carrier digit and
             last three digits)
+        cancelAvailableUntil:
+          type: string
+          format: date-time
+          description: "While a number change can still be undone, when that stops;\
+            \ otherwise null"
       required:
       - verified
     SendCodeRequest:
@@ -4424,6 +4547,20 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    ChangeStartRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: "0987654321"
+          pattern: "^(0|\\+84)([35789]\\d{8})$"
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - phone
+      - stepUpProof
     CreateApiTokenRequest:
       type: object
       properties:
@@ -5359,6 +5496,36 @@ components:
       - permissions
       - staff
       - superAdmin
+    AdminPhoneVerificationStatus:
+      type: object
+      properties:
+        verificationEnabled:
+          type: boolean
+        smsSender:
+          type: string
+          description: none when no SMS sender is wired; the configured sender when
+            it is a known one; else custom
+        hashSecretConfigured:
+          type: boolean
+          description: True when the hash secret is set and at least 32 bytes; the
+            value is never returned
+        gateEnabled:
+          type: boolean
+        globalSendsPerDay:
+          type: integer
+          format: int32
+          description: Cap on codes sent from every member per 24 hours
+        sentLast24h:
+          type: integer
+          format: int64
+          description: Codes sent in the last 24 hours
+      required:
+      - gateEnabled
+      - globalSendsPerDay
+      - hashSecretConfigured
+      - sentLast24h
+      - smsSender
+      - verificationEnabled
     MediaJobResponse:
       type: object
       properties:

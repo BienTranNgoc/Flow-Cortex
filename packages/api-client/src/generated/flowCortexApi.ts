@@ -119,6 +119,7 @@ export interface MeResponse {
   passwordSetupRequired?: boolean;
   permissions: MeResponsePermissionsItem[];
   adminDisabled: boolean;
+  phoneVerificationRequired: boolean;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -741,6 +742,7 @@ export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof St
 
 export const StepUpRequestPurpose = {
   PAT_CREATE: 'PAT_CREATE',
+  PHONE_CHANGE: 'PHONE_CHANGE',
 } as const;
 
 export interface StepUpRequest {
@@ -768,6 +770,8 @@ export interface PhoneResponse {
   verified: boolean;
   /** The verified number as shown to the member (carrier digit and last three digits) */
   maskedPhone?: string;
+  /** While a number change can still be undone, when that stops; otherwise null */
+  cancelAvailableUntil?: string;
 }
 
 export interface SendCodeRequest {
@@ -780,6 +784,16 @@ export interface SendCodeResponse {
   /** Seconds before a resend is accepted */
   resendAfterSeconds: number;
   expiresAt: string;
+}
+
+export interface ChangeStartRequest {
+  /** @pattern ^(0|\+84)([35789]\d{8})$ */
+  phone: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof: string;
 }
 
 export interface CreateApiTokenRequest {
@@ -1369,6 +1383,19 @@ export interface RoleResponse {
   staff: boolean;
   superAdmin: boolean;
   permissions: RoleResponsePermissionsItem[];
+}
+
+export interface AdminPhoneVerificationStatus {
+  verificationEnabled: boolean;
+  /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
+  smsSender: string;
+  /** True when the hash secret is set and at least 32 bytes; the value is never returned */
+  hashSecretConfigured: boolean;
+  gateEnabled: boolean;
+  /** Cap on codes sent from every member per 24 hours */
+  globalSendsPerDay: number;
+  /** Codes sent in the last 24 hours */
+  sentLast24h: number;
 }
 
 export interface MediaJobResponse {
@@ -3527,6 +3554,184 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type changeVerifyResponse200 = {
+  data: PhoneResponse;
+  status: 200;
+};
+
+export type changeVerifyResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type changeVerifyResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type changeVerifyResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type changeVerifyResponseSuccess = changeVerifyResponse200 & {
+  headers: Headers;
+};
+export type changeVerifyResponseError = (
+  changeVerifyResponse400 | changeVerifyResponse409 | changeVerifyResponse422
+) & {
+  headers: Headers;
+};
+
+export type changeVerifyResponse = changeVerifyResponseSuccess | changeVerifyResponseError;
+
+export const getChangeVerifyUrl = () => {
+  return `/api/v1/me/phone/change/verify`;
+};
+
+export const changeVerify = async (
+  verifyCodeRequest: VerifyCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeVerifyResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<changeVerifyResponse>(getChangeVerifyUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(verifyCodeRequest),
+  });
+};
+
+export type changeStartResponse200 = {
+  data: SendCodeResponse;
+  status: 200;
+};
+
+export type changeStartResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type changeStartResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type changeStartResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type changeStartResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type changeStartResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type changeStartResponseSuccess = changeStartResponse200 & {
+  headers: Headers;
+};
+export type changeStartResponseError = (
+  | changeStartResponse400
+  | changeStartResponse403
+  | changeStartResponse409
+  | changeStartResponse422
+  | changeStartResponse429
+) & {
+  headers: Headers;
+};
+
+export type changeStartResponse = changeStartResponseSuccess | changeStartResponseError;
+
+export const getChangeStartUrl = () => {
+  return `/api/v1/me/phone/change/start`;
+};
+
+export const changeStart = async (
+  changeStartRequest: ChangeStartRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeStartResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<changeStartResponse>(getChangeStartUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(changeStartRequest),
+  });
+};
+
+export type changeCancelResponse200 = {
+  data: PhoneResponse;
+  status: 200;
+};
+
+export type changeCancelResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type changeCancelResponseSuccess = changeCancelResponse200 & {
+  headers: Headers;
+};
+export type changeCancelResponseError = changeCancelResponse409 & {
+  headers: Headers;
+};
+
+export type changeCancelResponse = changeCancelResponseSuccess | changeCancelResponseError;
+
+export const getChangeCancelUrl = () => {
+  return `/api/v1/me/phone/change/cancel`;
+};
+
+export const changeCancel = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeCancelResponse> => {
+  return customFetch<changeCancelResponse>(getChangeCancelUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -6552,6 +6757,34 @@ export const listAdminRoles = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type getAdminPhoneVerificationStatusResponse200 = {
+  data: AdminPhoneVerificationStatus;
+  status: 200;
+};
+
+export type getAdminPhoneVerificationStatusResponseSuccess =
+  getAdminPhoneVerificationStatusResponse200 & {
+    headers: Headers;
+  };
+export type getAdminPhoneVerificationStatusResponse =
+  getAdminPhoneVerificationStatusResponseSuccess;
+
+export const getGetAdminPhoneVerificationStatusUrl = () => {
+  return `/api/v1/admin/phone-verification/status`;
+};
+
+export const getAdminPhoneVerificationStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminPhoneVerificationStatusResponse> => {
+  return customFetch<getAdminPhoneVerificationStatusResponse>(
+    getGetAdminPhoneVerificationStatusUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type listAdminMediaJobsResponse200 = {
