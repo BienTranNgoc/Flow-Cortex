@@ -18,6 +18,8 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   isShared: true,
   available: true,
+  allowFork: false,
+  forkCount: 0,
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
 };
 
@@ -26,6 +28,8 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo',
   isShared: true,
   available: true,
+  allowFork: false,
+  forkCount: 0,
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -43,6 +47,8 @@ const INCOMPLETE: WorkflowResponse = {
   name: 'Incomplete Demo (step 2 not configured)',
   isShared: true,
   available: true,
+  allowFork: false,
+  forkCount: 0,
   steps: [
     { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
     { id: 'ws2', stepOrder: 2, name: 'Echo step 2', type: 'echo', mode: 'inline' },
@@ -125,6 +131,8 @@ describe('WorkflowDetailPage', () => {
       name: 'Three steps',
       isShared: true,
       available: true,
+      allowFork: false,
+      forkCount: 0,
       steps: [
         { id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' },
         { id: 'ws2', stepOrder: 2, name: 'Pull the audio', type: 'extract_audio', mode: 'remote' },

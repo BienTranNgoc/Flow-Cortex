@@ -60,12 +60,12 @@ public class WorkflowForkService {
     }
 
     private static void refuse(ForkEligibility.Refusal refusal) {
-        switch (refusal) {
-            case OWN -> throw new UnprocessableEntityException(new LocalizedMessage("workflow.fork.own"),
+        throw switch (refusal) {
+            case OWN -> new UnprocessableEntityException(new LocalizedMessage("workflow.fork.own"),
                     "CANNOT_FORK_OWN");
-            case FIXED -> throw new ConflictException(new LocalizedMessage("workflow.copy.fixedWorkflow"));
-            case NOT_ALLOWED -> throw new LocalizedStatusException(HttpStatus.FORBIDDEN,
+            case FIXED -> new ConflictException(new LocalizedMessage("workflow.copy.fixedWorkflow"));
+            case NOT_ALLOWED -> new LocalizedStatusException(HttpStatus.FORBIDDEN,
                     new LocalizedMessage("workflow.fork.notAllowed"));
-        }
+        };
     }
 }

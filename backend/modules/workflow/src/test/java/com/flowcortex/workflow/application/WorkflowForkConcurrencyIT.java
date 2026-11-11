@@ -133,7 +133,8 @@ class WorkflowForkConcurrencyIT {
         Workflow source = forkableSource("poison");
         jdbc.execute("ALTER TABLE workflow_step ADD CONSTRAINT ck_no_poison CHECK (name <> 'poison') NOT VALID");
         try {
-            assertThatThrownBy(() -> forkService.fork(UUID.randomUUID(), source.getId())).isInstanceOf(DataIntegrityViolationException.class);
+            assertThatThrownBy(() -> forkService.fork(UUID.randomUUID(), source.getId()))
+                    .isInstanceOf(DataIntegrityViolationException.class);
 
             assertThat(countOf(source.getId())).isZero();
             assertThat(forksOf(source.getId())).isZero();
