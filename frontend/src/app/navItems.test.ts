@@ -1,4 +1,11 @@
-import { BookOpen, FlowArrow, House, PlugsConnected, Play } from '@phosphor-icons/react';
+import {
+  BookOpen,
+  ChatsCircle,
+  FlowArrow,
+  House,
+  PlugsConnected,
+  Play,
+} from '@phosphor-icons/react';
 import { DOCS_ICON, primaryNavItems } from './navItems';
 
 const labels = () => primaryNavItems().map((item) => item.label);
@@ -31,5 +38,22 @@ describe('primaryNavItems', () => {
       ['Integrations', PlugsConnected],
     ]);
     expect(DOCS_ICON).toBe(BookOpen);
+  });
+
+  it('adds Chat after Workflows only while the chat switch is on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+    const withChat = primaryNavItems(undefined, { chat: true });
+    expect(withChat.map((item) => item.label)).toEqual([
+      'Home',
+      'Workflows',
+      'Chat',
+      'Runs',
+      'Integrations',
+    ]);
+    expect(withChat.find((item) => item.label === 'Chat')?.to).toBe('/chat');
+    expect(withChat.find((item) => item.label === 'Chat')?.icon).toBe(ChatsCircle);
+    expect(primaryNavItems(undefined, { chat: false }).map((item) => item.label)).not.toContain(
+      'Chat',
+    );
   });
 });
