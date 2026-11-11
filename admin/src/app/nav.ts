@@ -5,6 +5,7 @@ import {
   ClipboardText,
   Coins,
   Cpu,
+  CreditCard,
   Cube,
   GearSix,
   Headset,
@@ -12,6 +13,7 @@ import {
   Play,
   Pulse,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkle,
   SquaresFour,
   Stack,
@@ -100,6 +102,12 @@ export const NAV: NavGroup[] = [
         disabled: true,
         tag: COMING_SOON,
       },
+      {
+        label: 'common.shell.nav.items.paymentSettings',
+        path: '/payment-settings',
+        icon: CreditCard,
+        key: 'payment.setting.view',
+      },
     ],
   },
   {
@@ -117,6 +125,12 @@ export const NAV: NavGroup[] = [
         path: '/sms-outbox',
         icon: ChatText,
         key: 'platform.sms_outbox.view',
+      },
+      {
+        label: 'common.shell.nav.items.settings',
+        path: '/settings',
+        icon: SlidersHorizontal,
+        key: 'platform.setting.view',
       },
       {
         label: 'common.shell.nav.items.features',

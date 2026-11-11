@@ -1,7 +1,8 @@
 package com.flowcortex.support.assistant;
 
 import com.flowcortex.shared.web.LocalizedMessage;
-import com.flowcortex.support.config.SupportProperties;
+import com.flowcortex.settings.api.Settings;
+import com.flowcortex.support.config.SupportSettingKeys;
 import com.flowcortex.support.web.SupportProblemException;
 import java.time.Clock;
 import java.time.Instant;
@@ -38,16 +39,16 @@ class QuotaService {
 
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactions;
-    private final SupportProperties.Assistant limits;
+    private final Settings settings;
     private final Clock clock;
     private final AtomicReference<LocalDate> ceilingWarnedFor = new AtomicReference<>();
 
-    QuotaService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager,
-            SupportProperties properties, Clock clock) {
+    QuotaService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager, Settings settings,
+            Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactions = new TransactionTemplate(transactionManager);
         this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        this.limits = properties.assistant();
+        this.settings = settings;
         this.clock = clock;
     }
 
@@ -62,11 +63,12 @@ class QuotaService {
     }
 
     /**
-     * Charges the global ceiling and the asker's subjects. Refuses with 503 {@code assistant-paused}
-     * when the ceiling is used up and 429 {@code assistant-quota} when one of the asker's quotas is.
+     * Charges the global ceiling, as {@link #refuseWhenPaused} read it for this question, and the
+     * asker's subjects. Refuses with 503 {@code assistant-paused} when the ceiling is used up and 429
+     * {@code assistant-quota} when one of the asker's quotas is.
      */
-    Charge charge(Asker asker) {
-        return charge(asker, true);
+    Charge charge(Asker asker, int ceiling) {
+        return charge(asker, true, ceiling);
     }
 
     /**
@@ -74,15 +76,16 @@ class QuotaService {
      * global ceiling (a count of provider calls) alone. Refuses with 429 like {@link #charge}.
      */
     Charge chargeAskerOnly(Asker asker) {
-        return charge(asker, false);
+        return charge(asker, false, 0);
     }
 
-    private Charge charge(Asker asker, boolean globalCeiling) {
+    /** Every setting is read before the transaction opens, so a failed read can never abort it. */
+    private Charge charge(Asker asker, boolean globalCeiling, int ceiling) {
         LocalDate day = today();
         List<Subject> subjects = subjects(asker);
         Integer remaining = transactions.execute(status -> {
-            if (globalCeiling && increment(GLOBAL, day, limits.dailyCeiling()) == null) {
-                throw paused(day);
+            if (globalCeiling && increment(GLOBAL, day, ceiling) == null) {
+                throw paused(day, ceiling);
             }
             int least = Integer.MAX_VALUE;
             for (Subject subject : subjects) {
@@ -120,23 +123,28 @@ class QuotaService {
     }
 
     int dailyCeiling() {
-        return limits.dailyCeiling();
+        return settings.get(SupportSettingKeys.DAILY_CEILING).effective();
     }
 
     boolean ceilingReachedToday() {
-        return used(GLOBAL, today()) >= limits.dailyCeiling();
+        return used(GLOBAL, today()) >= dailyCeiling();
     }
 
-    /** Refuses with 503 {@code assistant-paused} while today's ceiling is used up, without charging. */
-    void refuseWhenPaused() {
+    /**
+     * Refuses with 503 {@code assistant-paused} while today's ceiling is used up, without charging;
+     * otherwise returns the ceiling it read, for the charge that follows.
+     */
+    int refuseWhenPaused() {
         LocalDate day = today();
-        if (used(GLOBAL, day) >= limits.dailyCeiling()) {
-            throw paused(day);
+        int ceiling = dailyCeiling();
+        if (used(GLOBAL, day) >= ceiling) {
+            throw paused(day, ceiling);
         }
+        return ceiling;
     }
 
-    private SupportProblemException paused(LocalDate day) {
-        warnCeilingOnce(day);
+    private SupportProblemException paused(LocalDate day, int ceiling) {
+        warnCeilingOnce(day, ceiling);
         return new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-paused",
                 new LocalizedMessage("support.assistant.paused")).with("retryAt", resetsAt(day));
     }
@@ -156,9 +164,12 @@ class QuotaService {
 
     private List<Subject> subjects(Asker asker) {
         return switch (asker) {
-            case Asker.Member member -> List.of(new Subject(member.subjectKey(), limits.memberDailyQuota()));
-            case Asker.Guest guest -> List.of(new Subject(guest.subjectKey(), limits.guestDailyQuota()),
-                    new Subject(guest.networkKey(), limits.guestNetworkDailyQuota()));
+            case Asker.Member member -> List.of(new Subject(member.subjectKey(),
+                    settings.get(SupportSettingKeys.MEMBER_DAILY_QUOTA).effective()));
+            case Asker.Guest guest -> List.of(
+                    new Subject(guest.subjectKey(), settings.get(SupportSettingKeys.GUEST_DAILY_QUOTA).effective()),
+                    new Subject(guest.networkKey(),
+                            settings.get(SupportSettingKeys.GUEST_NETWORK_DAILY_QUOTA).effective()));
         };
     }
 
@@ -173,10 +184,10 @@ class QuotaService {
         return counts.isEmpty() ? 0 : counts.getFirst();
     }
 
-    private void warnCeilingOnce(LocalDate day) {
+    private void warnCeilingOnce(LocalDate day, int ceiling) {
         LocalDate warned = ceilingWarnedFor.get();
         if (!day.equals(warned) && ceilingWarnedFor.compareAndSet(warned, day)) {
-            LOG.warn("support.assistant.ceiling outcome=reached ceiling={}", limits.dailyCeiling());
+            LOG.warn("support.assistant.ceiling outcome=reached ceiling={}", ceiling);
         }
     }
 }

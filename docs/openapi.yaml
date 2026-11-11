@@ -409,6 +409,114 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/settings/{key}:
+    put:
+      tags:
+      - admin-settings-controller
+      operationId: updateAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: setting.invalidValue (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-settings-controller
+      operationId: resetAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/payment-settings/{key}:
+    put:
+      tags:
+      - payment-settings-admin-controller
+      operationId: updatePaymentSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSettingView"
+        "400":
+          description: "validation-failed (errors.value, errors.reason)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: forbidden (needs payment.setting.update)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: paymentSetting.reasonRequired (errors.reason) or setting.invalidValue
+            (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/chat/settings:
     get:
       tags:
@@ -2809,6 +2917,60 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SmsOutboxEntryResponse"
+  /api/v1/admin/settings:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettingList"
+  /api/v1/admin/settings/{key}/history:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettingHistory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminSettingChange"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/runs:
     get:
       tags:
@@ -2867,6 +3029,68 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RoleResponse"
+  /api/v1/admin/payment-settings:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentSettingView"
+  /api/v1/admin/payment-settings/history:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettingHistory
+      parameters:
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 25
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewPaymentSettingChangeView"
+        "400":
+          description: "validation-failed (errors.page, errors.size)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -3113,6 +3337,8 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - payment.setting.view
+            - payment.setting.update
         adminDisabled:
           type: boolean
       required:
@@ -3148,7 +3374,6 @@ components:
       - ceilingReachedToday
       - dailyCeiling
       - envEnabled
-      - updatedAt
     AdminSupportRequestStatusChange:
       type: object
       properties:
@@ -3424,6 +3649,191 @@ components:
       - status
       - title
       - updatedAt
+    AdminSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+      required:
+      - value
+    AdminSetting:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+          - ENUM
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        decidedValue:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        options:
+          type: array
+          items:
+            type: string
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - decidedValue
+      - group
+      - key
+      - options
+      - source
+      - type
+      - value
+    PaymentSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        reason:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+          minLength: 0
+      required:
+      - value
+    PaymentSettingView:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+          - ENUM
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        dangerous:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - dangerous
+      - group
+      - key
+      - options
+      - source
+      - type
+      - value
     AdminChatSettingsUpdate:
       type: object
       properties:
@@ -4848,6 +5258,66 @@ components:
       - createdAt
       - id
       - phone
+    AdminSettingList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSetting"
+      required:
+      - items
+    AdminSettingChange:
+      type: object
+      properties:
+        previousValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        newValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        changedBy:
+          type:
+          - string
+          - "null"
+        reason:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+    PageViewAdminSettingChange:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSettingChange"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     AdminRunResponse:
       type: object
       properties:
@@ -4929,11 +5399,70 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - payment.setting.view
+            - payment.setting.update
       required:
       - code
       - permissions
       - staff
       - superAdmin
+    PageViewPaymentSettingChangeView:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentSettingChangeView"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    PaymentSettingChangeView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        previousValue:
+          type:
+          - string
+          - "null"
+        newValue:
+          type:
+          - string
+          - "null"
+        actorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        actorEmail:
+          type:
+          - string
+          - "null"
+        reason:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+      - id
+      - key
     MediaJobResponse:
       type: object
       properties:

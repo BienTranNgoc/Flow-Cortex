@@ -304,6 +304,14 @@ flowcortex:
       render_video: 200
       translate: 100
       tts: 100
+  # Payments region gate: off places nobody, shadow only counts callers outside Vietnam,
+  # enforce refuses them on payment-opening handlers. The mode is the configured layer of the console
+  # setting payment.region_gate.mode: a value stored there wins. The refresh pace is for the registry download.
+  billing:
+    region-gate:
+      mode: ${FLOWCORTEX_BILLING_REGION_GATE_MODE:shadow}
+      refresh-interval: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INTERVAL:PT24H}
+      refresh-initial-delay: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INITIAL_DELAY:PT10M}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
@@ -379,7 +387,9 @@ flowcortex:
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
       answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
-  # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
+  # up). The assistant switch and the four daily limits below are configured here and changed at
+  # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the
+  # assistant off whatever is stored. The Help Center switch itself needs a restart.
   support:
     enabled: ${FLOWCORTEX_SUPPORT_ENABLED:false}
     # Shown to guests and suspended members; empty shows no contact line.

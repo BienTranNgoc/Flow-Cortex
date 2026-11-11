@@ -99,6 +99,27 @@ class ChatSwitchIT extends ChatItSupport {
     }
 
     @Test
+    void theSwitchFollowsThePlatformSettingKeysNotTheAdminRole() {
+        UserView operator = userService.createUser(admin.id(), uniqueEmail("switch-operator"), "password123",
+                "Operator", "PLATFORM_OPERATOR");
+        UserView support = userService.createUser(admin.id(), uniqueEmail("switch-support"), "password123",
+                "Support", "CUSTOMER_SUPPORT");
+        String supportToken = login(support.email());
+
+        ResponseEntity<String> deniedGet = restTemplate.exchange(SETTINGS, HttpMethod.GET,
+                new HttpEntity<>(bearer(supportToken)), String.class);
+        ResponseEntity<String> deniedPut = restTemplate.exchange(SETTINGS, HttpMethod.PUT,
+                new HttpEntity<>(new SettingsUpdate(false), bearer(supportToken)), String.class);
+        ResponseEntity<Settings> flipped = restTemplate.exchange(SETTINGS, HttpMethod.PUT,
+                new HttpEntity<>(new SettingsUpdate(false), bearer(login(operator.email()))), Settings.class);
+
+        assertThat(deniedGet.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(deniedPut.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(flipped.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(flipped.getBody().updatedBy()).isEqualTo(operator.email());
+    }
+
+    @Test
     void anUpdateWithoutTheFlagIsRefused() {
         ResponseEntity<Problem> response = restTemplate.exchange(SETTINGS, HttpMethod.PUT,
                 new HttpEntity<>(new SettingsUpdate(null), bearer(login(admin.email()))), Problem.class);
