@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:chat"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -83,4 +84,27 @@ tasks.withType<Test> {
     inputs.dir(rootProject.projectDir.parentFile.resolve("contracts"))
         .withPropertyName("contracts")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+// ITs tagged multi-instance boot extra full app contexts of their own; sharing the main suite's
+// heap with its context cache runs it out of memory, so they get a JVM of their own.
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("multi-instance")
+    }
+}
+
+val multiInstanceTest by tasks.registering(Test::class) {
+    description = "Runs the ITs tagged multi-instance in their own JVM."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("multi-instance")
+    }
+    shouldRunAfter(tasks.test)
+}
+
+tasks.check {
+    dependsOn(multiInstanceTest)
 }
