@@ -1,7 +1,6 @@
 package com.flowcortex.workflow.web;
 
 import com.flowcortex.credit.api.CreditAccounts;
-import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
@@ -25,7 +24,7 @@ record WorkflowResponse(
     static WorkflowResponse from(WorkflowView view, CreditAccounts credits) {
         return new WorkflowResponse(view.id(), view.name(), view.shared(), view.createdAt(), view.updatedAt(),
                 view.steps().stream().map(WorkflowStepResponse::from).toList(),
-                credits.enabled() ? credits.estimate(view.steps().stream().map(WorkflowStepView::type).toList()) : null,
-                view.available(), view.status(), view.publishedVersionId(), view.servedVersion());
+                view.estimatedCredits(credits), view.available(), view.status(), view.publishedVersionId(),
+                view.servedVersion());
     }
 }

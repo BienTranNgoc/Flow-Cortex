@@ -54,7 +54,8 @@ class WorkflowServiceImplTest {
             new WorkflowWriteAccess(workflowRepository, registry,
                     Validation.buildDefaultValidatorFactory().getValidator()),
             new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
-            new ServedDefinitions(workflowStepRepository, versionRepository));
+            new ServedDefinitions(workflowStepRepository, versionRepository),
+            mock(com.flowcortex.credit.api.CreditAccounts.class));
 
     {
         when(versionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
