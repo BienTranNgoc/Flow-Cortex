@@ -60,6 +60,7 @@
         "administration": "Quản trị",
         "system": "Hệ thống",
         "support": "Hỗ trợ",
+        "content": "Nội dung",
         "chat": "Trò chuyện"
       },
       "items": {
@@ -81,6 +82,8 @@
         "supportRequests": "Yêu cầu",
         "supportSettings": "Cài đặt trợ lý",
         "adminAccounts": "Tài khoản quản trị",
+        "contentDocuments": "Tài liệu",
+        "contentMedia": "Thư viện media",
         "chatSettings": "Cài đặt"
       }
     },

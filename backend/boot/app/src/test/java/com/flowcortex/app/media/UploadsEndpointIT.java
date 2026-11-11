@@ -167,10 +167,12 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
         String token = loginAs(user);
         WorkflowView workflow = newWorkflow(user.id(), false,
                 new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
-        UploadResponseView first = grant(token, "first.png", CLIP.length).getBody();
-        UploadResponseView second = grant(token, "second.webp", CLIP.length).getBody();
-        assertThat(put(first, "image/png", CLIP.length, CLIP.length, null)).isEqualTo(200);
-        assertThat(put(second, "image/webp", CLIP.length, CLIP.length, null)).isEqualTo(200);
+        byte[] png = ImageFixtures.png();
+        byte[] webp = ImageFixtures.webp();
+        UploadResponseView first = grant(token, "first.png", png.length).getBody();
+        UploadResponseView second = grant(token, "second.webp", webp.length).getBody();
+        assertThat(put(first, "image/png", png, png.length, null)).isEqualTo(200);
+        assertThat(put(second, "image/webp", webp, webp.length, null)).isEqualTo(200);
 
         ResponseEntity<String> response = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
                 Map.of("uploadIds", List.of(first.uploadId(), second.uploadId())), String.class);
@@ -183,6 +185,89 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
                 runId)).containsExactly(Map.entry("image_1", first.uploadId()), Map.entry("image_2", second.uploadId()));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM media_asset WHERE owner_id = ? AND status = 'ready'",
                 Long.class, user.id())).isEqualTo(2L);
+        UUID personalSpace = jdbc.queryForObject("SELECT id FROM space WHERE owner_id = ? AND is_default", UUID.class,
+                user.id());
+        assertThat(jdbc.queryForList("SELECT space_id FROM media_asset WHERE owner_id = ?", UUID.class, user.id()))
+                .containsExactly(personalSpace, personalSpace);
+    }
+
+    record RunInputView(String bindingKey, String kind, String mimeType, String url, Instant expiresAt) {
+    }
+
+    @Test
+    void theOwnerReadsTheRunsInputsInStartOrderAndAnotherMemberGets404() throws IOException {
+        UserView user = newUser("uploads-run-inputs");
+        String token = loginAs(user);
+        WorkflowView workflow = newWorkflow(user.id(), false,
+                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+        byte[] png = ImageFixtures.png();
+        byte[] webp = ImageFixtures.webp();
+        UploadResponseView first = grant(token, "first.png", png.length).getBody();
+        UploadResponseView second = grant(token, "second.webp", webp.length).getBody();
+        assertThat(put(first, "image/png", png, png.length, null)).isEqualTo(200);
+        assertThat(put(second, "image/webp", webp, webp.length, null)).isEqualTo(200);
+        assertThat(post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("uploadIds", List.of(first.uploadId(), second.uploadId())), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        UUID runId = jdbc.queryForObject("SELECT id FROM workflow_run WHERE workflow_id = ?", UUID.class,
+                workflow.id());
+
+        ResponseEntity<RunInputView[]> owner = get("/api/v1/runs/" + runId + "/inputs", token, RunInputView[].class);
+
+        assertThat(owner.getStatusCode()).isEqualTo(HttpStatus.OK);
+        RunInputView[] inputs = owner.getBody();
+        assertThat(inputs).extracting(RunInputView::bindingKey).containsExactly("image_1", "image_2");
+        assertThat(inputs).extracting(RunInputView::kind).containsOnly("image");
+        assertThat(inputs).extracting(RunInputView::mimeType).containsExactly("image/png", "image/webp");
+        assertThat(inputs[0].url()).contains("runs/" + runId + "/inputs/image_1");
+        assertThat(inputs[1].url()).contains("runs/" + runId + "/inputs/image_2");
+        assertThat(inputs).extracting(RunInputView::expiresAt).doesNotContainNull();
+
+        UserView other = newUser("uploads-run-inputs-other");
+        ResponseEntity<ProblemView> foreign = get("/api/v1/runs/" + runId + "/inputs", loginAs(other),
+                ProblemView.class);
+        assertThat(foreign.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(foreign.getBody().detail()).isEqualTo("Workflow run not found: " + runId);
+    }
+
+    @Test
+    void aRunWithoutUploadsHasNoInputs() {
+        UserView user = newUser("uploads-run-no-inputs");
+        String token = loginAs(user);
+        WorkflowView workflow = newWorkflow(user.id(), false, new NewWorkflowStep("only", "echo", null));
+        assertThat(post("/api/v1/workflows/" + workflow.id() + "/runs", token, Map.of("input", "hello"),
+                String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        UUID runId = jdbc.queryForObject("SELECT id FROM workflow_run WHERE workflow_id = ?", UUID.class,
+                workflow.id());
+
+        ResponseEntity<RunInputView[]> response = get("/api/v1/runs/" + runId + "/inputs", token,
+                RunInputView[].class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEmpty();
+    }
+
+    record ProblemView(String detail, Map<String, String> errors) {
+    }
+
+    @Test
+    void anImageOverTwentyFiveMegapixelsIsRefusedAtRunStartOnUploadIdsAndCreatesNoRun() throws IOException {
+        UserView user = newUser("uploads-image-pixels");
+        String token = loginAs(user);
+        WorkflowView workflow = newWorkflow(user.id(), false,
+                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+        byte[] huge = ImageFixtures.png(5001, 5000);
+        UploadResponseView upload = grant(token, "huge.png", huge.length).getBody();
+        assertThat(put(upload, "image/png", huge, huge.length, null)).isEqualTo(200);
+
+        ResponseEntity<ProblemView> response = post("/api/v1/workflows/" + workflow.id() + "/runs", token,
+                Map.of("uploadIds", List.of(upload.uploadId())), ProblemView.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().errors()).containsEntry("uploadIds",
+                "This image is too large: at most 25 megapixels.");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_run WHERE workflow_id = ?", Long.class,
+                workflow.id())).isZero();
     }
 
     @Test
@@ -245,19 +330,23 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
      */
     private static int put(UploadResponseView grant, String contentType, int length, int firstChunk,
             Instant resumeAt) throws IOException {
+        return put(grant, contentType, Arrays.copyOf(CLIP, length), firstChunk, resumeAt);
+    }
+
+    private static int put(UploadResponseView grant, String contentType, byte[] body, int firstChunk,
+            Instant resumeAt) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) URI.create(grant.url()).toURL().openConnection();
         connection.setRequestMethod("PUT");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", contentType);
-        connection.setFixedLengthStreamingMode(length);
-        byte[] body = Arrays.copyOf(CLIP, length);
+        connection.setFixedLengthStreamingMode(body.length);
         try (OutputStream out = connection.getOutputStream()) {
             out.write(body, 0, firstChunk);
             out.flush();
             if (resumeAt != null) {
                 sleepUntil(resumeAt);
             }
-            out.write(body, firstChunk, length - firstChunk);
+            out.write(body, firstChunk, body.length - firstChunk);
         }
         return connection.getResponseCode();
     }

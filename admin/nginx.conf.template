@@ -20,7 +20,11 @@ server {
     # these, so none does.
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer" always;
-    add_header Content-Security-Policy "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'" always;
+    # The console PUTs uploads to the object store's public origin and shows files the API
+    # redirects there; a browser applies the CSP again after that redirect. MEDIA_ORIGIN
+    # (scheme://host[:port], the origin S3_PUBLIC_ENDPOINT is signed for) is the one origin
+    # allowed beyond 'self'; empty leaves 'self' alone. The image start script fills it in.
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' ${MEDIA_ORIGIN}; media-src 'self' ${MEDIA_ORIGIN}; connect-src 'self' ${MEDIA_ORIGIN}; frame-ancestors 'none'; object-src 'none'; base-uri 'none'" always;
 
     # SPA client-side routing: serve index.html for any unmatched path.
     location / {

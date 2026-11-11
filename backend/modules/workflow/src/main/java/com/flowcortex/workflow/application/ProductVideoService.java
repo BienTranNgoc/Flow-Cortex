@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -118,7 +119,7 @@ public class ProductVideoService implements ProductVideoRuns {
             boolean acknowledgeCost, String requestKey) {
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
-        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
+        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds);
         String productJson = productJson(draft);
         // Copied before the run's transaction opens, so no database transaction waits on the object store.
         UUID runId = UUID.randomUUID();

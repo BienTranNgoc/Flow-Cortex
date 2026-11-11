@@ -3,6 +3,7 @@ import enAdminAccounts from '../locales/en/adminAccounts.json';
 import enAuth from '../locales/en/auth.json';
 import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
+import enContent from '../locales/en/content.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
 import enRuns from '../locales/en/runs.json';
@@ -13,6 +14,7 @@ import viAdminAccounts from '../locales/vi/adminAccounts.json';
 import viAuth from '../locales/vi/auth.json';
 import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
+import viContent from '../locales/vi/content.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
 import viRuns from '../locales/vi/runs.json';
@@ -34,6 +36,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: viSmsOutbox,
     support: viSupport,
     chat: viChat,
+    content: viContent,
   },
   en: {
     common: enCommon,
@@ -46,6 +49,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: enSmsOutbox,
     support: enSupport,
     chat: enChat,
+    content: enContent,
   },
 });
 

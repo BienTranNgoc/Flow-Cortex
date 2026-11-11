@@ -409,6 +409,71 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: getContentDocumentDraft
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentDraft"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-content-documents-controller
+      operationId: saveContentDocumentDraft
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveContentDocumentDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentDraft"
+        "400":
+          description: "document-invalid (errors by field path), validation-failed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: version-conflict (currentVersion)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/chat/settings:
     get:
       tags:
@@ -1856,6 +1921,150 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/media:
+    get:
+      tags:
+      - admin-content-media-controller
+      operationId: listContentMedia
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: image|video
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 24
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentMediaItem"
+        "400":
+          description: validation-failed (errors by parameter name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - admin-content-media-controller
+      operationId: registerContentMedia
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterContentMediaRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentMediaItem"
+        "400":
+          description: "content-media-rejected, validation-failed (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: content-media-unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/media/uploads:
+    post:
+      tags:
+      - admin-content-media-controller
+      operationId: requestContentMediaUpload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentMediaUploadRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadGrant"
+        "400":
+          description: "content-media-rejected, validation-failed (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: content-media-unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}/publish:
+    post:
+      tags:
+      - admin-content-documents-controller
+      operationId: publishContentDocument
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishContentDocumentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentPublication"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "version-conflict (currentVersion), nothing-to-publish"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: document-incomplete (fields)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts/{id}/deactivate:
     post:
       tags:
@@ -2506,6 +2715,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutputUrlResponse"
+  /api/v1/runs/{id}/inputs:
+    get:
+      tags:
+      - runs-controller
+      operationId: getRunInputs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunInputResponse"
   /api/v1/realtime/stream:
     get:
       tags:
@@ -2598,6 +2828,119 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceResponse"
+  /api/v1/content/media/{id}:
+    get:
+      tags:
+      - public-content-media-controller
+      operationId: getContentMedia
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to a time-limited URL of the stored copy
+        "404":
+          description: media-not-found (also a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/documents/{slug}:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: getPublishedContentDocument
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentPublication"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/documents/{slug}/history:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: listContentDocumentHistory
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentDocumentHistoryEntry"
+      security: []
+  /api/v1/content/documents/{slug}/history/{id}:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: getContentDocumentPublication
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentHistoryPublication"
+        "404":
+          description: document-not-found (also a draft snapshot or a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations/{id}/messages:
     get:
       tags:
@@ -2909,6 +3252,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/content/documents:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: listContentDocuments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContentDocumentSummary"
+  /api/v1/admin/content/documents/{slug}/revisions:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: listContentDocumentRevisions
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentDocumentRevisionSummary"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}/revisions/{id}:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: getContentDocumentRevision
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentRevision"
+        "404":
+          description: document-not-found (also a snapshot of another document or
+            a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts:
     get:
       tags:
@@ -3107,6 +3536,10 @@ components:
             - content.help_topic.manage
             - content.help_article.view
             - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
             - platform.setting.view
             - platform.setting.update
             - platform.sms_outbox.view
@@ -3424,6 +3857,86 @@ components:
       - status
       - title
       - updatedAt
+    ContentSection:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "The section type, e.g. richText or media"
+        schemaVersion:
+          type: integer
+          format: int32
+        data:
+          type: object
+          additionalProperties: {}
+          description: "The fields of the section type; text fields are {vi, en}"
+      required:
+      - data
+      - schemaVersion
+      - type
+    ContentSeoMeta:
+      type: object
+      properties:
+        title:
+          $ref: "#/components/schemas/LocalizedText"
+        description:
+          $ref: "#/components/schemas/LocalizedText"
+      required:
+      - description
+      - title
+    LocalizedText:
+      type: object
+      properties:
+        vi:
+          type: string
+        en:
+          type: string
+    SaveContentDocumentDraftRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: The draft version the editor loaded; 0 when none
+          minimum: 0
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - sections
+      - seoMeta
+      - version
+    ContentDocumentDraft:
+      type: object
+      properties:
+        slug:
+          type: string
+        version:
+          type: integer
+          format: int32
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        updatedByEmail:
+          type:
+          - string
+          - "null"
+      required:
+      - sections
+      - seoMeta
+      - slug
+      - version
     AdminChatSettingsUpdate:
       type: object
       properties:
@@ -4388,6 +4901,123 @@ components:
       required:
       - body
       - status
+    RegisterContentMediaRequest:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+          description: "The upload id of a granted, uploaded file"
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+          pattern: "[^\\p{Cntrl}/\\\\]+"
+      required:
+      - fileName
+      - uploadId
+    ContentMediaItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - image
+          - video
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        fileName:
+          type: string
+        uploaderEmail:
+          type:
+          - string
+          - "null"
+          description: Null when the uploader's account no longer exists
+        createdAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+      required:
+      - contentType
+      - createdAt
+      - fileName
+      - id
+      - kind
+      - sizeBytes
+      - url
+    ContentMediaUploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    UploadGrant:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+    PublishContentDocumentRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: The draft version the editor reviewed
+          minimum: 0
+      required:
+      - version
+    ContentDocumentPublication:
+      type: object
+      properties:
+        slug:
+          type: string
+        version:
+          type: integer
+          format: int32
+        publishedAt:
+          type: string
+          format: date-time
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - publishedAt
+      - sections
+      - seoMeta
+      - slug
+      - version
     AdminAccountResponse:
       type: object
       properties:
@@ -4650,6 +5280,26 @@ components:
       required:
       - expiresAt
       - url
+    RunInputResponse:
+      type: object
+      properties:
+        bindingKey:
+          type: string
+        kind:
+          type: string
+        mimeType:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - bindingKey
+      - expiresAt
+      - kind
+      - mimeType
+      - url
     HealthResponse:
       type: object
       properties:
@@ -4698,6 +5348,62 @@ components:
         balance:
           type: integer
           format: int64
+    ContentDocumentHistoryEntry:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+      - publishedAt
+      - revisionId
+    PageViewContentDocumentHistoryEntry:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentDocumentHistoryEntry"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentHistoryPublication:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+        slug:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - publishedAt
+      - revisionId
+      - sections
+      - seoMeta
+      - slug
     ChatConversationList:
       type: object
       properties:
@@ -4923,6 +5629,10 @@ components:
             - content.help_topic.manage
             - content.help_article.view
             - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
             - platform.setting.view
             - platform.setting.update
             - platform.sms_outbox.view
@@ -5010,6 +5720,144 @@ components:
       - page
       - size
       - total
+    PageViewContentMediaItem:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentMediaItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          $ref: "#/components/schemas/LocalizedText"
+        sectionTypes:
+          type: array
+          items:
+            type: string
+        publicHistory:
+          type: boolean
+        draftVersion:
+          type: integer
+          format: int32
+        draftUpdatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        publishedVersion:
+          type: integer
+          format: int32
+        publishedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - draftVersion
+      - publicHistory
+      - publishedVersion
+      - sectionTypes
+      - slug
+      - title
+    ContentDocumentRevisionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - draft
+          - publication
+        version:
+          type: integer
+          format: int32
+        authorEmail:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - version
+    PageViewContentDocumentRevisionSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentDocumentRevisionSummary"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - draft
+          - publication
+        version:
+          type: integer
+          format: int32
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+        authorEmail:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - sections
+      - seoMeta
+      - version
     PageViewAdminAccountResponse:
       type: object
       properties:

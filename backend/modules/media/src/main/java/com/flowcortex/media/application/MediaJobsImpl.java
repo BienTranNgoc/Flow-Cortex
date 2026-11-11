@@ -9,10 +9,13 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
+import com.flowcortex.media.api.RunInput;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.media.api.StoredContentMedia;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.provider.ProviderJobPayload;
 import com.flowcortex.media.api.UploadGrant;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.media.infrastructure.S3MediaStore;
 import com.flowcortex.media.domain.MediaAsset;
@@ -20,12 +23,13 @@ import com.flowcortex.media.domain.MediaAssetBinding;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.space.api.PersonalSpaces;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -46,7 +50,6 @@ import tools.jackson.databind.json.JsonMapper;
 class MediaJobsImpl implements MediaJobs {
 
     private static final Logger LOG = LoggerFactory.getLogger(MediaJobsImpl.class);
-    private static final long MEGABYTE = 1024L * 1024;
     /** The key of the one input a job built from an upload carries. */
     private static final String UPLOAD_INPUT_KEY = "media";
     private static final Pattern PLAIN_FILE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,254}");
@@ -56,6 +59,10 @@ class MediaJobsImpl implements MediaJobs {
     /** Retention tag values the media bucket's lifecycle rules key on: pending expires, attachment is kept. */
     private static final String SUPPORT_PENDING = "support-pending";
     private static final String SUPPORT_ATTACHMENT = "support-attachment";
+    private static final String CONTENT_PREFIX = "content/";
+    /** Content copies follow the same lifecycle: pending expires, kept stays. */
+    private static final String CONTENT_PENDING = "content-pending";
+    private static final String CONTENT_KEPT = "content";
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -63,15 +70,20 @@ class MediaJobsImpl implements MediaJobs {
     private final S3MediaStore store;
     private final MediaAssetRepository assets;
     private final MediaAssetBindingRepository bindings;
+    private final PersonalSpaces personalSpaces;
+    private final UploadPurposePolicy purposes;
 
     MediaJobsImpl(ApplicationEventPublisher events, Validator validator, MediaProperties properties,
-            S3MediaStore store, MediaAssetRepository assets, MediaAssetBindingRepository bindings) {
+            S3MediaStore store, MediaAssetRepository assets, MediaAssetBindingRepository bindings,
+            PersonalSpaces personalSpaces) {
         this.events = events;
         this.validator = validator;
         this.properties = properties;
         this.store = store;
         this.assets = assets;
         this.bindings = bindings;
+        this.personalSpaces = personalSpaces;
+        this.purposes = new UploadPurposePolicy(properties.upload());
     }
 
     // MANDATORY: outside a transaction the after-commit externalization never fires and the job
@@ -166,40 +178,37 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
-    public UploadGrant prepareUpload(UUID ownerId, String fileName, long size) {
-        String contentType = allowedType(fileName)
-                .orElseThrow(() -> new UploadRejectedException("fileName", typeDetail()));
-        String kind = MediaProperties.Upload.kindOf(contentType);
-        if (!withinLimit(kind, size)) {
-            throw new UploadRejectedException("size", sizeDetail(kind));
-        }
+    public UploadGrant prepareUpload(UploadPurpose purpose, UUID ownerId, String fileName, long size) {
+        UploadPurposePolicy.Allowed allowed = purposes.grant(purpose, fileName, size);
         UUID uploadId = UUID.randomUUID();
         String bucket = properties.s3().uploadBucket();
-        String key = objectKey(ownerId, uploadId);
-        S3MediaStore.PresignedPut put = store.presignPut(bucket, key, contentType, size, properties.upload().urlTtl());
-        LOG.info("Upload grant issued: bucket={} key={} size={} expiresAt={}", bucket, key, size, put.expiresAt());
-        return new UploadGrant(uploadId, put.url(), "PUT", put.headers(), put.expiresAt(),
-                properties.upload().maxBytesOf(kind));
+        String key = purposes.objectKey(purpose, ownerId, uploadId);
+        S3MediaStore.PresignedPut put = store.presignPut(bucket, key, allowed.contentType(), size,
+                properties.upload().urlTtl());
+        LOG.info("Upload grant issued: purpose={} bucket={} key={} size={} expiresAt={}", purpose, bucket, key, size,
+                put.expiresAt());
+        return new UploadGrant(uploadId, put.url(), "PUT", put.headers(), put.expiresAt(), allowed.maxBytes());
     }
 
     @Override
     @Transactional
     public MediaAssetInput resolveUpload(UUID ownerId, UUID uploadId) {
-        return resolveAndRegister(ownerId, uploadId, UPLOAD_INPUT_KEY, properties.upload().mediaExtensions(), null);
+        return resolveAndRegister(UploadPurpose.RUN_INPUT, ownerId, uploadId, UPLOAD_INPUT_KEY,
+                properties.upload().mediaExtensions(), null);
     }
 
     @Override
     @Transactional
-    public List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds) {
+    public List<MediaAssetInput> resolveImageUploads(UploadPurpose purpose, UUID ownerId, List<UUID> uploadIds) {
         if (uploadIds == null || uploadIds.isEmpty() || uploadIds.size() > 10
                 || uploadIds.stream().distinct().count() != uploadIds.size()) {
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.imageCount"));
         }
         List<MediaAssetInput> resolved = new java.util.ArrayList<>();
-        List<String> anyAllowed = List.copyOf(properties.upload().mimeTypes().keySet());
+        List<String> anyAllowed = List.copyOf(purposes.mimeTypes(purpose).keySet());
         for (int index = 0; index < uploadIds.size(); index++) {
-            resolved.add(resolveAndRegister(ownerId, uploadIds.get(index), "image_" + (index + 1), anyAllowed,
-                    "image/"));
+            resolved.add(resolveAndRegister(purpose, ownerId, uploadIds.get(index), "image_" + (index + 1),
+                    anyAllowed, "image/"));
         }
         return List.copyOf(resolved);
     }
@@ -212,13 +221,26 @@ class MediaJobsImpl implements MediaJobs {
         for (MediaAssetInput input : inputs) {
             MediaJobInput source = input.input();
             String targetKey = runInputKey(runId, source.key());
-            try {
-                store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
-            } catch (UploadRejectedException e) {
-                if (UPLOAD_INPUT_KEY.equals(source.key())) {
-                    throw new UploadRejectedException("uploadId", e.detail());
+            MediaAsset asset = assets.findById(input.assetId())
+                    .orElseThrow(() -> new IllegalStateException("Bound asset is not registered: " + input.assetId()));
+            if ("image".equals(asset.getKind())) {
+                String bucket = properties.s3().bucket();
+                HardenedImage image = hardenedImage(source, asset.getMimeType(),
+                        purposes.maxBytes(UploadPurpose.RUN_INPUT, "image"), reason -> {
+                            LOG.info("Upload refused at run start: bucket={} key={} reason={}", source.bucket(),
+                                    source.objectKey(), reason);
+                            return new UploadRejectedException("uploadIds", invalidContentDetail("image"));
+                        });
+                store.put(bucket, targetKey, image.contentType(), image.bytes(), S3MediaStore.RUN_INPUT_RETENTION);
+            } else {
+                try {
+                    store.copy(source.bucket(), source.objectKey(), properties.s3().bucket(), targetKey);
+                } catch (UploadRejectedException e) {
+                    if (UPLOAD_INPUT_KEY.equals(source.key())) {
+                        throw new UploadRejectedException("uploadId", e.detail());
+                    }
+                    throw e;
                 }
-                throw e;
             }
             if (properties.upload().contentCheck().enabled()) {
                 checkContent(input.assetId(), properties.s3().bucket(), targetKey);
@@ -256,7 +278,9 @@ class MediaJobsImpl implements MediaJobs {
         for (int index = 0; index < inputs.size(); index++) {
             MediaJobInput source = inputs.get(index).input();
             String targetKey = keyPrefix + "/" + (index + 1);
-            store.copy(source.bucket(), source.objectKey(), bucket, targetKey, SUPPORT_PENDING);
+            HardenedImage image = hardenedImage(source, sources.get(index).getMimeType(), maxBytes,
+                    reason -> refusedAttachment(source.bucket(), source.objectKey(), reason));
+            store.put(bucket, targetKey, image.contentType(), image.bytes(), SUPPORT_PENDING);
             if (properties.upload().contentCheck().enabled()) {
                 byte[] prefix = store.readPrefix(bucket, targetKey, ContentSniffer.PREFIX_LENGTH)
                         .orElseThrow(() -> refusedAttachment(bucket, targetKey, "gone before the content check"));
@@ -268,7 +292,7 @@ class MediaJobsImpl implements MediaJobs {
                 }
             }
             MediaAsset asset = sources.get(index);
-            kept.add(new StoredAttachment(bucket, targetKey, asset.getMimeType(), asset.getBytes()));
+            kept.add(new StoredAttachment(bucket, targetKey, asset.getMimeType(), image.bytes().length));
         }
         List<StoredAttachment> retagged = new java.util.ArrayList<>();
         try {
@@ -314,6 +338,106 @@ class MediaJobsImpl implements MediaJobs {
         if (first != null) {
             throw first;
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public StoredContentMedia keepContentMedia(UUID ownerId, UUID uploadId, UUID mediaId) {
+        try {
+            return keepContent(ownerId, uploadId, mediaId);
+        } catch (UploadRejectedException e) {
+            // The store and the image checks name the batch field of run starts; this port has one upload.
+            if ("uploadId".equals(e.field())) {
+                throw e;
+            }
+            throw new UploadRejectedException("uploadId", e.detail());
+        }
+    }
+
+    private StoredContentMedia keepContent(UUID ownerId, UUID uploadId, UUID mediaId) {
+        MediaAsset asset = registerUpload(UploadPurpose.CONTENT_MEDIA, ownerId, uploadId,
+                List.copyOf(purposes.mimeTypes(UploadPurpose.CONTENT_MEDIA).keySet()), null);
+        MediaJobInput source = new MediaJobInput(UPLOAD_INPUT_KEY, properties.s3().uploadBucket(),
+                purposes.objectKey(UploadPurpose.CONTENT_MEDIA, ownerId, uploadId));
+        String bucket = properties.s3().bucket();
+        String key = CONTENT_PREFIX + mediaId;
+        String kind = asset.getKind();
+        String contentType = asset.getMimeType();
+        long size = asset.getBytes();
+        if ("image".equals(kind)) {
+            HardenedImage image = hardenedImage(source, contentType,
+                    purposes.maxBytes(UploadPurpose.CONTENT_MEDIA, kind),
+                    reason -> refusedContent(bucket, key, reason, kind));
+            store.put(bucket, key, image.contentType(), image.bytes(), CONTENT_PENDING);
+            contentType = image.contentType();
+            size = image.bytes().length;
+        } else {
+            store.copy(source.bucket(), source.objectKey(), bucket, key, CONTENT_PENDING);
+        }
+        if (properties.upload().contentCheck().enabled()) {
+            byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
+                    .orElseThrow(() -> refusedContent(bucket, key, "gone before the content check", kind));
+            if (!ContentSniffer.matches(kind, prefix)) {
+                throw refusedContent(bucket, key, "content is not " + kind, kind);
+            }
+            if ("image".equals(kind) && !sniffedImageType(prefix).equals(contentType)) {
+                throw refusedContent(bucket, key, "content is not " + contentType, kind);
+            }
+        }
+        store.retag(bucket, key, CONTENT_KEPT);
+        LOG.info("Content media kept: bucket={} key={} kind={} bytes={}", bucket, key, kind, size);
+        return new StoredContentMedia(bucket, key, contentType, kind, size);
+    }
+
+    @Override
+    public void releaseContentMedia(StoredContentMedia media) {
+        String bucket = properties.s3().bucket();
+        if (!bucket.equals(media.bucket()) || !media.objectKey().startsWith(CONTENT_PREFIX)
+                || media.objectKey().length() == CONTENT_PREFIX.length()) {
+            throw new IllegalArgumentException("Not a kept content copy: " + media.bucket() + "/"
+                    + media.objectKey());
+        }
+        store.retag(bucket, media.objectKey(), CONTENT_PENDING);
+        LOG.info("Content media released: bucket={} key={}", bucket, media.objectKey());
+    }
+
+    /** The refused copy keeps its pending tag and expires; the backend may not delete in the media bucket. */
+    private UploadRejectedException refusedContent(String bucket, String key, String reason, String kind) {
+        LOG.info("Content media refused: bucket={} key={} reason={}", bucket, key, reason);
+        return new UploadRejectedException("uploadId", invalidContentDetail(UploadPurpose.CONTENT_MEDIA, kind));
+    }
+
+    /** An image ready to be written: its metadata stripped, typed by what its bytes are. */
+    private record HardenedImage(byte[] bytes, String contentType) {
+    }
+
+    /**
+     * Reads the upload and returns it stripped of metadata, whatever the content-check switch says: the
+     * format comes from the bytes and must be the declared type, the header must parse and hold at most
+     * {@value ImageHardening#MAX_PIXELS} pixels. Each failure but the pixel cap goes through {@code notAnImage},
+     * which receives the reason to log; an object that grew past {@code maxBytes} since it was granted is one.
+     */
+    private HardenedImage hardenedImage(MediaJobInput source, String declaredType, long maxBytes,
+            java.util.function.Function<String, UploadRejectedException> notAnImage) {
+        byte[] bytes = store.read(source.bucket(), source.objectKey(), Math.toIntExact(maxBytes));
+        if (bytes.length > maxBytes) {
+            throw notAnImage.apply("over " + maxBytes + " bytes");
+        }
+        ImageHardening.ImageFormat format = ImageHardening.detect(bytes)
+                .orElseThrow(() -> notAnImage.apply("content is not an image"));
+        if (!format.mimeType().equals(declaredType)) {
+            throw notAnImage.apply("content is " + format.mimeType() + ", not " + declaredType);
+        }
+        ImageHardening.Dimensions dimensions = ImageHardening.dimensions(format, bytes)
+                .orElseThrow(() -> notAnImage.apply("unreadable " + format + " header"));
+        if (!ImageHardening.withinPixelCap(dimensions)) {
+            LOG.info("Image refused: bucket={} key={} width={} height={}", source.bucket(), source.objectKey(),
+                    dimensions.width(), dimensions.height());
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.imageTooLarge"));
+        }
+        byte[] stripped = ImageHardening.strip(format, bytes)
+                .orElseThrow(() -> notAnImage.apply("unreadable " + format + " body"));
+        return new HardenedImage(stripped, format.mimeType());
     }
 
     /** The MIME type of an image prefix {@link ContentSniffer} already accepted as an image. */
@@ -374,30 +498,37 @@ class MediaJobsImpl implements MediaJobs {
         // one attempt overwrite another's outputs.
         String legacyPrefix = attempt == 1 ? MediaJob.outputPrefix(runId, stepOrder) : null;
         Instant now = Instant.now();
+        UUID spaceId = personalSpaces.personalSpaceOf(ownerId);
         List<MediaAsset> registered = outputs.stream().map(output -> {
             if (!properties.s3().bucket().equals(output.bucket())
                     || !(MediaJob.isBelow(expectedPrefix, output.objectKey())
                             || legacyPrefix != null && MediaJob.isBelow(legacyPrefix, output.objectKey()))) {
                 throw new IllegalArgumentException("Worker output is outside the current run prefix");
             }
-            return new MediaAsset(UUID.randomUUID(), ownerId, MediaProperties.Upload.kindOf(output.mime()), output.bucket(),
-                    output.objectKey(), output.mime(), output.bytes(), null, runStepId, attempt, now);
+            return new MediaAsset(UUID.randomUUID(), ownerId, spaceId, MediaProperties.Upload.kindOf(output.mime()),
+                    output.bucket(), output.objectKey(), output.mime(), output.bytes(), null, runStepId, attempt, now);
         }).toList();
         assets.saveAll(registered);
     }
 
-    private MediaAssetInput resolveAndRegister(UUID ownerId, UUID uploadId, String inputKey,
+    private MediaAssetInput resolveAndRegister(UploadPurpose purpose, UUID ownerId, UUID uploadId, String inputKey,
             List<String> allowedExtensions, String requiredMimePrefix) {
+        MediaAsset asset = registerUpload(purpose, ownerId, uploadId, allowedExtensions, requiredMimePrefix);
+        return new MediaAssetInput(asset.getId(), new MediaJobInput(inputKey, properties.s3().uploadBucket(),
+                purposes.objectKey(purpose, ownerId, uploadId)));
+    }
+
+    private MediaAsset registerUpload(UploadPurpose purpose, UUID ownerId, UUID uploadId,
+            List<String> allowedExtensions, String requiredMimePrefix) {
+        String bucket = properties.s3().uploadBucket();
+        String key = purposes.objectKey(purpose, ownerId, uploadId);
         Optional<MediaAsset> existing = assets.findById(uploadId);
         if (existing.isPresent() && !existing.orElseThrow().getOwnerId().equals(ownerId)) {
-            throw refused(properties.s3().uploadBucket(), objectKey(ownerId, uploadId), "another owner",
-                    new LocalizedMessage("upload.again"));
+            throw refused(bucket, key, "another owner", new LocalizedMessage("upload.again"));
         }
-        String bucket = properties.s3().uploadBucket();
-        String key = objectKey(ownerId, uploadId);
         S3MediaStore.StoredObject stored = store.head(bucket, key)
                 .orElseThrow(() -> refused(bucket, key, "no object", new LocalizedMessage("upload.again")));
-        Map<String, String> mimeTypes = properties.upload().mimeTypes();
+        Map<String, String> mimeTypes = purposes.mimeTypes(purpose);
         if (allowedExtensions.stream().map(mimeTypes::get).noneMatch(type -> type.equals(stored.contentType()))) {
             throw refused(bucket, key, "type " + stored.contentType(), typeDetail(allowedExtensions));
         }
@@ -405,14 +536,15 @@ class MediaJobsImpl implements MediaJobs {
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.notAnImage"));
         }
         String kind = MediaProperties.Upload.kindOf(stored.contentType());
-        if (!withinLimit(kind, stored.size())) {
-            throw refused(bucket, key, stored.size() + " bytes", sizeDetail(kind));
+        if (stored.size() < 1 || stored.size() > purposes.maxBytes(purpose, kind)) {
+            throw refused(bucket, key, stored.size() + " bytes", purposes.sizeDetail(purpose, kind));
         }
-        MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId, kind, bucket, key,
-                stored.contentType(), stored.size(), stored.checksum(), Instant.now()));
+        MediaAsset asset = existing.orElseGet(() -> new MediaAsset(uploadId, ownerId,
+                personalSpaces.personalSpaceOf(ownerId), kind, bucket, key, stored.contentType(), stored.size(),
+                stored.checksum(), Instant.now()));
         asset.refresh(stored.contentType(), stored.size(), stored.checksum());
         assets.save(asset);
-        return new MediaAssetInput(asset.getId(), new MediaJobInput(inputKey, bucket, key));
+        return asset;
     }
 
     /**
@@ -430,6 +562,36 @@ class MediaJobsImpl implements MediaJobs {
         if (!ContentSniffer.matches(kind, prefix)) {
             throw refused(bucket, key, "content is not " + kind, invalidContentDetail(kind));
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RunInput> runInputs(UUID runId) {
+        String bucket = properties.s3().bucket();
+        List<RunInput> inputs = new ArrayList<>();
+        for (MediaAssetBinding binding : bindings.findByRunIdOrderByPositionAsc(runId)) {
+            Optional<MediaAsset> asset = assets.findById(binding.getAssetId());
+            if (asset.isEmpty()) {
+                LOG.warn("Run input skipped, its asset is not registered: runId={} bindingKey={} assetId={}",
+                        runId, binding.getBindingKey(), binding.getAssetId());
+                continue;
+            }
+            String bindingKey = binding.getBindingKey();
+            String mimeType = asset.get().getMimeType();
+            MediaDownload download = presignedGet(bucket, runInputKey(runId, bindingKey),
+                    "input-" + bindingKey + "." + extensionOf(mimeType));
+            inputs.add(new RunInput(bindingKey, asset.get().getKind(), mimeType, download.url(),
+                    download.expiresAt()));
+        }
+        return inputs;
+    }
+
+    private String extensionOf(String mimeType) {
+        return properties.upload().mimeTypes().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(mimeType))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse("bin");
     }
 
     @Override
@@ -476,47 +638,18 @@ class MediaJobsImpl implements MediaJobs {
         return new UploadRejectedException("uploadId", detail);
     }
 
-    private static String objectKey(UUID ownerId, UUID uploadId) {
-        return ownerId + "/" + uploadId;
-    }
-
-    private Optional<String> allowedType(String fileName) {
-        int dot = fileName.lastIndexOf('.');
-        if (dot < 0) {
-            return Optional.empty();
-        }
-        String extension = fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
-        return Optional.ofNullable(properties.upload().mimeTypes().get(extension));
-    }
-
-    private boolean withinLimit(String kind, long size) {
-        return size >= 1 && size <= properties.upload().maxBytesOf(kind);
-    }
-
-    private LocalizedMessage sizeDetail(String kind) {
-        long max = properties.upload().maxBytesOf(kind);
-        return max % MEGABYTE == 0
-                ? new LocalizedMessage("upload.sizeMegabytes", max / MEGABYTE, formats(kind))
-                : new LocalizedMessage("upload.sizeBytes", max, formats(kind));
-    }
-
     /** Only reached after the size check, which refuses every kind but video, audio and image. */
     private LocalizedMessage invalidContentDetail(String kind) {
+        return invalidContentDetail(UploadPurpose.RUN_INPUT, kind);
+    }
+
+    private LocalizedMessage invalidContentDetail(UploadPurpose purpose, String kind) {
+        String formats = purposes.formats(purpose, kind);
         return switch (kind) {
-            case "video" -> new LocalizedMessage("upload.invalidVideo", formats(kind));
-            case "audio" -> new LocalizedMessage("upload.invalidAudio", formats(kind));
-            default -> new LocalizedMessage("upload.invalidImage", formats(kind));
+            case "video" -> new LocalizedMessage("upload.invalidVideo", formats);
+            case "audio" -> new LocalizedMessage("upload.invalidAudio", formats);
+            default -> new LocalizedMessage("upload.invalidImage", formats);
         };
-    }
-
-    private String formats(String kind) {
-        return String.join(", ", properties.upload().extensionsOf(kind).stream().map(e -> "." + e).toList());
-    }
-
-    private LocalizedMessage typeDetail() {
-        List<String> extensions = new java.util.ArrayList<>(properties.upload().mediaExtensions());
-        extensions.addAll(properties.upload().productImageExtensions());
-        return typeDetail(extensions);
     }
 
     private static LocalizedMessage typeDetail(List<String> allowedExtensions) {

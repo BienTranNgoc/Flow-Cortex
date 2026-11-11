@@ -225,8 +225,11 @@ What to know about the media path:
   bucket), tagged so the store deletes it after `RUN_INPUT_RETENTION_DAYS` (30);
   keep that at least as long as a run may wait for its script review.
 - **Browser origins.** `MINIO_API_CORS_ALLOW_ORIGIN` lists the origins allowed to
-  upload: `http://localhost:5173,http://127.0.0.1:5173`. Add the production origin
-  later; never `*`.
+  upload: the member app and the admin console, at `localhost` and `127.0.0.1` on
+  ports 5173 and 5174. Add the production origins later; never `*`. The admin
+  console's own content security policy also names the store's public origin
+  (`MEDIA_ORIGIN`, set in compose to the value of `S3_PUBLIC_ENDPOINT`), or its
+  uploads and thumbnails are blocked.
 - **No run history yet.** The run page's address is the only way back to a run,
   so download the report before you leave the page.
 - **The media worker has no internet egress**, by design: its only network is the

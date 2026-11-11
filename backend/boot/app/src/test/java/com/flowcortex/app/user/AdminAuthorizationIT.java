@@ -84,8 +84,10 @@ class AdminAuthorizationIT extends AbstractUserModuleIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().adminDisabled()).isFalse();
         assertThat(response.getBody().permissions()).containsExactly(
+                "content.document.manage", "content.document.view",
                 "content.help_article.manage", "content.help_article.view",
-                "content.help_topic.manage", "content.help_topic.view");
+                "content.help_topic.manage", "content.help_topic.view",
+                "content.media.manage", "content.media.view");
     }
 
     @Test
