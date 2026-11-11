@@ -9,7 +9,6 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
@@ -22,7 +21,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * Runs before every other interceptor, the admin kill switch included, so a caller without the key
  * is refused before it learns whether the surface is on.
  */
-@Component
 class AdminAuthorizationInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final CallerFactsLoader factsLoader;
