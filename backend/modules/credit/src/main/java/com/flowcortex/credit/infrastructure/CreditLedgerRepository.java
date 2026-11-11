@@ -21,24 +21,28 @@ public interface CreditLedgerRepository extends JpaRepository<CreditLedgerEntry,
     @Modifying
     @Query(value = "WITH charged AS (UPDATE credit_wallet SET balance = balance - :amount "
             + "WHERE user_id = :userId AND balance >= :amount RETURNING user_id) "
-            + "INSERT INTO credit_ledger (id, user_id, run_id, run_step_id, kind, amount, created_at) "
-            + "SELECT :id, user_id, :runId, :runStepId, 'debit', :amount, :now FROM charged", nativeQuery = true)
+            + "INSERT INTO credit_ledger (id, user_id, run_id, run_step_id, attempt, kind, amount, created_at) "
+            + "SELECT :id, user_id, :runId, :runStepId, :attempt, 'debit', :amount, :now FROM charged",
+            nativeQuery = true)
     int debit(@Param("id") UUID id, @Param("userId") UUID userId, @Param("runId") UUID runId,
-            @Param("runStepId") UUID runStepId, @Param("amount") long amount, @Param("now") Instant now);
+            @Param("runStepId") UUID runStepId, @Param("attempt") short attempt, @Param("amount") long amount,
+            @Param("now") Instant now);
 
     /**
-     * Gives back the step's debit; {@code 1} when refunded, {@code 0} when the step was never charged
-     * or is already refunded (a concurrent second attempt waits on the unique index, then does nothing).
+     * Gives back the debit of one attempt of the step; {@code 1} when refunded, {@code 0} when that
+     * attempt was never charged or is already refunded (a concurrent second call waits on the unique
+     * index, then does nothing).
      */
     @Modifying
-    @Query(value = "WITH refunded AS (INSERT INTO credit_ledger (id, user_id, run_id, run_step_id, kind, amount, created_at) "
-            + "SELECT :id, d.user_id, d.run_id, d.run_step_id, 'refund', d.amount, :now FROM credit_ledger d "
-            + "WHERE d.run_step_id = :runStepId AND d.kind = 'debit' "
-            + "ON CONFLICT (run_step_id, kind) WHERE run_step_id IS NOT NULL DO NOTHING "
+    @Query(value = "WITH refunded AS (INSERT INTO credit_ledger (id, user_id, run_id, run_step_id, attempt, kind, amount, created_at) "
+            + "SELECT :id, d.user_id, d.run_id, d.run_step_id, d.attempt, 'refund', d.amount, :now FROM credit_ledger d "
+            + "WHERE d.run_step_id = :runStepId AND d.attempt = :attempt AND d.kind = 'debit' "
+            + "ON CONFLICT (run_step_id, attempt, kind) WHERE run_step_id IS NOT NULL DO NOTHING "
             + "RETURNING user_id, amount) "
             + "UPDATE credit_wallet w SET balance = w.balance + r.amount FROM refunded r WHERE w.user_id = r.user_id",
             nativeQuery = true)
-    int refund(@Param("id") UUID id, @Param("runStepId") UUID runStepId, @Param("now") Instant now);
+    int refund(@Param("id") UUID id, @Param("runStepId") UUID runStepId, @Param("attempt") short attempt,
+            @Param("now") Instant now);
 
     /** The one signup grant, creating the wallet if needed; {@code 1} when granted, {@code 0} when already granted. */
     @Modifying
@@ -51,7 +55,7 @@ public interface CreditLedgerRepository extends JpaRepository<CreditLedgerEntry,
     int grant(@Param("id") UUID id, @Param("userId") UUID userId, @Param("amount") long amount,
             @Param("now") Instant now);
 
-    Optional<CreditLedgerEntry> findByRunStepIdAndKind(UUID runStepId, String kind);
+    Optional<CreditLedgerEntry> findByRunStepIdAndAttemptAndKind(UUID runStepId, short attempt, String kind);
 
     @Query("SELECT COALESCE(SUM(CASE WHEN e.kind = 'debit' THEN e.amount ELSE -e.amount END), 0) "
             + "FROM CreditLedgerEntry e WHERE e.runId = :runId AND e.kind IN ('debit', 'refund')")

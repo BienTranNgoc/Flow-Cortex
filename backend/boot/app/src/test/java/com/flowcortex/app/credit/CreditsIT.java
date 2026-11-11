@@ -153,7 +153,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(get("/api/v1/runs/" + runId, token, ChargedRunView.class).getBody().chargedCredits())
                 .isEqualTo(10);
 
-        creditAccounts.refundStep(runId, failed.id(), failed.errorCode());
+        creditAccounts.refundStep(runId, failed.id(), (short) 1, failed.errorCode());
 
         assertThat(ledger(runId, "refund")).containsExactly(50L);
         assertThat(balance(member)).isEqualTo(90);
@@ -166,7 +166,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         UUID stepId = stepIds(runId).get(1);
         chargeBySql(member, runId, stepId, 50);
 
-        creditAccounts.refundStep(runId, stepId, "APPROVAL_REJECTED");
+        creditAccounts.refundStep(runId, stepId, (short) 1, "APPROVAL_REJECTED");
 
         assertThat(ledger(runId, "refund")).isEmpty();
         assertThat(balance(member)).isEqualTo(50);
@@ -229,11 +229,11 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         List<Callable<Boolean>> debits = List.of(
                 () -> {
                     go.await();
-                    return creditAccounts.debitForStep(member.id(), runA, UUID.randomUUID(), "fail");
+                    return creditAccounts.debitForStep(member.id(), runA, UUID.randomUUID(), (short) 1, "fail");
                 },
                 () -> {
                     go.await();
-                    return creditAccounts.debitForStep(member.id(), runB, UUID.randomUUID(), "fail");
+                    return creditAccounts.debitForStep(member.id(), runB, UUID.randomUUID(), (short) 1, "fail");
                 });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
@@ -255,6 +255,23 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(balance(member)).isEqualTo(10);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ? AND kind = 'debit'",
                 Long.class, member.id())).isEqualTo(1);
+    }
+
+    @Test
+    void eachAttemptOfAStepIsChargedAndRefundedOnItsOwn() {
+        UserView member = memberWithBalance("attempts", 100);
+        UUID runId = seedRun(member, "error", "error");
+        UUID stepId = stepIds(runId).get(0);
+
+        for (short attempt = 1; attempt <= 2; attempt++) {
+            assertThat(creditAccounts.debitForStep(member.id(), runId, stepId, attempt, "fail")).isTrue();
+            creditAccounts.refundStep(runId, stepId, attempt, "lease_expired");
+            creditAccounts.refundStep(runId, stepId, attempt, "lease_expired");
+        }
+
+        assertThat(ledger(runId, "debit")).containsExactly(50L, 50L);
+        assertThat(ledger(runId, "refund")).containsExactly(50L, 50L);
+        assertThat(balance(member)).isEqualTo(100);
     }
 
     private WorkflowView echoThenFail(UserView owner) {

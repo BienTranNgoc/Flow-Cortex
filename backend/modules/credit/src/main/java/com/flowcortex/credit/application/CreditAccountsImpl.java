@@ -60,7 +60,7 @@ class CreditAccountsImpl implements CreditAccounts {
 
     @Override
     @Transactional
-    public boolean debitForStep(UUID userId, UUID runId, UUID runStepId, String stepType) {
+    public boolean debitForStep(UUID userId, UUID runId, UUID runStepId, short attempt, String stepType) {
         if (!enabled) {
             return true;
         }
@@ -68,37 +68,40 @@ class CreditAccountsImpl implements CreditAccounts {
         if (cost == 0) {
             return true;
         }
-        if (ledger.debit(UUID.randomUUID(), userId, runId, runStepId, cost, Instant.now(clock)) == 1) {
-            LOG.info("Credits: outcome=debit userId={} runId={} stepId={} amount={}", userId, runId, runStepId, cost);
+        if (ledger.debit(UUID.randomUUID(), userId, runId, runStepId, attempt, cost, Instant.now(clock)) == 1) {
+            LOG.info("Credits: outcome=debit userId={} runId={} stepId={} attempt={} amount={}", userId, runId,
+                    runStepId, attempt, cost);
             return true;
         }
-        LOG.info("Credits: outcome=debit_refused userId={} runId={} stepId={} amount={}", userId, runId, runStepId,
-                cost);
+        LOG.info("Credits: outcome=debit_refused userId={} runId={} stepId={} attempt={} amount={}", userId, runId,
+                runStepId, attempt, cost);
         return false;
     }
 
     @Override
     @Transactional
-    public void refundStep(UUID runId, UUID runStepId, String errorCode) {
+    public void refundStep(UUID runId, UUID runStepId, short attempt, String errorCode) {
         if (!enabled) {
             return;
         }
-        Optional<CreditLedgerEntry> debit = ledger.findByRunStepIdAndKind(runStepId, CreditLedgerEntry.DEBIT);
+        Optional<CreditLedgerEntry> debit = ledger.findByRunStepIdAndAttemptAndKind(runStepId, attempt,
+                CreditLedgerEntry.DEBIT);
         if (debit.isEmpty()) {
             return;
         }
         UUID userId = debit.get().getUserId();
         long amount = debit.get().getAmount();
         if (!RefundPolicy.refunds(errorCode)) {
-            LOG.info("Credits: outcome=refund_skipped_user_fault userId={} runId={} stepId={} amount={} code={}",
-                    userId, runId, runStepId, amount, errorCode);
+            LOG.info("Credits: outcome=refund_skipped_user_fault userId={} runId={} stepId={} attempt={} amount={} code={}",
+                    userId, runId, runStepId, attempt, amount, errorCode);
             return;
         }
-        if (ledger.refund(UUID.randomUUID(), runStepId, Instant.now(clock)) == 1) {
-            LOG.info("Credits: outcome=refund userId={} runId={} stepId={} amount={}", userId, runId, runStepId, amount);
+        if (ledger.refund(UUID.randomUUID(), runStepId, attempt, Instant.now(clock)) == 1) {
+            LOG.info("Credits: outcome=refund userId={} runId={} stepId={} attempt={} amount={}", userId, runId,
+                    runStepId, attempt, amount);
         } else {
-            LOG.info("Credits: outcome=refund_duplicate userId={} runId={} stepId={} amount={}", userId, runId,
-                    runStepId, amount);
+            LOG.info("Credits: outcome=refund_duplicate userId={} runId={} stepId={} attempt={} amount={}", userId,
+                    runId, runStepId, attempt, amount);
         }
     }
 

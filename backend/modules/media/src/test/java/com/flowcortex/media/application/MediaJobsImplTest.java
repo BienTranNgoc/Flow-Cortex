@@ -466,6 +466,81 @@ class MediaJobsImplTest {
         });
     }
 
+    @Test
+    void copyStepOutputsMapsEachKeyUnderTheNewRunsFirstAttempt() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID from = UUID.randomUUID();
+            UUID to = UUID.randomUUID();
+            Map<String, Object> meta = Map.of("duration", 4);
+            List<MediaOutput> outputs = List.of(
+                    new MediaOutput("video", "flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
+                            "video/mp4", 42L, meta),
+                    new MediaOutput("clip", "flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
+                            "video/mp4", 7L, null));
+
+            List<MediaOutput> copies = jobs.copyStepOutputs(from, to, 2, outputs);
+
+            assertThat(copies).containsExactly(
+                    new MediaOutput("video", "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/video.mp4",
+                            "video/mp4", 42L, meta),
+                    new MediaOutput("clip", "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4",
+                            "video/mp4", 7L, null));
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
+                    "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/video.mp4");
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
+                    "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4");
+        });
+    }
+
+    @Test
+    void copyStepOutputsRefusesAKeyOutsideTheSourceStep() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID from = UUID.randomUUID();
+            UUID to = UUID.randomUUID();
+            MediaOutput inside = new MediaOutput("a", "flowcortex-media", "runs/" + from + "/steps/2/a.mp4",
+                    "video/mp4", 1L, null);
+
+            for (String key : List.of("runs/" + UUID.randomUUID() + "/steps/2/b.mp4",
+                    "runs/" + from + "/steps/3/b.mp4", "runs/" + from + "/steps/2/../3/b.mp4",
+                    "runs/" + from + "/steps/2/")) {
+                assertThatThrownBy(() -> jobs.copyStepOutputs(from, to, 2, List.of(inside,
+                        new MediaOutput("b", "flowcortex-media", key, "video/mp4", 1L, null))))
+                        .as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(store, never()).copyWithoutTags(anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void runInputsStoredIsFalseWhenABoundCopyIsGone() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
+            UUID runId = UUID.randomUUID();
+            when(bindings.findByRunIdOrderByPositionAsc(runId)).thenReturn(List.of(
+                    new com.flowcortex.media.domain.MediaAssetBinding(runId, "image_1", UUID.randomUUID(),
+                            (short) 0, Instant.now()),
+                    new com.flowcortex.media.domain.MediaAssetBinding(runId, "image_2", UUID.randomUUID(),
+                            (short) 1, Instant.now())));
+            String key1 = "runs/" + runId + "/inputs/image_1";
+            String key2 = "runs/" + runId + "/inputs/image_2";
+            when(store.head("flowcortex-media", key1)).thenReturn(Optional.of(new S3MediaStore.StoredObject(1, "x")));
+            when(store.head("flowcortex-media", key2)).thenReturn(Optional.empty());
+
+            assertThat(jobs.runInputsStored(runId)).isFalse();
+
+            when(store.head("flowcortex-media", key2)).thenReturn(Optional.of(new S3MediaStore.StoredObject(1, "x")));
+            assertThat(jobs.runInputsStored(runId)).isTrue();
+            assertThat(jobs.runInputsStored(UUID.randomUUID())).isTrue();
+        });
+    }
+
     private static void givenRegistered(org.springframework.context.ApplicationContext context, UUID assetId,
             String kind) {
         when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(

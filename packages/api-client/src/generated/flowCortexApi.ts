@@ -634,6 +634,11 @@ export interface SupportAssistantReply {
   quota: SupportAssistantQuota;
 }
 
+export interface RetryRunRequest {
+  fromStepOrder?: number;
+  acknowledgeCost?: boolean;
+}
+
 export interface CreateScriptRevisionRequest {
   /**
    * @minLength 0
@@ -3095,6 +3100,253 @@ export const askSupportAssistantAsGuest = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(supportAssistantQuestion),
+  });
+};
+
+export type retryRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type retryRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryRunStepResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryRunStepResponseSuccess = retryRunStepResponse200 & {
+  headers: Headers;
+};
+export type retryRunStepResponseError = (
+  | retryRunStepResponse401
+  | retryRunStepResponse404
+  | retryRunStepResponse409
+  | retryRunStepResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryRunStepResponse = retryRunStepResponseSuccess | retryRunStepResponseError;
+
+export const getRetryRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/retry`;
+};
+
+export const retryRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryRunStepResponse> => {
+  return customFetch<retryRunStepResponse>(getRetryRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resetRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type resetRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type resetRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resetRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type resetRunStepResponseSuccess = resetRunStepResponse200 & {
+  headers: Headers;
+};
+export type resetRunStepResponseError = (
+  resetRunStepResponse401 | resetRunStepResponse404 | resetRunStepResponse409
+) & {
+  headers: Headers;
+};
+
+export type resetRunStepResponse = resetRunStepResponseSuccess | resetRunStepResponseError;
+
+export const getResetRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/reset`;
+};
+
+export const resetRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetRunStepResponse> => {
+  return customFetch<resetRunStepResponse>(getResetRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type executeRunStepResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type executeRunStepResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type executeRunStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type executeRunStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type executeRunStepResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type executeRunStepResponseSuccess = executeRunStepResponse200 & {
+  headers: Headers;
+};
+export type executeRunStepResponseError = (
+  | executeRunStepResponse401
+  | executeRunStepResponse404
+  | executeRunStepResponse409
+  | executeRunStepResponse503
+) & {
+  headers: Headers;
+};
+
+export type executeRunStepResponse = executeRunStepResponseSuccess | executeRunStepResponseError;
+
+export const getExecuteRunStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/execute`;
+};
+
+export const executeRunStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<executeRunStepResponse> => {
+  return customFetch<executeRunStepResponse>(getExecuteRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type retryRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type retryRunResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type retryRunResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryRunResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type retryRunResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryRunResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryRunResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryRunResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryRunResponseSuccess = retryRunResponse200 & {
+  headers: Headers;
+};
+export type retryRunResponseError = (
+  | retryRunResponse400
+  | retryRunResponse401
+  | retryRunResponse402
+  | retryRunResponse404
+  | retryRunResponse409
+  | retryRunResponse422
+  | retryRunResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryRunResponse = retryRunResponseSuccess | retryRunResponseError;
+
+export const getRetryRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}/retry`;
+};
+
+export const retryRun = async (
+  id: string,
+  retryRunRequest?: RetryRunRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<retryRunResponse>(getRetryRunUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(retryRunRequest),
   });
 };
 

@@ -23,16 +23,17 @@ public interface CreditAccounts {
     long balance(UUID userId);
 
     /**
-     * Charges the step's cost in the caller's transaction, only if the balance covers it. Returns
-     * {@code false} when it does not (nothing is written); a step that costs nothing is never recorded.
+     * Charges the cost of one attempt of the step in the caller's transaction, only if the balance
+     * covers it. Returns {@code false} when it does not (nothing is written); a step that costs nothing
+     * is never recorded.
      */
-    boolean debitForStep(UUID userId, UUID runId, UUID runStepId, String stepType);
+    boolean debitForStep(UUID userId, UUID runId, UUID runStepId, short attempt, String stepType);
 
     /**
-     * Returns the step's charge to its member in the caller's transaction, unless {@code errorCode} is
-     * one the member caused. At most once per step, however often it is called.
+     * Returns one attempt's charge of the step to its member in the caller's transaction, unless
+     * {@code errorCode} is one the member caused. At most once per step attempt, however often it is called.
      */
-    void refundStep(UUID runId, UUID runStepId, String errorCode);
+    void refundStep(UUID runId, UUID runStepId, short attempt, String errorCode);
 
     /** What the run has cost: its charges minus its refunds. */
     long chargedForRun(UUID runId);

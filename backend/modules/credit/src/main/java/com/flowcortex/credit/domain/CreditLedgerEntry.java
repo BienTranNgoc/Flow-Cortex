@@ -32,6 +32,9 @@ public class CreditLedgerEntry {
     @Column(name = "run_step_id", updatable = false)
     private UUID runStepId;
 
+    @Column(name = "attempt", nullable = false, updatable = false)
+    private short attempt;
+
     @Column(name = "kind", nullable = false, updatable = false, length = 10)
     private String kind;
 
@@ -58,6 +61,10 @@ public class CreditLedgerEntry {
 
     public UUID getRunStepId() {
         return runStepId;
+    }
+
+    public short getAttempt() {
+        return attempt;
     }
 
     public String getKind() {
