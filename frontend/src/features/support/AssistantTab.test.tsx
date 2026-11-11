@@ -37,6 +37,7 @@ function features(supportAssistant = true): Handler {
       credits: false,
       supportWidget: true,
       supportAssistant,
+      chat: false,
     },
   };
 }
