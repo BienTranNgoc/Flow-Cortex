@@ -5,6 +5,9 @@ import { MemoryRouter } from 'react-router-dom';
 import i18n from '../lib/i18n';
 import { SidebarNav } from './SidebarNav';
 
+const features = vi.hoisted(() => ({ chat: false }));
+vi.mock('./useFeatures', () => ({ useFeatures: () => features }));
+
 function renderNav(path: string, rail = false) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -21,6 +24,18 @@ const names = (nav: HTMLElement) =>
 describe('SidebarNav', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    features.chat = false;
+  });
+
+  it('lists Chat after Workflows while the chat switch is on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
+    features.chat = true;
+
+    renderNav('/');
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Chat']);
+    expect(within(nav).getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/chat');
   });
 
   it('lists Home, Workflows, Runs and the Docs group while the demo pages flag is off', () => {
