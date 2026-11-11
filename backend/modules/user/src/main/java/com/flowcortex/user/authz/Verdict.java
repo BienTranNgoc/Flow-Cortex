@@ -10,11 +10,11 @@ enum Verdict {
 
     /** Throws the exception the problem-details advice renders for this verdict; nothing for {@link #ALLOW}. */
     void requireAllowed() {
-        switch (this) {
-            case ALLOW -> {
-            }
-            case DENY -> throw new AccessDeniedException("Missing permission");
-            case ADMIN_DISABLED -> throw new AdminDisabledException();
+        if (this == DENY) {
+            throw new AccessDeniedException("Missing permission");
+        }
+        if (this == ADMIN_DISABLED) {
+            throw new AdminDisabledException();
         }
     }
 }
