@@ -1,0 +1,18 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "loadFailed": "Could not load the data.",
+    "retry": "Retry",
+    "saveFailed": "Could not save. Please try again."
+  },
+  "settings": {
+    "eyebrow": "Chat",
+    "title": "Chat settings",
+    "description": "Turning chat off takes effect immediately: members cannot send new messages until it is turned back on.",
+    "toggle": "Chat",
+    "stateOn": "Turned on",
+    "stateOff": "Turned off",
+    "changedBy": "{{state}} by {{who}} at {{at}}",
+    "changedAt": "{{state}} at {{at}}"
+  }
+}
