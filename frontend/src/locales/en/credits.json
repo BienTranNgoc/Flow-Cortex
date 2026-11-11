@@ -3,5 +3,25 @@
   "runAnyway": "Run anyway",
   "estimatedCost": "Estimated cost: {{amount}} credits",
   "chargedSoFarOne": "Charged for this run so far: {{amount}} credit",
-  "chargedSoFarOther": "Charged for this run so far: {{amount}} credits"
+  "chargedSoFarOther": "Charged for this run so far: {{amount}} credits",
+  "wallet": {
+    "aria": "{{amount}} credits, {{tier}}. Open your profile",
+    "used": "{{used}} of {{granted}} credits used",
+    "tier": {
+      "ok": "balance healthy",
+      "low": "balance low",
+      "critical": "balance critically low",
+      "exhausted": "no credits left"
+    }
+  },
+  "banner": {
+    "title": "Credits",
+    "balance": "{{amount}} credits",
+    "used": "{{used}} of {{granted}} credits used",
+    "warning": {
+      "low": "Your balance is running low. Top up before your next run.",
+      "critical": "Your balance is critically low. Runs may be refused soon.",
+      "exhausted": "You have no credits left. Runs are refused until you get more."
+    }
+  }
 }

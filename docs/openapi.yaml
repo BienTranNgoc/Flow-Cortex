@@ -960,6 +960,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/notifications/{id}/read:
+    post:
+      tags:
+      - notifications-controller
+      operationId: markNotificationRead
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: "marked read, also when it already was"
+        "404":
+          description: "unknown id, or not the caller's"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/read-all:
+    post:
+      tags:
+      - notifications-controller
+      operationId: markAllNotificationsRead
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadAllResult"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -1733,6 +1765,40 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/preferences:
+    get:
+      tags:
+      - preferences-controller
+      operationId: getNotificationPreferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesView"
+    patch:
+      tags:
+      - preferences-controller
+      operationId: updateNotificationPreferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesView"
+        "400":
+          description: "empty body, or a field that is not one of the three booleans"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -2118,6 +2184,52 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications:
+    get:
+      tags:
+      - notifications-controller
+      operationId: listNotifications
+      parameters:
+      - name: filter
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPage"
+        "400":
+          description: "filter, page or size out of range"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/unread-count:
+    get:
+      tags:
+      - notifications-controller
+      operationId: getUnreadNotificationCount
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCount"
   /api/v1/me/phone:
     get:
       tags:
@@ -3491,6 +3603,12 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    ReadAllResult:
+      type: object
+      properties:
+        marked:
+          type: integer
+          format: int32
     VerifyCodeRequest:
       type: object
       properties:
@@ -3835,6 +3953,24 @@ components:
       required:
       - body
       - status
+    PatchBody:
+      type: object
+      properties:
+        inApp:
+          type: boolean
+        careEmail:
+          type: boolean
+        marketingEmail:
+          type: boolean
+    PreferencesView:
+      type: object
+      properties:
+        inApp:
+          type: boolean
+        careEmail:
+          type: boolean
+        marketingEmail:
+          type: boolean
     WorkflowResponse:
       type: object
       properties:
@@ -4076,6 +4212,49 @@ components:
       required:
       - expiresAt
       - url
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        link:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    NotificationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        hasMore:
+          type: boolean
+        unreadCount:
+          type: integer
+          format: int64
+    UnreadCount:
+      type: object
+      properties:
+        unreadCount:
+          type: integer
+          format: int64
     HealthResponse:
       type: object
       properties:
@@ -4141,6 +4320,9 @@ components:
       type: object
       properties:
         balance:
+          type: integer
+          format: int64
+        granted:
           type: integer
           format: int64
     ChatConversationList:

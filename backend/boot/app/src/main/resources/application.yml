@@ -328,6 +328,9 @@ flowcortex:
     hub-threads: 2
     publish:
       queue-capacity: 1000
+  # In-app notifications: a member keeps their newest max-per-member; older ones are deleted on insert.
+  notifications:
+    max-per-member: 500
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
