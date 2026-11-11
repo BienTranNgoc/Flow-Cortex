@@ -40,14 +40,14 @@ describe('primaryNavItems', () => {
     expect(DOCS_ICON).toBe(BookOpen);
   });
 
-  it('adds Chat after Workflows only while the chat switch is on', () => {
+  it('adds Chat after Runs only while the chat switch is on', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
     const withChat = primaryNavItems(undefined, { chat: true });
     expect(withChat.map((item) => item.label)).toEqual([
       'Home',
       'Workflows',
-      'Chat',
       'Runs',
+      'Chat',
       'Integrations',
     ]);
     expect(withChat.find((item) => item.label === 'Chat')?.to).toBe('/chat');

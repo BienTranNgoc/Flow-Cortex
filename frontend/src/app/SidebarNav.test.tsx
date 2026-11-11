@@ -27,14 +27,14 @@ describe('SidebarNav', () => {
     features.chat = false;
   });
 
-  it('lists Chat after Workflows while the chat switch is on', () => {
+  it('lists Chat after Runs while the chat switch is on', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
     features.chat = true;
 
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Chat']);
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Chat']);
     expect(within(nav).getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/chat');
   });
 
