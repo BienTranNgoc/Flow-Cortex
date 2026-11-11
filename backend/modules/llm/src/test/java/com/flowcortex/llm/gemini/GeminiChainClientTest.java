@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -113,7 +115,15 @@ class GeminiChainClientTest {
     private GeminiChainClient overRealHttp(String base, Duration callTimeout) {
         return new GeminiChainClient(properties(KEY, base), slots(WAITS, callTimeout),
                 timeout -> GeminiAttempts.restClient(HttpClient.newBuilder().build(), timeout), waits::add,
-                new GeminiTelemetry(meters, ObservationRegistry.NOOP));
+                new GeminiTelemetry(meters, recording()));
+    }
+
+    /** Each attempt the client made, in order, as {@code model#attempt:outcome}. */
+    private List<String> attemptOutcomes() {
+        return attempts.stream()
+                .map(call -> keyValues(call).get("model") + "#" + keyValues(call).get("attempt") + ":"
+                        + keyValues(call).get("outcome"))
+                .toList();
     }
 
     private ResponseActions expectTranslate(String model) {
@@ -480,14 +490,15 @@ class GeminiChainClientTest {
     }
 
     @Test
-    void aCallThatOutlastsTheConfiguredTimeoutIsGivenUpAndRetried() throws IOException, InterruptedException {
+    void aCallThatOutlastsTheConfiguredTimeoutIsGivenUpAndRetried() throws IOException {
         AtomicInteger requests = new AtomicInteger();
+        CountDownLatch release = new CountDownLatch(1);
         HttpServer slow = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         slow.setExecutor(Executors.newCachedThreadPool());
         slow.createContext("/", exchange -> {
             requests.incrementAndGet();
             try {
-                Thread.sleep(2_000);
+                release.await(10, TimeUnit.SECONDS);
                 exchange.sendResponseHeaders(200, -1);
             } catch (InterruptedException | IOException e) {
                 Thread.currentThread().interrupt();
@@ -505,9 +516,12 @@ class GeminiChainClientTest {
                     .isEqualTo(new LlmJsonResult.Failed(Kind.TIMEOUT));
             Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
 
-            assertThat(awaitAtLeast(requests, 6)).isEqualTo(6);
+            assertThat(attemptOutcomes()).containsExactly(LITE + "#1:timeout", LITE + "#2:timeout",
+                    LITE + "#3:timeout", FLASH + "#1:timeout", FLASH + "#2:timeout", FLASH + "#3:timeout");
+            assertThat(requests.get()).isLessThanOrEqualTo(6);
             assertThat(elapsed).isLessThan(Duration.ofSeconds(6));
         } finally {
+            release.countDown();
             slow.stop(0);
         }
     }
@@ -515,6 +529,7 @@ class GeminiChainClientTest {
     @Test
     void anAnswerWhoseBodyStallsAfterTheHeadersIsGivenUpAndRetried() throws IOException {
         AtomicInteger requests = new AtomicInteger();
+        CountDownLatch release = new CountDownLatch(1);
         byte[] part = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"[".getBytes(StandardCharsets.UTF_8);
         HttpServer stalling = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         stalling.setExecutor(Executors.newCachedThreadPool());
@@ -525,7 +540,7 @@ class GeminiChainClientTest {
                 exchange.sendResponseHeaders(200, 1_000);
                 exchange.getResponseBody().write(part);
                 exchange.getResponseBody().flush();
-                Thread.sleep(2_000);
+                release.await(10, TimeUnit.SECONDS);
             } catch (InterruptedException | IOException e) {
                 Thread.currentThread().interrupt();
             } finally {
@@ -541,20 +556,15 @@ class GeminiChainClientTest {
             assertThat(client.generateJson(TRANSLATE, "translate these", SCHEMA)).isInstanceOfSatisfying(
                     LlmJsonResult.Failed.class,
                     failed -> assertThat(failed.kind()).isIn(Kind.TIMEOUT, Kind.UPSTREAM));
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
 
-            assertThat(requests.get()).isEqualTo(6);
-            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(6));
+            assertThat(attemptOutcomes()).hasSize(6)
+                    .allSatisfy(outcome -> assertThat(outcome).matches(".*:(timeout|upstream)"));
+            assertThat(requests.get()).isLessThanOrEqualTo(6);
+            assertThat(elapsed).isLessThan(Duration.ofSeconds(6));
         } finally {
+            release.countDown();
             stalling.stop(0);
         }
-    }
-
-    /** The client can give up on a request before the server has dispatched it to the handler that counts it. */
-    private static int awaitAtLeast(AtomicInteger counter, int expected) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-        while (counter.get() < expected && System.nanoTime() < deadline) {
-            Thread.sleep(20);
-        }
-        return counter.get();
     }
 }
