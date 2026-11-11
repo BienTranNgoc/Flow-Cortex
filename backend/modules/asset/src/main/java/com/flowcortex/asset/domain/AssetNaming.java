@@ -16,7 +16,10 @@ public final class AssetNaming {
 
     private AssetNaming() {}
 
-    /** Base of a run asset title: {@code <short input> · <workflow name>}, else the workflow name, else the short input alone, else {@code Run <8 hex>}. */
+    /**
+     * Base of a run asset title: {@code <short input> · <workflow name>}, else the workflow name, else the short
+     * input alone, else {@code Run <8 hex>}.
+     */
     public static String runTitleBase(String input, String workflowName, UUID runId) {
         String shortInput = cut(firstNonBlankLine(input), SHORT_INPUT_CODE_POINTS);
         String name = normalize(workflowName);
