@@ -68,7 +68,7 @@ public abstract class AbstractWorkflowHttpIT extends AbstractWorkflowModuleIT {
     }
 
     record WorkflowResponseView(
-            UUID id, String name, boolean isShared, Instant createdAt, Instant updatedAt,
+            UUID id, String name, String visibility, Instant createdAt, Instant updatedAt,
             List<WorkflowStepResponseView> steps) {
     }
 

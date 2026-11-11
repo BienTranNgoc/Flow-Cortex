@@ -333,6 +333,9 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    share:
+      # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
+      accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,

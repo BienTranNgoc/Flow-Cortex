@@ -308,9 +308,9 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     private UUID insertWorkflow(UUID ownerId, String status, boolean shared, Timestamp deletedAt) {
         UUID id = UUID.randomUUID();
         Timestamp now = Timestamp.from(Instant.now());
-        jdbcTemplate.update("INSERT INTO workflow (id, owner_id, name, is_shared, created_at, updated_at, status, "
-                + "deleted_at) VALUES (?, ?, 'Seeded', ?, ?, ?, ?, ?)", id, ownerId, shared, now, now, status,
-                deletedAt);
+        jdbcTemplate.update("INSERT INTO workflow (id, owner_id, name, is_shared, visibility, created_at, updated_at, "
+                + "status, deleted_at) VALUES (?, ?, 'Seeded', ?, ?, ?, ?, ?, ?)", id, ownerId, shared,
+                shared ? "public" : "private", now, now, status, deletedAt);
         return id;
     }
 

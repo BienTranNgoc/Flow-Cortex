@@ -8,7 +8,7 @@ import { WorkflowCard } from './WorkflowCard';
 const PRODUCT_VIDEO: WorkflowResponse = {
   id: 'wf-pv',
   name: 'Product Video',
-  isShared: true,
+  visibility: 'public',
   available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'script', type: 'script', mode: 'inline' },

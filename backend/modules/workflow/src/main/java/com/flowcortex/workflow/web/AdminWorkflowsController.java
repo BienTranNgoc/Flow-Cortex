@@ -3,10 +3,12 @@ package com.flowcortex.workflow.web;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.application.Caller;
 import com.flowcortex.workflow.application.WorkflowAuthoring;
+import com.flowcortex.workflow.application.WorkflowSharingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -37,12 +39,33 @@ class AdminWorkflowsController {
     private final WorkflowAuthoring workflowAuthoring;
     private final CurrentUserResolver currentUserResolver;
     private final CreditAccounts creditAccounts;
+    private final WorkflowSharingService sharingService;
 
     AdminWorkflowsController(WorkflowAuthoring workflowAuthoring, CurrentUserResolver currentUserResolver,
-            CreditAccounts creditAccounts) {
+            CreditAccounts creditAccounts, WorkflowSharingService sharingService) {
+        this.sharingService = sharingService;
         this.workflowAuthoring = workflowAuthoring;
         this.currentUserResolver = currentUserResolver;
         this.creditAccounts = creditAccounts;
+    }
+
+    @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @Operation(operationId = "setAdminWorkflowVisibility")
+    @ResponseStatus(HttpStatus.OK)
+    @PatchMapping(value = "/{id}/visibility", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<ShareSettingsResponse> setVisibility(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @Valid @RequestBody SetVisibilityRequest request, HttpServletRequest http) {
+        UUID adminId = currentUserResolver.requireAdmin(jwt);
+        return ResponseEntity.ok(ShareSettingsResponse.from(sharingService.setVisibility(Caller.admin(adminId), id,
+                request.target(), request.expiresAt(), WorkflowSharingController.originOf(http))));
     }
 
     @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
@@ -60,8 +83,7 @@ class AdminWorkflowsController {
             @Valid @RequestBody CreateWorkflowRequest request) {
         UUID adminId = currentUserResolver.requireAdmin(jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowResponse.from(
-                workflowAuthoring.createDraft(adminId, AuthoringRequests.name(request),
-                        AuthoringRequests.shared(request)), creditAccounts));
+                workflowAuthoring.createDraft(adminId, AuthoringRequests.name(request)), creditAccounts));
     }
 
     @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
@@ -73,6 +95,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "updateAdminWorkflow")
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<WorkflowResponse> updateWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
@@ -127,6 +150,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "updateAdminWorkflowStep")
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping(value = "/{id}/steps/{stepId}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<WorkflowStepResponse> updateStep(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,

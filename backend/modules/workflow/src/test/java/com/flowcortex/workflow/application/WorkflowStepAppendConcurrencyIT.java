@@ -90,7 +90,7 @@ class WorkflowStepAppendConcurrencyIT {
     @Test
     void eightConcurrentAppendsGetDistinctGapFreeOrders() throws Exception {
         UUID ownerId = UUID.randomUUID();
-        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race", false));
+        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race"));
 
         CountDownLatch ready = new CountDownLatch(APPENDS);
         CountDownLatch go = new CountDownLatch(1);

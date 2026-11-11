@@ -118,8 +118,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
 
     @Override
     @Transactional
-    public WorkflowView createDraft(UUID ownerId, String name, boolean shared) {
-        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name, shared));
+    public WorkflowView createDraft(UUID ownerId, String name) {
+        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name));
         return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable);
     }
 
@@ -154,9 +154,6 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         Workflow workflow = lockForWrite(caller, workflowId);
         if (update.name() != null && !update.name().equals(workflow.getName())) {
             workflow.rename(update.name());
-        }
-        if (update.shared() != null && update.shared() != workflow.isShared()) {
-            workflow.setShared(update.shared());
         }
         if (update.status() != null) {
             WorkflowStatus status = WorkflowStatus.valueOf(update.status().toUpperCase(Locale.ROOT));
@@ -224,20 +221,33 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
      * The one arbiter every write passes: load under the row lock, then the owner and visibility rule (skipped for
      * an admin), then the fixed Product Video workflow, which nobody edits.
      */
-    private Workflow lockForWrite(Caller caller, UUID workflowId) {
+    Workflow lockForWrite(Caller caller, UUID workflowId) {
         Workflow workflow = workflowRepository.findByIdAndDeletedAtIsNull(workflowId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
-        if (!caller.admin() && !workflow.getOwnerId().equals(caller.userId())) {
-            boolean visible = workflow.isShared() && workflow.getStatus() == WorkflowStatus.PUBLISHED;
-            if (!visible) {
-                throw new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId));
-            }
-            throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
-        }
+        requireOwnerOrAdmin(caller, workflow);
         if (ProductVideoWorkflow.ID.equals(workflow.getId())) {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         return workflow;
+    }
+
+    /** The owner and visibility rule of {@link #lockForWrite} for a read, without the row lock. */
+    Workflow loadForOwnerRead(Caller caller, UUID workflowId) {
+        Workflow workflow = workflowRepository.findActiveById(workflowId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        requireOwnerOrAdmin(caller, workflow);
+        return workflow;
+    }
+
+    /** 404 for a caller who cannot see the workflow, 403 for one who can but does not own it. */
+    private void requireOwnerOrAdmin(Caller caller, Workflow workflow) {
+        if (caller.admin() || workflow.getOwnerId().equals(caller.userId())) {
+            return;
+        }
+        if (workflowRepository.findVisibleTo(workflow.getId(), caller.userId()).isEmpty()) {
+            throw new NotFoundException(new LocalizedMessage("workflow.notFound", workflow.getId()));
+        }
+        throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
     }
 
     private void validateDefinition(List<NewWorkflowStep> steps) {

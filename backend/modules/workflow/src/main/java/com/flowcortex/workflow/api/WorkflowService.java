@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /**
  * Public API backing the read side of {@code /api/v1/workflows}. Every method applies the same visibility rule: a
- * workflow is visible when {@code ownerId = currentUserId} or shared — otherwise 404 ("not found", not "forbidden").
+ * workflow is visible when {@code ownerId = currentUserId}, or it is published and public, or published and unlisted
+ * with a link grant for the caller — otherwise 404 ("not found", not "forbidden").
  */
 public interface WorkflowService {
 
@@ -25,8 +26,8 @@ public interface WorkflowService {
      */
     WorkflowView createWorkflow(UUID ownerId, String name, boolean shared, List<NewWorkflowStep> steps);
 
-    /** Creates an empty draft owned by {@code ownerId}. */
-    WorkflowView createDraft(UUID ownerId, String name, boolean shared);
+    /** Creates an empty private draft owned by {@code ownerId}. */
+    WorkflowView createDraft(UUID ownerId, String name);
 
     /**
      * Changes a workflow the caller owns: 403 when the caller can see it but does not own it, 404 when it is

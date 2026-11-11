@@ -15,13 +15,8 @@ final class AuthoringRequests {
         return request.name().trim();
     }
 
-    static boolean shared(CreateWorkflowRequest request) {
-        return Boolean.TRUE.equals(request.shared());
-    }
-
     static UpdateWorkflow update(UpdateWorkflowRequest request) {
-        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.shared(),
-                request.status());
+        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.status());
     }
 
     static NewStep newStep(CreateStepRequest request) {

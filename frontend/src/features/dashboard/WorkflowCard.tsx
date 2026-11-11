@@ -61,7 +61,7 @@ export function WorkflowCard({ workflow }: Readonly<WorkflowCardProps>) {
             <li className={`workflow-card__chip workflow-card__status ${TONE_TO_CLASS[meta.statusTone]}`}>
               {meta.statusLabel}
             </li>
-            {workflow.isShared && (
+            {workflow.visibility === 'public' && (
               <li className="workflow-card__chip">{t('dashboard.card.sharedWithAll')}</li>
             )}
             <li className="workflow-card__chip">{etaLabel(meta.etaSeconds, t)}</li>

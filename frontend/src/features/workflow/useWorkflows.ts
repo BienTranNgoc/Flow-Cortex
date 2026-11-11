@@ -43,14 +43,14 @@ export function useWorkflowsQuery() {
 export function useWorkflowQuery(id: string) {
   return useQuery({
     queryKey: ['workflows', id],
-    queryFn: () => unwrap(getWorkflow(id, authHeaders())),
+    queryFn: () => unwrap(getWorkflow(id, undefined, authHeaders())),
     enabled: Boolean(id),
   });
 }
 
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
-    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, undefined, authHeaders())),
   });
 }
 

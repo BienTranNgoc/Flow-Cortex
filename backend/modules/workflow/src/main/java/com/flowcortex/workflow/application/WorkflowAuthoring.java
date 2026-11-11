@@ -13,7 +13,8 @@ import java.util.UUID;
  */
 public interface WorkflowAuthoring {
 
-    WorkflowView createDraft(UUID ownerId, String name, boolean shared);
+    /** Creates an empty private draft owned by {@code ownerId}. */
+    WorkflowView createDraft(UUID ownerId, String name);
 
     WorkflowView updateWorkflow(Caller caller, UUID workflowId, UpdateWorkflow update);
 
