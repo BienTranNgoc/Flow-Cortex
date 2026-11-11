@@ -25,8 +25,9 @@ class StepExecutorRegistry {
     private final Map<String, StepExecutor> byType = new LinkedHashMap<>();
 
     @Autowired
-    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts) {
-        this(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts));
+    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
+            WorkflowCallStepExecutor workflowCall) {
+        this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts), workflowCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -58,6 +59,11 @@ class StepExecutorRegistry {
             StepExecutor tts) {
         executors.add(translate);
         executors.add(tts);
+        return executors;
+    }
+
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall) {
+        executors.add(workflowCall);
         return executors;
     }
 

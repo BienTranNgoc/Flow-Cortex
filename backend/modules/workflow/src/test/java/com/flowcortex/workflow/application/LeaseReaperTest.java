@@ -47,7 +47,7 @@ class LeaseReaperTest {
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final LeaseReaper reaper = new LeaseReaper(runStepRepository, workflowRunRepository,
             new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
-                    mock(RunUpdates.class)),
+                    mock(RunUpdates.class), mock(ChildRuns.class)),
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), advancer, meters,
             Clock.fixed(NOW, ZoneOffset.UTC));
 

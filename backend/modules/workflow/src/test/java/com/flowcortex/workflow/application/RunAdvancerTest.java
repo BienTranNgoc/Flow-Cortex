@@ -82,6 +82,7 @@ class RunAdvancerTest {
     private final TaskScheduler scheduler = mock(TaskScheduler.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final NestedStepExecutor nested = new NestedStepExecutor();
         private final StepExecutorRegistry registry = new StepExecutorRegistry(List.of(
                 new EchoStepExecutor(),
                 new FailStepExecutor(),
@@ -89,12 +90,13 @@ class RunAdvancerTest {
                 new ProviderStepExecutor(),
                 new StoringStepExecutor(),
                 new VoiceStepExecutor(),
+                nested,
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions =
             new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
-                    mock(RunUpdates.class));
+                    mock(RunUpdates.class), mock(ChildRuns.class));
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -179,6 +181,48 @@ class RunAdvancerTest {
         @Override
         public String execute(StepContext context) {
             return context.input().toUpperCase(java.util.Locale.ROOT);
+        }
+    }
+
+    /** A nested type: starts its child in the claim, so what it saw there is recorded for the tests. */
+    private final class NestedStepExecutor implements StepExecutor {
+
+        static final Duration MAX_RUNTIME = Duration.ofHours(2);
+
+        final List<Thread> threads = new java.util.ArrayList<>();
+        boolean claimedBeforeExecute;
+        boolean pickedUpBeforeExecute;
+        RuntimeException failure;
+
+        @Override
+        public String type() {
+            return "nested";
+        }
+
+        @Override
+        public Mode mode() {
+            return Mode.NESTED;
+        }
+
+        @Override
+        public Duration maxRuntime() {
+            return MAX_RUNTIME;
+        }
+
+        @Override
+        public String execute(StepContext context) {
+            threads.add(Thread.currentThread());
+            claimedBeforeExecute = invoked("claimPending");
+            pickedUpBeforeExecute = invoked("recordPickup");
+            if (failure != null) {
+                throw failure;
+            }
+            return null;
+        }
+
+        private boolean invoked(String method) {
+            return org.mockito.Mockito.mockingDetails(runStepRepository).getInvocations().stream()
+                    .anyMatch(invocation -> invocation.getMethod().getName().equals(method));
         }
     }
 
@@ -552,6 +596,74 @@ class RunAdvancerTest {
                 + " stepOrder=1 type=echo outcome=completed durationMs=0")
                 .contains("Step finished: runId=" + runId + " runStepId=" + step2.getId()
                         + " stepOrder=2 type=fail outcome=error code=null durationMs=0");
+    }
+
+    @Test
+    void aNestedStepRunsItsExecutorInsideTheClaim() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        org.springframework.core.task.TaskExecutor taskExecutor = mock(org.springframework.core.task.TaskExecutor.class);
+        List<Runnable> providerTasks = new java.util.ArrayList<>();
+
+        advancer(taskExecutor, providerTasks::add).on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(nested.threads).containsExactly(Thread.currentThread());
+        assertThat(nested.claimedBeforeExecute).isTrue();
+        assertThat(nested.pickedUpBeforeExecute).isFalse();
+        verify(taskExecutor, never()).execute(any());
+        assertThat(providerTasks).isEmpty();
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void aNestedStepRecordsItsDeadlineRightAfterTheClaim() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        Instant runDeadline = NOW.plus(NestedStepExecutor.MAX_RUNTIME);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).recordPickup(step.getId(), (short) 1, NOW, runDeadline.plus(LEASE), runDeadline,
+                (short) 0);
+        verify(scheduler, never()).scheduleAtFixedRate(any(), any(Instant.class), any(Duration.class));
+    }
+
+    @Test
+    void aNestedStepWhoseDeadlineWriteFindsItClosedAlreadyIsLeftAlone() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(0);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void aNestedStepFailingInTheClaimIsNotPickedUp() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        nested.failure = new StepFailedException("workflow_call_cycle", "no");
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("workflow_call_cycle"), eq("no"), eq(NOW));
+        verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
+    }
+
+    @Test
+    void aNestedStepIsNotReportedRemote() {
+        assertThat(registry.isRemote("nested")).isFalse();
+        assertThat(registry.remoteTypes()).doesNotContain("nested");
     }
 
     @Test

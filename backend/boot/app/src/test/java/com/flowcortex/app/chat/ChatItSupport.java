@@ -83,11 +83,25 @@ abstract class ChatItSupport extends AbstractPostgresBootTest {
         chatSwitch.environmentEnabled(true);
         stub.reset();
         events.reset();
+        setSeededPrice("echo", 10);
+        setSeededPrice("probe", 40);
     }
 
     @AfterEach
     void restoreEnvironmentSwitch() {
         chatSwitch.environmentEnabled(true);
+    }
+
+    @AfterEach
+    void restoreSeededPrices() {
+        setSeededPrice("echo", 1);
+        setSeededPrice("probe", 10);
+    }
+
+    private void setSeededPrice(String ref, int credits) {
+        int updated = jdbcTemplate.update("UPDATE rate_card SET credits_per_unit = ? WHERE rate_card_ref = ? "
+                + "AND effective_to IS NULL", credits, ref);
+        assertThat(updated).as("seeded open rate_card row of %s", ref).isEqualTo(1);
     }
 
     /** Runs started by a confirmed card carry remote steps the admin media-jobs counts would otherwise see. */

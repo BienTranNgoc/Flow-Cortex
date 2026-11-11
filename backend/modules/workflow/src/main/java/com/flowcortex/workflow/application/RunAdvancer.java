@@ -286,7 +286,7 @@ class RunAdvancer {
                 inClaim = () -> {
                     throw new StepFailedException(null, "Unsupported step type: " + step.getType());
                 };
-            } else if (remote) {
+            } else if (remote || executor.get().mode() == StepExecutor.Mode.NESTED) {
                 inClaim = () -> executor.get().execute(built);
             } else {
                 inClaim = () -> { };
@@ -314,11 +314,26 @@ class RunAdvancer {
                     dispatchedJobs.increment();
                     LOG.info("Job dispatched: runId={} jobId={} stepOrder={} capability={} attempt={}", run.getId(),
                             step.getId(), order, step.getType(), step.getAttempt());
+                } else if (claimed.mode() == StepExecutor.Mode.NESTED) {
+                    recordNestedDeadline(context, claimed);
                 } else {
                     submitInline(run.getId(), step, claimed, context);
                 }
             }
             default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
+        }
+    }
+
+    /**
+     * The lease outlives the run deadline, so a child that never reports back is reaped as {@code run_timeout}.
+     * A {@code false} means the child already ended and closed the step, which needs nothing more.
+     */
+    private void recordNestedDeadline(StepContext context, StepExecutor executor) {
+        Instant pickedUpAt = clock.instant();
+        Instant runDeadline = pickedUpAt.plus(executor.maxRuntime());
+        if (!transactions.recordPickup(context.runId(), context.stepId(), context.attempt(), pickedUpAt,
+                runDeadline.plus(lease), runDeadline, INLINE_DELIVERY)) {
+            LOG.info("Step {} closed before its deadline was recorded", context.stepOrder());
         }
     }
 

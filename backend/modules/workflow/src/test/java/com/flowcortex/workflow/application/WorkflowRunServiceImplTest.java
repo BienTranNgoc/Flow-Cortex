@@ -42,6 +42,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -66,10 +67,18 @@ class WorkflowRunServiceImplTest {
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
 
+    @SuppressWarnings("unchecked")
+    private RunCreation runCreation(StepExecutorRegistry executors) {
+        ObjectProvider<StepExecutorRegistry> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(executors);
+        return new RunCreation(workflowRunRepository, runStepRepository, events, runUpdates, provider, mediaJobs,
+                new TransactionTemplate(transactions));
+    }
+
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
-                runStepRepository, events, runUpdates, registry, mediaJobs, mock(UserDirectory.class),
-                new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
+                runStepRepository, registry, mediaJobs, mock(UserDirectory.class), new RunStartGuards(List.of()),
+                runCreation(registry), workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -113,10 +122,10 @@ class WorkflowRunServiceImplTest {
         RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
             throw new IllegalStateException("the credit guard must not be consulted");
         };
+        StepExecutorRegistry dubRegistry = new StepExecutorRegistry(List.of(translate));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
-                workflowRunRepository, runStepRepository, events, runUpdates, new StepExecutorRegistry(List.of(translate)),
-                mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
-                new RunStartGuards(List.of(creditGuard)), true);
+                workflowRunRepository, runStepRepository, dubRegistry, mediaJobs, mock(UserDirectory.class),
+                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "translate");
 
@@ -253,9 +262,8 @@ class WorkflowRunServiceImplTest {
         workflow.pointTo(pointed.getId());
         when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
-                workflowRunRepository, runStepRepository, events, runUpdates, registry, mediaJobs,
-                mock(UserDirectory.class), new TransactionTemplate(transactions),
-                new RunStartGuards(List.of(new WorkflowReadinessGuard())), true);
+                workflowRunRepository, runStepRepository, registry, mediaJobs, mock(UserDirectory.class),
+                new RunStartGuards(List.of(new WorkflowReadinessGuard())), runCreation(registry), true);
 
         assertThatThrownBy(() -> service.startRun(binh, workflow.getId(), "hi"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,

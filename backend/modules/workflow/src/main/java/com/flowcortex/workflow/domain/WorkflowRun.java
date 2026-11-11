@@ -52,6 +52,18 @@ public class WorkflowRun {
     @Column(name = "options", updatable = false)
     private String options;
 
+    @Column(name = "parent_run_id", updatable = false)
+    private UUID parentRunId;
+
+    @Column(name = "parent_step_id", updatable = false)
+    private UUID parentStepId;
+
+    @Column(name = "parent_step_attempt", updatable = false)
+    private Short parentStepAttempt;
+
+    @Column(name = "call_depth", nullable = false, updatable = false)
+    private short callDepth;
+
     @Column(name = "request_key", updatable = false)
     private String requestKey;
 
@@ -80,6 +92,17 @@ public class WorkflowRun {
         this.startedAt = startedAt;
     }
 
+    /** A run started by a step of another run, at {@code callDepth} one more than its parent's. */
+    public static WorkflowRun child(UUID id, UUID workflowId, UUID ownerId, String input, String options,
+            Instant startedAt, UUID parentRunId, UUID parentStepId, short parentStepAttempt, short callDepth) {
+        WorkflowRun run = new WorkflowRun(id, workflowId, ownerId, input, options, startedAt);
+        run.parentRunId = parentRunId;
+        run.parentStepId = parentStepId;
+        run.parentStepAttempt = parentStepAttempt;
+        run.callDepth = callDepth;
+        return run;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -90,6 +113,22 @@ public class WorkflowRun {
 
     public UUID getOwnerId() {
         return ownerId;
+    }
+
+    public UUID getParentRunId() {
+        return parentRunId;
+    }
+
+    public UUID getParentStepId() {
+        return parentStepId;
+    }
+
+    public Short getParentStepAttempt() {
+        return parentStepAttempt;
+    }
+
+    public short getCallDepth() {
+        return callDepth;
     }
 
     public RunStatus getStatus() {

@@ -10,12 +10,14 @@ spring:
     url: jdbc:postgresql://localhost:5432/flowcortex
     username: flowcortex
     driver-class-name: org.postgresql.Driver
-    # Each async task can hold two connections at once (a listener's REQUIRES_NEW plus the
-    # step transition it opens), so the pool is at least 2 x task.execution.pool.max-size (16)
-    # plus headroom for HTTP requests, the reaper and heartbeats. Idle connections stay few:
-    # Hikari otherwise holds all 40 open per instance even when nothing runs.
+    # An async task can hold up to 4 connections at once (listener + advance + claim + workflow.call
+    # fact reads), so the pool is at least 4 x task.execution.pool.max-size (16) = 64 plus headroom
+    # for HTTP requests, the reaper and heartbeats; the workflow module refuses to start below the
+    # 4 x product. Each backend instance opens up to this many, so instances x this must fit in
+    # Postgres max_connections (100 by default; compose runs one backend). Idle connections stay few:
+    # Hikari otherwise holds all 80 open per instance even when nothing runs.
     hikari:
-      maximum-pool-size: 40
+      maximum-pool-size: 80
       minimum-idle: 5
 
   jpa:
@@ -29,6 +31,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    postgresql:
+      # The default transaction-scoped migration lock keeps a snapshot open for the whole run, which
+      # makes CREATE INDEX CONCURRENTLY wait on Flyway itself forever; a session lock does not.
+      transactional-lock: false
 
   # Bounds Boot's own applicationTaskExecutor, which runs every @Async and
   # @ApplicationModuleListener and the engine's inline steps. Declaring an
@@ -286,24 +292,12 @@ flowcortex:
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
-  # Every registered step type needs a cost here, or startup fails.
+  # Prices live in the rate_card and capability_pricing tables, not here. Every registered step type
+  # needs a capability_pricing row and an active rate_card row, or startup fails. To change a price,
+  # in one migration: UPDATE the key's open rate_card row SET effective_to = T, then INSERT the new
+  # open-ended row with effective_from = T.
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
-    step-costs:
-      echo: 1
-      fail: 20
-      # Brackets make the map binder keep the key exactly as written (upper case).
-      "[APPROVAL_CHECKPOINT]": 0
-      probe: 10
-      extract_audio: 50
-      align_audio: 50
-      generate_script: 100
-      generate_speech: 100
-      generate_storyboard: 100
-      generate_video: 200
-      render_video: 200
-      translate: 100
-      tts: 100
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
@@ -333,6 +327,10 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    call:
+      # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
+      # child is stopped. Covers a child of four media steps at their queue and run bounds.
+      max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,

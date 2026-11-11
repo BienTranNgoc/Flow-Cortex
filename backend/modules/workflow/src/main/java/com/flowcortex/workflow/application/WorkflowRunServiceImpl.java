@@ -32,8 +32,6 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.RunWithWorkflowName;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,13 +42,11 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Implementation of {@link WorkflowRunService}. {@link #startRun} is tx#1 of the async
@@ -80,32 +76,27 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final ServedDefinitions servedDefinitions;
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
-    private final ApplicationEventPublisher events;
     private final StepExecutorRegistry registry;
     private final MediaJobs mediaJobs;
     private final UserDirectory userDirectory;
-    private final TransactionTemplate transactionTemplate;
     private final RunStartGuards runStartGuards;
-    private final RunUpdates runUpdates;
+    private final RunCreation runCreation;
     private final boolean workflowEnabled;
 
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
-            MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
-            RunStartGuards runStartGuards,
+            StepExecutorRegistry registry, MediaJobs mediaJobs, UserDirectory userDirectory,
+            RunStartGuards runStartGuards, RunCreation runCreation,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
-        this.runUpdates = runUpdates;
         this.workflowRepository = workflowRepository;
         this.servedDefinitions = servedDefinitions;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
-        this.events = events;
         this.registry = registry;
         this.mediaJobs = mediaJobs;
         this.userDirectory = userDirectory;
-        this.transactionTemplate = transactionTemplate;
         this.runStartGuards = runStartGuards;
+        this.runCreation = runCreation;
         this.workflowEnabled = workflowEnabled;
     }
 
@@ -206,32 +197,8 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         String displayedInput = runInput;
         String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
-        return transactionTemplate.execute(status -> {
-            WorkflowRun run = workflowRunRepository.save(new WorkflowRun(runId, workflow.getId(),
-                    currentUserId, displayedInput, runOptions, Instant.now(), requestKey));
-            if (!copies.isEmpty()) {
-                mediaJobs.bindRunInputs(run.getId(), copies);
-            }
-            List<RunStep> runSteps = new ArrayList<>();
-            for (WorkflowStep stepDef : stepDefs) {
-                String stepInput = registry.isRemote(stepDef.getType()) ? stepInputJson : null;
-                runSteps.add(new RunStep(
-                        UUID.randomUUID(),
-                        run.getId(),
-                        stepDef.getStepOrder(),
-                        stepDef.getType(),
-                        stepInput,
-                        stepDef.getConfig(),
-                        stepDef.getInputRef()));
-            }
-            runSteps = runStepRepository.saveAll(runSteps);
-            runUpdates.touched(run.getId());
-
-            // Published within this tx; RunAdvancer's @ApplicationModuleListener only
-            // fires after commit — this method returns first.
-            events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, runSteps, registry::isRemote, mediaJobs::isDownloadable);
-        });
+        return runCreation.create(RunCreation.NewRun.started(runId, workflow.getId(), currentUserId, stepDefs,
+                displayedInput, runOptions, stepInputJson, copies, requestKey));
     }
 
     private String json(Object value) {

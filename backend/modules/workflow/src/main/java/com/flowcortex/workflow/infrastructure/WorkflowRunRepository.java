@@ -75,4 +75,28 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
             + "WHERE (:status IS NULL OR r.status = :status) ORDER BY r.startedAt DESC, r.id DESC",
             countQuery = "SELECT count(r) FROM WorkflowRun r WHERE (:status IS NULL OR r.status = :status)")
     Page<RunWithWorkflowName> findAllNewestFirst(@Param("status") RunStatus status, Pageable page);
+
+    /** A child run still in flight, with the owner its own stop must be issued under. */
+    record ChildRef(UUID id, UUID ownerId) {
+    }
+
+    /** Runs started by any step of {@code parentRunId} that have not reached a final status. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.WorkflowRunRepository$ChildRef(r.id, r.ownerId) "
+            + "FROM WorkflowRun r WHERE r.parentRunId = :parentRunId AND r.status IN ("
+            + "com.flowcortex.workflow.domain.RunStatus.RUNNING, "
+            + "com.flowcortex.workflow.domain.RunStatus.WAITING_APPROVAL, "
+            + "com.flowcortex.workflow.domain.RunStatus.CANCELLING)")
+    List<ChildRef> findRunningChildren(@Param("parentRunId") UUID parentRunId);
+
+    /** Runs started by one step of its parent that have not reached a final status. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.WorkflowRunRepository$ChildRef(r.id, r.ownerId) "
+            + "FROM WorkflowRun r WHERE r.parentStepId = :parentStepId AND r.status IN ("
+            + "com.flowcortex.workflow.domain.RunStatus.RUNNING, "
+            + "com.flowcortex.workflow.domain.RunStatus.WAITING_APPROVAL, "
+            + "com.flowcortex.workflow.domain.RunStatus.CANCELLING)")
+    List<ChildRef> findRunningChildrenOfStep(@Param("parentStepId") UUID parentStepId);
+
+    /** The step that started this run, or empty for a run no step started. */
+    @Query("SELECT r.parentStepId FROM WorkflowRun r WHERE r.id = :runId AND r.parentStepId IS NOT NULL")
+    Optional<UUID> findParentStepIdById(@Param("runId") UUID runId);
 }

@@ -48,6 +48,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
         "spring.flyway.locations=filesystem:${flowcortex.migrations.dir}",
+        "spring.flyway.postgresql.transactional-lock=false",
         "spring.jpa.hibernate.ddl-auto=validate"
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -69,6 +70,9 @@ class RunStepTransactionsIT {
 
     @MockitoBean
     private RunUpdates runUpdates;
+
+    @MockitoBean
+    private ChildRuns childRuns;
 
     @Autowired
     private RunStepRepository runStepRepository;

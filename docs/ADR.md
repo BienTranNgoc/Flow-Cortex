@@ -510,3 +510,50 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+---
+
+## ADR-0024 — A step may wait on a child run
+
+- **Context:** ADR-0007's run engine runs one workflow's steps in order. A step
+  either runs inline and returns its output, or hands a job to the media engine
+  and waits for a media event. The `workflow.call` step type runs another
+  workflow as part of a run, so a step must be able to wait on a whole run, and
+  `workflow_run` must be able to name its parent.
+- **Decision:**
+  - **A third step mode, `NESTED`.** The step starts its child run inside its
+    own claim transaction, so a crash cannot leave a running step with no child,
+    and finishes when the child ends, the way a remote step finishes on a media
+    event. No thread waits; `REMOTE` keeps meaning "media". The child is an
+    ordinary run owned by the parent run's owner, started for the workflow's
+    served steps, and charged step by step at its own claims, so nothing is
+    charged twice; `workflow.call` itself is priced `free`.
+  - **A run-finished signal at every terminal transition.** Wherever a run
+    becomes `completed`, `error` or `cancelled`, the same transaction calls
+    `ChildRuns.finished(runId)`, which publishes `ChildRunFinishedEvent` only
+    for a run that has a parent step. The listener completes or fails the parent
+    step with the existing compare-and-set on `running` and attempt, so a late
+    or repeated signal changes nothing. Today these are
+    `RunStepTransactions.completeRunIfAllStepsCompleted`, `failRunning` (and its
+    settle branch), `settleIfCancelling` from `complete`,
+    `RunCancellation.cancelRun` when it settles at once, and a child stopped by
+    its parent.
+  - **Stops go down the tree.** Stopping a run, or failing its `workflow.call`
+    step (for instance by the reaper at its run deadline), stops the unfinished
+    children, each under its own owner, and theirs in turn.
+  - **Bounded shape.** Depth is 0 to 2, enforced by the executor and by a
+    database check; a workflow naming itself or an ancestor is refused; one
+    step attempt has at most one child (a unique index); a child may not be a
+    Product Video run, need an upload, or contain an approval checkpoint.
+    `flowcortex.workflow.call.max-runtime` bounds how long a step waits.
+- **Consequences:**
+  - `workflow_run` gains `parent_run_id`, `parent_step_id`,
+    `parent_step_attempt` and `call_depth`; the migration is additive and
+    two-way, and existing rows read as roots at depth 0.
+  - **A new terminal transition must call `ChildRuns.finished`.** One that does
+    not leaves the parent step waiting until its run deadline, then failing
+    `run_timeout`. The list above is the places to check.
+  - A lost signal costs at most the wait up to that run deadline.
+  - The executor and `RunCreation` need the step registry, which takes the
+    executor; they resolve it, and the start guards, when they run rather than
+    at construction.
