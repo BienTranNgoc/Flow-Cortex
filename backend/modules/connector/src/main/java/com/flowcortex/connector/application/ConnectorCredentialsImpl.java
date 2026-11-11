@@ -18,7 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Encrypts on the way in, decrypts only in {@link #readTokens} and in the handle {@link #readActive} returns; logs the provider and the outcome, never a token. */
+/**
+ * Encrypts on the way in, decrypts only in {@link #readTokens} and in the handle {@link #readActive} returns;
+ * logs the provider and the outcome, never a token.
+ */
 @Service
 class ConnectorCredentialsImpl implements ConnectorCredentials {
 
