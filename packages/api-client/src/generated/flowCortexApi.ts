@@ -973,6 +973,58 @@ export interface UpdateStepRequest {
   config?: string;
 }
 
+export type EdgeKind = (typeof EdgeKind)[keyof typeof EdgeKind];
+
+export const EdgeKind = {
+  previous: 'previous',
+  reference: 'reference',
+  outputInput: 'outputInput',
+} as const;
+
+export interface Edge {
+  fromStepId?: string;
+  toStepId?: string;
+  kind: EdgeKind;
+}
+
+export type NodeMode = (typeof NodeMode)[keyof typeof NodeMode];
+
+export const NodeMode = {
+  inline: 'inline',
+  remote: 'remote',
+} as const;
+
+export interface Node {
+  id?: string;
+  stepOrder?: number;
+  name?: string;
+  type?: string;
+  mode: NodeMode;
+  readsRunInput?: boolean;
+}
+
+export type ProblemKind = (typeof ProblemKind)[keyof typeof ProblemKind];
+
+export const ProblemKind = {
+  MALFORMED: 'MALFORMED',
+  UNKNOWN_STEP: 'UNKNOWN_STEP',
+  AMBIGUOUS_NAME: 'AMBIGUOUS_NAME',
+  NOT_EARLIER: 'NOT_EARLIER',
+} as const;
+
+export interface Problem {
+  stepId?: string;
+  stepOrder?: number;
+  kind: ProblemKind;
+}
+
+export interface WorkflowGraphResponse {
+  workflowId?: string;
+  nodes?: Node[];
+  edges?: Edge[];
+  problems?: Problem[];
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -2403,6 +2455,11 @@ export type addStepResponse404 = {
   status: 404;
 };
 
+export type addStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type addStepResponse422 = {
   data: ProblemDetail;
   status: 422;
@@ -2412,7 +2469,11 @@ export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
 export type addStepResponseError = (
-  addStepResponse400 | addStepResponse403 | addStepResponse404 | addStepResponse422
+  | addStepResponse400
+  | addStepResponse403
+  | addStepResponse404
+  | addStepResponse409
+  | addStepResponse422
 ) & {
   headers: Headers;
 };
@@ -4870,13 +4931,22 @@ export type updateStepResponse404 = {
   status: 404;
 };
 
+export type updateStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type updateStepResponse422 = {
   data: ProblemDetail;
   status: 422;
 };
 
 export type updateStepResponseError = (
-  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
+  | updateStepResponse400
+  | updateStepResponse403
+  | updateStepResponse404
+  | updateStepResponse409
+  | updateStepResponse422
 ) & {
   headers: Headers;
 };
@@ -5161,6 +5231,47 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type getWorkflowGraphResponse200 = {
+  data: WorkflowGraphResponse;
+  status: 200;
+};
+
+export type getWorkflowGraphResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getWorkflowGraphResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowGraphResponseSuccess = getWorkflowGraphResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowGraphResponseError = (
+  getWorkflowGraphResponse401 | getWorkflowGraphResponse404
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowGraphResponse =
+  getWorkflowGraphResponseSuccess | getWorkflowGraphResponseError;
+
+export const getGetWorkflowGraphUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/graph`;
+};
+
+export const getWorkflowGraph = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowGraphResponse> => {
+  return customFetch<getWorkflowGraphResponse>(getGetWorkflowGraphUrl(id), {
+    ...options,
+    method: 'GET',
   });
 };
 

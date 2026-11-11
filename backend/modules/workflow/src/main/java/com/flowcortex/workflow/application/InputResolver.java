@@ -4,8 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,8 +19,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class InputResolver {
-
-    static final Pattern REF_PATTERN = Pattern.compile("^\\{step:(\\d+)(?:\\.(\\w+))?}$");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -50,18 +46,17 @@ class InputResolver {
     }
 
     private String resolveRef(String inputRef, Map<Integer, String> priorOutputs) {
-        Matcher matcher = REF_PATTERN.matcher(inputRef);
-        if (!matcher.matches()) {
-            throw new IllegalStateException("Invalid input_ref format: " + inputRef);
-        }
-        int referencedOrder = Integer.parseInt(matcher.group(1));
-        String field = matcher.group(2);
+        // A by-name head is canonicalized to an order when the run starts, so one here is malformed.
+        StepReferences.Reference reference = StepReferences.parse(inputRef)
+                .filter(parsed -> parsed.head() instanceof StepReferences.Order)
+                .orElseThrow(() -> new IllegalStateException("Invalid input_ref format: " + inputRef));
+        int referencedOrder = ((StepReferences.Order) reference.head()).value();
         String referencedOutput = priorOutputs.get(referencedOrder);
         if (referencedOutput == null) {
             throw new IllegalStateException(
                     "input_ref " + inputRef + " references step " + referencedOrder + " with no output available");
         }
-        if (field == null) {
+        if (reference.path().isEmpty()) {
             return referencedOutput;
         }
         JsonNode node;
@@ -71,12 +66,25 @@ class InputResolver {
             throw new IllegalStateException(
                     "input_ref " + inputRef + " target step " + referencedOrder + " output is not valid JSON", e);
         }
-        JsonNode value = node.get(field);
-        if (value == null || value.isNull()) {
-            throw new IllegalStateException(
-                    "input_ref " + inputRef + " field '" + field + "' not found in step " + referencedOrder
-                            + " output");
+        JsonNode value = node;
+        for (StepReferences.Segment segment : reference.path()) {
+            JsonNode next = switch (segment) {
+                case StepReferences.Field field -> value.get(field.name());
+                case StepReferences.Index index -> value.get(index.position());
+            };
+            if (next == null || next.isNull()) {
+                throw new IllegalStateException("input_ref " + inputRef + " " + describe(segment)
+                        + " not found in step " + referencedOrder + " output");
+            }
+            value = next;
         }
         return value.isTextual() ? value.asText() : value.toString();
+    }
+
+    private static String describe(StepReferences.Segment segment) {
+        return switch (segment) {
+            case StepReferences.Field field -> "field '" + field.name() + "'";
+            case StepReferences.Index index -> "index [" + index.position() + "]";
+        };
     }
 }

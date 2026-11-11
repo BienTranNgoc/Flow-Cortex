@@ -136,6 +136,35 @@ final class StoredWithOutputsResolver {
         }
     }
 
+    /**
+     * The {@code stepOrder} of each {@code outputInputs} entry of {@code config}, in declaration order;
+     * empty when the config is not a JSON object or has no list. Entries without a positive integer
+     * {@code stepOrder} are skipped.
+     */
+    static List<Integer> declaredSources(String config) {
+        if (config == null || config.isBlank()) {
+            return List.of();
+        }
+        JsonNode root;
+        try {
+            root = CONFIG_READER.readTree(config);
+        } catch (JsonProcessingException e) {
+            return List.of();
+        }
+        JsonNode mappings = root == null || !root.isObject() ? null : root.get("outputInputs");
+        if (mappings == null || !mappings.isArray()) {
+            return List.of();
+        }
+        List<Integer> orders = new ArrayList<>();
+        for (JsonNode mapping : mappings) {
+            JsonNode value = mapping.get("stepOrder");
+            if (value != null && value.canConvertToInt() && value.isIntegralNumber() && value.intValue() > 0) {
+                orders.add(value.intValue());
+            }
+        }
+        return orders;
+    }
+
     private List<MediaJobInput> storedInputs(String storedInput) throws JsonProcessingException {
         if (storedInput != null && json.readTree(storedInput).isObject()) {
             return List.of(json.readValue(storedInput, MediaJobInput.class));
