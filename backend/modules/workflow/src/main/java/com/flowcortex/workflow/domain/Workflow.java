@@ -36,18 +36,58 @@ public class Workflow {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "status", nullable = false)
+    private WorkflowStatus status;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     /** Required by JPA. */
     protected Workflow() {
     }
 
+    /** Creates a published workflow. */
     public Workflow(UUID id, UUID ownerId, String name, boolean shared) {
+        this(id, ownerId, name, shared, WorkflowStatus.PUBLISHED);
+    }
+
+    public static Workflow draft(UUID id, UUID ownerId, String name, boolean shared) {
+        return new Workflow(id, ownerId, name, shared, WorkflowStatus.DRAFT);
+    }
+
+    private Workflow(UUID id, UUID ownerId, String name, boolean shared, WorkflowStatus status) {
         this.id = id;
         this.ownerId = ownerId;
         this.name = name;
         this.shared = shared;
+        this.status = status;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    public void rename(String name) {
+        this.name = name;
+        touch();
+    }
+
+    public void setShared(boolean shared) {
+        this.shared = shared;
+        touch();
+    }
+
+    public void changeStatus(WorkflowStatus status) {
+        this.status = status;
+        touch();
+    }
+
+    public void markDeleted() {
+        this.deletedAt = Instant.now();
+        touch();
+    }
+
+    private void touch() {
+        this.updatedAt = Instant.now();
     }
 
     public UUID getId() {
@@ -72,5 +112,13 @@ public class Workflow {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public WorkflowStatus getStatus() {
+        return status;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 }

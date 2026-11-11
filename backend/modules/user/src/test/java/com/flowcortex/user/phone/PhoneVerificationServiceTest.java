@@ -9,13 +9,20 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocaleConfig;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.shared.web.UnprocessableEntityException;
+import com.flowcortex.user.phone.PhoneChallenge.Purpose;
 import com.flowcortex.user.phone.PhoneVerificationService.SentCode;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -68,6 +75,7 @@ class PhoneVerificationServiceTest {
     private final PhoneSendAttemptStore attempts = mock(PhoneSendAttemptStore.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final UUID userId = UUID.randomUUID();
 
     @Test
@@ -201,7 +209,8 @@ class PhoneVerificationServiceTest {
     @Test
     void theRightCodeConsumesTheChallengeAndRecordsTheVerifiedNumber(CapturedOutput output) {
         PhoneChallenge challenge = challenge("482913", NOW.minusSeconds(30));
-        when(challenges.findFirstByUserIdOrderByCreatedAtDesc(userId)).thenReturn(Optional.of(challenge));
+        when(challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY))
+                .thenReturn(Optional.of(challenge));
         when(challenges.consume(challenge.getId(), NOW)).thenReturn(1);
         when(phones.findById(userId)).thenReturn(Optional.empty());
 
@@ -217,7 +226,8 @@ class PhoneVerificationServiceTest {
     @Test
     void theFourthWrongCodeLeavesOneTryAndTheFifthLocksTheCode() {
         PhoneChallenge challenge = challenge("482913", NOW.minusSeconds(30));
-        when(challenges.findFirstByUserIdOrderByCreatedAtDesc(userId)).thenReturn(Optional.of(challenge));
+        when(challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY))
+                .thenReturn(Optional.of(challenge));
         when(challenges.countWrongAttempt(challenge.getId())).thenReturn(1);
         when(challenges.findAttempts(challenge.getId())).thenReturn(4, 5);
 
@@ -238,9 +248,10 @@ class PhoneVerificationServiceTest {
     void anEarlierCodeIsNoLongerValidAndDoesNotCountAsAWrongEntry() {
         PhoneChallenge current = challenge("482913", NOW.minusSeconds(10));
         PhoneChallenge earlier = challenge("222222", NOW.minusSeconds(70));
-        when(challenges.findFirstByUserIdOrderByCreatedAtDesc(userId)).thenReturn(Optional.of(current));
-        when(challenges.findTop5ByUserIdAndIdNotOrderByCreatedAtDesc(userId, current.getId()))
-                .thenReturn(List.of(earlier));
+        when(challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY))
+                .thenReturn(Optional.of(current));
+        when(challenges.findTop5ByUserIdAndPurposeAndIdNotOrderByCreatedAtDesc(userId, Purpose.VERIFY,
+                current.getId())).thenReturn(List.of(earlier));
 
         assertThatThrownBy(() -> service(NOW).verify(userId, "222222"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class, refused -> {
@@ -254,12 +265,84 @@ class PhoneVerificationServiceTest {
     @Test
     void theRightCodeAfterFiveMinutesHasExpired() {
         PhoneChallenge challenge = challenge("482913", NOW);
-        when(challenges.findFirstByUserIdOrderByCreatedAtDesc(userId)).thenReturn(Optional.of(challenge));
+        when(challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY))
+                .thenReturn(Optional.of(challenge));
 
         assertThatThrownBy(() -> service(NOW.plusSeconds(301)).verify(userId, "482913"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,
                         refused -> assertThat(refused.getCode()).isEqualTo("OTP_EXPIRED"));
         verify(challenges, never()).consume(any(), any());
+    }
+
+    @Test
+    void aMemberWithAVerifiedNumberIsRefusedOnSendBeforeAnyQuotaIsReadOrAttemptRecorded() {
+        holdsAVerifiedNumber();
+
+        assertThatThrownBy(() -> service(NOW).sendCode(userId, "0987654321", IP))
+                .isInstanceOfSatisfying(PhoneConflictException.class, refused -> {
+                    assertThat(refused.getBody().getProperties()).containsEntry("code", "PHONE_ALREADY_VERIFIED");
+                    assertThat(english(refused)).isEqualTo("Your phone number is already verified. "
+                            + "To use another number, change it from your profile.");
+                });
+        verifyNoInteractions(attempts, smsSender, jdbc, challenges);
+        assertThat(meters.counter("phone_otp.send", "outcome", "already_verified").count()).isEqualTo(1);
+    }
+
+    @Test
+    void aMemberWithAVerifiedNumberIsRefusedOnVerify() {
+        holdsAVerifiedNumber();
+
+        assertThatThrownBy(() -> service(NOW).verify(userId, "482913"))
+                .isInstanceOfSatisfying(PhoneConflictException.class, refused -> assertThat(
+                        refused.getBody().getProperties()).containsEntry("code", "PHONE_ALREADY_VERIFIED"));
+        verify(challenges, never()).consume(any(), any());
+        verify(challenges, never()).countWrongAttempt(any());
+        verify(phones, never()).saveAndFlush(any());
+        assertThat(meters.counter("phone_otp.verify", "outcome", "already_verified").count()).isEqualTo(1);
+    }
+
+    @Test
+    void thePlainVerifyReadsOnlyVerifyPurposeCodes() {
+        PhoneChallenge plain = challenge("482913", NOW.minusSeconds(60));
+        PhoneChallenge change = new PhoneChallenge(UUID.randomUUID(), userId, "+84987654321",
+                encoder.encode("111111"), NOW.plusSeconds(290), NOW.minusSeconds(10), Purpose.CHANGE);
+        when(challenges.findFirstByUserIdAndPurposeAndConsumedAtIsNullAndInvalidatedAtIsNullOrderByCreatedAtDesc(
+                userId, Purpose.VERIFY)).thenReturn(Optional.of(plain));
+        when(challenges.findFirstByUserIdAndPurposeAndConsumedAtIsNullAndInvalidatedAtIsNullOrderByCreatedAtDesc(
+                userId, Purpose.CHANGE)).thenReturn(Optional.of(change));
+        when(challenges.countWrongAttempt(plain.getId())).thenReturn(1);
+        when(challenges.findAttempts(plain.getId())).thenReturn(1);
+        when(challenges.consume(plain.getId(), NOW)).thenReturn(1);
+
+        assertThatThrownBy(() -> service(NOW).verify(userId, "111111"))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        refused -> assertThat(refused.getCode()).isEqualTo("OTP_INVALID"));
+        service(NOW).verify(userId, "482913");
+
+        verify(challenges, never()).consume(eq(change.getId()), any());
+        verify(challenges, never()).countWrongAttempt(change.getId());
+        verify(challenges).consume(plain.getId(), NOW);
+    }
+
+    @Test
+    void everySendAndCheckOutcomeIsCountedByItsName() {
+        when(challenges.findSendTimesByUserSince(eq(userId), eq(PHONE), any())).thenReturn(List.of(NOW.minusSeconds(59)));
+        assertThatThrownBy(() -> service(NOW).sendCode(userId, "0912345678", IP))
+                .isInstanceOf(OtpRateLimitedException.class);
+        PhoneChallenge challenge = challenge("482913", NOW.minusSeconds(30));
+        when(challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY))
+                .thenReturn(Optional.of(challenge));
+        when(challenges.countWrongAttempt(challenge.getId())).thenReturn(1);
+        when(challenges.findAttempts(challenge.getId())).thenReturn(1);
+        assertThatThrownBy(() -> service(NOW).verify(userId, "000000"))
+                .isInstanceOf(UnprocessableEntityException.class);
+
+        assertThat(meters.counter("phone_otp.send", "outcome", "cooldown").count()).isEqualTo(1);
+        assertThat(meters.counter("phone_otp.verify", "outcome", "wrong").count()).isEqualTo(1);
+    }
+
+    private void holdsAVerifiedNumber() {
+        when(phones.findById(userId)).thenReturn(Optional.of(new UserPhone(userId, PHONE, NOW.minusSeconds(86_400))));
     }
 
     private PhoneVerificationService service(Instant now) {
@@ -271,15 +354,18 @@ class PhoneVerificationServiceTest {
         ObjectProvider<SmsSender> senders = mock(ObjectProvider.class);
         when(senders.getIfAvailable()).thenReturn(sender);
         return new PhoneVerificationService(challenges, phones, senders, enabled, attempts, HASHER,
-                new PhoneSendIpLimiter(LIMITS), LIMITS, encoder, jdbc, mock(PlatformTransactionManager.class),
-                Clock.fixed(now, ZoneOffset.UTC), LOCALE, LOCALE.getBean(RequestLocale.class));
+                new PhoneSendIpLimiter(new RateLimiters(List.of(new PhoneRateLimits().phoneSendIp(LIMITS)),
+                        new InMemoryRateLimitStore(),
+                        new RateLimitTelemetry(new SimpleMeterRegistry(), Clock.systemUTC()))), LIMITS, encoder, jdbc,
+                mock(PlatformTransactionManager.class), Clock.fixed(now, ZoneOffset.UTC), LOCALE,
+                LOCALE.getBean(RequestLocale.class), new PhoneTelemetry(meters));
     }
 
     private static String english(MessageSourceResolvable message) {
         return LOCALE.getMessage(message, Locale.ENGLISH);
     }
 
-    private static String english(OtpRateLimitedException refused) {
+    private static String english(LocalizedStatusException refused) {
         return LOCALE.getMessage(refused.getDetailMessageCode(), refused.getDetailMessageArguments(), Locale.ENGLISH);
     }
 

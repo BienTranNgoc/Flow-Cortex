@@ -2,7 +2,7 @@ package com.flowcortex.user.passwordreset;
 
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
-import com.flowcortex.user.application.RefreshTokenService;
+import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
@@ -43,13 +43,13 @@ public class PasswordResetService {
 
     private final AppUserRepository users;
     private final EmailConfirmationService emailLinks;
-    private final RefreshTokenService refreshTokens;
+    private final AccountCredentials credentials;
     private final PasswordResetProperties properties;
     private final Clock clock;
 
     /** Fails startup when reset is on and a link could not be built or mailed. */
     PasswordResetService(AppUserRepository users, EmailConfirmationService emailLinks,
-            RefreshTokenService refreshTokens, PasswordResetProperties properties, Clock clock,
+            AccountCredentials credentials, PasswordResetProperties properties, Clock clock,
             @Value("${flowcortex.app.public-url:}") String publicUrl, @Value("${spring.mail.host:}") String mailHost) {
         if (properties.enabled()) {
             requireSet(publicUrl, "flowcortex.app.public-url (FLOWCORTEX_APP_PUBLIC_URL), the member app origin"
@@ -58,7 +58,7 @@ public class PasswordResetService {
         }
         this.users = users;
         this.emailLinks = emailLinks;
-        this.refreshTokens = refreshTokens;
+        this.credentials = credentials;
         this.properties = properties;
         this.clock = clock;
     }
@@ -118,8 +118,8 @@ public class PasswordResetService {
     }
 
     /**
-     * Spends the reset link and sets {@code passwordHash} as the account's password; every session and
-     * every other open emailed link of the account ends with it, and any lockout is cleared. Returns the
+     * Spends the reset link and sets {@code passwordHash} as the account's password; every session, every
+     * personal access token and every other open emailed link of the account ends with it, and any lockout is cleared. Returns the
      * account's id and email.
      *
      * @throws UnprocessableEntityException {@code RESET_LINK_INVALID} when the link cannot be spent or
@@ -141,7 +141,7 @@ public class PasswordResetService {
         account.changePasswordHash(passwordHash);
         account.resetFailedLoginAttempts(Instant.now(clock));
         int retired = emailLinks.retireOpenLinks(account.getId());
-        refreshTokens.revokeAllFor(account.getId());
+        credentials.revokeAllFor(account.getId());
         emailLinks.mailPasswordChangedNotice(account);
         LOG.info("password_reset outcome=completed userId={} retiredLinks={}", account.getId(), retired);
         return new CompletedReset(account.getId(), account.getEmail());

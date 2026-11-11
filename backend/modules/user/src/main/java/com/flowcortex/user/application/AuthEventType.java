@@ -28,6 +28,16 @@ public enum AuthEventType {
     REFRESH_TOKEN_ROTATED,
     REFRESH_TOKEN_REUSE_DETECTED,
 
+    STEP_UP_SUCCEEDED,
+    STEP_UP_FAILED_INVALID_PASSWORD,
+    STEP_UP_FAILED_PASSWORD_REQUIRED,
+    STEP_UP_RATE_LIMITED,
+    PAT_CREATED,
+    PAT_REVOKED,
+
+    PHONE_CHANGED,
+    PHONE_CHANGE_REVERTED,
+
     LOGOUT;
 
     public static Map<String, Object> metadata(Object... keyValuePairs) {

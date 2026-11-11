@@ -3,17 +3,24 @@ package com.flowcortex.user.passwordreset;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.LocaleConfig;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.application.PasswordResetRateLimitedException;
 import com.flowcortex.user.application.RateLimit;
-import com.flowcortex.user.application.RefreshTokenService;
+import com.flowcortex.user.domain.AppUser;
+import com.flowcortex.user.domain.Role;
+import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -23,7 +30,7 @@ class PasswordResetServiceTest {
 
     private static PasswordResetService service(boolean enabled, String publicUrl, String mailHost) {
         return new PasswordResetService(mock(AppUserRepository.class), mock(EmailConfirmationService.class),
-                mock(RefreshTokenService.class), new PasswordResetProperties(enabled, Duration.ofHours(1), HOURLY,
+                mock(AccountCredentials.class), new PasswordResetProperties(enabled, Duration.ofHours(1), HOURLY,
                         HOURLY, HOURLY), Clock.systemUTC(), publicUrl, mailHost);
     }
 
@@ -37,6 +44,22 @@ class PasswordResetServiceTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("SPRING_MAIL_HOST");
         }
+    }
+
+    @Test
+    void completingAResetRevokesEveryCredentialOfTheAccount() {
+        AppUser account = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "admin@example.com", "old", "Admin",
+                Role.ADMIN, UserStatus.ACTIVE);
+        EmailConfirmationService links = mock(EmailConfirmationService.class);
+        when(links.spendPasswordReset("raw")).thenReturn(Optional.of(account));
+        AccountCredentials credentials = mock(AccountCredentials.class);
+        PasswordResetService resets = new PasswordResetService(mock(AppUserRepository.class), links, credentials,
+                new PasswordResetProperties(false, Duration.ofHours(1), HOURLY, HOURLY, HOURLY), Clock.systemUTC(),
+                "", "");
+
+        resets.reset("raw", "new-hash");
+
+        verify(credentials).revokeAllFor(account.getId());
     }
 
     @Test

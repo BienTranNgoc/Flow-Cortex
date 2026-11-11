@@ -444,6 +444,110 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows:
+    get:
+      tags:
+      - workflows-controller
+      operationId: listWorkflows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowResponse"
+    post:
+      tags:
+      - workflows-controller
+      operationId: createWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/steps:
+    post:
+      tags:
+      - workflows-controller
+      operationId: addStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -960,6 +1064,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/me/step-up:
+    post:
+      tags:
+      - step-up-controller
+      operationId: stepUp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StepUpRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepUpResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -996,6 +1148,281 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/phone/change/verify:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeVerify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/start:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeStart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeStartRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendCodeResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/cancel:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeCancel
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/api-tokens:
+    get:
+      tags:
+      - personal-access-token-controller
+      operationId: list_1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiTokenView"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - personal-access-token-controller
+      operationId: create_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiTokenRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedApiToken"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/email-links/{token}/unsubscribe:
+    post:
+      tags:
+      - email-links-controller
+      operationId: unsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkUnsubscribed"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/email-links/{token}/one-click:
+    post:
+      tags:
+      - email-links-controller
+      operationId: oneClickUnsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkOneClick"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/client-errors:
+    post:
+      tags:
+      - client-errors-controller
+      summary: Report an error the web app contained
+      operationId: reportClientError
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        "204":
+          description: "Accepted, or ignored while the intake is off"
+        "400":
+          description: "client_error_content_type, client_error_unreadable, client_error_invalid"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: client_error_too_large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: client_error_rate_limited (Retry-After)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
@@ -1465,6 +1892,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/admin/workflows:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: createAdminWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/admin/workflows/{id}/steps:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: addAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -1661,20 +2179,44 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/workflows:
-    get:
+  /api/v1/admin/accounts/{id}/deactivate:
+    post:
       tags:
-      - workflows-controller
-      operationId: listWorkflows
+      - admin-accounts-controller
+      operationId: deactivateAdminAccount
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowResponse"
+                $ref: "#/components/schemas/AdminAccountResponse"
+  /api/v1/admin/accounts/{id}/activate:
+    post:
+      tags:
+      - admin-accounts-controller
+      operationId: activateAdminAccount
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountResponse"
   /api/v1/workflows/{id}:
     get:
       tags:
@@ -1694,6 +2236,290 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+    delete:
+      tags:
+      - workflows-controller
+      operationId: deleteWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/{id}:
+    delete:
+      tags:
+      - admin-workflows-controller
+      operationId: deleteAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/accounts/{id}/role:
+    patch:
+      tags:
+      - admin-accounts-controller
+      operationId: changeAdminAccountRole
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountResponse"
   /api/v1/support/settings:
     get:
       tags:
@@ -2083,6 +2909,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
       security: []
+  /api/v1/email-links/{token}:
+    get:
+      tags:
+      - email-links-controller
+      operationId: viewEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkView"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/credits/balance:
     get:
       tags:
@@ -2350,6 +3207,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminRunResponse"
+  /api/v1/admin/roles:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleResponse"
+  /api/v1/admin/phone-verification/status:
+    get:
+      tags:
+      - admin-phone-verification-controller
+      operationId: getAdminPhoneVerificationStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPhoneVerificationStatus"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -2392,6 +3275,81 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/accounts:
+    get:
+      tags:
+      - admin-accounts-controller
+      operationId: listAdminAccounts
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminAccountResponse"
+  /api/v1/me/api-tokens/{id}:
+    delete:
+      tags:
+      - personal-access-token-controller
+      operationId: revoke
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
 components:
   schemas:
     UpdateUserRequest:
@@ -2404,7 +3362,7 @@ components:
           type: string
         role:
           type: string
-          pattern: ADMIN|MEMBER|CREATOR
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
         status:
           type: string
           pattern: ACTIVE|SUSPENDED
@@ -2528,6 +3486,40 @@ components:
           type: boolean
         passwordSetupRequired:
           type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.admin_account.view
+            - system.admin_account.manage
+        adminDisabled:
+          type: boolean
+        phoneVerificationRequired:
+          type: boolean
+      required:
+      - adminDisabled
+      - permissions
+      - phoneVerificationRequired
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -2853,6 +3845,95 @@ components:
           format: date-time
       required:
       - enabled
+    CreateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        shared:
+          type: boolean
+      required:
+      - name
+    WorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        isShared:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepResponse"
+        estimatedCredits:
+          type: integer
+          format: int64
+        available:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      required:
+      - available
+    WorkflowStepResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+        type:
+          type: string
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+        inputRef:
+          type:
+          - string
+          - "null"
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - mode
+    CreateStepRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
+      required:
+      - type
     RunOptionsRequest:
       type: object
       properties:
@@ -3000,7 +4081,7 @@ components:
         role:
           type: string
           minLength: 1
-          pattern: ADMIN|MEMBER|CREATOR
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - email
       - name
@@ -3388,6 +4469,32 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    StepUpRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          maxLength: 72
+          minLength: 0
+        purpose:
+          type: string
+          enum:
+          - PAT_CREATE
+          - PHONE_CHANGE
+      required:
+      - password
+      - purpose
+    StepUpResponse:
+      type: object
+      properties:
+        stepUpProof:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - stepUpProof
     VerifyCodeRequest:
       type: object
       properties:
@@ -3408,6 +4515,11 @@ components:
           type: string
           description: The verified number as shown to the member (carrier digit and
             last three digits)
+        cancelAvailableUntil:
+          type: string
+          format: date-time
+          description: "While a number change can still be undone, when that stops;\
+            \ otherwise null"
       required:
       - verified
     SendCodeRequest:
@@ -3435,6 +4547,84 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    ChangeStartRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: "0987654321"
+          pattern: "^(0|\\+84)([35789]\\d{8})$"
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - phone
+      - stepUpProof
+    CreateApiTokenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 0
+        expiresInDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - name
+      - stepUpProof
+    CreatedApiToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        token:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - expiresAt
+      - id
+      - name
+      - token
+    EmailLinkUnsubscribed:
+      type: object
+      properties:
+        unsubscribed:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+    EmailLinkOneClick:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+      - ok
     Attachment:
       type: object
       properties:
@@ -3709,53 +4899,74 @@ components:
       required:
       - body
       - status
-    WorkflowResponse:
+    AdminAccountResponse:
       type: object
       properties:
         id:
           type: string
           format: uuid
+        email:
+          type: string
         name:
           type: string
-        isShared:
+        role:
+          type: string
+        status:
+          type: string
+        adminDisabled:
           type: boolean
+        adminDisabledAt:
+          type: string
+          format: date-time
         createdAt:
           type: string
           format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        steps:
-          type: array
-          items:
-            $ref: "#/components/schemas/WorkflowStepResponse"
-        estimatedCredits:
-          type: integer
-          format: int64
-        available:
-          type: boolean
       required:
-      - available
-    WorkflowStepResponse:
+      - adminDisabled
+      - createdAt
+      - email
+      - id
+      - name
+      - role
+      - status
+    UpdateWorkflowRequest:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        stepOrder:
-          type: integer
-          format: int32
         name:
           type: string
-        type:
-          type: string
-        mode:
+          maxLength: 255
+          minLength: 0
+          pattern: (?s)\s*\S.*
+        shared:
+          type: boolean
+        status:
           type: string
           enum:
-          - inline
-          - remote
+          - draft
+          - published
+          pattern: draft|published
+    UpdateStepRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
+    ChangeRoleRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          minLength: 1
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
-      - mode
+      - role
     SupportSettings:
       type: object
       properties:
@@ -3950,6 +5161,32 @@ components:
       required:
       - expiresAt
       - url
+    ApiTokenView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Null until the token is first used
+        expired:
+          type: boolean
+      required:
+      - createdAt
+      - expired
+      - expiresAt
+      - id
+      - name
     HealthResponse:
       type: object
       properties:
@@ -3980,6 +5217,8 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        personalAccessTokens:
+          type: boolean
         chat:
           type: boolean
       required:
@@ -3987,11 +5226,31 @@ components:
       - credits
       - emailConfirmation
       - passwordReset
+      - personalAccessTokens
       - phoneVerification
       - runCancellation
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EmailLinkView:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        unsubscribed:
+          type: boolean
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+      - valid
     BalanceResponse:
       type: object
       properties:
@@ -4197,6 +5456,76 @@ components:
       - page
       - size
       - total
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        staff:
+          type: boolean
+        superAdmin:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.admin_account.view
+            - system.admin_account.manage
+      required:
+      - code
+      - permissions
+      - staff
+      - superAdmin
+    AdminPhoneVerificationStatus:
+      type: object
+      properties:
+        verificationEnabled:
+          type: boolean
+        smsSender:
+          type: string
+          description: none when no SMS sender is wired; the configured sender when
+            it is a known one; else custom
+        hashSecretConfigured:
+          type: boolean
+          description: True when the hash secret is set and at least 32 bytes; the
+            value is never returned
+        gateEnabled:
+          type: boolean
+        globalSendsPerDay:
+          type: integer
+          format: int32
+          description: Cap on codes sent from every member per 24 hours
+        sentLast24h:
+          type: integer
+          format: int64
+          description: Codes sent in the last 24 hours
+      required:
+      - gateEnabled
+      - globalSendsPerDay
+      - hashSecretConfigured
+      - sentLast24h
+      - smsSender
+      - verificationEnabled
     MediaJobResponse:
       type: object
       properties:
@@ -4259,6 +5588,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MediaJobResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    PageViewAdminAccountResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAccountResponse"
         page:
           type: integer
           format: int32

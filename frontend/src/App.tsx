@@ -16,16 +16,19 @@ import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
+import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -84,12 +87,26 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <PasswordSetupGate>
+                    <Outlet />
+                  </PasswordSetupGate>
+                </RequireAuth>
+              }
+            >
+              <Route path="/verify-phone" element={<VerifyPhonePage />} />
+            </Route>
           </Route>
           <Route
             element={
               <RequireAuth>
                 <PasswordSetupGate>
-                  <Layout />
+                  <PhoneGate>
+                    <Layout />
+                  </PhoneGate>
                 </PasswordSetupGate>
               </RequireAuth>
             }

@@ -71,6 +71,7 @@
         "providers": "Model Providers",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "phoneVerification": "Phone verification",
         "features": "Feature Switches",
         "auditLog": "Audit Log",
         "mediaJobs": "Media Jobs",
@@ -80,13 +81,20 @@
         "supportGroups": "Topics",
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
+        "adminAccounts": "Admin accounts",
         "chatSettings": "Settings"
       }
     },
     "noAccess": {
       "title": "No access",
-      "messageWithEmail": "<account>{{email}}</account> does not have the ADMIN role, so it cannot use the admin console.",
-      "message": "This account does not have the ADMIN role, so it cannot use the admin console.",
+      "messageWithEmail": "<account>{{email}}</account> has no admin permissions, so it cannot use the admin console.",
+      "message": "This account has no admin permissions, so it cannot use the admin console.",
+      "signOut": "Sign out"
+    },
+    "disabled": {
+      "title": "Your admin account is deactivated",
+      "messageWithEmail": "<account>{{email}}</account> is deactivated, so it cannot use the admin console. Ask a super admin to reactivate it. You can still use the member app.",
+      "message": "This admin account is deactivated, so it cannot use the admin console. Ask a super admin to reactivate it. You can still use the member app.",
       "signOut": "Sign out"
     },
     "session": {

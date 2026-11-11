@@ -10,9 +10,11 @@ import { queryClient } from './app/queryClient';
 import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
+import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
@@ -29,7 +31,9 @@ const PAGES: Record<string, ReactElement> = {
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
   '/sms-outbox': <SmsOutboxPage />,
+  '/phone-verification': <PhoneVerificationStatusPage />,
   '/media-jobs': <MediaJobsPage />,
+  '/admin-accounts': <AdminAccountsPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,
   '/support/requests': <RequestsInboxPage />,
@@ -47,7 +51,7 @@ const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */
 function AdminRoutes() {
   const { t } = useTranslation();
-  const items = reachableItems(useMeQuery().data?.role);
+  const items = reachableItems(useMeQuery().data);
   const home = items[0]?.path;
 
   return (

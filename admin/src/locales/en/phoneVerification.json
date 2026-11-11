@@ -1,0 +1,27 @@
+{
+  "title": "Phone verification",
+  "eyebrow": "Administration",
+  "description": "How the phone verification flow is switched and wired in the running backend.",
+  "loading": "Loading phone verification status…",
+  "loadError": "Could not load the phone verification status.",
+  "retry": "Try again",
+  "on": "On",
+  "off": "Off",
+  "fields": {
+    "verification": "Phone verification",
+    "sender": "SMS sender",
+    "hashSecret": "Hash secret",
+    "gate": "Phone gate",
+    "dailyBudget": "Daily budget of codes",
+    "sentLast24h": "Codes sent in the last 24 hours"
+  },
+  "sender": {
+    "none": "None",
+    "outbox": "Development outbox",
+    "custom": "Custom sender"
+  },
+  "hashSecret": {
+    "configured": "Configured",
+    "missing": "Not configured"
+  }
+}

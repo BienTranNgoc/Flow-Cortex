@@ -11,6 +11,9 @@ dependencies {
     // never builds a response body itself).
     implementation("org.springframework:spring-webmvc")
 
+    // @JsonValue on Permission: the wire form of a key is its dotted string.
+    implementation("com.fasterxml.jackson.core:jackson-annotations")
+
     // DispatcherType, for the ERROR-dispatch permitAll rule in SecurityConfig.
     compileOnly("jakarta.servlet:jakarta.servlet-api")
     testImplementation("jakarta.servlet:jakarta.servlet-api")

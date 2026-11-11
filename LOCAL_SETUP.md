@@ -311,6 +311,12 @@ the member app reads it once per session.
   over STARTTLS, so account mail never lands in a sink there. To try a relay
   from the local stack, set the same four plus `SPRING_MAIL_SMTP_AUTH=true` and
   `SPRING_MAIL_SMTP_STARTTLS=true` in `.env`.
+  Every mail comes from one sender, `FLOWCORTEX_MAIL_FROM_NAME`
+  <`FLOWCORTEX_MAIL_FROM`> (default `Nodi <no-reply@flow-cortex.dev>`), and carries a text
+  and an HTML part. `FLOWCORTEX_MAIL_LINK_SECRET` (at least 32 bytes) and
+  `FLOWCORTEX_APP_PUBLIC_URL` become required once a care or promotional mail exists;
+  `FLOWCORTEX_MAIL_LINK_RATE_LIMIT` and `FLOWCORTEX_MAIL_LINK_RATE_WINDOW` (defaults 10 per
+  `60s`) bound the public unsubscribe-link calls.
   Accounts still unconfirmed after `FLOWCORTEX_AUTH_UNCONFIRMED_ACCOUNT_RETENTION`
   (72h) are deleted.
 - **SMS.** No SMS is delivered. Compose sets `FLOWCORTEX_SMS_SENDER=outbox`, so each code

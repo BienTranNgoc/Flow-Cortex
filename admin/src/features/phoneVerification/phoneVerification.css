@@ -1,0 +1,40 @@
+.phone-verification-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+}
+
+.phone-verification-status__row {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  min-height: var(--admin-hit-min);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--admin-card-edge);
+}
+
+.phone-verification-status__row:last-child {
+  border-bottom: 0;
+}
+
+.phone-verification-status dt {
+  color: var(--admin-ink-3);
+  font-weight: 600;
+}
+
+.phone-verification-status dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--admin-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .phone-verification-status__row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.25rem;
+  }
+}

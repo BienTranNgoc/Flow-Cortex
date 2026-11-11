@@ -107,7 +107,7 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
     record SessionView(String accessToken, long expiresIn) {
     }
 
-    record MeView(String name, boolean hasPassword, boolean passwordSetupRequired) {
+    record MeView(String name, boolean hasPassword, boolean passwordSetupRequired, Boolean phoneVerificationRequired) {
     }
 
     record StatusView(String status) {
@@ -276,6 +276,7 @@ class RegistrationConfirmationIT extends AbstractGoogleOAuthIT {
         MeView me = get("/api/v1/auth/me", accessToken, MeView.class).getBody();
         assertThat(me.hasPassword()).isFalse();
         assertThat(me.passwordSetupRequired()).isTrue();
+        assertThat(me.phoneVerificationRequired()).isFalse();
         assertThat(me.name()).as("the name chosen at registration is dropped")
                 .isEqualTo(email.substring(0, email.indexOf('@')));
 

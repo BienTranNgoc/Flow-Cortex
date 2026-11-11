@@ -75,6 +75,7 @@ class AuthServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountCredentials accountCredentials = mock(AccountCredentials.class);
     private final LoginAttemptRecorder loginAttempts = mock(LoginAttemptRecorder.class);
     private final LoginRateLimiter loginRateLimiter = mock(LoginRateLimiter.class);
     private final RegistrationRateLimiter registrationRateLimiter = mock(RegistrationRateLimiter.class);
@@ -91,11 +92,11 @@ class AuthServiceImplTest {
     }
 
     private AuthServiceImpl service(String ownerEmail, boolean confirmationEnabled) {
-        return new AuthServiceImpl(repository, ENCODER, refreshTokenService, loginAttempts, loginRateLimiter,
+        return new AuthServiceImpl(repository, ENCODER, refreshTokenService, accountCredentials, loginAttempts, loginRateLimiter,
                 registrationRateLimiter, googleOAuthClient, audit,
                 new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
-                new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24), "no-reply@flow-cortex.dev",
+                new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24),
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 mock(PasswordResetRateLimiter.class), mock(PasswordResetService.class),
                 mock(PasswordResetSubmitLimiter.class));
@@ -459,8 +460,8 @@ class AuthServiceImplTest {
         assertThat(confirmed.session()).isEqualTo(SESSION);
         assertThat(confirmed.passwordSetupRequired()).isTrue();
         assertThat(confirmed.passwordSetupToken()).isEqualTo("setup-token");
-        InOrder order = inOrder(refreshTokenService);
-        order.verify(refreshTokenService).revokeAllFor(user.getId());
+        InOrder order = inOrder(accountCredentials, refreshTokenService);
+        order.verify(accountCredentials).revokeAllFor(user.getId());
         order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false);
         verify(events).publishEvent(new UserActivatedEvent(user.getId()));
     }
@@ -473,7 +474,7 @@ class AuthServiceImplTest {
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,
                         e -> assertThat(english(e.getDetail())).isEqualTo("This confirmation link is no longer valid"));
 
-        verifyNoInteractions(refreshTokenService, events);
+        verifyNoInteractions(refreshTokenService, accountCredentials, events);
     }
 
     @Test
@@ -513,7 +514,7 @@ class AuthServiceImplTest {
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,
                         e -> assertThat(english(e.getDetail())).isEqualTo("This set-password link is no longer valid"));
 
-        verifyNoInteractions(refreshTokenService);
+        verifyNoInteractions(refreshTokenService, accountCredentials);
     }
 
     @Test
@@ -531,8 +532,8 @@ class AuthServiceImplTest {
         assertThat(ENCODER.matches("new-password-1", user.getPasswordHash())).isTrue();
         assertThat(user.getName()).isEqualTo("Binh Le");
         assertThat(user.getUsername()).isEqualTo("binh_le");
-        InOrder order = inOrder(refreshTokenService);
-        order.verify(refreshTokenService).revokeAllFor(user.getId());
+        InOrder order = inOrder(accountCredentials, refreshTokenService);
+        order.verify(accountCredentials).revokeAllFor(user.getId());
         order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false);
         verify(emailConfirmation).retireOpenLinks(user.getId());
         verify(emailConfirmation).mailPasswordSetNotice(user.getId(), "person@example.com");
@@ -552,7 +553,7 @@ class AuthServiceImplTest {
 
         assertThat(user.hasPassword()).isFalse();
         assertThat(user.getName()).isEqualTo("P");
-        verifyNoInteractions(refreshTokenService);
+        verifyNoInteractions(refreshTokenService, accountCredentials);
         verify(emailConfirmation, never()).mailPasswordSetNotice(any(), any());
     }
 
@@ -610,7 +611,7 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> service.confirmEmail("raw-token", "127.0.0.1", "ua"))
                 .isInstanceOf(AccessDeniedException.class);
 
-        verify(refreshTokenService).revokeAllFor(user.getId());
+        verify(accountCredentials).revokeAllFor(user.getId());
         verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
         verifyNoInteractions(events);
     }
@@ -725,7 +726,7 @@ class AuthServiceImplTest {
         assertThat(unconfirmed.getPasswordHash()).isEmpty();
         verify(repository).saveAndFlush(unconfirmed);
         verify(emailConfirmation).retireOpenLinks(id);
-        verify(refreshTokenService).revokeAllFor(id);
+        verify(accountCredentials).revokeAllFor(id);
         verify(events).publishEvent(new UserActivatedEvent(id));
         verify(audit).write(eq(AuthEventType.OAUTH_UNCONFIRMED_ACCOUNT_CLAIMED), eq(id), any(), any(), any());
         verifyNoInteractions(registrationRateLimiter);
@@ -956,11 +957,11 @@ class AuthServiceImplTest {
     }
 
     private AuthServiceImpl resetService(PasswordEncoder encoder, PasswordResetService resets) {
-        return new AuthServiceImpl(repository, encoder, refreshTokenService, loginAttempts, loginRateLimiter,
+        return new AuthServiceImpl(repository, encoder, refreshTokenService, accountCredentials, loginAttempts, loginRateLimiter,
                 registrationRateLimiter, googleOAuthClient, audit,
                 new RegistrationProperties(OWNER_EMAIL, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
-                new EmailConfirmationProperties(false, Duration.ofHours(24), "no-reply@flow-cortex.dev",
+                new EmailConfirmationProperties(false, Duration.ofHours(24),
                         Duration.ofHours(72), Duration.ofMinutes(30), 500),
                 mock(PasswordResetRateLimiter.class), resets, mock(PasswordResetSubmitLimiter.class));
     }

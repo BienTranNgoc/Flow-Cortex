@@ -6,6 +6,7 @@ import {
   Coins,
   Cpu,
   Cube,
+  DeviceMobile,
   GearSix,
   Headset,
   ListChecks,
@@ -15,21 +16,25 @@ import {
   Sparkle,
   SquaresFour,
   Stack,
+  UserGear,
   Users,
   Waveform,
   type Icon,
 } from '@phosphor-icons/react';
-import { can, type Action } from './permissions';
+import { can, type Caller, type PermissionKey } from './permissions';
 
 /** A live source `useLiveNav` reads into an entry's `badge`; it also picks the count's wording. */
 export type NavLiveCount = 'openSupportRequests';
 
-/** `label` and `tag` are i18n keys; the sidebar translates them. A `badge` above 0 shows a count. */
+/**
+ * `label` and `tag` are i18n keys; the sidebar translates them. A `badge` above 0 shows a count.
+ * `key` is the permission an entry and its route need; a disabled entry has none.
+ */
 export interface NavItem {
   label: string;
   path: string;
   icon: Icon;
-  action: Action;
+  key?: PermissionKey;
   disabled?: boolean;
   tag?: string;
   badge?: number;
@@ -53,7 +58,7 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.dashboard',
         path: '/dashboard',
         icon: SquaresFour,
-        action: 'runs.view',
+        key: 'workflow.run.view',
       },
     ],
   },
@@ -65,16 +70,14 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.workflows',
         path: '/workflows',
         icon: Cube,
-        action: 'workflows.view',
         disabled: true,
         tag: COMING_SOON,
       },
-      { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, action: 'runs.view' },
+      { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, key: 'workflow.run.view' },
       {
         label: 'common.shell.nav.items.approvals',
         path: '/approvals',
         icon: ListChecks,
-        action: 'approvals.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -88,7 +91,6 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.credits',
         path: '/credits',
         icon: Coins,
-        action: 'credits.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -96,7 +98,6 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.providers',
         path: '/providers',
         icon: Cpu,
-        action: 'providers.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -110,19 +111,24 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.users',
         path: '/users',
         icon: Users,
-        action: 'users.manage',
+        key: 'user.account.view',
       },
       {
         label: 'common.shell.nav.items.smsOutbox',
         path: '/sms-outbox',
         icon: ChatText,
-        action: 'users.manage',
+        key: 'platform.sms_outbox.view',
+      },
+      {
+        label: 'common.shell.nav.items.phoneVerification',
+        path: '/phone-verification',
+        icon: DeviceMobile,
+        key: 'platform.setting.view',
       },
       {
         label: 'common.shell.nav.items.features',
         path: '/features',
         icon: GearSix,
-        action: 'features.toggle',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -130,7 +136,6 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.auditLog',
         path: '/audit',
         icon: ClipboardText,
-        action: 'audit.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -144,13 +149,18 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.mediaJobs',
         path: '/media-jobs',
         icon: Pulse,
-        action: 'mediaJobs.view',
+        key: 'workflow.run.view',
+      },
+      {
+        label: 'common.shell.nav.items.adminAccounts',
+        path: '/admin-accounts',
+        icon: UserGear,
+        key: 'system.admin_account.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',
         path: '/voice-quota',
         icon: Waveform,
-        action: 'voice.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -158,7 +168,6 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.health',
         path: '/health',
         icon: ShieldCheck,
-        action: 'health.view',
         disabled: true,
         tag: COMING_SOON,
       },
@@ -172,26 +181,26 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.supportArticles',
         path: '/support/articles',
         icon: BookOpen,
-        action: 'support.manage',
+        key: 'content.help_article.view',
       },
       {
         label: 'common.shell.nav.items.supportGroups',
         path: '/support/groups',
         icon: Stack,
-        action: 'support.manage',
+        key: 'content.help_topic.view',
       },
       {
         label: 'common.shell.nav.items.supportRequests',
         path: '/support/requests',
         icon: Headset,
-        action: 'support.manage',
+        key: 'support.ticket.view',
         liveCount: 'openSupportRequests',
       },
       {
         label: 'common.shell.nav.items.supportSettings',
         path: '/support/settings',
         icon: Sparkle,
-        action: 'support.manage',
+        key: 'platform.setting.view',
       },
     ],
   },
@@ -203,15 +212,20 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.chatSettings',
         path: '/chat/settings',
         icon: ChatsCircle,
-        action: 'features.toggle',
+        key: 'platform.setting.view',
       },
     ],
   },
 ];
 
-/** Enabled entries the role may open, in sidebar order: these are also the only routable pages. */
-export function reachableItems(role: string | undefined): NavItem[] {
+/** Whether the caller sees `item` in the sidebar: a disabled entry carries no key and is shown to every admin. */
+export function isVisible(me: Caller | undefined, item: NavItem): boolean {
+  return item.key === undefined || can(me, item.key);
+}
+
+/** Enabled entries the caller may open, in sidebar order: these are also the only routable pages. */
+export function reachableItems(me: Caller | undefined): NavItem[] {
   return NAV.flatMap((group) => group.items).filter(
-    (item) => !item.disabled && can(role, item.action),
+    (item) => !item.disabled && item.key !== undefined && can(me, item.key),
   );
 }
