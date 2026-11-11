@@ -34,7 +34,7 @@ def _threshold(params: Mapping[str, Any]) -> float:
     if params.get("sceneThreshold") is None:
         return DEFAULT_SCENE_THRESHOLD
     value = finite_param(params, "sceneThreshold")
-    if not 0 < value < 1:
+    if value <= 0 or value >= 1:
         raise PermanentError(
             "contract_violation",
             f"param 'sceneThreshold' must be above 0 and below 1 (got {value!r})",
