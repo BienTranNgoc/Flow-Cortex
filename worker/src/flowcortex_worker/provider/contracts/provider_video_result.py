@@ -25,3 +25,5 @@ class ProviderVideoData(BaseModel):
     idempotencyKey: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
     providerTaskId: Annotated[StrictStr, Field(max_length=200, min_length=1)]
     format: Literal["mp4"]
+    fingerprint: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None
+    requestKey: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None

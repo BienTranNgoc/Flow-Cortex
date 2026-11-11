@@ -9,15 +9,24 @@ import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.provider.ProviderInput;
 import com.flowcortex.media.api.provider.ProviderJob;
+import com.flowcortex.media.api.provider.VendorLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
+import com.flowcortex.workflow.application.vendor.VendorRequestKey;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 
 /** Dispatches provider-neutral script, speech and generated-video jobs. */
 class ProviderStepExecutor implements StepExecutor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProviderStepExecutor.class);
 
     private static final TypeReference<Map<String, Object>> OBJECT = new TypeReference<>() { };
     private static final TypeReference<List<MediaJobInput>> INPUTS = new TypeReference<>() { };
@@ -27,12 +36,22 @@ class ProviderStepExecutor implements StepExecutor {
     private final String profile;
     private final MediaJobs mediaJobs;
     private final Clock clock;
+    private final VendorJobLedger ledger;
+    private final VendorJobsProperties vendorJobs;
 
     ProviderStepExecutor(String capability, String profile, MediaJobs mediaJobs, Clock clock) {
+        this(capability, profile, mediaJobs, clock, null, null);
+    }
+
+    /** With a ledger, a {@code generate_video} job carries the vendor-job block; other capabilities ignore it. */
+    ProviderStepExecutor(String capability, String profile, MediaJobs mediaJobs, Clock clock, VendorJobLedger ledger,
+            VendorJobsProperties vendorJobs) {
         this.capability = capability;
         this.profile = profile;
         this.mediaJobs = mediaJobs;
         this.clock = clock;
+        this.ledger = ledger;
+        this.vendorJobs = vendorJobs;
     }
 
     @Override
@@ -66,12 +85,14 @@ class ProviderStepExecutor implements StepExecutor {
     public String execute(StepContext context) {
         Map<String, Object> payload = mappedPayload(payload(context.input()), context.config());
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("profile", profile(context.config()));
+        String jobProfile = profile(context.config());
+        params.put("profile", jobProfile);
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
                 context.stepOrder(), capability, params, providerInputs(context),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
-                (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant());
+                (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant(),
+                vendorLedger(context, jobProfile, payload));
         try {
             mediaJobs.enqueueProvider(job);
         } catch (ConstraintViolationException e) {
@@ -79,6 +100,27 @@ class ProviderStepExecutor implements StepExecutor {
                     "The provider job breaks its contract: " + e.getMessage(), e);
         }
         return null;
+    }
+
+    /**
+     * The attach candidates for this request, claimed inside the dispatching transaction. A ledger
+     * that cannot answer must not stop a paid step, so it dispatches with none.
+     */
+    private VendorLedger vendorLedger(StepContext context, String jobProfile, Map<String, Object> payload) {
+        if (ledger == null || !"generate_video".equals(capability)) {
+            return null;
+        }
+        String requestKey = VendorRequestKey.of(capability, jobProfile, payload);
+        List<VendorLedger.Candidate> candidates = List.of();
+        if (vendorJobs.resumeEnabled()) {
+            try {
+                candidates = ledger.claimCandidates(context.runId(), context.stepId(), capability, requestKey);
+            } catch (DataAccessException e) {
+                LOG.warn("vendor_job outcome=ledger_error op=claim run={} step={}", context.runId(),
+                        context.stepId(), e);
+            }
+        }
+        return new VendorLedger(requestKey, candidates);
     }
 
     /**

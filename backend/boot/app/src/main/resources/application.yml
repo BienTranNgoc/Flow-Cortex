@@ -333,6 +333,16 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+  # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
+  # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
+  # (every clip submits) while recording continues. Rows older than `retention` are deleted every
+  # cleanup interval. Env var + restart.
+  vendor-jobs:
+    resume-enabled: ${FLOWCORTEX_VENDOR_JOBS_RESUME_ENABLED:true}
+    cleanup:
+      enabled: ${FLOWCORTEX_VENDOR_JOBS_CLEANUP_ENABLED:true}
+      interval: ${FLOWCORTEX_VENDOR_JOBS_CLEANUP_INTERVAL:1h}
+    retention: ${FLOWCORTEX_VENDOR_JOBS_RETENTION:7d}
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,

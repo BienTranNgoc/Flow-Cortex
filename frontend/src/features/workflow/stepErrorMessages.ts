@@ -11,6 +11,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   media_disabled: 'workflow.stepError.media_disabled',
   contract_violation: 'workflow.stepError.contract_violation',
   speech_too_long: 'workflow.stepError.speech_too_long',
+  provider_timeout: 'workflow.stepError.provider_timeout',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
 };
 

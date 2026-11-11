@@ -16,6 +16,7 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         PROVIDER_CAPABILITY_UNAVAILABLE("provider_capability_unavailable"),
         PROVIDER_REQUEST_FAILED("provider_request_failed"),
         PROVIDER_RESPONSE_INVALID("provider_response_invalid"),
+        PROVIDER_TIMEOUT("provider_timeout"),
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout"),
         DURATION_EXCEEDED("duration_exceeded"),

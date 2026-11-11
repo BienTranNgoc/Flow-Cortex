@@ -12,13 +12,20 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.provider.ProviderInput;
 import com.flowcortex.media.api.provider.ProviderJob;
+import com.flowcortex.media.api.provider.VendorLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
+import com.flowcortex.workflow.application.vendor.VendorRequestKey;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 class ProviderStepExecutorTest {
 
@@ -197,6 +204,82 @@ class ProviderStepExecutorTest {
                 .isInstanceOf(StepFailedException.class)
                 .hasMessage("Product image image_1 is missing from the run inputs");
         verify(jobs, never()).enqueueProvider(any());
+    }
+
+    @Test
+    void videoJobCarriesTheLedgerCandidatesOfItsRequest() {
+        VendorJobLedger ledger = mock(VendorJobLedger.class);
+        VendorLedger.Candidate candidate = candidate();
+        StepContext context = ownVideoContext();
+        when(ledger.claimCandidates(any(), any(), any(), any())).thenReturn(List.of(candidate));
+
+        ledgerExecutor("generate_video", ledger, true).execute(context);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        String key = VendorRequestKey.of("generate_video", "vertical_ad_clip_v1",
+                Map.of("prompt", "Opening hero scene"));
+        assertThat(sent.getValue().vendorLedger()).isEqualTo(new VendorLedger(key, List.of(candidate)));
+        verify(ledger).claimCandidates(context.runId(), context.stepId(), "generate_video", key);
+    }
+
+    @Test
+    void videoJobWithResumeOffCarriesNoCandidateAndNeverClaims() {
+        VendorJobLedger ledger = mock(VendorJobLedger.class);
+
+        ledgerExecutor("generate_video", ledger, false).execute(ownVideoContext());
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().vendorLedger().requestKey()).matches("[0-9a-f]{64}");
+        assertThat(sent.getValue().vendorLedger().candidates()).isEmpty();
+        verify(ledger, never()).claimCandidates(any(), any(), any(), any());
+    }
+
+    @Test
+    void videoJobIsStillDispatchedWithoutCandidatesWhenTheLedgerFails() {
+        VendorJobLedger ledger = mock(VendorJobLedger.class);
+        when(ledger.claimCandidates(any(), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        ledgerExecutor("generate_video", ledger, true).execute(ownVideoContext());
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().vendorLedger().candidates()).isEmpty();
+    }
+
+    @Test
+    void nonVideoJobsCarryNoLedgerBlock() {
+        VendorJobLedger ledger = mock(VendorJobLedger.class);
+
+        ledgerExecutor("generate_script", ledger, true).execute(context("""
+                {"productName":"Bình giữ nhiệt","description":"Giữ đồ uống"}
+                """, "{\"profile\":\"product_ad_v1\"}"));
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().vendorLedger()).isNull();
+        verify(ledger, never()).claimCandidates(any(), any(), any(), any());
+    }
+
+    private ProviderStepExecutor ledgerExecutor(String capability, VendorJobLedger ledger, boolean resume) {
+        when(jobs.providerLimits(capability))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+        String profile = "generate_video".equals(capability) ? "vertical_ad_clip_v1" : "product_ad_v1";
+        return new ProviderStepExecutor(capability, profile, jobs, clock, ledger,
+                new VendorJobsProperties(resume, new VendorJobsProperties.Cleanup(true, Duration.ofHours(1)),
+                        Duration.ofDays(7)));
+    }
+
+    private static StepContext ownVideoContext() {
+        UUID runId = UUID.randomUUID();
+        return videoContext(runId, storedImages(runId, "image_1"));
+    }
+
+    private static VendorLedger.Candidate candidate() {
+        return new VendorLedger.Candidate(UUID.randomUUID(), "seedance", "seedance-1", "a".repeat(64), "cgt-1",
+                Map.of());
     }
 
     private static StepContext videoContext(UUID runId, String storedInput) {

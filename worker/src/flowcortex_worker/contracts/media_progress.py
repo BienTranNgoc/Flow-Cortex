@@ -2,14 +2,41 @@
 #   filename:  media-progress.schema.json
 
 from __future__ import annotations
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from uuid import UUID
 
 
+class VendorTaskReport(BaseModel):
+    """
+    A vendor job the worker submitted (status running, no vendorTaskId; it also needs fingerprint, requestKey, handle and vendorCreatedAt) or a verdict on a ledger row (any other status), named by vendorTaskId or by vendor and vendorJobId.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    vendorTaskId: UUID | None = None
+    vendor: Annotated[StrictStr, Field(max_length=32, min_length=1)]
+    model: Annotated[StrictStr, Field(max_length=200, min_length=1)]
+    fingerprint: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None
+    requestKey: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None
+    vendorJobId: Annotated[StrictStr, Field(max_length=200, min_length=1)]
+    handle: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Vendor job identifiers only, at most 2048 bytes serialized; never a credential or signed URL.",
+            max_length=16,
+        ),
+    ] = None
+    status: Annotated[
+        Literal["running", "failed", "expired", "gone"], Field(title="VendorTaskStatus")
+    ]
+    vendorCreatedAt: AwareDatetime | None = None
+
+
 class MediaProgress(BaseModel):
     """
-    A liveness message for one delivery of a job: `started` once per delivery, then periodic heartbeats.
+    A liveness message for one delivery of a job: `started` once per delivery, then periodic heartbeats; `vendor_task` reports a vendor job the worker submitted or judged.
     """
 
     model_config = ConfigDict(
@@ -20,7 +47,16 @@ class MediaProgress(BaseModel):
     runId: UUID
     attempt: Annotated[StrictInt, Field(ge=1)]
     deliveryCount: Annotated[StrictInt, Field(ge=0)]
-    kind: Annotated[Literal["started", "heartbeat"], Field(title="MediaProgressKind")]
+    kind: Annotated[
+        Literal["started", "heartbeat", "vendor_task"], Field(title="MediaProgressKind")
+    ]
     percent: Annotated[StrictInt | None, Field(ge=0, le=100)] = None
     message: StrictStr | None = None
     at: AwareDatetime
+    vendorTask: Annotated[
+        VendorTaskReport | None,
+        Field(
+            description="A vendor job the worker submitted (status running, no vendorTaskId; it also needs fingerprint, requestKey, handle and vendorCreatedAt) or a verdict on a ledger row (any other status), named by vendorTaskId or by vendor and vendorJobId.",
+            title="VendorTaskReport",
+        ),
+    ] = None

@@ -271,7 +271,41 @@
         },
         "attempt": { "type": "integer", "minimum": 1 },
         "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
-        "issuedAt": { "type": "string", "format": "date-time" }
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "vendorLedger": { "$ref": "#/$defs/vendorLedger" }
+      }
+    },
+    "vendorLedger": {
+      "title": "VendorLedger",
+      "description": "Vendor jobs the backend ledger holds for this ask. Optional: a worker given none submits a new vendor job.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestKey", "candidates"],
+      "properties": {
+        "requestKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "candidates": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/vendorCandidate" }
+        }
+      }
+    },
+    "vendorCandidate": {
+      "title": "VendorCandidate",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendorTaskId", "vendor", "model", "fingerprint", "vendorJobId", "handle"],
+      "properties": {
+        "vendorTaskId": { "type": "string", "format": "uuid" },
+        "vendor": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "vendorJobId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "handle": {
+          "type": "object",
+          "maxProperties": 16,
+          "description": "Vendor job identifiers only, at most 2048 bytes serialized; never a credential or signed URL."
+        }
       }
     }
   }

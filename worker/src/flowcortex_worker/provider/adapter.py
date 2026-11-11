@@ -8,11 +8,13 @@ import wave
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID
 
 from ..errors import PermanentError
 from .contracts.provider_job import ProductAdPayload
+
+VendorProbe = Literal["running", "succeeded", "failed", "expired", "gone"]
 
 
 class Abort(Protocol):
@@ -108,6 +110,14 @@ class VideoAdapter(Protocol):
     def video_identity(self) -> VideoIdentity: ...
     def submit_video(self, request: VideoRequest) -> str: ...
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact: ...
+    def probe_video(self, task_id: str) -> VendorProbe:
+        """One look at a vendor job: running, succeeded (result still retrievable), failed,
+        expired or gone. Raises when the vendor cannot answer."""
+        ...
+
+    def vendor_scope(self) -> dict[str, str]:
+        """Endpoint host and key hash that scope this adapter's job ids (see `vendor_scope`)."""
+        ...
 
 
 class ProviderAdapter(ScriptAdapter, SpeechAdapter, VideoAdapter, Protocol):
@@ -152,6 +162,12 @@ class CapabilityProviderAdapter:
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         return self.video_adapter.await_video(task_id, abort)
+
+    def probe_video(self, task_id: str) -> VendorProbe:
+        return self.video_adapter.probe_video(task_id)
+
+    def vendor_scope(self) -> dict[str, str]:
+        return self.video_adapter.vendor_scope()
 
 
 class FixtureProviderAdapter:
@@ -216,6 +232,12 @@ class FixtureProviderAdapter:
             f"{request.source_revision_id}|{request.prompt}".encode()
         ).hexdigest()[:16]
         return f"fixture-{digest}"
+
+    def probe_video(self, task_id: str) -> VendorProbe:
+        return "succeeded"
+
+    def vendor_scope(self) -> dict[str, str]:
+        return {"endpoint": "fixture", "account": "fixture"}
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         abort.check()

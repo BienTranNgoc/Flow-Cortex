@@ -6,7 +6,7 @@ import signal
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from types import FrameType
 from typing import Any
@@ -17,6 +17,7 @@ import pika
 from flowcortex_worker import telemetry
 from flowcortex_worker.config import Settings
 from flowcortex_worker.consumer import Consumer
+from flowcortex_worker.contracts.media_progress import VendorTaskReport
 from flowcortex_worker.errors import PermanentError
 from flowcortex_worker.healthcheck import prepare_state_dir
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
@@ -32,6 +33,7 @@ from .adapter import (
 from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
+from .fal_queue import probe_fal_queue, urllib_fetch
 from .openai_adapter import (
     _OPENAI_BASE_URL,
     _OPENAI_SCRIPT_MODEL,
@@ -39,6 +41,7 @@ from .openai_adapter import (
     select_adapter,
 )
 from .seedance_adapter import PROVIDER_SEEDANCE, SeedanceAdapter, SeedanceConfig
+from .vendor_jobs import ProbeFn, ProbeRegistry
 from .veo_adapter import PROVIDER_VEO, VeoAdapter, VeoConfig
 from .wan_adapter import PROVIDER_WAN, WanAdapter, WanConfig
 
@@ -156,14 +159,16 @@ def main() -> int:
 
 def make_execute_job(
     queue: str, storage: Any, adapter: ScriptAdapter | SpeechAdapter | VideoAdapter
-) -> Callable[[Any, ProcessRunner], Any]:
+) -> Callable[[Any, ProcessRunner, Callable[[VendorTaskReport], None]], Any]:
     """Runs one job; a job that reached the other pool's queue is answered, never executed.
 
     A clip job an older backend left on provider.jobs would otherwise get the fixture clip from
     provider-worker, which has no video vendor settings.
     """
 
-    def execute_job(job: Any, runner: ProcessRunner) -> Any:
+    def execute_job(
+        job: Any, runner: ProcessRunner, report: Callable[[VendorTaskReport], None]
+    ) -> Any:
         runner.check()
         request = job.root if hasattr(job, "root") else job
         is_video = request.capability == VIDEO_CAPABILITY
@@ -182,12 +187,37 @@ def make_execute_job(
             bucket=storage.bucket,
             output_prefix=request.outputPrefix,
             abort=runner,
+            report=report,
+            probes=build_probe_registry(adapter, os.environ) if is_video else {},
         )
         outcome = execute(ProviderJob(root=job), adapter, context)
         runner.check()
         return outcome
 
     return execute_job
+
+
+def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegistry:
+    """The vendors whose recorded jobs this worker may probe and attach to.
+
+    A candidate of any other vendor is skipped, never probed. fal is available only when
+    explicitly enabled and keyed, since no adapter here submits to it yet.
+    """
+    probes: dict[str, ProbeFn] = {
+        adapter.video_identity().provider: lambda task_id, handle: adapter.probe_video(task_id)
+    }
+    fal_key = environ.get("FAL_KEY", "").strip()
+    if environ.get("FAL_QUEUE_PROBE_ENABLED", "").strip().lower() == "true" and fal_key:
+        suffixes = tuple(
+            part.strip().lower()
+            for part in environ.get("FAL_MEDIA_HOST_SUFFIXES", ".fal.media").split(",")
+            if part.strip()
+        )
+        headers = {"Authorization": f"Key {fal_key}"}
+        probes["fal"] = lambda task_id, handle: probe_fal_queue(
+            handle, headers, urllib_fetch, suffixes
+        )
+    return probes
 
 
 def _build_adapter(

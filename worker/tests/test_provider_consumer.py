@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from conftest import FakeConnection, FakeStorage, assert_valid, published, run_consumer, settled
 
+from flowcortex_worker.contracts.media_progress import VendorTaskReport
+from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider.__main__ import make_execute_job, provider_queue
 from flowcortex_worker.provider.adapter import FixtureProviderAdapter
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+from flowcortex_worker.provider.vendor_jobs import VendorJobTimeout
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
@@ -127,6 +132,134 @@ def test_a_job_on_the_other_pool_s_queue_is_answered_with_a_contract_violation(
     assert result["status"] == "error"
     assert result["error"] == {"code": "contract_violation", "message": message, "retryable": False}
     assert storage.puts == {}
+
+
+def run_with(
+    conn: FakeConnection, execute_job: Any, *, redeliveries: int | None = None
+) -> None:
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.video.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=execute_job,
+        max_transient_redeliveries=redeliveries,
+        wait=lambda seconds: None,
+        until=settled,
+    )
+
+
+def test_a_vendor_timeout_on_the_last_delivery_is_answered_retryable() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job("generate_video", "vertical_ad_clip_v1", VIDEO_PAYLOAD)
+        | {"vendorLedger": {"requestKey": "b" * 64, "candidates": []}},
+        headers={"x-delivery-count": 3},
+    )
+
+    def poll_too_long(job: Any, runner: Any, report: Any) -> Any:
+        raise VendorJobTimeout("seedance", "cgt-1", ledger_id="row-7")
+
+    run_with(conn, poll_too_long, redeliveries=3)
+
+    result = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "provider_timeout"
+    assert result["error"]["retryable"] is True
+    assert "seedance" in result["error"]["message"]
+    assert "row-7" in result["error"]["message"]
+    assert conn.consume.acks == [1]
+
+
+def test_a_vendor_timeout_on_a_job_without_the_ledger_block_stays_provider_request_failed() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job("generate_video", "vertical_ad_clip_v1", VIDEO_PAYLOAD),
+        headers={"x-delivery-count": 3},
+    )
+
+    def poll_too_long(job: Any, runner: Any, report: Any) -> Any:
+        raise VendorJobTimeout("seedance", "cgt-1")
+
+    run_with(conn, poll_too_long, redeliveries=3)
+
+    result = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert result["error"]["code"] == "provider_request_failed"
+    assert result["error"]["retryable"] is False
+    assert conn.consume.acks == [1]
+
+
+def test_a_vendor_timeout_before_the_last_delivery_is_retried() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job("generate_video", "vertical_ad_clip_v1", VIDEO_PAYLOAD),
+        headers={"x-delivery-count": 1},
+    )
+
+    def poll_too_long(job: Any, runner: Any, report: Any) -> Any:
+        raise VendorJobTimeout("seedance", "cgt-1")
+
+    run_with(conn, poll_too_long, redeliveries=3)
+
+    assert published(conn, "result") == []
+    assert conn.consume.rejects
+
+
+def test_a_plain_transient_failure_on_the_last_delivery_stays_provider_request_failed() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job("generate_video", "vertical_ad_clip_v1", VIDEO_PAYLOAD),
+        headers={"x-delivery-count": 3},
+    )
+
+    def unavailable(job: Any, runner: Any, report: Any) -> Any:
+        raise TransientError("provider unavailable")
+
+    run_with(conn, unavailable, redeliveries=3)
+
+    result = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert result["error"]["code"] == "provider_request_failed"
+    assert result["error"]["retryable"] is False
+
+
+def test_a_vendor_task_report_is_published_as_progress_with_the_jobs_ids() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job("generate_video", "vertical_ad_clip_v1", VIDEO_PAYLOAD),
+        headers={"x-delivery-count": 2},
+    )
+
+    def submit_then_fail(job: Any, runner: Any, report: Any) -> Any:
+        report(
+            VendorTaskReport(
+                vendor="seedance",
+                model="seedance-1.5-pro",
+                fingerprint="a" * 64,
+                requestKey="b" * 64,
+                vendorJobId="cgt-1",
+                handle={},
+                status="running",
+                vendorCreatedAt=datetime(2026, 11, 9, tzinfo=UTC),
+            )
+        )
+        raise PermanentError("provider_request_failed", "ended")
+
+    run_with(conn, submit_then_fail)
+
+    reports = [
+        assert_valid(item.body, "media-progress")
+        for item in published(conn, "progress")
+        if json.loads(item.body)["kind"] == "vendor_task"
+    ]
+    [report] = reports
+    assert report["jobId"] == JOB_ID and report["runId"] == RUN_ID
+    assert report["deliveryCount"] == 2
+    assert report["vendorTask"]["vendorJobId"] == "cgt-1"
+    assert "vendorTaskId" not in report["vendorTask"]
 
 
 @pytest.mark.parametrize(
