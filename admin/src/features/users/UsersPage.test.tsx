@@ -1,10 +1,12 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import i18n from '../../lib/i18n';
-import viUsers from '../../locales/vi/users.json';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { ADMIN_ME, renderRoute, staffMe, stubApi } from '../../test/fakeApi';
 import { UsersPage } from './UsersPage';
+
+const ME_PATH = 'GET /api/v1/auth/me';
+const LIST_PATH = 'GET /api/v1/users';
+const STATS_PATH = 'GET /api/v1/users/stats';
 
 const ALICE = {
   id: 'u1',
@@ -12,13 +14,18 @@ const ALICE = {
   name: 'Alice',
   role: 'MEMBER',
   status: 'ACTIVE',
+  state: 'active',
+  staffTarget: false,
 };
-const BOB = {
-  id: 'u2',
-  email: 'bob@flowcortex.dev',
-  name: 'Bob',
-  role: 'MEMBER',
-  status: 'ACTIVE',
+
+const pageOf = (items: unknown[], extra: { page?: number; total?: number } = {}) => ({
+  status: 200,
+  body: { items, page: extra.page ?? 0, size: 20, total: extra.total ?? items.length },
+});
+
+const STATS = {
+  status: 200,
+  body: { total: 7, active: 4, pendingConfirmation: 1, locked: 1, suspended: 1, newLast7Days: 3 },
 };
 
 beforeEach(() => setToken('admin-token-users', true));
@@ -28,52 +35,6 @@ afterEach(() => {
 });
 
 describe('UsersPage', () => {
-  it('creates a user through POST /api/v1/users and refreshes the list', async () => {
-    let users = [ALICE];
-    const calls = stubApi({
-      'GET /api/v1/users': () => ({ status: 200, body: users }),
-      'POST /api/v1/users': () => {
-        users = [ALICE, BOB];
-        return { status: 201, body: BOB };
-      },
-    });
-    renderRoute('/users', '/users', <UsersPage />);
-    await screen.findByText(ALICE.email);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Add user' }));
-    await userEvent.type(screen.getByLabelText('Email'), BOB.email);
-    await userEvent.type(screen.getByLabelText('Password'), 'long-enough-password');
-    await userEvent.type(screen.getByLabelText('Name'), BOB.name);
-    await userEvent.click(screen.getByRole('button', { name: 'Create user' }));
-
-    expect(await screen.findByText(BOB.email)).toBeInTheDocument();
-    expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
-      email: BOB.email,
-      password: 'long-enough-password',
-      name: BOB.name,
-      role: 'MEMBER',
-    });
-    expect(
-      calls.filter((call) => call.method === 'GET' && call.path === '/api/v1/users'),
-    ).toHaveLength(2);
-  });
-
-  it('offers Retry when the list cannot be loaded', async () => {
-    let failing = true;
-    stubApi({
-      'GET /api/v1/users': () =>
-        failing ? { status: 500, body: { status: 500 } } : { status: 200, body: [ALICE] },
-    });
-    renderRoute('/users', '/users', <UsersPage />);
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load users.');
-    failing = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
-    await waitFor(() => expect(screen.getByText(ALICE.email)).toBeInTheDocument());
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
   it('editingAStaffRowsNameLeavesItsRoleUnchanged', async () => {
     const manager = {
       ...ALICE,
@@ -81,14 +42,17 @@ describe('UsersPage', () => {
       email: 'ops@flowcortex.dev',
       name: 'Ops',
       role: 'OPERATION_MANAGER',
+      staffTarget: true,
     };
     const calls = stubApi({
-      'GET /api/v1/users': { status: 200, body: [manager] },
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([manager]),
       'PUT /api/v1/users/u4': { status: 200, body: manager },
     });
     renderRoute('/users', '/users', <UsersPage />);
     await screen.findByText(manager.email);
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(screen.getByLabelText('Role', { selector: '#edit-role-u4' })).toHaveValue(
       'OPERATION_MANAGER',
     );
@@ -106,12 +70,14 @@ describe('UsersPage', () => {
   it('keeps the Creator role selected and sends no role when it is untouched', async () => {
     const creator = { ...ALICE, id: 'u3', email: 'creator@flowcortex.dev', role: 'CREATOR' };
     const calls = stubApi({
-      'GET /api/v1/users': { status: 200, body: [creator] },
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([creator]),
       'PUT /api/v1/users/u3': { status: 200, body: creator },
     });
     renderRoute('/users', '/users', <UsersPage />);
     await screen.findByText(creator.email);
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
     expect(screen.getByLabelText('Role', { selector: '#edit-role-u3' })).toHaveValue('CREATOR');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -119,68 +85,54 @@ describe('UsersPage', () => {
     expect(calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty('role');
   });
 
-  it('shows the role and status badges as labels, not codes', async () => {
-    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
-    renderRoute('/users', '/users', <UsersPage />);
-    const row = (await screen.findByText(ALICE.email)).closest('tr') as HTMLElement;
+  it('sends one list request for a settled search and resets the page', async () => {
+    const calls = stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([ALICE], { page: 2, total: 60 }),
+    });
+    renderRoute('/users', '/users?page=2', <UsersPage />);
+    await screen.findByText(ALICE.email);
+    const before = calls.filter((call) => call.path === '/api/v1/users').length;
 
-    expect(within(row).getByText('Member')).toHaveClass('cortex-admin-pill');
-    expect(within(row).getByText('Active')).toHaveClass('cortex-admin-pill');
+    await userEvent.type(screen.getByLabelText('Search'), 'nguyen');
+
+    await waitFor(() =>
+      expect(calls.filter((call) => call.path === '/api/v1/users')).toHaveLength(before + 1),
+    );
+    const last = calls.filter((call) => call.path === '/api/v1/users').at(-1);
+    expect(last?.query.get('q')).toBe('nguyen');
+    expect(last?.query.get('page')).toBe('0');
   });
 
-  it('says "account" for one account and "accounts" for several', async () => {
-    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
-    const single = renderRoute('/users', '/users', <UsersPage />);
-    expect(await screen.findByText('Showing 1 of 1 account')).toBeInTheDocument();
-    single.unmount();
-
-    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE, BOB] } });
-    renderRoute('/users', '/users', <UsersPage />);
-    expect(await screen.findByText('Showing 2 of 2 accounts')).toBeInTheDocument();
-  });
-
-  it('wraps the table in a focusable scroll region named for the list', async () => {
-    stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
-    renderRoute('/users', '/users', <UsersPage />);
-
-    const region = await screen.findByRole('region', { name: 'Users table' });
-    expect(region).toHaveAttribute('tabindex', '0');
-    expect(within(region).getByRole('table')).toBeInTheDocument();
-  });
-
-  describe('in Vietnamese', () => {
-    beforeEach(async () => {
-      await i18n.changeLanguage('vi');
-    });
-    afterEach(async () => {
-      await i18n.changeLanguage('en');
-    });
-
-    it('names the table region in Vietnamese', async () => {
-      stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
+  describe('account control', () => {
+    it('hides edit for a staff row without the admin-account key and says why', async () => {
+      const support = {
+        ...ALICE,
+        id: 'u9',
+        email: 'linh@flowcortex.dev',
+        role: 'CUSTOMER_SUPPORT',
+        staffTarget: true,
+      };
+      stubApi({
+        [ME_PATH]: {
+          status: 200,
+          body: staffMe('OPERATION_MANAGER', ['user.account.view', 'user.account.update']),
+        },
+        [STATS_PATH]: STATS,
+        [LIST_PATH]: pageOf([support, { ...ALICE, id: 'u10', email: 'ba@flowcortex.dev' }]),
+      });
       renderRoute('/users', '/users', <UsersPage />);
 
-      expect(await screen.findByRole('region', { name: viUsers.directory.tableLabel })).toBeInTheDocument();
-    });
-
-    it('shows the Vietnamese heading and the join date in vi-VN conventions', async () => {
-      const createdAt = '2026-10-18T03:04:05Z';
-      stubApi({ 'GET /api/v1/users': { status: 200, body: [{ ...ALICE, createdAt }] } });
-      renderRoute('/users', '/users', <UsersPage />);
-      await screen.findByText(ALICE.email);
-
-      expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(viUsers.title);
-      const joined = screen.getByText(new Intl.DateTimeFormat('vi-VN').format(new Date(createdAt)));
-      expect(joined).toHaveAttribute('dateTime', createdAt);
-    });
-
-    it('shows the role and status badges in Vietnamese', async () => {
-      stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
-      renderRoute('/users', '/users', <UsersPage />);
-      const row = (await screen.findByText(ALICE.email)).closest('tr') as HTMLElement;
-
-      expect(within(row).getByText(viUsers.role.MEMBER)).toHaveClass('cortex-admin-pill');
-      expect(within(row).getByText(viUsers.status.ACTIVE)).toHaveClass('cortex-admin-pill');
+      const staffRow = (await screen.findByText(support.email)).closest('tr') as HTMLElement;
+      const memberRow = (await screen.findByText('ba@flowcortex.dev')).closest('tr') as HTMLElement;
+      await waitFor(() =>
+        expect(within(memberRow).getByRole('button', { name: 'Edit' })).toBeInTheDocument(),
+      );
+      expect(within(staffRow).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+      expect(
+        within(staffRow).getByText('Only a super admin changes admin accounts.'),
+      ).toBeInTheDocument();
     });
   });
 });

@@ -1,37 +1,60 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
-import { ArrowsClockwise, Plus } from '@phosphor-icons/react';
+import { ArrowsClockwise, DownloadSimple, Plus } from '@phosphor-icons/react';
 import { useMeQuery } from '../auth/useAuth';
 import { assignableRoles, ROLE_CODES } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
 import { UserRow } from './UserRow';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
+import {
+  DEFAULT_USERS_PARAMS,
+  MAX_SEARCH_LENGTH,
+  parseUsersParams,
+  toSearchParams,
+  USER_SORTS,
+  USER_STATES,
+  type UsersParams,
+} from './usersQueryParams';
 import { usePageTitle } from '../../app/usePageTitle';
 import { PageHeading } from '../../app/PageHeading';
 import { MetricCard } from '../../app/MetricCard';
 import { EmptyState } from '../../app/EmptyState';
 import { TableRegion } from '../../app/TableRegion';
+import { can } from '../../app/permissions';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
-import { useCreateUserMutation, useUsersQuery } from './useUsers';
+import {
+  useCreateUserMutation,
+  useExportUsers,
+  useUserStatsQuery,
+  useUsersQuery,
+} from './useUsers';
 
-const EMPTY_USERS: NonNullable<ReturnType<typeof useUsersQuery>['data']> = [];
 const DEFAULT_CREATE_ROLES = ['MEMBER'];
+const SEARCH_DEBOUNCE_MS = 300;
+
+function isFiltered(params: UsersParams): boolean {
+  return params.q !== '' || params.role !== '' || params.state !== '';
+}
 
 export function UsersPage() {
   const { t } = useTranslation();
   const locale = activeLocale();
   usePageTitle(t('users.title'));
-  const assignable = assignableRoles(useMeQuery().data);
-  const usersQuery = useUsersQuery();
+  const me = useMeQuery().data;
+  const assignable = assignableRoles(me);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const params = useMemo(() => parseUsersParams(searchParams), [searchParams]);
+  const usersQuery = useUsersQuery(params);
+  const statsQuery = useUserStatsQuery();
   const createMutation = useCreateUserMutation();
+  const exportMutation = useExportUsers();
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [searchInput, setSearchInput] = useState(params.q);
   const {
     register,
     handleSubmit,
@@ -41,6 +64,30 @@ export function UsersPage() {
     resolver: zodResolver(createUserSchema),
     defaultValues: { email: '', password: '', name: '', role: 'MEMBER' },
   });
+
+  const showView = (next: UsersParams) => setSearchParams(toSearchParams(next));
+  const change = (patch: Partial<UsersParams>) => showView({ ...params, page: 0, ...patch });
+  const clearFilters = () => {
+    setSearchInput('');
+    showView(DEFAULT_USERS_PARAMS);
+  };
+
+  useEffect(() => {
+    const typed = searchInput.trim().slice(0, MAX_SEARCH_LENGTH).trim();
+    if (typed === params.q) return undefined;
+    const timer = setTimeout(
+      () => setSearchParams(toSearchParams({ ...params, q: typed, page: 0 }), { replace: true }),
+      SEARCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [searchInput, params, setSearchParams]);
+
+  // A search that changed from outside the field (Clear filters, back button) replaces what is typed.
+  useEffect(() => {
+    setSearchInput((typed) =>
+      typed.trim().slice(0, MAX_SEARCH_LENGTH).trim() === params.q ? typed : params.q,
+    );
+  }, [params.q]);
 
   const onCreate = handleSubmit((values) => {
     createMutation.mutate(values, {
@@ -53,25 +100,62 @@ export function UsersPage() {
 
   const createError =
     createMutation.error instanceof ApiError ? createMutation.error.problem : undefined;
-  const users = usersQuery.data ?? EMPTY_USERS;
-  const visibleUsers = useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase();
-    return users.filter((user) => {
-      const matchesSearch =
-        !needle ||
-        user.email?.toLocaleLowerCase().includes(needle) ||
-        user.name?.toLocaleLowerCase().includes(needle);
-      return (
-        matchesSearch &&
-        (!statusFilter || user.status === statusFilter) &&
-        (!roleFilter || user.role === roleFilter)
+  const exportError = exportMutation.error;
+  const exportRefused = exportError instanceof ApiError && exportError.status === 422;
+  const page = usersQuery.data;
+  const stats = statsQuery.data;
+  const pages = page ? Math.max(1, Math.ceil(page.total / page.size), page.page + 1) : 1;
+  const hasPrevious = params.page > 0;
+  const hasNext = page !== undefined && params.page + 1 < pages;
+  const filtered = isFiltered(params);
+  const count = (value: number | undefined) =>
+    value === undefined ? '—' : formatNumber(value, locale);
+  const refresh = () => {
+    void usersQuery.refetch();
+    void statsQuery.refetch();
+  };
+
+  let emptyState = null;
+  if (page?.items.length === 0) {
+    if (page.page > 0) {
+      emptyState = (
+        <EmptyState
+          title={t('users.directory.emptyPage')}
+          action={
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--ghost"
+              onClick={() => change({ page: 0 })}
+            >
+              {t('users.directory.backToFirstPage')}
+            </button>
+          }
+        />
       );
-    });
-  }, [users, search, statusFilter, roleFilter]);
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const newThisWeek = users.filter(
-    (user) => user.createdAt && Date.parse(user.createdAt) >= sevenDaysAgo,
-  ).length;
+    } else if (filtered) {
+      emptyState = (
+        <EmptyState
+          title={t('users.directory.noMatch')}
+          action={
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--ghost"
+              onClick={clearFilters}
+            >
+              {t('users.directory.clearFilters')}
+            </button>
+          }
+        />
+      );
+    } else {
+      emptyState = (
+        <EmptyState
+          title={t('users.directory.empty')}
+          description={t('users.directory.emptyHint')}
+        />
+      );
+    }
+  }
 
   return (
     <div className="cortex-admin-users">
@@ -84,16 +168,29 @@ export function UsersPage() {
             <button
               type="button"
               className="cortex-admin-btn cortex-admin-btn--ghost"
-              onClick={() => usersQuery.refetch()}
-              disabled={usersQuery.isFetching}
+              onClick={refresh}
+              disabled={usersQuery.isFetching || statsQuery.isFetching}
             >
               <ArrowsClockwise size={16} aria-hidden="true" />
               <span>
-                {usersQuery.isFetching
+                {usersQuery.isFetching || statsQuery.isFetching
                   ? t('users.directory.refreshing')
                   : t('users.directory.refresh')}
               </span>
             </button>
+            {can(me, 'user.account.export') && (
+              <button
+                type="button"
+                className="cortex-admin-btn cortex-admin-btn--ghost"
+                onClick={() => exportMutation.mutate(params)}
+                disabled={exportMutation.isPending}
+              >
+                <DownloadSimple size={16} aria-hidden="true" />
+                <span>
+                  {exportMutation.isPending ? t('users.export.busy') : t('users.export.button')}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               className="cortex-admin-btn cortex-admin-btn--primary"
@@ -106,24 +203,40 @@ export function UsersPage() {
         }
       />
 
-      {usersQuery.data && (
+      {exportError && (
+        <div className="cortex-admin-error" role="alert">
+          {exportRefused ? (
+            <>
+              <p>{exportError.message}</p>
+              <p>{t('users.export.tooManyRows')}</p>
+            </>
+          ) : (
+            <>
+              <p>{t('users.export.error')}</p>
+              <button
+                type="button"
+                className="cortex-admin-btn"
+                onClick={() => exportMutation.mutate(params)}
+                disabled={exportMutation.isPending}
+              >
+                {t('users.export.retry')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {stats && (
         <section className="cortex-admin-metric-grid" aria-label={t('users.stats.label')}>
-          <MetricCard label={t('users.stats.total')} value={formatNumber(users.length, locale)} />
+          <MetricCard label={t('users.stats.total')} value={count(stats.total)} />
+          <MetricCard label={t('users.stats.active')} value={count(stats.active)} />
           <MetricCard
-            label={t('users.stats.active')}
-            value={formatNumber(users.filter((user) => user.status === 'ACTIVE').length, locale)}
+            label={t('users.stats.pendingConfirmation')}
+            value={count(stats.pendingConfirmation)}
           />
-          <MetricCard
-            label={t('users.stats.suspended')}
-            value={formatNumber(
-              users.filter((user) => user.status === 'SUSPENDED').length,
-              locale,
-            )}
-          />
-          <MetricCard
-            label={t('users.stats.newThisWeek')}
-            value={formatNumber(newThisWeek, locale)}
-          />
+          <MetricCard label={t('users.stats.locked')} value={count(stats.locked)} />
+          <MetricCard label={t('users.stats.suspended')} value={count(stats.suspended)} />
+          <MetricCard label={t('users.stats.newThisWeek')} value={count(stats.newLast7Days)} />
         </section>
       )}
 
@@ -202,15 +315,6 @@ export function UsersPage() {
         <header className="cortex-admin-section-heading">
           <div>
             <h2>{t('users.directory.title')}</h2>
-            {usersQuery.data && (
-              <p>
-                {t('users.directory.count', {
-                  count: users.length,
-                  visible: formatNumber(visibleUsers.length, locale),
-                  total: formatNumber(users.length, locale),
-                })}
-              </p>
-            )}
           </div>
         </header>
         <div className="cortex-admin-filters">
@@ -219,94 +323,131 @@ export function UsersPage() {
             <input
               id="users-search"
               type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={searchInput}
+              maxLength={MAX_SEARCH_LENGTH}
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder={t('users.directory.searchPlaceholder')}
             />
           </div>
           <div className="cortex-admin-field">
-            <label htmlFor="users-status">{t('users.directory.status')}</label>
+            <label htmlFor="users-state">{t('users.directory.state')}</label>
             <select
-              id="users-status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              id="users-state"
+              value={params.state}
+              onChange={(event) =>
+                change({
+                  state: parseUsersParams(new URLSearchParams({ state: event.target.value })).state,
+                })
+              }
             >
-              <option value="">{t('users.directory.allStatuses')}</option>
-              <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
-              <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
+              <option value="">{t('users.directory.allStates')}</option>
+              {USER_STATES.map((state) => (
+                <option key={state} value={state}>
+                  {t(`users.state.${state}`)}
+                </option>
+              ))}
             </select>
           </div>
           <div className="cortex-admin-field">
             <label htmlFor="users-role">{t('users.directory.role')}</label>
             <select
               id="users-role"
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
+              value={params.role}
+              onChange={(event) => change({ role: event.target.value })}
             >
               <option value="">{t('users.directory.allRoles')}</option>
               <RoleOptions roles={ROLE_CODES} />
+              {params.role !== '' && !ROLE_CODES.some((code) => code === params.role) && (
+                <option value={params.role}>{params.role}</option>
+              )}
+            </select>
+          </div>
+          <div className="cortex-admin-field">
+            <label htmlFor="users-sort">{t('users.sort.label')}</label>
+            <select
+              id="users-sort"
+              value={params.sort}
+              onChange={(event) =>
+                change({
+                  sort: parseUsersParams(new URLSearchParams({ sort: event.target.value })).sort,
+                })
+              }
+            >
+              {USER_SORTS.map((sort) => (
+                <option key={sort} value={sort}>
+                  {t(`users.sort.${sort}`)}
+                </option>
+              ))}
             </select>
           </div>
         </div>
-        {usersQuery.isLoading && (
+        {usersQuery.isPending && (
           <output className="cortex-admin-loading">{t('users.directory.loading')}</output>
         )}
         {usersQuery.isError && (
           <div className="cortex-admin-error" role="alert">
             <p>{t('users.directory.loadError')}</p>
-            <button
-              type="button"
-              className="cortex-admin-btn"
-              onClick={() => usersQuery.refetch()}
-            >
+            <button type="button" className="cortex-admin-btn" onClick={() => usersQuery.refetch()}>
               {t('users.directory.retry')}
             </button>
-          </div>
-        )}
-        {usersQuery.data?.length === 0 && (
-          <EmptyState
-            title={t('users.directory.empty')}
-            description={t('users.directory.emptyHint')}
-          />
-        )}
-        {usersQuery.data && users.length > 0 && visibleUsers.length === 0 && (
-          <EmptyState
-            title={t('users.directory.noMatch')}
-            action={
-              <button
-                type="button"
-                className="cortex-admin-btn cortex-admin-btn--ghost"
-                onClick={() => {
-                  setSearch('');
-                  setStatusFilter('');
-                  setRoleFilter('');
-                }}
-              >
+            {filtered && (
+              <button type="button" className="cortex-admin-btn" onClick={clearFilters}>
                 {t('users.directory.clearFilters')}
               </button>
-            }
-          />
+            )}
+          </div>
         )}
-        {visibleUsers.length > 0 && (
-          <TableRegion label={t('users.directory.tableLabel')}>
+        {emptyState}
+        {page && page.items.length > 0 && (
+          <TableRegion label={t('users.directory.tableLabel')} busy={usersQuery.isPlaceholderData}>
             <table className="cortex-admin-table">
               <thead>
                 <tr>
                   <th scope="col">{t('users.columns.name')}</th>
                   <th scope="col">{t('users.columns.email')}</th>
                   <th scope="col">{t('users.columns.role')}</th>
-                  <th scope="col">{t('users.columns.status')}</th>
+                  <th scope="col">{t('users.columns.state')}</th>
                   <th scope="col">{t('users.columns.joined')}</th>
                   <th scope="col">{t('users.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.map((user) => (
+                {page.items.map((user) => (
                   <UserRow key={user.id} user={user} />
                 ))}
               </tbody>
             </table>
           </TableRegion>
+        )}
+        {page && (page.items.length > 0 || page.page > 0) && (
+          <nav className="cortex-admin-pager" aria-label={t('users.pagination.label')}>
+            <button
+              type="button"
+              className="cortex-admin-btn"
+              aria-label={t('users.pagination.previous')}
+              aria-disabled={!hasPrevious}
+              onClick={() => hasPrevious && change({ page: params.page - 1 })}
+            >
+              {t('users.pagination.previous')}
+            </button>
+            <span>
+              {t('users.pagination.summary', {
+                page: formatNumber(params.page + 1, locale),
+                pages: formatNumber(pages, locale),
+                count: page.total,
+                total: formatNumber(page.total, locale),
+              })}
+            </span>
+            <button
+              type="button"
+              className="cortex-admin-btn"
+              aria-label={t('users.pagination.next')}
+              aria-disabled={!hasNext}
+              onClick={() => hasNext && change({ page: params.page + 1 })}
+            >
+              {t('users.pagination.next')}
+            </button>
+          </nav>
         )}
       </section>
     </div>

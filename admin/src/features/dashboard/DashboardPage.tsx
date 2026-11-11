@@ -13,7 +13,7 @@ import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useMeQuery } from '../auth/useAuth';
 import { useAdminRuns } from '../runs/useAdminRuns';
-import { useUsersQuery } from '../users/useUsers';
+import { useUserStatsQuery } from '../users/useUsers';
 
 const RUN_STATES = [
   { labelKey: 'dashboard.runStatus.running', status: ListAdminRunsStatus.running, tone: 'info' },
@@ -39,28 +39,23 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const locale = activeLocale();
   usePageTitle(t('dashboard.title'));
-  const usersQuery = useUsersQuery(can(useMeQuery().data, 'user.account.view'));
+  const canViewUsers = can(useMeQuery().data, 'user.account.view');
+  const statsQuery = useUserStatsQuery(canViewUsers);
   const allRuns = useAdminRuns(0, undefined);
   const runningRuns = useAdminRuns(0, ListAdminRunsStatus.running);
   const completedRuns = useAdminRuns(0, ListAdminRunsStatus.completed);
   const failedRuns = useAdminRuns(0, ListAdminRunsStatus.error);
-  const users = usersQuery.data ?? [];
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const newUsers = users.filter(
-    (user) => user.createdAt && Date.parse(user.createdAt) >= cutoff,
-  ).length;
+  const stats = statsQuery.data;
   const statusQueries = [runningRuns, completedRuns, failedRuns];
   const failedItems = failedRuns.data?.items.slice(0, 5) ?? [];
   const isRefreshing =
-    usersQuery.isFetching ||
-    allRuns.isFetching ||
-    statusQueries.some((query) => query.isFetching);
+    statsQuery.isFetching || allRuns.isFetching || statusQueries.some((query) => query.isFetching);
   const count = (value: number | undefined) =>
     value === undefined ? '—' : formatNumber(value, locale);
 
   const refresh = () => {
     void Promise.all([
-      usersQuery.refetch(),
+      ...(canViewUsers ? [statsQuery.refetch()] : []),
       allRuns.refetch(),
       ...statusQueries.map((query) => query.refetch()),
     ]);
@@ -85,7 +80,7 @@ export function DashboardPage() {
         }
       />
 
-      {(usersQuery.isError || allRuns.isError) && (
+      {(statsQuery.isError || allRuns.isError) && (
         <div className="cortex-admin-error" role="alert">
           <p>{t('dashboard.loadError')}</p>
           <button type="button" className="cortex-admin-btn" onClick={refresh}>
@@ -95,23 +90,25 @@ export function DashboardPage() {
       )}
 
       <section className="cortex-admin-metric-grid" aria-label={t('dashboard.metrics.label')}>
-        <MetricCard
-          label={t('dashboard.metrics.totalUsers')}
-          value={count(usersQuery.data ? users.length : undefined)}
-          hint={t('dashboard.metrics.totalUsersHint')}
-        />
-        <MetricCard
-          label={t('dashboard.metrics.activeUsers')}
-          value={count(
-            usersQuery.data ? users.filter((user) => user.status === 'ACTIVE').length : undefined,
-          )}
-          hint={t('dashboard.metrics.activeUsersHint')}
-        />
-        <MetricCard
-          label={t('dashboard.metrics.newUsers')}
-          value={count(usersQuery.data ? newUsers : undefined)}
-          hint={t('dashboard.metrics.newUsersHint')}
-        />
+        {canViewUsers && (
+          <>
+            <MetricCard
+              label={t('dashboard.metrics.totalUsers')}
+              value={count(stats?.total)}
+              hint={t('dashboard.metrics.totalUsersHint')}
+            />
+            <MetricCard
+              label={t('dashboard.metrics.activeUsers')}
+              value={count(stats?.active)}
+              hint={t('dashboard.metrics.activeUsersHint')}
+            />
+            <MetricCard
+              label={t('dashboard.metrics.newUsers')}
+              value={count(stats?.newLast7Days)}
+              hint={t('dashboard.metrics.newUsersHint')}
+            />
+          </>
+        )}
         <MetricCard
           label={t('dashboard.metrics.totalRuns')}
           value={count(allRuns.data?.total)}

@@ -1039,6 +1039,7 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
   align-items: center;
   gap: 0.35rem;
   margin-bottom: 1rem;
+  min-height: var(--admin-control-h);
   color: var(--admin-accent);
   text-decoration: none;
   font-size: 0.88rem;

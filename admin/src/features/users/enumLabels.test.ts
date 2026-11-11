@@ -1,6 +1,10 @@
 import i18n from '../../lib/i18n';
 import { ADMIN_ME, staffMe } from '../../test/fakeApi';
-import { assignableRoles, roleLabel, statusLabel } from './enumLabels';
+import {
+  assignableRoles,
+  roleLabel,
+  statusLabel,
+} from './enumLabels';
 
 describe('enumLabels', () => {
   const t = i18n.t.bind(i18n);
