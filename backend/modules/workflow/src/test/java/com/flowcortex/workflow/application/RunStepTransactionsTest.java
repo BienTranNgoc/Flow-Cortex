@@ -181,7 +181,7 @@ class RunStepTransactionsTest {
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
 
-        verify(events, times(1)).publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId(), NOW));
+        verify(events, times(1)).publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
     }
 
     @Test

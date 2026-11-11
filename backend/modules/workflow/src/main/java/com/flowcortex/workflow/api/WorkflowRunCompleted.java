@@ -1,11 +1,10 @@
 package com.flowcortex.workflow.api;
 
-import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A run reached {@code completed}. Published in the transaction that completes the run, so it is
- * heard only after that transaction commits and at most once per completion.
+ * A run reached {@code completed}. Published in the transaction that completes the run, at most
+ * once per completion, and heard after commit.
  */
-public record WorkflowRunCompleted(UUID runId, UUID ownerId, Instant finishedAt) {
+public record WorkflowRunCompleted(UUID runId, UUID ownerId) {
 }

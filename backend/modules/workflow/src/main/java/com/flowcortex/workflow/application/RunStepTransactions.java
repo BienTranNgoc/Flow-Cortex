@@ -201,7 +201,7 @@ class RunStepTransactions {
         if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
-            events.publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId(), now));
+            events.publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
             runUpdates.touched(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
