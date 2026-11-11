@@ -47,9 +47,6 @@ export function DeleteRoleDialog({
       className="roles-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) dialogRef.current?.close();
-      }}
     >
       <form className="roles-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>{t('roles.detail.delete.title', { name })}</h2>
