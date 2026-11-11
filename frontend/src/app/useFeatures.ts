@@ -10,6 +10,7 @@ const ALL_OFF: FeaturesResponse = {
   passwordReset: false,
   supportWidget: false,
   supportAssistant: false,
+  onboarding: false,
   chat: false,
 };
 

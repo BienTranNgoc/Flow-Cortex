@@ -61,6 +61,22 @@ function SupportWidgetWhenOn() {
   ) : null;
 }
 
+// A failed chunk renders nothing: the route element sits outside ContainedOutlet's ErrorBoundary.
+const OnboardingFlow = lazy(() =>
+  import('./features/onboarding/OnboardingFlow')
+    .then((module) => ({ default: module.OnboardingFlow }))
+    .catch(() => ({ default: () => null })),
+);
+
+function OnboardingFlowWhenOn() {
+  const { onboarding } = useFeatures();
+  return onboarding ? (
+    <Suspense fallback={null}>
+      <OnboardingFlow />
+    </Suspense>
+  ) : null;
+}
+
 const chatPage = (
   <ChatFeatureGate>
     <ChatPage />
@@ -87,6 +103,7 @@ export function App() {
               <RequireAuth>
                 <PasswordSetupGate>
                   <Layout />
+                  <OnboardingFlowWhenOn />
                 </PasswordSetupGate>
               </RequireAuth>
             }

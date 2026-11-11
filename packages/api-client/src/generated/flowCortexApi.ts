@@ -708,6 +708,183 @@ export interface ProductVideoRunRequest {
   acknowledgeCost?: boolean;
 }
 
+export interface OnboardingResetResponse {
+  completed: boolean;
+}
+
+export type OnboardingQuizBodyPurposesItem =
+  (typeof OnboardingQuizBodyPurposesItem)[keyof typeof OnboardingQuizBodyPurposesItem];
+
+export const OnboardingQuizBodyPurposesItem = {
+  marketing_content: 'marketing_content',
+  automation: 'automation',
+  documents_reports: 'documents_reports',
+  customer_care: 'customer_care',
+  research: 'research',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodySource =
+  (typeof OnboardingQuizBodySource)[keyof typeof OnboardingQuizBodySource] | null;
+
+export const OnboardingQuizBodySource = {
+  facebook: 'facebook',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  google: 'google',
+  referral: 'referral',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodyAiLevel =
+  (typeof OnboardingQuizBodyAiLevel)[keyof typeof OnboardingQuizBodyAiLevel] | null;
+
+export const OnboardingQuizBodyAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingQuizBodyIndustriesItem =
+  (typeof OnboardingQuizBodyIndustriesItem)[keyof typeof OnboardingQuizBodyIndustriesItem];
+
+export const OnboardingQuizBodyIndustriesItem = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingQuizBodyContentTypesItem =
+  (typeof OnboardingQuizBodyContentTypesItem)[keyof typeof OnboardingQuizBodyContentTypesItem];
+
+export const OnboardingQuizBodyContentTypesItem = {
+  text: 'text',
+  image: 'image',
+  audio: 'audio',
+  video: 'video',
+  spreadsheet: 'spreadsheet',
+  document: 'document',
+  slide: 'slide',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodyUsageType =
+  (typeof OnboardingQuizBodyUsageType)[keyof typeof OnboardingQuizBodyUsageType] | null;
+
+export const OnboardingQuizBodyUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+export interface OnboardingQuizBody {
+  /** @nullable */
+  purposes?: OnboardingQuizBodyPurposesItem[] | null;
+  /** @nullable */
+  source?: OnboardingQuizBodySource;
+  /** @nullable */
+  aiLevel?: OnboardingQuizBodyAiLevel;
+  /** @nullable */
+  industries?: OnboardingQuizBodyIndustriesItem[] | null;
+  /** @nullable */
+  contentTypes?: OnboardingQuizBodyContentTypesItem[] | null;
+  /** @nullable */
+  usageType?: OnboardingQuizBodyUsageType;
+  finished?: boolean;
+  skipped?: boolean;
+}
+
+export interface QuizSaveResponse {
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+  skipped?: boolean;
+}
+
+export type OnboardingProgressBodyStep =
+  (typeof OnboardingProgressBodyStep)[keyof typeof OnboardingProgressBodyStep];
+
+export const OnboardingProgressBodyStep = {
+  welcome: 'welcome',
+  'tour:home': 'tour:home',
+  'survey-intro': 'survey-intro',
+  quiz: 'quiz',
+  done: 'done',
+} as const;
+
+export interface OnboardingProgressBody {
+  step?: OnboardingProgressBodyStep;
+  /**
+   * @minimum 1
+   * @maximum 6
+   */
+  question?: number;
+  surveyDeferred?: boolean;
+  finished?: boolean;
+}
+
+export type OnboardingProgressStep =
+  (typeof OnboardingProgressStep)[keyof typeof OnboardingProgressStep];
+
+export const OnboardingProgressStep = {
+  welcome: 'welcome',
+  'tour:home': 'tour:home',
+  'survey-intro': 'survey-intro',
+  quiz: 'quiz',
+  done: 'done',
+} as const;
+
+export interface OnboardingProgress {
+  v?: number;
+  step?: OnboardingProgressStep;
+  /**
+   * @minimum 1
+   * @maximum 6
+   */
+  question?: number;
+  surveyDeferredAt?: string;
+  finishedAt?: string;
+  updatedAt?: string;
+}
+
+export interface OnboardingProgressResponse {
+  progress: OnboardingProgress;
+  completedAt?: string;
+}
+
+export interface BuilderProgressBody {
+  state: string;
+}
+
+export interface BuilderOnboardingResponse {
+  state: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export type BuilderCompleteBodyReason =
+  (typeof BuilderCompleteBodyReason)[keyof typeof BuilderCompleteBodyReason];
+
+export const BuilderCompleteBodyReason = {
+  skipped: 'skipped',
+  finished: 'finished',
+} as const;
+
+export interface BuilderCompleteBody {
+  reason?: BuilderCompleteBodyReason;
+}
+
 export interface VerifyCodeRequest {
   /** @pattern ^\d{6}$ */
   code: string;
@@ -1075,6 +1252,169 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export type OnboardingStatusResponsePurposesItem =
+  (typeof OnboardingStatusResponsePurposesItem)[keyof typeof OnboardingStatusResponsePurposesItem];
+
+export const OnboardingStatusResponsePurposesItem = {
+  marketing_content: 'marketing_content',
+  automation: 'automation',
+  documents_reports: 'documents_reports',
+  customer_care: 'customer_care',
+  research: 'research',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseSource =
+  (typeof OnboardingStatusResponseSource)[keyof typeof OnboardingStatusResponseSource] | null;
+
+export const OnboardingStatusResponseSource = {
+  facebook: 'facebook',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  google: 'google',
+  referral: 'referral',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseAiLevel =
+  (typeof OnboardingStatusResponseAiLevel)[keyof typeof OnboardingStatusResponseAiLevel] | null;
+
+export const OnboardingStatusResponseAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingStatusResponseIndustriesItem =
+  (typeof OnboardingStatusResponseIndustriesItem)[keyof typeof OnboardingStatusResponseIndustriesItem];
+
+export const OnboardingStatusResponseIndustriesItem = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingStatusResponseContentTypesItem =
+  (typeof OnboardingStatusResponseContentTypesItem)[keyof typeof OnboardingStatusResponseContentTypesItem];
+
+export const OnboardingStatusResponseContentTypesItem = {
+  text: 'text',
+  image: 'image',
+  audio: 'audio',
+  video: 'video',
+  spreadsheet: 'spreadsheet',
+  document: 'document',
+  slide: 'slide',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseUsageType =
+  (typeof OnboardingStatusResponseUsageType)[keyof typeof OnboardingStatusResponseUsageType] | null;
+
+export const OnboardingStatusResponseUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseEntry =
+  (typeof OnboardingStatusResponseEntry)[keyof typeof OnboardingStatusResponseEntry] | null;
+
+export const OnboardingStatusResponseEntry = {
+  first: 'first',
+} as const;
+
+export interface OnboardingStatusResponse {
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  purposes: OnboardingStatusResponsePurposesItem[] | null;
+  /** @nullable */
+  source: OnboardingStatusResponseSource;
+  /** @nullable */
+  aiLevel: OnboardingStatusResponseAiLevel;
+  /** @nullable */
+  industries: OnboardingStatusResponseIndustriesItem[] | null;
+  /** @nullable */
+  contentTypes: OnboardingStatusResponseContentTypesItem[] | null;
+  /** @nullable */
+  usageType: OnboardingStatusResponseUsageType;
+  progress: OnboardingProgress;
+  firstRunDone: boolean;
+  open: boolean;
+  /** @nullable */
+  entry: OnboardingStatusResponseEntry;
+}
+
+export type OnboardingResultResponseIndustry =
+  (typeof OnboardingResultResponseIndustry)[keyof typeof OnboardingResultResponseIndustry];
+
+export const OnboardingResultResponseIndustry = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingResultResponseTrack =
+  (typeof OnboardingResultResponseTrack)[keyof typeof OnboardingResultResponseTrack];
+
+export const OnboardingResultResponseTrack = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingResultResponseAiLevel =
+  (typeof OnboardingResultResponseAiLevel)[keyof typeof OnboardingResultResponseAiLevel] | null;
+
+export const OnboardingResultResponseAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingResultResponseUsageType =
+  (typeof OnboardingResultResponseUsageType)[keyof typeof OnboardingResultResponseUsageType];
+
+export const OnboardingResultResponseUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+export interface OnboardingResultResponse {
+  completed: boolean;
+  industry: OnboardingResultResponseIndustry;
+  track: OnboardingResultResponseTrack;
+  /** @nullable */
+  aiLevel: OnboardingResultResponseAiLevel;
+  usageType: OnboardingResultResponseUsageType;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -1091,6 +1431,7 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  onboarding: boolean;
   chat: boolean;
 }
 
@@ -3156,6 +3497,356 @@ export const startProductVideoRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(productVideoRunRequest),
+  });
+};
+
+export type resetOnboardingResponse200 = {
+  data: OnboardingResetResponse;
+  status: 200;
+};
+
+export type resetOnboardingResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type resetOnboardingResponseSuccess = resetOnboardingResponse200 & {
+  headers: Headers;
+};
+export type resetOnboardingResponseError = resetOnboardingResponse401 & {
+  headers: Headers;
+};
+
+export type resetOnboardingResponse = resetOnboardingResponseSuccess | resetOnboardingResponseError;
+
+export const getResetOnboardingUrl = () => {
+  return `/api/v1/onboarding/reset`;
+};
+
+export const resetOnboarding = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetOnboardingResponse> => {
+  return customFetch<resetOnboardingResponse>(getResetOnboardingUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type saveOnboardingQuizResponse200 = {
+  data: QuizSaveResponse;
+  status: 200;
+};
+
+export type saveOnboardingQuizResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveOnboardingQuizResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveOnboardingQuizResponseSuccess = saveOnboardingQuizResponse200 & {
+  headers: Headers;
+};
+export type saveOnboardingQuizResponseError = (
+  saveOnboardingQuizResponse401 | saveOnboardingQuizResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveOnboardingQuizResponse =
+  saveOnboardingQuizResponseSuccess | saveOnboardingQuizResponseError;
+
+export const getSaveOnboardingQuizUrl = () => {
+  return `/api/v1/onboarding/quiz`;
+};
+
+export const saveOnboardingQuiz = async (
+  onboardingQuizBody: OnboardingQuizBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveOnboardingQuizResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveOnboardingQuizResponse>(getSaveOnboardingQuizUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingQuizBody),
+  });
+};
+
+export type patchOnboardingQuizResponse200 = {
+  data: QuizSaveResponse;
+  status: 200;
+};
+
+export type patchOnboardingQuizResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type patchOnboardingQuizResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type patchOnboardingQuizResponseSuccess = patchOnboardingQuizResponse200 & {
+  headers: Headers;
+};
+export type patchOnboardingQuizResponseError = (
+  patchOnboardingQuizResponse401 | patchOnboardingQuizResponse422
+) & {
+  headers: Headers;
+};
+
+export type patchOnboardingQuizResponse =
+  patchOnboardingQuizResponseSuccess | patchOnboardingQuizResponseError;
+
+export const getPatchOnboardingQuizUrl = () => {
+  return `/api/v1/onboarding/quiz`;
+};
+
+export const patchOnboardingQuiz = async (
+  onboardingQuizBody: OnboardingQuizBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<patchOnboardingQuizResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<patchOnboardingQuizResponse>(getPatchOnboardingQuizUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingQuizBody),
+  });
+};
+
+export type saveOnboardingProgressResponse200 = {
+  data: OnboardingProgressResponse;
+  status: 200;
+};
+
+export type saveOnboardingProgressResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveOnboardingProgressResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type saveOnboardingProgressResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveOnboardingProgressResponseSuccess = saveOnboardingProgressResponse200 & {
+  headers: Headers;
+};
+export type saveOnboardingProgressResponseError = (
+  | saveOnboardingProgressResponse401
+  | saveOnboardingProgressResponse409
+  | saveOnboardingProgressResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveOnboardingProgressResponse =
+  saveOnboardingProgressResponseSuccess | saveOnboardingProgressResponseError;
+
+export const getSaveOnboardingProgressUrl = () => {
+  return `/api/v1/onboarding/progress`;
+};
+
+export const saveOnboardingProgress = async (
+  onboardingProgressBody: OnboardingProgressBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveOnboardingProgressResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveOnboardingProgressResponse>(getSaveOnboardingProgressUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingProgressBody),
+  });
+};
+
+export type saveBuilderOnboardingProgressResponse200 = {
+  data: BuilderOnboardingResponse;
+  status: 200;
+};
+
+export type saveBuilderOnboardingProgressResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveBuilderOnboardingProgressResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveBuilderOnboardingProgressResponseSuccess =
+  saveBuilderOnboardingProgressResponse200 & {
+    headers: Headers;
+  };
+export type saveBuilderOnboardingProgressResponseError = (
+  saveBuilderOnboardingProgressResponse401 | saveBuilderOnboardingProgressResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveBuilderOnboardingProgressResponse =
+  saveBuilderOnboardingProgressResponseSuccess | saveBuilderOnboardingProgressResponseError;
+
+export const getSaveBuilderOnboardingProgressUrl = () => {
+  return `/api/v1/onboarding/builder/progress`;
+};
+
+export const saveBuilderOnboardingProgress = async (
+  builderProgressBody: BuilderProgressBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveBuilderOnboardingProgressResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveBuilderOnboardingProgressResponse>(getSaveBuilderOnboardingProgressUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(builderProgressBody),
+  });
+};
+
+export type completeBuilderOnboardingResponse200 = {
+  data: BuilderOnboardingResponse;
+  status: 200;
+};
+
+export type completeBuilderOnboardingResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type completeBuilderOnboardingResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type completeBuilderOnboardingResponseSuccess = completeBuilderOnboardingResponse200 & {
+  headers: Headers;
+};
+export type completeBuilderOnboardingResponseError = (
+  completeBuilderOnboardingResponse401 | completeBuilderOnboardingResponse422
+) & {
+  headers: Headers;
+};
+
+export type completeBuilderOnboardingResponse =
+  completeBuilderOnboardingResponseSuccess | completeBuilderOnboardingResponseError;
+
+export const getCompleteBuilderOnboardingUrl = () => {
+  return `/api/v1/onboarding/builder/complete`;
+};
+
+export const completeBuilderOnboarding = async (
+  builderCompleteBody?: BuilderCompleteBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<completeBuilderOnboardingResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<completeBuilderOnboardingResponse>(getCompleteBuilderOnboardingUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(builderCompleteBody),
   });
 };
 
@@ -5396,6 +6087,72 @@ export const openRealtimeStream = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<openRealtimeStreamResponse> => {
   return customFetch<openRealtimeStreamResponse>(getOpenRealtimeStreamUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getOnboardingStatusResponse200 = {
+  data: OnboardingStatusResponse;
+  status: 200;
+};
+
+export type getOnboardingStatusResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getOnboardingStatusResponseSuccess = getOnboardingStatusResponse200 & {
+  headers: Headers;
+};
+export type getOnboardingStatusResponseError = getOnboardingStatusResponse401 & {
+  headers: Headers;
+};
+
+export type getOnboardingStatusResponse =
+  getOnboardingStatusResponseSuccess | getOnboardingStatusResponseError;
+
+export const getGetOnboardingStatusUrl = () => {
+  return `/api/v1/onboarding/status`;
+};
+
+export const getOnboardingStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getOnboardingStatusResponse> => {
+  return customFetch<getOnboardingStatusResponse>(getGetOnboardingStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getOnboardingResultResponse200 = {
+  data: OnboardingResultResponse;
+  status: 200;
+};
+
+export type getOnboardingResultResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getOnboardingResultResponseSuccess = getOnboardingResultResponse200 & {
+  headers: Headers;
+};
+export type getOnboardingResultResponseError = getOnboardingResultResponse401 & {
+  headers: Headers;
+};
+
+export type getOnboardingResultResponse =
+  getOnboardingResultResponseSuccess | getOnboardingResultResponseError;
+
+export const getGetOnboardingResultUrl = () => {
+  return `/api/v1/onboarding/result`;
+};
+
+export const getOnboardingResult = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getOnboardingResultResponse> => {
+  return customFetch<getOnboardingResultResponse>(getGetOnboardingResultUrl(), {
     ...options,
     method: 'GET',
   });

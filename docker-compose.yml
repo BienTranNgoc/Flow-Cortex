@@ -365,6 +365,8 @@ services:
       FLOWCORTEX_SMS_OUTBOX_RETENTION: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:-7d}
       # Personal spaces: off makes the session space answer 503; spaces are still provisioned.
       FLOWCORTEX_SPACES_ENABLED: ${FLOWCORTEX_SPACES_ENABLED:-true}
+      # Member onboarding journey: off hides it and makes progress writes answer 409.
+      FLOWCORTEX_ONBOARDING_ENABLED: ${FLOWCORTEX_ONBOARDING_ENABLED:-true}
       # Confirmation mail goes to the Mailpit sink unless .env names a relay; links in it point
       # at the member app.
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
