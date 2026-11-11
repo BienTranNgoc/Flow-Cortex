@@ -151,15 +151,20 @@ export function RequestsInboxPage() {
       </div>
 
       <div className="request-inbox">
-        <InboxToolbar
-          filter={filter}
-          facets={facets}
-          anyFilter={filtered || Boolean(filter.status)}
-          onChange={change}
-          onClear={() => setParams({}, { replace: true })}
-        />
-
         <AdminList
+          toolbar={{
+            label: t('support.requests.filtersLabel'),
+            className: 'request-toolbar',
+            lead: (
+              <InboxFilters
+                filter={filter}
+                facets={facets}
+                anyFilter={filtered || Boolean(filter.status)}
+                onChange={change}
+                onClear={() => setParams({}, { replace: true })}
+              />
+            ),
+          }}
           query={query}
           nounKey="support.requests.noun"
           tableLabelKey="support.requests.tableLabel"
@@ -194,7 +199,7 @@ export function RequestsInboxPage() {
   );
 }
 
-function InboxToolbar({
+function InboxFilters({
   filter,
   facets,
   anyFilter,
@@ -243,15 +248,7 @@ function InboxToolbar({
     filter.assignee && filter.assignee !== 'me' && filter.assignee !== 'unassigned' && !knownPerson;
 
   return (
-    <form
-      className="cortex-admin-toolbar request-toolbar"
-      role="search"
-      aria-label={t('support.requests.filtersLabel')}
-      onSubmit={(event) => {
-        event.preventDefault();
-        commit(draft);
-      }}
-    >
+    <>
       <div className="cortex-admin-field request-search">
         <label htmlFor={`${ids}-q`}>{t('support.requests.search')}</label>
         <div className="request-search-box">
@@ -265,6 +262,12 @@ function InboxToolbar({
             placeholder={t('support.requests.searchPlaceholder')}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                commit(draft);
+              }
+            }}
           />
           {draft && (
             <button
@@ -283,7 +286,7 @@ function InboxToolbar({
         </div>
       </div>
 
-      <div className="cortex-admin-field">
+      <div className="cortex-admin-field request-assignee-filter">
         <label htmlFor={`${ids}-assignee`}>{t('support.requests.columns.assignee')}</label>
         <select
           id={`${ids}-assignee`}
@@ -364,7 +367,7 @@ function InboxToolbar({
           {t('support.requests.clearFilters')}
         </button>
       )}
-    </form>
+    </>
   );
 }
 
@@ -416,16 +419,16 @@ function RequestsTable({
                 />
               </td>
             )}
-            <td data-label={t('support.requests.columns.number')}>
+            <td className="request-cell-fit" data-label={t('support.requests.columns.number')}>
               {t('support.requests.number', { number: request.number })}
             </td>
             <td data-label={t('support.requests.columns.subject')}>
               <Link to={`/support/requests/${request.number}`}>{request.subject}</Link>
             </td>
-            <td data-label={t('support.requests.columns.type')}>
+            <td className="request-cell-fit" data-label={t('support.requests.columns.type')}>
               {t(`support.requests.type.${request.type}`)}
             </td>
-            <td data-label={t('support.requests.columns.status')}>
+            <td className="request-cell-fit" data-label={t('support.requests.columns.status')}>
               <StatusBadge status={request.status} />
             </td>
             <td data-label={t('support.requests.columns.assignee')}>
@@ -434,7 +437,7 @@ function RequestsTable({
             <td data-label={t('support.requests.columns.requester')}>
               <RequesterLabel requester={request.requester} />
             </td>
-            <td data-label={t('support.requests.columns.activity')}>
+            <td className="request-cell-fit" data-label={t('support.requests.columns.activity')}>
               <RequestTime value={request.lastActivityAt} />
             </td>
           </tr>

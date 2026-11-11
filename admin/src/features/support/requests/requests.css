@@ -18,13 +18,28 @@
   flex-wrap: wrap;
 }
 
+/*
+ * A select is as wide as its longest option and never shrinks, so a label is never cut: the row
+ * wraps instead. The search box keeps room for its placeholder and takes what is left.
+ */
 .request-toolbar .cortex-admin-field {
-  flex: 1 1 10rem;
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: none;
+}
+
+.request-toolbar .cortex-admin-field select {
+  width: auto;
+}
+
+/* Account emails are the one open-ended option text; the closed select clips them. */
+.request-toolbar .request-assignee-filter {
+  max-width: 12rem;
 }
 
 .request-toolbar .request-search {
-  flex-basis: 14rem;
+  flex: 1 0 16rem;
+  max-width: none;
 }
 
 .request-search-box {
@@ -103,6 +118,16 @@
   overflow-wrap: anywhere;
 }
 
+/* The header sticks while the rows scroll under it, so it must not let them show through. */
+.request-table th {
+  background: var(--admin-card-surface-2);
+}
+
+/* Short values break only between words; only the free-text columns break inside one. */
+.request-table td.request-cell-fit {
+  overflow-wrap: normal;
+}
+
 .request-bulk {
   order: 1;
   display: flex;
@@ -178,17 +203,55 @@
   border-color: var(--admin-red);
 }
 
-@media (min-width: 1280px) {
-  .request-toolbar {
-    flex-wrap: nowrap;
+/* Seven columns plus the checkbox no longer fit unwrapped: headers and badges may take two lines. */
+@media (min-width: 721px) and (max-width: 1279px) {
+  .request-table th,
+  .request-table .status-badge {
+    white-space: normal;
   }
 }
 
+/*
+ * From 1024px the page is exactly one viewport tall and the table region takes what the heading,
+ * toolbars, bulk bar and pager leave. --request-topbar-h and the padding mirror base.css's
+ * .cortex-admin-header__inner height and .cortex-admin-content padding.
+ */
 @media (min-width: 1024px) {
+  main:has(> .request-inbox) {
+    --request-topbar-h: 56px;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--request-topbar-h) - 2 * clamp(1rem, 2.4vw, 2rem));
+  }
+
+  main:has(> .request-inbox) > .cortex-admin-page-heading {
+    flex: none;
+  }
+
+  .request-inbox {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .request-inbox > * {
+    flex-shrink: 0;
+  }
+
   .request-inbox > .cortex-admin-table-wrapper {
-    min-height: 12rem;
-    max-height: calc(100dvh - 26rem);
+    flex-shrink: 1;
+    min-height: 7rem;
     overflow-y: auto;
+  }
+}
+
+/* Short windows give the rows the space the intro would take. */
+@media (min-width: 1024px) and (max-height: 800px) {
+  main:has(> .request-inbox) > .cortex-admin-page-heading {
+    margin-bottom: 0.75rem;
+  }
+
+  main:has(> .request-inbox) .cortex-admin-page-description {
+    display: none;
   }
 }
 
@@ -204,6 +267,7 @@
   .request-bulk .cortex-admin-btn {
     flex: 0 0 auto;
     width: 100%;
+    max-width: none;
   }
 
   .request-bulk {
