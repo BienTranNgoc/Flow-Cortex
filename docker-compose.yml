@@ -552,6 +552,10 @@ services:
       context: .
       dockerfile: admin/Dockerfile
     image: flow-cortex-admin:local
+    environment:
+      # The origin the backend signs upload and download URLs for (its S3_PUBLIC_ENDPOINT); the
+      # console's CSP lets the browser reach exactly this one origin besides itself.
+      MEDIA_ORIGIN: http://localhost:9000
     networks: [default, internal]
     ports:
       - '127.0.0.1:5174:8080'

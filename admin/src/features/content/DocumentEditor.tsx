@@ -30,6 +30,7 @@ import {
 import { MediaPicker } from './MediaPicker';
 import { publishGate } from './publishGate';
 import { RevisionsPanel } from './RevisionsPanel';
+import { saveGate } from './saveGate';
 import { SectionEditor } from './SectionEditor';
 import { TextField } from './TextField';
 import { useUnsavedGuard } from './useUnsavedGuard';
@@ -121,6 +122,12 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
   const fetchLatest = useLatestDraft(slug);
   const guard = useUnsavedGuard(state.unsaved && canManage);
   const gate = publishGate({ me, unsaved: state.unsaved, version: state.version });
+  const saveEnabled = saveGate({
+    canManage,
+    pending: save.isPending,
+    unsaved: state.unsaved,
+    version: state.version,
+  });
 
   const clearFeedback = () => {
     setErrors({});
@@ -187,7 +194,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
   };
 
   const onSave = () => {
-    if (save.isPending || !canManage) return;
+    if (!saveEnabled) return;
     submit(state.version, state.content);
   };
 
@@ -375,7 +382,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
             <button
               type="button"
               className="cortex-admin-btn"
-              aria-disabled={save.isPending || (!state.unsaved && state.version > 0)}
+              aria-disabled={!saveEnabled}
               onClick={onSave}
             >
               {save.isPending ? t('content.editor.saving') : t('content.editor.save')}

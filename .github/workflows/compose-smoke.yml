@@ -1,6 +1,7 @@
 name: compose-smoke
 
-# Checks egress isolation, builds every image, starts the whole compose stack and runs
+# Checks egress isolation, builds every image, checks the admin console's CSP names the store
+# origin (scripts/check-admin-csp.sh), starts the whole compose stack and runs
 # scripts/smoke-probe.sh: upload a clip, check it on the worker, download the
 # report, see the run in the admin list, fail a text file with probe_failed, and
 # carry a Product Video run through the fixture provider worker, a script
@@ -61,8 +62,16 @@ jobs:
             admin.cache-from=type=gha,scope=admin
             admin.cache-to=type=gha,scope=admin,mode=max
 
+      - name: Admin content security policy
+        run: scripts/check-admin-csp.sh
+
       - name: Start the stack
         run: SPRING_PROFILES_ACTIVE=dev docker compose up -d --no-build --wait --wait-timeout 300
+
+      - name: Admin CSP names the store origin the backend signs for
+        run: |
+          origin="$(docker compose exec -T backend sh -c 'printf %s "$S3_PUBLIC_ENDPOINT"')"
+          ADMIN_URL=http://localhost:5174 EXPECTED_MEDIA_ORIGIN="$origin" scripts/check-admin-csp.sh
 
       - name: Readiness
         run: curl -fsS localhost:8080/readyz
