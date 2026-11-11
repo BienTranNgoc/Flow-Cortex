@@ -250,7 +250,8 @@ class WorkflowServiceImplTest {
                 mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others);
         return new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
                 new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall)),
-                Validation.buildDefaultValidatorFactory().getValidator());
+                Validation.buildDefaultValidatorFactory().getValidator(),
+                mock(com.flowcortex.credit.api.CreditAccounts.class));
     }
 
     private List<WorkflowStep> withEchoThenConnectorStep(Workflow workflow) {
