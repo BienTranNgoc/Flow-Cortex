@@ -5,6 +5,55 @@
  * OpenAPI spec version: v1.0
  */
 import { customFetch } from '../customFetch';
+export interface HelpfulRequest {
+  helpful: boolean;
+}
+
+export interface HelpfulResponse {
+  helpful: boolean;
+  helpfulCount: number;
+}
+
+export interface ReviewRequest {
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating?: string;
+  /**
+   * @maxLength 5000
+   * @nullable
+   */
+  body?: string | null;
+  /** @nullable */
+  images?: string[] | null;
+}
+
+export interface ReviewImageResponse {
+  id: string;
+  url: string;
+  expiresAt: string;
+}
+
+export interface ReviewResponse {
+  id: string;
+  rating: number;
+  /** @nullable */
+  body?: string | null;
+  images: ReviewImageResponse[];
+  helpfulCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookmarkRequest {
+  bookmarked: boolean;
+}
+
+export interface BookmarkResponse {
+  bookmarked: boolean;
+}
+
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
@@ -461,6 +510,52 @@ export interface RunResponse {
   chargedCredits?: number;
 }
 
+export type ReportRequestReason = (typeof ReportRequestReason)[keyof typeof ReportRequestReason];
+
+export const ReportRequestReason = {
+  spam: 'spam',
+  scam: 'scam',
+  harmful: 'harmful',
+  harassment: 'harassment',
+  misinformation: 'misinformation',
+  copyright: 'copyright',
+  nsfw: 'nsfw',
+  other: 'other',
+} as const;
+
+export interface ReportRequest {
+  reason?: ReportRequestReason;
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  details?: string | null;
+}
+
+export interface ReportedResponse {
+  reported: boolean;
+}
+
+export interface UploadRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  fileName: string;
+  size: number;
+}
+
+export type UploadResponseHeaders = { [key: string]: string };
+
+export interface UploadResponse {
+  uploadId: string;
+  url: string;
+  method: string;
+  headers: UploadResponseHeaders;
+  expiresAt: string;
+  maxBytes: number;
+}
+
 export type ShareSettingsResponseVisibility =
   (typeof ShareSettingsResponseVisibility)[keyof typeof ShareSettingsResponseVisibility];
 
@@ -495,26 +590,6 @@ export interface CreateUserRequest {
    * @pattern ADMIN|MEMBER|CREATOR
    */
   role: string;
-}
-
-export interface UploadRequest {
-  /**
-   * @minLength 0
-   * @maxLength 255
-   */
-  fileName: string;
-  size: number;
-}
-
-export type UploadResponseHeaders = { [key: string]: string };
-
-export interface UploadResponse {
-  uploadId: string;
-  url: string;
-  method: string;
-  headers: UploadResponseHeaders;
-  expiresAt: string;
-  maxBytes: number;
 }
 
 export interface SupportUploadRequest {
@@ -1060,6 +1135,35 @@ export interface VisibilityAuditPageResponse {
   meta?: Meta;
 }
 
+export interface ReviewListItemResponse {
+  id: string;
+  rating: number;
+  /** @nullable */
+  body?: string | null;
+  images: ReviewImageResponse[];
+  helpfulCount: number;
+  createdAt: string;
+  updatedAt: string;
+  helpfulByMe: boolean;
+  mine: boolean;
+  /** @nullable */
+  authorName?: string | null;
+}
+
+export interface ReviewPageResponse {
+  data: ReviewListItemResponse[];
+  meta: Meta;
+}
+
+export type ReviewSummaryResponseDistribution = { [key: string]: number };
+
+export interface ReviewSummaryResponse {
+  /** @nullable */
+  average?: number | null;
+  total: number;
+  distribution: ReviewSummaryResponseDistribution;
+}
+
 export interface Grant {
   userId?: string;
   /** @nullable */
@@ -1089,6 +1193,16 @@ export interface SharedWorkflowResponse {
   /** @nullable */
   authorName?: string | null;
   steps?: Step[];
+}
+
+export interface Item {
+  workflow: WorkflowResponse;
+  bookmarkedAt: string;
+}
+
+export interface BookmarkedWorkflowPageResponse {
+  data: Item[];
+  meta: Meta;
 }
 
 export interface SupportSettings {
@@ -1197,6 +1311,14 @@ export interface SupportAssistantConversation {
 }
 
 export interface OutputUrlResponse {
+  url: string;
+  expiresAt: string;
+}
+
+export interface RunInputResponse {
+  bindingKey: string;
+  kind: string;
+  mimeType: string;
   url: string;
   expiresAt: string;
 }
@@ -1368,6 +1490,38 @@ export type GetWorkflowVisibilityAuditParams = {
   cursor?: string;
 };
 
+export type ListWorkflowReviewsParams = {
+  /**
+   * @pattern newest|helpful
+   */
+  sort?: ListWorkflowReviewsSort;
+  /**
+   * @minimum 1
+   * @maximum 5
+   */
+  rating?: number;
+  withComment?: boolean;
+  withImages?: boolean;
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListWorkflowReviewsSort =
+  (typeof ListWorkflowReviewsSort)[keyof typeof ListWorkflowReviewsSort];
+
+export const ListWorkflowReviewsSort = {
+  newest: 'newest',
+  helpful: 'helpful',
+} as const;
+
 export type ListWorkflowLinkGrantsParams = {
   limit?: number;
   cursor?: string;
@@ -1376,6 +1530,19 @@ export type ListWorkflowLinkGrantsParams = {
 export type GetWorkflowAccessLogParams = {
   limit?: number;
   cursor?: string;
+};
+
+export type ListBookmarkedWorkflowsParams = {
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
 };
 
 export type SearchSupportKbParams = {
@@ -1495,6 +1662,220 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type setWorkflowReviewHelpfulResponse200 = {
+  data: HelpfulResponse;
+  status: 200;
+};
+
+export type setWorkflowReviewHelpfulResponseSuccess = setWorkflowReviewHelpfulResponse200 & {
+  headers: Headers;
+};
+export type setWorkflowReviewHelpfulResponse = setWorkflowReviewHelpfulResponseSuccess;
+
+export const getSetWorkflowReviewHelpfulUrl = (id: string, reviewId: string) => {
+  return `/api/v1/workflows/${id}/reviews/${reviewId}/helpful`;
+};
+
+export const setWorkflowReviewHelpful = async (
+  id: string,
+  reviewId: string,
+  helpfulRequest: HelpfulRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setWorkflowReviewHelpfulResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setWorkflowReviewHelpfulResponse>(
+    getSetWorkflowReviewHelpfulUrl(id, reviewId),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(helpfulRequest),
+    },
+  );
+};
+
+export type getMyWorkflowReviewResponse200 = {
+  data: ReviewResponse;
+  status: 200;
+};
+
+export type getMyWorkflowReviewResponseSuccess = getMyWorkflowReviewResponse200 & {
+  headers: Headers;
+};
+export type getMyWorkflowReviewResponse = getMyWorkflowReviewResponseSuccess;
+
+export const getGetMyWorkflowReviewUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/reviews/mine`;
+};
+
+export const getMyWorkflowReview = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getMyWorkflowReviewResponse> => {
+  return customFetch<getMyWorkflowReviewResponse>(getGetMyWorkflowReviewUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type putMyWorkflowReviewResponse200 = {
+  data: ReviewResponse;
+  status: 200;
+};
+
+export type putMyWorkflowReviewResponseSuccess = putMyWorkflowReviewResponse200 & {
+  headers: Headers;
+};
+export type putMyWorkflowReviewResponse = putMyWorkflowReviewResponseSuccess;
+
+export const getPutMyWorkflowReviewUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/reviews/mine`;
+};
+
+export const putMyWorkflowReview = async (
+  id: string,
+  reviewRequest: ReviewRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<putMyWorkflowReviewResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<putMyWorkflowReviewResponse>(getPutMyWorkflowReviewUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reviewRequest),
+  });
+};
+
+export type deleteMyWorkflowReviewResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type deleteMyWorkflowReviewResponseSuccess = deleteMyWorkflowReviewResponse200 & {
+  headers: Headers;
+};
+export type deleteMyWorkflowReviewResponse = deleteMyWorkflowReviewResponseSuccess;
+
+export const getDeleteMyWorkflowReviewUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/reviews/mine`;
+};
+
+export const deleteMyWorkflowReview = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteMyWorkflowReviewResponse> => {
+  return customFetch<deleteMyWorkflowReviewResponse>(getDeleteMyWorkflowReviewUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type getWorkflowBookmarkResponse200 = {
+  data: BookmarkResponse;
+  status: 200;
+};
+
+export type getWorkflowBookmarkResponseSuccess = getWorkflowBookmarkResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowBookmarkResponse = getWorkflowBookmarkResponseSuccess;
+
+export const getGetWorkflowBookmarkUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/bookmark`;
+};
+
+export const getWorkflowBookmark = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowBookmarkResponse> => {
+  return customFetch<getWorkflowBookmarkResponse>(getGetWorkflowBookmarkUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type setWorkflowBookmarkResponse200 = {
+  data: BookmarkResponse;
+  status: 200;
+};
+
+export type setWorkflowBookmarkResponseSuccess = setWorkflowBookmarkResponse200 & {
+  headers: Headers;
+};
+export type setWorkflowBookmarkResponse = setWorkflowBookmarkResponseSuccess;
+
+export const getSetWorkflowBookmarkUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/bookmark`;
+};
+
+export const setWorkflowBookmark = async (
+  id: string,
+  bookmarkRequest: BookmarkRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setWorkflowBookmarkResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setWorkflowBookmarkResponse>(getSetWorkflowBookmarkUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(bookmarkRequest),
+  });
+};
 
 export type getResponse200 = {
   data: UserResponse;
@@ -2525,6 +2906,99 @@ export const startRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRunRequest),
+  });
+};
+
+export type reportWorkflowReviewResponse200 = {
+  data: ReportedResponse;
+  status: 200;
+};
+
+export type reportWorkflowReviewResponseSuccess = reportWorkflowReviewResponse200 & {
+  headers: Headers;
+};
+export type reportWorkflowReviewResponse = reportWorkflowReviewResponseSuccess;
+
+export const getReportWorkflowReviewUrl = (id: string, reviewId: string) => {
+  return `/api/v1/workflows/${id}/reviews/${reviewId}/report`;
+};
+
+export const reportWorkflowReview = async (
+  id: string,
+  reviewId: string,
+  reportRequest: ReportRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportWorkflowReviewResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportWorkflowReviewResponse>(getReportWorkflowReviewUrl(id, reviewId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reportRequest),
+  });
+};
+
+export type createReviewImageUploadResponse200 = {
+  data: UploadResponse;
+  status: 200;
+};
+
+export type createReviewImageUploadResponseSuccess = createReviewImageUploadResponse200 & {
+  headers: Headers;
+};
+export type createReviewImageUploadResponse = createReviewImageUploadResponseSuccess;
+
+export const getCreateReviewImageUploadUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/reviews/image-uploads`;
+};
+
+export const createReviewImageUpload = async (
+  id: string,
+  uploadRequest: UploadRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createReviewImageUploadResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createReviewImageUploadResponse>(getCreateReviewImageUploadUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadRequest),
   });
 };
 
@@ -5450,6 +5924,67 @@ export const getWorkflowSharing = async (
   });
 };
 
+export type listWorkflowReviewsResponse200 = {
+  data: ReviewPageResponse;
+  status: 200;
+};
+
+export type listWorkflowReviewsResponseSuccess = listWorkflowReviewsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowReviewsResponse = listWorkflowReviewsResponseSuccess;
+
+export const getListWorkflowReviewsUrl = (id: string, params?: ListWorkflowReviewsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/reviews?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/reviews`;
+};
+
+export const listWorkflowReviews = async (
+  id: string,
+  params?: ListWorkflowReviewsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowReviewsResponse> => {
+  return customFetch<listWorkflowReviewsResponse>(getListWorkflowReviewsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getWorkflowReviewSummaryResponse200 = {
+  data: ReviewSummaryResponse;
+  status: 200;
+};
+
+export type getWorkflowReviewSummaryResponseSuccess = getWorkflowReviewSummaryResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowReviewSummaryResponse = getWorkflowReviewSummaryResponseSuccess;
+
+export const getGetWorkflowReviewSummaryUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/reviews/summary`;
+};
+
+export const getWorkflowReviewSummary = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowReviewSummaryResponse> => {
+  return customFetch<getWorkflowReviewSummaryResponse>(getGetWorkflowReviewSummaryUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listWorkflowLinkGrantsResponse200 = {
   data: LinkGrantPageResponse;
   status: 200;
@@ -5656,6 +6191,42 @@ export const getWorkflowByShareKey = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getWorkflowByShareKeyResponse> => {
   return customFetch<getWorkflowByShareKeyResponse>(getGetWorkflowByShareKeyUrl(key), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listBookmarkedWorkflowsResponse200 = {
+  data: BookmarkedWorkflowPageResponse;
+  status: 200;
+};
+
+export type listBookmarkedWorkflowsResponseSuccess = listBookmarkedWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listBookmarkedWorkflowsResponse = listBookmarkedWorkflowsResponseSuccess;
+
+export const getListBookmarkedWorkflowsUrl = (params?: ListBookmarkedWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/bookmarked?${stringifiedParams}`
+    : `/api/v1/workflows/bookmarked`;
+};
+
+export const listBookmarkedWorkflows = async (
+  params?: ListBookmarkedWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBookmarkedWorkflowsResponse> => {
+  return customFetch<listBookmarkedWorkflowsResponse>(getListBookmarkedWorkflowsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -6094,6 +6665,30 @@ export const getOutputUrl = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getOutputUrlResponse> => {
   return customFetch<getOutputUrlResponse>(getGetOutputUrlUrl(id, order, name), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getRunInputsResponse200 = {
+  data: RunInputResponse[];
+  status: 200;
+};
+
+export type getRunInputsResponseSuccess = getRunInputsResponse200 & {
+  headers: Headers;
+};
+export type getRunInputsResponse = getRunInputsResponseSuccess;
+
+export const getGetRunInputsUrl = (id: string) => {
+  return `/api/v1/runs/${id}/inputs`;
+};
+
+export const getRunInputs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunInputsResponse> => {
+  return customFetch<getRunInputsResponse>(getGetRunInputsUrl(id), {
     ...options,
     method: 'GET',
   });

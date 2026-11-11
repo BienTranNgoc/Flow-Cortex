@@ -18,7 +18,8 @@ import org.springframework.web.servlet.LocaleResolver;
  * A refused upload renders like a field validation failure, so the form shows the sentence on the
  * field it names. Ordered first: the shared handler's catch-all would otherwise turn it into a 500.
  */
-@RestControllerAdvice(assignableTypes = {UploadsController.class, WorkflowsController.class})
+@RestControllerAdvice(assignableTypes = {UploadsController.class, WorkflowsController.class,
+        WorkflowReviewImageUploadsController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class UploadRejectionHandler {
 

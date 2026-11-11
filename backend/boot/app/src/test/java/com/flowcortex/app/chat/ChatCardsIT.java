@@ -5,6 +5,7 @@ import static com.flowcortex.app.chat.ChatTestConfig.StubChatClient.text;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.chat.cards.CardStore;
 import com.flowcortex.llm.api.LlmChatOutcome;
 import com.flowcortex.llm.api.LlmTurn;
@@ -13,7 +14,6 @@ import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.WorkflowService;
 import com.flowcortex.workflow.api.WorkflowView;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -96,13 +96,13 @@ class ChatCardsIT extends ChatItSupport {
 
     private UUID upload(UserView owner, String token, String fileName) {
         ResponseEntity<UploadGrant> grant = restTemplate.exchange("/api/v1/uploads", HttpMethod.POST,
-                new HttpEntity<>(new UploadRequest(fileName, 16), bearer(token)), UploadGrant.class);
+                new HttpEntity<>(new UploadRequest(fileName, ImageFixtures.png().length), bearer(token)),
+                UploadGrant.class);
         assertThat(grant.getStatusCode().value()).isEqualTo(201);
         UUID uploadId = grant.getBody().uploadId();
         try (S3Client store = objectStore()) {
             store.putObject(request -> request.bucket(UPLOAD_BUCKET).key(owner.id() + "/" + uploadId)
-                    .contentType("image/png"),
-                    RequestBody.fromBytes("sixteen bytes!!!".getBytes(StandardCharsets.UTF_8)));
+                    .contentType("image/png"), RequestBody.fromBytes(ImageFixtures.png()));
         }
         return uploadId;
     }

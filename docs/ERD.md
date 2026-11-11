@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.10.11.002`)
+## Current schema (`V2026.09.22.001` – `V2026.11.11.280`)
 
 ```mermaid
 erDiagram
@@ -21,6 +21,11 @@ erDiagram
   run_step ||--o| review_task : "run_step_id, UNIQUE — one checkpoint per step"
   review_task ||--o{ script_revision : "review_task_id"
   media_asset ||--o{ media_asset_binding : "asset_id"
+  workflow ||--o{ workflow_bookmark : "workflow_id"
+  workflow ||--o{ workflow_review : "workflow_id"
+  workflow_review ||--o{ workflow_review_image : "review_id, ON DELETE CASCADE"
+  workflow_review ||--o{ workflow_review_helpful : "review_id, ON DELETE CASCADE"
+  workflow_review ||--o{ workflow_review_report : "review_id, ON DELETE CASCADE"
 
   app_user {
     uuid id PK
@@ -87,6 +92,7 @@ erDiagram
   media_asset {
     uuid id PK "upload id for uploaded inputs"
     uuid owner_id "application-enforced owner scope"
+    uuid space_id "personal space of the owner, NOT NULL, no FK"
     varchar kind "image | audio | video | binary"
     varchar bucket
     varchar object_key UK
@@ -140,6 +146,43 @@ erDiagram
     uuid created_by "NULL for revision 1, which the provider wrote"
     timestamptz created_at
   }
+  workflow_bookmark {
+    uuid user_id PK "no FK — the user table belongs to another module"
+    uuid workflow_id PK,FK
+    timestamptz created_at "kept when the workflow leaves the member's sight, so it returns with its date"
+  }
+  workflow_review {
+    uuid id PK
+    uuid workflow_id FK "UNIQUE (workflow_id, user_id) — one review per member"
+    uuid user_id "no FK"
+    smallint rating "CHECK 1..5"
+    varchar body "up to 5000, NULL when blank"
+    integer helpful_count "CHECK >= 0; moved only by additive updates beside a mark insert or delete"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  workflow_review_image {
+    uuid id PK
+    uuid review_id FK
+    smallint position "1..5, UNIQUE (review_id, position) DEFERRABLE INITIALLY DEFERRED"
+    varchar bucket
+    varchar object_key "workflow-review/<workflowId>/<userId>/<batch>/..."
+    varchar content_type
+    bigint size_bytes
+    timestamptz created_at
+  }
+  workflow_review_helpful {
+    uuid review_id PK,FK
+    uuid user_id PK "no FK"
+    timestamptz created_at
+  }
+  workflow_review_report {
+    uuid review_id PK,FK
+    uuid reporter_id PK "no FK; one report per reporter"
+    varchar reason "spam | scam | harmful | harassment | misinformation | copyright | nsfw | other"
+    varchar details "up to 1000"
+    timestamptz created_at
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -157,7 +200,10 @@ Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_own
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
 the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
-`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
+`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`,
+`idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` — the saved list),
+`idx_workflow_review_newest` (`workflow_id, created_at DESC, id DESC`), `idx_workflow_review_helpful`
+(`workflow_id, helpful_count DESC, created_at DESC, id DESC`).
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is

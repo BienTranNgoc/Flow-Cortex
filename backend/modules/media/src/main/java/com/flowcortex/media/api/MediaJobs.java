@@ -32,11 +32,13 @@ public interface MediaJobs {
     MediaLimits providerLimits(String capability);
 
     /**
-     * Signs an upload of {@code size} bytes to a key derived from {@code ownerId} and a new upload id.
-     * The type comes from the extension of {@code fileName}, which is not stored anywhere.
-     * @throws UploadRejectedException for {@code fileName} outside the allowlist or {@code size} out of range
+     * Signs an upload of {@code size} bytes to a key derived from {@code purpose}, {@code ownerId} and a new
+     * upload id. The type comes from the extension of {@code fileName}, which is not stored anywhere, and must
+     * be one the purpose accepts.
+     * @throws UploadRejectedException on field {@code fileName} outside the purpose's allowlist, on field
+     *         {@code size} out of range
      */
-    UploadGrant prepareUpload(UUID ownerId, String fileName, long size);
+    UploadGrant prepareUpload(UploadPurpose purpose, UUID ownerId, String fileName, long size);
 
     /**
      * The stored object of {@code ownerId}'s upload {@code uploadId}, re-checked and registered as an asset.
@@ -51,8 +53,11 @@ public interface MediaJobs {
     /** Whether an output stored in {@code bucket} can be signed for download: only the media bucket's can. */
     boolean isDownloadable(String bucket);
 
-    /** Resolves and registers 1-10 uploads, preserving their order as {@code image_1..image_N}. */
-    List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds);
+    /**
+     * Resolves and registers 1-10 uploads granted for {@code purpose}, preserving their order as
+     * {@code image_1..image_N}. An upload granted for another purpose is not found.
+     */
+    List<MediaAssetInput> resolveImageUploads(UploadPurpose purpose, UUID ownerId, List<UUID> uploadIds);
 
     /**
      * Copies already owner-verified assets into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket,
@@ -60,11 +65,13 @@ public interface MediaJobs {
      * video copy can take minutes. The uploads bucket expires objects after a day while an approval may wait far
      * longer, and an upload URL can rewrite its object, so the worker reads only the copy. With the content check
      * on, the first bytes of each copy must match its kind. Copies of a start that fails later are not deleted;
-     * the media bucket's run-input lifecycle rule expires them.
+     * the media bucket's run-input lifecycle rule expires them. An image is not copied server-side: it is
+     * read, checked (format, pixel cap) and written back without its metadata, whatever the content check says.
      * @return the inputs, each pointing at its copy in the media bucket
      * @throws UploadRejectedException on field {@code uploadId} for the single media upload, {@code uploadIds}
      *         otherwise, if an upload vanished before it was copied; on field {@code uploadId} if a copy's
-     *         content is not its kind
+     *         content is not its kind; on field {@code uploadIds} if an image is not the image it was declared
+     *         as or has more than 25 million pixels
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs);
@@ -78,11 +85,15 @@ public interface MediaJobs {
 
     /**
      * Keeps owner-verified image uploads as attachments at {@code <keyPrefix>/1..N} of the media bucket. Each
-     * copy is tagged pending and sniffed (content check on); all are re-tagged kept only once every copy passed,
-     * and a refused copy expires by the media bucket's lifecycle rule. Call it outside any transaction.
+     * image is read, checked (format, pixel cap) and written without its metadata, tagged pending; all are
+     * re-tagged kept only once every copy passed, and a refused copy expires by the media bucket's lifecycle
+     * rule. Call it outside any transaction.
+     * @return the kept copies, each with the size of the stored (stripped) bytes
      * @throws UploadRejectedException on field {@code uploadIds} if an upload is not an image, is larger than
-     *         {@code maxBytes} (checked before any copy), vanished, or its copy's content is not an image
-     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/}, or there are not 1-10 inputs
+     *         {@code maxBytes} (checked before any read), vanished, is not the image it was declared as, or has
+     *         more than 25 million pixels
+     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/} or
+     *         {@code workflow-review/}, or there are not 1-10 inputs
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes);
@@ -90,9 +101,17 @@ public interface MediaJobs {
     /**
      * Re-tags kept attachments pending again, so the media bucket's lifecycle rule expires them: for copies whose
      * request or message was never saved. Tries every object, then rethrows the first failure.
-     * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
+     * @throws IllegalArgumentException if an attachment is not under {@code support/} or
+     *         {@code workflow-review/} of the media bucket
      */
     void releaseAttachments(List<StoredAttachment> attachments);
+
+    /**
+     * The inputs bound to {@code runId} in start order, each with a signed URL to the run's own copy under
+     * {@code runs/<runId>/inputs/}. The caller must have verified that the run belongs to the reader. A run
+     * with no bound input yields an empty list.
+     */
+    List<RunInput> runInputs(UUID runId);
 
     /**
      * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after

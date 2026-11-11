@@ -2,6 +2,7 @@ package com.flowcortex.workflow.web;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadGrant;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,7 +49,7 @@ class UploadsController {
         if (!mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        UploadGrant grant = mediaJobs.prepareUpload(callerId, request.fileName(), request.size());
+        UploadGrant grant = mediaJobs.prepareUpload(UploadPurpose.RUN_INPUT, callerId, request.fileName(), request.size());
         return ResponseEntity.status(HttpStatus.CREATED).body(UploadResponse.from(grant));
     }
 
