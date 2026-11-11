@@ -1,4 +1,12 @@
-import { BookOpen, FlowArrow, House, PlugsConnected, Play, type Icon } from '@phosphor-icons/react';
+import {
+  BookOpen,
+  ChatsCircle,
+  FlowArrow,
+  House,
+  PlugsConnected,
+  Play,
+  type Icon,
+} from '@phosphor-icons/react';
 import type { TFunction } from 'i18next';
 import i18n from '../lib/i18n';
 import { demoPagesEnabled } from './featureFlags';
@@ -26,6 +34,10 @@ const CORE_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/workflows', labelKey: 'common.nav.workflows', icon: FlowArrow },
 ];
 
+const CHAT_NAV_ITEMS: readonly NavEntry[] = [
+  { to: '/chat', labelKey: 'common.nav.chat', icon: ChatsCircle },
+];
+
 const DEMO_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/runs', labelKey: 'common.nav.runs', icon: Play },
   { to: '/integrations', labelKey: 'common.nav.integrations', icon: PlugsConnected },
@@ -35,8 +47,15 @@ const DEMO_NAV_ITEMS: readonly NavEntry[] = [
  * Sidebar items; the demo pages join only while their flag is on, read on every call like the flag itself.
  * Components pass their own `t` so labels follow a language switch.
  */
-export function primaryNavItems(t: TFunction = i18n.t): readonly PrimaryNavItem[] {
-  const entries = demoPagesEnabled() ? [...CORE_NAV_ITEMS, ...DEMO_NAV_ITEMS] : CORE_NAV_ITEMS;
+export function primaryNavItems(
+  t: TFunction = i18n.t,
+  options: { chat?: boolean } = {},
+): readonly PrimaryNavItem[] {
+  const entries = [
+    ...CORE_NAV_ITEMS,
+    ...(options.chat ? CHAT_NAV_ITEMS : []),
+    ...(demoPagesEnabled() ? DEMO_NAV_ITEMS : []),
+  ];
   return entries.map(({ labelKey, ...rest }) => ({ ...rest, label: t(labelKey) }));
 }
 

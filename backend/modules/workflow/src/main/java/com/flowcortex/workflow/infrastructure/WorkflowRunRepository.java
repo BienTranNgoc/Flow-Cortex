@@ -43,6 +43,8 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     @Query("SELECT r.id FROM WorkflowRun r WHERE r.id > :after AND " + MEMBER_RESULT_RUN + " ORDER BY r.id")
     List<UUID> findCompletedIdsAfter(@Param("after") UUID after, Pageable page);
 
+    Optional<WorkflowRun> findByOwnerIdAndRequestKey(UUID ownerId, String requestKey);
+
     /**
      * Running runs with no step in flight: nothing will move them unless someone advances them
      * (a pending next step whose advance was lost, or all steps completed but the run not closed).
