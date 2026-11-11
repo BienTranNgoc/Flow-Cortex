@@ -12,6 +12,55 @@
   color: var(--ink-3);
 }
 
+.home-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 2.5rem;
+  max-width: 40rem;
+}
+
+.home-prompt__label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.home-prompt__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.home-prompt__input {
+  flex: 1 1 14rem;
+  min-height: var(--target-min);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.home-prompt__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.home-prompt__input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.home-prompt__send {
+  min-height: var(--target-min);
+}
+
+.home-prompt__send:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* ===== Cards section =================================================== */
 
 .launchpad-cards {

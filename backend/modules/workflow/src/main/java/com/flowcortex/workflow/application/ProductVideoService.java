@@ -9,6 +9,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
+import com.flowcortex.workflow.api.ProductVideoRuns;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Starts the seeded Product Video workflow with an immutable product/asset snapshot. */
 @Service
-public class ProductVideoService {
+public class ProductVideoService implements ProductVideoRuns {
 
     private final WorkflowRepository workflows;
     private final WorkflowStepRepository workflowSteps;
@@ -79,6 +81,20 @@ public class ProductVideoService {
     }
 
     public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost) {
+        return startRun(ownerId, draft, uploadIds, acknowledgeCost, null);
+    }
+
+    @Override
+    public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost,
+            String requestKey) {
+        ProductVideoDraft validated = ProductVideoDraft.of(draft.productName(), draft.description(), draft.cta(),
+                draft.price(), draft.promotion(), draft.aspectRatio());
+        ProductVideoDraft.requireUploads(uploadIds);
+        return startRun(ownerId, validated, uploadIds, acknowledgeCost, requestKey);
+    }
+
+    private RunView startRun(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost,
+            String requestKey) {
         if (!enabled || !workflowEnabled) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     new LocalizedMessage("workflow.productVideo.disabled"));
@@ -88,6 +104,19 @@ public class ProductVideoService {
         }
         Workflow workflow = workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
+        // A retried start answers with its run before any cost guard or object copy runs again.
+        Optional<RunView> started = RunRequestKeys.existing(runs, runSteps, registry, mediaJobs::isDownloadable,
+                ownerId, requestKey);
+        if (started.isPresent()) {
+            return started.get();
+        }
+        return RunRequestKeys.orWinner(
+                () -> startNew(ownerId, workflow, draft, uploadIds, acknowledgeCost, requestKey),
+                runs, runSteps, registry, mediaJobs::isDownloadable, ownerId, requestKey);
+    }
+
+    private RunView startNew(UUID ownerId, Workflow workflow, ProductVideoDraft draft, List<UUID> uploadIds,
+            boolean acknowledgeCost, String requestKey) {
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
         List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds);
@@ -99,7 +128,8 @@ public class ProductVideoService {
         Instant now = Instant.now();
 
         return transactions.execute(status -> {
-            WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, now));
+            WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, null,
+                    now, requestKey));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
             mediaJobs.bindRunInputs(run.getId(), copies);
