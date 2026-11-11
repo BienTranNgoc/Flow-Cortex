@@ -8,7 +8,7 @@ import java.util.Map;
  * GlobalExceptionHandler} to a 422 problem whose optional {@code code} is a stable machine code
  * and whose optional {@code errors} names offending fields.
  */
-public class UnprocessableEntityException extends RuntimeException {
+public class UnprocessableEntityException extends RuntimeException implements LocalizedProblem {
 
     private final LocalizedMessage detail;
     private final String code;
@@ -27,6 +27,11 @@ public class UnprocessableEntityException extends RuntimeException {
 
     /** The bundle key for the problem detail. */
     public LocalizedMessage getDetail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
         return detail;
     }
 

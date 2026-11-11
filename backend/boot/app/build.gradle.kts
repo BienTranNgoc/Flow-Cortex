@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
+    implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
@@ -55,6 +56,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-resttestclient")
     testImplementation("org.springframework.boot:spring-boot-restclient")
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // The publication ITs declare their own @ApplicationModuleListener probes.
+    testImplementation("org.springframework.modulith:spring-modulith-events-api")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.flywaydb:flyway-database-postgresql")

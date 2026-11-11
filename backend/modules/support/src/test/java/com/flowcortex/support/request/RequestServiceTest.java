@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,10 +45,10 @@ class RequestServiceTest {
 
     private final RequestRepository requests = mock(RequestRepository.class);
     private final IdempotencyGuard idempotency = mock(IdempotencyGuard.class);
-    private final MailOutboxRepository outbox = mock(MailOutboxRepository.class);
+    private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final AttachmentService attachments = mock(AttachmentService.class);
     private final UserDirectory users = mock(UserDirectory.class);
-    private final RequestService service = new RequestService(requests, idempotency, outbox, attachments, users,
+    private final RequestService service = new RequestService(requests, idempotency, publisher, attachments, users,
             mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
@@ -186,7 +188,7 @@ class RequestServiceTest {
         service.adminReply(admin, 12, "Đã xử lý", List.of(upload), "resolved", Optional.of("key"));
 
         verify(attachments).release(kept);
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -275,7 +277,14 @@ class RequestServiceTest {
 
         assertThat(detail.status()).isEqualTo("resolved");
         assertThat(detail.requester().deleted()).isFalse();
-        verify(outbox).insert(eq(id), any(), eq(member), eq(NOW));
+        ArgumentCaptor<SupportReplyMailRequested> mail = ArgumentCaptor.forClass(SupportReplyMailRequested.class);
+        verify(publisher).publishEvent(mail.capture());
+        assertThat(mail.getValue()).satisfies(event -> {
+            assertThat(event.requestId()).isEqualTo(id);
+            assertThat(event.recipientUserId()).isEqualTo(member);
+            assertThat(event.requestNumber()).isEqualTo(12);
+            assertThat(event.locale()).isEqualTo("en");
+        });
         verify(requests).insertMessage(any(), eq(id), eq("admin"), eq(admin), eq("Đã xử lý"), eq(NOW));
     }
 
@@ -289,7 +298,7 @@ class RequestServiceTest {
                 HttpStatus.CONFLICT, "requester-deleted");
         assertProblem(() -> service.adminReply(admin, 5, "Xin chào", List.of(), "closed", Optional.empty()),
                 HttpStatus.BAD_REQUEST, "validation-failed");
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -303,7 +312,7 @@ class RequestServiceTest {
                     assertThat(e.code()).isEqualTo("validation-failed");
                     assertThat(e.fieldErrors()).containsOnlyKeys("status");
                 });
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -311,7 +320,7 @@ class RequestServiceTest {
         UUID id = UUID.randomUUID();
         UUID conversation = UUID.randomUUID();
         RequestRow linked = new RequestRow(id, 12, member, "credit", "Không thấy credit", RequestStatus.NEW,
-                conversation, true, false, NOW, null, null, null, NOW);
+                conversation, true, false, NOW, null, null, null, NOW, "vi");
         when(requests.findByNumber(12)).thenReturn(Optional.of(linked));
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
         when(requests.conversation(conversation)).thenReturn(List.of(
@@ -329,7 +338,7 @@ class RequestServiceTest {
     void aLinkedConversationTheRetentionDeletedShowsAsExpiredWhileNoLinkDoesNot() {
         UUID expiredId = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(expiredId, 12, member, "credit",
-                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW)));
+                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW, "vi")));
         when(requests.findByNumber(13)).thenReturn(Optional.of(row(UUID.randomUUID(), 13, RequestStatus.NEW)));
 
         AdminDetail expired = service.adminDetail(12);
@@ -403,7 +412,7 @@ class RequestServiceTest {
     private static RequestRow row(UUID id, long number, RequestStatus status, UUID requester) {
         return new RequestRow(id, number, requester, "credit", "Không thấy credit", status, null, false, false, NOW,
                 status == RequestStatus.RESOLVED ? NOW : null, null,
-                status == RequestStatus.CLOSED ? "cancelled" : null, NOW);
+                status == RequestStatus.CLOSED ? "cancelled" : null, NOW, "en");
     }
 
     private static void assertProblem(Runnable call, HttpStatus status, String code) {

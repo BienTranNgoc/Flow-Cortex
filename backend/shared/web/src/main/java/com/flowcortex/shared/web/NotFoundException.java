@@ -6,7 +6,7 @@ package com.flowcortex.shared.web;
  * scope boundaries are not discoverable). Mapped by {@link
  * GlobalExceptionHandler} to a 404 {@code application/problem+json} response.
  */
-public class NotFoundException extends RuntimeException {
+public class NotFoundException extends RuntimeException implements LocalizedProblem {
 
     private final LocalizedMessage detail;
 
@@ -17,6 +17,11 @@ public class NotFoundException extends RuntimeException {
 
     /** The bundle key for the problem detail. */
     public LocalizedMessage getDetail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
         return detail;
     }
 }

@@ -2,6 +2,7 @@ package com.flowcortex.user.accounts;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.shared.web.PageView;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -55,6 +56,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "changeAdminAccountRole")
+    @AdminAudit(value = "admin_account.change_role", capture = "role")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PatchMapping(value = "/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -64,6 +66,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "deactivateAdminAccount")
+    @AdminAudit("admin_account.deactivate")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PostMapping(value = "/{id}/deactivate", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminAccountResponse> deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
@@ -71,6 +74,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "activateAdminAccount")
+    @AdminAudit("admin_account.activate")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PostMapping(value = "/{id}/activate", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminAccountResponse> activate(@PathVariable UUID id) {

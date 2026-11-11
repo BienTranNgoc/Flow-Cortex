@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -42,7 +43,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Members file and follow their own requests; admins answer and move them. Every status change goes through the
  * lifecycle table and a conditional update, so of two concurrent changes exactly one wins. Attachments are copied
- * before the write's transaction opens; the write, its idempotency claim and its outbox row commit together.
+ * before the write's transaction opens; the write, its idempotency claim and its reply-mail event commit together.
  */
 @Service
 class RequestService {
@@ -67,18 +68,18 @@ class RequestService {
 
     private final RequestRepository requests;
     private final IdempotencyGuard idempotency;
-    private final MailOutboxRepository outbox;
+    private final ApplicationEventPublisher events;
     private final AttachmentService attachments;
     private final UserDirectory users;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
-    RequestService(RequestRepository requests, IdempotencyGuard idempotency, MailOutboxRepository outbox,
+    RequestService(RequestRepository requests, IdempotencyGuard idempotency, ApplicationEventPublisher events,
             AttachmentService attachments, UserDirectory users, PlatformTransactionManager transactionManager,
             Clock clock) {
         this.requests = requests;
         this.idempotency = idempotency;
-        this.outbox = outbox;
+        this.events = events;
         this.attachments = attachments;
         this.users = users;
         this.transaction = new TransactionTemplate(transactionManager);
@@ -243,7 +244,8 @@ class RequestService {
             requireMoved(row, move, Boolean.TRUE, at);
             requests.insertMessage(messageId, row.id(), "admin", adminId, text, at);
             requests.insertAttachments(messageId, kept, at);
-            outbox.insert(row.id(), messageId, row.requesterId(), at);
+            events.publishEvent(new SupportReplyMailRequested(row.id(), messageId, row.requesterId(), row.number(),
+                    row.locale()));
             LOG.info("support.request outcome=replied request={} actor=admin status={} attachments={}", row.number(),
                     move.target().value(), kept.size());
             return Optional.<UUID>empty();

@@ -3,6 +3,7 @@ package com.flowcortex.chat.web;
 import com.flowcortex.chat.config.ChatSwitch;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -67,6 +68,7 @@ class AdminChatSettingsController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
+    @AdminAudit(value = "chat_setting.update", capture = "enabled")
     @PutMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     AdminSettings update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SettingsUpdate body) {
         CurrentUser admin = caller.require(jwt);

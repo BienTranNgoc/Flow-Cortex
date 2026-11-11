@@ -9,6 +9,7 @@ include(
     ":modules:workflow",
     ":modules:media",
     ":modules:credit",
+    ":modules:jobs",
     ":modules:llm",
     ":modules:support",
     ":modules:space",
