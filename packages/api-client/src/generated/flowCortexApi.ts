@@ -1227,8 +1227,8 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
-  chat: boolean;
   personalAccessTokens: boolean;
+  chat: boolean;
 }
 
 export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];

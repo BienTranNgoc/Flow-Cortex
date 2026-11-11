@@ -5217,9 +5217,9 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
-        chat:
-          type: boolean
         personalAccessTokens:
+          type: boolean
+        chat:
           type: boolean
       required:
       - chat
