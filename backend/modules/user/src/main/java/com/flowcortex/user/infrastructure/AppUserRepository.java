@@ -81,8 +81,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
 
     Optional<AppUser> findByOwnerIdAndId(UUID ownerId, UUID id);
 
-    List<AppUser> findAllByOwnerIdOrderByEmailAsc(UUID ownerId);
-
     /** Ids and emails only, whatever the status: the rest of the row, the password hash included, stays unread. */
     @Query("SELECT new com.flowcortex.user.infrastructure.UserEmail(u.id, u.email) FROM AppUser u WHERE u.id IN :ids")
     List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<UUID> ids);

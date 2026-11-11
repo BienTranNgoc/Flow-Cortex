@@ -17,26 +17,16 @@ describe('DashboardPage', () => {
   it('shows totals from server pages and account dates from the user list', async () => {
     const calls = stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
-      'GET /api/v1/users': {
+      'GET /api/v1/users/stats': {
         status: 200,
-        body: [
-          {
-            id: 'u1',
-            email: 'active@example.com',
-            name: 'Active',
-            role: 'MEMBER',
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: 'u2',
-            email: 'locked@example.com',
-            name: 'Locked',
-            role: 'MEMBER',
-            status: 'SUSPENDED',
-            createdAt: '2020-01-01T00:00:00Z',
-          },
-        ],
+        body: {
+          total: 42,
+          active: 30,
+          pendingConfirmation: 5,
+          locked: 2,
+          suspended: 5,
+          newLast7Days: 9,
+        },
       },
       [RUNS_PATH]: () => {
         const status = calls.at(-1)?.query.get('status') ?? null;
@@ -67,6 +57,8 @@ describe('DashboardPage', () => {
     renderRoute('/dashboard', '/dashboard', <DashboardPage />);
 
     expect(await screen.findByText('15')).toBeInTheDocument();
+    expect(await screen.findByText('42')).toBeInTheDocument();
+    expect(calls.some((call) => call.path === '/api/v1/users')).toBe(false);
     expect(screen.getByText('Total workflow runs')).toBeInTheDocument();
     expect(screen.getByText('New in 7 days')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
@@ -86,7 +78,7 @@ describe('DashboardPage', () => {
 
     expect((await screen.findAllByText('7')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(calls.some((call) => call.path === '/api/v1/users')).toBe(false);
+    expect(calls.some((call) => call.path.startsWith('/api/v1/users'))).toBe(false);
   });
 
   describe('in Vietnamese', () => {
@@ -100,7 +92,7 @@ describe('DashboardPage', () => {
     it('renders the heading, metric cards, status pills and empty state in Vietnamese', async () => {
       stubApi({
         'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
-        'GET /api/v1/users': { status: 200, body: [] },
+        'GET /api/v1/users/stats': { status: 200, body: {} },
         [RUNS_PATH]: { status: 200, body: { items: [], page: 0, size: 20, total: 1200 } },
       });
       renderRoute('/dashboard', '/dashboard', <DashboardPage />);

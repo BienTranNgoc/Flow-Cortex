@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import java.util.List;
@@ -70,10 +71,12 @@ class UserConcurrentCreateIT extends AbstractPostgresBootTest {
 
             // Each owner scope also lists the seed admin's own (self-owned)
             // row, so `contains` rather than `containsExactly`.
-            List<UserView> winnerScope = userService.listUsers(winner.ownerId());
+            List<UserView> winnerScope =
+                    userService.searchUsers(winner.ownerId(), UserQuery.all(), 0, 100).items();
             assertThat(winnerScope).extracting(UserView::email).contains(racedEmail);
 
-            List<UserView> loserScope = userService.listUsers(loser.ownerId());
+            List<UserView> loserScope =
+                    userService.searchUsers(loser.ownerId(), UserQuery.all(), 0, 100).items();
             assertThat(loserScope).extracting(UserView::email).doesNotContain(racedEmail);
         } finally {
             pool.shutdownNow();

@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import { can, type Caller } from '../../app/permissions';
+import type { StatusTone } from '../../app/StatusPill';
 
 export const END_USER_ROLES = ['MEMBER', 'CREATOR'] as const;
 export const STAFF_ROLES = [
@@ -31,6 +32,34 @@ export function roleLabel(t: TFunction, role: string | undefined): string {
     return '';
   }
   return ROLES.includes(role) ? t(`users.role.${role}`) : role;
+}
+
+const STATES: readonly string[] = ['active', 'pending_confirmation', 'locked', 'suspended'];
+const SIGN_IN_METHODS: readonly string[] = ['PASSWORD', 'GOOGLE'];
+
+const STATE_TONES: Record<string, StatusTone> = {
+  active: 'success',
+  pending_confirmation: 'info',
+  locked: 'warning',
+  suspended: 'error',
+};
+
+/** The account state's label in the active language; a state this console does not know is shown as sent. */
+export function stateLabel(t: TFunction, state: string | undefined): string {
+  if (!state) {
+    return '';
+  }
+  return STATES.includes(state) ? t(`users.state.${state}`) : state;
+}
+
+/** The pill tone of an account state; an unknown state reads as muted. */
+export function stateTone(state: string | undefined): StatusTone {
+  return (state && STATE_TONES[state]) || 'muted';
+}
+
+/** A sign-in method's label in the active language; a method this console does not know is shown as sent. */
+export function signInMethodLabel(t: TFunction, method: string): string {
+  return SIGN_IN_METHODS.includes(method) ? t(`users.signInMethod.${method}`) : method;
 }
 
 /** The account status's label in the active language; no status reads as active, an unknown code is shown as sent. */

@@ -577,16 +577,68 @@ paths:
     get:
       tags:
       - users-controller
-      operationId: list
+      operationId: listUsers
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+          minLength: 0
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]{0,19}$"
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - pending_confirmation
+          - locked
+          - suspended
+          pattern: active|pending_confirmation|locked|suspended
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - email
+          - name
+          pattern: newest|oldest|email|name
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserResponse"
+                $ref: "#/components/schemas/PageViewUserResponse"
     post:
       tags:
       - users-controller
@@ -2197,6 +2249,71 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminAccountResponse"
+  /api/v1/users/stats:
+    get:
+      tags:
+      - users-controller
+      operationId: getUserStats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+  /api/v1/users/export:
+    get:
+      tags:
+      - user-export-controller
+      operationId: exportUsers
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+          minLength: 0
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]{0,19}$"
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - pending_confirmation
+          - locked
+          - suspended
+          pattern: active|pending_confirmation|locked|suspended
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - email
+          - name
+          pattern: newest|oldest|email|name
+      responses:
+        "200":
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: byte
+            application/problem+json:
+              schema:
+                type: string
+                format: byte
   /api/v1/support/settings:
     get:
       tags:
@@ -2987,6 +3104,24 @@ components:
         updatedAt:
           type: string
           format: date-time
+        username:
+          type: string
+        state:
+          type: string
+        emailConfirmedAt:
+          type: string
+          format: date-time
+        lockedUntil:
+          type: string
+          format: date-time
+        signInMethods:
+          type: array
+          items:
+            type: string
+        adminDisabled:
+          type: boolean
+        staffTarget:
+          type: boolean
     SetPasswordRequest:
       type: object
       properties:
@@ -3113,6 +3248,7 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - user.account.export
         adminDisabled:
           type: boolean
       required:
@@ -4456,6 +4592,48 @@ components:
           pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - role
+    PageViewUserResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    UserStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        active:
+          type: integer
+          format: int64
+        pendingConfirmation:
+          type: integer
+          format: int64
+        locked:
+          type: integer
+          format: int64
+        suspended:
+          type: integer
+          format: int64
+        newLast7Days:
+          type: integer
+          format: int64
     SupportSettings:
       type: object
       properties:
@@ -4929,6 +5107,7 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - user.account.export
       required:
       - code
       - permissions
