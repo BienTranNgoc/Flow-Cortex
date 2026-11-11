@@ -17,6 +17,14 @@ dependencies = [
     "opentelemetry-instrumentation-logging==0.65b0",
 ]
 
+[project.optional-dependencies]
+# Image clean overlay: geometry, pipeline and their tests. torch, torchvision and easyocr are
+# installed from engines/requirements-overlay.txt in the overlay image only.
+overlay = [
+    "numpy==1.26.4",
+    "opencv-python-headless==4.10.0.84",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
@@ -48,7 +56,16 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # No type information is published for these.
-module = ["pika.*", "boto3.*", "botocore.*", "jsonschema.*"]
+module = [
+    "pika.*",
+    "boto3.*",
+    "botocore.*",
+    "jsonschema.*",
+    "cv2.*",
+    "torch.*",
+    "torchvision.*",
+    "easyocr.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
