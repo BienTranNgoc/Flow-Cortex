@@ -401,6 +401,25 @@ flowcortex:
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
     mail:
       from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
+  # Main chat. Off: the page is hidden by the features flag. The console's chat switch gates sends on top
+  # of it. Restart to apply. Limits count member messages; the sweeper fails a turn still running
+  # sweep-grace after turn-timeout.
+  chat:
+    enabled: ${FLOWCORTEX_CHAT_ENABLED:false}
+    model: ${FLOWCORTEX_CHAT_MODEL:gemini-3.5-flash}
+    quota:
+      member-per-day: ${FLOWCORTEX_CHAT_MEMBER_DAILY_QUOTA:100}
+      global-per-day: ${FLOWCORTEX_CHAT_GLOBAL_DAILY_QUOTA:5000}
+      per-minute: ${FLOWCORTEX_CHAT_PER_MINUTE:10}
+    turn-timeout: ${FLOWCORTEX_CHAT_TURN_TIMEOUT:90s}
+    sweep-grace: ${FLOWCORTEX_CHAT_SWEEP_GRACE:30s}
+    max-tool-rounds: ${FLOWCORTEX_CHAT_MAX_TOOL_ROUNDS:4}
+    turn-threads: ${FLOWCORTEX_CHAT_TURN_THREADS:8}
+    turn-queue: ${FLOWCORTEX_CHAT_TURN_QUEUE:32}
+    # One answer's token cap. The provider counts the model's thinking tokens inside it, so the thinking
+    # budget is the share thinking may use and must stay below it.
+    max-output-tokens: ${FLOWCORTEX_CHAT_MAX_OUTPUT_TOKENS:8192}
+    thinking-budget: ${FLOWCORTEX_CHAT_THINKING_BUDGET:1024}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store

@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.api;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -13,4 +14,9 @@ import java.util.UUID;
 public record WorkflowView(
         UUID id, UUID ownerId, String name, boolean shared, Instant createdAt, Instant updatedAt,
         List<WorkflowStepView> steps, boolean available, String status) {
+
+    /** Sum of the steps' configured costs; {@code null} while credits are switched off. */
+    public Long estimatedCredits(CreditAccounts credits) {
+        return credits.enabled() ? credits.estimate(steps.stream().map(WorkflowStepView::type).toList()) : null;
+    }
 }
