@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
+import com.flowcortex.workflow.api.ChatWorkflowView;
 import com.flowcortex.workflow.api.NewStep;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
@@ -49,9 +51,11 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     private final WorkflowStepRepository workflowStepRepository;
     private final StepExecutorRegistry registry;
     private final Validator validator;
+    private final CreditAccounts credits;
 
     WorkflowServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
-            StepExecutorRegistry registry, Validator validator) {
+            StepExecutorRegistry registry, Validator validator, CreditAccounts credits) {
+        this.credits = credits;
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
         this.registry = registry;
@@ -65,6 +69,24 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                 .map(workflow -> WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote,
                         registry::isAvailable))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChatWorkflowView> listChatCatalog(UUID userId) {
+        return listVisibleWorkflows(userId).stream()
+                .map(view -> new ChatWorkflowView(view.id(), view.name(),
+                        view.steps().stream().map(WorkflowStepView::type).toList(), inputKind(view),
+                        view.estimatedCredits(credits)))
+                .toList();
+    }
+
+    private static String inputKind(WorkflowView view) {
+        if (ProductVideoWorkflow.ID.equals(view.id())) {
+            return "product_video";
+        }
+        boolean imageFirst = !view.steps().isEmpty() && "remote".equals(view.steps().getFirst().mode());
+        return imageFirst ? "image" : "text";
     }
 
     @Override
