@@ -318,7 +318,7 @@ export function ApiTokensSection() {
           </button>
         </p>
       )}
-      {tokens.data && tokens.data.length === 0 && (
+      {tokens.data?.length === 0 && (
         <p className="api-tokens-empty">{t('auth.apiTokens.empty')}</p>
       )}
       {revokeError && (

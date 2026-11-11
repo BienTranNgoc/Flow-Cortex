@@ -59,16 +59,17 @@ function post(reportingApp: ClientErrorApp, kind: ClientErrorKind, name: string,
     route,
     ...(lang ? { lang } : {}),
   });
-  try {
-    void fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body,
-      credentials: 'omit',
-      keepalive: true,
-      referrerPolicy: 'no-referrer',
-    }).catch(() => {});
-  } catch {
-    // Best-effort delivery: a failed post must never become a new page error.
-  }
+  // Best-effort delivery: a failed post, thrown or rejected, must never become a new page error.
+  void new Promise<Response>((resolve) => {
+    resolve(
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body,
+        credentials: 'omit',
+        keepalive: true,
+        referrerPolicy: 'no-referrer',
+      }),
+    );
+  }).catch(() => {});
 }

@@ -13,8 +13,8 @@ const ALL_OFF = {
   passwordReset: false,
   supportWidget: false,
   supportAssistant: false,
-  chat: false,
   personalAccessTokens: false,
+  chat: false,
 };
 
 function setup() {

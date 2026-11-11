@@ -10,8 +10,8 @@ const ALL_OFF: FeaturesResponse = {
   passwordReset: false,
   supportWidget: false,
   supportAssistant: false,
-  chat: false,
   personalAccessTokens: false,
+  chat: false,
 };
 
 /** The `/features` query itself, for a page that must tell "still loading" from "switched off". */
