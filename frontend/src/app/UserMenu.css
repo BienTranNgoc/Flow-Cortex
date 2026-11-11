@@ -34,6 +34,13 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.cortex-user-menu__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .cortex-user-menu__avatar--lg {

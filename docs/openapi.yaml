@@ -64,6 +64,30 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/v1/profile/images/{slot}:
+    put:
+      tags:
+      - profile-images-controller
+      operationId: setCurrent
+      parameters:
+      - name: slot
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadedImageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileImageView"
   /api/v1/me/password:
     put:
       tags:
@@ -152,6 +176,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile:
+    get:
+      tags:
+      - own-profile-controller
+      operationId: get_1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnProfileResponse"
     put:
       tags:
       - auth-controller
@@ -169,6 +204,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/auth/profile/username:
+    put:
+      tags:
+      - own-profile-controller
+      operationId: changeUsername
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsernameRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnProfileResponse"
+  /api/v1/auth/profile/preferences/locale:
+    put:
+      tags:
+      - account-preferences-controller
+      operationId: setLocale
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocaleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocaleResponse"
   /api/v1/admin/support/settings:
     get:
       tags:
@@ -942,6 +1013,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewTaskResponse"
+  /api/v1/profile/images/{slot}/originals:
+    get:
+      tags:
+      - profile-images-controller
+      operationId: originals
+      parameters:
+      - name: slot
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProfileImageView"
+    post:
+      tags:
+      - profile-images-controller
+      operationId: addOriginal
+      parameters:
+      - name: slot
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadedImageRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileImageView"
+  /api/v1/profile/images/uploads:
+    post:
+      tags:
+      - profile-images-controller
+      operationId: requestUpload_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
   /api/v1/product-videos/runs:
     post:
       tags:
@@ -1661,6 +1793,45 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/profile/preferences/ui:
+    patch:
+      tags:
+      - account-preferences-controller
+      description: "Body keys: theme (light|dark), sidebarMode (pinned|rail)"
+      operationId: patchUi
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UiPreferences"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiPreferences"
+  /api/v1/auth/profile/preferences/privacy:
+    patch:
+      tags:
+      - account-preferences-controller
+      description: "Body keys: profile, activity, message (everyone|followers|only_me),\
+        \ stats (show|hide)"
+      operationId: patchPrivacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivacySettings"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacySettings"
   /api/v1/workflows:
     get:
       tags:
@@ -2067,11 +2238,23 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/profile/images:
+    get:
+      tags:
+      - profile-images-controller
+      operationId: current
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentImages"
   /api/v1/me/phone:
     get:
       tags:
       - phone-controller
-      operationId: current
+      operationId: current_1
       responses:
         "200":
           description: OK
@@ -2155,6 +2338,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/v1/auth/profile/preferences:
+    get:
+      tags:
+      - account-preferences-controller
+      operationId: get_2
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesView"
   /api/v1/auth/oauth/google/callback:
     get:
       tags:
@@ -2449,6 +2644,31 @@ components:
         updatedAt:
           type: string
           format: date-time
+    UploadedImageRequest:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+      required:
+      - uploadId
+    ProfileImageView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        width:
+          type: integer
+          format: int32
+        height:
+          type: integer
+          format: int32
     SetPasswordRequest:
       type: object
       properties:
@@ -2528,7 +2748,16 @@ components:
       properties:
         name:
           type: string
-          minLength: 1
+          maxLength: 255
+          minLength: 0
+        firstName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        lastName:
+          type: string
+          maxLength: 100
+          minLength: 0
       required:
       - name
     MeResponse:
@@ -2549,6 +2778,45 @@ components:
           type: boolean
         passwordSetupRequired:
           type: boolean
+    UsernameRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          pattern: "^[a-z0-9_]{3,20}$"
+      required:
+      - username
+    OwnProfileResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        username:
+          type: string
+        usernameNextChangeAt:
+          type: string
+          format: date-time
+      required:
+      - name
+    LocaleRequest:
+      type: object
+      properties:
+        locale:
+          type: string
+          pattern: vi|en
+      required:
+      - locale
+    LocaleResponse:
+      type: object
+      properties:
+        locale:
+          type: string
+      required:
+      - locale
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -3730,6 +3998,45 @@ components:
       required:
       - body
       - status
+    UiPreferences:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum:
+          - light
+          - dark
+        sidebarMode:
+          type: string
+          enum:
+          - pinned
+          - rail
+    PrivacySettings:
+      type: object
+      properties:
+        profile:
+          type: string
+          enum:
+          - everyone
+          - followers
+          - only_me
+        activity:
+          type: string
+          enum:
+          - everyone
+          - followers
+          - only_me
+        message:
+          type: string
+          enum:
+          - everyone
+          - followers
+          - only_me
+        stats:
+          type: string
+          enum:
+          - show
+          - hide
     WorkflowResponse:
       type: object
       properties:
@@ -3991,6 +4298,13 @@ components:
       - kind
       - mimeType
       - url
+    CurrentImages:
+      type: object
+      properties:
+        avatar:
+          $ref: "#/components/schemas/ProfileImageView"
+        cover:
+          $ref: "#/components/schemas/ProfileImageView"
     HealthResponse:
       type: object
       properties:
@@ -4039,6 +4353,9 @@ components:
         balance:
           type: integer
           format: int64
+        granted:
+          type: integer
+          format: int64
     ChatConversationList:
       type: object
       properties:
@@ -4058,6 +4375,23 @@ components:
         productVideoWorkflowId:
           type: string
           format: uuid
+    PreferencesView:
+      type: object
+      properties:
+        locale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+        ui:
+          $ref: "#/components/schemas/UiPreferences"
+        privacy:
+          $ref: "#/components/schemas/PrivacySettings"
+      required:
+      - privacy
+      - ui
     AdminSupportRequestPage:
       type: object
       properties:

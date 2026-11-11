@@ -1,0 +1,33 @@
+# Given names that embed an R3 term; the allowlist exempts a name from R3 only.
+# Ported from the product-owner list kept by the Xood backend. Change only through a reviewed PR.
+phuc
+hoangphuc
+minhphuc
+phucanh
+phuclong
+phucthinh
+phucnguyen
+bich
+bichngoc
+bichphuong
+bichtram
+bichhang
+cuong
+manhcuong
+quoccuong
+cuongnguyen
+cuc
+cuchoa
+duc
+minhduc
+ducanh
+dung
+dungnguyen
+thuydung
+dang
+dangkhoa
+dangnguyen
+hangnga
+congdanh
+danhdo
+dinhcong

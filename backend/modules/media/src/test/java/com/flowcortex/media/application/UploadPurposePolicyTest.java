@@ -112,6 +112,35 @@ class UploadPurposePolicyTest {
     }
 
     @Test
+    void profileImageAcceptsPngJpgJpegWebpUpToTenMegabytesAndRefusesGifAndOneByteMore() {
+        for (String fileName : List.of("a.png", "a.JPG", "a.jpeg", "a.webp")) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.PROFILE_IMAGE, fileName, IMAGE_CAP);
+            assertThat(allowed.kind()).as(fileName).isEqualTo("image");
+            assertThat(allowed.maxBytes()).isEqualTo(IMAGE_CAP);
+        }
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.PROFILE_IMAGE, "a.gif", 1L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("fileName");
+                    assertThat(e.detail().args()).containsExactly(".png, .jpg, .jpeg", ".webp");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.PROFILE_IMAGE, "a.png", IMAGE_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().args()[0]).isEqualTo(10L);
+                });
+        assertThat(policy.maxBytes(UploadPurpose.PROFILE_IMAGE, "video")).isZero();
+    }
+
+    @Test
+    void profileImageKeyCarriesItsPrefix() {
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+
+        assertThat(policy.objectKey(UploadPurpose.PROFILE_IMAGE, owner, upload))
+                .isEqualTo("profile-image/" + owner + "/" + upload);
+    }
+
+    @Test
     void noPurposeAcceptsASizeBelowOneByte() {
         for (UploadPurpose purpose : UploadPurpose.values()) {
             for (long size : new long[] {0L, -1L}) {

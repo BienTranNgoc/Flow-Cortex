@@ -24,6 +24,18 @@ export interface UserResponse {
   updatedAt?: string;
 }
 
+export interface UploadedImageRequest {
+  uploadId: string;
+}
+
+export interface ProfileImageView {
+  id?: string;
+  url?: string;
+  expiresAt?: string;
+  width?: number;
+  height?: number;
+}
+
 export interface SetPasswordRequest {
   /**
    * @minLength 0
@@ -78,8 +90,21 @@ export interface ChatConversation {
 }
 
 export interface ProfileUpdateRequest {
-  /** @minLength 1 */
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
   name: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  firstName?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  lastName?: string;
 }
 
 export interface MeResponse {
@@ -90,6 +115,28 @@ export interface MeResponse {
   status?: string;
   hasPassword?: boolean;
   passwordSetupRequired?: boolean;
+}
+
+export interface UsernameRequest {
+  /** @pattern ^[a-z0-9_]{3,20}$ */
+  username: string;
+}
+
+export interface OwnProfileResponse {
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  usernameNextChangeAt?: string;
+}
+
+export interface LocaleRequest {
+  /** @pattern vi|en */
+  locale: string;
+}
+
+export interface LocaleResponse {
+  locale: string;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -863,6 +910,67 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export type UiPreferencesTheme = (typeof UiPreferencesTheme)[keyof typeof UiPreferencesTheme];
+
+export const UiPreferencesTheme = {
+  light: 'light',
+  dark: 'dark',
+} as const;
+
+export type UiPreferencesSidebarMode =
+  (typeof UiPreferencesSidebarMode)[keyof typeof UiPreferencesSidebarMode];
+
+export const UiPreferencesSidebarMode = {
+  pinned: 'pinned',
+  rail: 'rail',
+} as const;
+
+export interface UiPreferences {
+  theme?: UiPreferencesTheme;
+  sidebarMode?: UiPreferencesSidebarMode;
+}
+
+export type PrivacySettingsProfile =
+  (typeof PrivacySettingsProfile)[keyof typeof PrivacySettingsProfile];
+
+export const PrivacySettingsProfile = {
+  everyone: 'everyone',
+  followers: 'followers',
+  only_me: 'only_me',
+} as const;
+
+export type PrivacySettingsActivity =
+  (typeof PrivacySettingsActivity)[keyof typeof PrivacySettingsActivity];
+
+export const PrivacySettingsActivity = {
+  everyone: 'everyone',
+  followers: 'followers',
+  only_me: 'only_me',
+} as const;
+
+export type PrivacySettingsMessage =
+  (typeof PrivacySettingsMessage)[keyof typeof PrivacySettingsMessage];
+
+export const PrivacySettingsMessage = {
+  everyone: 'everyone',
+  followers: 'followers',
+  only_me: 'only_me',
+} as const;
+
+export type PrivacySettingsStats = (typeof PrivacySettingsStats)[keyof typeof PrivacySettingsStats];
+
+export const PrivacySettingsStats = {
+  show: 'show',
+  hide: 'hide',
+} as const;
+
+export interface PrivacySettings {
+  profile?: PrivacySettingsProfile;
+  activity?: PrivacySettingsActivity;
+  message?: PrivacySettingsMessage;
+  stats?: PrivacySettingsStats;
+}
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -1008,6 +1116,11 @@ export interface RunInputResponse {
   expiresAt: string;
 }
 
+export interface CurrentImages {
+  avatar?: ProfileImageView;
+  cover?: ProfileImageView;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -1029,6 +1142,7 @@ export interface FeaturesResponse {
 
 export interface BalanceResponse {
   balance?: number;
+  granted?: number;
 }
 
 export interface ChatConversationList {
@@ -1040,6 +1154,24 @@ export interface CapabilitiesResponse {
   mediaEnabled?: boolean;
   productVideoEnabled?: boolean;
   productVideoWorkflowId?: string;
+}
+
+/**
+ * @nullable
+ */
+export type PreferencesViewLocale =
+  (typeof PreferencesViewLocale)[keyof typeof PreferencesViewLocale] | null;
+
+export const PreferencesViewLocale = {
+  vi: 'vi',
+  en: 'en',
+} as const;
+
+export interface PreferencesView {
+  /** @nullable */
+  locale?: PreferencesViewLocale;
+  ui: UiPreferences;
+  privacy: PrivacySettings;
 }
 
 export type AdminSupportRequestSummaryType =
@@ -1370,6 +1502,52 @@ export const _delete = async (
   });
 };
 
+export type setCurrentResponse200 = {
+  data: ProfileImageView;
+  status: 200;
+};
+
+export type setCurrentResponseSuccess = setCurrentResponse200 & {
+  headers: Headers;
+};
+export type setCurrentResponse = setCurrentResponseSuccess;
+
+export const getSetCurrentUrl = (slot: string) => {
+  return `/api/v1/profile/images/${slot}`;
+};
+
+export const setCurrent = async (
+  slot: string,
+  uploadedImageRequest: UploadedImageRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setCurrentResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setCurrentResponse>(getSetCurrentUrl(slot), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadedImageRequest),
+  });
+};
+
 export type setPasswordResponse200 = {
   data: AccessTokenResponse;
   status: 200;
@@ -1526,6 +1704,27 @@ export const deleteChatConversation = async (
   });
 };
 
+export type get1Response200 = {
+  data: OwnProfileResponse;
+  status: 200;
+};
+
+export type get1ResponseSuccess = get1Response200 & {
+  headers: Headers;
+};
+export type get1Response = get1ResponseSuccess;
+
+export const getGet1Url = () => {
+  return `/api/v1/auth/profile`;
+};
+
+export const get1 = async (options?: Parameters<typeof customFetch>[1]): Promise<get1Response> => {
+  return customFetch<get1Response>(getGet1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type updateProfileResponse200 = {
   data: MeResponse;
   status: 200;
@@ -1568,6 +1767,96 @@ export const updateProfile = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(profileUpdateRequest),
+  });
+};
+
+export type changeUsernameResponse200 = {
+  data: OwnProfileResponse;
+  status: 200;
+};
+
+export type changeUsernameResponseSuccess = changeUsernameResponse200 & {
+  headers: Headers;
+};
+export type changeUsernameResponse = changeUsernameResponseSuccess;
+
+export const getChangeUsernameUrl = () => {
+  return `/api/v1/auth/profile/username`;
+};
+
+export const changeUsername = async (
+  usernameRequest: UsernameRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeUsernameResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<changeUsernameResponse>(getChangeUsernameUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(usernameRequest),
+  });
+};
+
+export type setLocaleResponse200 = {
+  data: LocaleResponse;
+  status: 200;
+};
+
+export type setLocaleResponseSuccess = setLocaleResponse200 & {
+  headers: Headers;
+};
+export type setLocaleResponse = setLocaleResponseSuccess;
+
+export const getSetLocaleUrl = () => {
+  return `/api/v1/auth/profile/preferences/locale`;
+};
+
+export const setLocale = async (
+  localeRequest: LocaleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setLocaleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setLocaleResponse>(getSetLocaleUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(localeRequest),
   });
 };
 
@@ -2878,6 +3167,121 @@ export const approveTask = async (
   });
 };
 
+export type originalsResponse200 = {
+  data: ProfileImageView[];
+  status: 200;
+};
+
+export type originalsResponseSuccess = originalsResponse200 & {
+  headers: Headers;
+};
+export type originalsResponse = originalsResponseSuccess;
+
+export const getOriginalsUrl = (slot: string) => {
+  return `/api/v1/profile/images/${slot}/originals`;
+};
+
+export const originals = async (
+  slot: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<originalsResponse> => {
+  return customFetch<originalsResponse>(getOriginalsUrl(slot), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type addOriginalResponse201 = {
+  data: ProfileImageView;
+  status: 201;
+};
+
+export type addOriginalResponseSuccess = addOriginalResponse201 & {
+  headers: Headers;
+};
+export type addOriginalResponse = addOriginalResponseSuccess;
+
+export const getAddOriginalUrl = (slot: string) => {
+  return `/api/v1/profile/images/${slot}/originals`;
+};
+
+export const addOriginal = async (
+  slot: string,
+  uploadedImageRequest: UploadedImageRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<addOriginalResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<addOriginalResponse>(getAddOriginalUrl(slot), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadedImageRequest),
+  });
+};
+
+export type requestUpload1Response201 = {
+  data: UploadResponse;
+  status: 201;
+};
+
+export type requestUpload1ResponseSuccess = requestUpload1Response201 & {
+  headers: Headers;
+};
+export type requestUpload1Response = requestUpload1ResponseSuccess;
+
+export const getRequestUpload1Url = () => {
+  return `/api/v1/profile/images/uploads`;
+};
+
+export const requestUpload1 = async (
+  uploadRequest: UploadRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestUpload1Response> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestUpload1Response>(getRequestUpload1Url(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadRequest),
+  });
+};
+
 export type startProductVideoRunResponse200 = {
   data: RunResponse;
   status: 200;
@@ -4115,6 +4519,102 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
+export type patchUiResponse200 = {
+  data: UiPreferences;
+  status: 200;
+};
+
+export type patchUiResponseSuccess = patchUiResponse200 & {
+  headers: Headers;
+};
+export type patchUiResponse = patchUiResponseSuccess;
+
+export const getPatchUiUrl = () => {
+  return `/api/v1/auth/profile/preferences/ui`;
+};
+
+/**
+ * Body keys: theme (light|dark), sidebarMode (pinned|rail)
+ */
+export const patchUi = async (
+  uiPreferences: UiPreferences,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<patchUiResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<patchUiResponse>(getPatchUiUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uiPreferences),
+  });
+};
+
+export type patchPrivacyResponse200 = {
+  data: PrivacySettings;
+  status: 200;
+};
+
+export type patchPrivacyResponseSuccess = patchPrivacyResponse200 & {
+  headers: Headers;
+};
+export type patchPrivacyResponse = patchPrivacyResponseSuccess;
+
+export const getPatchPrivacyUrl = () => {
+  return `/api/v1/auth/profile/preferences/privacy`;
+};
+
+/**
+ * Body keys: profile, activity, message (everyone|followers|only_me), stats (show|hide)
+ */
+export const patchPrivacy = async (
+  privacySettings: PrivacySettings,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<patchPrivacyResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<patchPrivacyResponse>(getPatchPrivacyUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(privacySettings),
+  });
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -4688,7 +5188,7 @@ export const openRealtimeStream = async (
 };
 
 export type currentResponse200 = {
-  data: PhoneResponse;
+  data: CurrentImages;
   status: 200;
 };
 
@@ -4698,13 +5198,36 @@ export type currentResponseSuccess = currentResponse200 & {
 export type currentResponse = currentResponseSuccess;
 
 export const getCurrentUrl = () => {
-  return `/api/v1/me/phone`;
+  return `/api/v1/profile/images`;
 };
 
 export const current = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<currentResponse> => {
   return customFetch<currentResponse>(getCurrentUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type current1Response200 = {
+  data: PhoneResponse;
+  status: 200;
+};
+
+export type current1ResponseSuccess = current1Response200 & {
+  headers: Headers;
+};
+export type current1Response = current1ResponseSuccess;
+
+export const getCurrent1Url = () => {
+  return `/api/v1/me/phone`;
+};
+
+export const current1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<current1Response> => {
+  return customFetch<current1Response>(getCurrent1Url(), {
     ...options,
     method: 'GET',
   });
@@ -4831,6 +5354,27 @@ export const capabilities = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<capabilitiesResponse> => {
   return customFetch<capabilitiesResponse>(getCapabilitiesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type get2Response200 = {
+  data: PreferencesView;
+  status: 200;
+};
+
+export type get2ResponseSuccess = get2Response200 & {
+  headers: Headers;
+};
+export type get2Response = get2ResponseSuccess;
+
+export const getGet2Url = () => {
+  return `/api/v1/auth/profile/preferences`;
+};
+
+export const get2 = async (options?: Parameters<typeof customFetch>[1]): Promise<get2Response> => {
+  return customFetch<get2Response>(getGet2Url(), {
     ...options,
     method: 'GET',
   });

@@ -48,6 +48,9 @@ public class AppUser {
     @Column(name = "username")
     private String username;
 
+    @Column(name = "username_changed_at")
+    private Instant usernameChangedAt;
+
     /** {@code null} only for a self-registered account that has not opened its confirmation link yet. */
     @Column(name = "email_confirmed_at")
     private Instant emailConfirmedAt;
@@ -179,6 +182,10 @@ public class AppUser {
         return username;
     }
 
+    public Instant getUsernameChangedAt() {
+        return usernameChangedAt;
+    }
+
     public Instant getEmailConfirmedAt() {
         return emailConfirmedAt;
     }
@@ -240,6 +247,23 @@ public class AppUser {
 
     public void changeName(String name) {
         this.name = name;
+        touch();
+    }
+
+    /** A blank first or last name arrives as {@code null} and clears the field. */
+    public void changeNames(String name, String firstName, String lastName) {
+        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        touch();
+    }
+
+    /** {@code changedAtOrNull} starts the cooldown; a {@code null} leaves the previous stamp as it was. */
+    public void changeUsername(String next, Instant changedAtOrNull) {
+        this.username = next;
+        if (changedAtOrNull != null) {
+            this.usernameChangedAt = changedAtOrNull;
+        }
         touch();
     }
 

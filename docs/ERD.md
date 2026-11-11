@@ -30,6 +30,7 @@ erDiagram
     varchar name
     varchar role "ADMIN | MEMBER"
     varchar status "ACTIVE | SUSPENDED"
+    timestamptz username_changed_at "NULL until the first username change; the 30-day cooldown reads it"
     timestamptz created_at
     timestamptz updated_at
   }
@@ -173,6 +174,50 @@ the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex
 forward, never overwrites one. Approval names a revision id and the task `version` it read, so a browser
 tab holding older text loses the approval with a 409 instead of approving something it never showed. The
 payload `generate_speech` consumes is the approved revision's content, not whatever sits in the task.
+
+## Profile settings and images (`V2026.11.11.090` – `V2026.11.11.091`)
+
+```mermaid
+erDiagram
+  app_user ||--o{ username_hold : "user_id, ON DELETE CASCADE"
+  app_user ||--o| account_preference : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ profile_image : "user_id (no FK)"
+
+  username_hold {
+    varchar username PK "one row per released name"
+    uuid user_id FK "former owner; may take the name back"
+    timestamptz expires_at "hold ends; an expired row is overwritten by the next hold"
+    timestamptz created_at
+  }
+  account_preference {
+    uuid user_id PK, FK
+    varchar locale "vi | en | NULL = follow the device"
+    jsonb ui "closed key set validated in Java"
+    jsonb privacy "closed key set validated in Java"
+    timestamptz updated_at
+  }
+  profile_image {
+    uuid id PK
+    uuid user_id "no FK: owned by the profile module"
+    varchar slot "avatar | cover"
+    varchar role "original (history) | current (shown)"
+    varchar object_key UK
+    varchar mime_type
+    integer width
+    integer height
+    bigint bytes
+    timestamptz created_at
+  }
+```
+
+Indexes: `uq_profile_image_current` (unique, partial `WHERE role = 'current'` — one shown image per member
+and slot, which also makes concurrent saves exactly-once), `idx_profile_image_history` (partial
+`WHERE role = 'original'`, newest first).
+
+`username_hold` and `account_preference` live in the user module and cascade with `app_user`.
+`profile_image` belongs to the profile module and carries no foreign key to `app_user`, like the other
+cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
+rows behind.
 
 ## Roadmap tables (each arrives with its own change)
 

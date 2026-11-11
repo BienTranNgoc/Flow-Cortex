@@ -1,5 +1,6 @@
 import { withClientId } from './clientId';
 import { withLocale } from './locale';
+import { emitNetworkSignal, rateLimitWaitSeconds } from './networkSignals';
 import { getToken } from './tokenStore';
 import { REFRESH_PATH, refreshAccessToken } from './session';
 
@@ -29,7 +30,18 @@ export async function customFetch<T>(url: string, options: RequestInit = {}): Pr
       response = await fetch(url, withBearer(options, token));
     }
   }
-  return toResult<T>(response);
+  const result = await toResult<{ data: unknown }>(response);
+  if (response.status === 429) {
+    emitNetworkSignal({
+      type: 'rate-limited',
+      waitSeconds: rateLimitWaitSeconds(
+        result.data,
+        response.headers.get('Retry-After'),
+        Date.now(),
+      ),
+    });
+  }
+  return result as T;
 }
 
 function bearerOf(headers: HeadersInit | undefined): string | null {

@@ -1,20 +1,52 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { authHeaders, unwrap, updateProfile } from '@flow-cortex/api-client';
-import type { ProfileUpdateRequest } from '@flow-cortex/api-client';
 import { accountStatsEnabled } from '../../app/featureFlags';
 import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useBalance } from '../credits/useBalance';
+import { AvatarPickerDialog } from '../profile/AvatarPickerDialog';
+import { CoverPickerDialog } from '../profile/CoverPickerDialog';
+import { useImageFailure } from '../profile/useImageFailure';
+import { useProfileImagesQuery } from '../profile/useProfileImages';
 import { roleLabel, statusLabel } from './enumLabels';
 import { PhoneVerification } from './PhoneVerification';
+import { PrivacySection } from './PrivacySection';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
+import { UsernameField } from './UsernameField';
 import { failureMessage, useMeQuery } from './useAuth';
+import { useOwnProfileQuery, useUpdateNames } from './useOwnProfile';
 import './ProfilePage.css';
+
+const NAME_FIELDS = [
+  { name: 'name', id: 'profile-name', label: 'nameLabel', placeholder: 'namePlaceholder' },
+  {
+    name: 'firstName',
+    id: 'profile-first-name',
+    label: 'firstNameLabel',
+    placeholder: 'firstNamePlaceholder',
+  },
+  {
+    name: 'lastName',
+    id: 'profile-last-name',
+    label: 'lastNameLabel',
+    placeholder: 'lastNamePlaceholder',
+  },
+] as const;
+
+function savedNames(
+  displayName: string | null | undefined,
+  own: { name?: string; firstName?: string; lastName?: string } | undefined,
+): ProfileFormValues {
+  return {
+    name: own?.name ?? displayName ?? '',
+    firstName: own?.firstName ?? '',
+    lastName: own?.lastName ?? '',
+  };
+}
 
 function initialsFrom(name: string | null | undefined, email: string | null | undefined): string {
   const source = (name ?? '').trim() || email || '';
@@ -24,13 +56,17 @@ function initialsFrom(name: string | null | undefined, email: string | null | un
   return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
 }
 
-/** Fix my own display name; email/role/status are not self-service. */
+/** My own names, username and privacy; email/role/status are not self-service. */
 export function ProfilePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
+  const ownProfile = useOwnProfileQuery();
   const { phoneVerification } = useFeatures();
   const credits = useBalance();
-  const queryClient = useQueryClient();
+  const images = useProfileImagesQuery();
+  const avatar = useImageFailure(images.data?.avatar?.url);
+  const cover = useImageFailure(images.data?.cover?.url);
+  const [picker, setPicker] = useState<'avatar' | 'cover' | null>(null);
   const {
     register,
     handleSubmit,
@@ -38,15 +74,12 @@ export function ProfilePage() {
     reset,
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    ...(meQuery.data ? { values: { name: meQuery.data.name ?? '' } } : {}),
+    ...(meQuery.data && ownProfile.data
+      ? { values: savedNames(meQuery.data.name, ownProfile.data) }
+      : {}),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (values: ProfileUpdateRequest) => unwrap(updateProfile(values, authHeaders())),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
-  });
+  const updateMutation = useUpdateNames();
 
   if (meQuery.isLoading) {
     return (
@@ -80,7 +113,15 @@ export function ProfilePage() {
   const showAccountStats = accountStatsEnabled();
   const initials = initialsFrom(me.name, me.email);
   const onSubmit = handleSubmit((values) => updateMutation.mutate(values));
-  const onCancel = () => reset({ name: me.name ?? '' });
+  const onCancel = () => reset(savedNames(me.name, ownProfile.data));
+  const ownProfileError = ownProfile.isError && (
+    <p role="alert" className="form-error">
+      {t('auth.profile.loadError')}{' '}
+      <button type="button" onClick={() => void ownProfile.refetch()}>
+        {t('auth.profile.retry')}
+      </button>
+    </p>
+  );
   const serverError = failureMessage(updateMutation, t);
 
   return (
@@ -93,8 +134,33 @@ export function ProfilePage() {
           className="profile-card profile-card--identity"
           aria-label={t('auth.profile.summaryLabel')}
         >
+          <div className="profile-cover">
+            {cover.shown && <img src={images.data?.cover?.url} alt="" onError={cover.onError} />}
+          </div>
+
           <div className="profile-avatar" aria-hidden="true">
-            <span>{initials}</span>
+            {avatar.shown ? (
+              <img src={images.data?.avatar?.url} alt="" onError={avatar.onError} />
+            ) : (
+              <span>{initials}</span>
+            )}
+          </div>
+
+          <div className="profile-image-actions">
+            <button
+              type="button"
+              className="cortex-btn cortex-btn--ghost"
+              onClick={() => setPicker('avatar')}
+            >
+              {t('auth.profile.images.changePhoto')}
+            </button>
+            <button
+              type="button"
+              className="cortex-btn cortex-btn--ghost"
+              onClick={() => setPicker('cover')}
+            >
+              {t('auth.profile.images.changeCover')}
+            </button>
           </div>
 
           <div className="profile-identity__text">
@@ -128,7 +194,7 @@ export function ProfilePage() {
               {credits !== undefined && (
                 <li>
                   <span className="profile-stats__value">
-                    {formatNumber(credits, activeLocale())}
+                    {formatNumber(credits.balance, activeLocale())}
                   </span>
                   <span className="profile-stats__label">{t('auth.profile.stats.credits')}</span>
                 </li>
@@ -145,51 +211,69 @@ export function ProfilePage() {
           <h2 className="profile-card__title">{t('auth.profile.editTitle')}</h2>
           <p className="profile-card__hint">{t('auth.profile.editHint')}</p>
 
-          <form onSubmit={onSubmit} noValidate>
-            <div className="field">
-              <label htmlFor="profile-name">{t('auth.profile.nameLabel')}</label>
-              <input
-                id="profile-name"
-                {...register('name')}
-                aria-invalid={Boolean(errors.name) || undefined}
-                placeholder={t('auth.profile.namePlaceholder')}
-              />
-              {errors.name?.message && (
+          {!ownProfile.data && (ownProfileError || <output>{t('auth.profile.loading')}</output>)}
+          {ownProfile.data && (
+            <form onSubmit={onSubmit} noValidate>
+              {NAME_FIELDS.map(({ name, id, label, placeholder }) => (
+                <div className="field" key={name}>
+                  <label htmlFor={id}>{t(`auth.profile.${label}`)}</label>
+                  <input
+                    id={id}
+                    {...register(name)}
+                    aria-invalid={Boolean(errors[name]) || undefined}
+                    placeholder={t(`auth.profile.${placeholder}`)}
+                  />
+                  {errors[name]?.message && (
+                    <p role="alert" className="form-error">
+                      {t(errors[name].message)}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              {serverError && (
                 <p role="alert" className="form-error">
-                  {t(errors.name.message)}
+                  {serverError}
                 </p>
               )}
-            </div>
+              {updateMutation.isSuccess && (
+                <p className="profile-saved" role="status">
+                  {t('auth.profile.saved')}
+                </p>
+              )}
 
-            {serverError && (
-              <p role="alert" className="form-error">
-                {serverError}
-              </p>
-            )}
-            {updateMutation.isSuccess && (
-              <p className="profile-saved" role="status">
-                {t('auth.profile.saved')}
-              </p>
-            )}
+              <div className="profile-form__actions">
+                <button
+                  type="button"
+                  className="cortex-btn cortex-btn--ghost"
+                  onClick={onCancel}
+                  disabled={updateMutation.isPending}
+                >
+                  {t('auth.profile.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="cortex-btn cortex-btn--primary"
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
+                </button>
+              </div>
+            </form>
+          )}
 
-            <div className="profile-form__actions">
-              <button
-                type="button"
-                className="cortex-btn cortex-btn--ghost"
-                onClick={onCancel}
-                disabled={updateMutation.isPending}
-              >
-                {t('auth.profile.cancel')}
-              </button>
-              <button
-                type="submit"
-                className="cortex-btn cortex-btn--primary"
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? t('auth.profile.saving') : t('auth.profile.save')}
-              </button>
-            </div>
-          </form>
+          <hr className="profile-card__divider" />
+
+          {ownProfile.data && (
+            <UsernameField
+              username={ownProfile.data.username}
+              nextChangeAt={ownProfile.data.usernameNextChangeAt}
+            />
+          )}
+
+          <hr className="profile-card__divider" />
+
+          <PrivacySection />
 
           <hr className="profile-card__divider" />
 
@@ -206,7 +290,9 @@ export function ProfilePage() {
             <div>
               <dt>{t('auth.profile.statusLabel')}</dt>
               <dd>
-                {me.status === 'ACTIVE' && <span className="profile-status-dot" aria-hidden="true" />}
+                {me.status === 'ACTIVE' && (
+                  <span className="profile-status-dot" aria-hidden="true" />
+                )}
                 {statusLabel(t, me.status) || '—'}
               </dd>
             </div>
@@ -236,6 +322,9 @@ export function ProfilePage() {
           )}
         </section>
       </div>
+
+      <AvatarPickerDialog open={picker === 'avatar'} onClose={() => setPicker(null)} />
+      <CoverPickerDialog open={picker === 'cover'} onClose={() => setPicker(null)} />
     </div>
   );
 }

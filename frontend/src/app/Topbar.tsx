@@ -3,10 +3,10 @@ import { List } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useBalance } from '../features/credits/useBalance';
+import { WalletBadge } from '../features/credits/WalletBadge';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
-import { formatNumber } from '../lib/format';
-import { activeLocale } from '../lib/i18n';
-import { useTheme } from './useTheme';
+import { useSaveLocale } from '../features/auth/useAccountPreferences';
+import type { Theme } from './useTheme';
 import { UserMenu } from './UserMenu';
 import './Topbar.css';
 
@@ -15,14 +15,23 @@ interface TopbarProps {
   readonly showMenuButton: boolean;
   readonly drawerOpen: boolean;
   readonly onOpenMenu: () => void;
+  /** The shell owns the one theme instance; the topbar only shows and flips it. */
+  readonly theme: Theme;
+  readonly onToggleTheme: () => void;
 }
 
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
-export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<TopbarProps>) {
+export function Topbar({
+  showMenuButton,
+  drawerOpen,
+  onOpenMenu,
+  theme,
+  onToggleTheme,
+}: Readonly<TopbarProps>) {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
   const credits = useBalance();
-  const { theme, toggle } = useTheme();
+  const saveLocale = useSaveLocale();
   return (
     <header className="topbar">
       {showMenuButton && (
@@ -38,25 +47,11 @@ export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<Topb
         </button>
       )}
       <div className="topbar__actions">
-        {credits !== undefined && (
-          <span className="topbar__credits">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              width="12"
-              height="12"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
-            </svg>
-            <span>{t('common.nav.credits', { amount: formatNumber(credits, activeLocale()) })}</span>
-          </span>
-        )}
-        <AppLanguageToggle />
+        {credits !== undefined && <WalletBadge wallet={credits} />}
+        <AppLanguageToggle onSwitch={saveLocale.mutate} />
         <ThemeToggle
           theme={theme}
-          onToggle={toggle}
+          onToggle={onToggleTheme}
           compact
           labels={{
             switchToLight: t('common.theme.switchToLight'),

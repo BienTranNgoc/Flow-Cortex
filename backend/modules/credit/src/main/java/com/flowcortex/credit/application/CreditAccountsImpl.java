@@ -59,6 +59,12 @@ class CreditAccountsImpl implements CreditAccounts {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public long granted(UUID userId) {
+        return ledger.sumByUserIdAndKindIn(userId, CreditLedgerEntry.CREDITING_KINDS);
+    }
+
+    @Override
     @Transactional
     public boolean debitForStep(UUID userId, UUID runId, UUID runStepId, String stepType) {
         if (!enabled) {

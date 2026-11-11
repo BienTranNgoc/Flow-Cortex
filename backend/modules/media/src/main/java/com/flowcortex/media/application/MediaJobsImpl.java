@@ -1,5 +1,6 @@
 package com.flowcortex.media.application;
 
+import com.flowcortex.media.api.KeptImage;
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaDownload;
@@ -58,6 +59,10 @@ class MediaJobsImpl implements MediaJobs {
     /** Retention tag values the media bucket's lifecycle rules key on: pending expires, attachment is kept. */
     private static final String SUPPORT_PENDING = "support-pending";
     private static final String SUPPORT_ATTACHMENT = "support-attachment";
+    private static final String PROFILE_PREFIX = "profile/";
+    /** Profile images: pending expires like a released one, a confirmed one is kept. */
+    private static final String PROFILE_IMAGE_TAG = "profile-image";
+    private static final String PROFILE_RELEASED = "profile-released";
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -335,8 +340,69 @@ class MediaJobsImpl implements MediaJobs {
         }
     }
 
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public KeptImage keepProfileImage(UUID ownerId, UUID uploadId, String targetKey) {
+        requireProfileKey(targetKey);
+        MediaAssetInput resolved = resolveAndRegister(UploadPurpose.PROFILE_IMAGE, ownerId, uploadId, "image",
+                List.copyOf(purposes.mimeTypes(UploadPurpose.PROFILE_IMAGE).keySet()), "image/");
+        MediaAsset asset = assets.findById(resolved.assetId())
+                .orElseThrow(() -> new IllegalStateException("Profile image is not registered: " + uploadId));
+        MediaJobInput source = resolved.input();
+        long maxBytes = purposes.maxBytes(UploadPurpose.PROFILE_IMAGE, "image");
+        HardenedImage image = hardenedImage(source, asset.getMimeType(), maxBytes, reason -> {
+            LOG.info("Profile image refused: bucket={} key={} reason={}", source.bucket(), source.objectKey(), reason);
+            return new UploadRejectedException("uploadIds", new LocalizedMessage("upload.attachmentNotImage"));
+        });
+        String bucket = properties.s3().bucket();
+        store.put(bucket, targetKey, image.contentType(), image.bytes(), PROFILE_RELEASED);
+        LOG.info("Profile image kept pending: bucket={} key={} bytes={}", bucket, targetKey, image.bytes().length);
+        return new KeptImage(bucket, targetKey, image.contentType(), image.bytes().length,
+                Math.toIntExact(image.dimensions().width()), Math.toIntExact(image.dimensions().height()));
+    }
+
+    @Override
+    public void confirmProfileImages(List<String> objectKeys) {
+        retagProfileImages(objectKeys, PROFILE_IMAGE_TAG, "confirmed");
+    }
+
+    @Override
+    public void releaseProfileImages(List<String> objectKeys) {
+        retagProfileImages(objectKeys, PROFILE_RELEASED, "released");
+    }
+
+    private void retagProfileImages(List<String> objectKeys, String retention, String outcome) {
+        objectKeys.forEach(MediaJobsImpl::requireProfileKey);
+        String bucket = properties.s3().bucket();
+        RuntimeException first = null;
+        for (String key : objectKeys) {
+            try {
+                store.retag(bucket, key, retention);
+                LOG.info("Profile image {}: bucket={} key={}", outcome, bucket, key);
+            } catch (RuntimeException e) {
+                LOG.warn("Profile image retag failed: bucket={} key={} retention={} error={}", bucket, key,
+                        retention, e.getClass().getSimpleName());
+                if (first == null) {
+                    first = e;
+                } else {
+                    first.addSuppressed(e);
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
+    }
+
+    private static void requireProfileKey(String key) {
+        if (key == null || !key.startsWith(PROFILE_PREFIX) || key.length() == PROFILE_PREFIX.length()
+                || key.endsWith("/") || key.contains("..")) {
+            throw new IllegalArgumentException("Profile images live only under " + PROFILE_PREFIX + ": " + key);
+        }
+    }
+
     /** An image ready to be written: its metadata stripped, typed by what its bytes are. */
-    private record HardenedImage(byte[] bytes, String contentType) {
+    private record HardenedImage(byte[] bytes, String contentType, ImageHardening.Dimensions dimensions) {
     }
 
     /**
@@ -365,7 +431,7 @@ class MediaJobsImpl implements MediaJobs {
         }
         byte[] stripped = ImageHardening.strip(format, bytes)
                 .orElseThrow(() -> notAnImage.apply("unreadable " + format + " body"));
-        return new HardenedImage(stripped, format.mimeType());
+        return new HardenedImage(stripped, format.mimeType(), dimensions);
     }
 
     /** The MIME type of an image prefix {@link ContentSniffer} already accepted as an image. */

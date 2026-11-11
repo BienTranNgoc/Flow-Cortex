@@ -105,6 +105,34 @@ public interface MediaJobs {
     void releaseAttachments(List<StoredAttachment> attachments);
 
     /**
+     * Keeps a member's profile-image upload (granted under {@link UploadPurpose#PROFILE_IMAGE}) at
+     * {@code targetKey} of the media bucket. The image is read, checked (format, pixel cap) and written without
+     * its metadata, tagged to expire; it stays so until {@link #confirmProfileImages} retags it, so a copy whose
+     * caller never saved it vanishes by the bucket's lifecycle rule. Call it outside any transaction.
+     * @return the kept copy with the pixel size read from its header and the size of the stored (stripped) bytes
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, not the owner's, or not
+     *         a png, jpg or webp within the size cap; on field {@code uploadIds} if the bytes are not the image
+     *         they were declared as, exceed the cap since the grant, or have more than 25 million pixels
+     * @throws IllegalArgumentException if {@code targetKey} is not an object name under {@code profile/}
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    KeptImage keepProfileImage(UUID ownerId, UUID uploadId, String targetKey);
+
+    /**
+     * Retags kept profile images as permanent. Call it only after the database write that records them has
+     * committed. Tries every object, then rethrows the first failure.
+     * @throws IllegalArgumentException if a key is not an object name under {@code profile/}; nothing is retagged
+     */
+    void confirmProfileImages(List<String> objectKeys);
+
+    /**
+     * Retags profile images so the media bucket's lifecycle rule expires them: for copies whose record was never
+     * saved, or whose history entry was dropped. Tries every object, then rethrows the first failure.
+     * @throws IllegalArgumentException if a key is not an object name under {@code profile/}; nothing is retagged
+     */
+    void releaseProfileImages(List<String> objectKeys);
+
+    /**
      * The inputs bound to {@code runId} in start order, each with a signed URL to the run's own copy under
      * {@code runs/<runId>/inputs/}. The caller must have verified that the run belongs to the reader. A run
      * with no bound input yields an empty list.
