@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types, the dub steps, and one remote executor per media capability. Workflow creation rejects
+ * types, the dub and connector steps, and one remote executor per media capability. Workflow creation rejects
  * any other type.
  */
 @Component
@@ -25,8 +25,9 @@ class StepExecutorRegistry {
     private final Map<String, StepExecutor> byType = new LinkedHashMap<>();
 
     @Autowired
-    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts) {
-        this(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts));
+    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
+            ConnectorCallStepExecutor connectorCall) {
+        this(withSpringSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts, connectorCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -54,10 +55,11 @@ class StepExecutorRegistry {
         return executors;
     }
 
-    private static List<StepExecutor> withDubSteps(List<StepExecutor> executors, StepExecutor translate,
-            StepExecutor tts) {
+    private static List<StepExecutor> withSpringSteps(List<StepExecutor> executors, StepExecutor translate,
+            StepExecutor tts, StepExecutor connectorCall) {
         executors.add(translate);
         executors.add(tts);
+        executors.add(connectorCall);
         return executors;
     }
 
