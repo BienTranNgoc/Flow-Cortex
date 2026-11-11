@@ -11,6 +11,7 @@ include(
     ":modules:credit",
     ":modules:llm",
     ":modules:support",
+    ":modules:content",
     ":modules:space",
     ":modules:realtime",
     ":modules:chat",
