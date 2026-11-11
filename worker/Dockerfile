@@ -31,7 +31,7 @@ RUN apt-get update \
 COPY fonts/ /usr/share/fonts/truetype/flowcortex/
 RUN fc-cache -f
 COPY docker/check_fonts.py /opt/check_fonts.py
-RUN python3 /opt/check_fonts.py /usr/share/fonts/truetype/flowcortex/manifest.json
+RUN python3 /opt/check_fonts.py
 
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \

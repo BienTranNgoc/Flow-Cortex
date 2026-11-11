@@ -13,7 +13,7 @@ build (exit 1, every failing family named on stderr) when:
   * ffmpeg has no `ass` filter,
   * libass renders no filled box for a BorderStyle 3 backdrop line.
 
-Usage: check_fonts.py <path to manifest.json>
+Usage: check_fonts.py (checks the library installed under FONT_DIR)
 """
 
 import json
@@ -40,16 +40,25 @@ DEBIAN_EM_PER_LINE = {
 _WEIGHT_STYLE = {400: "regular", 700: "bold"}
 
 
-def required_families(manifest_path: str) -> list[str]:
-    with open(manifest_path, encoding="utf-8") as f:
-        library = [m["family"] for m in json.load(f)["families"]]
-    return DEBIAN_FAMILIES + library
+FONT_DIR = "/usr/share/fonts/truetype/flowcortex"
+MANIFEST_PATH = os.path.join(FONT_DIR, "manifest.json")
+GLYPH_ADVANCES_PATH = os.path.join(FONT_DIR, "glyph-advances.json")
 
 
-def expected_em_per_line(manifest_path: str) -> dict[str, float]:
-    with open(manifest_path, encoding="utf-8") as f:
-        library = {m["family"]: m["emPerLine"] for m in json.load(f)["families"]}
-    return {**DEBIAN_EM_PER_LINE, **library}
+def manifest_em_per_line() -> dict[str, float]:
+    with open(MANIFEST_PATH, encoding="utf-8") as f:
+        return {m["family"]: m["emPerLine"] for m in json.load(f)["families"]}
+
+
+def installed_families() -> set[str]:
+    """Family names as fontconfig reads them from the vendored files; manifest text is only
+    compared against them and never reaches a command line."""
+    families: set[str] = set()
+    for root, _dirs, files in os.walk(FONT_DIR):
+        for name in sorted(files):
+            if name.endswith(".ttf"):
+                families.add(_run(["fc-query", "-f", "%{family[0]}", os.path.join(root, name)]))
+    return families
 
 
 def _sfnt_table_offsets(data: bytes) -> dict[bytes, int]:
@@ -195,12 +204,11 @@ def _charset_has(charset_tokens: list[str], cp: int) -> bool:
     return False
 
 
-def check_glyph_advances(manifest_path: str) -> list[str]:
+def check_glyph_advances() -> list[str]:
     """Re-measure the Debian families' advances in the resolved files, against the table."""
-    ga_path = os.path.join(os.path.dirname(manifest_path), "glyph-advances.json")
-    if not os.path.exists(ga_path):
-        return [f"glyph-advances.json is missing next to {manifest_path}"]
-    with open(ga_path, encoding="utf-8") as f:
+    if not os.path.exists(GLYPH_ADVANCES_PATH):
+        return [f"{GLYPH_ADVANCES_PATH} is missing"]
+    with open(GLYPH_ADVANCES_PATH, encoding="utf-8") as f:
         committed = json.load(f)
     codepoints = committed["codepoints"]
     problems: list[str] = []
@@ -351,16 +359,23 @@ def check_backdrop_box() -> list[str]:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: check_fonts.py <manifest.json>", file=sys.stderr)
+    if len(sys.argv) != 1:
+        print("usage: check_fonts.py", file=sys.stderr)
         return 2
-    manifest = sys.argv[1]
-    em = expected_em_per_line(manifest)
-    problems: list[str] = []
-    for fam in required_families(manifest):
+    library_em = manifest_em_per_line()
+    installed = installed_families()
+    problems = [
+        f"{fam}: declared in manifest.json but no file under {FONT_DIR} carries it"
+        for fam in sorted(set(library_em) - installed)
+    ] + [
+        f"{fam}: a file under {FONT_DIR} carries it but manifest.json does not declare it"
+        for fam in sorted(installed - set(library_em))
+    ]
+    em = {**DEBIAN_EM_PER_LINE, **library_em}
+    for fam in DEBIAN_FAMILIES + sorted(installed & set(library_em)):
         problems.extend(check_family(fam, "bold", em[fam]))
         problems.extend(check_family(fam, "regular", em[fam]))
-    problems.extend(check_glyph_advances(manifest))
+    problems.extend(check_glyph_advances())
     ass_problems = check_ass_filter()
     problems.extend(ass_problems)
     if not ass_problems:
