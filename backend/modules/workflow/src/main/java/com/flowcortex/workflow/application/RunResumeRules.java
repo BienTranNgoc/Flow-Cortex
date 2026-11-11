@@ -55,7 +55,8 @@ final class RunResumeRules {
         if (step.status() != RunStepStatus.ERROR) {
             return refused(Kind.STEP_NOT_FAILED);
         }
-        if (KnownStepTypes.APPROVAL_CHECKPOINT.equals(step.type()) || (step.errorCode() != null && NON_RETRYABLE_CODES.contains(step.errorCode()))) {
+        if (KnownStepTypes.APPROVAL_CHECKPOINT.equals(step.type())
+                || (step.errorCode() != null && NON_RETRYABLE_CODES.contains(step.errorCode()))) {
             return refused(Kind.STEP_NOT_RETRYABLE);
         }
         if (step.attempt() >= Short.MAX_VALUE) {
