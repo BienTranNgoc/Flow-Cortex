@@ -43,7 +43,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 @Service
 public class SettingsService implements Settings {
 
-    private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SettingsService.class);
     private static final int MAX_REASON_LENGTH = 2000;
 
     private final SettingStore store;
@@ -75,7 +75,7 @@ public class SettingsService implements Settings {
             return reads.execute(status -> store.find(definition.name()))
                     .map(stored -> new SettingChange(stored.updatedBy(), stored.updatedAt()));
         } catch (DataAccessException | TransactionException e) {
-            log.error("settings.lastChange outcome=degraded key={}", definition.name(), e);
+            LOG.error("settings.lastChange outcome=degraded key={}", definition.name(), e);
             return Optional.empty();
         }
     }
@@ -197,13 +197,13 @@ public class SettingsService implements Settings {
             stored = Objects.requireNonNull(reads.execute(status -> store.find(definition.name())));
         } catch (DataAccessException | TransactionException e) {
             failed = true;
-            log.error("settings.read outcome=degraded key={}", definition.name(), e);
+            LOG.error("settings.read outcome=degraded key={}", definition.name(), e);
         }
         SettingRead<T> read = SettingResolution.resolve(definition, stored.map(StoredSetting::value), failed);
         if (read.source() == SettingSource.DEGRADED) {
             meters.counter("settings.read.degraded", "key", definition.name()).increment();
             if (!failed) {
-                log.error("settings.read outcome=degraded key={}", definition.name());
+                LOG.error("settings.read outcome=degraded key={}", definition.name());
             }
         }
         T storedValue = stored.flatMap(row -> SettingValues.parseStored(definition, row.value())).orElse(null);
@@ -226,7 +226,7 @@ public class SettingsService implements Settings {
                 store.upsert(name, newText, actor, now);
             }
             store.insertChange(UUID.randomUUID(), name, previous, newText, actor, now, reason);
-            log.info("settings.write outcome={} key={}", newText == null ? "reset" : "updated", name);
+            LOG.info("settings.write outcome={} key={}", newText == null ? "reset" : "updated", name);
         });
     }
 
