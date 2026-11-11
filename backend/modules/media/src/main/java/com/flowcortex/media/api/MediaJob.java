@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
@@ -20,7 +19,7 @@ public record MediaJob(
         @NotNull UUID correlationId,
         @NotNull @Min(1) Integer stepOrder,
         @NotNull MediaCapability capability,
-        @NotEmpty List<@NotNull @Valid MediaJobInput> inputs,
+        @NotNull List<@NotNull @Valid MediaJobInput> inputs,
         @NotNull Map<String, Object> params,
         @NotNull @Pattern(regexp = OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,
@@ -29,6 +28,8 @@ public record MediaJob(
         @NotNull Instant issuedAt) {
 
     /** Same pattern as {@code outputPrefix} in the job schema: the worker writes only under its step. */
+    public static final int MAX_FETCH_URL_LENGTH = 2048;
+
     public static final String OUTPUT_PREFIX_PATTERN =
             "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/(?:attempts/[1-9][0-9]*/)?$";
 
@@ -55,6 +56,21 @@ public record MediaJob(
             }
         }
         return true;
+    }
+
+    /** A {@code fetch_video} job has no inputs and a {@code params.url}; every other job has inputs. */
+    @AssertTrue(message = "inputs must fit the capability: fetch_video has none and a params.url,"
+            + " every other capability has at least one")
+    @JsonIgnore
+    public boolean isInputsFitCapability() {
+        if (capability == null || inputs == null) {
+            return true;
+        }
+        if (capability != MediaCapability.FETCH_VIDEO) {
+            return !inputs.isEmpty();
+        }
+        return inputs.isEmpty() && params != null && params.get("url") instanceof String url
+                && !url.isEmpty() && url.length() <= MAX_FETCH_URL_LENGTH;
     }
 
     /** {@code correlationId} is the run id; the schema cannot express the equality. */

@@ -63,10 +63,37 @@ class MediaTopologyConfigTest {
     }
 
     @Test
-    void onlyRenderVideoIsRoutedToTheRenderLane() {
+    void declaresTheFetchLaneLikeTheDefaultJobQueue() {
+        Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
+
+        Queue fetch = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("media.fetch.jobs"))
+                .findFirst()
+                .orElseThrow();
+        Queue jobs = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("media.jobs"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(fetch.getArguments()).isEqualTo(jobs.getArguments());
+        assertThat(topology.getDeclarablesByType(Queue.class))
+                .extracting(Queue::getName)
+                .contains("media.fetch.jobs.dlq");
+        assertThat(topology.getDeclarablesByType(Binding.class))
+                .extracting(Binding::getDestination, Binding::getExchange, Binding::getRoutingKey)
+                .contains(
+                        tuple("media.fetch.jobs", "media", "fetch.job"),
+                        tuple("media.fetch.jobs.dlq", "media.dlx", "fetch.job"));
+    }
+
+    @Test
+    void eachLaneCapabilityIsRoutedToItsOwnLaneAndEveryOtherOneToTheDefault() {
         for (MediaCapability capability : MediaCapability.values()) {
-            assertThat(MediaTopologyConfig.mediaJobKey(capability)).as(capability.value())
-                    .isEqualTo(capability == MediaCapability.RENDER_VIDEO ? "render.job" : "job");
+            String expected = switch (capability) {
+                case RENDER_VIDEO -> "render.job";
+                case FETCH_VIDEO -> "fetch.job";
+                default -> "job";
+            };
+            assertThat(MediaTopologyConfig.mediaJobKey(capability)).as(capability.value()).isEqualTo(expected);
         }
     }
 

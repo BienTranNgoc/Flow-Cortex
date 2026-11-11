@@ -58,6 +58,8 @@ class MediaJobsImpl implements MediaJobs {
     /** Retention tag values the media bucket's lifecycle rules key on: pending expires, attachment is kept. */
     private static final String SUPPORT_PENDING = "support-pending";
     private static final String SUPPORT_ATTACHMENT = "support-attachment";
+    /** A retention value no lifecycle rule of the media bucket matches: the copy lives as long as worker outputs. */
+    private static final String STEP_OUTPUT = "step-output";
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -551,6 +553,35 @@ class MediaJobsImpl implements MediaJobs {
         }
         LOG.info("Run object stored: bucket={} key={} bytes={}", bucket, key, bytes.length);
         return new MediaOutput(name, bucket, key, mime, (long) bytes.length, null);
+    }
+
+    @Override
+    public MediaOutput copyRunObject(UUID runId, int stepOrder, MediaJobInput source, String name) {
+        if (!PLAIN_FILE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Not a plain file name: " + name.replaceAll("\\p{Cntrl}", "?"));
+        }
+        String bucket = properties.s3().bucket();
+        if (!bucket.equals(source.bucket()) || !MediaJob.isBelow("runs/" + runId + "/", source.objectKey())) {
+            throw new IllegalArgumentException("Only an object of the run in the media bucket can be copied: "
+                    + source.key());
+        }
+        String key = MediaJob.outputPrefix(runId, stepOrder) + name;
+        Optional<S3MediaStore.StoredObject> copy;
+        try {
+            store.copy(bucket, source.objectKey(), bucket, key, STEP_OUTPUT);
+            copy = store.head(bucket, key);
+        } catch (SdkException e) {
+            // The message may reach a step's error message; where the object was going stays in the log.
+            LOG.warn("Run object not copied: bucket={} key={} source={}", bucket, key, source.objectKey(), e);
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", e);
+        }
+        if (copy.isEmpty()) {
+            LOG.warn("Run object not found after its copy: bucket={} key={} source={}", bucket, key,
+                    source.objectKey());
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", null);
+        }
+        LOG.info("Run object copied: bucket={} key={} bytes={}", bucket, key, copy.get().size());
+        return new MediaOutput(name, bucket, key, copy.get().contentType(), copy.get().size(), null);
     }
 
     private static UploadRejectedException refused(String bucket, String key, String reason,

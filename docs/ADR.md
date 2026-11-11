@@ -411,10 +411,14 @@ Format per entry: **Context → Decision → Consequences**.
     the same image with the policy `open` (any public host) behind the same
     private-range block, rate limits (100 concurrent requests, 50 requests per
     second, burst 150, 50 concurrent CONNECT tunnels) and its own network
-    `fetch`, which is `internal` and has no member but `egress-fetch`. Only
-    URL-fetch code joins `fetch`; `backend` and the provider workers stay on
-    `internal` and cannot reach it. The first URL-fetch service joins `fetch`
-    in its own change, so the tier is built and checked but idle until then.
+    `fetch`, which is `internal` and has no member but `egress-fetch` and
+    `fetch-worker`. Only URL-fetch code joins `fetch`; `backend`, the media
+    worker and the provider workers stay on `internal` and cannot reach it.
+    `fetch-worker` (the media image on `media.fetch.jobs`, `fetch_video` only)
+    is the one URL-fetch service: it sits on `internal` and `fetch`, holds no
+    database credential, and has its own object-store key that can only write
+    under `flowcortex-media/runs/`, so a compromised downloader reads no
+    upload and no run object.
   - **Topology:** services that publish a host port keep `default` (a
     published port on a container whose only networks are internal did not
     work when tried), so `postgres`, `mailpit`, `frontend` and `admin` are on
@@ -430,8 +434,10 @@ Format per entry: **Context → Decision → Consequences**.
   - **Guard:** `scripts/check-egress-isolation.sh` reads
     `docker compose config` for the base file and each overlay and fails when
     an application service regains a non-internal network, when anything but
-    the two proxies is on `egress`, when a proxy publishes a port, or when
-    `fetch` is not internal or has another member. CI runs it.
+    the two proxies is on `egress`, when a proxy publishes a port, when
+    `fetch` is not internal or has a member besides `egress-fetch` and
+    `fetch-worker`, when `fetch-worker` leaves `internal` and `fetch`, or when
+    its object-store key equals another service's. CI runs it.
   - **Allowlist per environment:** the committed list is
     `infra/egress-proxy/acl.yaml`, seeded with the hosts the code calls:
     `*.googleapis.com`, `api.openai.com`, `api.replicate.com`,
@@ -446,7 +452,8 @@ Format per entry: **Context → Decision → Consequences**.
     restarted. A live reload was not measured, so recreate is the documented
     path. Policy `report` (allow and log unlisted hosts) exists for finding
     hosts before enforcing.
-  - **URL downloads and yt-dlp:** they use `egress-fetch` and nothing else,
+  - **URL downloads and yt-dlp:** they run in `fetch-worker` and use
+    `egress-fetch` and nothing else,
     because yt-dlp resolves and follows hosts a vendor allowlist cannot list,
     and an IP-pinned HTTP guard cannot protect it (ADR-0007). The risk that
     remains is that a URL-fetch bug can send traffic to any public host; the

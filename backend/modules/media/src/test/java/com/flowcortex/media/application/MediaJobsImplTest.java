@@ -98,6 +98,7 @@ class MediaJobsImplTest {
         "flowcortex.media.max-runtime.extract_audio=10m",
         "flowcortex.media.max-runtime.align_audio=10m",
         "flowcortex.media.max-runtime.render_video=10m",
+        "flowcortex.media.max-runtime.fetch_video=10m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
         "flowcortex.media.provider-queue-timeout=5m",
@@ -1008,6 +1009,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.provider-max-runtime=10m",
                 "flowcortex.media.consumer-timeout=12m")
         .run(context -> {
@@ -1068,6 +1070,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
             assertThat(context).hasFailed();
@@ -1081,6 +1084,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());
@@ -1180,6 +1184,73 @@ class MediaJobsImplTest {
             assertThat(stored).isEqualTo(new MediaOutput("voice.wav", "flowcortex-uploads", key, "audio/wav", 3L,
                     null));
             assertThat(output.getAll()).contains("flowcortex-uploads", key, "bytes=3");
+        });
+    }
+
+    @Test
+    void aRunObjectIsCopiedServerSideIntoTheStepPrefixTaggedStepOutputAndDescribedFromTheCopy() {
+        runner.run(context -> {
+            UUID runId = UUID.randomUUID();
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            String target = "runs/" + runId + "/steps/1/video";
+            when(store.head("flowcortex-media", target))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(4_096L, "video/mp4")));
+
+            MediaOutput copied = context.getBean(MediaJobs.class).copyRunObject(runId, 1,
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media"), "video");
+
+            verify(store).copy("flowcortex-media", "runs/" + runId + "/inputs/media", "flowcortex-media", target,
+                    "step-output");
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString());
+            assertThat(copied).isEqualTo(new MediaOutput("video", "flowcortex-media", target, "video/mp4", 4_096L,
+                    null));
+        });
+    }
+
+    @Test
+    void aRunObjectWhoseSourceIsOutsideTheRunOrNotInTheMediaBucketIsRefusedAndNothingIsCopied() {
+        runner.run(context -> {
+            UUID runId = UUID.randomUUID();
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            for (MediaJobInput source : List.of(
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + UUID.randomUUID() + "/inputs/media"),
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/../other/inputs/media"),
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/"),
+                    new MediaJobInput("media", "flowcortex-uploads", "runs/" + runId + "/inputs/media"))) {
+                assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
+                        .as(source.toString()).isInstanceOf(IllegalArgumentException.class);
+            }
+            assertThatThrownBy(() -> jobs.copyRunObject(runId, 1,
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media"), "../video"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(context.getBean(S3MediaStore.class), never()).copy(any(), any(), any(), any(), any());
+        });
+    }
+
+    @Test
+    void aCopyTheStoreRefusesOrCannotDescribeSurfacesAsStoreUnavailableNamingTheObjectOnlyInTheLog(
+            CapturedOutput output) {
+        runner.run(context -> {
+            UUID runId = UUID.randomUUID();
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            MediaJobInput source = new MediaJobInput("media", "flowcortex-media",
+                    "runs/" + runId + "/inputs/media");
+            org.mockito.Mockito.doThrow(SdkException.builder().message("connection refused").build())
+                    .when(store).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+
+            assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCauseInstanceOf(SdkException.class)
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("flowcortex-media", "runs/"));
+            assertThat(output.getAll()).contains("WARN").contains("runs/" + runId + "/steps/1/video",
+                    "connection refused");
+
+            org.mockito.Mockito.doNothing().when(store)
+                    .copy(anyString(), anyString(), anyString(), anyString(), anyString());
+            when(store.head(anyString(), anyString())).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
+                    .isInstanceOf(MediaStoreUnavailableException.class);
         });
     }
 

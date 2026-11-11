@@ -9,6 +9,7 @@ set -eu
 : "${BACKEND_S3_ACCESS_KEY:?}" "${BACKEND_S3_SECRET_KEY:?}"
 : "${WORKER_S3_ACCESS_KEY:?}" "${WORKER_S3_SECRET_KEY:?}"
 : "${PROVIDER_S3_ACCESS_KEY:?}" "${PROVIDER_S3_SECRET_KEY:?}"
+: "${FETCH_S3_ACCESS_KEY:?}" "${FETCH_S3_SECRET_KEY:?}"
 RUN_INPUT_RETENTION_DAYS=${RUN_INPUT_RETENTION_DAYS:-30}
 case "$RUN_INPUT_RETENTION_DAYS" in
     ''|0*|*[!0-9]*)
@@ -60,9 +61,11 @@ printf '%s\n' \
 mc admin policy create ROOT flowcortex-backend "$DIR/backend-policy.json"
 mc admin policy create ROOT flowcortex-worker "$DIR/worker-policy.json"
 mc admin policy create ROOT flowcortex-provider "$DIR/provider-policy.json"
+mc admin policy create ROOT flowcortex-fetch "$DIR/fetch-policy.json"
 printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$PROVIDER_S3_ACCESS_KEY" "$PROVIDER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
+printf '%s\n%s\n' "$FETCH_S3_ACCESS_KEY" "$FETCH_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 
 # Re-attaching an attached policy is an error on the server; treat it as done.
 attach() {
@@ -95,5 +98,7 @@ attach flowcortex-worker "$WORKER_S3_ACCESS_KEY"
 # to this user. Merely attaching the new policy would leave those old read permissions effective.
 detach_if_present flowcortex-worker "$PROVIDER_S3_ACCESS_KEY"
 attach flowcortex-provider "$PROVIDER_S3_ACCESS_KEY"
+# The one service on the open proxy tier gets write-only access to run outputs.
+attach flowcortex-fetch "$FETCH_S3_ACCESS_KEY"
 
 echo "minio-init: done"
