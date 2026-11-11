@@ -286,7 +286,7 @@ class AssistantServiceTest {
 
     @Test
     void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
-        MinuteLimiter real = new MinuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
+        MinuteLimiter real = AskerLimitsTest.minuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
         SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
                 "gemini-test", 2000, 50, 10, 100), new SupportProperties.Mail("no-reply@flow-cortex.dev"));
         AssistantService limited = new AssistantService(assistantSwitch, properties, conversations, quotas, real,

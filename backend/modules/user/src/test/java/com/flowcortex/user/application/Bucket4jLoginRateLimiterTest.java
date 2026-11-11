@@ -4,15 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
 class Bucket4jLoginRateLimiterTest {
 
-    private final Bucket4jLoginRateLimiter limiter = new Bucket4jLoginRateLimiter(
-            new LoginThrottleProperties(new RateLimit(3, Duration.ofMinutes(15))));
+    private final Bucket4jLoginRateLimiter limiter = new Bucket4jLoginRateLimiter(new RateLimiters(
+            List.of(new UserRateLimits().loginFailuresIp(
+                    new LoginThrottleProperties(new RateLimit(3, Duration.ofMinutes(15))))),
+            new InMemoryRateLimitStore(), new RateLimitTelemetry(new SimpleMeterRegistry(), Clock.systemUTC())));
 
     @Test
     void anIpWithNoFailuresIsAlwaysWithinTheLimit() {

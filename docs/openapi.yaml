@@ -960,6 +960,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/me/step-up:
+    post:
+      tags:
+      - step-up-controller
+      operationId: stepUp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StepUpRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepUpResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -996,6 +1044,107 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/api-tokens:
+    get:
+      tags:
+      - personal-access-token-controller
+      operationId: list_1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiTokenView"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - personal-access-token-controller
+      operationId: create_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiTokenRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedApiToken"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/client-errors:
+    post:
+      tags:
+      - client-errors-controller
+      summary: Report an error the web app contained
+      operationId: reportClientError
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        "204":
+          description: "Accepted, or ignored while the intake is off"
+        "400":
+          description: "client_error_content_type, client_error_unreadable, client_error_invalid"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: client_error_too_large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: client_error_rate_limited (Retry-After)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
@@ -2392,6 +2541,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/me/api-tokens/{id}:
+    delete:
+      tags:
+      - personal-access-token-controller
+      operationId: revoke
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
 components:
   schemas:
     UpdateUserRequest:
@@ -3388,6 +3570,31 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    StepUpRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          maxLength: 72
+          minLength: 0
+        purpose:
+          type: string
+          enum:
+          - PAT_CREATE
+      required:
+      - password
+      - purpose
+    StepUpResponse:
+      type: object
+      properties:
+        stepUpProof:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - stepUpProof
     VerifyCodeRequest:
       type: object
       properties:
@@ -3435,6 +3642,47 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    CreateApiTokenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 0
+        expiresInDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - name
+      - stepUpProof
+    CreatedApiToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        token:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - expiresAt
+      - id
+      - name
+      - token
     Attachment:
       type: object
       properties:
@@ -3950,6 +4198,32 @@ components:
       required:
       - expiresAt
       - url
+    ApiTokenView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Null until the token is first used
+        expired:
+          type: boolean
+      required:
+      - createdAt
+      - expired
+      - expiresAt
+      - id
+      - name
     HealthResponse:
       type: object
       properties:
@@ -3980,6 +4254,8 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        personalAccessTokens:
+          type: boolean
         chat:
           type: boolean
       required:
@@ -3987,6 +4263,7 @@ components:
       - credits
       - emailConfirmation
       - passwordReset
+      - personalAccessTokens
       - phoneVerification
       - runCancellation
       - supportAssistant

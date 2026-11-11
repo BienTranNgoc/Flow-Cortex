@@ -35,11 +35,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountCredentials accountCredentials = mock(AccountCredentials.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -118,7 +118,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, null, null, "SUSPENDED");
 
-        verify(refreshTokenService).revokeAllFor(id);
+        verify(accountCredentials).revokeAllFor(id);
     }
 
     @Test
@@ -133,7 +133,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
-        verify(refreshTokenService, never()).revokeAllFor(any());
+        verify(accountCredentials, never()).revokeAllFor(any());
     }
 
     @Test

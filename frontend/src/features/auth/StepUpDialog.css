@@ -1,0 +1,88 @@
+.step-up-dialog {
+  box-sizing: border-box;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.step-up-dialog[open] {
+  animation: step-up-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.step-up-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.step-up-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.step-up-dialog p {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.step-up-dialog .field {
+  max-width: none;
+}
+
+.step-up-dialog .field input:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: 0.125rem;
+}
+
+.step-up-dialog .field input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.step-up-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.step-up-actions button {
+  margin-right: 0;
+  min-height: var(--target-min);
+}
+
+.step-up-actions button:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: 0.125rem;
+}
+
+.step-up-actions button[aria-busy='true'] {
+  cursor: progress;
+}
+
+@keyframes step-up-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-up-dialog[open] {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .step-up-actions {
+    flex-direction: column-reverse;
+  }
+
+  .step-up-actions button {
+    width: 100%;
+  }
+}

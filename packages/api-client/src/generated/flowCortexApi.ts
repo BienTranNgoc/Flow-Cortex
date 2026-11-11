@@ -643,6 +643,26 @@ export interface ProductVideoRunRequest {
   acknowledgeCost?: boolean;
 }
 
+export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof StepUpRequestPurpose];
+
+export const StepUpRequestPurpose = {
+  PAT_CREATE: 'PAT_CREATE',
+} as const;
+
+export interface StepUpRequest {
+  /**
+   * @minLength 0
+   * @maxLength 72
+   */
+  password: string;
+  purpose: StepUpRequestPurpose;
+}
+
+export interface StepUpResponse {
+  stepUpProof: string;
+  expiresAt: string;
+}
+
 export interface VerifyCodeRequest {
   /** @pattern ^\d{6}$ */
   code: string;
@@ -665,6 +685,32 @@ export interface SendCodeResponse {
   maskedPhone: string;
   /** Seconds before a resend is accepted */
   resendAfterSeconds: number;
+  expiresAt: string;
+}
+
+export interface CreateApiTokenRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  name: string;
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  expiresInDays?: number;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof: string;
+}
+
+export interface CreatedApiToken {
+  id: string;
+  name: string;
+  token: string;
+  createdAt: string;
   expiresAt: string;
 }
 
@@ -1000,6 +1046,16 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export interface ApiTokenView {
+  id: string;
+  name: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Null until the token is first used */
+  lastUsedAt?: string;
+  expired: boolean;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -1016,6 +1072,7 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  personalAccessTokens: boolean;
   chat: boolean;
 }
 
@@ -2916,6 +2973,82 @@ export const startProductVideoRun = async (
   });
 };
 
+export type stepUpResponse200 = {
+  data: StepUpResponse;
+  status: 200;
+};
+
+export type stepUpResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type stepUpResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type stepUpResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type stepUpResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type stepUpResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type stepUpResponseSuccess = stepUpResponse200 & {
+  headers: Headers;
+};
+export type stepUpResponseError = (
+  stepUpResponse400 | stepUpResponse403 | stepUpResponse409 | stepUpResponse422 | stepUpResponse429
+) & {
+  headers: Headers;
+};
+
+export type stepUpResponse = stepUpResponseSuccess | stepUpResponseError;
+
+export const getStepUpUrl = () => {
+  return `/api/v1/me/step-up`;
+};
+
+export const stepUp = async (
+  stepUpRequest: StepUpRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<stepUpResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<stepUpResponse>(getStepUpUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(stepUpRequest),
+  });
+};
+
 export type verifyResponse200 = {
   data: PhoneResponse;
   status: 200;
@@ -3003,6 +3136,184 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: ApiTokenView[];
+  status: 200;
+};
+
+export type list1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type list1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1ResponseError = (list1Response403 | list1Response503) & {
+  headers: Headers;
+};
+
+export type list1Response = list1ResponseSuccess | list1ResponseError;
+
+export const getList1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type create1Response201 = {
+  data: CreatedApiToken;
+  status: 201;
+};
+
+export type create1Response400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type create1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type create1Response409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type create1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type create1ResponseSuccess = create1Response201 & {
+  headers: Headers;
+};
+export type create1ResponseError = (
+  create1Response400 | create1Response403 | create1Response409 | create1Response503
+) & {
+  headers: Headers;
+};
+
+export type create1Response = create1ResponseSuccess | create1ResponseError;
+
+export const getCreate1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const create1 = async (
+  createApiTokenRequest: CreateApiTokenRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<create1Response> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<create1Response>(getCreate1Url(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createApiTokenRequest),
+  });
+};
+
+export type reportClientErrorResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type reportClientErrorResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reportClientErrorResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reportClientErrorResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reportClientErrorResponseSuccess = reportClientErrorResponse204 & {
+  headers: Headers;
+};
+export type reportClientErrorResponseError = (
+  reportClientErrorResponse400 | reportClientErrorResponse413 | reportClientErrorResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportClientErrorResponse =
+  reportClientErrorResponseSuccess | reportClientErrorResponseError;
+
+export const getReportClientErrorUrl = () => {
+  return `/api/v1/client-errors`;
+};
+
+/**
+ * @summary Report an error the web app contained
+ */
+export const reportClientError = async (
+  reportClientErrorBody: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportClientErrorResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportClientErrorResponse>(getReportClientErrorUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', ...getHeaders(options?.headers) },
+    body: reportClientErrorBody,
   });
 };
 
@@ -5113,5 +5424,48 @@ export const listAdminMediaJobs = async (
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type revokeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type revokeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type revokeResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type revokeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeResponseSuccess = revokeResponse204 & {
+  headers: Headers;
+};
+export type revokeResponseError = (revokeResponse403 | revokeResponse404 | revokeResponse503) & {
+  headers: Headers;
+};
+
+export type revokeResponse = revokeResponseSuccess | revokeResponseError;
+
+export const getRevokeUrl = (id: string) => {
+  return `/api/v1/me/api-tokens/${id}`;
+};
+
+export const revoke = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeResponse> => {
+  return customFetch<revokeResponse>(getRevokeUrl(id), {
+    ...options,
+    method: 'DELETE',
   });
 };
