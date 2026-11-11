@@ -609,7 +609,11 @@ def test_a_new_job_the_vendor_ended_is_reported_by_its_vendor_job_id() -> None:
     assert failure.value.code == "provider_request_failed"
     assert events == ["submit:new-1", "report:running:new", "await:new-1", "report:failed:new"]
     verdict = reports[-1]
-    assert (verdict.vendor, verdict.vendorJobId, verdict.vendorTaskId) == ("seedance", "new-1", None)
+    assert (verdict.vendor, verdict.vendorJobId, verdict.vendorTaskId) == (
+        "seedance",
+        "new-1",
+        None,
+    )
     assert verdict.fingerprint is None
 
 
