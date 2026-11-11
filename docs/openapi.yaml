@@ -352,6 +352,133 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample:
+    get:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: getAdminOnboardingSample
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSample
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.workflowId, errors.sampleInput,\
+            \ errors.sourceLocale)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: ONBOARDING_SAMPLE_INELIGIBLE (errors.workflowId says why);
+            the stored sample is unchanged
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample/translations/{locale}:
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSampleTranslation
+      parameters:
+      - name: locale
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleTranslationUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.input, errors.sourceHash)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no sample is set
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: the sample changed since sourceHash was read; nothing was stored
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: the sample's own language has no translation (errors.locale)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -1180,6 +1307,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/first-result/claim:
+    post:
+      tags:
+      - first-result-controller
+      operationId: claimFirstResult
+      responses:
+        "200":
+          description: "the account's first completed run, reported now"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "204":
+          description: "nothing to report: no completed run, or already reported"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the account is suspended
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: the token's user no longer exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -3071,6 +3234,115 @@ components:
       - status
       - title
       - updatedAt
+    AdminOnboardingSampleUpdate:
+      type: object
+      properties:
+        workflowId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        sampleInput:
+          type:
+          - string
+          - "null"
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+          pattern: vi|en
+      required:
+      - workflowId
+    AdminOnboardingSample:
+      type: object
+      properties:
+        workflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/AdminOnboardingSampleWorkflow"
+        shown:
+          type: boolean
+        reason:
+          type:
+          - string
+          - "null"
+        sampleInput:
+          type:
+          - string
+          - "null"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+        sourceHash:
+          type:
+          - string
+          - "null"
+        translations:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AdminOnboardingSampleTranslation"
+          description: one entry per editable language
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - reason
+      - sampleInput
+      - shown
+      - sourceHash
+      - sourceLocale
+      - translations
+      - updatedAt
+      - updatedBy
+      - workflow
+    AdminOnboardingSampleTranslation:
+      type:
+      - string
+      - "null"
+    AdminOnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AdminOnboardingSampleTranslationUpdate:
+      type: object
+      properties:
+        sourceHash:
+          type: string
+          description: the sourceHash the admin was looking at
+          pattern: "[0-9a-f]{64}"
+        input:
+          type: string
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+      required:
+      - input
+      - sourceHash
     CreateWorkflowRequest:
       type: object
       properties:
@@ -3924,6 +4196,18 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    FirstResultClaimResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+      required:
+      - runId
+      - workflowId
     ResetPasswordRequest:
       type: object
       properties:
@@ -4294,6 +4578,20 @@ components:
       required:
       - expiresAt
       - url
+    OnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        input:
+          type: string
+      required:
+      - id
+      - input
+      - name
     OnboardingStatusResponse:
       type: object
       properties:
@@ -4383,17 +4681,30 @@ components:
           - "null"
           enum:
           - first
+        sampleWorkflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/OnboardingSampleWorkflow"
+        firstResult:
+          type: string
+          enum:
+          - reported
+          - pending
+          - none
       required:
       - aiLevel
       - completed
       - completedAt
       - contentTypes
       - entry
+      - firstResult
       - firstRunDone
       - industries
       - open
       - progress
       - purposes
+      - sampleWorkflow
       - source
       - usageType
     OnboardingResultResponse:
