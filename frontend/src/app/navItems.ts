@@ -32,6 +32,7 @@ export const DOCS_ICON: Icon = BookOpen;
 const CORE_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/', labelKey: 'common.nav.home', icon: House, end: true },
   { to: '/workflows', labelKey: 'common.nav.workflows', icon: FlowArrow },
+  { to: '/runs', labelKey: 'common.nav.runs', icon: Play },
 ];
 
 const CHAT_NAV_ITEMS: readonly NavEntry[] = [
@@ -39,7 +40,6 @@ const CHAT_NAV_ITEMS: readonly NavEntry[] = [
 ];
 
 const DEMO_NAV_ITEMS: readonly NavEntry[] = [
-  { to: '/runs', labelKey: 'common.nav.runs', icon: Play },
   { to: '/integrations', labelKey: 'common.nav.integrations', icon: PlugsConnected },
 ];
 

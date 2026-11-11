@@ -988,6 +988,34 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void openDownloadableRefusesAnotherBucket() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).openDownloadable("flowcortex-uploads", "u/up"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(store, never()).open(any(), any());
+        });
+    }
+
+    @Test
+    void openDownloadableServesTheMediaBucketObjectAndAStoreFailureIsUnavailable() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            java.io.InputStream bytes = new java.io.ByteArrayInputStream(new byte[] {1});
+            when(store.open("flowcortex-media", "runs/r/steps/1/a.wav")).thenReturn(bytes);
+            when(store.open("flowcortex-media", "runs/r/steps/1/b.wav"))
+                    .thenThrow(SdkException.builder().message("connection refused").build());
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+
+            assertThat(jobs.openDownloadable("flowcortex-media", "runs/r/steps/1/a.wav")).isSameAs(bytes);
+            assertThatThrownBy(() -> jobs.openDownloadable("flowcortex-media", "runs/r/steps/1/b.wav"))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCauseInstanceOf(SdkException.class);
+        });
+    }
+
+    @Test
     void aRunObjectTheStoreRefusesSurfacesAsStoreUnavailableNamingTheObjectOnlyInTheLog(CapturedOutput output) {
         runner.run(context -> {
             org.mockito.Mockito.doThrow(SdkException.builder().message("connection refused").build())

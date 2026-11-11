@@ -1,7 +1,9 @@
 package com.flowcortex.credit.api;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -36,4 +38,16 @@ public interface CreditAccounts {
 
     /** What the run has cost: its charges minus its refunds. */
     long chargedForRun(UUID runId);
+
+    /**
+     * What each run has cost, charges minus refunds, in one grouped read. A run without ledger entries is
+     * absent from the map (read it as 0); empty input returns an empty map without a query.
+     */
+    Map<UUID, Long> chargedForRuns(Collection<UUID> runIds);
+
+    /**
+     * What the member's runs have cost, per run, counting ledger entries written at or after {@code since}.
+     * A run without such entries is absent from the map.
+     */
+    Map<UUID, Long> chargedForRunsOf(UUID userId, Instant since);
 }

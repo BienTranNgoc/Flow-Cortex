@@ -71,6 +71,35 @@
     "loading": "Loading run…",
     "loadError": "Could not load this run."
   },
+  "runLog": {
+    "title": "Run log",
+    "loading": "Loading the run log…",
+    "loadError": "Could not load the run log.",
+    "retry": "Try again",
+    "empty": "No log entries at this level.",
+    "filter": {
+      "label": "Show",
+      "all": "All",
+      "error": "Errors",
+      "warn": "Warnings"
+    },
+    "level": {
+      "error": "Error",
+      "warn": "Warning",
+      "info": "Info"
+    },
+    "started": "Started",
+    "duration": "Duration",
+    "attempt": "Attempt",
+    "errorCode": "Error code",
+    "traceId": "Trace ID",
+    "copyTrace": "Copy trace id",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the trace id instead."
+  },
+  "waveform": {
+    "name": "Waveform of {{label}}"
+  },
   "file": "File: {{name}}",
   "download": {
     "summary": "Download summary (.txt)",

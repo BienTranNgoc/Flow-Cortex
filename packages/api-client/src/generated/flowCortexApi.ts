@@ -973,6 +973,36 @@ export interface UpdateStepRequest {
   config?: string;
 }
 
+export interface UpdateRunRequest {
+  title?: string;
+  favorite?: boolean;
+}
+
+export type RunHistoryRowResponseStatus =
+  (typeof RunHistoryRowResponseStatus)[keyof typeof RunHistoryRowResponseStatus];
+
+export const RunHistoryRowResponseStatus = {
+  running: 'running',
+  waiting_approval: 'waiting_approval',
+  completed: 'completed',
+  error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
+} as const;
+
+export interface RunHistoryRowResponse {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  title?: string;
+  status: RunHistoryRowResponseStatus;
+  favorite: boolean;
+  startedAt: string;
+  finishedAt?: string;
+  durationSeconds?: number;
+  creditsCharged?: number;
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -1078,9 +1108,106 @@ export interface SupportAssistantConversation {
   messages: SupportAssistantHistoryMessage[];
 }
 
+export interface PageViewRunHistoryRowResponse {
+  items: RunHistoryRowResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface OutputUrlResponse {
   url: string;
   expiresAt: string;
+}
+
+export interface PeaksResponse {
+  /**
+   * @minimum 0
+   * @maximum 1
+   * @nullable
+   */
+  peaks: number[] | null;
+}
+
+export type EntryLevel = (typeof EntryLevel)[keyof typeof EntryLevel];
+
+export const EntryLevel = {
+  error: 'error',
+  warn: 'warn',
+  info: 'info',
+} as const;
+
+export interface Entry {
+  stepOrder: number;
+  type: string;
+  level: EntryLevel;
+  status: string;
+  /** @nullable */
+  message?: string | null;
+  /** @nullable */
+  errorCode?: string | null;
+  attempt: number;
+  deliveryCount: number;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  finishedAt?: string | null;
+  /** @nullable */
+  durationMs?: number | null;
+}
+
+export interface Summary {
+  errorCount: number;
+  warningCount: number;
+  /** @nullable */
+  firstError?: string | null;
+}
+
+export interface RunLogResponse {
+  status: string;
+  /** @nullable */
+  traceId?: string | null;
+  stepCount: number;
+  entries: Entry[];
+  summary: Summary;
+}
+
+export interface WorkflowOptionResponse {
+  id: string;
+  name: string;
+}
+
+export interface TopWorkflowResponse {
+  workflowId: string;
+  name: string;
+  runs: number;
+  credits?: number;
+  averageCredits?: number;
+}
+
+export interface UsageDayResponse {
+  day: string;
+  runs: number;
+  failed: number;
+  credits?: number;
+}
+
+export interface UsageSummaryResponse {
+  days: number;
+  from: string;
+  to: string;
+  runs: number;
+  failed: number;
+  failureRate: number;
+  creditsSpent?: number;
+  balance?: number;
+  series: UsageDayResponse[];
+  topWorkflows: TopWorkflowResponse[];
+}
+
+export interface RunTrayResponse {
+  active: RunHistoryRowResponse[];
+  recent: RunHistoryRowResponse[];
 }
 
 export interface HealthResponse {
@@ -1240,6 +1367,85 @@ export type SearchSupportKbParams = {
    */
   q: string;
 };
+
+export type ListRunsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  status?: ListRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
+  favorite?: boolean;
+};
+
+export type ListRunsStatus = (typeof ListRunsStatus)[keyof typeof ListRunsStatus];
+
+export const ListRunsStatus = {
+  running: 'running',
+  waiting_approval: 'waiting_approval',
+  completed: 'completed',
+  error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
+} as const;
+
+export type GetRunLogParams = {
+  level?: GetRunLogLevel;
+  /**
+   * @minimum 1
+   * @maximum 500
+   */
+  limit?: string;
+};
+
+export type GetRunLogLevel = (typeof GetRunLogLevel)[keyof typeof GetRunLogLevel];
+
+export const GetRunLogLevel = {
+  error: 'error',
+  warn: 'warn',
+  info: 'info',
+  all: 'all',
+} as const;
+
+export type GetRunUsageSummaryParams = {
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  days?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  top?: number;
+};
+
+export type ExportRunsParams = {
+  status?: ExportRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
+  favorite?: boolean;
+};
+
+export type ExportRunsStatus = (typeof ExportRunsStatus)[keyof typeof ExportRunsStatus];
+
+export const ExportRunsStatus = {
+  running: 'running',
+  waiting_approval: 'waiting_approval',
+  completed: 'completed',
+  error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
+} as const;
 
 export type OpenRealtimeStreamParams = {
   topic?: string[];
@@ -4920,6 +5126,100 @@ export const updateStep = async (
   });
 };
 
+export type getRunResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type getRunResponseSuccess = getRunResponse200 & {
+  headers: Headers;
+};
+export type getRunResponse = getRunResponseSuccess;
+
+export const getGetRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}`;
+};
+
+export const getRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunResponse> => {
+  return customFetch<getRunResponse>(getGetRunUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteRunResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type deleteRunResponseSuccess = deleteRunResponse200 & {
+  headers: Headers;
+};
+export type deleteRunResponse = deleteRunResponseSuccess;
+
+export const getDeleteRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}`;
+};
+
+export const deleteRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteRunResponse> => {
+  return customFetch<deleteRunResponse>(getDeleteRunUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateRunResponse200 = {
+  data: RunHistoryRowResponse;
+  status: 200;
+};
+
+export type updateRunResponseSuccess = updateRunResponse200 & {
+  headers: Headers;
+};
+export type updateRunResponse = updateRunResponseSuccess;
+
+export const getUpdateRunUrl = (id: string) => {
+  return `/api/v1/runs/${id}`;
+};
+
+export const updateRun = async (
+  id: string,
+  updateRunRequest: UpdateRunRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateRunResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateRunResponse>(getUpdateRunUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateRunRequest),
+  });
+};
+
 export type deleteAdminWorkflowResponse204 = {
   data: void;
   status: 204;
@@ -5528,6 +5828,40 @@ export const getSupportAssistantLatestConversation = async (
   );
 };
 
+export type listRunsResponse200 = {
+  data: PageViewRunHistoryRowResponse;
+  status: 200;
+};
+
+export type listRunsResponseSuccess = listRunsResponse200 & {
+  headers: Headers;
+};
+export type listRunsResponse = listRunsResponseSuccess;
+
+export const getListRunsUrl = (params?: ListRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/runs?${stringifiedParams}` : `/api/v1/runs`;
+};
+
+export const listRuns = async (
+  params?: ListRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listRunsResponse> => {
+  return customFetch<listRunsResponse>(getListRunsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getReviewTasksResponse200 = {
   data: ReviewTaskResponse[];
   status: 200;
@@ -5547,30 +5881,6 @@ export const getReviewTasks = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getReviewTasksResponse> => {
   return customFetch<getReviewTasksResponse>(getGetReviewTasksUrl(runId), {
-    ...options,
-    method: 'GET',
-  });
-};
-
-export type getRunResponse200 = {
-  data: RunResponse;
-  status: 200;
-};
-
-export type getRunResponseSuccess = getRunResponse200 & {
-  headers: Headers;
-};
-export type getRunResponse = getRunResponseSuccess;
-
-export const getGetRunUrl = (id: string) => {
-  return `/api/v1/runs/${id}`;
-};
-
-export const getRun = async (
-  id: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<getRunResponse> => {
-  return customFetch<getRunResponse>(getGetRunUrl(id), {
     ...options,
     method: 'GET',
   });
@@ -5597,6 +5907,187 @@ export const getOutputUrl = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getOutputUrlResponse> => {
   return customFetch<getOutputUrlResponse>(getGetOutputUrlUrl(id, order, name), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getStepOutputPeaksResponse200 = {
+  data: PeaksResponse;
+  status: 200;
+};
+
+export type getStepOutputPeaksResponseSuccess = getStepOutputPeaksResponse200 & {
+  headers: Headers;
+};
+export type getStepOutputPeaksResponse = getStepOutputPeaksResponseSuccess;
+
+export const getGetStepOutputPeaksUrl = (id: string, order: number, name: string) => {
+  return `/api/v1/runs/${id}/steps/${order}/outputs/${name}/peaks`;
+};
+
+export const getStepOutputPeaks = async (
+  id: string,
+  order: number,
+  name: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getStepOutputPeaksResponse> => {
+  return customFetch<getStepOutputPeaksResponse>(getGetStepOutputPeaksUrl(id, order, name), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getRunLogResponse200 = {
+  data: RunLogResponse;
+  status: 200;
+};
+
+export type getRunLogResponseSuccess = getRunLogResponse200 & {
+  headers: Headers;
+};
+export type getRunLogResponse = getRunLogResponseSuccess;
+
+export const getGetRunLogUrl = (id: string, params?: GetRunLogParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/runs/${id}/logs?${stringifiedParams}`
+    : `/api/v1/runs/${id}/logs`;
+};
+
+export const getRunLog = async (
+  id: string,
+  params?: GetRunLogParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunLogResponse> => {
+  return customFetch<getRunLogResponse>(getGetRunLogUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listRunWorkflowsResponse200 = {
+  data: WorkflowOptionResponse[];
+  status: 200;
+};
+
+export type listRunWorkflowsResponseSuccess = listRunWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listRunWorkflowsResponse = listRunWorkflowsResponseSuccess;
+
+export const getListRunWorkflowsUrl = () => {
+  return `/api/v1/runs/workflows`;
+};
+
+export const listRunWorkflows = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listRunWorkflowsResponse> => {
+  return customFetch<listRunWorkflowsResponse>(getListRunWorkflowsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getRunUsageSummaryResponse200 = {
+  data: UsageSummaryResponse;
+  status: 200;
+};
+
+export type getRunUsageSummaryResponseSuccess = getRunUsageSummaryResponse200 & {
+  headers: Headers;
+};
+export type getRunUsageSummaryResponse = getRunUsageSummaryResponseSuccess;
+
+export const getGetRunUsageSummaryUrl = (params?: GetRunUsageSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/runs/usage-summary?${stringifiedParams}`
+    : `/api/v1/runs/usage-summary`;
+};
+
+export const getRunUsageSummary = async (
+  params?: GetRunUsageSummaryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunUsageSummaryResponse> => {
+  return customFetch<getRunUsageSummaryResponse>(getGetRunUsageSummaryUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getRunTrayResponse200 = {
+  data: RunTrayResponse;
+  status: 200;
+};
+
+export type getRunTrayResponseSuccess = getRunTrayResponse200 & {
+  headers: Headers;
+};
+export type getRunTrayResponse = getRunTrayResponseSuccess;
+
+export const getGetRunTrayUrl = () => {
+  return `/api/v1/runs/tray`;
+};
+
+export const getRunTray = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunTrayResponse> => {
+  return customFetch<getRunTrayResponse>(getGetRunTrayUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportRunsResponse200 = {
+  data: Blob;
+  status: 200;
+};
+
+export type exportRunsResponseSuccess = exportRunsResponse200 & {
+  headers: Headers;
+};
+export type exportRunsResponse = exportRunsResponseSuccess;
+
+export const getExportRunsUrl = (params?: ExportRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/runs/export?${stringifiedParams}`
+    : `/api/v1/runs/export`;
+};
+
+export const exportRuns = async (
+  params?: ExportRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportRunsResponse> => {
+  return customFetch<exportRunsResponse>(getExportRunsUrl(params), {
     ...options,
     method: 'GET',
   });

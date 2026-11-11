@@ -2146,6 +2146,63 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/runs/{id}:
+    get:
+      tags:
+      - runs-controller
+      operationId: getRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+    delete:
+      tags:
+      - run-history-controller
+      operationId: deleteRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags:
+      - run-history-controller
+      operationId: updateRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRunRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunHistoryRowResponse"
   /api/v1/admin/workflows/{id}:
     delete:
       tags:
@@ -2559,6 +2616,73 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/runs:
+    get:
+      tags:
+      - run-history-controller
+      operationId: listRuns
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - running
+          - waiting_approval
+          - completed
+          - error
+          - cancelling
+          - cancelled
+      - name: workflowId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: favorite
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewRunHistoryRowResponse"
   /api/v1/runs/{runId}/review-tasks:
     get:
       tags:
@@ -2580,25 +2704,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ReviewTaskResponse"
-  /api/v1/runs/{id}:
-    get:
-      tags:
-      - runs-controller
-      operationId: getRun
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RunResponse"
   /api/v1/runs/{id}/steps/{order}/outputs/{name}/url:
     get:
       tags:
@@ -2629,6 +2734,185 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutputUrlResponse"
+  /api/v1/runs/{id}/steps/{order}/outputs/{name}/peaks:
+    get:
+      tags:
+      - run-diagnostics-controller
+      operationId: getStepOutputPeaks
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: order
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeaksResponse"
+  /api/v1/runs/{id}/logs:
+    get:
+      tags:
+      - run-diagnostics-controller
+      operationId: getRunLog
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: level
+        in: query
+        required: false
+        schema:
+          type: string
+          default: all
+          enum:
+          - error
+          - warn
+          - info
+          - all
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+          default: "50"
+          maximum: 500
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunLogResponse"
+  /api/v1/runs/workflows:
+    get:
+      tags:
+      - run-history-controller
+      operationId: listRunWorkflows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowOptionResponse"
+  /api/v1/runs/usage-summary:
+    get:
+      tags:
+      - run-history-controller
+      operationId: getRunUsageSummary
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          maximum: 365
+          minimum: 1
+      - name: top
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 10
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageSummaryResponse"
+  /api/v1/runs/tray:
+    get:
+      tags:
+      - run-history-controller
+      operationId: getRunTray
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunTrayResponse"
+  /api/v1/runs/export:
+    get:
+      tags:
+      - run-history-controller
+      operationId: exportRuns
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - running
+          - waiting_approval
+          - completed
+          - error
+          - cancelling
+          - cancelled
+      - name: workflowId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: favorite
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Total-Count:
+              style: simple
+              schema:
+                type: integer
+                format: int64
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
   /api/v1/realtime/stream:
     get:
       tags:
@@ -4465,6 +4749,58 @@ components:
           minLength: 0
         config:
           type: string
+    UpdateRunRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          writeOnly: true
+        favorite:
+          type: boolean
+          writeOnly: true
+    RunHistoryRowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum:
+          - running
+          - waiting_approval
+          - completed
+          - error
+          - cancelling
+          - cancelled
+        favorite:
+          type: boolean
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        durationSeconds:
+          type: integer
+          format: int64
+        creditsCharged:
+          type: integer
+          format: int64
+      required:
+      - favorite
+      - id
+      - startedAt
+      - status
+      - workflowId
+      - workflowName
     SupportSettings:
       type: object
       properties:
@@ -4648,6 +4984,27 @@ components:
       - role
       - sources
       - text
+    PageViewRunHistoryRowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunHistoryRowResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     OutputUrlResponse:
       type: object
       properties:
@@ -4659,6 +5016,220 @@ components:
       required:
       - expiresAt
       - url
+    PeaksResponse:
+      type: object
+      properties:
+        peaks:
+          type:
+          - array
+          - "null"
+          items:
+            type: number
+            format: double
+          maximum: 1
+          minimum: 0
+      required:
+      - peaks
+    Entry:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+        type:
+          type: string
+        level:
+          type: string
+          enum:
+          - error
+          - warn
+          - info
+        status:
+          type: string
+        message:
+          type:
+          - string
+          - "null"
+        errorCode:
+          type:
+          - string
+          - "null"
+        attempt:
+          type: integer
+          format: int32
+        deliveryCount:
+          type: integer
+          format: int32
+        startedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        finishedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        durationMs:
+          type:
+          - integer
+          - "null"
+          format: int64
+      required:
+      - attempt
+      - deliveryCount
+      - level
+      - status
+      - stepOrder
+      - type
+    RunLogResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        traceId:
+          type:
+          - string
+          - "null"
+        stepCount:
+          type: integer
+          format: int32
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        summary:
+          $ref: "#/components/schemas/Summary"
+      required:
+      - entries
+      - status
+      - stepCount
+      - summary
+    Summary:
+      type: object
+      properties:
+        errorCount:
+          type: integer
+          format: int32
+        warningCount:
+          type: integer
+          format: int32
+        firstError:
+          type:
+          - string
+          - "null"
+      required:
+      - errorCount
+      - warningCount
+    WorkflowOptionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    TopWorkflowResponse:
+      type: object
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        runs:
+          type: integer
+          format: int64
+        credits:
+          type: integer
+          format: int64
+        averageCredits:
+          type: number
+          format: double
+      required:
+      - name
+      - runs
+      - workflowId
+    UsageDayResponse:
+      type: object
+      properties:
+        day:
+          type: string
+          format: date
+        runs:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        credits:
+          type: integer
+          format: int64
+      required:
+      - day
+      - failed
+      - runs
+    UsageSummaryResponse:
+      type: object
+      properties:
+        days:
+          type: integer
+          format: int32
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        runs:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        failureRate:
+          type: number
+          format: double
+        creditsSpent:
+          type: integer
+          format: int64
+        balance:
+          type: integer
+          format: int64
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/UsageDayResponse"
+        topWorkflows:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopWorkflowResponse"
+      required:
+      - days
+      - failed
+      - failureRate
+      - from
+      - runs
+      - series
+      - to
+      - topWorkflows
+    RunTrayResponse:
+      type: object
+      properties:
+        active:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunHistoryRowResponse"
+        recent:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunHistoryRowResponse"
+      required:
+      - active
+      - recent
     HealthResponse:
       type: object
       properties:

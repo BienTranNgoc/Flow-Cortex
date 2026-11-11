@@ -8,7 +8,9 @@ import com.flowcortex.credit.infrastructure.CreditWalletRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -106,5 +108,28 @@ class CreditAccountsImpl implements CreditAccounts {
     @Transactional(readOnly = true)
     public long chargedForRun(UUID runId) {
         return ledger.sumChargedForRun(runId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> chargedForRuns(Collection<UUID> runIds) {
+        if (runIds.isEmpty()) {
+            return Map.of();
+        }
+        return toMap(ledger.sumChargedForRuns(runIds));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> chargedForRunsOf(UUID userId, Instant since) {
+        return toMap(ledger.sumChargedForRunsOf(userId, since));
+    }
+
+    private static Map<UUID, Long> toMap(List<CreditLedgerRepository.RunCharge> charges) {
+        Map<UUID, Long> byRun = new HashMap<>();
+        for (CreditLedgerRepository.RunCharge charge : charges) {
+            byRun.put(charge.getRunId(), charge.getCharged());
+        }
+        return byRun;
     }
 }

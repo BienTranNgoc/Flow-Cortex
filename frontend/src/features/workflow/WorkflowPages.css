@@ -273,7 +273,264 @@
   }
 }
 
+.audio-waveform {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  height: 2.5rem;
+  fill: var(--primary);
+}
+
+.audio-waveform-skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--paper-3);
+  animation: audio-waveform-pulse 1.4s var(--ease-standard) infinite alternate;
+}
+
+@keyframes audio-waveform-pulse {
+  to {
+    opacity: 0.5;
+  }
+}
+
+.run-log {
+  margin: 1rem 0 0;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+}
+
+.run-log-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.run-log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--target-min);
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-log-toggle::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-quick) var(--ease-standard);
+}
+
+.run-log-toggle[aria-expanded='true']::before {
+  transform: rotate(45deg);
+}
+
+.run-log-toggle:hover {
+  background: var(--btn-bg-hover);
+}
+
+.run-log-toggle:focus-visible,
+.run-log-filter:focus-visible,
+.run-log-copy:focus-visible,
+.run-log-retry:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.run-log-body {
+  padding: 0 1rem 1rem;
+}
+
+.run-log-body > output {
+  display: block;
+  color: var(--ink-3);
+}
+
+.run-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.run-log-filter,
+.run-log-copy,
+.run-log-retry {
+  min-height: var(--target-min);
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-full);
+  background: var(--btn-bg);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.run-log-filter:hover,
+.run-log-copy:hover,
+.run-log-retry:hover {
+  background: var(--btn-bg-hover);
+}
+
+.run-log-filter:active,
+.run-log-copy:active,
+.run-log-retry:active {
+  background: var(--chrome-active);
+}
+
+.run-log-filter[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 700;
+}
+
+.run-log-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.run-log-trace-id {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  user-select: all;
+}
+
+.run-log-copied {
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+
+.run-log-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--red);
+}
+
+.run-log-error p,
+.run-log-empty {
+  margin: 0;
+}
+
+.run-log-entries {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-log-entry {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line-soft);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  overflow-wrap: anywhere;
+}
+
+.run-log-entry-error {
+  border-left-color: var(--red);
+}
+
+.run-log-entry-warn {
+  border-left-color: var(--warning);
+}
+
+.run-log-entry-info {
+  border-left-color: var(--line-2);
+}
+
+.run-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.run-log-level {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--paper-3);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.run-log-level-error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.run-log-level-warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.run-log-order {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-log-status {
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+
+.run-log-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+}
+
+.run-log-facts div {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.run-log-facts dt {
+  color: var(--ink-4);
+}
+
+.run-log-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-log-message {
+  margin: 0.35rem 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-waveform-skeleton {
+    animation: none;
+  }
+}
+
 @media (max-width: 480px) {
+  .run-log-facts {
+    flex-direction: column;
+  }
+
   .output-fields {
     grid-template-columns: 1fr;
     gap: 0;

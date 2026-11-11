@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -206,6 +207,41 @@ class CreditsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void chargedForRunsIsDebitsMinusRefundsPerRunAndZeroForARunWithNoEntry() {
+        UserView member = memberWithBalance("chargedruns", 1000);
+        UUID charged = UUID.randomUUID();
+        UUID untouched = UUID.randomUUID();
+        UUID neverSeen = UUID.randomUUID();
+        Instant now = Instant.now();
+        ledgerRow(member, charged, "debit", 30, now);
+        ledgerRow(member, charged, "refund", 10, now);
+
+        Map<UUID, Long> byRun = creditAccounts.chargedForRuns(List.of(charged, untouched, neverSeen));
+
+        assertThat(byRun).containsOnlyKeys(charged).containsEntry(charged, 20L);
+        assertThat(creditAccounts.chargedForRuns(List.of())).isEmpty();
+    }
+
+    @Test
+    void chargedForRunsOfSumsOneMembersRunsChargedSinceTheInstant() {
+        UserView member = memberWithBalance("chargedof", 1000);
+        UserView other = memberWithBalance("chargedofother", 1000);
+        UUID recent = UUID.randomUUID();
+        UUID old = UUID.randomUUID();
+        UUID othersRun = UUID.randomUUID();
+        Instant since = Instant.now().minus(Duration.ofDays(1));
+        ledgerRow(member, recent, "debit", 40, since.plusSeconds(60));
+        ledgerRow(member, recent, "refund", 15, since.plusSeconds(120));
+        ledgerRow(member, old, "debit", 7, since.minusSeconds(60));
+        ledgerRow(other, othersRun, "debit", 9, since.plusSeconds(60));
+        ledgerRow(member, null, "debit", 100, since.plusSeconds(60));
+
+        Map<UUID, Long> byRun = creditAccounts.chargedForRunsOf(member.id(), since);
+
+        assertThat(byRun).containsOnlyKeys(recent).containsEntry(recent, 25L);
+    }
+
+    @Test
     void aNewAccountIsGrantedOneThousandCreditsOnceEvenWhenTheEventIsHandledAgain() {
         UserView member = newUser("signup");
         awaitWallet(member.id());
@@ -299,6 +335,13 @@ class CreditsIT extends AbstractWorkflowHttpIT {
     private List<UUID> stepIds(UUID runId) {
         return jdbcTemplate.queryForList("SELECT id FROM run_step WHERE run_id = ? ORDER BY step_order", UUID.class,
                 runId);
+    }
+
+    /** A ledger row with no step, so a run can carry several of one kind at chosen times. */
+    private void ledgerRow(UserView member, UUID runId, String kind, long amount, Instant at) {
+        jdbcTemplate.update("INSERT INTO credit_ledger (id, user_id, run_id, kind, amount, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), member.id(), runId, kind, amount,
+                Timestamp.from(at));
     }
 
     /** A charge as the claim makes it: the wallet down by the cost and one debit row for the step. */

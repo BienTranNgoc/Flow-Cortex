@@ -71,6 +71,35 @@
     "loading": "Đang tải lượt chạy…",
     "loadError": "Không tải được lượt chạy này."
   },
+  "runLog": {
+    "title": "Nhật ký lượt chạy",
+    "loading": "Đang tải nhật ký lượt chạy…",
+    "loadError": "Không tải được nhật ký lượt chạy.",
+    "retry": "Thử lại",
+    "empty": "Không có mục nhật ký nào ở mức này.",
+    "filter": {
+      "label": "Hiển thị",
+      "all": "Tất cả",
+      "error": "Lỗi",
+      "warn": "Cảnh báo"
+    },
+    "level": {
+      "error": "Lỗi",
+      "warn": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "started": "Bắt đầu",
+    "duration": "Thời lượng",
+    "attempt": "Lần chạy",
+    "errorCode": "Mã lỗi",
+    "traceId": "Mã theo dõi",
+    "copyTrace": "Sao chép mã theo dõi",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được. Hãy chọn mã theo dõi."
+  },
+  "waveform": {
+    "name": "Dạng sóng của {{label}}"
+  },
   "file": "Tệp: {{name}}",
   "download": {
     "summary": "Tải bản tóm tắt (.txt)",

@@ -3,6 +3,7 @@ import { List } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useBalance } from '../features/credits/useBalance';
+import { RunTray } from '../features/runHistory/RunTray';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { formatNumber } from '../lib/format';
 import { activeLocale } from '../lib/i18n';
@@ -53,6 +54,7 @@ export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<Topb
             <span>{t('common.nav.credits', { amount: formatNumber(credits, activeLocale()) })}</span>
           </span>
         )}
+        <RunTray />
         <AppLanguageToggle />
         <ThemeToggle
           theme={theme}

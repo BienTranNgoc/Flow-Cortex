@@ -28,6 +28,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -62,7 +63,7 @@ class WorkflowRunServiceImplTest {
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository, workflowRunRepository,
                 runStepRepository, events, runUpdates, registry, mediaJobs, mock(UserDirectory.class),
-                new TransactionTemplate(transactions), new RunStartGuards(List.of()), workflowEnabled);
+                new TransactionTemplate(transactions), new RunStartGuards(List.of()), Tracer.NOOP, workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -109,7 +110,7 @@ class WorkflowRunServiceImplTest {
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, workflowStepRepository,
                 workflowRunRepository, runStepRepository, events, runUpdates, new StepExecutorRegistry(List.of(translate)),
                 mediaJobs, mock(UserDirectory.class), new TransactionTemplate(transactions),
-                new RunStartGuards(List.of(creditGuard)), true);
+                new RunStartGuards(List.of(creditGuard)), Tracer.NOOP, true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "translate");
 

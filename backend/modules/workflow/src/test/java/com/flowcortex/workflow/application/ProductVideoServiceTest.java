@@ -25,6 +25,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +53,7 @@ class ProductVideoServiceTest {
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                runUpdates, transactions, new RunStartGuards(List.of()), enabled, true);
+                runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP, enabled, true);
     }
 
     @Test
@@ -80,7 +81,7 @@ class ProductVideoServiceTest {
             throw new IllegalStateException("refused");
         };
         ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
-                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), true, true);
+                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), Tracer.NOOP, true, true);
 
         assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
                 .hasMessage("refused");

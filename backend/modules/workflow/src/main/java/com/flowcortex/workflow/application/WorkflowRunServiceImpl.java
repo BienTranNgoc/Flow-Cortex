@@ -33,6 +33,7 @@ import com.flowcortex.workflow.infrastructure.RunWithWorkflowName;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +45,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -88,14 +91,27 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final TransactionTemplate transactionTemplate;
     private final RunStartGuards runStartGuards;
     private final RunUpdates runUpdates;
+    private final Tracer tracer;
     private final boolean workflowEnabled;
+
+    @Autowired
+    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
+            WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
+            MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
+            RunStartGuards runStartGuards, ObjectProvider<Tracer> tracer,
+            @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this(workflowRepository, workflowStepRepository, workflowRunRepository, runStepRepository, events,
+                runUpdates, registry, mediaJobs, userDirectory, transactionTemplate, runStartGuards,
+                tracer.getIfAvailable(() -> Tracer.NOOP), workflowEnabled);
+    }
 
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
             MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
-            RunStartGuards runStartGuards,
-            @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+            RunStartGuards runStartGuards, Tracer tracer, boolean workflowEnabled) {
+        this.tracer = tracer;
         this.runUpdates = runUpdates;
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -207,9 +223,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         String displayedInput = runInput;
         String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
+        String traceId = CurrentTrace.idFor(tracer);
         return transactionTemplate.execute(status -> {
             WorkflowRun run = workflowRunRepository.save(new WorkflowRun(runId, workflow.getId(),
-                    currentUserId, displayedInput, runOptions, Instant.now(), requestKey));
+                    currentUserId, displayedInput, runOptions, Instant.now(), requestKey).withTraceId(traceId));
             if (!copies.isEmpty()) {
                 mediaJobs.bindRunInputs(run.getId(), copies);
             }
@@ -267,6 +284,16 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     @Transactional(readOnly = true)
     public RunOutputUrlView getOutputUrl(UUID currentUserId, UUID runId, int stepOrder, String name) {
+        DownloadableOutput output = downloadableOutput(currentUserId, runId, stepOrder, name);
+        MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());
+        return new RunOutputUrlView(download.url(), download.expiresAt());
+    }
+
+    /**
+     * The stored output of the caller's run that lies under its step and sits in a downloadable bucket.
+     * @throws NotFoundException if the run is not the caller's, or the step or output is absent or not downloadable
+     */
+    DownloadableOutput downloadableOutput(UUID currentUserId, UUID runId, int stepOrder, String name) {
         workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         RunStep step = runStepRepository.findByRunIdOrderByStepOrderAsc(runId).stream()
@@ -288,8 +315,8 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                     runId, stepOrder, name, output.bucket());
             throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
         }
-        MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());
-        return new RunOutputUrlView(download.url(), download.expiresAt());
+        return new DownloadableOutput(step.getId(), step.getAttempt(), output.name(), output.bucket(),
+                output.objectKey(), output.mime());
     }
 
     @Override
@@ -328,6 +355,11 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     }
 
     /** Where a step's output is stored; this never leaves the server. */
-    private record StoredOutput(String name, String bucket, String objectKey) {
+    private record StoredOutput(String name, String bucket, String objectKey, String mime) {
+    }
+
+    /** A step attempt's output that may be read from the media bucket; {@code mime} is as the worker reported it. */
+    record DownloadableOutput(UUID runStepId, short attempt, String name, String bucket, String objectKey,
+            String mime) {
     }
 }
