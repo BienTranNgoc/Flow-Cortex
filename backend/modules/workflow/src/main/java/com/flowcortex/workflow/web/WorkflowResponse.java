@@ -13,18 +13,22 @@ import java.util.UUID;
  * is the sum of its steps' configured costs; {@code null} while credits are switched off. While
  * {@code available} is false, starting a run of it answers 503. {@code servedVersion} is the number of the
  * version {@code steps} come from, null when they are the live draft; {@code publishedVersionId} is the pointer.
+ * {@code allowFork} is the owner's switch, {@code forkCount} how many times it was forked and {@code forkedFromId}
+ * the workflow it was forked from.
  */
 record WorkflowResponse(
         UUID id, String name, boolean isShared, Instant createdAt, Instant updatedAt,
         List<WorkflowStepResponse> steps, Long estimatedCredits,
         @Schema(requiredMode = RequiredMode.REQUIRED) boolean available,
         @Schema(allowableValues = {"draft", "published"}) String status,
-        @Schema(nullable = true) UUID publishedVersionId, @Schema(nullable = true) Integer servedVersion) {
+        @Schema(nullable = true) UUID publishedVersionId, @Schema(nullable = true) Integer servedVersion,
+        @Schema(requiredMode = RequiredMode.REQUIRED) boolean allowFork,
+        @Schema(requiredMode = RequiredMode.REQUIRED) int forkCount, @Schema(nullable = true) UUID forkedFromId) {
 
     static WorkflowResponse from(WorkflowView view, CreditAccounts credits) {
         return new WorkflowResponse(view.id(), view.name(), view.shared(), view.createdAt(), view.updatedAt(),
                 view.steps().stream().map(WorkflowStepResponse::from).toList(),
                 view.estimatedCredits(credits), view.available(), view.status(), view.publishedVersionId(),
-                view.servedVersion());
+                view.servedVersion(), view.allowFork(), view.forkCount(), view.forkedFromId());
     }
 }

@@ -53,6 +53,13 @@ class ThrowawayTestController {
                 "THING_INCOMPLETE", Map.of("steps[1].config", new LocalizedMessage(GlobalExceptionHandlerTest.THING_MISSING)));
     }
 
+    @GetMapping("/test/unprocessable-reasons")
+    String triggerUnprocessableWithReasons() {
+        throw new UnprocessableEntityException(new LocalizedMessage(GlobalExceptionHandlerTest.THING_INCOMPLETE),
+                "THING_INCOMPLETE", Map.of("steps[1].config", new LocalizedMessage(GlobalExceptionHandlerTest.THING_MISSING)),
+                Map.of("steps[1].config", "missing_key"));
+    }
+
     @GetMapping("/test/optimistic-lock")
     String triggerOptimisticLock() {
         throw new ObjectOptimisticLockingFailureException(Object.class, "thing-id");

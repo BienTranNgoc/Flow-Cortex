@@ -358,6 +358,10 @@ export interface WorkflowResponse {
   publishedVersionId?: string | null;
   /** @nullable */
   servedVersion?: number | null;
+  allowFork: boolean;
+  forkCount: number;
+  /** @nullable */
+  forkedFromId?: string | null;
 }
 
 export interface SaveVersionRequest {
@@ -983,6 +987,89 @@ export interface ResetRequestedResponse {
   status: string;
 }
 
+export interface ImportWorkflowRequest {
+  /** @minLength 1 */
+  token: string;
+  acknowledgeOutboundTargets?: boolean;
+}
+
+export interface WorkflowArtifactWorkflow {
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+}
+
+export interface WorkflowArtifactStep {
+  /** @minimum 1 */
+  stepOrder: number;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  name: string | null;
+  /**
+   * @minLength 1
+   * @maxLength 50
+   */
+  type: string;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  inputRef: string | null;
+  /** @nullable */
+  config: string | null;
+}
+
+export interface WorkflowArtifact {
+  /**
+   * @minimum 1
+   * @maximum 1
+   */
+  formatVersion: number;
+  exportedAt: string;
+  workflow: WorkflowArtifactWorkflow;
+  steps: WorkflowArtifactStep[];
+}
+
+export type ImportIssueResponseSeverity =
+  (typeof ImportIssueResponseSeverity)[keyof typeof ImportIssueResponseSeverity];
+
+export const ImportIssueResponseSeverity = {
+  blocking: 'blocking',
+  advisory: 'advisory',
+} as const;
+
+export interface ImportIssueResponse {
+  code: string;
+  severity: ImportIssueResponseSeverity;
+  /** @nullable */
+  stepOrder?: number | null;
+  /** @nullable */
+  field?: string | null;
+  message: string;
+}
+
+export interface OutboundTargetResponse {
+  stepOrder: number;
+  type: string;
+  field: string;
+  value: string;
+}
+
+export interface ImportReviewResponse {
+  token: string;
+  expiresAt: string;
+  workflowName: string;
+  stepCount: number;
+  blocked: boolean;
+  outbound: boolean;
+  issues: ImportIssueResponse[];
+  outboundTargets: OutboundTargetResponse[];
+}
+
 export type AdminSupportRequestReplyStatus =
   (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
 
@@ -1019,6 +1106,7 @@ export interface UpdateWorkflowRequest {
   shared?: boolean;
   /** @pattern draft|published */
   status?: UpdateWorkflowRequestStatus;
+  allowFork?: boolean;
 }
 
 export interface RenameVersionRequest {
@@ -2965,6 +3053,59 @@ export const hotfixWorkflow = async (
   });
 };
 
+export type forkWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type forkWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type forkWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type forkWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type forkWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type forkWorkflowResponseSuccess = forkWorkflowResponse201 & {
+  headers: Headers;
+};
+export type forkWorkflowResponseError = (
+  | forkWorkflowResponse403
+  | forkWorkflowResponse404
+  | forkWorkflowResponse409
+  | forkWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type forkWorkflowResponse = forkWorkflowResponseSuccess | forkWorkflowResponseError;
+
+export const getForkWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/fork`;
+};
+
+export const forkWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<forkWorkflowResponse> => {
+  return customFetch<forkWorkflowResponse>(getForkWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type listResponse200 = {
   data: UserResponse[];
   status: 200;
@@ -4791,6 +4932,150 @@ export const addAdminWorkflowStep = async (
   });
 };
 
+export type importAdminWorkflowResponse200 = {
+  data: WorkflowResponse;
+  status: 200;
+};
+
+export type importAdminWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type importAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type importAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type importAdminWorkflowResponseSuccess = (
+  importAdminWorkflowResponse200 | importAdminWorkflowResponse201
+) & {
+  headers: Headers;
+};
+export type importAdminWorkflowResponseError = (
+  importAdminWorkflowResponse400 | importAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type importAdminWorkflowResponse =
+  importAdminWorkflowResponseSuccess | importAdminWorkflowResponseError;
+
+export const getImportAdminWorkflowUrl = () => {
+  return `/api/v1/admin/workflows/import`;
+};
+
+export const importAdminWorkflow = async (
+  importWorkflowRequest: ImportWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<importAdminWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<importAdminWorkflowResponse>(getImportAdminWorkflowUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importWorkflowRequest),
+  });
+};
+
+export type reviewAdminWorkflowImportResponse200 = {
+  data: ImportReviewResponse;
+  status: 200;
+};
+
+export type reviewAdminWorkflowImportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reviewAdminWorkflowImportResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reviewAdminWorkflowImportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reviewAdminWorkflowImportResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reviewAdminWorkflowImportResponseSuccess = reviewAdminWorkflowImportResponse200 & {
+  headers: Headers;
+};
+export type reviewAdminWorkflowImportResponseError = (
+  | reviewAdminWorkflowImportResponse400
+  | reviewAdminWorkflowImportResponse413
+  | reviewAdminWorkflowImportResponse422
+  | reviewAdminWorkflowImportResponse429
+) & {
+  headers: Headers;
+};
+
+export type reviewAdminWorkflowImportResponse =
+  reviewAdminWorkflowImportResponseSuccess | reviewAdminWorkflowImportResponseError;
+
+export const getReviewAdminWorkflowImportUrl = () => {
+  return `/api/v1/admin/workflows/import/review`;
+};
+
+export const reviewAdminWorkflowImport = async (
+  workflowArtifact: WorkflowArtifact,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reviewAdminWorkflowImportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reviewAdminWorkflowImportResponse>(getReviewAdminWorkflowImportUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(workflowArtifact),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -6500,6 +6785,52 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminWorkflowResponse200 = {
+  data: WorkflowArtifact;
+  status: 200;
+};
+
+export type exportAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type exportAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type exportAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type exportAdminWorkflowResponseSuccess = exportAdminWorkflowResponse200 & {
+  headers: Headers;
+};
+export type exportAdminWorkflowResponseError = (
+  exportAdminWorkflowResponse404 | exportAdminWorkflowResponse409 | exportAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type exportAdminWorkflowResponse =
+  exportAdminWorkflowResponseSuccess | exportAdminWorkflowResponseError;
+
+export const getExportAdminWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/export`;
+};
+
+export const exportAdminWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminWorkflowResponse> => {
+  return customFetch<exportAdminWorkflowResponse>(getExportAdminWorkflowUrl(id), {
     ...options,
     method: 'GET',
   });
