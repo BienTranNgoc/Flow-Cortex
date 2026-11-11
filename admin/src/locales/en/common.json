@@ -60,6 +60,7 @@
         "administration": "Administration",
         "system": "System",
         "support": "Support",
+        "content": "Content",
         "chat": "Chat"
       },
       "items": {
@@ -81,6 +82,8 @@
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
         "adminAccounts": "Admin accounts",
+        "contentDocuments": "Documents",
+        "contentMedia": "Media library",
         "chatSettings": "Settings"
       }
     },
