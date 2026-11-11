@@ -510,3 +510,47 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+---
+
+## ADR-0016 — Runtime settings registry
+
+- **Context:** Operator-tunable values (the Help Center assistant switch and
+  its four daily limits) were bound once from environment variables at
+  startup, with one ad-hoc table per feature for the switch. Changing a limit
+  meant a restart, there was no common history, and a console page would have
+  needed per-feature code. Every later runtime switch would have repeated the
+  pattern.
+- **Decision:** One registry of typed keys, decided at read time.
+  - **Declaration:** each module declares its own keys as `SettingDefinition`
+    beans (key, type, bounds, code default, a supplier of the configured
+    value); the settings module collects them at startup and refuses a
+    duplicate, a malformed name, bounds with min above max, a configured value
+    outside its bounds, and any key whose segment looks like a secret
+    (`key`, `token`, `secret`, `password`). No secret is ever a setting.
+  - **Composition:** one pure function decides every read. The environment is
+    the configured layer. A switch is tri-state there: configured off vetoes
+    whatever is stored, configured on turns the switch on when nothing is
+    stored, unset defers to stored-else-code-default. An integer is stored,
+    else configured. A stored value beats the configured one except for the
+    veto.
+  - **Reads never throw:** one primary-key query outside the caller's
+    transaction, no cache. A failed read or unparseable stored text degrades
+    by type (a switch to off, an integer to its configured value), increments
+    `settings.read.degraded{key}` and logs the key, never the text.
+  - **Writes:** one transaction per key under a per-key advisory lock; the
+    value and its history row commit together, an unchanged value records
+    nothing, and a reset deletes the stored value and records one row.
+  - **Surface:** an admin API gated by `platform.setting.view|update` lists
+    keys with their source, edits, resets and pages the history; the console
+    Settings page renders any declared key from that API.
+- **Consequences:**
+  - A later key adds a declaration and copy, no store or page code.
+  - A switch fails closed on a database fault, intended for cost-bearing
+    switches; a key whose safe position is "on" needs a hold-last policy
+    first.
+  - Every read is one indexed query; a cache would need cross-instance
+    invalidation and is deferred until there is more than one instance.
+  - `support_settings` stays unread after the switch is copied, so rolling the
+    release back still serves the pre-upgrade switch; a cleanup change drops
+    it.

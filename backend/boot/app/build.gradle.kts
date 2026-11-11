@@ -24,6 +24,7 @@ dependencies {
     implementation(project(":modules:credit"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
+    implementation(project(":modules:settings"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:chat"))

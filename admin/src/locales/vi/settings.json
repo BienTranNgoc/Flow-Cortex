@@ -1,0 +1,73 @@
+{
+  "eyebrow": "Quản trị",
+  "title": "Cài đặt",
+  "description": "Các công tắc và giới hạn có hiệu lực từ yêu cầu kế tiếp, không cần khởi động lại.",
+  "readOnly": "Bạn chỉ xem được các cài đặt này, không thể thay đổi.",
+  "empty": "Chưa có cài đặt nào để hiển thị.",
+  "loading": "Đang tải…",
+  "loadFailed": "Không tải được cài đặt.",
+  "refreshFailed": "Không làm mới được cài đặt mới nhất — đang hiển thị bản đã tải trước đó.",
+  "retry": "Thử lại",
+  "save": "Lưu",
+  "saving": "Đang lưu…",
+  "saveFailed": "Không lưu được. Vui lòng thử lại.",
+  "reset": "Đặt lại về giá trị cấu hình",
+  "integerRange": "Nhập một số nguyên từ {{min}} đến {{max}}.",
+  "bounds": "Từ {{min}} đến {{max}}",
+  "changedBy": "{{email}} đã thay đổi lúc {{at}}",
+  "changedAt": "Đã thay đổi lúc {{at}}",
+  "vetoedNote": "Đang bị tắt bởi cấu hình máy chủ; giá trị đã lưu sẽ có hiệu lực khi cấu hình được gỡ.",
+  "degradedNote": "Kho cài đặt không khả dụng nên đang áp dụng giá trị dự phòng an toàn.",
+  "groups": {
+    "support": "Trung tâm trợ giúp"
+  },
+  "source": {
+    "STORED": "Do quản trị viên đặt",
+    "CONFIGURED": "Từ cấu hình máy chủ",
+    "DEFAULT": "Mặc định",
+    "VETOED": "Bị tắt bởi cấu hình máy chủ",
+    "DEGRADED": "Kho cài đặt không khả dụng"
+  },
+  "value": {
+    "on": "Bật",
+    "off": "Tắt"
+  },
+  "history": {
+    "show": "Xem lịch sử",
+    "hide": "Ẩn lịch sử",
+    "loadFailed": "Không tải được lịch sử.",
+    "empty": "Chưa có thay đổi nào.",
+    "unset": "chưa đặt",
+    "unknownActor": "Tài khoản đã bị xóa",
+    "transition": "{{from}} → {{to}}",
+    "range": "{{from}}–{{to}} trên {{total}}",
+    "newer": "Mới hơn",
+    "older": "Cũ hơn"
+  },
+  "keys": {
+    "support": {
+      "assistant": {
+        "enabled": {
+          "label": "Trợ lý AI",
+          "help": "Tắt trợ lý có hiệu lực từ câu hỏi kế tiếp; bài hướng dẫn và yêu cầu hỗ trợ vẫn hoạt động."
+        },
+        "daily_ceiling": {
+          "label": "Số câu hỏi mỗi ngày, mọi người dùng",
+          "help": "Trợ lý tạm dừng trong ngày khi đã trả lời đủ số câu hỏi này."
+        },
+        "member_daily_quota": {
+          "label": "Số câu hỏi mỗi thành viên mỗi ngày",
+          "help": "Số câu hỏi một thành viên đã đăng nhập được hỏi mỗi ngày."
+        },
+        "guest_daily_quota": {
+          "label": "Số câu hỏi mỗi khách mỗi ngày",
+          "help": "Số câu hỏi một khách được hỏi mỗi ngày."
+        },
+        "guest_network_daily_quota": {
+          "label": "Số câu hỏi mỗi mạng của khách mỗi ngày",
+          "help": "Số câu hỏi tất cả khách dùng chung một địa chỉ mạng được hỏi mỗi ngày."
+        }
+      }
+    }
+  }
+}

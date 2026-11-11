@@ -1,0 +1,120 @@
+.settings-group {
+  max-width: 48rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.settings-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.settings-item-label {
+  font-weight: 600;
+}
+
+.settings-muted {
+  margin: 0;
+  color: var(--admin-ink-4);
+}
+
+.settings-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.settings-meta .cortex-admin-pill,
+.settings-notice {
+  margin: 0;
+  white-space: normal;
+}
+
+.settings-switch {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  accent-color: var(--admin-primary);
+  cursor: pointer;
+}
+
+.settings-switch:disabled,
+.settings-switch[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-number input {
+  width: 9rem;
+  min-height: var(--admin-control-h);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  background: var(--admin-input-bg);
+  color: var(--admin-input-text);
+  font: inherit;
+}
+
+.settings-number input:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 1px;
+  border-color: var(--admin-primary);
+}
+
+.settings-number button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-history {
+  width: 100%;
+}
+
+.settings-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-history-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.settings-history-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}

@@ -10,7 +10,8 @@
         displayName = "User",
         allowedDependencies = {
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "settings :: api"
         }
 )
 package com.flowcortex.user;
