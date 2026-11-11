@@ -107,7 +107,7 @@ def parse_target(url: str) -> Target:
         raise _rejected("the URL path or query is not valid text") from None
     if scheme == "http":
         authority = _host_for_url(host) + (f":{port}" if port not in (None, 80) else "")
-        request_target = f"http://{authority}{path}"
+        request_target = f"{scheme}://{authority}{path}"
     else:
         request_target = path
     return Target(
