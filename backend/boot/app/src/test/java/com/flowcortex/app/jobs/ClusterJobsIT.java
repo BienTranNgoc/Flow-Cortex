@@ -315,13 +315,14 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
         private JdbcTemplate rows;
 
         @Test
-        void theSevenJobsHaveRowsWithTheirConfiguredIntervals() {
+        void theEightJobsHaveRowsWithTheirConfiguredIntervals() {
             Map<String, Long> expected = Map.of(
                     "jobs.publication-resubmitter", 60_000L,
                     "workflow.lease-reaper", 30_000L,
                     "user.auth-retention", 3_600_000L,
                     "user.unconfirmed-account-purge", 3_600_000L,
                     "user.phone-retention", 3_600_000L,
+                    "user.admin-audit-origin-retention", 3_600_000L,
                     "support.assistant-retention", 3_600_000L,
                     "support.request-auto-close", 3_600_000L);
 

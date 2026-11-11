@@ -12,7 +12,6 @@ import org.springframework.core.Ordered;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
@@ -26,7 +25,6 @@ import tools.jackson.databind.json.JsonMapper;
  * got past the permission decision and the kill switch. It runs last so a request refused earlier
  * never reaches {@code afterCompletion}.
  */
-@Component
 class AdminAuditInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     static final int MAX_USER_AGENT_LENGTH = 512;
