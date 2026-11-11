@@ -59,9 +59,10 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
         return user;
     }
 
+    /** Stubbing the shared spy would race the runs earlier tests left advancing on other threads. */
     @BeforeEach
-    void enableMedia() {
-        org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
+    void mediaIsOn() {
+        assertThat(mediaJobs.isEnabled()).isTrue();
     }
 
     @Test
