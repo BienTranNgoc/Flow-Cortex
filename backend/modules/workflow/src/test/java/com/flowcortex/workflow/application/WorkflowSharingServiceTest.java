@@ -35,6 +35,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
+import org.springframework.transaction.support.DefaultTransactionStatus;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** {@link WorkflowSharingService}: the key lifecycle, key admission and the owner's lists. */
 class WorkflowSharingServiceTest {
@@ -67,7 +72,7 @@ class WorkflowSharingServiceTest {
     private final WorkflowAccessLog accessLog = new WorkflowAccessLog(accessLogs, new AccessorKeys(SECRET),
             mock(PlatformTransactionManager.class), clock);
     private final WorkflowSharingService service = new WorkflowSharingService(arbiter, workflows, steps, grants,
-            accessLogs, audits, accessLog, users, clock);
+            accessLogs, audits, accessLog, users, clock, mock(PlatformTransactionManager.class));
 
     private Workflow locked(Workflow workflow) {
         when(arbiter.lockForWrite(any(), eq(workflow.getId()))).thenReturn(workflow);
@@ -413,6 +418,49 @@ class WorkflowSharingServiceTest {
         service.admitByKey(BEN, workflow.getId(), "K", ORIGIN);
 
         verify(grants).admit(workflow.getId(), BEN, "K", NOW);
+    }
+
+    /** Opens a real transaction scope around each template call, so nesting shows as an active transaction. */
+    private static final class ScopeOnlyTransactionManager extends AbstractPlatformTransactionManager {
+        @Override
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
+        @Override
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
+        @Override
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
+        @Override
+        protected void doRollback(DefaultTransactionStatus status) {
+        }
+    }
+
+    @Test
+    void theAccessLogEntryIsWrittenOutsideTheReadAndGrantTransactions() {
+        WorkflowSharingService scoped = new WorkflowSharingService(arbiter, workflows, steps, grants, accessLogs,
+                audits, accessLog, users, clock, new ScopeOnlyTransactionManager());
+        Workflow workflow = published(unlisted("K", null));
+        List<Boolean> grantInTransaction = new ArrayList<>();
+        List<Boolean> logInTransaction = new ArrayList<>();
+        when(grants.admit(any(), any(), any(), any())).thenAnswer(call -> {
+            grantInTransaction.add(TransactionSynchronizationManager.isActualTransactionActive());
+            return 1;
+        });
+        when(accessLogs.insertOnce(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(call -> {
+            logInTransaction.add(TransactionSynchronizationManager.isActualTransactionActive());
+            return 1;
+        });
+
+        scoped.admitByKey(BEN, workflow.getId(), "K", ORIGIN);
+        scoped.sharedView(null, "K", ORIGIN);
+
+        assertThat(grantInTransaction).containsExactly(true);
+        assertThat(logInTransaction).containsExactly(false, false);
     }
 
     // --- the owner's lists ---

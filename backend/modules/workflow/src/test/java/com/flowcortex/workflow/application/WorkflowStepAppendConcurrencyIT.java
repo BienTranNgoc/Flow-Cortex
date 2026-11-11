@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.NewStep;
 import com.flowcortex.workflow.api.WorkflowStepView;
@@ -69,6 +70,11 @@ class WorkflowStepAppendConcurrencyIT {
         @Bean
         Validator validator() {
             return Validation.buildDefaultValidatorFactory().getValidator();
+        }
+
+        @Bean
+        CreditAccounts creditAccounts() {
+            return mock(CreditAccounts.class);
         }
     }
 
