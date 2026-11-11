@@ -60,11 +60,13 @@ the recognised text can be returned as layers.
   as `input_rejected` ("rejected by pixel cap (expected)"); only sizes within the cap count toward
   over budget. The `overlay-image` CI job runs it after the self-check and fails when a size
   within the cap is over budget; then lower `MAX_PIXELS` to the largest size within budget.
-- CI measurement (GitHub-hosted runner, AMD EPYC 9V74 80-Core Processor, 4 CPUs, 4 torch threads,
-  `--network none --memory 6g`): 1024² P50 51.7 s, P95 52.3 s, peak RSS 2.56 GiB; 2048² P50
-  224.2 s, P95 225.0 s, peak RSS 4.70 GiB; 3840×2160 P50 394.3 s, P95 396.8 s, peak RSS 6.11 GiB
-  (over the 6 GiB budget); 5000² killed by signal 9 (OOM). Hence the 2048² cap. The production
-  worker host's figures are still to be added there.
+- CI measurement, latest run (GitHub-hosted runner, `cpu: AMD EPYC 9V45 96-Core Processor`, 4
+  CPUs, 4 torch threads, `--network none --memory 6g`): 1024² P95 26.9 s (P50 26.0 s), peak RSS
+  2.57 GiB; 2048² P95 120.0 s (P50 117.5 s), peak RSS 4.70 GiB; 3840×2160 and 5000² are rejected by
+  the pixel cap. Runner speed varies between runs (2048² P95 was 225.0 s on an EPYC 9V74 runner),
+  so the time budget has wide headroom while memory is the limiter: before the cap existed,
+  3840×2160 peaked at 6.11 GiB (over the 6 GiB budget) and 5000² was killed by signal 9 (OOM).
+  Hence the 2048² cap. The production worker host's figures are still to be added there.
 - Promotion rule (ADR-0011): the measured P95 is compared with
   `flowcortex.media.max-runtime.clean_overlay` once the enum owner adds the capability; the
   max-runtime must sit above it with headroom.
