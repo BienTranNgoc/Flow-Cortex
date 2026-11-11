@@ -32,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 
 /** {@link LeaseReaper}: which bound closed a stuck step, that only a won CAS counts, and the stalled-run sweep. */
@@ -47,7 +48,7 @@ class LeaseReaperTest {
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final LeaseReaper reaper = new LeaseReaper(runStepRepository, workflowRunRepository,
             new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
-                    mock(RunUpdates.class)),
+                    mock(RunUpdates.class), mock(ApplicationEventPublisher.class)),
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), advancer, meters,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -74,6 +75,11 @@ class LeaseReaperTest {
 
     private double reaped(String code, String mode) {
         return meters.get("media.reaper.reaped").tags("code", code, "mode", mode).counter().count();
+    }
+
+    @Test
+    void theClusterClaimOnTheReaperLastsTwoMinutes() {
+        assertThat(reaper.lease()).isEqualTo(Duration.ofMinutes(2));
     }
 
     @Test

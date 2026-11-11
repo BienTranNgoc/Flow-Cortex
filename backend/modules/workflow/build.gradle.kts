@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:jobs"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 

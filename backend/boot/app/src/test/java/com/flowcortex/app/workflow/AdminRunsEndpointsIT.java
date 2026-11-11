@@ -182,7 +182,10 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
     void theRunsPageCanBeServedByTheStartedAtIndex() {
         String plan = jdbc.execute((ConnectionCallback<String>) connection -> {
             try (Statement statement = connection.createStatement()) {
+                // The shared database's statistics depend on what other suites left in workflow_run; with
+                // scans and sorts off, only an index already in this order can produce the page.
                 statement.execute("SET enable_seqscan = off");
+                statement.execute("SET enable_sort = off");
                 try (ResultSet rows = statement.executeQuery("EXPLAIN SELECT wr.id, w.name FROM workflow_run wr "
                         + "JOIN workflow w ON w.id = wr.workflow_id "
                         + "ORDER BY wr.started_at DESC, wr.id DESC LIMIT 20")) {
@@ -192,12 +195,13 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
                     }
                     return lines.toString();
                 } finally {
+                    statement.execute("RESET enable_sort");
                     statement.execute("RESET enable_seqscan");
                 }
             }
         });
 
-        assertThat(plan).contains("idx_workflow_run_started_at");
+        assertThat(plan).as("plan: %s", plan).contains("idx_workflow_run_started_at");
     }
 
     @Test

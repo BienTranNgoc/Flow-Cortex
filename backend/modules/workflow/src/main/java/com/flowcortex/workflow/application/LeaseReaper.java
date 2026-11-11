@@ -1,11 +1,13 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.jobs.api.ClusterJob;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
@@ -15,8 +17,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,7 +26,8 @@ import org.springframework.stereotype.Component;
  * never picked up by the queue deadline → {@code queue_timeout}; picked up but no heartbeat within
  * the lease → {@code lease_expired}; picked up and past the run deadline → {@code run_timeout}.
  * The failure is the same CAS a result uses, so a result that lands first wins and the step is
- * neither counted nor touched. Runs in every instance; the CAS makes concurrent reapers safe.
+ * neither counted nor touched. Runs on one instance at a time through the cluster runner; the CAS keeps a pass that
+ * overlaps a takeover safe.
  *
  * <p>Each pass then re-advances running runs with no step in flight, which is how a run whose
  * advance was lost after a step completed (a crash, a failed listener) gets moving again.
@@ -32,7 +35,7 @@ import org.springframework.stereotype.Component;
  * with the runs swept longest ago.
  */
 @Component
-class LeaseReaper {
+class LeaseReaper implements ClusterJob {
 
     static final int BATCH_SIZE = 100;
 
@@ -47,17 +50,25 @@ class LeaseReaper {
     private final Map<Reason, Counter> reapedInline = new EnumMap<>(Reason.class);
     private final Map<Reason, Counter> reapedRemote = new EnumMap<>(Reason.class);
     private final Clock clock;
+    private final Duration interval;
 
     @Autowired
     LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
             RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
-            MeterRegistry meters) {
-        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, Clock.systemUTC());
+            MeterRegistry meters, @Value("${flowcortex.workflow.reaper-interval-ms:30000}") long intervalMs) {
+        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, Clock.systemUTC(),
+                intervalMs);
     }
 
     LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
             RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
             MeterRegistry meters, Clock clock) {
+        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, clock, 30_000L);
+    }
+
+    private LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
+            RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
+            MeterRegistry meters, Clock clock, long intervalMs) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.transactions = transactions;
@@ -68,6 +79,28 @@ class LeaseReaper {
             reapedRemote.put(reason, reapedCounter(meters, reason, "remote"));
         }
         this.clock = clock;
+        this.interval = Duration.ofMillis(intervalMs);
+    }
+
+    @Override
+    public String name() {
+        return "workflow.lease-reaper";
+    }
+
+    @Override
+    public Duration interval() {
+        return interval;
+    }
+
+    /** Shorter than the default: this pass is what closes a dead executor's steps. */
+    @Override
+    public Duration lease() {
+        return Duration.ofMinutes(2);
+    }
+
+    @Override
+    public void run() {
+        reap();
     }
 
     private static Counter reapedCounter(MeterRegistry meters, Reason reason, String mode) {
@@ -78,7 +111,6 @@ class LeaseReaper {
                 .register(meters);
     }
 
-    @Scheduled(fixedDelayString = "${flowcortex.workflow.reaper-interval-ms:30000}")
     void reap() {
         Instant now = clock.instant();
         for (RunStep step : runStepRepository.findReapable(now, PageRequest.of(0, BATCH_SIZE))) {

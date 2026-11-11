@@ -24,6 +24,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
+import com.flowcortex.media.api.RunInputsBound;
 import com.flowcortex.media.api.StoredAttachment;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.UploadGrant;
@@ -75,6 +76,7 @@ import software.amazon.awssdk.core.exception.SdkException;
 class MediaJobsImplTest {
 
     private static final UUID SPACE_ID = UUID.randomUUID();
+    private static final UUID OWNER_ID = UUID.randomUUID();
     private static final String SIZE_SENTENCE =
             "Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.";
     private static final String AUDIO_SIZE_SENTENCE =
@@ -352,6 +354,46 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void bindingPublishesRunInputsBoundWithTheRunAndItsOwnerOnce() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            givenRegistered(context, uploadId, "video");
+            List<MediaAssetInput> copy = List.of(new MediaAssetInput(uploadId,
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media")));
+
+            tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copy));
+
+            assertThat(context.getBean(EventCapture.class).inputsBound)
+                    .containsExactly(new RunInputsBound(runId, OWNER_ID));
+        });
+    }
+
+    @Test
+    void bindingUploadsOfTwoOwnersIsRefusedAndNothingIsPublished() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID mine = UUID.randomUUID();
+            UUID theirs = UUID.randomUUID();
+            givenRegistered(context, mine, "video");
+            when(context.getBean(MediaAssetRepository.class).findById(theirs)).thenReturn(Optional.of(new MediaAsset(
+                    theirs, UUID.randomUUID(), SPACE_ID, "image", "flowcortex-uploads", "o/" + theirs, "image/png",
+                    16L, null, Instant.now())));
+            List<MediaAssetInput> copies = List.of(
+                    new MediaAssetInput(mine, new MediaJobInput("a", "flowcortex-media", "runs/" + runId + "/inputs/a")),
+                    new MediaAssetInput(theirs, new MediaJobInput("b", "flowcortex-media", "runs/" + runId + "/inputs/b")));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copies)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(context.getBean(EventCapture.class).inputsBound).isEmpty();
+        });
+    }
+
+    @Test
     void theCopyAndItsContentCheckRunWithNoTransactionOpenAndRefuseToJoinOne() {
         runner.run(context -> {
             MediaJobs jobs = context.getBean(MediaJobs.class);
@@ -484,14 +526,14 @@ class MediaJobsImplTest {
     private static void givenRegistered(org.springframework.context.ApplicationContext context, UUID assetId,
             String kind) {
         when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(
-                assetId, UUID.randomUUID(), SPACE_ID, kind, "flowcortex-uploads", "o/" + assetId, kind + "/x", 16L, null,
+                assetId, OWNER_ID, SPACE_ID, kind, "flowcortex-uploads", "o/" + assetId, kind + "/x", 16L, null,
                 Instant.now())));
     }
 
     private static void givenImage(org.springframework.context.ApplicationContext context, UUID assetId,
             String mimeType, long bytes) {
         when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(
-                assetId, UUID.randomUUID(), SPACE_ID, MediaProperties.Upload.kindOf(mimeType), "flowcortex-uploads",
+                assetId, OWNER_ID, SPACE_ID, MediaProperties.Upload.kindOf(mimeType), "flowcortex-uploads",
                 "o/" + assetId, mimeType, bytes, null, Instant.now())));
     }
 
@@ -1481,6 +1523,12 @@ class MediaJobsImplTest {
         final List<MediaJobRequested> events = new ArrayList<>();
         final List<Boolean> publishedInTransaction = new ArrayList<>();
         final List<ProviderJobRequested> providerEvents = new ArrayList<>();
+        final List<RunInputsBound> inputsBound = new ArrayList<>();
+
+        @EventListener
+        void on(RunInputsBound event) {
+            inputsBound.add(event);
+        }
 
         @EventListener
         void on(MediaJobRequested event) {
