@@ -11,6 +11,7 @@ const ALL_OFF: FeaturesResponse = {
   supportWidget: false,
   supportAssistant: false,
   personalAccessTokens: false,
+  chat: false,
 };
 
 /** The `/features` query itself, for a page that must tell "still loading" from "switched off". */

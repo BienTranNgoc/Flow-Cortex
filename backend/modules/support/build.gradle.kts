@@ -17,6 +17,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.commonmark:commonmark:${providers.gradleProperty("commonmarkVersion").get()}")
+    implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
+    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
     implementation("io.micrometer:micrometer-core")
     implementation("io.micrometer:context-propagation")
