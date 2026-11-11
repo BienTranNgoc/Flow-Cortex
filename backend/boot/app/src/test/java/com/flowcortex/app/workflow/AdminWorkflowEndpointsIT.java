@@ -92,6 +92,37 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void anAdminReordersAndDeletesStepsOfAnotherOwnersDraft() {
+        UserView admin = newUser("admin-wf-steps");
+        UserView owner = newUser("owner-wf-steps");
+        UUID draft = insertWorkflow(owner.id(), "draft", false);
+        UUID first = insertStep(draft, 1, "First");
+        UUID second = insertStep(draft, 2, "Second");
+        UUID third = insertStep(draft, 3, "Third");
+        String token = loginAs(admin);
+        String base = "/api/v1/admin/workflows/" + draft + "/steps";
+
+        ResponseEntity<Map> reordered = exchange(HttpMethod.PUT, base + "/order", token,
+                Map.of("stepIds", List.of(third, first, second)));
+        assertThat(reordered.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(stepIdsInOrder(draft)).containsExactly(third, first, second);
+
+        assertThat(exchange(HttpMethod.DELETE, base + "/" + third, token, null).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(stepIdsInOrder(draft)).containsExactly(first, second);
+        assertThat(jdbc.queryForList("SELECT step_order FROM workflow_step WHERE workflow_id = ? ORDER BY step_order",
+                Integer.class, draft)).containsExactly(1, 2);
+
+        assertThat(exchange(HttpMethod.DELETE, base + "/" + third, token, null).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange(HttpMethod.PUT, base + "/order", token, Map.of("stepIds", List.of(first))).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(exchange(HttpMethod.PUT, base + "/order", token, Map.of()).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(stepIdsInOrder(draft)).containsExactly(first, second);
+    }
+
+    @Test
     void everyAdminWriteToTheProductVideoWorkflowIsAConflict() {
         UserView admin = newUser("admin-wf-system");
         String token = loginAs(admin);
@@ -128,7 +159,9 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
                 new Route(HttpMethod.PATCH, base + "/" + workflowId, Map.of("name", "Changed")),
                 new Route(HttpMethod.DELETE, base + "/" + workflowId, null),
                 new Route(HttpMethod.POST, base + "/" + workflowId + "/steps", Map.of("type", "echo")),
-                new Route(HttpMethod.PATCH, base + "/" + workflowId + "/steps/" + stepId, Map.of("name", "Changed")));
+                new Route(HttpMethod.PATCH, base + "/" + workflowId + "/steps/" + stepId, Map.of("name", "Changed")),
+                new Route(HttpMethod.DELETE, base + "/" + workflowId + "/steps/" + stepId, null),
+                new Route(HttpMethod.PUT, base + "/" + workflowId + "/steps/order", Map.of("stepIds", List.of(stepId))));
     }
 
     private ResponseEntity<Map> send(Route route, String token) {
@@ -152,9 +185,18 @@ class AdminWorkflowEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     private UUID insertStep(UUID workflowId) {
+        return insertStep(workflowId, 1, "Fixture step");
+    }
+
+    private UUID insertStep(UUID workflowId, int order, String name) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO workflow_step (id, workflow_id, step_order, name, type) "
-                + "VALUES (?, ?, 1, 'Fixture step', 'echo')", id, workflowId);
+                + "VALUES (?, ?, ?, ?, 'echo')", id, workflowId, order, name);
         return id;
+    }
+
+    private List<UUID> stepIdsInOrder(UUID workflowId) {
+        return jdbc.queryForList("SELECT id FROM workflow_step WHERE workflow_id = ? ORDER BY step_order", UUID.class,
+                workflowId);
     }
 }

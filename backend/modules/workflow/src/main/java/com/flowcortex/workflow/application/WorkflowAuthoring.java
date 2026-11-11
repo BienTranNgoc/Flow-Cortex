@@ -5,6 +5,7 @@ import com.flowcortex.workflow.api.StepEdit;
 import com.flowcortex.workflow.api.UpdateWorkflow;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,4 +23,8 @@ public interface WorkflowAuthoring {
     WorkflowStepView addStep(Caller caller, UUID workflowId, NewStep step);
 
     WorkflowStepView updateStep(Caller caller, UUID workflowId, UUID stepId, StepEdit edit);
+
+    void deleteStep(Caller caller, UUID workflowId, UUID stepId);
+
+    WorkflowView reorderSteps(Caller caller, UUID workflowId, List<UUID> stepIds);
 }

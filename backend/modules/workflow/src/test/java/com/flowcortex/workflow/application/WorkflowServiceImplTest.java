@@ -3,6 +3,8 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.NewStep;
@@ -585,6 +588,149 @@ class WorkflowServiceImplTest {
                                         + "runs inline"));
 
         verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void aNonOwnerCannotDeleteOrReorderSteps() {
+        Workflow visible = stored(published(ANA, true));
+        List<WorkflowStep> steps = withSteps(visible, "echo", "echo");
+        Workflow hidden = stored(draft(ANA, true));
+        withSteps(hidden, "echo");
+
+        assertThatThrownBy(() -> service.deleteStep(BEN, visible.getId(), steps.get(0).getId()))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> service.reorderSteps(BEN, visible.getId(),
+                List.of(steps.get(1).getId(), steps.get(0).getId())))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> service.deleteStep(BEN, hidden.getId(), UUID.randomUUID()))
+                .isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.reorderSteps(BEN, hidden.getId(), List.of()))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(workflowStepRepository, never()).deleteById(any());
+        verify(workflowStepRepository, never()).parkOrders(any(), any());
+        verify(workflowStepRepository, never()).setOrder(any(), anyShort());
+    }
+
+    @Test
+    void deletingAStepOfAnotherWorkflowIsNotFound() {
+        Workflow workflow = stored(published(ANA, false));
+        withSteps(workflow, "echo");
+
+        assertThatThrownBy(() -> service.deleteStep(ANA, workflow.getId(), UUID.randomUUID()))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(workflowStepRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deletingTheMediaFirstStepUnderAFileReadingStepIsRefusedAndNothingIsSaved() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "extract_audio", "echo", "extract_audio");
+
+        assertThatThrownBy(() -> service.deleteStep(ANA, workflow.getId(), steps.get(0).getId()))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath().toString())
+                        .containsExactly("steps[1].type"));
+
+        verify(workflowStepRepository, never()).deleteById(any());
+        verify(workflowStepRepository, never()).setOrder(any(), anyShort());
+    }
+
+    @Test
+    void aReorderThatMovesAnOutputInputsSourceAfterItsReaderIsRefusedAndNothingIsSaved() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "extract_audio", "extract_audio");
+        String config = "{\"outputInputs\":[" + entry("1", "\"a.wav\"", "\"a\"") + "]}";
+        steps.set(1, new WorkflowStep(steps.get(1).getId(), workflow.getId(), (short) 2, "s2", "extract_audio", null,
+                config));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+
+        assertThatThrownBy(() -> service.reorderSteps(ANA, workflow.getId(),
+                List.of(steps.get(1).getId(), steps.get(0).getId())))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath().toString())
+                        .containsExactly("steps[0].config"));
+
+        verify(workflowStepRepository, never()).parkOrders(any(), any());
+        verify(workflowStepRepository, never()).setOrder(any(), anyShort());
+    }
+
+    @Test
+    void deletingAMiddleStepCompactsTheLaterOrders() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "echo", "echo", "echo");
+        steps.set(2, new WorkflowStep(steps.get(2).getId(), workflow.getId(), (short) 3, "s3", "echo", "{step:1.x}"));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId()))
+                .thenReturn(steps, List.of(steps.get(0), steps.get(2)));
+
+        service.deleteStep(ANA, workflow.getId(), steps.get(1).getId());
+
+        verify(workflowStepRepository).deleteById(steps.get(1).getId());
+        verify(workflowStepRepository).setOrder(steps.get(2).getId(), (short) 2);
+        verify(workflowStepRepository, never()).parkOrders(any(), any());
+    }
+
+    @Test
+    void aReaderOfTheDeletedStepRefusesTheDeleteNamingTheReaders() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "echo", "echo", "echo");
+        steps.set(1, new WorkflowStep(steps.get(1).getId(), workflow.getId(), (short) 2, "s2", "echo", "{step:1}"));
+        steps.set(2, new WorkflowStep(steps.get(2).getId(), workflow.getId(), (short) 3, "s3", "echo", "{step:1.a}"));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+
+        assertThatThrownBy(() -> service.deleteStep(ANA, workflow.getId(), steps.get(0).getId()))
+                .isInstanceOfSatisfying(ConflictException.class, e -> {
+                    LocalizedMessage message = e.getDetail();
+                    assertThat(message.code()).isEqualTo("workflow.definitionStep.referenced");
+                    assertThat(message.getArguments()).containsExactly(1, "2, 3");
+                });
+
+        verify(workflowStepRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void reorderRefusesADuplicateAStaleListAndAForwardReference() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "echo", "echo");
+        UUID first = steps.get(0).getId();
+        UUID second = steps.get(1).getId();
+
+        assertThatThrownBy(() -> service.reorderSteps(ANA, workflow.getId(), List.of(first, first)))
+                .isInstanceOf(UnprocessableEntityException.class);
+        assertThatThrownBy(() -> service.reorderSteps(ANA, workflow.getId(), List.of(first)))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.reorderSteps(ANA, workflow.getId(), List.of(first, UUID.randomUUID())))
+                .isInstanceOf(ConflictException.class);
+
+        steps.set(1, new WorkflowStep(second, workflow.getId(), (short) 2, "s2", "echo", "{step:1}"));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        assertThatThrownBy(() -> service.reorderSteps(ANA, workflow.getId(), List.of(second, first)))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("WORKFLOW_STEP_ORDER_INVALID");
+                    assertThat(e.getErrors()).containsKey("steps[0].inputRef");
+                });
+
+        verify(workflowStepRepository, never()).parkOrders(any(), any());
+    }
+
+    @Test
+    void reorderParksAndWritesOnlyTheMovedStepsAndTheSameOrderWritesNothing() {
+        Workflow workflow = stored(published(ANA, false));
+        List<WorkflowStep> steps = withSteps(workflow, "echo", "echo", "echo");
+        UUID a = steps.get(0).getId();
+        UUID b = steps.get(1).getId();
+        UUID c = steps.get(2).getId();
+
+        service.reorderSteps(ANA, workflow.getId(), List.of(a, b, c));
+        verify(workflowStepRepository, never()).parkOrders(any(), any());
+
+        service.reorderSteps(ANA, workflow.getId(), List.of(a, c, b));
+
+        verify(workflowStepRepository).parkOrders(workflow.getId(), List.of(c, b));
+        verify(workflowStepRepository).setOrder(c, (short) 2);
+        verify(workflowStepRepository).setOrder(b, (short) 3);
+        verify(workflowStepRepository, never()).setOrder(eq(a), anyShort());
     }
 
     private static NewWorkflowStep remote(String name, String outputInputs) {
