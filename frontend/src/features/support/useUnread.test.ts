@@ -17,6 +17,7 @@ function features(supportWidget: boolean) {
       credits: false,
       supportWidget,
       supportAssistant: false,
+      chat: false,
     },
   };
 }
