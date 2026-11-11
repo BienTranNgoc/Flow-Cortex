@@ -668,6 +668,92 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export interface DriveUploadRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  fileName: string;
+  size: number;
+}
+
+export type DriveUploadResponseHeaders = { [key: string]: string };
+
+export interface DriveUploadResponse {
+  uploadId: string;
+  url: string;
+  method: string;
+  headers: DriveUploadResponseHeaders;
+  expiresAt: string;
+  maxBytes: number;
+}
+
+export type CreateDriveItemRequestContentType =
+  (typeof CreateDriveItemRequestContentType)[keyof typeof CreateDriveItemRequestContentType];
+
+export const CreateDriveItemRequestContentType = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface RunOutputRef {
+  runId: string;
+  stepOrder: number;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  name: string;
+}
+
+export interface CreateDriveItemRequest {
+  name: string;
+  contentType: CreateDriveItemRequestContentType;
+  semanticRole: string;
+  textValue?: string;
+  uploadId?: string;
+  runOutput?: RunOutputRef;
+}
+
+export type DriveItemResponseContentType =
+  (typeof DriveItemResponseContentType)[keyof typeof DriveItemResponseContentType];
+
+export const DriveItemResponseContentType = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export type DriveItemResponseSource =
+  (typeof DriveItemResponseSource)[keyof typeof DriveItemResponseSource];
+
+export const DriveItemResponseSource = {
+  text: 'text',
+  upload: 'upload',
+  run_output: 'run_output',
+} as const;
+
+export interface DriveItemResponse {
+  id: string;
+  name: string;
+  contentType: DriveItemResponseContentType;
+  semanticRole: string;
+  source: DriveItemResponseSource;
+  textValue?: string;
+  url?: string;
+  urlExpiresAt?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  runId?: string;
+  stepOrder?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Attachment {
   uploadId?: string;
   fileName?: string;
@@ -863,6 +949,12 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface UpdateDriveItemRequest {
+  name?: string;
+  semanticRole?: string;
+  textValue?: string;
+}
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -1008,6 +1100,18 @@ export interface RunInputResponse {
   expiresAt: string;
 }
 
+export interface Counts {
+  runs: number;
+  results: number;
+}
+
+export interface DriveMigrationResponse {
+  /** @nullable */
+  migratedAt: string | null;
+  /** @nullable */
+  counts: Counts;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -1025,6 +1129,90 @@ export interface FeaturesResponse {
   supportWidget: boolean;
   supportAssistant: boolean;
   chat: boolean;
+}
+
+export interface RunOutputView {
+  runId: string;
+  stepOrder: number;
+  name: string;
+}
+
+export type SuggestionResponseKind =
+  (typeof SuggestionResponseKind)[keyof typeof SuggestionResponseKind];
+
+export const SuggestionResponseKind = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface SuggestionResponse {
+  id: string;
+  kind: SuggestionResponseKind;
+  previewText: string;
+  textValue?: string;
+  tooLong: boolean;
+  roleHint?: string;
+  workflowName: string;
+  stepType?: string;
+  runId: string;
+  at: string;
+  runOutput?: RunOutputView;
+  url?: string;
+  urlExpiresAt?: string;
+}
+
+export type MemoryEntryResponseKind =
+  (typeof MemoryEntryResponseKind)[keyof typeof MemoryEntryResponseKind];
+
+export const MemoryEntryResponseKind = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+} as const;
+
+export interface MemoryEntryResponse {
+  id: string;
+  runId: string;
+  stepOrder: number;
+  kind: MemoryEntryResponseKind;
+  title: string;
+  previewText?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes: number;
+  resultAt: string;
+  pinned: boolean;
+  url?: string;
+  urlExpiresAt?: string;
+}
+
+export interface SizeBuckets {
+  lt1mb: number;
+  '1to50mb': number;
+  gt50mb: number;
+}
+
+export interface MemoryListResponse {
+  items: MemoryEntryResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pinned: MemoryEntryResponse[];
+  sizeBuckets: SizeBuckets;
+}
+
+export interface MemoryTextResponse {
+  text: string;
+}
+
+export interface PageViewDriveItemResponse {
+  items: DriveItemResponse[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface BalanceResponse {
@@ -1158,6 +1346,21 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export type ListDriveItemsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  role?: string;
+  contentType?: string;
+};
+
 export type SearchSupportKbParams = {
   /**
    * @minLength 2
@@ -1168,6 +1371,30 @@ export type SearchSupportKbParams = {
 
 export type OpenRealtimeStreamParams = {
   topic?: string[];
+};
+
+export type ListDriveSuggestionsParams = {
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
+
+export type ListDriveMemoryParams = {
+  q?: string;
+  type?: string[];
+  time?: string;
+  from?: string;
+  to?: string;
+  size?: string[];
+  sort?: string;
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  pageSize?: number;
 };
 
 export type CallbackParams = {
@@ -3013,6 +3240,204 @@ export const sendCode = async (
   });
 };
 
+export type requestDriveUploadResponse200 = {
+  data: DriveUploadResponse;
+  status: 200;
+};
+
+export type requestDriveUploadResponseSuccess = requestDriveUploadResponse200 & {
+  headers: Headers;
+};
+export type requestDriveUploadResponse = requestDriveUploadResponseSuccess;
+
+export const getRequestDriveUploadUrl = () => {
+  return `/api/v1/drive/uploads`;
+};
+
+export const requestDriveUpload = async (
+  driveUploadRequest: DriveUploadRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestDriveUploadResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestDriveUploadResponse>(getRequestDriveUploadUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(driveUploadRequest),
+  });
+};
+
+export type pinDriveMemoryResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type pinDriveMemoryResponseSuccess = pinDriveMemoryResponse200 & {
+  headers: Headers;
+};
+export type pinDriveMemoryResponse = pinDriveMemoryResponseSuccess;
+
+export const getPinDriveMemoryUrl = (id: string) => {
+  return `/api/v1/drive/memory/${id}/pin`;
+};
+
+export const pinDriveMemory = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinDriveMemoryResponse> => {
+  return customFetch<pinDriveMemoryResponse>(getPinDriveMemoryUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type unpinDriveMemoryResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type unpinDriveMemoryResponseSuccess = unpinDriveMemoryResponse200 & {
+  headers: Headers;
+};
+export type unpinDriveMemoryResponse = unpinDriveMemoryResponseSuccess;
+
+export const getUnpinDriveMemoryUrl = (id: string) => {
+  return `/api/v1/drive/memory/${id}/pin`;
+};
+
+export const unpinDriveMemory = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<unpinDriveMemoryResponse> => {
+  return customFetch<unpinDriveMemoryResponse>(getUnpinDriveMemoryUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type hideDriveMemoryResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type hideDriveMemoryResponseSuccess = hideDriveMemoryResponse200 & {
+  headers: Headers;
+};
+export type hideDriveMemoryResponse = hideDriveMemoryResponseSuccess;
+
+export const getHideDriveMemoryUrl = (id: string) => {
+  return `/api/v1/drive/memory/${id}/hide`;
+};
+
+export const hideDriveMemory = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<hideDriveMemoryResponse> => {
+  return customFetch<hideDriveMemoryResponse>(getHideDriveMemoryUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type listDriveItemsResponse200 = {
+  data: PageViewDriveItemResponse;
+  status: 200;
+};
+
+export type listDriveItemsResponseSuccess = listDriveItemsResponse200 & {
+  headers: Headers;
+};
+export type listDriveItemsResponse = listDriveItemsResponseSuccess;
+
+export const getListDriveItemsUrl = (params?: ListDriveItemsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/drive/items?${stringifiedParams}`
+    : `/api/v1/drive/items`;
+};
+
+export const listDriveItems = async (
+  params?: ListDriveItemsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listDriveItemsResponse> => {
+  return customFetch<listDriveItemsResponse>(getListDriveItemsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createDriveItemResponse200 = {
+  data: DriveItemResponse;
+  status: 200;
+};
+
+export type createDriveItemResponseSuccess = createDriveItemResponse200 & {
+  headers: Headers;
+};
+export type createDriveItemResponse = createDriveItemResponseSuccess;
+
+export const getCreateDriveItemUrl = () => {
+  return `/api/v1/drive/items`;
+};
+
+export const createDriveItem = async (
+  createDriveItemRequest: CreateDriveItemRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createDriveItemResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createDriveItemResponse>(getCreateDriveItemUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createDriveItemRequest),
+  });
+};
+
 export type listChatConversationsResponse200 = {
   data: ChatConversationList;
   status: 200;
@@ -4115,6 +4540,100 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
+export type getDriveItemResponse200 = {
+  data: DriveItemResponse;
+  status: 200;
+};
+
+export type getDriveItemResponseSuccess = getDriveItemResponse200 & {
+  headers: Headers;
+};
+export type getDriveItemResponse = getDriveItemResponseSuccess;
+
+export const getGetDriveItemUrl = (id: string) => {
+  return `/api/v1/drive/items/${id}`;
+};
+
+export const getDriveItem = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getDriveItemResponse> => {
+  return customFetch<getDriveItemResponse>(getGetDriveItemUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteDriveItemResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type deleteDriveItemResponseSuccess = deleteDriveItemResponse200 & {
+  headers: Headers;
+};
+export type deleteDriveItemResponse = deleteDriveItemResponseSuccess;
+
+export const getDeleteDriveItemUrl = (id: string) => {
+  return `/api/v1/drive/items/${id}`;
+};
+
+export const deleteDriveItem = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteDriveItemResponse> => {
+  return customFetch<deleteDriveItemResponse>(getDeleteDriveItemUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateDriveItemResponse200 = {
+  data: DriveItemResponse;
+  status: 200;
+};
+
+export type updateDriveItemResponseSuccess = updateDriveItemResponse200 & {
+  headers: Headers;
+};
+export type updateDriveItemResponse = updateDriveItemResponseSuccess;
+
+export const getUpdateDriveItemUrl = (id: string) => {
+  return `/api/v1/drive/items/${id}`;
+};
+
+export const updateDriveItem = async (
+  id: string,
+  updateDriveItemRequest: UpdateDriveItemRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateDriveItemResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateDriveItemResponse>(getUpdateDriveItemUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateDriveItemRequest),
+  });
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -4710,6 +5229,29 @@ export const current = async (
   });
 };
 
+export type getDriveMigrationResponse200 = {
+  data: DriveMigrationResponse;
+  status: 200;
+};
+
+export type getDriveMigrationResponseSuccess = getDriveMigrationResponse200 & {
+  headers: Headers;
+};
+export type getDriveMigrationResponse = getDriveMigrationResponseSuccess;
+
+export const getGetDriveMigrationUrl = () => {
+  return `/api/v1/me/drive-migration`;
+};
+
+export const getDriveMigration = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getDriveMigrationResponse> => {
+  return customFetch<getDriveMigrationResponse>(getGetDriveMigrationUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -4751,6 +5293,111 @@ export const features = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<featuresResponse> => {
   return customFetch<featuresResponse>(getFeaturesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listDriveSuggestionsResponse200 = {
+  data: SuggestionResponse[];
+  status: 200;
+};
+
+export type listDriveSuggestionsResponseSuccess = listDriveSuggestionsResponse200 & {
+  headers: Headers;
+};
+export type listDriveSuggestionsResponse = listDriveSuggestionsResponseSuccess;
+
+export const getListDriveSuggestionsUrl = (params?: ListDriveSuggestionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/drive/suggestions?${stringifiedParams}`
+    : `/api/v1/drive/suggestions`;
+};
+
+export const listDriveSuggestions = async (
+  params?: ListDriveSuggestionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listDriveSuggestionsResponse> => {
+  return customFetch<listDriveSuggestionsResponse>(getListDriveSuggestionsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listDriveMemoryResponse200 = {
+  data: MemoryListResponse;
+  status: 200;
+};
+
+export type listDriveMemoryResponseSuccess = listDriveMemoryResponse200 & {
+  headers: Headers;
+};
+export type listDriveMemoryResponse = listDriveMemoryResponseSuccess;
+
+export const getListDriveMemoryUrl = (params?: ListDriveMemoryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['type', 'size'];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/drive/memory?${stringifiedParams}`
+    : `/api/v1/drive/memory`;
+};
+
+export const listDriveMemory = async (
+  params?: ListDriveMemoryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listDriveMemoryResponse> => {
+  return customFetch<listDriveMemoryResponse>(getListDriveMemoryUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getDriveMemoryTextResponse200 = {
+  data: MemoryTextResponse;
+  status: 200;
+};
+
+export type getDriveMemoryTextResponseSuccess = getDriveMemoryTextResponse200 & {
+  headers: Headers;
+};
+export type getDriveMemoryTextResponse = getDriveMemoryTextResponseSuccess;
+
+export const getGetDriveMemoryTextUrl = (id: string) => {
+  return `/api/v1/drive/memory/${id}/text`;
+};
+
+export const getDriveMemoryText = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getDriveMemoryTextResponse> => {
+  return customFetch<getDriveMemoryTextResponse>(getGetDriveMemoryTextUrl(id), {
     ...options,
     method: 'GET',
   });

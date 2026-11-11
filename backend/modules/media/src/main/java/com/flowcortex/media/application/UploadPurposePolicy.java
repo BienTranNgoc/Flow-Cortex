@@ -18,6 +18,7 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String DRIVE_ITEM_PREFIX = "drive-item/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
@@ -60,14 +61,18 @@ final class UploadPurposePolicy {
     }
 
     String objectKey(UploadPurpose purpose, UUID ownerId, UUID uploadId) {
-        String prefix = purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_ATTACHMENT_PREFIX : "";
+        String prefix = switch (purpose) {
+            case RUN_INPUT -> "";
+            case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case DRIVE_ITEM -> DRIVE_ITEM_PREFIX;
+        };
         return prefix + ownerId + "/" + uploadId;
     }
 
     /** The size cap of {@code kind} under {@code purpose}, or 0 for a kind the purpose never accepts. */
     long maxBytes(UploadPurpose purpose, String kind) {
         return switch (purpose) {
-            case RUN_INPUT -> upload.maxBytesOf(kind);
+            case RUN_INPUT, DRIVE_ITEM -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
         };
     }

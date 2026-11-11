@@ -152,6 +152,56 @@ erDiagram
     integer completion_attempts
     timestamptz last_resubmission_date
   }
+  drive_item {
+    uuid id PK
+    uuid space_id "personal space of the owner, no FK; INDEX (space_id, created_at DESC, id DESC)"
+    uuid owner_id "no FK"
+    varchar name "1-160 chars, sent by the client"
+    varchar content_type "text | image | video | audio"
+    varchar semantic_role "role vocabulary checked by the application"
+    text text_value "text items only"
+    varchar source "text | upload | run_output — CHECK ck_drive_item_payload ties source to the columns that must be set or empty"
+    varchar bucket "media items"
+    varchar object_key "upload: drive/{spaceId}/{itemId}; run_output: the run's own output key"
+    varchar file_name
+    varchar mime_type
+    bigint size_bytes
+    uuid run_id "run_output only, no FK"
+    smallint step_order "run_output only"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  memory_result {
+    uuid id PK
+    uuid space_id "UNIQUE (space_id, result_key)"
+    uuid owner_id "no FK"
+    uuid run_id "INDEX; no FK"
+    uuid run_step_id "no FK"
+    smallint step_order
+    varchar result_key "run_step_id for text, run_step_id/outputName for media — stable across attempts"
+    varchar kind "text | image | video | audio"
+    varchar title
+    varchar preview_text "text results, first 500 chars"
+    varchar bucket "media results"
+    varchar object_key "media results"
+    varchar file_name
+    varchar mime_type
+    bigint size_bytes "text: UTF-8 byte length"
+    timestamptz result_at "run finished_at"
+    boolean pinned "member-owned, survives re-population"
+    boolean hidden "member-owned, survives re-population"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  drive_backfill {
+    uuid space_id PK
+    uuid owner_id
+    timestamptz migrated_at "NULL until an apply inserted an entry for the space"
+    jsonb counts "{runs, results} inserted by applies"
+    timestamptz reconciled_at
+    boolean ok
+    timestamptz updated_at
+  }
 ```
 
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,

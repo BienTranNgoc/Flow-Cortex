@@ -22,7 +22,7 @@ import java.util.function.Predicate;
 /** Entity -> {@code api} view mapping, mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
 final class WorkflowMapper {
 
-    /** Reads name, bucket, mime and bytes of each stored output; only name, mime and bytes reach the view. */
+    /** Reads each stored output; the run view shows only name, mime and bytes of it. */
     private static final ObjectMapper OUTPUTS_READER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -85,21 +85,27 @@ final class WorkflowMapper {
     }
 
     private static List<RunStepOutputView> outputs(RunStep step, Predicate<String> isDownloadable) {
+        return downloadableOutputs(step, isDownloadable).stream()
+                .map(output -> new RunStepOutputView(output.name(), output.mime(), output.bytes()))
+                .toList();
+    }
+
+    /** The outputs recorded on a step that sit in a bucket {@code isDownloadable} accepts. */
+    static List<StoredOutput> downloadableOutputs(RunStep step, Predicate<String> isDownloadable) {
         if (step.getOutputs() == null) {
             return List.of();
         }
         try {
             return Arrays.stream(OUTPUTS_READER.readValue(step.getOutputs(), StoredOutput[].class))
                     .filter(output -> isDownloadable.test(output.bucket()))
-                    .map(output -> new RunStepOutputView(output.name(), output.mime(), output.bytes()))
                     .toList();
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("run_step " + step.getId() + " holds outputs that are not an output list", e);
         }
     }
 
-    /** A recorded output as far as the run view reads it; the bucket decides whether it is offered. */
-    private record StoredOutput(String name, String bucket, String mime, long bytes) {
+    /** A recorded output; the bucket decides whether it is offered. */
+    record StoredOutput(String name, String bucket, String objectKey, String mime, long bytes) {
     }
 
     /** run/run_step status is wire-visible lowercase (running/completed/error/pending). */

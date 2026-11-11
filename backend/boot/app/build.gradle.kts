@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
+    implementation(project(":modules:drive"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:chat"))
     implementation(project(":shared:web"))

@@ -22,7 +22,26 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> {
 
+    /** The one JPQL predicate that decides which runs are member results; every result query uses it. */
+    String MEMBER_RESULT_RUN = "r.status = com.flowcortex.workflow.domain.RunStatus.COMPLETED";
+
     Optional<WorkflowRun> findByIdAndOwnerId(UUID id, UUID ownerId);
+
+    /** A member-result run with its workflow's name; empty for any other run. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.id = :id AND " + MEMBER_RESULT_RUN)
+    Optional<RunWithWorkflowName> findCompletedWithWorkflowName(@Param("id") UUID id);
+
+    /** The owner's member-result runs, most recently finished first. */
+    @Query("SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
+            + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
+            + "WHERE r.ownerId = :ownerId AND " + MEMBER_RESULT_RUN + " ORDER BY r.finishedAt DESC, r.id DESC")
+    List<RunWithWorkflowName> findCompletedByOwnerNewestFirst(@Param("ownerId") UUID ownerId, Pageable page);
+
+    /** Ids of member-result runs strictly after {@code after} in id order. */
+    @Query("SELECT r.id FROM WorkflowRun r WHERE r.id > :after AND " + MEMBER_RESULT_RUN + " ORDER BY r.id")
+    List<UUID> findCompletedIdsAfter(@Param("after") UUID after, Pageable page);
 
     Optional<WorkflowRun> findByOwnerIdAndRequestKey(UUID ownerId, String requestKey);
 
