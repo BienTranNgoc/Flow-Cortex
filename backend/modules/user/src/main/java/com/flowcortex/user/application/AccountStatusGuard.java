@@ -16,12 +16,12 @@ import org.springframework.security.access.AccessDeniedException;
  * off the JWT role claim, so the services re-check status: a suspended ADMIN with a still-valid
  * token must not keep full CRUD for the token's remaining TTL.
  */
-final class AccountStatusGuard {
+public final class AccountStatusGuard {
 
     private AccountStatusGuard() {
     }
 
-    static void requireActive(AppUser user) {
+    public static void requireActive(AppUser user) {
         if (user.getStatus() == UserStatus.SUSPENDED) {
             throw new AccessDeniedException("Account is suspended");
         }

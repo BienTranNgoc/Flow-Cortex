@@ -1,6 +1,8 @@
 package com.flowcortex.chat.web;
 
 import com.flowcortex.chat.config.ChatSwitch;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,9 +55,9 @@ class AdminChatSettingsController {
     }
 
     @Operation(operationId = "getAdminChatSettings")
+    @RequirePermission(Permission.PLATFORM_SETTING_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminSettings settings(@AuthenticationPrincipal Jwt jwt) {
-        caller.requireAdmin(jwt);
+    AdminSettings settings() {
         return view();
     }
 
@@ -64,9 +66,10 @@ class AdminChatSettingsController {
     @ApiResponse(responseCode = "400", description = "validation-failed (errors.enabled)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
     @PutMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     AdminSettings update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SettingsUpdate body) {
-        CurrentUser admin = caller.requireAdmin(jwt);
+        CurrentUser admin = caller.require(jwt);
         chatSwitch.setConsole(body.enabled(), admin.id(), clock.instant());
         return view();
     }

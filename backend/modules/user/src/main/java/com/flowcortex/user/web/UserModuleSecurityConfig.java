@@ -23,9 +23,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * <ol>
  *   <li>{@code POST /api/v1/auth/login} must be reachable pre-auth (shared chain's
  *   {@code anyRequest().authenticated()} would block it).</li>
- *   <li>{@code @PreAuthorize("hasRole('ADMIN')")} on {@code UsersController} needs the JWT's
- *   {@code role} claim mapped to a {@code ROLE_*} authority ({@link RoleClaimJwtConverter}) — the
- *   shared chain's default converter reads OAuth2 {@code scope}/{@code scp} instead.</li>
+ *   <li>the JWT's {@code role} claim is mapped to a {@code ROLE_*} authority
+ *   ({@link RoleClaimJwtConverter}) — the shared chain's default converter reads OAuth2
+ *   {@code scope}/{@code scp} instead.</li>
  * </ol>
  *
  * <p>Reuses the shared chain's {@link JwtDecoder} and {@code HandlerExceptionResolver} beans,

@@ -353,6 +353,42 @@ class SupportRequestIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void aPlatformOperatorReplyWithAStatusIsForbidden() {
+        String memberToken = login(member("req-operator-member").email());
+        long number = file(memberToken, "technical").number();
+        UserView operator = userService.createUser(admin.id(), uniqueEmail("req-operator"), "password123",
+                "Operator", "PLATFORM_OPERATOR");
+        String operatorToken = login(operator.email());
+        String path = "/api/v1/admin/support/requests/" + number + "/messages";
+
+        ResponseEntity<Problem> withStatus = exchange(HttpMethod.POST, path, operatorToken,
+                new AdminReplyRequest("Đã ghi nhận, bên mình đang kiểm tra.", List.of(), "resolved"), Problem.class);
+
+        assertProblem(withStatus, HttpStatus.FORBIDDEN, "forbidden");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM support_message WHERE author_kind = 'admin'",
+                Long.class)).isZero();
+        assertThat(exchange(HttpMethod.GET, "/api/v1/admin/support/requests/" + number, operatorToken, null,
+                AdminDetailView.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void aPlatformOperatorReplyThatWaitsForTheMemberIsStored() {
+        long number = file(login(member("req-operator-wait-member").email()), "technical").number();
+        UserView operator = userService.createUser(admin.id(), uniqueEmail("req-operator-wait"), "password123",
+                "Operator", "PLATFORM_OPERATOR");
+        String operatorToken = login(operator.email());
+
+        ResponseEntity<AdminDetailView> reply = exchange(HttpMethod.POST,
+                "/api/v1/admin/support/requests/" + number + "/messages", operatorToken,
+                new AdminReplyRequest("Bên mình cần thêm thông tin.", List.of(), "waiting_member"),
+                AdminDetailView.class);
+
+        assertThat(reply.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(reply.getBody().status()).isEqualTo("waiting_member");
+        assertThat(reply.getBody().messages()).extracting(MessageView::authorKind).containsExactly("member", "admin");
+    }
+
+    @Test
     void aDeletedRequesterIsFlaggedAndTheReplyIsRefusedWhileTheStatusCanStillClose() {
         UserView member = member("req-deleted");
         long number = file(login(member.email()), "account").number();
