@@ -1,8 +1,8 @@
 package com.flowcortex.user.application;
 
 import com.flowcortex.shared.security.authz.Permission;
-import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
+import com.flowcortex.user.infrastructure.RoleRow;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -16,26 +16,26 @@ final class UserMutationPolicy {
     }
 
     /** What a request would do to one account; {@code null} requested fields were not sent. */
-    record UserMutation(Kind kind, Role currentRole, Role requestedRole, UserStatus currentStatus,
+    record UserMutation(Kind kind, RoleRow currentRole, RoleRow requestedRole, UserStatus currentStatus,
             UserStatus requestedStatus) {
 
         enum Kind { CREATE, UPDATE, DELETE }
 
-        static UserMutation create(Role role) {
+        static UserMutation create(RoleRow role) {
             return new UserMutation(Kind.CREATE, null, role, null, null);
         }
 
-        static UserMutation update(Role currentRole, Role requestedRole, UserStatus currentStatus,
+        static UserMutation update(RoleRow currentRole, RoleRow requestedRole, UserStatus currentStatus,
                 UserStatus requestedStatus) {
             return new UserMutation(Kind.UPDATE, currentRole, requestedRole, currentStatus, requestedStatus);
         }
 
-        static UserMutation delete(Role currentRole) {
+        static UserMutation delete(RoleRow currentRole) {
             return new UserMutation(Kind.DELETE, currentRole, null, null, null);
         }
 
         boolean changesRole() {
-            return requestedRole != null && requestedRole != currentRole;
+            return requestedRole != null && !requestedRole.code().equals(currentRole.code());
         }
 
         boolean changesStatus() {
@@ -68,7 +68,7 @@ final class UserMutationPolicy {
         };
     }
 
-    private static boolean isAdminAccount(Role role) {
-        return role != null && (role.isSuperAdmin() || role.isStaff());
+    private static boolean isAdminAccount(RoleRow role) {
+        return role != null && role.isAdminAccount();
     }
 }

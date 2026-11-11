@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserActivatedEvent;
@@ -24,10 +25,14 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.RoleRow;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -49,9 +54,73 @@ class UserServiceImplTest {
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
+    private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
     private final UserServiceImpl service =
             new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks,
-                    adminPermissions, superAdminInvariant, registrationOwnerGuard);
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog);
+
+    UserServiceImplTest() {
+        when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));
+        when(roleCatalog.names()).thenReturn(Map.of("HO_TRO_CAP_2", "Support level 2"));
+    }
+
+    private static RoleRow roleRow(String code) {
+        boolean staff = List.of("OPERATION_MANAGER", "CUSTOMER_SUPPORT", "CONTENT_EDITOR", "PLATFORM_OPERATOR",
+                "HO_TRO_CAP_2").contains(code);
+        boolean system = !code.equals("HO_TRO_CAP_2");
+        return new RoleRow(code, code, system, staff, code.equals("ADMIN"));
+    }
+
+    @Test
+    void aCustomRoleCodeIsAcceptedAndShownByItsName() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserView created = service.createUser(ownerId, "agent@example.com", "correct horse battery staple",
+                "Agent", "HO_TRO_CAP_2");
+
+        assertThat(created.role()).isEqualTo("HO_TRO_CAP_2");
+        assertThat(created.roleName()).isEqualTo("Support level 2");
+    }
+
+    @Test
+    void anUnknownRoleCodeIsRefusedBeforeAnyWrite() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(roleCatalog.require("NOPE")).thenThrow(RoleCatalog.unknown("NOPE"));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "NOPE")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aRoleDeletedAfterTheLookupIsAnUnknownRoleNotATakenEmail() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("fk",
+                new ConstraintViolationException("fk", new SQLException("fk", "23503"), "fk_app_user_role")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "HO_TRO_CAP_2")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+    }
+
+    @Test
+    void anotherConstraintKeepsTheTakenEmailAnswer() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uname",
+                new ConstraintViolationException("uname", new SQLException("uname", "23505"),
+                        "uq_app_user_username")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "MEMBER")).isInstanceOf(ConflictException.class);
+    }
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {

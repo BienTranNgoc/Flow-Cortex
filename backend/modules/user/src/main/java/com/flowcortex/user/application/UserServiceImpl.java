@@ -14,7 +14,9 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.RoleRow;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
@@ -41,11 +43,14 @@ class UserServiceImpl implements UserService {
     private final AdminPermissions adminPermissions;
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
+    private final RoleCatalog roleCatalog;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokenService, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
-            SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard) {
+            SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
+            RoleCatalog roleCatalog) {
+        this.roleCatalog = roleCatalog;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -67,15 +72,15 @@ class UserServiceImpl implements UserService {
     @Transactional
     public UserView createUser(UUID callerId, String email, String rawPassword, String name, String role) {
         AppUser caller = requireActiveCaller(callerId);
-        Role newRole = parseRole(role);
+        RoleRow newRole = roleCatalog.require(role);
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.create(newRole)));
-        return createRow(UUID.randomUUID(), scopeOf(caller), email, rawPassword, name, newRole);
+        return createRow(UUID.randomUUID(), scopeOf(caller), email, rawPassword, name, Role.of(newRole.code()));
     }
 
     private UserView createRow(UUID id, UUID ownerId, String email, String rawPassword, String name, Role role) {
         AppUser user = new AppUser(id, ownerId, email, passwordEncoder.encode(rawPassword), name, role,
                 UserStatus.ACTIVE);
-        UserView created = save(user, email);
+        UserView created = save(user, email, role.code());
         // An admin-created account is confirmed on creation, so it is usable at once.
         events.publishEvent(new UserActivatedEvent(id));
         return created;
@@ -85,15 +90,16 @@ class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserView getUser(UUID callerId, UUID id) {
         AppUser caller = requireActiveCaller(callerId);
-        return AppUserMapper.toUserView(requireOwned(scopeOf(caller), id));
+        return AppUserMapper.toUserView(requireOwned(scopeOf(caller), id), roleCatalog.names());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<UserView> listUsers(UUID callerId) {
         AppUser caller = requireActiveCaller(callerId);
+        Map<String, String> roleNames = roleCatalog.names();
         return userRepository.findAllByOwnerIdOrderByEmailAsc(scopeOf(caller)).stream()
-                .map(AppUserMapper::toUserView)
+                .map(user -> AppUserMapper.toUserView(user, roleNames))
                 .toList();
     }
 
@@ -102,15 +108,16 @@ class UserServiceImpl implements UserService {
     public UserView updateUser(UUID callerId, UUID id, String email, String name, String role, String status) {
         AppUser caller = requireActiveCaller(callerId);
         AppUser user = requireOwned(scopeOf(caller), id);
-        Role newRole = role == null || role.isBlank() ? null : parseRole(role);
+        RoleRow newRoleRow = role == null || role.isBlank() ? null : roleCatalog.require(role);
+        Role newRole = newRoleRow == null ? null : Role.of(newRoleRow.code());
         UserStatus newStatus = status == null || status.isBlank() ? null : parseStatus(status);
         if (id.equals(callerId)) {
             // The caller's own row is in its scope, so requireOwned can't catch an admin
             // locking itself out by suspending or downgrading its own account.
             requireNotSelfLockout(user, newRole, newStatus);
         }
-        requireKeys(caller, UserMutationPolicy.requiredKeys(
-                UserMutation.update(user.getRole(), newRole, user.getStatus(), newStatus)));
+        requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.update(
+                roleCatalog.require(user.getRole().code()), newRoleRow, user.getStatus(), newStatus)));
         boolean leavesAdminRole = user.getRole().isSuperAdmin() && newRole != null && !newRole.isSuperAdmin();
         boolean suspends = newStatus == UserStatus.SUSPENDED;
         if (leavesAdminRole || suspends) {
@@ -128,7 +135,7 @@ class UserServiceImpl implements UserService {
             user.changeName(name);
         }
         if (newRole != null) {
-            user.changeRole(newRole);
+            user.changeRole(newRole, newRoleRow.isAdminAccount());
         }
         if (newStatus != null) {
             boolean reactivated = user.getStatus() != UserStatus.ACTIVE && newStatus == UserStatus.ACTIVE;
@@ -144,7 +151,7 @@ class UserServiceImpl implements UserService {
                 events.publishEvent(new UserActivatedEvent(id));
             }
         }
-        return save(user, email);
+        return save(user, email, role);
     }
 
     @Override
@@ -157,7 +164,8 @@ class UserServiceImpl implements UserService {
             throw new ConflictException(new LocalizedMessage("user.cannotDeleteSelf"));
         }
         AppUser user = requireOwned(scopeOf(caller), id);
-        requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.delete(user.getRole())));
+        requireKeys(caller, UserMutationPolicy.requiredKeys(
+                UserMutation.delete(roleCatalog.require(user.getRole().code()))));
         registrationOwnerGuard.assertNotRegistrationOwner(user);
         superAdminInvariant.assertNotLastActive(user);
         userRepository.delete(user);
@@ -204,10 +212,17 @@ class UserServiceImpl implements UserService {
         }
     }
 
-    private UserView save(AppUser user, String email) {
+    /**
+     * A role deleted after the catalog lookup fails {@code fk_app_user_role} at the flush: that is an
+     * unknown role, not a taken email. Every other constraint keeps the email answer.
+     */
+    private UserView save(AppUser user, String email, String requestedRole) {
         try {
-            return AppUserMapper.toUserView(userRepository.saveAndFlush(user));
+            return AppUserMapper.toUserView(userRepository.saveAndFlush(user), roleCatalog.names());
         } catch (DataIntegrityViolationException e) {
+            if (ConstraintViolations.isRoleForeignKey(e)) {
+                throw RoleCatalog.unknown(requestedRole);
+            }
             throw new ConflictException(new LocalizedMessage("user.emailTaken", email));
         }
     }
@@ -215,19 +230,6 @@ class UserServiceImpl implements UserService {
     private AppUser requireOwned(UUID ownerId, UUID id) {
         return userRepository.findByOwnerIdAndId(ownerId, id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-    }
-
-    /**
-     * The web layer already constrains {@code role}/{@code status} via {@code @Pattern}; this
-     * only fires for an {@code api} caller that skips validation — defence in depth, not a
-     * user-reachable path.
-     */
-    private static Role parseRole(String value) {
-        try {
-            return Role.valueOf(value);
-        } catch (IllegalArgumentException | NullPointerException e) {
-            throw new IllegalArgumentException("Invalid role: " + value);
-        }
     }
 
     private static UserStatus parseStatus(String value) {

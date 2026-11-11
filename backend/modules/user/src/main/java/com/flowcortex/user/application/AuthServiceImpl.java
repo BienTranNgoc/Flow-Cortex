@@ -579,7 +579,7 @@ class AuthServiceImpl implements AuthService {
         }
         AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
         String unusable = owner == null ? "owner_not_found"
-                : owner.getRole() != Role.ADMIN ? "owner_not_admin"
+                : !owner.getRole().isSuperAdmin() ? "owner_not_admin"
                 : owner.getStatus() != UserStatus.ACTIVE ? "owner_not_active"
                 : null;
         if (unusable != null) {

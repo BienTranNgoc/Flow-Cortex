@@ -183,7 +183,7 @@ class AdminAccountsEndpointsIT extends AbstractUserModuleIT {
         assertThat(roles).extracting(RoleView::code).containsExactly("ADMIN", "OPERATION_MANAGER",
                 "CUSTOMER_SUPPORT", "CONTENT_EDITOR", "PLATFORM_OPERATOR", "MEMBER", "CREATOR");
         assertThat(roles.get(0).superAdmin()).isTrue();
-        assertThat(roles.get(0).permissions()).hasSize(21);
+        assertThat(roles.get(0).permissions()).hasSize(22);
         assertThat(roles.get(5).staff()).isFalse();
         assertThat(roles.get(5).permissions()).isEmpty();
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);

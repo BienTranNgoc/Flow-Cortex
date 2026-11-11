@@ -49,7 +49,7 @@ class AccessTokenServiceTest {
         // Spring stores the issuer claim as a String, so we read it back via the raw map.
         assertThat(claims.getClaims()).containsEntry("iss", "flow-cortex");
         assertThat(claims.getSubject()).isEqualTo(user.getId().toString());
-        assertThat(claims.getClaim("role").toString()).isEqualTo(Role.MEMBER.name());
+        assertThat(claims.getClaim("role").toString()).isEqualTo(Role.MEMBER.code());
         assertThat(claims.getClaims()).doesNotContainKey("tv");
     }
 
