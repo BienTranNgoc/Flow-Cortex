@@ -61,7 +61,10 @@ import tools.jackson.databind.json.JsonMapper;
  * what earlier steps of the same run stored, remote or inline.
  */
 // The reaper's stalled-run sweep also advances runs; an hour apart it cannot be what moves a run here.
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.workflow.reaper-interval-ms=3600000")
+// The test-only store_voice step needs a cost, or the credit guard refuses to start the context.
+@SpringBootTest(
+        webEnvironment = WebEnvironment.RANDOM_PORT,
+        properties = {"flowcortex.workflow.reaper-interval-ms=3600000", "flowcortex.credits.step-costs.store_voice=0"})
 @AutoConfigureTestRestTemplate
 @Import(StoringStepTestConfig.class)
 class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {

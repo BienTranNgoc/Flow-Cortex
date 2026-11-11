@@ -47,7 +47,8 @@ class WorkflowServiceImplTest {
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
             registry, new WorkflowWriteAccess(workflowRepository, registry,
-                    Validation.buildDefaultValidatorFactory().getValidator()));
+                    Validation.buildDefaultValidatorFactory().getValidator()),
+            mock(com.flowcortex.credit.api.CreditAccounts.class));
 
     @Test
     void getVisibleWorkflowNotVisibleIsNotFound() {
