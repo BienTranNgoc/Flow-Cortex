@@ -322,12 +322,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
   return (
     <div className="content-editor">
       <div className="content-editor__bar">
-        <div
-          role="tablist"
-          aria-label={t('content.editor.languageTabs')}
-          className="content-tabs"
-          onKeyDown={onTabKey}
-        >
+        <div role="tablist" aria-label={t('content.editor.languageTabs')} className="content-tabs">
           {LOCALES.map((tab) => (
             <button
               key={tab}
@@ -342,12 +337,13 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
               tabIndex={locale === tab ? 0 : -1}
               className="content-tab"
               onClick={() => setLocale(tab)}
+              onKeyDown={onTabKey}
             >
               {t(`content.languages.${tab}`)}
             </button>
           ))}
         </div>
-        <div role="group" aria-label={t('content.editor.modeLabel')} className="content-modes">
+        <fieldset aria-label={t('content.editor.modeLabel')} className="content-modes">
           <button
             type="button"
             className="cortex-admin-btn cortex-admin-btn--sm"
@@ -372,11 +368,11 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
           >
             {t('content.editor.revisions')}
           </button>
-        </div>
-        <p role="status" className="content-editor__status">
+        </fieldset>
+        <output className="content-editor__status">
           {stateText}
           {notice && <span className="content-editor__notice"> · {notice}</span>}
-        </p>
+        </output>
         {canManage && (
           <div className="content-editor__actions">
             <button

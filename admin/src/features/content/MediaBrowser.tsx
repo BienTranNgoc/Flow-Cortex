@@ -98,7 +98,7 @@ export function MediaBrowser({ canUpload, onChoose }: MediaBrowserProps) {
       </div>
 
       {progress && (
-        <div role="status" className="content-upload-progress">
+        <output className="content-upload-progress">
           <span>
             {t('content.media.upload.progress', { name: progress.name, percent: progress.percent })}
           </span>
@@ -107,7 +107,7 @@ export function MediaBrowser({ canUpload, onChoose }: MediaBrowserProps) {
             value={progress.percent}
             aria-label={t('content.media.upload.progressLabel', { name: progress.name })}
           />
-        </div>
+        </output>
       )}
       {refusal && (
         <p id={refusalId} className="cortex-admin-form-error" role="alert">

@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 interface ContentDialogProps {
   readonly title: string;
   readonly children: ReactNode;
-  /** Called when the dialog closes by Escape, a backdrop click or the parent's own close. */
+  /** Called when the dialog closes by Escape or the parent's own close. */
   readonly onClose: () => void;
   readonly wide?: boolean;
 }
@@ -24,9 +24,6 @@ export function ContentDialog({ title, children, onClose, wide = false }: Conten
       className={wide ? 'content-dialog content-dialog--wide' : 'content-dialog'}
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) dialogRef.current?.close();
-      }}
     >
       <div className="content-dialog__body">
         <h2 id={titleId}>{title}</h2>

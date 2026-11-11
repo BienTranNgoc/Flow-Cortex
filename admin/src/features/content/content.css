@@ -150,6 +150,10 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .content-modes .cortex-admin-btn[aria-pressed='true'],
