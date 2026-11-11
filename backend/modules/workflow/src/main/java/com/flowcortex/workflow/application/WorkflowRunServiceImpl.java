@@ -35,6 +35,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -120,6 +121,19 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     @Override
     public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName, RunOptions options, boolean acknowledgeCost) {
+        return start(currentUserId, workflowId, input, uploadId, uploadIds, originalName, options, acknowledgeCost,
+                null);
+    }
+
+    @Override
+    public RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost, String requestKey) {
+        return start(currentUserId, workflowId, input, uploadId, uploadIds, originalName, null, acknowledgeCost,
+                requestKey);
+    }
+
+    private RunView start(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, RunOptions options, boolean acknowledgeCost, String requestKey) {
         // Kill switch — checked BEFORE anything is persisted: off means no
         // run is created at all, not a run that is immediately refused.
         if (!workflowEnabled) {
@@ -133,6 +147,22 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        // A retried start answers with its run before any cost guard or object copy runs again.
+        Optional<RunView> started = RunRequestKeys.existing(workflowRunRepository, runStepRepository, registry,
+                mediaJobs::isDownloadable, currentUserId, requestKey);
+        if (started.isPresent()) {
+            return started.get();
+        }
+        return RunRequestKeys.orWinner(
+                () -> startNew(currentUserId, workflow, input, uploadId, uploadIds, originalName, options,
+                        acknowledgeCost, requestKey),
+                workflowRunRepository, runStepRepository, registry,
+                mediaJobs::isDownloadable, currentUserId, requestKey);
+    }
+
+    private RunView startNew(UUID currentUserId, Workflow workflow, String input, UUID uploadId,
+            List<UUID> uploadIds, String originalName, RunOptions options, boolean acknowledgeCost,
+            String requestKey) {
         List<WorkflowStep> stepDefs = servedDefinitions.stepsFor(workflow, currentUserId);
         // Refused up front: a run whose remote step would only fail media_disabled later.
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
@@ -168,7 +198,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         String displayedInput = runInput;
         String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
         return runCreation.create(RunCreation.NewRun.started(runId, workflow.getId(), currentUserId, stepDefs,
-                displayedInput, runOptions, stepInputJson, copies));
+                displayedInput, runOptions, stepInputJson, copies, requestKey));
     }
 
     private String json(Object value) {

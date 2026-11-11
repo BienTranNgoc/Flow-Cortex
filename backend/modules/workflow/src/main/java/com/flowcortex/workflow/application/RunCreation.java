@@ -24,21 +24,24 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 class RunCreation {
 
-    /** A run to create; the parent fields are null (and {@code callDepth} 0) for a run a member started. */
+    /**
+     * A run to create; the parent fields are null (and {@code callDepth} 0) for a run a member started, and
+     * {@code requestKey} is null for a child run.
+     */
     record NewRun(UUID runId, UUID workflowId, UUID ownerId, List<WorkflowStep> steps, String input,
             String optionsJson, String stepInputJson, List<MediaAssetInput> copies, UUID parentRunId,
-            UUID parentStepId, Short parentStepAttempt, short callDepth) {
+            UUID parentStepId, Short parentStepAttempt, short callDepth, String requestKey) {
 
         static NewRun started(UUID runId, UUID workflowId, UUID ownerId, List<WorkflowStep> steps, String input,
-                String optionsJson, String stepInputJson, List<MediaAssetInput> copies) {
+                String optionsJson, String stepInputJson, List<MediaAssetInput> copies, String requestKey) {
             return new NewRun(runId, workflowId, ownerId, steps, input, optionsJson, stepInputJson, copies, null,
-                    null, null, (short) 0);
+                    null, null, (short) 0, requestKey);
         }
 
         static NewRun child(UUID workflowId, UUID ownerId, List<WorkflowStep> steps, String input,
                 String optionsJson, UUID parentRunId, UUID parentStepId, short parentStepAttempt, short callDepth) {
             return new NewRun(UUID.randomUUID(), workflowId, ownerId, steps, input, optionsJson, null, List.of(),
-                    parentRunId, parentStepId, parentStepAttempt, callDepth);
+                    parentRunId, parentStepId, parentStepAttempt, callDepth, null);
         }
     }
 
@@ -94,7 +97,7 @@ class RunCreation {
     private static WorkflowRun toRun(NewRun newRun) {
         if (newRun.parentRunId() == null) {
             return new WorkflowRun(newRun.runId(), newRun.workflowId(), newRun.ownerId(), newRun.input(),
-                    newRun.optionsJson(), Instant.now());
+                    newRun.optionsJson(), Instant.now(), newRun.requestKey());
         }
         return WorkflowRun.child(newRun.runId(), newRun.workflowId(), newRun.ownerId(), newRun.input(),
                 newRun.optionsJson(), Instant.now(), newRun.parentRunId(), newRun.parentStepId(),
