@@ -75,6 +75,8 @@ One family, `--admin-font-sans`: Google Sans Flex Variable, self-hosted from `@f
 
 Pages stay free of horizontal scroll at 375, 768 and 1280px. `--admin-control-h` (36px) sets the height of inputs, buttons and icon buttons; it becomes `--admin-hit-min` (44px) on `(any-pointer: coarse)` or below 1024px. Sidebar entries are `--admin-hit-min` everywhere. Adjacent controls stay 8px apart.
 
+The support inbox keeps its filter toolbar on one row from 1280px, wraps it below that and stacks one control per row at 720px or less, where table rows become labelled cards with the selection checkbox first. From 1024px the table region scrolls inside the page (its height is the viewport minus the toolbar and bulk bar), so the page itself does not scroll. Selection checkboxes are 24px and take the `--admin-focus-ring` on keyboard focus.
+
 ## Shapes
 
 `sm` for chips and small blocks, `md` for fields, buttons and navigation entries, `lg` for cards and the popover, `xl` for dialogs, `full` for pills.

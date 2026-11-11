@@ -43,6 +43,8 @@ final class RequestStateMachine {
                     ? new Refusal(TRANSITION_NOT_ALLOWED) : new Move(RequestStatus.RESOLVED);
             case ADMIN_SET_CLOSED -> closed ? new Refusal(TRANSITION_NOT_ALLOWED)
                     : new Move(RequestStatus.CLOSED, "admin");
+            case ADMIN_ASSIGN -> closed ? new Refusal(REQUEST_CLOSED)
+                    : new Move(from == RequestStatus.NEW ? RequestStatus.IN_PROGRESS : from);
             case AUTO_CLOSE -> from == RequestStatus.RESOLVED ? new Move(RequestStatus.CLOSED, "auto")
                     : new Refusal(TRANSITION_NOT_ALLOWED);
         };

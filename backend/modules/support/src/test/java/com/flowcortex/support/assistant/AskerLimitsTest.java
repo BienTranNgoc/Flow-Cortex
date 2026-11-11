@@ -113,6 +113,6 @@ class AskerLimitsTest {
 
     private static SupportProperties properties(boolean assistantEnabled) {
         return new SupportProperties(true, "", new SupportProperties.Assistant(assistantEnabled,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
     }
 }

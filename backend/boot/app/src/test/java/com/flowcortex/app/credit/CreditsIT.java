@@ -68,7 +68,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
     record CreditsProblem(int status, String detail, String code, Long balance, Long required, Long shortfall) {
     }
 
-    record BalanceView(long balance) {
+    record BalanceView(long balance, long granted) {
     }
 
     record PricedWorkflowView(UUID id, String name, Long estimatedCredits) {
@@ -203,6 +203,28 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(get("/api/v1/workflows/" + workflow.id(), token, PricedWorkflowView.class).getBody()
                 .estimatedCredits()).isEqualTo(60);
         assertThat(get("/api/v1/credits/balance", token, BalanceView.class).getBody().balance()).isEqualTo(940);
+    }
+
+    @Test
+    void theBalanceReportsWhatWasGrantedBesideWhatIsLeft() {
+        UserView member = memberWithBalance("granted", 940);
+        jdbcTemplate.update("UPDATE credit_ledger SET amount = 1000 WHERE user_id = ? AND kind = 'grant'",
+                member.id());
+        String token = loginAs(member);
+
+        BalanceView beforeCharge = get("/api/v1/credits/balance", token, BalanceView.class).getBody();
+        assertThat(beforeCharge.balance()).isEqualTo(940);
+        assertThat(beforeCharge.granted()).isEqualTo(1000);
+
+        UUID runId = seedRun(member, "running", "running");
+        UUID stepId = stepIds(runId).get(0);
+        chargeBySql(member, runId, stepId, 100);
+        creditAccounts.refundStep(runId, stepId, null);
+
+        BalanceView afterRefund = get("/api/v1/credits/balance", token, BalanceView.class).getBody();
+        assertThat(ledger(runId, "refund")).containsExactly(100L);
+        assertThat(afterRefund.balance()).isEqualTo(940);
+        assertThat(afterRefund.granted()).isEqualTo(1000);
     }
 
     @Test

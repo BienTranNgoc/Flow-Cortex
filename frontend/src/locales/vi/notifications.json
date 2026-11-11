@@ -1,0 +1,41 @@
+{
+  "title": "Thông báo",
+  "bell": {
+    "label": "Thông báo, {{unread}} chưa đọc"
+  },
+  "unreadMark": "Chưa đọc:",
+  "markAllRead": "Đánh dấu tất cả là đã đọc",
+  "viewAll": "Xem tất cả thông báo",
+  "preferencesLink": "Cài đặt thông báo",
+  "filterLabel": "Hiển thị thông báo",
+  "filter": {
+    "all": "Tất cả",
+    "unread": "Chưa đọc"
+  },
+  "empty": "Bạn chưa có thông báo nào.",
+  "emptyUnread": "Không có thông báo chưa đọc. Bạn đã xem hết rồi.",
+  "goToWorkflows": "Đến trang workflow",
+  "loadMore": "Tải thêm",
+  "loadError": "Không thể tải thông báo.",
+  "retry": "Thử lại",
+  "preferences": {
+    "title": "Cài đặt thông báo",
+    "lede": "Chọn những gì Nodi thông báo cho bạn.",
+    "back": "Quay lại thông báo",
+    "loadError": "Không tải được cài đặt thông báo của bạn.",
+    "saveError": "Không lưu được thay đổi. Cài đặt đã được đặt lại.",
+    "alwaysSent": "Email về tài khoản và bảo mật, như đặt lại mật khẩu và xác nhận đăng nhập, luôn được gửi.",
+    "inApp": {
+      "label": "Thông báo trong ứng dụng",
+      "description": "Hiện cập nhật ở chuông và trang thông báo."
+    },
+    "careEmail": {
+      "label": "Mẹo và lời nhắc qua email",
+      "description": "Gợi ý thỉnh thoảng giúp bạn dùng Nodi hiệu quả hơn."
+    },
+    "marketingEmail": {
+      "label": "Tin tức và ưu đãi qua email",
+      "description": "Tin về sản phẩm và khuyến mãi."
+    }
+  }
+}

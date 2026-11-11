@@ -74,7 +74,7 @@ spring:
 
   # The event publication registry is the outbox for job messages. Outstanding publications are
   # not republished on restart — a job in flight would be dispatched twice; failed ones are resubmitted
-  # by the media module instead. A completed publication is deleted: the run step is the record.
+  # by the jobs module instead. A completed publication is deleted: the run step is the record.
   modulith:
     events:
       republish-outstanding-events-on-restart: false
@@ -165,10 +165,26 @@ jdbc:
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
 # profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
+  # Cluster job runner: each pass looks for due jobs every poll-interval; with the runner off the
+  # instance registers and runs no scheduled job (the integration suite turns it off).
+  jobs:
+    poll-interval: ${FLOWCORTEX_JOBS_POLL_INTERVAL:5s}
+    runner:
+      enabled: ${FLOWCORTEX_JOBS_RUNNER_ENABLED:true}
   # The member app's public origin; links in outgoing mail point here. No default: with email
   # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:
     public-url: ${FLOWCORTEX_APP_PUBLIC_URL:}
+  # The one sender of every mail. link-secret (>= 32 bytes) signs unsubscribe links and, together with
+  # flowcortex.app.public-url, becomes required once the catalog holds a care or promotional key.
+  mail:
+    from: ${FLOWCORTEX_MAIL_FROM:no-reply@flow-cortex.dev}
+    from-name: ${FLOWCORTEX_MAIL_FROM_NAME:Nodi}
+    link-secret: ${FLOWCORTEX_MAIL_LINK_SECRET:}
+    links:
+      rate-limit:
+        capacity: ${FLOWCORTEX_MAIL_LINK_RATE_LIMIT:10}
+        period: ${FLOWCORTEX_MAIL_LINK_RATE_WINDOW:60s}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -318,6 +334,9 @@ flowcortex:
     hub-threads: 2
     publish:
       queue-capacity: 1000
+  # In-app notifications: a member keeps their newest max-per-member; older ones are deleted on insert.
+  notifications:
+    max-per-member: 500
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
@@ -379,7 +398,9 @@ flowcortex:
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
       answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
-  # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
+  # up). The assistant switch and the four daily limits below are configured here and changed at
+  # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the
+  # assistant off whatever is stored. The Help Center switch itself needs a restart.
   support:
     enabled: ${FLOWCORTEX_SUPPORT_ENABLED:false}
     # Shown to guests and suspended members; empty shows no contact line.
@@ -394,8 +415,24 @@ flowcortex:
       member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
       guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
-    mail:
-      from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
+    # Request lifecycle: the three switches and three numbers below are configured here and changed at
+    # runtime in the console Settings page; a switch set to false here stays off whatever is stored.
+    lifecycle:
+      auto-close-enabled: ${FLOWCORTEX_SUPPORT_AUTO_CLOSE_ENABLED:true}
+      # Days after the member first opens a resolution before it closes (1-90).
+      auto-close-resolved-days: ${FLOWCORTEX_SUPPORT_AUTO_CLOSE_RESOLVED_DAYS:7}
+      reply-mail-enabled: ${FLOWCORTEX_SUPPORT_REPLY_MAIL_ENABLED:true}
+      # Minutes replies to one request are gathered into a single mail; 0 mails after the next sweep (0-1440).
+      reply-mail-window-minutes: ${FLOWCORTEX_SUPPORT_REPLY_MAIL_WINDOW_MINUTES:0}
+      retention-enabled: ${FLOWCORTEX_SUPPORT_RETENTION_ENABLED:true}
+      # Months a closed request is kept after its last activity (6-120).
+      retention-closed-request-months: ${FLOWCORTEX_SUPPORT_RETENTION_CLOSED_REQUEST_MONTHS:24}
+    # Pace of the reply-mail sweep and the closed-request purge; not under support.retention, whose
+    # interval paces the auto-close and assistant retention jobs.
+    reply-mail:
+      sweep-interval: PT1M
+    request-retention:
+      interval: PT6H
   # Main chat. Off: the page is hidden by the features flag. The console's chat switch gates sends on top
   # of it. Restart to apply. Limits count member messages; the sweeper fails a turn still running
   # sweep-grace after turn-timeout.

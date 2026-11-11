@@ -68,13 +68,13 @@ class WorkflowStepAppendConcurrencyIT {
         }
 
         @Bean
-        Validator validator() {
-            return Validation.buildDefaultValidatorFactory().getValidator();
+        CreditAccounts creditAccounts() {
+            return mock(CreditAccounts.class);
         }
 
         @Bean
-        CreditAccounts creditAccounts() {
-            return mock(CreditAccounts.class);
+        Validator validator() {
+            return Validation.buildDefaultValidatorFactory().getValidator();
         }
     }
 

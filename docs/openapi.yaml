@@ -247,6 +247,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}/assignee:
+    put:
+      tags:
+      - admin-request-controller
+      operationId: assignAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestAssignee"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: validation-failed (errors.assigneeId)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups/{id}:
     put:
       tags:
@@ -405,6 +448,65 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "409":
           description: "slug-taken, featured-full, featured-position-taken"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/settings/{key}:
+    put:
+      tags:
+      - admin-settings-controller
+      operationId: updateAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: setting.invalidValue (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-settings-controller
+      operationId: resetAdminSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "404":
+          description: not-found (unknown key)
           content:
             application/problem+json:
               schema:
@@ -1064,6 +1166,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/notifications/{id}/read:
+    post:
+      tags:
+      - notifications-controller
+      operationId: markNotificationRead
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: "marked read, also when it already was"
+        "404":
+          description: "unknown id, or not the caller's"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/read-all:
+    post:
+      tags:
+      - notifications-controller
+      operationId: markAllNotificationsRead
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadAllResult"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -1100,6 +1234,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/email-links/{token}/unsubscribe:
+    post:
+      tags:
+      - email-links-controller
+      operationId: unsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkUnsubscribed"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/email-links/{token}/one-click:
+    post:
+      tags:
+      - email-links-controller
+      operationId: oneClickUnsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkOneClick"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
@@ -1716,6 +1922,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/bulk-assign:
+    post:
+      tags:
+      - admin-request-controller
+      operationId: bulkAssignAdminSupportRequests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportBulkAssign"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportBulkAssignResult"
+        "400":
+          description: "validation-failed (errors.numbers, errors.assigneeId)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups:
     get:
       tags:
@@ -2038,6 +2268,40 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "422":
           description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/preferences:
+    get:
+      tags:
+      - preferences-controller
+      operationId: getNotificationPreferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesView"
+    patch:
+      tags:
+      - preferences-controller
+      operationId: updateNotificationPreferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesView"
+        "400":
+          description: "empty body, or a field that is not one of the three booleans"
           content:
             application/problem+json:
               schema:
@@ -2549,6 +2813,52 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications:
+    get:
+      tags:
+      - notifications-controller
+      operationId: listNotifications
+      parameters:
+      - name: filter
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPage"
+        "400":
+          description: "filter, page or size out of range"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/notifications/unread-count:
+    get:
+      tags:
+      - notifications-controller
+      operationId: getUnreadNotificationCount
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnreadCount"
   /api/v1/me/phone:
     get:
       tags:
@@ -2585,6 +2895,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
+      security: []
+  /api/v1/email-links/{token}:
+    get:
+      tags:
+      - email-links-controller
+      operationId: viewEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkView"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/credits/balance:
     get:
@@ -2726,6 +3067,39 @@ paths:
           - workflow
           - technical
           - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        description: "Subject text, or a request number with or without a leading\
+          \ #"
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
       - name: page
         in: query
         required: false
@@ -2743,7 +3117,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
-          description: "validation-failed (errors.status, errors.type, errors.page)"
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -2785,6 +3160,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SupportCount"
+  /api/v1/admin/support/requests/facets:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportRequestFacets
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestFacets"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/sms-outbox:
     get:
       tags:
@@ -2809,6 +3248,60 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SmsOutboxEntryResponse"
+  /api/v1/admin/settings:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSettingList"
+  /api/v1/admin/settings/{key}/history:
+    get:
+      tags:
+      - admin-settings-controller
+      operationId: listAdminSettingHistory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminSettingChange"
+        "404":
+          description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/runs:
     get:
       tags:
@@ -2909,6 +3402,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/assignees:
+    get:
+      tags:
+      - admin-assignees-controller
+      operationId: listAdminAssignees
+      parameters:
+      - name: for
+        in: query
+        description: "The list to read, named by the permission it serves"
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAssignee"
+        "400":
+          description: Missing or unknown list (errors.for)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: The caller may not read this list
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts:
     get:
       tags:
@@ -3103,6 +3629,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -3148,7 +3675,6 @@ components:
       - ceilingReachedToday
       - dailyCeiling
       - envEnabled
-      - updatedAt
     AdminSupportRequestStatusChange:
       type: object
       properties:
@@ -3204,6 +3730,8 @@ components:
           format: date-time
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         messages:
           type: array
           items:
@@ -3234,6 +3762,19 @@ components:
       - status
       - subject
       - type
+    SupportAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        deleted:
+          type: boolean
+      required:
+      - deleted
+      - id
     SupportConversationMessage:
       type: object
       properties:
@@ -3318,6 +3859,12 @@ components:
       required:
       - deleted
       - id
+    AdminSupportRequestAssignee:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
     AdminSupportKbGroupRequest:
       type: object
       properties:
@@ -3424,6 +3971,90 @@ components:
       - status
       - title
       - updatedAt
+    AdminSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+      required:
+      - value
+    AdminSetting:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+        value:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        decidedValue:
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - decidedValue
+      - group
+      - key
+      - source
+      - type
+      - value
     AdminChatSettingsUpdate:
       type: object
       properties:
@@ -4067,6 +4698,12 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    ReadAllResult:
+      type: object
+      properties:
+        marked:
+          type: integer
+          format: int32
     VerifyCodeRequest:
       type: object
       properties:
@@ -4114,6 +4751,29 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    EmailLinkUnsubscribed:
+      type: object
+      properties:
+        unsubscribed:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+    EmailLinkOneClick:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+      - ok
     Attachment:
       type: object
       properties:
@@ -4388,6 +5048,60 @@ components:
       required:
       - body
       - status
+    AdminSupportBulkAssign:
+      type: object
+      properties:
+        numbers:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+        assigneeId:
+          type: string
+          format: uuid
+      required:
+      - assigneeId
+      - numbers
+    AdminSupportBulkAssignResult:
+      type: object
+      properties:
+        assigned:
+          type: array
+          items:
+            type: integer
+            format: int64
+        unchanged:
+          type: array
+          items:
+            type: integer
+            format: int64
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportBulkAssignFailure"
+      required:
+      - assigned
+      - failed
+      - unchanged
+    SupportBulkAssignFailure:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum:
+          - not_found
+          - closed
+          - changed
+      required:
+      - number
+      - reason
     AdminAccountResponse:
       type: object
       properties:
@@ -4447,6 +5161,24 @@ components:
           minLength: 0
         config:
           type: string
+    PatchBody:
+      type: object
+      properties:
+        inApp:
+          type: boolean
+        careEmail:
+          type: boolean
+        marketingEmail:
+          type: boolean
+    PreferencesView:
+      type: object
+      properties:
+        inApp:
+          type: boolean
+        careEmail:
+          type: boolean
+        marketingEmail:
+          type: boolean
     ChangeRoleRequest:
       type: object
       properties:
@@ -4650,6 +5382,49 @@ components:
       required:
       - expiresAt
       - url
+    NotificationItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        link:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    NotificationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        hasMore:
+          type: boolean
+        unreadCount:
+          type: integer
+          format: int64
+    UnreadCount:
+      type: object
+      properties:
+        unreadCount:
+          type: integer
+          format: int64
     HealthResponse:
       type: object
       properties:
@@ -4692,10 +5467,32 @@ components:
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EmailLinkView:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        unsubscribed:
+          type: boolean
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+      - valid
     BalanceResponse:
       type: object
       properties:
         balance:
+          type: integer
+          format: int64
+        granted:
           type: integer
           format: int64
     ChatConversationList:
@@ -4764,6 +5561,8 @@ components:
           - closed
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         createdAt:
           type: string
           format: date-time
@@ -4778,6 +5577,70 @@ components:
       - status
       - subject
       - type
+    AdminSupportAssigneeFacet:
+      type: object
+      properties:
+        unassigned:
+          type: integer
+          format: int64
+        mine:
+          type: integer
+          format: int64
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssigneeCount"
+      required:
+      - mine
+      - people
+      - unassigned
+    AdminSupportRequestFacets:
+      type: object
+      properties:
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        type:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        assignee:
+          $ref: "#/components/schemas/AdminSupportAssigneeFacet"
+      required:
+      - assignee
+      - created
+      - status
+      - type
+    SupportAssigneeCount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - id
+    SupportFacetCount:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - value
     AdminSupportKbArticleList:
       type: object
       properties:
@@ -4848,6 +5711,60 @@ components:
       - createdAt
       - id
       - phone
+    AdminSettingList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSetting"
+      required:
+      - items
+    AdminSettingChange:
+      type: object
+      properties:
+        previousValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        newValue:
+          type: "null"
+          oneOf:
+          - type: boolean
+          - type: integer
+            format: int32
+        changedBy:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+    PageViewAdminSettingChange:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSettingChange"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     AdminRunResponse:
       type: object
       properties:
@@ -4919,6 +5836,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -5010,6 +5928,20 @@ components:
       - page
       - size
       - total
+    AdminAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+      required:
+      - email
+      - id
+      - name
     PageViewAdminAccountResponse:
       type: object
       properties:
