@@ -12,6 +12,7 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   isShared: false,
   available: true,
+  startInput: 'text',
   steps: [],
 };
 
@@ -20,6 +21,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   name: 'Product Video',
   isShared: true,
   available: true,
+  startInput: 'text',
   steps: [],
 };
 
@@ -28,6 +30,7 @@ const DOUYIN: WorkflowResponse = {
   name: 'Douyin Video Repurpose',
   isShared: true,
   available: true,
+  startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -39,6 +42,7 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo (all steps succeed)',
   isShared: false,
   available: true,
+  startInput: 'text',
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -47,6 +51,7 @@ const FAIL: WorkflowResponse = {
   name: 'Failing Demo (deliberate)',
   isShared: false,
   available: true,
+  startInput: 'text',
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
 

@@ -8,7 +8,8 @@ import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { invalidateBalance } from '../credits/useBalance';
 import { startProblem, type IncompleteWorkflow } from './startProblem';
-import { mediaFileProblem, NO_FILE, type FileProblem } from './startRunSchema';
+import { EMPTY_IMAGE_LIST, imageFileProblem } from './productVideoUpload';
+import { IMAGE, mediaFileProblem, NO_FILE, type FileProblem } from './startRunSchema';
 import { createStartWithUpload, StartStageError, type StartPhase } from './startWithUpload';
 import { uploadFile } from './uploadFile';
 import { useCreateUploadMutation, useStartRunMutation } from './useWorkflows';
@@ -32,33 +33,40 @@ function startButtonLabel(phase: StartPhase | null, t: TFunction): string {
 }
 
 /**
- * Start form of a workflow whose first step works on an uploaded file. Pressing Start uploads the
- * picked file and then starts the run, as one sequence; Start stays focusable while it runs and a
- * press during it changes nothing. A refusal because a step is not configured goes to
- * `onIncomplete`, which the page shows next to the pipeline; every new start clears it.
+ * Start form of a workflow whose first step works on an uploaded file (one image in `image` mode).
+ * Pressing Start uploads the picked file and then starts the run, as one sequence; Start stays
+ * focusable while it runs and a press during it changes nothing. A refusal because a step is not
+ * configured goes to `onIncomplete`, which the page shows next to the pipeline.
  */
 export function MediaStartForm({
   workflowId,
   disabled,
   onIncomplete,
+  mode = 'media',
 }: Readonly<{
   workflowId: string;
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
+  mode?: 'media' | 'image';
 }>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
   const queryClient = useQueryClient();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartRunMutation(workflowId);
+  const isImage = mode === 'image';
+  const fileProblem = isImage ? imageFileProblem : mediaFileProblem;
   const start = useMemo(
     () =>
-      createStartWithUpload({
-        requestUpload: createUpload.mutateAsync,
-        uploadFile,
-        startRun: startRun.mutateAsync,
-      }),
-    [createUpload.mutateAsync, startRun.mutateAsync],
+      createStartWithUpload(
+        {
+          requestUpload: createUpload.mutateAsync,
+          uploadFile,
+          startRun: startRun.mutateAsync,
+        },
+        mode,
+      ),
+    [createUpload.mutateAsync, startRun.mutateAsync, mode],
   );
   const [file, setFile] = useState<File | null>(null);
   const [fieldProblem, setFieldProblem] = useState<FieldProblem | null>(null);
@@ -81,7 +89,7 @@ export function MediaStartForm({
     const picked = event.target.files?.[0] ?? null;
     setFile(picked);
     setFailure(null);
-    setFieldProblem(picked ? asCheck(mediaFileProblem(picked)) : null);
+    setFieldProblem(picked ? asCheck(fileProblem(picked)) : null);
   };
 
   const showFailure = (error: unknown) => {
@@ -145,10 +153,10 @@ export function MediaStartForm({
       return;
     }
     if (!file) {
-      setFieldProblem(asCheck(NO_FILE));
+      setFieldProblem(asCheck(isImage ? EMPTY_IMAGE_LIST : NO_FILE));
       return;
     }
-    if (mediaFileProblem(file)) {
+    if (fileProblem(file)) {
       return;
     }
     void run(file);
@@ -164,10 +172,13 @@ export function MediaStartForm({
       className="media-start-form"
     >
       <div className="field">
-        <label htmlFor="run-file">{t('workflow.start.mediaFile')}</label>
+        <label htmlFor="run-file">
+          {t(isImage ? 'workflow.start.imageLabel' : 'workflow.start.mediaFile')}
+        </label>
         <input
           id="run-file"
           type="file"
+          accept={isImage ? IMAGE.extensions.map((extension) => `.${extension}`).join(',') : undefined}
           required
           onChange={onPick}
           aria-invalid={fieldProblem ? true : undefined}

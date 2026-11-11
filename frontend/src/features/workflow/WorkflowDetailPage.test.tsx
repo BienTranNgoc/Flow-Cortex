@@ -18,6 +18,7 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   isShared: true,
   available: true,
+  startInput: 'upload',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
 };
 
@@ -26,6 +27,7 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo',
   isShared: true,
   available: true,
+  startInput: 'text',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -43,6 +45,7 @@ const INCOMPLETE: WorkflowResponse = {
   name: 'Incomplete Demo (step 2 not configured)',
   isShared: true,
   available: true,
+  startInput: 'text',
   steps: [
     { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
     { id: 'ws2', stepOrder: 2, name: 'Echo step 2', type: 'echo', mode: 'inline' },
@@ -125,6 +128,7 @@ describe('WorkflowDetailPage', () => {
       name: 'Three steps',
       isShared: true,
       available: true,
+      startInput: 'upload',
       steps: [
         { id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' },
         { id: 'ws2', stepOrder: 2, name: 'Pull the audio', type: 'extract_audio', mode: 'remote' },
@@ -288,6 +292,7 @@ describe('WorkflowDetailPage', () => {
       renderForm(
         {
           ...INCOMPLETE,
+          startInput: 'upload',
           steps: (INCOMPLETE.steps ?? []).map((step) => ({ ...step, mode: 'remote' as const })),
         },
         { 'POST /api/v1/workflows/w1/runs': INCOMPLETE_REPLY },

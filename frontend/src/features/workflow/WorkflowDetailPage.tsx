@@ -18,19 +18,29 @@ import { Pipeline } from './Pipeline';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
 import { stepKey } from './stepDisplay';
 import { startProblem, type IncompleteStep, type IncompleteWorkflow } from './startProblem';
-import { startRunSchema, type StartRunFormValues } from './startRunSchema';
+import {
+  linkProblem,
+  startRunSchema,
+  type FileProblem,
+  type StartRunFormValues,
+} from './startRunSchema';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useStartRunMutation, useWorkflowQuery } from './useWorkflows';
 
-/** Start form of a workflow whose first step runs inline: an optional text input. */
+/**
+ * Start form of a workflow whose first step takes text: an optional input, or in `link` mode a
+ * required link that is checked here before any request.
+ */
 function InlineStartForm({
   workflowId,
   disabled,
   onIncomplete,
+  link = false,
 }: Readonly<{
   workflowId: string;
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
+  link?: boolean;
 }>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
@@ -38,6 +48,7 @@ function InlineStartForm({
   const startRunMutation = useStartRunMutation(workflowId);
   // The refused start, so "Run anyway" resends exactly what the member submitted.
   const lastBody = useRef<StartRunRequest>({});
+  const [linkRefusal, setLinkRefusal] = useState<FileProblem | null>(null);
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
     defaultValues: { input: '' },
@@ -81,6 +92,11 @@ function InlineStartForm({
   };
 
   const onStart = handleSubmit((values) => {
+    const refusal = link ? linkProblem(values.input ?? '') : null;
+    setLinkRefusal(refusal);
+    if (refusal) {
+      return;
+    }
     const trimmedInput = values.input?.trim();
     start(trimmedInput ? { input: trimmedInput } : {});
   });
@@ -88,8 +104,21 @@ function InlineStartForm({
   return (
     <form onSubmit={onStart} noValidate aria-label={t('workflow.start.formLabel')}>
       <div className="field">
-        <label htmlFor="run-input">{t('workflow.start.inputLabel')}</label>
-        <input id="run-input" {...register('input')} />
+        <label htmlFor="run-input">
+          {t(link ? 'workflow.start.linkLabel' : 'workflow.start.inputLabel')}
+        </label>
+        <input
+          id="run-input"
+          type={link ? 'url' : 'text'}
+          aria-invalid={linkRefusal ? true : undefined}
+          aria-describedby={linkRefusal ? 'run-input-problem' : undefined}
+          {...register('input')}
+        />
+        {linkRefusal && (
+          <div id="run-input-problem" className="field-error" role="alert">
+            <p>{t(linkRefusal.messageKey, linkRefusal.values ?? {})}</p>
+          </div>
+        )}
       </div>
       {alertMessage && (
         <div role="alert">
@@ -117,8 +146,8 @@ function InlineStartForm({
 
 /**
  * `/workflows/:id` — steps + "start run". On a successful start, navigates straight to the
- * run-progress view so watching it progress is the very next turn. The form follows the first
- * step: one that runs remotely works on an uploaded file, an inline one takes optional text.
+ * run-progress view so watching it progress is the very next turn. The form follows the
+ * workflow's `startInput`: a link, one image, an uploaded file, or optional text.
  *
  * The Product Video form renders as soon as the capabilities identify it, even while the workflow
  * fetch is in flight or has errored, disabled until the definition arrives. Any other form waits
@@ -158,26 +187,29 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   const productVideoWorkflowId = capabilitiesQuery.data?.productVideoWorkflowId;
   const isProductVideo =
     productVideoWorkflowId !== undefined && workflowId === productVideoWorkflowId;
-  const startsWithUpload = workflow?.steps?.[0]?.mode === 'remote';
   // A start against a definition that is loading or failed to load would 404.
   const startDisabled = workflowQuery.isLoading || workflowQuery.isError || !workflow;
   let startForm: ReactNode = null;
   if (isProductVideo) {
     startForm = <ProductVideoStartForm disabled={startDisabled} onIncomplete={setIncomplete} />;
   } else if (workflow && !capabilitiesQuery.isPending) {
-    startForm = startsWithUpload ? (
-      <MediaStartForm
-        workflowId={workflowId}
-        disabled={startDisabled}
-        onIncomplete={setIncomplete}
-      />
-    ) : (
-      <InlineStartForm
-        workflowId={workflowId}
-        disabled={startDisabled}
-        onIncomplete={setIncomplete}
-      />
-    );
+    const startInput = workflow.startInput;
+    startForm =
+      startInput === 'upload' || startInput === 'image' ? (
+        <MediaStartForm
+          workflowId={workflowId}
+          disabled={startDisabled}
+          onIncomplete={setIncomplete}
+          mode={startInput === 'image' ? 'image' : 'media'}
+        />
+      ) : (
+        <InlineStartForm
+          workflowId={workflowId}
+          disabled={startDisabled}
+          onIncomplete={setIncomplete}
+          link={startInput === 'link'}
+        />
+      );
   }
 
   return (
