@@ -4,6 +4,7 @@ import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
+import enOnboarding from '../locales/en/onboarding.json';
 import enRuns from '../locales/en/runs.json';
 import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
@@ -13,6 +14,7 @@ import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
+import viOnboarding from '../locales/vi/onboarding.json';
 import viRuns from '../locales/vi/runs.json';
 import viSmsOutbox from '../locales/vi/smsOutbox.json';
 import viSupport from '../locales/vi/support.json';
@@ -30,6 +32,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: viDashboard,
     smsOutbox: viSmsOutbox,
     support: viSupport,
+    onboarding: viOnboarding,
     chat: viChat,
   },
   en: {
@@ -41,6 +44,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: enDashboard,
     smsOutbox: enSmsOutbox,
     support: enSupport,
+    onboarding: enOnboarding,
     chat: enChat,
   },
 });

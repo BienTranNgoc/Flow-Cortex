@@ -119,6 +119,12 @@ export const NAV: NavGroup[] = [
         action: 'users.manage',
       },
       {
+        label: 'common.shell.nav.items.onboardingSample',
+        path: '/onboarding-sample',
+        icon: Sparkle,
+        action: 'features.toggle',
+      },
+      {
         label: 'common.shell.nav.items.features',
         path: '/features',
         icon: GearSix,

@@ -297,6 +297,102 @@ export interface AdminSupportKbArticle {
   updatedAt: string;
 }
 
+/**
+ * @nullable
+ * @pattern vi|en
+ */
+export type AdminOnboardingSampleUpdateSourceLocale =
+  | (typeof AdminOnboardingSampleUpdateSourceLocale)[keyof typeof AdminOnboardingSampleUpdateSourceLocale]
+  | null;
+
+export const AdminOnboardingSampleUpdateSourceLocale = {
+  vi: 'vi',
+  en: 'en',
+} as const;
+
+export interface AdminOnboardingSampleUpdate {
+  /**
+   * @nullable
+   * @pattern [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}
+   */
+  workflowId: string | null;
+  /**
+   * a single line
+   * @minLength 0
+   * @maxLength 10000
+   * @nullable
+   * @pattern [^\r\n]*
+   */
+  sampleInput?: string | null;
+  /**
+   * @nullable
+   * @pattern vi|en
+   */
+  sourceLocale?: AdminOnboardingSampleUpdateSourceLocale;
+}
+
+/**
+ * @nullable
+ */
+export type AdminOnboardingSampleSourceLocale =
+  (typeof AdminOnboardingSampleSourceLocale)[keyof typeof AdminOnboardingSampleSourceLocale] | null;
+
+export const AdminOnboardingSampleSourceLocale = {
+  vi: 'vi',
+  en: 'en',
+} as const;
+
+/**
+ * @nullable
+ */
+export type AdminOnboardingSampleTranslation = string | null;
+
+/**
+ * one entry per editable language
+ */
+export type AdminOnboardingSampleTranslations = {
+  [key: string]: AdminOnboardingSampleTranslation | null;
+};
+
+export interface AdminOnboardingSampleWorkflow {
+  id: string;
+  name: string;
+}
+
+export interface AdminOnboardingSample {
+  /** @nullable */
+  workflow: AdminOnboardingSampleWorkflow | null;
+  shown: boolean;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  sampleInput: string | null;
+  /** @nullable */
+  sourceLocale: AdminOnboardingSampleSourceLocale;
+  /** @nullable */
+  sourceHash: string | null;
+  /** one entry per editable language */
+  translations: AdminOnboardingSampleTranslations;
+  /** @nullable */
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+export interface AdminOnboardingSampleTranslationUpdate {
+  /**
+   * the sourceHash the admin was looking at
+   * @pattern [0-9a-f]{64}
+   */
+  sourceHash: string;
+  /**
+   * a single line
+   * @minLength 0
+   * @maxLength 10000
+   * @pattern [^\r\n]*
+   */
+  input: string;
+}
+
 export interface AdminChatSettingsUpdate {
   enabled: boolean;
 }
@@ -910,6 +1006,11 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export interface FirstResultClaimResponse {
+  runId: string;
+  workflowId: string;
+}
+
 export interface Attachment {
   uploadId?: string;
   fileName?: string;
@@ -1252,6 +1353,12 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export interface OnboardingSampleWorkflow {
+  id: string;
+  name: string;
+  input: string;
+}
+
 export type OnboardingStatusResponsePurposesItem =
   (typeof OnboardingStatusResponsePurposesItem)[keyof typeof OnboardingStatusResponsePurposesItem];
 
@@ -1338,6 +1445,15 @@ export const OnboardingStatusResponseEntry = {
   first: 'first',
 } as const;
 
+export type OnboardingStatusResponseFirstResult =
+  (typeof OnboardingStatusResponseFirstResult)[keyof typeof OnboardingStatusResponseFirstResult];
+
+export const OnboardingStatusResponseFirstResult = {
+  reported: 'reported',
+  pending: 'pending',
+  none: 'none',
+} as const;
+
 export interface OnboardingStatusResponse {
   completed: boolean;
   /** @nullable */
@@ -1359,6 +1475,9 @@ export interface OnboardingStatusResponse {
   open: boolean;
   /** @nullable */
   entry: OnboardingStatusResponseEntry;
+  /** @nullable */
+  sampleWorkflow: OnboardingSampleWorkflow | null;
+  firstResult: OnboardingStatusResponseFirstResult;
 }
 
 export type OnboardingResultResponseIndustry =
@@ -2399,6 +2518,214 @@ export const updateAdminSupportKbArticle = async (
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminSupportKbArticleRequest),
   });
+};
+
+export type getAdminOnboardingSampleResponse200 = {
+  data: AdminOnboardingSample;
+  status: 200;
+};
+
+export type getAdminOnboardingSampleResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getAdminOnboardingSampleResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type getAdminOnboardingSampleResponseSuccess = getAdminOnboardingSampleResponse200 & {
+  headers: Headers;
+};
+export type getAdminOnboardingSampleResponseError = (
+  getAdminOnboardingSampleResponse401 | getAdminOnboardingSampleResponse403
+) & {
+  headers: Headers;
+};
+
+export type getAdminOnboardingSampleResponse =
+  getAdminOnboardingSampleResponseSuccess | getAdminOnboardingSampleResponseError;
+
+export const getGetAdminOnboardingSampleUrl = () => {
+  return `/api/v1/admin/onboarding/sample`;
+};
+
+export const getAdminOnboardingSample = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminOnboardingSampleResponse> => {
+  return customFetch<getAdminOnboardingSampleResponse>(getGetAdminOnboardingSampleUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateAdminOnboardingSampleResponse200 = {
+  data: AdminOnboardingSample;
+  status: 200;
+};
+
+export type updateAdminOnboardingSampleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminOnboardingSampleResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type updateAdminOnboardingSampleResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateAdminOnboardingSampleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminOnboardingSampleResponseSuccess = updateAdminOnboardingSampleResponse200 & {
+  headers: Headers;
+};
+export type updateAdminOnboardingSampleResponseError = (
+  | updateAdminOnboardingSampleResponse400
+  | updateAdminOnboardingSampleResponse401
+  | updateAdminOnboardingSampleResponse403
+  | updateAdminOnboardingSampleResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateAdminOnboardingSampleResponse =
+  updateAdminOnboardingSampleResponseSuccess | updateAdminOnboardingSampleResponseError;
+
+export const getUpdateAdminOnboardingSampleUrl = () => {
+  return `/api/v1/admin/onboarding/sample`;
+};
+
+export const updateAdminOnboardingSample = async (
+  adminOnboardingSampleUpdate: AdminOnboardingSampleUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminOnboardingSampleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminOnboardingSampleResponse>(getUpdateAdminOnboardingSampleUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminOnboardingSampleUpdate),
+  });
+};
+
+export type updateAdminOnboardingSampleTranslationResponse200 = {
+  data: AdminOnboardingSample;
+  status: 200;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminOnboardingSampleTranslationResponseSuccess =
+  updateAdminOnboardingSampleTranslationResponse200 & {
+    headers: Headers;
+  };
+export type updateAdminOnboardingSampleTranslationResponseError = (
+  | updateAdminOnboardingSampleTranslationResponse400
+  | updateAdminOnboardingSampleTranslationResponse401
+  | updateAdminOnboardingSampleTranslationResponse403
+  | updateAdminOnboardingSampleTranslationResponse404
+  | updateAdminOnboardingSampleTranslationResponse409
+  | updateAdminOnboardingSampleTranslationResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateAdminOnboardingSampleTranslationResponse =
+  | updateAdminOnboardingSampleTranslationResponseSuccess
+  | updateAdminOnboardingSampleTranslationResponseError;
+
+export const getUpdateAdminOnboardingSampleTranslationUrl = (locale: string) => {
+  return `/api/v1/admin/onboarding/sample/translations/${locale}`;
+};
+
+export const updateAdminOnboardingSampleTranslation = async (
+  locale: string,
+  adminOnboardingSampleTranslationUpdate: AdminOnboardingSampleTranslationUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminOnboardingSampleTranslationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminOnboardingSampleTranslationResponse>(
+    getUpdateAdminOnboardingSampleTranslationUrl(locale),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(adminOnboardingSampleTranslationUpdate),
+    },
+  );
 };
 
 export type getAdminChatSettingsResponse200 = {
@@ -3937,6 +4264,58 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type claimFirstResultResponse200 = {
+  data: FirstResultClaimResponse;
+  status: 200;
+};
+
+export type claimFirstResultResponse204 = {
+  data: FirstResultClaimResponse;
+  status: 204;
+};
+
+export type claimFirstResultResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type claimFirstResultResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type claimFirstResultResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type claimFirstResultResponseSuccess = (
+  claimFirstResultResponse200 | claimFirstResultResponse204
+) & {
+  headers: Headers;
+};
+export type claimFirstResultResponseError = (
+  claimFirstResultResponse401 | claimFirstResultResponse403 | claimFirstResultResponse404
+) & {
+  headers: Headers;
+};
+
+export type claimFirstResultResponse =
+  claimFirstResultResponseSuccess | claimFirstResultResponseError;
+
+export const getClaimFirstResultUrl = () => {
+  return `/api/v1/me/first-result/claim`;
+};
+
+export const claimFirstResult = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<claimFirstResultResponse> => {
+  return customFetch<claimFirstResultResponse>(getClaimFirstResultUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
+import { useRefreshOnboardingOnCompletion } from '../onboarding/useFirstResultClaim';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
 import { StepDetail } from './StepDetail';
@@ -263,6 +264,7 @@ export function RunProgressPage() {
   const { workflowId, runId } = useParams<{ workflowId: string; runId: string }>();
   const runQuery = useRunQuery(runId);
   const { t } = useTranslation();
+  useRefreshOnboardingOnCompletion(runQuery.data?.status);
 
   if (!runId) {
     return <p role="alert">{t('workflow.run.noRun')}</p>;
