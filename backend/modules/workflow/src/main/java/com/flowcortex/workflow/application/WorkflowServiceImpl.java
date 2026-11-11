@@ -208,7 +208,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     @Transactional
     public WorkflowStepView updateStep(Caller caller, UUID workflowId, UUID stepId, StepEdit edit) {
         Workflow workflow = writeAccess.lockForWrite(caller, workflowId);
-        WorkflowStep step =workflowStepRepository.findById(stepId)
+        WorkflowStep step = workflowStepRepository.findById(stepId)
                 .filter(found -> found.getWorkflowId().equals(workflow.getId()))
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.definitionStep.notFound",
                         stepId)));
