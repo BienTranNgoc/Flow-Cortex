@@ -51,14 +51,20 @@ the recognised text can be returned as layers.
   time and again in the final stage; nothing is downloaded at run time. Licences and source URLs:
   `models/MODEL-LICENSES.md`.
 - Only the child process decodes the image: PNG, JPEG and WebP up to `overlay/protocol.MAX_PIXELS`
-  (25,000,000 until the benchmark says otherwise); anything else is `input_rejected`.
+  (4,194,304 = 2048×2048, the largest benchmarked size within budget); anything larger is
+  `input_rejected`.
 - **Measure** — `docker run --rm --network none --memory 6g --entrypoint python -v
   "$PWD/worker/scripts:/bench:ro" <overlay image> /bench/bench_clean_overlay.py` prints P50, P95 and
   peak RSS per size (1024², 2048², 3840×2160, 5000²), the CPU model and the torch thread count.
-  Budget: 900 s wall and 6 GiB RSS per image. The `overlay-image` CI job runs it after the
-  self-check and fails when a size is over budget; then lower `MAX_PIXELS` to the largest size
-  within budget. No figure is recorded yet: add the CI run's P95, peak RSS and CPU line here, and
-  the production worker host's.
+  Budget: 900 s wall and 6 GiB RSS per image. A size above `MAX_PIXELS` is run once and must end
+  as `input_rejected` ("rejected by pixel cap (expected)"); only sizes within the cap count toward
+  over budget. The `overlay-image` CI job runs it after the self-check and fails when a size
+  within the cap is over budget; then lower `MAX_PIXELS` to the largest size within budget.
+- CI measurement (GitHub-hosted runner, AMD EPYC 9V74 80-Core Processor, 4 CPUs, 4 torch threads,
+  `--network none --memory 6g`): 1024² P50 51.7 s, P95 52.3 s, peak RSS 2.56 GiB; 2048² P50
+  224.2 s, P95 225.0 s, peak RSS 4.70 GiB; 3840×2160 P50 394.3 s, P95 396.8 s, peak RSS 6.11 GiB
+  (over the 6 GiB budget); 5000² killed by signal 9 (OOM). Hence the 2048² cap. The production
+  worker host's figures are still to be added there.
 - Promotion rule (ADR-0011): the measured P95 is compared with
   `flowcortex.media.max-runtime.clean_overlay` once the enum owner adds the capability; the
   max-runtime must sit above it with headroom.

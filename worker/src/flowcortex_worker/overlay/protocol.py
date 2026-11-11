@@ -6,8 +6,10 @@ from typing import Any
 
 from .params import OverlayParams, RatioBox
 
-# Equals the upload pipeline's run-image cap; the child hands it to OpenCV's decoder limit.
-MAX_PIXELS = 25_000_000
+# Largest benchmarked size (2048x2048) that stays within 6 GiB RSS and 900 s on the 4-CPU CI
+# runner; 3840x2160 peaked at 6.11 GiB and 5000x5000 was OOM-killed. The child hands it to
+# OpenCV's decoder limit.
+MAX_PIXELS = 2048 * 2048
 
 OK = 0
 INPUT_REJECTED = 3

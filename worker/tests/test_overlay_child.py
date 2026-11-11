@@ -71,11 +71,19 @@ def test_oversized_png_is_rejected_before_decoding_pixels(tmp_path: Path) -> Non
 
 
 def test_image_of_exactly_the_cap_passes_the_decode_step(tmp_path: Path) -> None:
-    image = blank(tmp_path / "cap.png", 5000, 5000)
+    image = blank(tmp_path / "cap.png", 2048, 2048)
+    assert protocol.MAX_PIXELS == 2048 * 2048
     empty_models = tmp_path / "models"
     empty_models.mkdir()
     done, _ = run_child(image, tmp_path, empty_models)
     assert done.returncode == protocol.FACE_MODEL_MISSING, done.stderr
+
+
+def test_image_one_row_over_the_cap_is_rejected(tmp_path: Path) -> None:
+    image = blank(tmp_path / "over.png", 2048, 2049)
+    done, out = run_child(image, tmp_path)
+    assert done.returncode == protocol.INPUT_REJECTED
+    assert not (out / protocol.CLEAN_FILE).exists()
 
 
 def test_text_file_is_rejected(tmp_path: Path) -> None:

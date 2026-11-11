@@ -71,8 +71,10 @@ jobs:
             -m flowcortex_worker.overlay.selfcheck
 
       - name: Benchmark without network
-        # Exits non-zero when a size is killed, exceeds 900 s or peaks above 6 GiB; the printed
-        # P95, peak RSS and CPU line go into worker/README.md.
+        # Exits non-zero when a size within the pixel cap is killed, exceeds 900 s or peaks above
+        # 6 GiB; the printed P95, peak RSS and CPU line go into worker/README.md. `shell: bash`
+        # adds pipefail, so tee does not hide that exit code.
+        shell: bash
         run: |
           docker run --rm --network none --memory 6g --entrypoint python \
             -v "$PWD/worker/scripts:/bench:ro" flowcortex-worker-overlay:ci \
