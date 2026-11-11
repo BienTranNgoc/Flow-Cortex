@@ -102,6 +102,61 @@ class UploadPurposePolicyTest {
     }
 
     @Test
+    void contentMediaAcceptsTheProductImageTypesUpToTheImageCap() {
+        for (String fileName : List.of("a.png", "a.JPG", "a.jpeg", "a.webp")) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.CONTENT_MEDIA, fileName, IMAGE_CAP);
+            assertThat(allowed.kind()).as(fileName).isEqualTo("image");
+            assertThat(allowed.maxBytes()).isEqualTo(IMAGE_CAP);
+        }
+        assertThat(policy.grant(UploadPurpose.CONTENT_MEDIA, "a.webp", 1L).contentType()).isEqualTo("image/webp");
+        assertThat(policy.maxBytes(UploadPurpose.CONTENT_MEDIA, "image")).isEqualTo(IMAGE_CAP);
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.CONTENT_MEDIA, "a.png", IMAGE_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().code()).isEqualTo("upload.sizeMegabytes");
+                    assertThat(e.detail().args()).containsExactly(10L, ".jpg, .jpeg, .png, .webp");
+                });
+    }
+
+    @Test
+    void contentMediaAcceptsMp4AndWebmUpToTheVideoCap() {
+        UploadPurposePolicy.Allowed mp4 = policy.grant(UploadPurpose.CONTENT_MEDIA, "a.MP4", VIDEO_CAP);
+        assertThat(mp4.contentType()).isEqualTo("video/mp4");
+        assertThat(mp4.kind()).isEqualTo("video");
+        assertThat(mp4.maxBytes()).isEqualTo(VIDEO_CAP);
+        assertThat(policy.grant(UploadPurpose.CONTENT_MEDIA, "a.webm", VIDEO_CAP).contentType())
+                .isEqualTo("video/webm");
+        assertThat(policy.maxBytes(UploadPurpose.CONTENT_MEDIA, "video")).isEqualTo(VIDEO_CAP);
+        assertThat(policy.maxBytes(UploadPurpose.CONTENT_MEDIA, "audio")).isZero();
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.CONTENT_MEDIA, "a.mp4", VIDEO_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().args()).containsExactly(500L, ".mp4, .webm");
+                });
+    }
+
+    @Test
+    void contentMediaRefusesMovPdfAndAudio() {
+        for (String fileName : List.of("clip.mov", "clip.mkv", "notes.pdf", "song.mp3", "voice.m4a", "noextension")) {
+            assertThatThrownBy(() -> policy.grant(UploadPurpose.CONTENT_MEDIA, fileName, 16L))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).as(fileName).isEqualTo("fileName");
+                        assertThat(e.detail().code()).isEqualTo("upload.typeMany");
+                        assertThat(e.detail().args()).containsExactly(".jpg, .jpeg, .png, .webp, .mp4", ".webm");
+                    });
+        }
+    }
+
+    @Test
+    void contentMediaKeysAreUnderContentMedia() {
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+
+        assertThat(policy.objectKey(UploadPurpose.CONTENT_MEDIA, owner, upload))
+                .isEqualTo("content-media/" + owner + "/" + upload);
+    }
+
+    @Test
     void runInputKeyIsOwnerSlashUploadAndSupportKeyCarriesItsPrefix() {
         UUID owner = UUID.randomUUID();
         UUID upload = UUID.randomUUID();

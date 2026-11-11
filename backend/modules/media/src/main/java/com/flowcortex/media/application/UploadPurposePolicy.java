@@ -18,6 +18,7 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String CONTENT_MEDIA_PREFIX = "content-media/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
@@ -60,7 +61,11 @@ final class UploadPurposePolicy {
     }
 
     String objectKey(UploadPurpose purpose, UUID ownerId, UUID uploadId) {
-        String prefix = purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_ATTACHMENT_PREFIX : "";
+        String prefix = switch (purpose) {
+            case RUN_INPUT -> "";
+            case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case CONTENT_MEDIA -> CONTENT_MEDIA_PREFIX;
+        };
         return prefix + ownerId + "/" + uploadId;
     }
 
@@ -69,6 +74,11 @@ final class UploadPurposePolicy {
         return switch (purpose) {
             case RUN_INPUT -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
+            case CONTENT_MEDIA -> switch (kind) {
+                case "image" -> upload.maxImageBytes();
+                case "video" -> upload.maxVideoBytes();
+                default -> 0L;
+            };
         };
     }
 
@@ -79,7 +89,21 @@ final class UploadPurposePolicy {
 
     /** Extension to canonical content type, in the order formats are listed to the member. */
     Map<String, String> mimeTypes(UploadPurpose purpose) {
-        return purpose == UploadPurpose.SUPPORT_ATTACHMENT ? SUPPORT_MIME_TYPES : upload.mimeTypes();
+        return switch (purpose) {
+            case RUN_INPUT -> upload.mimeTypes();
+            case SUPPORT_ATTACHMENT -> SUPPORT_MIME_TYPES;
+            case CONTENT_MEDIA -> contentMediaMimeTypes();
+        };
+    }
+
+    /** The configured product-image types, then MP4 and WebM, the only videos every browser plays. */
+    private Map<String, String> contentMediaMimeTypes() {
+        Map<String, String> types = new LinkedHashMap<>();
+        Map<String, String> configured = upload.mimeTypes();
+        upload.productImageExtensions().forEach(extension -> types.put(extension, configured.get(extension)));
+        types.put("mp4", "video/mp4");
+        types.put("webm", "video/webm");
+        return Collections.unmodifiableMap(types);
     }
 
     private static String extensionOf(String fileName) {
@@ -89,11 +113,11 @@ final class UploadPurposePolicy {
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
         List<String> extensions = new ArrayList<>();
-        if (purpose == UploadPurpose.SUPPORT_ATTACHMENT) {
-            extensions.addAll(SUPPORT_MIME_TYPES.keySet());
-        } else {
+        if (purpose == UploadPurpose.RUN_INPUT) {
             extensions.addAll(upload.mediaExtensions());
             extensions.addAll(upload.productImageExtensions());
+        } else {
+            extensions.addAll(mimeTypes(purpose).keySet());
         }
         List<String> dotted = extensions.stream().map(e -> "." + e).toList();
         return dotted.size() == 1
@@ -102,11 +126,21 @@ final class UploadPurposePolicy {
                         String.join(", ", dotted.subList(0, dotted.size() - 1)), dotted.getLast());
     }
 
+    /** The extensions {@code purpose} accepts for {@code kind}, as the member is told them: {@code .mp4, .webm}. */
+    String formats(UploadPurpose purpose, String kind) {
+        List<String> extensions = switch (purpose) {
+            case RUN_INPUT -> upload.extensionsOf(kind);
+            case SUPPORT_ATTACHMENT -> List.copyOf(SUPPORT_MIME_TYPES.keySet());
+            case CONTENT_MEDIA -> contentMediaMimeTypes().entrySet().stream()
+                    .filter(entry -> MediaProperties.Upload.kindOf(entry.getValue()).equals(kind))
+                    .map(Map.Entry::getKey)
+                    .toList();
+        };
+        return String.join(", ", extensions.stream().map(e -> "." + e).toList());
+    }
+
     private LocalizedMessage sizeDetail(UploadPurpose purpose, String kind, long cap) {
-        List<String> extensions = purpose == UploadPurpose.SUPPORT_ATTACHMENT
-                ? List.copyOf(SUPPORT_MIME_TYPES.keySet())
-                : upload.extensionsOf(kind);
-        String formats = String.join(", ", extensions.stream().map(e -> "." + e).toList());
+        String formats = formats(purpose, kind);
         return cap % MEGABYTE == 0
                 ? new LocalizedMessage("upload.sizeMegabytes", cap / MEGABYTE, formats)
                 : new LocalizedMessage("upload.sizeBytes", cap, formats);
