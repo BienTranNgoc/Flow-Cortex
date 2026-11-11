@@ -3,6 +3,7 @@ package com.flowcortex.chat.web;
 import com.flowcortex.chat.config.ChatSwitch;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -12,12 +13,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Clock;
-import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,11 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/chat/settings")
 class AdminChatSettingsController {
 
+    private final ChatCaller caller;
     private final ChatSwitch chatSwitch;
     private final UserDirectory users;
     private final Clock clock;
 
-    AdminChatSettingsController(ChatSwitch chatSwitch, UserDirectory users, Clock clock) {
+    AdminChatSettingsController(ChatCaller caller, ChatSwitch chatSwitch, UserDirectory users, Clock clock) {
+        this.caller = caller;
         this.chatSwitch = chatSwitch;
         this.users = users;
         this.clock = clock;
@@ -65,8 +68,9 @@ class AdminChatSettingsController {
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
     @PutMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminSettings update(Principal caller, @Valid @RequestBody SettingsUpdate body) {
-        chatSwitch.setConsole(body.enabled(), UUID.fromString(caller.getName()), clock.instant());
+    AdminSettings update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SettingsUpdate body) {
+        CurrentUser admin = caller.require(jwt);
+        chatSwitch.setConsole(body.enabled(), admin.id(), clock.instant());
         return view();
     }
 

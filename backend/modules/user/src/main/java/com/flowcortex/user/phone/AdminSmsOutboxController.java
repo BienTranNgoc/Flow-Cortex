@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * {@code /api/v1/admin/sms-outbox} — the development SMS outbox, newest first, for a caller
  * holding {@code platform.sms_outbox.view}. The admin filter chain and the admin kill switch both
- * cover this path; the key is read from the database on each request. Mapped only with {@code flowcortex.sms.sender=outbox}, like the sender that fills the table.
+ * cover this path; the key is read from the database on each request. Mapped only with
+ * {@code flowcortex.sms.sender=outbox}, like the sender that fills the table.
  */
 @RestController
 @ConditionalOnProperty(name = "flowcortex.sms.sender", havingValue = "outbox")
