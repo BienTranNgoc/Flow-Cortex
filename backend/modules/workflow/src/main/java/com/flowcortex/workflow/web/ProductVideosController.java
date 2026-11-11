@@ -34,6 +34,6 @@ class ProductVideosController {
             @Valid @RequestBody ProductVideoRunRequest request) {
         UUID ownerId = currentUserResolver.require(jwt);
         return ResponseEntity.ok(RunResponse.from(productVideos.start(ownerId, request.draft(), request.uploadIds(),
-                Boolean.TRUE.equals(request.acknowledgeCost())), creditAccounts));
+                Boolean.TRUE.equals(request.acknowledgeCost()), null), creditAccounts));
     }
 }
