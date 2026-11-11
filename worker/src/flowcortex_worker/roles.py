@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Collection
 
-# Mirrors MediaTopologyConfig.JOBS and RENDER_JOBS in the backend.
-MEDIA_QUEUES = ("media.jobs", "media.render.jobs")
+# Mirrors the lane table of MediaTopologyConfig in the backend.
+MEDIA_QUEUES = ("media.jobs", "media.render.jobs", "media.fetch.jobs")
 
 
 class RoleError(Exception):

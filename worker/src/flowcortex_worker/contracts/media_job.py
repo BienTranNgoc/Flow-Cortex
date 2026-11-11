@@ -18,7 +18,7 @@ class MediaJobInput(BaseModel):
 
 class MediaJob(BaseModel):
     """
-    A job the API publishes to the media worker. Inputs are references to objects already in the store; the worker fetches nothing by URL.
+    A job the API publishes to the media worker. Inputs are references to objects already in the store; a fetch_video job has none and names its link in params.url.
     """
 
     model_config = ConfigDict(
@@ -35,10 +35,10 @@ class MediaJob(BaseModel):
     ]
     stepOrder: Annotated[StrictInt, Field(ge=1)]
     capability: Annotated[
-        Literal["probe", "extract_audio", "align_audio", "render_video"],
+        Literal["probe", "extract_audio", "align_audio", "render_video", "fetch_video"],
         Field(title="MediaCapability"),
     ]
-    inputs: Annotated[list[MediaJobInput], Field(min_length=1)]
+    inputs: list[MediaJobInput]
     params: dict[str, Any]
     outputPrefix: Annotated[
         StrictStr,

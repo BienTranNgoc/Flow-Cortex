@@ -42,6 +42,7 @@ EXCHANGE = "media"
 RESULT_KEY = "result"
 PROGRESS_KEY = "progress"
 CONNECTION_CLOSED = "connection closed"
+FETCH_CAPABILITY = "fetch_video"
 
 log = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -380,6 +381,7 @@ class Consumer:
 
     def _execute(self, job: Any, delivery: Delivery, stack: ExitStack) -> Result:
         runner = delivery.runner
+        stack.callback(runner.close)
         watchdog = threading.Timer(job.maxRuntimeSeconds, runner.kill, args=("run_timeout",))
         watchdog.daemon = True
         watchdog.start()
@@ -389,6 +391,7 @@ class Consumer:
             if job.outputPrefix not in (legacy_prefix, attempt_prefix):
                 raise PermanentError("contract_violation", "outputPrefix does not match the step")
             if self._execute_job is None:
+                _check_inputs_fit_capability(job)
                 handler = self._resolve(job.capability)
                 inputs = {
                     ref.key: stack.enter_context(
@@ -610,6 +613,15 @@ class _Heartbeat:
     def _loop(self) -> None:
         while not self._stopped.wait(self._interval):
             self._beat()
+
+
+def _check_inputs_fit_capability(job: MediaJob) -> None:
+    """A fetch job names its link in params and has no inputs; every other job has some."""
+    if job.capability == FETCH_CAPABILITY:
+        if job.inputs:
+            raise PermanentError("contract_violation", "a fetch_video job takes no inputs")
+    elif not job.inputs:
+        raise PermanentError("contract_violation", f"a {job.capability} job needs an input")
 
 
 def _describe(exc: BaseException) -> tuple[str, str | None]:
