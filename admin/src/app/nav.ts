@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ChatsCircle,
   ChatText,
   ClipboardText,
   Coins,
@@ -105,7 +106,12 @@ export const NAV: NavGroup[] = [
     id: 'administration',
     label: 'common.shell.nav.groups.administration',
     items: [
-      { label: 'common.shell.nav.items.users', path: '/users', icon: Users, action: 'users.manage' },
+      {
+        label: 'common.shell.nav.items.users',
+        path: '/users',
+        icon: Users,
+        action: 'users.manage',
+      },
       {
         label: 'common.shell.nav.items.smsOutbox',
         path: '/sms-outbox',
@@ -186,6 +192,18 @@ export const NAV: NavGroup[] = [
         path: '/support/settings',
         icon: Sparkle,
         action: 'support.manage',
+      },
+    ],
+  },
+  {
+    id: 'chat',
+    label: 'common.shell.nav.groups.chat',
+    items: [
+      {
+        label: 'common.shell.nav.items.chatSettings',
+        path: '/chat/settings',
+        icon: ChatsCircle,
+        action: 'features.toggle',
       },
     ],
   },
