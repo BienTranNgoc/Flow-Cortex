@@ -19,6 +19,19 @@ class StateSettings(BaseSettings):
         return self.worker_state_dir / "alive"
 
 
+class FetchSettings(BaseSettings):
+    """The forward proxy every URL download leaves through; empty refuses all downloads.
+
+    `fetch_upstream_rotates`: the proxy's upstream changes address, so a block is worth a retry.
+    """
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+    fetch_proxy_url: str = ""
+    fetch_platform_links_enabled: bool = True
+    fetch_upstream_rotates: bool = False
+
+
 class Settings(StateSettings):
     amqp_url: SecretStr
     s3_endpoint: str = Field(min_length=1)

@@ -183,9 +183,13 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
             throw new DubDisabledException();
         }
+        if (!stepDefs.isEmpty() && WorkflowMapper.takesLink(stepDefs.getFirst())
+                && FetchVideoConfig.linkFault(input) != null) {
+            throw new UploadRejectedException("input", new LocalizedMessage("workflow.start.linkRequired"));
+        }
         runStartGuards.check(currentUserId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
 
-        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
+        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.snapshotsRunInputs(stepDefs.getFirst().getType());
         String runInput = input;
         boolean singleUpload = false;
         List<MediaAssetInput> assetInputs = List.of();
@@ -207,6 +211,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         // The remote step reads a JSON object as its one input and an array as several.
         String stepInputJson = copied.isEmpty() ? null : json(singleUpload ? copied.getFirst() : copied);
 
+        List<String> types = stepDefs.stream().map(WorkflowStep::getType).toList();
         String displayedInput = runInput;
         String runOptions = json(options == null || options.voice() == null ? RunOptions.DEFAULTS : options);
         return transactionTemplate.execute(status -> {
@@ -216,8 +221,9 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 mediaJobs.bindRunInputs(run.getId(), copies);
             }
             List<RunStep> runSteps = new ArrayList<>();
-            for (WorkflowStep stepDef : stepDefs) {
-                String stepInput = registry.isRemote(stepDef.getType()) ? stepInputJson : null;
+            for (int index = 0; index < stepDefs.size(); index++) {
+                WorkflowStep stepDef = stepDefs.get(index);
+                String stepInput = registry.snapshotsUpload(types, index) ? stepInputJson : null;
                 runSteps.add(new RunStep(
                         UUID.randomUUID(),
                         run.getId(),

@@ -151,7 +151,7 @@ sets `SPRING_PROFILES_ACTIVE=dev`, so the stack seeds the demo accounts and the
 three demo workflows of §1 (Echo, Failing, "Check a video file"); remove that
 line for any shared or deployed stack.
 
-`docker compose ps -a` then shows nine services `healthy`, `rabbitmq-init` and
+`docker compose ps -a` then shows eleven services `healthy`, `rabbitmq-init` and
 `minio-init` `Exited (0)`, and `mailpit`, `api-publish`, `egress-proxy` and
 `egress-fetch` `Up` with no health status (they carry no healthcheck):
 
@@ -166,8 +166,10 @@ line for any shared or deployed stack.
 | `backend` | the API (internal network only; it reaches the internet through `egress-proxy`) | <http://localhost:8080>, through `api-publish` (`/livez`, `/readyz`) |
 | `api-publish` | a socat relay that publishes `backend` on `127.0.0.1:8080`, because a service on internal networks only cannot publish a port | <http://localhost:8080> |
 | `egress-proxy` | the forward proxy with the domain allowlist: the only way the backend and the provider workers reach third parties | not published |
-| `egress-fetch` | the open-policy proxy tier for URL downloads, on the `fetch` network; idle until a URL-fetch service joins it | not published |
-| `worker` | the Python media worker (internal network only, no proxy) | none — and no internet access |
+| `egress-fetch` | the open-policy proxy tier for URL downloads, on the `fetch` network; `fetch-worker` is its client | not published |
+| `fetch-worker` | the same image on `media.fetch.jobs`: `fetch_video` only, the one service on `internal` and `fetch`. It downloads a member's link through `egress-fetch` (yt-dlp for platform pages, a guarded download for direct files); `FETCH_PLATFORM_LINKS_ENABLED` and `FETCH_UPSTREAM_ROTATES` set its behaviour. Its store key (`FETCH_S3_*`) can only write under `runs/` and it holds no database credential | none — it reaches the internet only through `egress-fetch` |
+| `worker` | the Python media worker on `media.jobs` (internal network only, no proxy): probe, audio and caption jobs | none — and no internet access |
+| `render-worker` | the same image on `media.render.jobs`: `render_video` only. `MEDIA_RENDER_WORKERS` replicas (default 1), one encode each, so a render never waits behind a probe or audio job | none — and no internet access |
 | `provider-worker` | the Python provider worker, on `provider.jobs`: script, storyboard and speech — `SCRIPT_PROVIDER` (fixture or openai) and `SPEECH_PROVIDER` (fixture or edge). Edge TTS is demo-only — it calls Microsoft's undocumented Edge Read Aloud endpoint (no SLA, it has broken before) and sends the approved script there; keep the pinned `edge-tts` current and move production speech to a contracted provider | none |
 | `provider-video-worker` | the same image on `provider.video.jobs`: the video clips — `VIDEO_PROVIDER` (fixture, seedance, veo or wan). `PROVIDER_VIDEO_WORKERS` replicas (default 2), one clip each, so a clip that runs for minutes never delays another run's script or speech. Seedance, Veo and Wan receive the storyboard scene prompts and the run's first product image | none |
 | `frontend` | the member app (nginx, proxies `/api` to the backend) | <http://localhost:5173> |
@@ -243,8 +245,9 @@ What to know about the media path:
     `infra/egress-proxy/acl.yaml`, selected per environment by `EGRESS_ACL_FILE` in `.env`
     (default: that file).
   - `egress-fetch` is the open tier for URL downloads (any public host, same private-range
-    block, rate-limited). Its `fetch` network is internal and has no other member; only
-    URL-fetch code joins it, and nothing does yet.
+    block, rate-limited). Its `fetch` network is internal and has one other member,
+    `fetch-worker`, the only service that downloads a member's link; no other service joins
+    it or names `egress-fetch` as its proxy.
   - `127.0.0.1:8080` is served by the `api-publish` relay; callers are unchanged.
   - **Add a host** (a vendor, or an operator-supplied base URL such as `GEMINI_BASE_URL` or
     `SEEDANCE_BASE_URL`; list the exact host, because `*.example.com` does not match
@@ -258,7 +261,8 @@ What to know about the media path:
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
   management port 8081 and the broker's metrics port 15692 are not published.
 - **Store keys.** The backend, media worker and provider worker each have their own store user
-  (`BACKEND_S3_*`, `WORKER_S3_*`, `PROVIDER_S3_*`); the root account (`MINIO_ROOT_*`) is used only by
+  (`BACKEND_S3_*`, `WORKER_S3_*`, `PROVIDER_S3_*`, `FETCH_S3_*`; the fetch worker's key can only
+  write under `flowcortex-media/runs/`); the root account (`MINIO_ROOT_*`) is used only by
   `minio` and `minio-init`. The backend and the media worker share the broker account
   (`RABBITMQ_DEFAULT_*`); the provider workers share their own (`PROVIDER_RABBITMQ_*`), which
   can only consume `provider.jobs` and `provider.video.jobs` and publish to the `provider` exchange.
@@ -337,17 +341,19 @@ fix named in each case, when:
   changing `FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT` (or the delivery limit in code) on an
   existing broker makes the backend stay not-ready and log one ERROR naming the
   queue and the differing argument. Delete **every** job queue — `media.jobs`,
-  `provider.jobs` and `provider.video.jobs` — and restart the backend, or `down -v`:
+  `media.render.jobs`, `media.fetch.jobs`, `provider.jobs` and `provider.video.jobs` — and restart the backend, or `down -v`:
 
   ```bash
   docker compose exec rabbitmq rabbitmqctl delete_queue media.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.render.jobs
+  docker compose exec rabbitmq rabbitmqctl delete_queue media.fetch.jobs
   docker compose exec rabbitmq rabbitmqctl delete_queue provider.jobs
   docker compose exec rabbitmq rabbitmqctl delete_queue provider.video.jobs
   docker compose up -d backend
   ```
 
   Deleting a queue drops the messages still waiting in it, so stop the workers first
-  (`docker compose stop worker provider-worker provider-video-worker`) if any run is in flight. The queues
+  (`docker compose stop worker render-worker fetch-worker provider-worker provider-video-worker`) if any run is in flight. The queues
   are recreated by the backend at startup with the new argument.
 - **A store key was rotated.** `minio-init` creates a user for the new
   `BACKEND_S3_ACCESS_KEY` / `WORKER_S3_ACCESS_KEY` but leaves the old one in place.
@@ -404,6 +410,19 @@ docker compose up -d --build
 
 A video worker started before that re-run fails to consume (`ACCESS_REFUSED`) and keeps
 reconnecting with backoff until the permission exists.
+
+**Upgrading to link downloads.** `fetch_video` jobs go to their own queue, `media.fetch.jobs`
+(the backend declares it at startup), and run on `fetch-worker`. Set `FETCH_S3_ACCESS_KEY` and
+`FETCH_S3_SECRET_KEY` in `.env` first (compose refuses to start any service without them), then
+re-run `minio-init` so the `flowcortex-fetch` store user and policy exist before the worker starts:
+
+```bash
+docker compose up -d --force-recreate minio-init
+docker compose up -d --build
+```
+
+Optional, defaults in `.env.example`: `FETCH_PLATFORM_LINKS_ENABLED`, `FETCH_UPSTREAM_ROTATES`
+and `FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO`.
 
 **Upgrading to clips made from the product photo.** Both clip steps now send the run's
 first product photo (`image_1`) to the video provider: Veo receives the bytes, Seedance
@@ -516,7 +535,7 @@ docker compose -f docker-compose.yml -f compose.observability.yaml up -d --build
   without credentials on <http://127.0.0.1:9000/minio/v2/metrics/cluster>. That is
   loopback-only here; a shared or deployed host needs a bearer token instead.
 
-Turning the overlay on recreates `backend`, `worker` and `minio`, which take their
+Turning the overlay on recreates `backend`, `worker`, `render-worker` and `minio`, which take their
 exporter and metrics settings from it, and they come back healthy.
 
 **Trace a failed job.** In the admin SPA (<http://127.0.0.1:5174>), open
@@ -524,10 +543,10 @@ exporter and metrics settings from it, and they come back healthy.
 **Explore → Loki** and run:
 
 ```
-{service_name=~"flow-cortex|flow-worker"} | jobId="<job id>"
+{service_name=~"flow-cortex|flow-worker|render-worker"} | jobId="<job id>"
 ```
 
-Both services' lines for that job appear: dispatch, pickup, the worker's
+Render jobs log as `render-worker`; the API's and the workers' lines for that job appear: dispatch, pickup, the worker's
 `input downloaded` / `job answered`, and the API's `Job result applied` with the
 error code. Expand a line and follow its `trace_id` link to Tempo. The trace runs
 from the run's HTTP request through the job publication, the worker's processing
@@ -566,7 +585,7 @@ it, then recreate the core from the core file alone:
 docker compose --env-file .env up -d --remove-orphans
 ```
 
-That removes the overlay containers and recreates `backend`, `worker` and `minio`
+That removes the overlay containers and recreates `backend`, `worker`, `render-worker` and `minio`
 with their core settings: exporters `none`, and minio metrics behind auth again.
 Do not use `docker compose -f docker-compose.yml -f compose.observability.yaml down`,
 which stops the core too. Removing only the overlay services is not enough either,

@@ -14,7 +14,8 @@
 # Every published port binds 127.0.0.1. The backend and the workers sit on the
 # internal network only: their one way out is egress-proxy, which lets just the
 # allowlisted hosts through (infra/egress-proxy/acl.yaml). egress-fetch is a
-# separate open-policy proxy on the fetch network for URL-download code only.
+# separate open-policy proxy on the fetch network for URL-download code only;
+# fetch-worker is the one service that joins that network.
 # 127.0.0.1:8080 is relayed to the backend by api-publish. Traces, logs and
 # metrics are the optional overlay compose.observability.yaml. No credential has
 # a default here: a committed value would be a known secret.
@@ -60,6 +61,47 @@ x-provider-worker-env: &provider-worker-env
   S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_TRACES_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+
+# What worker and render-worker share: one image, one broker and store identity, the same
+# health and shutdown handling. Each service adds the queue it consumes and its identity.
+x-media-worker: &media-worker
+  build:
+    context: ./worker
+    target: media-runtime
+  image: flow-cortex-worker:local
+  networks: [internal]
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    minio-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
+  stop_grace_period: 40s
+  restart: unless-stopped
+
+x-media-worker-env: &media-worker-env
+  # The credentials must be URL-safe; they are placed in the URL as is.
+  AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_PATH_STYLE: 'true'
+  S3_UPLOAD_BUCKET: flowcortex-uploads
+  S3_BUCKET: flowcortex-media
+  S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
+  S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  # Spans and trace ids still exist without a collector; the observability
+  # overlay turns the exporters on.
   OTEL_TRACES_EXPORTER: none
   OTEL_LOGS_EXPORTER: none
   OTEL_METRICS_EXPORTER: none
@@ -207,6 +249,8 @@ services:
       WORKER_S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
       PROVIDER_S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
       PROVIDER_S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      FETCH_S3_ACCESS_KEY: ${FETCH_S3_ACCESS_KEY:?Set FETCH_S3_ACCESS_KEY (see .env.example)}
+      FETCH_S3_SECRET_KEY: ${FETCH_S3_SECRET_KEY:?Set FETCH_S3_SECRET_KEY (see .env.example)}
       # Expiry of run-input copies in the media bucket; must outlast the longest review wait.
       RUN_INPUT_RETENTION_DAYS: ${RUN_INPUT_RETENTION_DAYS:-30}
     volumes:
@@ -321,6 +365,7 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO:-10m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
@@ -408,44 +453,53 @@ services:
   # the internet; it makes no outbound call, so it has no proxy settings. No
   # published ports.
   worker:
-    build:
-      context: ./worker
-      target: media-runtime
-    image: flow-cortex-worker:local
+    <<: *media-worker
     environment:
-      # The credentials must be URL-safe; they are placed in the URL as is.
-      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
-      S3_UPLOAD_BUCKET: flowcortex-uploads
-      S3_BUCKET: flowcortex-media
-      S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
-      S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+      <<: *media-worker-env
       WORKER_ID: ${WORKER_ID:-flow-worker-1}
       OTEL_SERVICE_NAME: flow-worker
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      # Spans and trace ids still exist without a collector; the observability
-      # overlay turns the exporters on.
-      OTEL_TRACES_EXPORTER: none
-      OTEL_LOGS_EXPORTER: none
-      OTEL_METRICS_EXPORTER: none
-    networks: [internal]
+
+  # Render pool: consumes media.render.jobs (render_video), so an encode never waits
+  # behind probe or audio jobs and the pool is sized on its own. One job per
+  # container: the broker connection is not thread-safe, so the pool size is the
+  # replica count. A capability added to the backend's render lane is added to
+  # WORKER_CAPABILITIES in the same change. No WORKER_ID: each replica reports its
+  # own container hostname.
+  render-worker:
+    <<: *media-worker
+    environment:
+      <<: *media-worker-env
+      MEDIA_QUEUE: media.render.jobs
+      WORKER_CAPABILITIES: render_video
+      OTEL_SERVICE_NAME: render-worker
+    deploy:
+      replicas: ${MEDIA_RENDER_WORKERS:-1}
+
+  # Fetch worker: consumes media.fetch.jobs (fetch_video) and is the only service on the
+  # `fetch` network, so it alone can download a member's link, through egress-fetch. It
+  # runs yt-dlp and ffmpeg on content from anywhere, so it gets its own object-store key
+  # (write-only under runs/, no read of uploads or run objects) instead of the media
+  # worker's, and no database credential. No WORKER_ID: it reports its container hostname.
+  fetch-worker:
+    <<: *media-worker
+    networks: [internal, fetch]
     depends_on:
       rabbitmq:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    healthcheck:
-      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
-    stop_grace_period: 40s
-    restart: unless-stopped
+      egress-fetch:
+        condition: service_started
+    environment:
+      <<: *media-worker-env
+      S3_ACCESS_KEY: ${FETCH_S3_ACCESS_KEY:?Set FETCH_S3_ACCESS_KEY (see .env.example)}
+      S3_SECRET_KEY: ${FETCH_S3_SECRET_KEY:?Set FETCH_S3_SECRET_KEY (see .env.example)}
+      MEDIA_QUEUE: media.fetch.jobs
+      WORKER_CAPABILITIES: fetch_video
+      FETCH_PROXY_URL: http://egress-fetch:4750
+      FETCH_PLATFORM_LINKS_ENABLED: ${FETCH_PLATFORM_LINKS_ENABLED:-true}
+      FETCH_UPSTREAM_ROTATES: ${FETCH_UPSTREAM_ROTATES:-false}
+      OTEL_SERVICE_NAME: fetch-worker
 
   # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:
@@ -572,7 +626,7 @@ networks:
     internal: true
   # The only network with a route out; egress-proxy and egress-fetch alone join it.
   egress: {}
-  # URL-download code only; egress-fetch is its sole other member.
+  # URL-download code only; egress-fetch and fetch-worker are its two members.
   fetch:
     internal: true
 

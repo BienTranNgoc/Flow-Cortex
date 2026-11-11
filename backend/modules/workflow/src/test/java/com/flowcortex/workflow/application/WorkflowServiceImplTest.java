@@ -103,12 +103,13 @@ class WorkflowServiceImplTest {
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
-                                        + "echo, extract_audio, fail, generate_script, generate_speech, "
-                                        + "generate_storyboard, generate_video, probe, render_video",
+                                        + "echo, extract_audio, fail, fetch_video, generate_script, "
+                                        + "generate_speech, generate_storyboard, generate_video, ingest_image, "
+                                        + "ingest_video, probe, render_video",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
-                                        + "align_audio, echo, extract_audio, fail, generate_script, "
-                                        + "generate_speech, generate_storyboard, generate_video, probe, "
-                                        + "render_video"));
+                                        + "align_audio, echo, extract_audio, fail, fetch_video, "
+                                        + "generate_script, generate_speech, generate_storyboard, generate_video, "
+                                        + "ingest_image, ingest_video, probe, render_video"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
@@ -283,6 +284,113 @@ class WorkflowServiceImplTest {
                                         + "runs inline"));
 
         verify(workflowRepository, never()).save(any());
+    }
+
+    private static final String PROBE_FROM_STEP_1 =
+            "{\"outputInputs\":[{\"stepOrder\":1,\"outputName\":\"video\",\"inputKey\":\"media\"}]}";
+    private static final String NEEDS_UPLOAD =
+            "'probe' needs an uploaded file, so the workflow must start with a media step";
+    private static final String AFTER_INGEST =
+            "'probe' follows an ingest step, so it must read the file through outputInputs";
+
+    @Test
+    void createWorkflowAcceptsAMediaStepThatReadsTheFileOfALinkStepThroughOutputInputs() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Link then probe", false, List.of(
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("fetch_video", "probe");
+    }
+
+    @Test
+    void createWorkflowAcceptsAMediaStepThatReadsTheFileOfAnIngestStepThroughOutputInputs() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Upload then probe", false, List.of(
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("ingest_video", "probe");
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterATextStepEvenWhenItNamesThatStepInOutputInputs() {
+        assertRefused("steps[1].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("say", "echo", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1));
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterALinkStepWithoutOutputInputs() {
+        assertRefused("steps[1].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("probe", "probe", null));
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterAnIngestStepWithoutOutputInputs() {
+        assertRefused("steps[1].type", AFTER_INGEST,
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null));
+        assertRefused("steps[1].type", AFTER_INGEST,
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null, "{\"label\":\"x\"}"));
+    }
+
+    @Test
+    void createWorkflowRefusesOutputInputsThatNameAnInlineTextStepAfterALinkStep() {
+        String fromEcho = "{\"outputInputs\":[{\"stepOrder\":2,\"outputName\":\"video\",\"inputKey\":\"media\"}]}";
+
+        assertRefused("steps[2].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("say", "echo", null),
+                new NewWorkflowStep("probe", "probe", null, fromEcho));
+    }
+
+    @Test
+    void createWorkflowRefusesAFetchVideoConfigWithAnUnknownKeyOrBadQualityUnderThatStepsConfig() {
+        for (String config : List.of("{\"quality\":\"4k\"}", "{\"link\":\"https://x.example/a.mp4\"}",
+                "{\"url\":\"https://user:pw@cdn.example.com/a.mp4\"}")) {
+            assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Bad config", false,
+                    List.of(new NewWorkflowStep("fetch", "fetch_video", null, config))))
+                    .isInstanceOfSatisfying(ConstraintViolationException.class, e -> {
+                        assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getPropertyPath().toString())
+                                .containsExactly("steps[0].config");
+                        assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getMessage())
+                                .noneMatch(message -> message.contains("pw"));
+                    });
+        }
+
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkflowSavesAFetchVideoWithAValidConfig() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        String config = "{\"url\":\"https://www.tiktok.com/@a/video/1\",\"quality\":\"720p\",\"extractAudio\":false}";
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Fetch", false,
+                List.of(new NewWorkflowStep("fetch", "fetch_video", null, config)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("fetch_video");
+    }
+
+    private void assertRefused(String path, String message, NewWorkflowStep... steps) {
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Refused", false, List.of(steps)))
+                .isInstanceOfSatisfying(ConstraintViolationException.class,
+                        e -> assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                                .containsExactly(path + " " + message));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
     }
 
     private static NewWorkflowStep remote(String name, String outputInputs) {

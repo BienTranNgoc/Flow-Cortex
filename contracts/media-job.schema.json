@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flowcortex.dev/contracts/media-job.schema.json",
   "title": "MediaJob",
-  "description": "A job the API publishes to the media worker. Inputs are references to objects already in the store; the worker fetches nothing by URL.",
+  "description": "A job the API publishes to the media worker. Inputs are references to objects already in the store; a fetch_video job has none and names its link in params.url.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,7 +33,6 @@
     "capability": { "$ref": "#/$defs/capability" },
     "inputs": {
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "#/$defs/input" }
     },
     "params": { "type": "object" },
@@ -51,11 +50,31 @@
     },
     "issuedAt": { "type": "string", "format": "date-time" }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "capability": { "const": "fetch_video" } },
+        "required": ["capability"]
+      },
+      "then": {
+        "properties": {
+          "inputs": { "maxItems": 0 },
+          "params": {
+            "required": ["url"],
+            "properties": { "url": { "type": "string", "minLength": 1, "maxLength": 2048 } }
+          }
+        }
+      },
+      "else": {
+        "properties": { "inputs": { "minItems": 1 } }
+      }
+    }
+  ],
   "$defs": {
     "capability": {
       "title": "MediaCapability",
       "type": "string",
-      "enum": ["probe", "extract_audio", "align_audio", "render_video"]
+      "enum": ["probe", "extract_audio", "align_audio", "render_video", "fetch_video"]
     },
     "input": {
       "title": "MediaJobInput",

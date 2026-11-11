@@ -863,6 +863,16 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export type WorkflowResponseStartInput =
+  (typeof WorkflowResponseStartInput)[keyof typeof WorkflowResponseStartInput];
+
+export const WorkflowResponseStartInput = {
+  link: 'link',
+  image: 'image',
+  upload: 'upload',
+  text: 'text',
+} as const;
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -888,6 +898,7 @@ export interface WorkflowResponse {
   steps?: WorkflowStepResponse[];
   estimatedCredits?: number;
   available: boolean;
+  startInput: WorkflowResponseStartInput;
 }
 
 export interface SupportSettings {

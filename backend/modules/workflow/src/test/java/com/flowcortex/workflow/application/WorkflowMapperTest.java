@@ -1,7 +1,9 @@
 package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
@@ -12,6 +14,7 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -28,7 +31,8 @@ class WorkflowMapperTest {
         Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Demo", true);
         WorkflowStep step = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "First", "echo", null);
 
-        WorkflowView view = WorkflowMapper.toWorkflowView(workflow, List.of(step), type -> false, type -> true);
+        WorkflowView view = WorkflowMapper.toWorkflowView(workflow, List.of(step), type -> false, type -> true,
+                type -> false);
 
         assertThat(view.id()).isEqualTo(workflow.getId());
         assertThat(view.shared()).isTrue();
@@ -44,9 +48,9 @@ class WorkflowMapperTest {
                 new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Translate", "translate", null);
 
         assertThat(WorkflowMapper.toWorkflowView(workflow, List.of(echo, translate), type -> false,
-                type -> !"translate".equals(type)).available()).isFalse();
-        assertThat(WorkflowMapper.toWorkflowView(workflow, List.of(echo, translate), type -> false, type -> true)
-                .available()).isTrue();
+                type -> !"translate".equals(type), type -> false).available()).isFalse();
+        assertThat(WorkflowMapper.toWorkflowView(workflow, List.of(echo, translate), type -> false, type -> true,
+                type -> false).available()).isTrue();
     }
 
     @Test
@@ -56,9 +60,39 @@ class WorkflowMapperTest {
         WorkflowStep echo = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Echo", "echo", null);
 
         WorkflowView view = WorkflowMapper.toWorkflowView(workflow, List.of(probe, echo), "probe"::equals,
-                type -> true);
+                type -> true, type -> false);
 
         assertThat(view.steps()).extracting(WorkflowStepView::mode).containsExactly("remote", "inline");
+    }
+
+    @Test
+    void startInputFollowsTheFirstStep() {
+        assertThat(startInputOf("fetch_video", null)).isEqualTo("link");
+        assertThat(startInputOf("fetch_video", "{\"quality\":\"720p\"}")).isEqualTo("link");
+        assertThat(startInputOf("fetch_video", "{\"url\":\"https://cdn.example.com/a.mp4\"}")).isEqualTo("text");
+        assertThat(startInputOf("ingest_image", null)).isEqualTo("image");
+        assertThat(startInputOf("ingest_video", null)).isEqualTo("upload");
+        assertThat(startInputOf("probe", null)).isEqualTo("upload");
+        assertThat(startInputOf("generate_script", null)).isEqualTo("upload");
+        assertThat(startInputOf("generate_speech", null)).isEqualTo("text");
+        assertThat(startInputOf("echo", null)).isEqualTo("text");
+    }
+
+    @Test
+    void aWorkflowWithoutStepsStartsFromText() {
+        Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Empty", true);
+
+        assertThat(WorkflowMapper.toWorkflowView(workflow, List.of(), type -> false, type -> true, type -> true)
+                .startInput()).isEqualTo("text");
+    }
+
+    private static String startInputOf(String firstType, String firstConfig) {
+        Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Demo", true);
+        WorkflowStep first = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "First", firstType,
+                null, firstConfig);
+        StepExecutorRegistry registry = new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+        return WorkflowMapper.toWorkflowView(workflow, List.of(first), registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs).startInput();
     }
 
     @Test

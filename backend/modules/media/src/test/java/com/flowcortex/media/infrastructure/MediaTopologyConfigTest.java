@@ -18,6 +18,85 @@ import org.springframework.amqp.core.Queue;
 
 class MediaTopologyConfigTest {
 
+    private static MediaProperties properties() {
+        Map<String, Duration> runtimes = Arrays.stream(MediaCapability.values())
+                .collect(Collectors.toMap(MediaCapability::value, ignored -> Duration.ofMinutes(5)));
+        return new MediaProperties(
+                true,
+                Duration.ofMinutes(30),
+                runtimes,
+                Duration.ofMinutes(20),
+                Duration.ofMinutes(2),
+                Duration.ofMinutes(5),
+                Duration.ofMinutes(10),
+                Duration.ofMinutes(15),
+                Duration.ofMinutes(15),
+                new MediaProperties.Upload(10_000_000, 10_000_000, 10_000_000, List.of("jpg"), List.of("jpg"),
+                        Duration.ofMinutes(15), new MediaProperties.Upload.ContentCheck(true)),
+                new MediaProperties.S3(null, null, "us-east-1", true, "uploads", "media", null, null,
+                        Duration.ofSeconds(30), Duration.ofSeconds(10), Duration.ofMinutes(2)));
+    }
+
+    @Test
+    void declaresTheRenderLaneLikeTheDefaultJobQueue() {
+        Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
+
+        Queue render = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("media.render.jobs"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(render.getArguments())
+                .containsOnly(
+                        Map.entry("x-queue-type", "quorum"),
+                        Map.entry("x-delivery-limit", 3),
+                        Map.entry("x-dead-letter-exchange", "media.dlx"),
+                        Map.entry("x-consumer-timeout", Duration.ofMinutes(20).toMillis()));
+        assertThat(topology.getDeclarablesByType(Queue.class))
+                .extracting(Queue::getName)
+                .contains("media.render.jobs.dlq");
+        assertThat(topology.getDeclarablesByType(Binding.class))
+                .extracting(Binding::getDestination, Binding::getExchange, Binding::getRoutingKey)
+                .contains(
+                        tuple("media.render.jobs", "media", "render.job"),
+                        tuple("media.render.jobs.dlq", "media.dlx", "render.job"),
+                        tuple("media.jobs", "media", "job"));
+    }
+
+    @Test
+    void declaresTheFetchLaneLikeTheDefaultJobQueue() {
+        Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
+
+        Queue fetch = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("media.fetch.jobs"))
+                .findFirst()
+                .orElseThrow();
+        Queue jobs = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("media.jobs"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(fetch.getArguments()).isEqualTo(jobs.getArguments());
+        assertThat(topology.getDeclarablesByType(Queue.class))
+                .extracting(Queue::getName)
+                .contains("media.fetch.jobs.dlq");
+        assertThat(topology.getDeclarablesByType(Binding.class))
+                .extracting(Binding::getDestination, Binding::getExchange, Binding::getRoutingKey)
+                .contains(
+                        tuple("media.fetch.jobs", "media", "fetch.job"),
+                        tuple("media.fetch.jobs.dlq", "media.dlx", "fetch.job"));
+    }
+
+    @Test
+    void eachLaneCapabilityIsRoutedToItsOwnLaneAndEveryOtherOneToTheDefault() {
+        for (MediaCapability capability : MediaCapability.values()) {
+            String expected = switch (capability) {
+                case RENDER_VIDEO -> "render.job";
+                case FETCH_VIDEO -> "fetch.job";
+                default -> "job";
+            };
+            assertThat(MediaTopologyConfig.mediaJobKey(capability)).as(capability.value()).isEqualTo(expected);
+        }
+    }
+
     @Test
     void declaresIndependentProviderQueuesAndDeadLetterExchange() {
         Map<String, Duration> runtimes = Arrays.stream(MediaCapability.values())

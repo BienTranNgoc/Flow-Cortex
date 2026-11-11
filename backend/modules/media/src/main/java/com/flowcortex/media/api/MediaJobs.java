@@ -136,4 +136,14 @@ public interface MediaJobs {
      * @throws MediaStoreUnavailableException if the store does not take the write
      */
     MediaOutput putRunObject(UUID runId, int stepOrder, String name, String mime, byte[] bytes);
+
+    /**
+     * Copies {@code source}, an object of run {@code runId} in the media bucket, server-side to object {@code name}
+     * of step {@code stepOrder}, kept like a worker output; the result carries the copy's type and size.
+     * @throws IllegalArgumentException if {@code source} is outside {@code runs/<runId>/} of the media bucket or
+     *         {@code name} is not a plain file name; nothing is copied
+     * @throws UploadRejectedException if {@code source} is gone
+     * @throws MediaStoreUnavailableException if the store does not take the copy or cannot describe it
+     */
+    MediaOutput copyRunObject(UUID runId, int stepOrder, MediaJobInput source, String name);
 }

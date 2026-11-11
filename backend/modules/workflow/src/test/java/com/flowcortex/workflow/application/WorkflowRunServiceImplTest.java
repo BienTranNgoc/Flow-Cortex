@@ -37,6 +37,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
@@ -67,10 +70,15 @@ class WorkflowRunServiceImplTest {
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
+        return givenWorkflowWithFirstConfig(ownerId, null, types);
+    }
+
+    private Workflow givenWorkflowWithFirstConfig(UUID ownerId, String firstConfig, String... types) {
         Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
         List<WorkflowStep> steps = new ArrayList<>();
         for (int i = 0; i < types.length; i++) {
-            steps.add(new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) (i + 1), "s" + i, types[i], null));
+            steps.add(new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) (i + 1), "s" + i, types[i],
+                    null, i == 0 ? firstConfig : null));
         }
         when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
         when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
@@ -357,6 +365,155 @@ class WorkflowRunServiceImplTest {
         verify(mediaJobs, never()).resolveUpload(any(), any());
         verify(mediaJobs, never()).copyRunInputs(any(), any());
         verify(mediaJobs, never()).bindRunInputs(any(), any());
+    }
+
+    @Test
+    void aFetchVideoWorkflowStartsFromTheLinkAndAsksNoUpload() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "fetch_video", "probe", "echo");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), "https://www.youtube.com/watch?v=abc");
+
+        assertThat(started.input()).isEqualTo("https://www.youtube.com/watch?v=abc");
+        assertThat(savedSteps()).extracting(RunStep::getInput).containsOnlyNulls();
+        verify(mediaJobs, never()).resolveUpload(any(), any());
+        verify(mediaJobs, never()).copyRunInputs(any(), any());
+        verify(mediaJobs, never()).bindRunInputs(any(), any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"hello", "ftp://x.example/a.mp4", "https://x.example/a b", "https://u:p@x.example/a"})
+    void aFetchVideoWorkflowWithoutAUsableLinkIsRefusedUnderInputAndCreatesNothing(String input) {
+        assertLinkRefused(input);
+    }
+
+    @Test
+    void aLinkOver2048CharactersIsRefusedAndOneOfExactly2048IsAccepted() {
+        String prefix = "https://x.example/";
+
+        assertLinkRefused(prefix + "a".repeat(2049 - prefix.length()));
+
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "fetch_video");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        String link = prefix + "a".repeat(2048 - prefix.length());
+        assertThat(service.startRun(ownerId, workflow.getId(), link).input()).isEqualTo(link);
+    }
+
+    @Test
+    void aFetchVideoStepWithAConfigLinkStartsWithoutAnyInput() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflowWithFirstConfig(ownerId, "{\"url\":\"https://cdn.example.com/a.mp4\"}",
+                "fetch_video");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), "");
+
+        assertThat(started.status()).isEqualTo("running");
+        verify(mediaJobs, never()).resolveUpload(any(), any());
+    }
+
+    @Test
+    void anIngestVideoFirstStepStillRequiresAnUploadAndGetsItAsItsStoredInput() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "ingest_video");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), null, null, "clip.mp4"))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(english(e.detail())).isEqualTo("Choose a video or audio file to upload"));
+        verify(workflowRunRepository, never()).save(any());
+
+        givenStoredUpload(ownerId, uploadId);
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+
+        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput).isEqualTo(storedMedia(started));
+    }
+
+    @Test
+    void aProbeAfterAnIngestStepGetsNoStoredInputBecauseItReadsTheIngestOutput() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "ingest_video", "probe");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        givenStoredUpload(ownerId, uploadId);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+
+        assertThat(savedSteps()).extracting(RunStep::getInput).containsExactly(storedMedia(started), null);
+    }
+
+    @Test
+    void aProviderFirstWorkflowStillTakesAnUploadSnapshottedOntoStepOne() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "generate_script");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        givenStoredUpload(ownerId, uploadId);
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), null, null, null))
+                .isInstanceOf(UploadRejectedException.class);
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "shoe.png");
+
+        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput).isEqualTo(storedMedia(started));
+    }
+
+    @Test
+    void aSpeechFirstWorkflowStartsWithTextAndAsksNoUpload() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "generate_speech");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), "Xin chao");
+
+        assertThat(started.input()).isEqualTo("Xin chao");
+        assertThat(savedSteps()).singleElement().extracting(RunStep::getInput).isNull();
+        verify(mediaJobs, never()).resolveUpload(any(), any());
+    }
+
+    @Test
+    void aFetchVideoStepAfterAnUploadFirstStepGetsNoStoredInput() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        UUID uploadId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "probe", "fetch_video");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+        givenStoredUpload(ownerId, uploadId);
+
+        RunView started = service.startRun(ownerId, workflow.getId(), null, uploadId, "clip.mp4");
+
+        assertThat(savedSteps()).extracting(RunStep::getInput).containsExactly(storedMedia(started), null);
+    }
+
+    private void assertLinkRefused(String input) {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "fetch_video");
+        when(mediaJobs.isEnabled()).thenReturn(true);
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), input))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("input");
+                    assertThat(english(e.detail())).isEqualTo("Paste a link that starts with http:// or https://");
+                });
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    private static String storedMedia(RunView started) {
+        return "{\"key\":\"media\",\"bucket\":\"flowcortex-media\",\"objectKey\":\"runs/" + started.id()
+                + "/inputs/media\"}";
     }
 
     /** The media module resolves the upload and, like the real one, copies each input under the run. */

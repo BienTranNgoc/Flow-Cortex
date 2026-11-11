@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pika.exceptions
+import pytest
 from conftest import (
     FakeConnection,
     FakeStorage,
@@ -22,6 +23,7 @@ from conftest import (
 )
 
 from flowcortex_worker.consumer import Consumer
+from flowcortex_worker.errors import PermanentError
 from flowcortex_worker.handlers.registry import HandlerOutcome, OutputFile
 from flowcortex_worker.runtime import ProcessRunner, Supervisor
 
@@ -180,6 +182,72 @@ def test_output_prefix_not_matching_the_run_is_a_contract_violation() -> None:
     run_consumer(conn, resolve=recording_handler(calls, conn), until=settled)
 
     assert calls == []
+    message = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert message["error"]["code"] == "contract_violation"
+    assert conn.consume.acks == [1]
+
+
+def test_the_scratch_directory_lives_until_the_result_is_published_then_goes() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body())
+    seen: list[Path] = []
+    present_at_upload: list[bool] = []
+
+    def handler(job: Any, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
+        scratch = processes.scratch_dir()
+        (scratch / "out.bin").write_bytes(b"x")
+        seen.append(scratch)
+        assert scratch.stat().st_mode & 0o777 == 0o700
+        assert processes.scratch_dir() == scratch
+        return HandlerOutcome(data={}, files=[OutputFile("out", "video/mp4", scratch / "out.bin")])
+
+    storage = FakeStorage()
+    put = storage.put
+
+    def recording_put(key: str, body: bytes | Path, mime: str, abort: Any) -> int:
+        present_at_upload.append(isinstance(body, Path) and body.is_file())
+        return put(key, body, mime, abort)
+
+    storage.put = recording_put  # type: ignore[method-assign]
+
+    run_consumer(conn, storage=storage, resolve=lambda c: handler, until=settled)
+
+    assert present_at_upload == [True]
+    assert not seen[0].exists()
+    assert assert_valid(published(conn, "result")[0].body, "media-result")["status"] == "completed"
+
+
+def test_the_scratch_directory_goes_after_a_permanent_failure() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body())
+    seen: list[Path] = []
+
+    def handler(job: Any, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
+        seen.append(processes.scratch_dir())
+        raise PermanentError("input_rejected", "no")
+
+    run_consumer(conn, resolve=lambda c: handler, until=settled)
+
+    assert seen and not seen[0].exists()
+    message = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert message["error"]["code"] == "input_rejected"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"capability": "probe", "inputs": []},
+        {"capability": "fetch_video", "params": {"url": "https://cdn.example.com/a.mp4"}},
+    ],
+)
+def test_a_job_whose_inputs_do_not_fit_its_capability_is_refused_without_a_handler(
+    change: dict[str, Any],
+) -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body(**change))
+
+    run_consumer(conn, resolve=lambda c: pytest.fail("no handler may run"), until=settled)
+
     message = assert_valid(published(conn, "result")[0].body, "media-result")
     assert message["error"]["code"] == "contract_violation"
     assert conn.consume.acks == [1]

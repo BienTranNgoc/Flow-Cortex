@@ -3755,8 +3755,16 @@ components:
           format: int64
         available:
           type: boolean
+        startInput:
+          type: string
+          enum:
+          - link
+          - image
+          - upload
+          - text
       required:
       - available
+      - startInput
     WorkflowStepResponse:
       type: object
       properties:

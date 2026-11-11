@@ -122,6 +122,19 @@ class StoredWithOutputsResolverTest {
     }
 
     @Test
+    void aStepWithNoStoredInputReadsOnlyTheOutputsItDeclares() throws Exception {
+        String video = "runs/" + RUN_ID + "/steps/1/video";
+        String config = """
+                {"outputInputs":[{"stepOrder":1,"outputName":"video","inputKey":"media"}]}
+                """;
+
+        for (String stored : new String[] {null, "", "  "}) {
+            assertThat(inputs(resolver.resolve(stored, config, Map.of(1, outputs("video", video)), RUN_ID, 2)))
+                    .containsExactly(new MediaJobInput("media", "media", video));
+        }
+    }
+
+    @Test
     void anOptionalObjectOfAStepThatRecordedNothingIsLeftOut() throws Exception {
         String config = """
                 {"outputInputs":[{"stepOrder":7,"outputName":"voice.wav","inputKey":"voice","optional":true}]}

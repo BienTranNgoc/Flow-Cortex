@@ -26,6 +26,8 @@ class MediaExternalizationConfig {
         return EventExternalizationConfiguration.externalizing()
                 .select(EventExternalizationConfiguration.annotatedAsExternalized())
                 .mapping(MediaJobRequested.class, MediaJobRequested::job)
+                .routeKey(MediaJobRequested.class,
+                        event -> MediaTopologyConfig.mediaJobKey(event.job().capability()))
                 .mapping(ProviderJobRequested.class, ProviderJobRequested::job)
                 // Keeps the annotation's exchange; only the key changes, per capability.
                 .routeKey(ProviderJobRequested.class,
@@ -60,7 +62,9 @@ class MediaExternalizationConfig {
                 String routingKey) {
             MessageProperties properties = message.getMessageProperties();
             boolean mediaJob = MediaTopologyConfig.EXCHANGE.equals(exchange)
-                    && MediaTopologyConfig.JOB_KEY.equals(routingKey);
+                    && (MediaTopologyConfig.JOB_KEY.equals(routingKey)
+                            || MediaTopologyConfig.RENDER_JOB_KEY.equals(routingKey)
+                            || MediaTopologyConfig.FETCH_JOB_KEY.equals(routingKey));
             boolean providerJob = MediaTopologyConfig.PROVIDER_EXCHANGE.equals(exchange)
                     && (MediaTopologyConfig.JOB_KEY.equals(routingKey)
                             || MediaTopologyConfig.VIDEO_JOB_KEY.equals(routingKey));

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 import pika.exceptions
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+
+from .storage import TEMP_PREFIX
 
 if TYPE_CHECKING:
     from .consumer import Consumer
@@ -37,6 +41,7 @@ class ProcessRunner:
         self._process: subprocess.Popen[bytes] | None = None
         self._killed: str | None = None
         self._on_kill: list[Callable[[], None]] = []
+        self._scratch: Path | None = None
 
     @property
     def killed(self) -> str | None:
@@ -76,6 +81,19 @@ class ProcessRunner:
             if process.returncode != 0:
                 span.set_status(Status(StatusCode.ERROR, f"exit code {process.returncode}"))
             return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+
+    def scratch_dir(self) -> Path:
+        """The job's private (0700) directory, created on first use and removed by `close`."""
+        with self._lock:
+            if self._scratch is None:
+                self._scratch = Path(tempfile.mkdtemp(prefix=TEMP_PREFIX))
+            return self._scratch
+
+    def close(self) -> None:
+        with self._lock:
+            scratch, self._scratch = self._scratch, None
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
 
     def kill(self, reason: str) -> None:
         with self._lock:

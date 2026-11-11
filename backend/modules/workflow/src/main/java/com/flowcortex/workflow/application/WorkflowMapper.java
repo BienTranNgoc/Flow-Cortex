@@ -29,12 +29,33 @@ final class WorkflowMapper {
     private WorkflowMapper() {
     }
 
+    /** {@code snapshotsRunInputs} tells whether a step type takes the run's uploaded files, as run start asks it. */
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
-            Predicate<String> isAvailableType) {
+            Predicate<String> isAvailableType, Predicate<String> snapshotsRunInputs) {
         return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
-                steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType));
+                steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
+                startInput(steps, snapshotsRunInputs));
+    }
+
+    private static String startInput(List<WorkflowStep> steps, Predicate<String> snapshotsRunInputs) {
+        if (steps.isEmpty()) {
+            return "text";
+        }
+        WorkflowStep first = steps.getFirst();
+        if (takesLink(first)) {
+            return "link";
+        }
+        if ("ingest_image".equals(first.getType())) {
+            return "image";
+        }
+        return snapshotsRunInputs.test(first.getType()) ? "upload" : "text";
+    }
+
+    /** Whether the run's own input is the link: step 1 downloads one and its config carries none. */
+    static boolean takesLink(WorkflowStep step) {
+        return FetchVideoConfig.TYPE.equals(step.getType()) && FetchVideoConfig.configUrl(step.getConfig()).isEmpty();
     }
 
     private static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {

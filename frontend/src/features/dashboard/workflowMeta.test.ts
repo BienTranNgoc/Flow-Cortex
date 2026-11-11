@@ -14,6 +14,7 @@ const workflow = (name: string, types: readonly string[]): WorkflowResponse => (
   name,
   isShared: true,
   available: true,
+  startInput: 'text',
   steps: types.map((type, index) => step(type, index + 1)),
 });
 

@@ -132,6 +132,8 @@
     "nextAction": "Hãy thử lại, hoặc quay lại danh sách quy trình.",
     "inputLabel": "Dữ liệu đầu vào (không bắt buộc)",
     "mediaFile": "Tệp media",
+    "linkLabel": "Liên kết video",
+    "imageLabel": "Ảnh",
     "uploadProgress": "Tiến độ tải lên",
     "uploadUnfinished": "Tải lên chưa hoàn tất. Hãy thử lại.",
     "retry": "Thử lại"
@@ -157,7 +159,8 @@
     "imageType": "Hãy dùng .jpg, .jpeg, .png hoặc .webp.",
     "noImage": "Hãy thêm ít nhất một ảnh sản phẩm",
     "tooManyImages": "Tối đa 1 ảnh cho mỗi lượt chạy.",
-    "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ"
+    "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ",
+    "linkRequired": "Hãy dán một liên kết bắt đầu bằng http:// hoặc https://"
   },
   "stop": {
     "open": "Dừng quy trình",

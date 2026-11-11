@@ -1,9 +1,12 @@
 package com.flowcortex.media.infrastructure;
 
+import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.application.MediaProperties;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.ShutdownSignalException;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import org.apache.commons.logging.Log;
 import org.slf4j.Logger;
@@ -43,7 +46,13 @@ class MediaTopologyConfig {
     static final String JOBS = "media.jobs";
     static final String RESULTS = "media.results";
     static final String PROGRESS = "media.progress";
+    /** Mirrored by {@code MEDIA_QUEUES} in {@code worker/src/flowcortex_worker/roles.py}. */
+    static final String RENDER_JOBS = "media.render.jobs";
+    /** Mirrored by {@code MEDIA_QUEUES} in {@code worker/src/flowcortex_worker/roles.py}. */
+    static final String FETCH_JOBS = "media.fetch.jobs";
     static final String JOB_KEY = "job";
+    static final String RENDER_JOB_KEY = "render.job";
+    static final String FETCH_JOB_KEY = "fetch.job";
     static final String RESULT_KEY = "result";
     static final String PROGRESS_KEY = "progress";
     static final String PROVIDER_EXCHANGE = "provider";
@@ -59,6 +68,10 @@ class MediaTopologyConfig {
     static final String PROVIDER_VIDEO_JOBS = "provider.video.jobs";
     static final String VIDEO_JOB_KEY = "video.job";
     private static final String VIDEO_CAPABILITY = "generate_video";
+    /** Capabilities that run for minutes and so travel on the render lane, not the default queue. */
+    private static final Set<MediaCapability> RENDER_LANE = EnumSet.of(MediaCapability.RENDER_VIDEO);
+    /** The one lane whose worker may reach the internet, so no other capability shares it. */
+    private static final Set<MediaCapability> FETCH_LANE = EnumSet.of(MediaCapability.FETCH_VIDEO);
     /**
      * Returns of a job the broker counts before it dead-letters it. A constant, not a setting: queue
      * arguments are immutable once the queue exists, so a new value means re-creating the job queues.
@@ -79,9 +92,21 @@ class MediaTopologyConfig {
                 .deadLetterExchange(DEAD_LETTER_EXCHANGE)
                 .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
                 .build();
+        Queue renderJobs = QueueBuilder.durable(RENDER_JOBS).quorum()
+                .deliveryLimit(JOB_DELIVERY_LIMIT)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
+                .build();
+        Queue fetchJobs = QueueBuilder.durable(FETCH_JOBS).quorum()
+                .deliveryLimit(JOB_DELIVERY_LIMIT)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .withArgument("x-consumer-timeout", properties.consumerTimeout().toMillis())
+                .build();
         Queue results = QueueBuilder.durable(RESULTS).quorum().deadLetterExchange(DEAD_LETTER_EXCHANGE).build();
         Queue progress = QueueBuilder.durable(PROGRESS).quorum().deadLetterExchange(DEAD_LETTER_EXCHANGE).build();
         Queue jobsDlq = QueueBuilder.durable(JOBS + ".dlq").quorum().build();
+        Queue renderJobsDlq = QueueBuilder.durable(RENDER_JOBS + ".dlq").quorum().build();
+        Queue fetchJobsDlq = QueueBuilder.durable(FETCH_JOBS + ".dlq").quorum().build();
         Queue resultsDlq = QueueBuilder.durable(RESULTS + ".dlq").quorum().build();
         Queue progressDlq = QueueBuilder.durable(PROGRESS + ".dlq").quorum().build();
         DirectExchange provider = ExchangeBuilder.directExchange(PROVIDER_EXCHANGE).durable(true)
@@ -124,7 +149,21 @@ class MediaTopologyConfig {
                 bind(providerProgressDlq, providerDeadLetters, PROGRESS_KEY),
                 providerVideoJobs, providerVideoJobsDlq,
                 bind(providerVideoJobs, provider, VIDEO_JOB_KEY),
-                bind(providerVideoJobsDlq, providerDeadLetters, VIDEO_JOB_KEY));
+                bind(providerVideoJobsDlq, providerDeadLetters, VIDEO_JOB_KEY),
+                renderJobs, renderJobsDlq,
+                bind(renderJobs, media, RENDER_JOB_KEY),
+                bind(renderJobsDlq, deadLetters, RENDER_JOB_KEY),
+                fetchJobs, fetchJobsDlq,
+                bind(fetchJobs, media, FETCH_JOB_KEY),
+                bind(fetchJobsDlq, deadLetters, FETCH_JOB_KEY));
+    }
+
+    /** The routing key a media job of {@code capability} is published with. */
+    static String mediaJobKey(MediaCapability capability) {
+        if (FETCH_LANE.contains(capability)) {
+            return FETCH_JOB_KEY;
+        }
+        return RENDER_LANE.contains(capability) ? RENDER_JOB_KEY : JOB_KEY;
     }
 
     /** The routing key a provider job of {@code capability} is published with. */

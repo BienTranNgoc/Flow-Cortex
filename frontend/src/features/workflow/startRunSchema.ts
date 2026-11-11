@@ -57,6 +57,34 @@ export function sizeProblem(file: File, kind: UploadKind): FileProblem | null {
   };
 }
 
+const MAX_LINK_LENGTH = 2048;
+const LINK = /^https?:\/\/([^/?#]*)/i;
+
+function hasSpaceOrControl(text: string): boolean {
+  return Array.from(text).some((char) => {
+    const code = char.codePointAt(0) ?? 0;
+    return code <= 0x20 || (code >= 0x7f && code <= 0x9f) || /\s/.test(char);
+  });
+}
+
+/**
+ * Why `text` cannot start a link workflow, or `null`: after trimming, an `http` or `https` link
+ * with a host, no user info, no space or control character, and at most 2048 characters, the
+ * server's own rule so the refusal needs no request.
+ */
+export function linkProblem(text: string): FileProblem | null {
+  const link = text.trim();
+  const authority = LINK.exec(link)?.[1];
+  const host = authority?.replace(/:\d*$/, '');
+  const valid =
+    link.length <= MAX_LINK_LENGTH &&
+    !hasSpaceOrControl(link) &&
+    authority !== undefined &&
+    !authority.includes('@') &&
+    !!host;
+  return valid ? null : { messageKey: 'workflow.validation.linkRequired' };
+}
+
 export const NO_FILE: FileProblem = { messageKey: 'workflow.validation.noFile' };
 
 /** Why a picked file cannot be checked, or `null` when it may be uploaded. */
