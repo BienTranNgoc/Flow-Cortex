@@ -5,7 +5,6 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -14,7 +13,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * With {@code flowcortex.auth.personal-access-tokens.enabled} off, the token routes answer 503 before
  * their body is read. The flag binds at startup; the authenticator refuses the tokens themselves.
  */
-@Component
 class PersonalAccessTokenSwitch implements HandlerInterceptor, WebMvcConfigurer {
 
     private final PersonalAccessTokenProperties properties;

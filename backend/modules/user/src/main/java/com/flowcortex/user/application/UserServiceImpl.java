@@ -36,7 +36,7 @@ class UserServiceImpl implements UserService {
     private final EmailConfirmationService emailLinks;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            AccountCredentials accountCredentials,ApplicationEventPublisher events,
+            AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;

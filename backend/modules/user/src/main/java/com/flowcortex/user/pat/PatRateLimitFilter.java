@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -24,7 +23,6 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * valid or not, and answers 429 before the security chain authenticates it. The limiters are keyed
  * on the SHA-256 of the token, never the token itself. Requests with any other credential pass untouched.
  */
-@Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 class PatRateLimitFilter extends OncePerRequestFilter {
 
