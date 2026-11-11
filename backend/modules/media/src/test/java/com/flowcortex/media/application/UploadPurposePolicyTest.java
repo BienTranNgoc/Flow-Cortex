@@ -105,6 +105,7 @@ class UploadPurposePolicyTest {
     void driveItemAcceptsEveryRunInputKindAtItsCapUnderTheDriveItemPrefix() {
         record Row(String file, String type, String kind, long cap) {
         }
+
         List<Row> rows = List.of(
                 new Row("a.mp4", "video/mp4", "video", VIDEO_CAP),
                 new Row("a.mkv", "video/x-matroska", "video", VIDEO_CAP),
