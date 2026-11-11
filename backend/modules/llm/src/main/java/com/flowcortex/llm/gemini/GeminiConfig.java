@@ -1,5 +1,6 @@
 package com.flowcortex.llm.gemini;
 
+import com.flowcortex.llm.api.LlmChatClient;
 import com.flowcortex.llm.api.LlmClient;
 import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmTimeouts;
@@ -20,7 +21,7 @@ class GeminiConfig {
         return properties::answerTimeout;
     }
 
-    /** The one HTTP client of every JSON and speech call; the JVM proxy settings apply to it. */
+    /** The one HTTP client of every JSON, speech and chat-stream call; the JVM proxy settings apply to it. */
     @Bean
     HttpClient geminiHttpClient(GeminiProperties properties) {
         return HttpClient.newBuilder()
@@ -43,5 +44,10 @@ class GeminiConfig {
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP));
         return new GeminiChainClient(properties, slots,
                 callTimeout -> GeminiAttempts.restClient(geminiHttpClient, callTimeout), Thread::sleep, telemetry);
+    }
+
+    @Bean
+    LlmChatClient llmChatClient(GeminiProperties properties, HttpClient geminiHttpClient, MeterRegistry meters) {
+        return new GeminiChatClient(properties, geminiHttpClient, meters);
     }
 }
