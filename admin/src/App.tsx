@@ -14,6 +14,7 @@ import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
@@ -30,6 +31,7 @@ const PAGES: Record<string, ReactElement> = {
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
   '/sms-outbox': <SmsOutboxPage />,
+  '/phone-verification': <PhoneVerificationStatusPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
   '/support/articles': <ArticlesPage />,

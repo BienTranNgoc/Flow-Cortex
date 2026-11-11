@@ -71,6 +71,7 @@
         "providers": "Nhà cung cấp mô hình",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
+        "phoneVerification": "Xác minh số điện thoại",
         "features": "Công tắc tính năng",
         "auditLog": "Nhật ký kiểm toán",
         "mediaJobs": "Tác vụ media",

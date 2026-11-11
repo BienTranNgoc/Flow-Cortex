@@ -71,6 +71,7 @@
         "providers": "Model Providers",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "phoneVerification": "Phone verification",
         "features": "Feature Switches",
         "auditLog": "Audit Log",
         "mediaJobs": "Media Jobs",
