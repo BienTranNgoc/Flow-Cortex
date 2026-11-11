@@ -41,7 +41,7 @@ class WorkflowServiceImpl implements WorkflowService {
     public List<WorkflowView> listVisibleWorkflows(UUID currentUserId) {
         return workflowRepository.findAllVisibleTo(currentUserId).stream()
                 .map(workflow -> WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote,
-                        registry::isAvailable))
+                        registry::isAvailable, registry::snapshotsRunInputs))
                 .toList();
     }
 
@@ -50,7 +50,8 @@ class WorkflowServiceImpl implements WorkflowService {
     public WorkflowView getVisibleWorkflow(UUID currentUserId, UUID workflowId) {
         Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
-        return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     @Override
@@ -58,7 +59,7 @@ class WorkflowServiceImpl implements WorkflowService {
     public WorkflowView createWorkflow(UUID ownerId, String name, boolean shared, List<NewWorkflowStep> steps) {
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations =
                 validator.validate(new KnownStepTypes.Definition(steps, registry.knownTypes(),
-                        registry.storedInputTypes(), registry.remoteTypes()));
+                        registry.storedInputTypes(), registry.remoteTypes(), registry.ingestTypes()));
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
@@ -74,7 +75,8 @@ class WorkflowServiceImpl implements WorkflowService {
         }
         stepEntities = workflowStepRepository.saveAll(stepEntities);
 
-        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     private List<WorkflowStep> stepsOf(Workflow workflow) {

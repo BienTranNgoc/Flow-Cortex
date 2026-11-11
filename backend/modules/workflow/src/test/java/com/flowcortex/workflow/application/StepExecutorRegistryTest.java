@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -39,7 +40,7 @@ class StepExecutorRegistryTest {
         assertThat(registry.knownTypes())
                 .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_storyboard",
                         "generate_speech", "generate_video", "probe", "extract_audio", "align_audio",
-                        "render_video");
+                        "render_video", "fetch_video", "ingest_video", "ingest_image");
     }
 
     @Test
@@ -80,6 +81,45 @@ class StepExecutorRegistryTest {
         assertThat(registry.snapshotsRunInputs("generate_storyboard")).isTrue();
         assertThat(registry.snapshotsRunInputs("generate_video")).isTrue();
         assertThat(registry.snapshotsRunInputs("generate_speech")).isFalse();
+    }
+
+    @Test
+    void fetchVideoIsRemoteTakesNoStoredInputAndSnapshotsNoUpload() {
+        assertThat(registry.find("fetch_video")).get().isInstanceOf(FetchVideoStepExecutor.class);
+        assertThat(registry.isRemote("fetch_video")).isTrue();
+        assertThat(registry.usesStoredInput("fetch_video")).isFalse();
+        assertThat(registry.snapshotsRunInputs("fetch_video")).isFalse();
+        assertThat(registry.remoteTypes()).contains("fetch_video");
+        assertThat(registry.storedInputTypes()).doesNotContain("fetch_video");
+    }
+
+    @Test
+    void theIngestTypesAreInlineStoredInputStepsAndExactlyTwo() {
+        for (String type : List.of("ingest_video", "ingest_image")) {
+            assertThat(registry.find(type)).get().isInstanceOf(IngestStepExecutor.class);
+            assertThat(registry.isRemote(type)).isFalse();
+            assertThat(registry.usesStoredInput(type)).isTrue();
+            assertThat(registry.find(type).orElseThrow().mode()).isEqualTo(StepExecutor.Mode.INLINE);
+        }
+        assertThat(registry.ingestTypes()).containsExactlyInAnyOrder("ingest_video", "ingest_image");
+        assertThat(registry.storedInputTypes()).contains("ingest_video", "ingest_image");
+    }
+
+    @Test
+    void anUploadIsSnapshottedOnlyOntoTheStepsThatReadIt() {
+        assertThat(snapshots("ingest_video", "probe")).containsExactly(true, false);
+        assertThat(snapshots("ingest_video", "generate_script")).containsExactly(true, true);
+        assertThat(snapshots("ingest_image", "extract_audio")).containsExactly(true, false);
+        assertThat(snapshots("probe", "extract_audio")).containsExactly(true, true);
+        assertThat(snapshots("fetch_video", "probe")).containsExactly(false, false);
+        assertThat(snapshots("generate_script")).containsExactly(true);
+        assertThat(snapshots("generate_speech")).containsExactly(false);
+        assertThat(snapshots("echo", "generate_script")).containsExactly(false, false);
+    }
+
+    private List<Boolean> snapshots(String... types) {
+        List<String> list = List.of(types);
+        return IntStream.range(0, list.size()).mapToObj(index -> registry.snapshotsUpload(list, index)).toList();
     }
 
     @Test
