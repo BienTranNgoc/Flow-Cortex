@@ -252,7 +252,7 @@ body.support-widget-on {
 
 .support-button--primary {
   border: 0;
-  background: var(--gradient-cta);
+  background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 600;
 }
