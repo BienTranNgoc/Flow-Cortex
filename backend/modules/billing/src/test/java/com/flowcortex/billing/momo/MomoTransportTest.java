@@ -54,8 +54,12 @@ class MomoTransportTest {
     }
 
     private MomoTransport transport() {
+        return transport(Duration.ofSeconds(5));
+    }
+
+    private MomoTransport transport(Duration requestTimeout) {
         return MomoTransport.http("http://127.0.0.1:" + server.getAddress().getPort(), Duration.ofSeconds(2),
-                Duration.ofMillis(200));
+                requestTimeout);
     }
 
     private static ObjectNode request() {
@@ -63,8 +67,12 @@ class MomoTransportTest {
     }
 
     private ProviderTransportException failure() {
+        return failure(transport());
+    }
+
+    private static ProviderTransportException failure(MomoTransport transport) {
         try {
-            transport().post(PATH, request());
+            transport.post(PATH, request());
         } catch (ProviderTransportException e) {
             return e;
         }
@@ -149,7 +157,8 @@ class MomoTransportTest {
             exchange.close();
         });
 
-        assertThat(failure().kind()).isEqualTo(ProviderTransportException.Kind.TIMEOUT);
+        assertThat(failure(transport(Duration.ofMillis(200))).kind())
+                .isEqualTo(ProviderTransportException.Kind.TIMEOUT);
     }
 
     @Test

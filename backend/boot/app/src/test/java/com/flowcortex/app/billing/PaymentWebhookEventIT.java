@@ -70,8 +70,8 @@ class PaymentWebhookEventIT extends AbstractPostgresBootTest {
         try {
             CountDownLatch go = new CountDownLatch(1);
             List<Future<InsertResult>> results = List.of(
-                    pool.submit(() -> { go.await(); return accepted(REQUEST); }),
-                    pool.submit(() -> { go.await(); return accepted(REQUEST); }));
+                    pool.submit(() -> acceptedAfter(go)),
+                    pool.submit(() -> acceptedAfter(go)));
             go.countDown();
 
             assertThat(List.of(results.get(0).get(), results.get(1).get()))
@@ -80,6 +80,11 @@ class PaymentWebhookEventIT extends AbstractPostgresBootTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    private InsertResult acceptedAfter(CountDownLatch go) throws InterruptedException {
+        go.await();
+        return accepted(REQUEST);
     }
 
     @Test
