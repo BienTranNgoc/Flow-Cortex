@@ -78,7 +78,7 @@ export function useOnboardingStatus() {
   return useQuery({
     queryKey: ONBOARDING_STATUS_KEY,
     queryFn: fetchStatus,
-    enabled: onboarding && member,
+    enabled: onboarding === true && member,
   });
 }
 
