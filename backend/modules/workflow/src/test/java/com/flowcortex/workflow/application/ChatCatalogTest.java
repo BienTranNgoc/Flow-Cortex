@@ -12,6 +12,7 @@ import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
 import jakarta.validation.Validation;
 import java.time.Clock;
 import java.util.List;
@@ -26,8 +27,13 @@ class ChatCatalogTest {
     private final CreditAccounts credits = mock(CreditAccounts.class);
     private final StepExecutorRegistry registry =
             new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+    private final WorkflowVersionRepository versionRepository = mock(WorkflowVersionRepository.class);
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
-            registry, Validation.buildDefaultValidatorFactory().getValidator(), credits);
+            registry,
+            new WorkflowWriteAccess(workflowRepository, registry,
+                    Validation.buildDefaultValidatorFactory().getValidator()),
+            new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
+            new ServedDefinitions(workflowStepRepository, versionRepository), credits);
     private final UUID memberId = UUID.randomUUID();
 
     @Test

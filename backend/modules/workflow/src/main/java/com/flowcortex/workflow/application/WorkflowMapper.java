@@ -17,6 +17,7 @@ import com.flowcortex.workflow.domain.WorkflowStep;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 /** Entity -> {@code api} view mapping, mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
@@ -31,11 +32,27 @@ final class WorkflowMapper {
 
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
             Predicate<String> isAvailableType) {
+        return toWorkflowView(workflow, steps, isRemoteType, isAvailableType, null, null);
+    }
+
+    static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
+            Predicate<String> isAvailableType, UUID publishedVersionId, Integer servedVersion) {
         return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
-                wire(workflow.getStatus().name()));
+                wire(workflow.getStatus().name()), publishedVersionId, servedVersion);
+    }
+
+    /** The same view with every step reduced to what a reader who does not own the workflow may see. */
+    static WorkflowView withoutStepContent(WorkflowView view) {
+        return new WorkflowView(view.id(), view.ownerId(), view.name(), view.shared(), view.createdAt(),
+                view.updatedAt(),
+                view.steps().stream()
+                        .map(step -> new WorkflowStepView(step.id(), step.stepOrder(), step.name(), step.type(),
+                                step.mode(), null, null))
+                        .toList(),
+                view.available(), view.status(), view.publishedVersionId(), view.servedVersion());
     }
 
     static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {
