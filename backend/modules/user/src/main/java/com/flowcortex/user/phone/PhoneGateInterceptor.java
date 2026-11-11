@@ -9,7 +9,6 @@ import org.springframework.http.server.PathContainer;
 import org.springframework.http.server.RequestPath;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -21,7 +20,6 @@ import org.springframework.web.util.ServletRequestPathUtils;
  * admin authorization interceptor, so 401 and a missing admin key still answer first; a request with
  * no signed-in caller is never refused here.
  */
-@Component
 class PhoneGateInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final PhoneGate gate;
