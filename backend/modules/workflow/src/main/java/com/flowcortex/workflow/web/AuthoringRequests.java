@@ -1,9 +1,9 @@
 package com.flowcortex.workflow.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.flowcortex.workflow.api.NewStep;
 import com.flowcortex.workflow.api.StepEdit;
 import com.flowcortex.workflow.api.UpdateWorkflow;
+import tools.jackson.databind.JsonNode;
 
 /** Request-record to service-input mapping shared by the member and admin authoring controllers. */
 final class AuthoringRequests {

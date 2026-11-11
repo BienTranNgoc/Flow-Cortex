@@ -250,7 +250,9 @@ What to know about the media path:
     `SEEDANCE_BASE_URL`; list the exact host, because `*.example.com` does not match
     `example.com` itself): add it to the file `EGRESS_ACL_FILE` names, then run
     `docker compose up -d --force-recreate egress-proxy`. No image is rebuilt and the
-    backend and workers are not restarted. `compose.aws.yaml` refuses to start until
+    backend and workers are not restarted. A member's HTTP connector reaches only hosts on
+    this list: until its host is added, its calls fail with `connector.upstreamUnavailable`.
+    `compose.aws.yaml` refuses to start until
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
     host to it.
   - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
@@ -328,6 +330,15 @@ the member app reads it once per session.
   `compose.aws.yaml` turns phone verification off until a real SMS sender exists. Sending
   codes is rate-limited per member (10 codes and 3 different numbers a day), per client IP
   (30 an hour), per number and overall; the `FLOWCORTEX_PHONE_*` variables in `.env.example` set the limits.
+
+**Connector key.** The compose stack needs `FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1` in `.env`,
+generated with `openssl rand -base64 32` (the `change-me` placeholder stops the backend). A bare
+`bootRun` with `SPRING_PROFILES_ACTIVE=dev` uses the dev keyring instead. Key ids are lower-case
+(`KEYS_K1` is id `k1`, and `CURRENT` must say `k1`). To rotate, add
+`FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_<ID>` to `.env` and a matching
+`FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_<ID>: ${...:?...}` line under `backend.environment` in
+`docker-compose.yml` (compose forwards only the variables it names), then switch `CURRENT`.
+Retiring a key means removing both lines.
 
 **Resetting state.** `docker compose down -v` deletes every volume (database,
 broker, store), so the next `up` seeds from scratch. You need it, or the narrower

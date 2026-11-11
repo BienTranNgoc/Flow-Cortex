@@ -15,3 +15,4 @@ default:
     - '*.volces.com'
     - '*.aliyuncs.com'
     - speech.platform.bing.com
+    - api.telegram.org

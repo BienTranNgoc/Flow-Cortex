@@ -238,6 +238,96 @@ class WorkflowServiceImplTest {
         assertThat(other.getDeletedAt()).isNotNull();
     }
 
+    private static final String CONNECTOR_CONFIG =
+            "{\"connector\":\"notion-main\",\"url\":\"https://api.notion.com/v1/users\"}";
+
+    @SuppressWarnings("unchecked")
+    private WorkflowServiceImpl serviceKnowingConnectorCalls() {
+        org.springframework.beans.factory.ObjectProvider<StepExecutor> others =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(
+                mock(com.flowcortex.connector.api.HttpConnector.class),
+                mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others);
+        return new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
+                new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall)),
+                Validation.buildDefaultValidatorFactory().getValidator(),
+                mock(com.flowcortex.credit.api.CreditAccounts.class));
+    }
+
+    private List<WorkflowStep> withEchoThenConnectorStep(Workflow workflow) {
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Say", "echo", null, null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Call", "connector.call", null,
+                        CONNECTOR_CONFIG));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowStepRepository.findMaxStepOrder(workflow.getId())).thenReturn(2);
+        steps.forEach(step -> when(workflowStepRepository.findById(step.getId())).thenReturn(Optional.of(step)));
+        return steps;
+    }
+
+    @Test
+    void anAdminCannotAddOrEditAConnectorCallStepOnAnotherMembersWorkflow() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(admin, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getDetailMessageCode())
+                        .isEqualTo("workflow.notOwner"));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"connector\":\"notion-main\",\"method\":\"DELETE\","
+                        + "\"url\":\"https://api.notion.com/v1/blocks/b1\"}", null)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit("renamed", null, null))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        verify(workflowStepRepository, never()).save(any());
+        assertThat(steps.get(1).getConfig()).isEqualTo(CONNECTOR_CONFIG);
+    }
+
+    @Test
+    void anAdminStillEditsOtherStepsAndDeletesOrReordersAConnectorCallStepOfAnotherMember() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        connectorService.addStep(admin, workflow.getId(), new NewStep("Say", "echo", null, null));
+        connectorService.updateStep(admin, workflow.getId(), steps.get(0).getId(), new StepEdit("renamed", null, null));
+        connectorService.reorderSteps(admin, workflow.getId(), List.of(steps.get(1).getId(), steps.get(0).getId()));
+        connectorService.deleteStep(admin, workflow.getId(), steps.get(1).getId());
+
+        verify(workflowStepRepository).deleteById(steps.get(1).getId());
+    }
+
+    @Test
+    void theOwnerAddsAndEditsAConnectorCallStepWhetherOrNotAnAdmin() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        for (Caller owner : List.of(Caller.member(ANA), Caller.admin(ANA))) {
+            WorkflowStepView added = connectorService.addStep(owner, workflow.getId(),
+                    new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG));
+            assertThat(added.type()).isEqualTo("connector.call");
+            connectorService.updateStep(owner, workflow.getId(), steps.get(1).getId(), new StepEdit("renamed", null, null));
+        }
+        assertThat(steps.get(1).getName()).isEqualTo("renamed");
+    }
+
+    @Test
+    void aMemberWhoIsNotTheOwnerKeepsTheirExistingRefusal() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(published(ANA, true));
+        withEchoThenConnectorStep(workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+    }
+
     @Test
     void appendingTakesTheNextStepOrder() {
         Workflow workflow = stored(draft(ANA, false));
