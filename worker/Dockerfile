@@ -69,7 +69,7 @@ COPY engines/requirements-overlay.txt ./engines/requirements-overlay.txt
 RUN uv sync --frozen --no-build --no-dev --no-editable --extra overlay
 # torch and torchvision live on the PyTorch CPU index and the rest on PyPI, so the index
 # strategy must look at both; --require-hashes keeps every wheel pinned to the lock file.
-RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --no-build \
       --index-strategy unsafe-best-match -r engines/requirements-overlay.txt
 
 FROM python:3.12-slim AS overlay-models
