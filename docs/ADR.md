@@ -510,3 +510,45 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+## ADR-0012 — Connector credential key custody
+
+- **Context:** a member's connector secrets (a Telegram bot token, an HTTP
+  connector's API key) are stored in `connector_auth` and read back by the
+  server to call the third party. A database dump or backup alone must not
+  yield a usable secret, keys must be rotatable without a data migration, and
+  a ciphertext copied from one member's row to another must not decrypt.
+  The stack is a single-host Compose deployment (`compose.aws.yaml`) with no
+  cloud key service wired in. The choice was made when the store
+  landed and recorded in
+  `openspec/changes/archive/2026-11-08-connector-auths-encrypted-credentials/proposal.md:90`;
+  this entry is its permanent home.
+- **Decision:** an environment keyring, with the key id inside the stored
+  value and the row identity bound into the ciphertext.
+  - **Cipher:** AES-256-GCM through the JDK's `javax.crypto` (12-byte random
+    nonce, 128-bit tag, 32-byte key from base64); no new dependency.
+  - **Stored value:** one `text` string, `kid.iv.tag.ct` (each part but the
+    key id base64). The key id matches `[a-z0-9]{1,16}`; decryption uses the key
+    the value names, encryption uses the current one.
+  - **Associated data:** `userId|provider`, so a value moved to another
+    member's row or another provider's row fails authentication.
+  - **Keyring:** `FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT` names the current
+    key id and `FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_<ID>` holds each key
+    (`openssl rand -base64 32`). Rotating is: add a key, switch the current id;
+    values under the old key stay readable until it is retired.
+- **Alternatives rejected:**
+  - One unversioned env key: no rotation path, and a wrong key shows up only
+    when a secret is read.
+  - A cloud KMS envelope: a cloud SDK, a network call on every read, an egress
+    allowlist entry, and no KMS wiring in the single-host stack.
+- **Consequences:**
+  - **Losing a key makes the secrets stored under it unreadable;** the
+    member is asked to connect again (`connector.credentialUnreadable`). Keys
+    live in the host's environment, outside the repository and the database.
+  - **The key and the data are in the same trust zone** (the host running
+    the backend): this protects against a leaked database or backup, not
+    against a compromised backend host.
+  - **No re-encrypt job yet:** old values keep their old key id until a
+    follow-up re-encrypts them, so a key cannot be retired while rows use it.
+  - **No key custody beyond the host:** backing up the keyring is the
+    operator's job and is documented in `.env.example`.
