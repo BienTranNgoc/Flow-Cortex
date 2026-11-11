@@ -28,16 +28,18 @@ NORMALIZED_NAME = "normalized.mp4"
 NORMALIZED_MIME = "video/mp4"
 FRAME_MIME = "image/jpeg"
 _QUIET = ["-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file"]
+THRESHOLD_BOUNDS = (0.0, 1.0)
 
 
 def _threshold(params: Mapping[str, Any]) -> float:
     if params.get("sceneThreshold") is None:
         return DEFAULT_SCENE_THRESHOLD
     value = finite_param(params, "sceneThreshold")
-    if value <= 0 or value >= 1:
+    low, high = THRESHOLD_BOUNDS
+    if not low < value < high:
         raise PermanentError(
             "contract_violation",
-            f"param 'sceneThreshold' must be above 0 and below 1 (got {value!r})",
+            f"param 'sceneThreshold' must be above {low:g} and below {high:g} (got {value!r})",
         )
     return value
 
