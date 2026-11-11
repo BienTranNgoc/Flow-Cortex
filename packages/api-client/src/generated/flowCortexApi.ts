@@ -910,48 +910,6 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
-export type JsonNodeNodeType = (typeof JsonNodeNodeType)[keyof typeof JsonNodeNodeType];
-
-export const JsonNodeNodeType = {
-  ARRAY: 'ARRAY',
-  BINARY: 'BINARY',
-  BOOLEAN: 'BOOLEAN',
-  MISSING: 'MISSING',
-  NULL: 'NULL',
-  NUMBER: 'NUMBER',
-  OBJECT: 'OBJECT',
-  POJO: 'POJO',
-  STRING: 'STRING',
-} as const;
-
-export interface JsonNode {
-  empty?: boolean;
-  array?: boolean;
-  null?: boolean;
-  object?: boolean;
-  float?: boolean;
-  string?: boolean;
-  container?: boolean;
-  number?: boolean;
-  missingNode?: boolean;
-  valueNode?: boolean;
-  nodeType?: JsonNodeNodeType;
-  pojo?: boolean;
-  integralNumber?: boolean;
-  floatingPointNumber?: boolean;
-  short?: boolean;
-  int?: boolean;
-  long?: boolean;
-  double?: boolean;
-  bigDecimal?: boolean;
-  bigInteger?: boolean;
-  /** @deprecated */
-  textual?: boolean;
-  boolean?: boolean;
-  binary?: boolean;
-  embeddedValue?: boolean;
-}
-
 export type UiPreferencesTheme = (typeof UiPreferencesTheme)[keyof typeof UiPreferencesTheme];
 
 export const UiPreferencesTheme = {
@@ -4579,7 +4537,7 @@ export const getPatchUiUrl = () => {
  * Body keys: theme (light|dark), sidebarMode (pinned|rail)
  */
 export const patchUi = async (
-  jsonNode: JsonNode,
+  uiPreferences: UiPreferences,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<patchUiResponse> => {
   const getHeaders = (
@@ -4605,7 +4563,7 @@ export const patchUi = async (
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(jsonNode),
+    body: JSON.stringify(uiPreferences),
   });
 };
 
@@ -4627,7 +4585,7 @@ export const getPatchPrivacyUrl = () => {
  * Body keys: profile, activity, message (everyone|followers|only_me), stats (show|hide)
  */
 export const patchPrivacy = async (
-  jsonNode: JsonNode,
+  privacySettings: PrivacySettings,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<patchPrivacyResponse> => {
   const getHeaders = (
@@ -4653,7 +4611,7 @@ export const patchPrivacy = async (
     ...options,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(jsonNode),
+    body: JSON.stringify(privacySettings),
   });
 };
 

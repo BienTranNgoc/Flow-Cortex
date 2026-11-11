@@ -8,18 +8,10 @@ import {
   unwrap,
   useAuthToken,
 } from '@flow-cortex/api-client';
-import type {
-  JsonNode,
-  PreferencesView,
-  PrivacySettings,
-  UiPreferences,
-} from '@flow-cortex/api-client';
+import type { PreferencesView, PrivacySettings, UiPreferences } from '@flow-cortex/api-client';
 import type { Locale } from '@flow-cortex/i18n';
 
 const preferencesKey = (token: string | null) => ['account-preferences', token] as const;
-
-// The generated PATCH helpers type their body as the schema-less JsonNode the controller reads.
-const asBody = (patch: UiPreferences | Partial<PrivacySettings>) => patch as JsonNode;
 
 export function useAccountPreferencesQuery() {
   const token = useAuthToken();
@@ -70,7 +62,7 @@ export function useSaveLocale() {
 /** Failures are swallowed, as for the locale. */
 export function useSaveUi() {
   const { mutate } = useSavedPreferences(
-    (patch: UiPreferences) => unwrap(patchUiRequest(asBody(patch), authHeaders())),
+    (patch: UiPreferences) => unwrap(patchUiRequest(patch, authHeaders())),
     (view, saved) => ({ ...view, ui: saved }),
   );
   return { mutate: (patch: UiPreferences) => mutate(patch, { onError: () => {} }) };
@@ -79,7 +71,7 @@ export function useSaveUi() {
 /** Unlike the other two, a failed privacy save is surfaced: the caller reads `error`. */
 export function useSavePrivacy() {
   return useSavedPreferences(
-    (patch: Partial<PrivacySettings>) => unwrap(patchPrivacyRequest(asBody(patch), authHeaders())),
+    (patch: Partial<PrivacySettings>) => unwrap(patchPrivacyRequest(patch, authHeaders())),
     (view, saved) => ({ ...view, privacy: saved }),
   );
 }

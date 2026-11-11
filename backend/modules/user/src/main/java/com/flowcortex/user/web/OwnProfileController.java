@@ -17,7 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** {@code /api/v1/auth/profile}: the caller's own names and username; the names write is {@code PUT} on the same path in {@link AuthController}. */
+/**
+ * {@code /api/v1/auth/profile}: the caller's own names and username; the names write is
+ * {@code PUT} on the same path in {@link AuthController}.
+ */
 @RestController
 @RequestMapping("/api/v1/auth/profile")
 class OwnProfileController {

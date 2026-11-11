@@ -8,6 +8,7 @@ import com.flowcortex.user.preferences.PreferencePatch;
 import com.flowcortex.user.preferences.PrivacySettings;
 import com.flowcortex.user.preferences.UiPreferences;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -55,7 +56,9 @@ class AccountPreferencesController {
 
     @PatchMapping(value = "/ui", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Body keys: theme (light|dark), sidebarMode (pinned|rail)")
+    @Operation(description = "Body keys: theme (light|dark), sidebarMode (pinned|rail)",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(schema = @Schema(implementation = UiPreferences.class))))
     UiPreferences patchUi(@AuthenticationPrincipal Jwt jwt, @RequestBody JsonNode body) {
         UiPreferences patch = PreferencePatch.parseUi(body)
                 .orElseThrow(() -> new LocalizedStatusException(HttpStatus.BAD_REQUEST, INVALID));
@@ -64,7 +67,9 @@ class AccountPreferencesController {
 
     @PatchMapping(value = "/privacy", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(description = "Body keys: profile, activity, message (everyone|followers|only_me), stats (show|hide)")
+    @Operation(description = "Body keys: profile, activity, message (everyone|followers|only_me), stats (show|hide)",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(schema = @Schema(implementation = PrivacySettings.class))))
     PrivacySettings patchPrivacy(@AuthenticationPrincipal Jwt jwt, @RequestBody JsonNode body) {
         PrivacySettings patch = PreferencePatch.parsePrivacy(body)
                 .orElseThrow(() -> new LocalizedStatusException(HttpStatus.BAD_REQUEST, INVALID));

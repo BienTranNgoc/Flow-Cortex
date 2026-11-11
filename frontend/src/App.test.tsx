@@ -56,6 +56,17 @@ const FEATURES_OFF = {
   },
 };
 
+const SHELL_ACCOUNT = {
+  'GET /api/v1/auth/profile/preferences': {
+    status: 200,
+    body: {
+      ui: {},
+      privacy: { profile: 'everyone', activity: 'everyone', message: 'everyone', stats: 'show' },
+    },
+  },
+  'GET /api/v1/profile/images': { status: 200, body: {} },
+};
+
 vi.mock('./features/auth/LoginPage', async (importOriginal) => {
   const actual = await importOriginal<typeof LoginPageModule>();
   return {
@@ -190,7 +201,7 @@ describe('App', () => {
 
   it('contains a page that throws inside the layout, with Try again and one structured event', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+    stubApi({ ...MEMBER_ME, ...FEATURES_OFF, ...SHELL_ACCOUNT });
     setToken('t', true);
     window.history.pushState({}, '', '/');
 
