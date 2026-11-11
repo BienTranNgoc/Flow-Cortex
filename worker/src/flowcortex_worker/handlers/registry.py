@@ -3,7 +3,19 @@
 from __future__ import annotations
 
 from ..errors import PermanentError
-from . import Handler, HandlerOutcome, OutputFile, align_audio, extract_audio, probe, render_video
+from . import (
+    Handler,
+    HandlerOutcome,
+    OutputFile,
+    align_audio,
+    contact_sheet,
+    detect_shots,
+    extract_audio,
+    inspect,
+    probe,
+    render_video,
+    scene_frames,
+)
 
 __all__ = [
     "HANDLERS",
@@ -18,6 +30,10 @@ HANDLERS: dict[str, Handler] = {
     "extract_audio": extract_audio.handle,
     "align_audio": align_audio.handle,
     "render_video": render_video.handle,
+    "inspect": inspect.handle,
+    "contact_sheet": contact_sheet.handle,
+    "detect_shots": detect_shots.handle,
+    "scene_frames": scene_frames.handle,
     }
 
 
