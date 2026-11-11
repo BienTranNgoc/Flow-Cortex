@@ -1,5 +1,6 @@
 import { authHeaders, unwrap } from './client';
 import { setClientId } from './clientId';
+import { downloadFile } from './customFetch';
 import { ensureSession } from './session';
 import { login, logout, me } from './generated/flowCortexApi';
 import { getToken, setToken } from './tokenStore';
@@ -214,6 +215,65 @@ describe('customFetch', () => {
 
     expect(response.status).toBe(204);
     expect(response.data).toBeUndefined();
+  });
+});
+
+describe('downloadFile', () => {
+  afterEach(() => {
+    setToken(null);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the blob and the file name of a 2xx answer', async () => {
+    stubFetch(
+      () =>
+        new Response('a,b', {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="users-20261110-0900.csv"' },
+        }),
+    );
+
+    const result = await downloadFile('/api/v1/users/export', { headers: { Accept: 'text/csv' } });
+
+    expect(result.status).toBe(200);
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect(result.blob?.size).toBe(3);
+    expect(result.fileName).toBe('users-20261110-0900.csv');
+    expect(result.problem).toBeUndefined();
+  });
+
+  it('returns the parsed problem, with its code, of a non-2xx answer', async () => {
+    stubFetch(() => json(422, { status: 422, code: 'user.exportTooLarge', detail: 'too many' }));
+
+    const result = await downloadFile('/api/v1/users/export');
+
+    expect(result.status).toBe(422);
+    expect(result.blob).toBeUndefined();
+    expect(result.problem).toMatchObject({ code: 'user.exportTooLarge', detail: 'too many' });
+  });
+
+  it('returns no problem when the error body is not JSON', async () => {
+    stubFetch(() => new Response('<html>bad gateway</html>', { status: 502 }));
+
+    const result = await downloadFile('/api/v1/users/export');
+
+    expect(result).toEqual({ status: 502, problem: undefined });
+  });
+
+  it('refreshes the token once and replays the download', async () => {
+    setToken('old', true);
+    const calls = stubFetch((call) => {
+      if (call.path === '/api/v1/auth/refresh') return json(200, { accessToken: 'new', expiresIn: 900 });
+      return call.authorization === 'Bearer new' ? new Response('ok', { status: 200 }) : json(401, {});
+    });
+
+    const result = await downloadFile('/api/v1/users/export', authHeaders());
+
+    expect(result.status).toBe(200);
+    expect(refreshCalls(calls)).toHaveLength(1);
+    expect(calls.filter((c) => c.path === '/api/v1/users/export')).toHaveLength(2);
   });
 });
 
