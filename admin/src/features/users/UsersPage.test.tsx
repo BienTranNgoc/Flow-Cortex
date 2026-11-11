@@ -74,7 +74,36 @@ describe('UsersPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('preserves the Creator role when editing an existing account', async () => {
+  it('editingAStaffRowsNameLeavesItsRoleUnchanged', async () => {
+    const manager = {
+      ...ALICE,
+      id: 'u4',
+      email: 'ops@flowcortex.dev',
+      name: 'Ops',
+      role: 'OPERATION_MANAGER',
+    };
+    const calls = stubApi({
+      'GET /api/v1/users': { status: 200, body: [manager] },
+      'PUT /api/v1/users/u4': { status: 200, body: manager },
+    });
+    renderRoute('/users', '/users', <UsersPage />);
+    await screen.findByText(manager.email);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByLabelText('Role', { selector: '#edit-role-u4' })).toHaveValue(
+      'OPERATION_MANAGER',
+    );
+    const name = screen.getByLabelText('Name', { selector: '#edit-name-u4' });
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Ops Lead');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
+    const body = calls.find((call) => call.method === 'PUT')?.body;
+    expect(body).toMatchObject({ name: 'Ops Lead' });
+    expect(body).not.toHaveProperty('role');
+  });
+
+  it('keeps the Creator role selected and sends no role when it is untouched', async () => {
     const creator = { ...ALICE, id: 'u3', email: 'creator@flowcortex.dev', role: 'CREATOR' };
     const calls = stubApi({
       'GET /api/v1/users': { status: 200, body: [creator] },
@@ -86,9 +115,8 @@ describe('UsersPage', () => {
     expect(screen.getByLabelText('Role', { selector: '#edit-role-u3' })).toHaveValue('CREATOR');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() =>
-      expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({ role: 'CREATOR' }),
-    );
+    await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
+    expect(calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty('role');
   });
 
   it('shows the role and status badges as labels, not codes', async () => {

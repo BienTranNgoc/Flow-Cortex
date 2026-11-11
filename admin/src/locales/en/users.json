@@ -7,12 +7,20 @@
   "roleOptions": {
     "MEMBER": "Member",
     "ADMIN": "Admin",
-    "CREATOR": "Creator"
+    "CREATOR": "Creator",
+    "OPERATION_MANAGER": "Operation manager",
+    "CUSTOMER_SUPPORT": "Customer support",
+    "CONTENT_EDITOR": "Content editor",
+    "PLATFORM_OPERATOR": "Platform operator"
   },
   "role": {
     "MEMBER": "Member",
     "ADMIN": "Admin",
-    "CREATOR": "Creator"
+    "CREATOR": "Creator",
+    "OPERATION_MANAGER": "Operation manager",
+    "CUSTOMER_SUPPORT": "Customer support",
+    "CONTENT_EDITOR": "Content editor",
+    "PLATFORM_OPERATOR": "Platform operator"
   },
   "status": {
     "ACTIVE": "Active",

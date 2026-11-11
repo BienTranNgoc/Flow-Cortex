@@ -53,7 +53,7 @@ describe('UserDetailPage', () => {
     renderRoute('/users/:userId', '/users/not-a-uuid', <UserDetailPage />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('The user ID is not valid.');
-    expect(calls).toHaveLength(0);
+    expect(calls.filter((call) => call.path.startsWith('/api/v1/users'))).toHaveLength(0);
   });
 
   describe('in Vietnamese', () => {

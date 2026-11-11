@@ -1856,6 +1856,44 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/accounts/{id}/deactivate:
+    post:
+      tags:
+      - admin-accounts-controller
+      operationId: deactivateAdminAccount
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountResponse"
+  /api/v1/admin/accounts/{id}/activate:
+    post:
+      tags:
+      - admin-accounts-controller
+      operationId: activateAdminAccount
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountResponse"
   /api/v1/workflows/{id}:
     get:
       tags:
@@ -2134,6 +2172,31 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/accounts/{id}/role:
+    patch:
+      tags:
+      - admin-accounts-controller
+      operationId: changeAdminAccountRole
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountResponse"
   /api/v1/support/settings:
     get:
       tags:
@@ -2790,6 +2853,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminRunResponse"
+  /api/v1/admin/roles:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -2832,6 +2909,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/accounts:
+    get:
+      tags:
+      - admin-accounts-controller
+      operationId: listAdminAccounts
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminAccountResponse"
 components:
   schemas:
     UpdateUserRequest:
@@ -2844,7 +2963,7 @@ components:
           type: string
         role:
           type: string
-          pattern: ADMIN|MEMBER|CREATOR
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
         status:
           type: string
           pattern: ACTIVE|SUSPENDED
@@ -2968,6 +3087,37 @@ components:
           type: boolean
         passwordSetupRequired:
           type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.admin_account.view
+            - system.admin_account.manage
+        adminDisabled:
+          type: boolean
+      required:
+      - adminDisabled
+      - permissions
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -3529,7 +3679,7 @@ components:
         role:
           type: string
           minLength: 1
-          pattern: ADMIN|MEMBER|CREATOR
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - email
       - name
@@ -4238,6 +4388,36 @@ components:
       required:
       - body
       - status
+    AdminAccountResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        adminDisabled:
+          type: boolean
+        adminDisabledAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - adminDisabled
+      - createdAt
+      - email
+      - id
+      - name
+      - role
+      - status
     UpdateWorkflowRequest:
       type: object
       properties:
@@ -4267,6 +4447,15 @@ components:
           minLength: 0
         config:
           type: string
+    ChangeRoleRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          minLength: 1
+          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+      required:
+      - role
     SupportSettings:
       type: object
       properties:
@@ -4705,6 +4894,46 @@ components:
       - page
       - size
       - total
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        staff:
+          type: boolean
+        superAdmin:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.admin_account.view
+            - system.admin_account.manage
+      required:
+      - code
+      - permissions
+      - staff
+      - superAdmin
     MediaJobResponse:
       type: object
       properties:
@@ -4767,6 +4996,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MediaJobResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    PageViewAdminAccountResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAccountResponse"
         page:
           type: integer
           format: int32

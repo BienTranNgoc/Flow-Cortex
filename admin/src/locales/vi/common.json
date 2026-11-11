@@ -80,13 +80,20 @@
         "supportGroups": "Chủ đề",
         "supportRequests": "Yêu cầu",
         "supportSettings": "Cài đặt trợ lý",
+        "adminAccounts": "Tài khoản quản trị",
         "chatSettings": "Cài đặt"
       }
     },
     "noAccess": {
       "title": "Không có quyền truy cập",
-      "messageWithEmail": "<account>{{email}}</account> không có vai trò ADMIN nên không thể dùng trang quản trị.",
-      "message": "Tài khoản này không có vai trò ADMIN nên không thể dùng trang quản trị.",
+      "messageWithEmail": "<account>{{email}}</account> không có quyền quản trị nào nên không thể dùng trang quản trị.",
+      "message": "Tài khoản này không có quyền quản trị nào nên không thể dùng trang quản trị.",
+      "signOut": "Đăng xuất"
+    },
+    "disabled": {
+      "title": "Tài khoản quản trị của bạn đã bị vô hiệu hóa",
+      "messageWithEmail": "<account>{{email}}</account> đã bị vô hiệu hóa nên không thể dùng trang quản trị. Hãy nhờ quản trị viên cấp cao kích hoạt lại. Bạn vẫn dùng được ứng dụng thành viên.",
+      "message": "Tài khoản quản trị này đã bị vô hiệu hóa nên không thể dùng trang quản trị. Hãy nhờ quản trị viên cấp cao kích hoạt lại. Bạn vẫn dùng được ứng dụng thành viên.",
       "signOut": "Đăng xuất"
     },
     "session": {
