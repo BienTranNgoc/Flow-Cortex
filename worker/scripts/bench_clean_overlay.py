@@ -27,7 +27,13 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from flowcortex_worker.overlay.protocol import INPUT_REJECTED, MAX_PIXELS
+from flowcortex_worker.overlay.protocol import (
+    CLEAN_FILE,
+    INPUT_FILE,
+    INPUT_REJECTED,
+    MAX_PIXELS,
+    PARAMS_FILE,
+)
 
 SEED = 20260101
 WALL_LIMIT_SECONDS = 900.0
@@ -98,12 +104,14 @@ def caption_image(width: int, height: int) -> NDArray[np.uint8]:
     return image
 
 
-def run_child(image: Path, params: Path, out: Path) -> tuple[float, int | None, str | None]:
+def run_child(work: Path) -> tuple[float, int | None, str | None]:
     """Seconds, the child's exit code (None on timeout) and why the run failed, if it did."""
+    (work / CLEAN_FILE).unlink(missing_ok=True)
     started = time.monotonic()
     try:
         done = subprocess.run(
-            [sys.executable, "-m", "flowcortex_worker.overlay", str(image), str(params), str(out)],
+            [sys.executable, "-m", "flowcortex_worker.overlay"],
+            cwd=work,
             capture_output=True,
             text=True,
             timeout=WALL_LIMIT_SECONDS,
@@ -117,27 +125,28 @@ def run_child(image: Path, params: Path, out: Path) -> tuple[float, int | None, 
     if done.returncode != 0:
         tail = done.stderr.strip().splitlines()[-1:] or ["no stderr"]
         return elapsed, done.returncode, f"exit {done.returncode}: {tail[0]}"
-    if not (out / "clean.png").is_file():
-        return elapsed, done.returncode, "exit 0 without clean.png"
+    if not (work / CLEAN_FILE).is_file():
+        return elapsed, done.returncode, f"exit 0 without {CLEAN_FILE}"
     return elapsed, done.returncode, None
 
 
 def measure(width: int, height: int, warmups: int, runs: int, work: Path) -> SizeResult:
     result = SizeResult(width, height)
-    image = work / f"in-{width}x{height}.png"
-    if not cv2.imwrite(str(image), caption_image(width, height)):
-        result.failure = "could not write the generated image"
+    encoded, png = cv2.imencode(".png", caption_image(width, height))
+    if not encoded:
+        result.failure = "could not encode the generated image"
         return result
-    params = work / "params.json"
-    params.write_text(json.dumps(PARAMS), encoding="utf-8")
+    work = work / f"{width}x{height}"
+    work.mkdir()
+    (work / INPUT_FILE).write_bytes(png.tobytes())
+    (work / PARAMS_FILE).write_text(json.dumps(PARAMS), encoding="utf-8")
     if result.over_cap:
-        _, code, failure = run_child(image, params, work / f"out-{width}x{height}")
+        _, code, failure = run_child(work)
         if code != INPUT_REJECTED:
             result.failure = failure or f"exit {code}, expected {INPUT_REJECTED} (input_rejected)"
         return result
     for index in range(warmups + runs):
-        out = work / f"out-{width}x{height}-{index}"
-        elapsed, _, failure = run_child(image, params, out)
+        elapsed, _, failure = run_child(work)
         # Children are reaped one by one, so this high-water mark is the largest child so far;
         # sizes ascend, which makes it the peak of the current size.
         result.peak_kib = max(

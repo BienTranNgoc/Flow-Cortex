@@ -7,6 +7,7 @@ library and the worker package, and the watchdog or a cancel can kill a long inp
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 from collections.abc import Mapping
@@ -20,8 +21,7 @@ from ..overlay.params import parse_params
 from ..runtime import ProcessRunner
 from . import HandlerOutcome, OutputFile
 
-PARAMS_NAME = "overlay-params.json"
-OUT_DIR_NAME = "overlay-out"
+WORK_DIR_NAME = "overlay-work"
 STDERR_TAIL_CHARS = 300
 
 
@@ -37,35 +37,36 @@ def handle(
         )
     source = inputs["image"]
 
-    params_path = source.parent / PARAMS_NAME
-    out_dir = source.parent / OUT_DIR_NAME
-    shutil.rmtree(out_dir, ignore_errors=True)
-    out_dir.mkdir()
-    params_path.write_text(json.dumps(protocol.params_to_json(params)), encoding="utf-8")
+    work = source.parent / WORK_DIR_NAME
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir()
+    staged = work / protocol.INPUT_FILE
+    params_path = work / protocol.PARAMS_FILE
 
     try:
-        completed = processes.run(
-            [
-                sys.executable,
-                "-m",
-                "flowcortex_worker.overlay",
-                str(source),
-                str(params_path),
-                str(out_dir),
-            ]
-        )
-        clean = out_dir / protocol.CLEAN_FILE
+        _stage(source, staged)
+        params_path.write_text(json.dumps(protocol.params_to_json(params)), encoding="utf-8")
+        completed = processes.run([sys.executable, "-m", "flowcortex_worker.overlay"], cwd=work)
+        clean = work / protocol.CLEAN_FILE
         _raise_for_exit(completed.returncode, completed.stderr)
-        data = _read_result(out_dir / protocol.RESULT_FILE)
+        data = _read_result(work / protocol.RESULT_FILE)
         if not clean.is_file() or clean.stat().st_size == 0:
             raise PermanentError("contract_violation", "the overlay engine produced no image")
     except BaseException:
-        shutil.rmtree(out_dir, ignore_errors=True)
+        shutil.rmtree(work, ignore_errors=True)
         raise
     finally:
+        staged.unlink(missing_ok=True)
         params_path.unlink(missing_ok=True)
 
     return HandlerOutcome(data=data, files=[OutputFile(protocol.CLEAN_FILE, "image/png", clean)])
+
+
+def _stage(source: Path, staged: Path) -> None:
+    try:
+        os.link(source, staged)
+    except OSError:
+        shutil.copyfile(source, staged)
 
 
 def _raise_for_exit(code: int, stderr: bytes) -> None:

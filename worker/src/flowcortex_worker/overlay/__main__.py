@@ -1,6 +1,7 @@
 """Child process of the clean.
 
-Run as `python -m flowcortex_worker.overlay <image> <params.json> <out dir>`.
+Run as `python -m flowcortex_worker.overlay` inside a work directory holding the image and the
+parameters under the names in `protocol`; the cleaned image and the result land beside them.
 Exit codes are the ones in `protocol`; the handler maps them to job errors.
 """
 
@@ -122,10 +123,10 @@ def _reject(message: str) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        sys.stderr.write("usage: python -m flowcortex_worker.overlay <image> <params.json> <out>\n")
+    if argv:
+        sys.stderr.write("usage: python -m flowcortex_worker.overlay (no arguments)\n")
         return USAGE
-    image_path, params_path, out_dir = Path(argv[0]), Path(argv[1]), Path(argv[2])
+    work = Path.cwd()
 
     try:
         import cv2
@@ -135,9 +136,10 @@ def main(argv: list[str]) -> int:
         sys.stderr.write(f"overlay runtime missing: {error}\n")
         return protocol.RUNTIME_MISSING
 
-    params = protocol.params_from_json(json.loads(params_path.read_text(encoding="utf-8")))
+    raw_params = json.loads((work / protocol.PARAMS_FILE).read_text(encoding="utf-8"))
+    params = protocol.params_from_json(raw_params)
     try:
-        image = decode_image(image_path)
+        image = decode_image(work / protocol.INPUT_FILE)
     except InputRejected as error:
         return _reject(str(error))
     try:
@@ -148,10 +150,9 @@ def main(argv: list[str]) -> int:
 
     cleaned, data = pipeline.clean(image, params, models.ModelEngines())
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    if not cv2.imwrite(str(out_dir / protocol.CLEAN_FILE), cleaned):
+    if not cv2.imwrite(str(work / protocol.CLEAN_FILE), cleaned):
         raise OSError("could not write the cleaned image")
-    (out_dir / protocol.RESULT_FILE).write_text(json.dumps(data), encoding="utf-8")
+    (work / protocol.RESULT_FILE).write_text(json.dumps(data), encoding="utf-8")
     return protocol.OK
 
 

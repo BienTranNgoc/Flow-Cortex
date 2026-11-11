@@ -40,18 +40,17 @@ def check() -> list[str]:
     """Problems found; empty when the image cleans a captioned picture."""
     with tempfile.TemporaryDirectory() as scratch:
         root = Path(scratch)
-        source = root / "input.png"
-        if not cv2.imwrite(str(source), caption_image()):
-            return ["could not write the generated input"]
-        params = root / "params.json"
-        params.write_text(
+        encoded, png = cv2.imencode(".png", caption_image())
+        if not encoded:
+            return ["could not encode the generated input"]
+        (root / protocol.INPUT_FILE).write_bytes(png.tobytes())
+        (root / protocol.PARAMS_FILE).write_text(
             json.dumps(protocol.params_to_json(parse_params({"extractText": True}))),
             encoding="utf-8",
         )
-        out = root / "out"
-        out.mkdir()
         done = subprocess.run(
-            [sys.executable, "-m", "flowcortex_worker.overlay", str(source), str(params), str(out)],
+            [sys.executable, "-m", "flowcortex_worker.overlay"],
+            cwd=root,
             capture_output=True,
             text=True,
             timeout=CHILD_TIMEOUT_SECONDS,
@@ -59,8 +58,8 @@ def check() -> list[str]:
         )
         if done.returncode != protocol.OK:
             return [f"child exited {done.returncode}: {done.stderr.strip()[-400:]}"]
-        cleaned = cv2.imread(str(out / protocol.CLEAN_FILE), cv2.IMREAD_UNCHANGED)
-        data = json.loads((out / protocol.RESULT_FILE).read_text(encoding="utf-8"))
+        cleaned = cv2.imread(str(root / protocol.CLEAN_FILE), cv2.IMREAD_UNCHANGED)
+        data = json.loads((root / protocol.RESULT_FILE).read_text(encoding="utf-8"))
     # After the child has exited: two copies of the models do not fit a small CI runner.
     ModelEngines().load_all()
     problems: list[str] = []

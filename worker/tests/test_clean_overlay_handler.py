@@ -28,37 +28,36 @@ class FakeRunner:
         self,
         code: int = 0,
         stderr: bytes = b"",
-        on_run: Callable[[list[str]], None] | None = None,
+        on_run: Callable[[Path], None] | None = None,
         raises: Exception | None = None,
     ) -> None:
         self.code = code
         self.stderr = stderr
         self.on_run = on_run
         self.raises = raises
-        self.calls: list[list[str]] = []
+        self.calls: list[tuple[list[str], Path | None]] = []
         self.params_seen: dict[str, Any] | None = None
+        self.input_seen: bytes | None = None
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
-        self.calls.append(argv)
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
+        self.calls.append((argv, cwd))
         if self.raises is not None:
             raise self.raises
-        self.params_seen = json.loads(Path(argv[4]).read_text(encoding="utf-8"))
+        assert cwd is not None
+        self.params_seen = json.loads((cwd / protocol.PARAMS_FILE).read_text(encoding="utf-8"))
+        self.input_seen = (cwd / protocol.INPUT_FILE).read_bytes()
         if self.on_run is not None:
-            self.on_run(argv)
+            self.on_run(cwd)
         return subprocess.CompletedProcess(argv, self.code, b"", self.stderr)
 
 
-def writes_outputs(argv: list[str]) -> None:
-    out = Path(argv[5])
-    out.mkdir(parents=True, exist_ok=True)
-    (out / protocol.CLEAN_FILE).write_bytes(b"\x89PNG-clean")
-    (out / protocol.RESULT_FILE).write_text(json.dumps(RESULT), encoding="utf-8")
+def writes_outputs(work: Path) -> None:
+    (work / protocol.CLEAN_FILE).write_bytes(b"\x89PNG-clean")
+    (work / protocol.RESULT_FILE).write_text(json.dumps(RESULT), encoding="utf-8")
 
 
-def writes_partial(argv: list[str]) -> None:
-    out = Path(argv[5])
-    out.mkdir(parents=True, exist_ok=True)
-    (out / protocol.CLEAN_FILE).write_bytes(b"partial")
+def writes_partial(work: Path) -> None:
+    (work / protocol.CLEAN_FILE).write_bytes(b"partial")
 
 
 def job(params: dict[str, Any]) -> Any:
@@ -122,11 +121,12 @@ def test_a_finished_child_yields_the_clean_png_and_its_result(tmp_path: Path) ->
 
     outcome = run(tmp_path, runner, params)
 
-    [call] = runner.calls
-    source = tmp_path / "in.png"
-    assert call[:4] == [sys.executable, "-m", "flowcortex_worker.overlay", str(source)]
-    assert Path(call[4]).parent == tmp_path
-    assert Path(call[5]).parent == tmp_path
+    [(argv, work)] = runner.calls
+    assert argv == [sys.executable, "-m", "flowcortex_worker.overlay"]
+    assert work is not None
+    assert work.parent == tmp_path
+    assert runner.input_seen == (tmp_path / "in.png").read_bytes()
+    assert sorted(p.name for p in work.iterdir()) == [protocol.CLEAN_FILE, protocol.RESULT_FILE]
     assert runner.params_seen == {
         "region": "manual",
         "boxes": [[0.5, 0.0, 0.5, 0.1]],
@@ -136,7 +136,7 @@ def test_a_finished_child_yields_the_clean_png_and_its_result(tmp_path: Path) ->
     }
     assert outcome.data == RESULT
     [file] = outcome.files
-    assert file == OutputFile("clean.png", "image/png", Path(call[5]) / "clean.png")
+    assert file == OutputFile("clean.png", "image/png", work / "clean.png")
     assert cast(Path, file.body).read_bytes() == b"\x89PNG-clean"
 
 
@@ -178,9 +178,9 @@ def test_exit_0_without_the_expected_files_is_a_contract_violation(tmp_path: Pat
 
 
 def test_an_unreadable_result_is_a_contract_violation(tmp_path: Path) -> None:
-    def garbage(argv: list[str]) -> None:
-        writes_outputs(argv)
-        (Path(argv[5]) / protocol.RESULT_FILE).write_text("[1]", encoding="utf-8")
+    def garbage(work: Path) -> None:
+        writes_outputs(work)
+        (work / protocol.RESULT_FILE).write_text("[1]", encoding="utf-8")
 
     with pytest.raises(PermanentError) as refused:
         run(tmp_path, FakeRunner(on_run=garbage))

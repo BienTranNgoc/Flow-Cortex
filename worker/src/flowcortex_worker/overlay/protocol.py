@@ -16,6 +16,9 @@ INPUT_REJECTED = 3
 FACE_MODEL_MISSING = 4
 RUNTIME_MISSING = 5
 
+# File names inside the child's working directory; the child takes no path arguments.
+INPUT_FILE = "input"
+PARAMS_FILE = "params.json"
 CLEAN_FILE = "clean.png"
 RESULT_FILE = "result.json"
 
