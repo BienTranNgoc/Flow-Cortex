@@ -238,8 +238,8 @@ describe('downloadFile', () => {
     const result = await downloadFile('/api/v1/users/export', { headers: { Accept: 'text/csv' } });
 
     expect(result.status).toBe(200);
-    expect(result.blob).toBeInstanceOf(Blob);
     expect(result.blob?.size).toBe(3);
+    expect(await result.blob?.text()).toBe('a,b');
     expect(result.fileName).toBe('users-20261110-0900.csv');
     expect(result.problem).toBeUndefined();
   });
