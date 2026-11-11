@@ -996,6 +996,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/email-links/{token}/unsubscribe:
+    post:
+      tags:
+      - email-links-controller
+      operationId: unsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkUnsubscribed"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/email-links/{token}/one-click:
+    post:
+      tags:
+      - email-links-controller
+      operationId: oneClickUnsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkOneClick"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
@@ -2082,6 +2154,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
+      security: []
+  /api/v1/email-links/{token}:
+    get:
+      tags:
+      - email-links-controller
+      operationId: viewEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkView"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/credits/balance:
     get:
@@ -3435,6 +3538,29 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    EmailLinkUnsubscribed:
+      type: object
+      properties:
+        unsubscribed:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+    EmailLinkOneClick:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+      - ok
     Attachment:
       type: object
       properties:
@@ -3992,6 +4118,25 @@ components:
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EmailLinkView:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        unsubscribed:
+          type: boolean
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+      - valid
     BalanceResponse:
       type: object
       properties:

@@ -13,6 +13,7 @@ include(
     ":modules:support",
     ":modules:space",
     ":modules:realtime",
+    ":modules:mail",
     ":modules:chat",
     ":shared:web",
     ":shared:security",
