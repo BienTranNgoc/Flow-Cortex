@@ -1,0 +1,119 @@
+{
+  "page": {
+    "title": "Chat"
+  },
+  "list": {
+    "label": "Your conversations",
+    "heading": "Conversations",
+    "open": "Conversations",
+    "close": "Close",
+    "new": "New chat",
+    "loading": "Loading conversations…",
+    "empty": "No conversations yet. Start a new chat.",
+    "loadFailed": "Could not load your conversations.",
+    "retry": "Retry"
+  },
+  "row": {
+    "rename": "Rename",
+    "delete": "Delete",
+    "renameLabel": "Conversation title",
+    "save": "Save",
+    "cancel": "Cancel",
+    "counter": "{{length}}/{{max}}",
+    "titleEmpty": "Give the conversation a title.",
+    "titleTooLong": "A title can have at most {{max}} characters.",
+    "renameFailed": "Could not rename the conversation."
+  },
+  "delete": {
+    "title": "Delete this conversation?",
+    "text": "“{{title}}” and all its messages will be removed. This cannot be undone.",
+    "keep": "Keep",
+    "confirm": "Delete",
+    "deleting": "Deleting…",
+    "failed": "Could not delete the conversation."
+  },
+  "thread": {
+    "empty": "Ask anything, or describe what you want to create.",
+    "loading": "Loading messages…",
+    "loadFailed": "Could not load this conversation.",
+    "retry": "Retry",
+    "log": "Messages",
+    "you": "You",
+    "assistant": "Assistant",
+    "streaming": "Writing…",
+    "failed": "The assistant couldn't answer.",
+    "tryAgain": "Try again",
+    "stopped": "Stopped"
+  },
+  "composer": {
+    "label": "Message",
+    "placeholder": "Describe what you want to create…",
+    "send": "Send",
+    "sending": "Sending…",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "attach": "Attach images",
+    "counter": "{{length}}/{{max}}",
+    "over": "A message can have at most {{max}} characters."
+  },
+  "attach": {
+    "uploading": "Uploading…",
+    "ready": "Ready",
+    "failed": "This image could not be uploaded.",
+    "remove": "Remove {{name}}",
+    "tooMany": "At most {{max}} images."
+  },
+  "card": {
+    "label": "Proposed run: {{name}}",
+    "input": "Input:",
+    "images": "Input images:",
+    "noImages": "None attached",
+    "optional": "(optional)",
+    "field": {
+      "productName": "Product name",
+      "description": "Description",
+      "cta": "Call to action",
+      "price": "Price",
+      "promotion": "Promotion"
+    },
+    "imagesExpired": "Image expired — attach again",
+    "attachAgain": "Attach images again",
+    "changeImages": "Change images",
+    "run": "Run",
+    "running": "Starting…",
+    "started": "Run started",
+    "invalid": "Some details need fixing before this can run.",
+    "failed": "Could not start the run. Please try again."
+  },
+  "run": {
+    "label": "Run",
+    "loading": "Loading run…",
+    "loadFailed": "Could not load this run.",
+    "retry": "Retry",
+    "statusLabel": "Status:",
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "waitingApproval": "Waiting for your review",
+      "cancelling": "Stopping…",
+      "completed": "Completed",
+      "error": "Failed",
+      "cancelled": "Cancelled",
+      "other": "{{status}}"
+    },
+    "progress": "{{done}} of {{total}} steps done",
+    "review": "Review needed",
+    "outputs": "Results:",
+    "results": "Open results",
+    "open": "Open run"
+  },
+  "problems": {
+    "notFound": "This conversation no longer exists.",
+    "startNew": "Start a new chat",
+    "off": "Chat is turned off for now.",
+    "quota": "You've reached today's chat limit.",
+    "resumeAt": "You can chat again {{time}}.",
+    "inProgress": "The assistant is still answering.",
+    "generic": "Something went wrong. Please try again."
+  }
+}

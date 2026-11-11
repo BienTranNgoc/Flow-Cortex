@@ -37,15 +37,10 @@ record ProductVideoRunRequest(
     }
 
     ProductVideoDraft draft() {
-        return new ProductVideoDraft(productName.trim(), description.trim(), trimToNull(cta), trimToNull(price),
-                trimToNull(promotion), video.aspectRatio());
+        return ProductVideoDraft.of(productName, description, cta, price, promotion, video.aspectRatio());
     }
 
     private static boolean notBlankWhenPresent(String value) {
         return value == null || !value.isBlank();
-    }
-
-    private static String trimToNull(String value) {
-        return value == null ? null : value.trim();
     }
 }
