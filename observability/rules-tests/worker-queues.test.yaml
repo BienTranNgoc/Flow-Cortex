@@ -8,6 +8,10 @@ tests:
     input_series:
       - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.render.jobs"}'
         values: '1+0x30'
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.audio.jobs"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages{job="rabbitmq-per-object",queue="media.audio.jobs.dlq"}'
+        values: '0+0x9 1+0x30'
       - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.jobs"}'
         values: '1+0x14 0+0x30'
       - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="provider.jobs"}'
@@ -21,12 +25,19 @@ tests:
       - series: 'rabbitmq_queue_messages{job="rabbitmq-per-object",queue="provider.results.dlq"}'
         values: '1+0x3 0+0x30'
     alert_rule_test:
-      # Backlog held for 15 minutes: the render, provider and provider-video
-      # queues fire, each with its own remedy; the drained media.jobs queue and
-      # the unlisted media.results queue stay quiet.
+      # Backlog held for 15 minutes: the render, audio, provider and
+      # provider-video queues fire, each with its own remedy; the drained
+      # media.jobs queue and the unlisted media.results queue stay quiet.
       - eval_time: 16m
         alertname: WorkerQueueBacklog
         exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: rabbitmq-per-object
+              queue: media.audio.jobs
+            exp_annotations:
+              summary: "Queue media.audio.jobs has had ready messages for 15 minutes"
+              description: "media.audio.jobs has not emptied for 15 minutes (consumers busy or absent). Raise MEDIA_AUDIO_WORKERS."
           - exp_labels:
               severity: warning
               job: rabbitmq-per-object
@@ -52,6 +63,13 @@ tests:
       - eval_time: 16m
         alertname: WorkerDeadLetters
         exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: rabbitmq-per-object
+              queue: media.audio.jobs.dlq
+            exp_annotations:
+              summary: "Dead-letter queue media.audio.jobs.dlq holds messages"
+              description: "A dead-letter queue has no TTL or consumer, so this alert fires until the queue is emptied. Inspect the message in the management UI (127.0.0.1:15672), then run `docker compose exec rabbitmq rabbitmqctl purge_queue media.audio.jobs.dlq` once it has been handled."
           - exp_labels:
               severity: critical
               job: rabbitmq-per-object

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Collection
 
-# Mirrors MediaTopologyConfig.JOBS and RENDER_JOBS in the backend.
-MEDIA_QUEUES = ("media.jobs", "media.render.jobs")
+# Mirrors MediaTopologyConfig.JOBS, RENDER_JOBS and AUDIO_JOBS in the backend.
+MEDIA_QUEUES = ("media.jobs", "media.render.jobs", "media.audio.jobs")
 
 
 class RoleError(Exception):

@@ -25,6 +25,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -37,20 +39,37 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Cards over HTTP with a scripted provider: the model proposes a run through the tool loop, and the member's
- * confirm is the only thing that starts one. Credits are on in the shared context: {@code echo} costs 10,
- * {@code probe} 40.
+ * confirm is the only thing that starts one. Credits are on in the shared context; {@code probe} costs 40
+ * here, set on its seeded {@code rate_card} row before each test and put back after.
  */
 @ChatIt
 class ChatCardsIT extends ChatItSupport {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Duration WAIT = Duration.ofSeconds(8);
+    private static final int SEEDED_PROBE_PRICE = 10;
 
     @Autowired
     private WorkflowService workflowService;
 
     @Autowired
     private CardStore cardStore;
+
+    @BeforeEach
+    void priceProbeForTheScenarios() {
+        setSeededPrice("probe", 40);
+    }
+
+    @AfterEach
+    void restoreTheSeededProbePrice() {
+        setSeededPrice("probe", SEEDED_PROBE_PRICE);
+    }
+
+    private void setSeededPrice(String ref, int credits) {
+        int updated = jdbcTemplate.update("UPDATE rate_card SET credits_per_unit = ? WHERE rate_card_ref = ? "
+                + "AND effective_to IS NULL", credits, ref);
+        assertThat(updated).as("seeded open rate_card row of %s", ref).isEqualTo(1);
+    }
 
     record Pv(String productName, String description, String cta, String price, String promotion) {
     }

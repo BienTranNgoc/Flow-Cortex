@@ -62,11 +62,12 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    // Every distinct @SpringBootTest property set is its own cached context, each a full application.
-    // Evicting the least recently used keeps at most 8 alive. 1 GB was enough for this suite alone
-    // but ran out in CI once a branch added more contexts, so the heap is 2 GB (one test JVM, 16 GB runners).
+    // Every distinct @SpringBootTest property set is its own cached context; past ~20 of them the
+    // default 512 MB heap runs out. Evicting the least recently used bounds the contexts alive: 8 of
+    // them overran 1 GB (OutOfMemoryError during classpath scanning) once more ITs joined the suite,
+    // so the cache keeps 6 and the heap is 2 GB (one test JVM, 16 GB runners).
     maxHeapSize = "2g"
-    systemProperty("spring.test.context.cache.maxSize", "8")
+    systemProperty("spring.test.context.cache.maxSize", "6")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")
     // Absolute path to the committed OpenAPI snapshot; the repo root is backend/'s parent.

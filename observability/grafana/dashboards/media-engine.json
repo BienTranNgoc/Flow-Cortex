@@ -111,19 +111,19 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (queue) (rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs\"})",
+          "expr": "sum by (queue) (rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs|media\\\\.audio\\\\.jobs\"})",
           "legendFormat": "ready {{queue}}"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (queue) (rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs\"})",
+          "expr": "sum by (queue) (rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs|media\\\\.audio\\\\.jobs\"})",
           "legendFormat": "unacked {{queue}}"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (queue) (rabbitmq_queue_messages{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs\\\\.dlq|media\\\\.render\\\\.jobs\\\\.dlq\"})",
+          "expr": "sum by (queue) (rabbitmq_queue_messages{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs\\\\.dlq|media\\\\.render\\\\.jobs\\\\.dlq|media\\\\.audio\\\\.jobs\\\\.dlq\"})",
           "legendFormat": "dead-lettered {{queue}}"
         }
       ]

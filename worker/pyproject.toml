@@ -51,5 +51,23 @@ plugins = ["pydantic.mypy"]
 module = ["pika.*", "boto3.*", "botocore.*", "jsonschema.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# Engine libraries exist only in the audio image; the worker process never imports them.
+module = [
+    "numpy.*",
+    "torch.*",
+    "torchaudio.*",
+    "demucs.*",
+    "soundfile.*",
+    "sherpa_onnx.*",
+    "sklearn.*",
+    "scipy.*",
+    "librosa.*",
+    "beat_this.*",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not engines'"
+markers = ["engines: needs the engine libraries and models of the audio image"]

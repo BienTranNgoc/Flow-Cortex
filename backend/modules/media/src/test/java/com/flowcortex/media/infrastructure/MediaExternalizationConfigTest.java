@@ -69,6 +69,16 @@ class MediaExternalizationConfigTest {
     }
 
     @Test
+    void anAudioJobGetsTheSameTraceableIds() {
+        MessageProperties sent = ids.postProcessMessage(job(null), null, "media", "audio.job")
+                .getMessageProperties();
+
+        assertThat(sent.getMessageId()).isEqualTo(jobId.toString());
+        assertThat(sent.getCorrelationId()).isEqualTo(runId.toString());
+        assertThat(sent.getHeaders()).containsEntry("baggage", "runId=" + runId);
+    }
+
+    @Test
     void videoClipsLeaveOnTheVideoKeyAndOtherProviderJobsOnTheJobKey() {
         EventExternalizationConfiguration configuration = new MediaExternalizationConfig().mediaExternalization();
 

@@ -3,8 +3,9 @@
 One Python codebase serves two isolated runtimes:
 
 - the media worker consumes the queue `MEDIA_QUEUE` names — `media.jobs` (the default) or
-  `media.render.jobs` (`render_video`, compose service `render-worker`) — reads assets, runs
-  FFmpeg/FFprobe capabilities and publishes through exchange `media`. It runs the capabilities
+  `media.render.jobs` (`render_video`, compose service `render-worker`) or `media.audio.jobs`
+  (`separate_audio`, compose service `audio-worker`) — reads assets, runs FFmpeg/FFprobe
+  capabilities and publishes through exchange `media`. It runs the capabilities
   `WORKER_CAPABILITIES` lists, comma-separated (empty = all). An unknown queue or capability
   name, or a listed handler that fails to import, exits non-zero before it connects;
 - the provider worker consumes the queue `PROVIDER_QUEUE` names — `provider.jobs` (script,
@@ -13,6 +14,16 @@ One Python codebase serves two isolated runtimes:
   exchange `provider`. Its deterministic fixture adapter is for development until OpenAI is wired.
 
 Message shapes live in `../contracts/*.schema.json`.
+
+**Audio lane** — `audio-worker` builds the `audio-runtime` Dockerfile target (the default `docker
+build` target; `media-runtime` and `provider-runtime` are unchanged) on `media.audio.jobs` and
+runs `separate_audio`. The image bakes torch (CPU), demucs `htdemucs`, the speaker and VAD models
+and the beat model, each verified against a pinned sha256, so the engines need no network at run
+time. Engines (`engines/separate.py`, `speakers.py`, `beats.py`) run as child processes of the
+handler, so an out-of-memory kill or crash fails one job, not the worker. Licence texts for the
+bundled models and libraries are under `/app/licenses` (`worker/docker/AUDIO-LICENSES.md`,
+`speakers-NOTICE.txt`). Pool size: `MEDIA_AUDIO_WORKERS`; longest run:
+`FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO`.
 
 **Run** — `docker compose up worker provider-worker provider-video-worker` from the repo root (env in `.env`, see
 `.env.example`). Local entrypoints are `uv run python -m flowcortex_worker` and
