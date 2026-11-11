@@ -78,7 +78,8 @@
         "supportArticles": "Guide articles",
         "supportGroups": "Topics",
         "supportRequests": "Requests",
-        "supportSettings": "Assistant settings"
+        "supportSettings": "Assistant settings",
+        "onboardingSample": "Onboarding sample"
       }
     },
     "noAccess": {

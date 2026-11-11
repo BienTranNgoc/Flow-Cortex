@@ -1,0 +1,61 @@
+{
+  "eyebrow": "Làm quen",
+  "title": "Mẫu làm quen",
+  "description": "Quy trình được gợi ý cho thành viên mới ở cuối phần làm quen, cùng dữ liệu nhập ban đầu của nó.",
+  "common": {
+    "loading": "Đang tải…",
+    "loadFailed": "Không tải được mẫu làm quen.",
+    "retry": "Thử lại",
+    "saveFailed": "Không lưu được. Vui lòng thử lại."
+  },
+  "status": {
+    "heading": "Trạng thái hiện tại",
+    "workflow": "Quy trình",
+    "none": "Chưa cấu hình",
+    "shown": "Đang gợi ý",
+    "notShown": "Không gợi ý",
+    "changedBy": "Thay đổi lần cuối bởi {{email}} lúc {{at}}"
+  },
+  "reason": {
+    "not_found": "Quy trình không còn tồn tại.",
+    "deleted": "Quy trình đã bị xóa.",
+    "unpublished": "Quy trình chưa được xuất bản.",
+    "private": "Quy trình ở chế độ riêng tư nên thành viên không mở được.",
+    "no_steps": "Quy trình chưa có bước nào.",
+    "unavailable": "Một bước của quy trình đang bị tắt.",
+    "needs_upload": "Quy trình bắt đầu từ tệp tải lên nên không thể điền sẵn.",
+    "needs_link": "Quy trình bắt đầu từ một liên kết nên không thể điền sẵn.",
+    "manual_step": "Quy trình chờ phê duyệt nên không phải kết quả đầu tiên chỉ với một lần bấm.",
+    "onboarding_off": "Quy trình hợp lệ, nhưng phần làm quen đang tắt với thành viên."
+  },
+  "form": {
+    "heading": "Quy trình mẫu",
+    "workflowId": "ID quy trình",
+    "workflowIdHint": "Dán ID của một quy trình đã xuất bản và được chia sẻ.",
+    "workflowRequired": "Nhập ID quy trình, hoặc dùng Xóa để bỏ mẫu.",
+    "sampleInput": "Dữ liệu nhập mẫu",
+    "sampleInputHint": "Một dòng. Nội dung này được điền sẵn vào form bắt đầu của thành viên.",
+    "counter": "{{used}} / {{max}}",
+    "sourceLocale": "Ngôn ngữ của dữ liệu nhập",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "clear": "Xóa",
+    "clearing": "Đang xóa…"
+  },
+  "locale": {
+    "vi": "Tiếng Việt",
+    "en": "Tiếng Anh"
+  },
+  "translations": {
+    "heading": "Bản dịch",
+    "description": "Thành viên dùng ứng dụng bằng ngôn ngữ khác sẽ nhận dữ liệu nhập này thay cho bản gốc.",
+    "empty": "Hãy lưu một mẫu trước khi dịch dữ liệu nhập.",
+    "field": "Dữ liệu nhập bằng {{language}}",
+    "fieldHint": "Để trống để dùng lại dữ liệu nhập gốc.",
+    "save": "Lưu bản dịch",
+    "saving": "Đang lưu…",
+    "saved": "Đã lưu bản dịch.",
+    "stale": "Mẫu đã thay đổi kể từ khi trang tải. Hãy tải lại để xem bản hiện tại; nội dung bạn nhập vẫn được giữ.",
+    "reload": "Tải lại"
+  }
+}
