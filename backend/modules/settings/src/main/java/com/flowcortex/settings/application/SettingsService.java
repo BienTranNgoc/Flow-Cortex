@@ -8,7 +8,6 @@ import com.flowcortex.settings.api.SettingKey;
 import com.flowcortex.settings.api.SettingRead;
 import com.flowcortex.settings.api.SettingScope;
 import com.flowcortex.settings.api.SettingSource;
-import com.flowcortex.settings.api.SettingType;
 import com.flowcortex.settings.api.Settings;
 import com.flowcortex.settings.infrastructure.SettingStore;
 import com.flowcortex.settings.infrastructure.SettingStore.StoredChange;

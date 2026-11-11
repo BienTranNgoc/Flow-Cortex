@@ -217,8 +217,9 @@ class SettingsServiceTest {
         }
 
         @Override
-        public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at) {
-            changes.add(new StoredChange(previous, next, actor, at));
+        public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at,
+                String reason) {
+            changes.add(new StoredChange(id, key, previous, next, actor, reason, at));
         }
 
         @Override
