@@ -327,6 +327,10 @@ flowcortex:
       interval: ${FLOWCORTEX_PHONE_RETENTION_INTERVAL:1h}
       send-attempts: ${FLOWCORTEX_PHONE_SEND_ATTEMPT_RETENTION:30d}
       sms-outbox: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:7d}
+  # The phone wall: on refuses a signed-in member's requests until a phone number is verified
+  # (staff and super admins excepted). Needs phone verification on, or startup fails; env + restart.
+  phone-gate:
+    enabled: ${FLOWCORTEX_PHONE_GATE_ENABLED:false}
   # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
   phone:
     hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}

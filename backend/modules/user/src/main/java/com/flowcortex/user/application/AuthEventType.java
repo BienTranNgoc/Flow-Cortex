@@ -35,6 +35,9 @@ public enum AuthEventType {
     PAT_CREATED,
     PAT_REVOKED,
 
+    PHONE_CHANGED,
+    PHONE_CHANGE_REVERTED,
+
     LOGOUT;
 
     public static Map<String, Object> metadata(Object... keyValuePairs) {

@@ -40,6 +40,11 @@ public class PhoneNumberHasher {
         }
     }
 
+    /** True when the secret is set and long enough, so {@link #hash} works. */
+    boolean configured() {
+        return key != null;
+    }
+
     public String hash(String e164) {
         if (key == null) {
             throw new IllegalStateException("flowcortex.phone.hash-secret is not set");

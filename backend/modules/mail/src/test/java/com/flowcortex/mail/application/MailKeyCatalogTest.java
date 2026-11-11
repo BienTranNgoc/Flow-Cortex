@@ -39,7 +39,8 @@ class MailKeyCatalogTest {
             MailKey.RESET_PASSWORD, List.of(LINK, new LocalizedMessage("email.duration.hours", 1)),
             MailKey.PASSWORD_CHANGED, List.of("https://app.example/login"),
             MailKey.GOOGLE_SIGN_IN_NOTICE, List.of("https://app.example/login"),
-            MailKey.SUPPORT_REQUEST_REPLIED, List.of(42, "https://app.example/?help=request-42")));
+            MailKey.SUPPORT_REQUEST_REPLIED, List.of(42, "https://app.example/?help=request-42"),
+            MailKey.PHONE_CHANGED, List.of("+84 9•• ••• 321")));
 
     private final ResourceBundleMessageSource messages = messageSource();
 
