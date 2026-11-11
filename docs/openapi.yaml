@@ -56,6 +56,138 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/data/{key}:
+    get:
+      tags:
+      - workflow-data-store-controller
+      operationId: getWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - workflow-data-store-controller
+      operationId: putWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutDataEntryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - workflow-data-store-controller
+      operationId: deleteWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users/{id}:
     get:
       tags:
@@ -665,6 +797,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/workflow-examples/{exampleId}/workflows:
+    post:
+      tags:
+      - workflow-examples-controller
+      operationId: useWorkflowExample
+      parameters:
+      - name: exampleId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users:
     get:
       tags:
@@ -2320,6 +2482,57 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/data:
+    get:
+      tags:
+      - workflow-data-store-controller
+      operationId: listWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryListResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflow-examples:
+    get:
+      tags:
+      - workflow-examples-controller
+      operationId: listWorkflowExamples
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowExampleResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/settings:
     get:
       tags:
@@ -3051,6 +3264,37 @@ components:
         properties:
           type: object
           additionalProperties: {}
+    PutDataEntryRequest:
+      type: object
+      properties:
+        value:
+          description: Any JSON value
+        dataType:
+          type:
+          - string
+          - "null"
+      required:
+      - value
+    DataEntryResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          description: Any JSON value
+        dataType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - value
     UpdateUserRequest:
       type: object
       properties:
@@ -4465,6 +4709,65 @@ components:
           minLength: 0
         config:
           type: string
+    DataEntryListResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataEntrySummary"
+        maxKeys:
+          type: integer
+          format: int32
+        maxValueBytes:
+          type: integer
+          format: int32
+    DataEntrySummary:
+      type: object
+      properties:
+        key:
+          type: string
+        dataType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    WorkflowExampleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        pattern:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        sampleInput:
+          type: string
+        stepTypes:
+          type: array
+          items:
+            type: string
+        stepCount:
+          type: integer
+          format: int32
+        estimatedCredits:
+          type: integer
+          format: int64
+      required:
+      - description
+      - id
+      - pattern
+      - stepCount
+      - stepTypes
+      - title
     SupportSettings:
       type: object
       properties:

@@ -46,7 +46,8 @@ class WorkflowServiceImplTest {
     private final StepExecutorRegistry registry =
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
-            registry, Validation.buildDefaultValidatorFactory().getValidator(),
+            registry, new WorkflowWriteAccess(workflowRepository, registry,
+                    Validation.buildDefaultValidatorFactory().getValidator()),
             mock(com.flowcortex.credit.api.CreditAccounts.class));
 
     @Test
@@ -392,6 +393,32 @@ class WorkflowServiceImplTest {
         assertThat(created.ownerId()).isEqualTo(ownerId);
         assertThat(created.shared()).isTrue();
         assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
+    }
+
+    @Test
+    void createDraftWithStepsStoresAPrivateDraftWithTheStepsInOrder() {
+        UUID ownerId = UUID.randomUUID();
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createDraft(ownerId, "From example", List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "echo", "{step:1.field}")));
+
+        assertThat(created.ownerId()).isEqualTo(ownerId);
+        assertThat(created.shared()).isFalse();
+        assertThat(created.status()).isEqualTo("draft");
+        assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
+    }
+
+    @Test
+    void createDraftWithStepsRejectsAnUnknownStepTypeAndSavesNothing() {
+        assertThatThrownBy(() -> service.createDraft(UUID.randomUUID(), "Bad", List.of(
+                new NewWorkflowStep("first", "image.gen", null))))
+                .isInstanceOf(ConstraintViolationException.class);
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
     }
 
     @Test

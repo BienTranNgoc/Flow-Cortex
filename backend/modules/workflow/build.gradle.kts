@@ -17,6 +17,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     // InputResolver parses a referenced step's JSON output directly.
     implementation("com.fasterxml.jackson.core:jackson-databind")
+    // The HTTP converter is Jackson 3, so request and response bodies are typed with its JsonNode.
+    implementation("tools.jackson.core:jackson-databind")
     // Persistent Event Publication Registry: an after-commit listener crash mid-run
     // redelivers instead of losing the run (schema: V2026.09.22.003__event_publication.sql).
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")

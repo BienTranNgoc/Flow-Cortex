@@ -27,7 +27,8 @@ class ChatCatalogTest {
     private final StepExecutorRegistry registry =
             new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
-            registry, Validation.buildDefaultValidatorFactory().getValidator(), credits);
+            registry, new WorkflowWriteAccess(workflowRepository, registry,
+                    Validation.buildDefaultValidatorFactory().getValidator()), credits);
     private final UUID memberId = UUID.randomUUID();
 
     @Test

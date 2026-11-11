@@ -24,6 +24,23 @@ export interface ProblemDetail {
   properties?: ProblemDetailProperties;
 }
 
+export interface PutDataEntryRequest {
+  /** Any JSON value */
+  value: unknown;
+  /** @nullable */
+  dataType?: string | null;
+}
+
+export interface DataEntryResponse {
+  key?: string;
+  /** Any JSON value */
+  value: unknown;
+  dataType?: string;
+  sizeBytes?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
@@ -973,6 +990,31 @@ export interface UpdateStepRequest {
   config?: string;
 }
 
+export interface DataEntrySummary {
+  key?: string;
+  dataType?: string;
+  sizeBytes?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DataEntryListResponse {
+  entries?: DataEntrySummary[];
+  maxKeys?: number;
+  maxValueBytes?: number;
+}
+
+export interface WorkflowExampleResponse {
+  id: string;
+  pattern: string;
+  title: string;
+  description: string;
+  sampleInput?: string;
+  stepTypes: string[];
+  stepCount: number;
+  estimatedCredits?: number;
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -1421,6 +1463,176 @@ export const reorderWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type getWorkflowDataResponse200 = {
+  data: DataEntryResponse;
+  status: 200;
+};
+
+export type getWorkflowDataResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type getWorkflowDataResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowDataResponseSuccess = getWorkflowDataResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowDataResponseError = (
+  getWorkflowDataResponse403 | getWorkflowDataResponse404
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowDataResponse = getWorkflowDataResponseSuccess | getWorkflowDataResponseError;
+
+export const getGetWorkflowDataUrl = (id: string, key: string) => {
+  return `/api/v1/workflows/${id}/data/${key}`;
+};
+
+export const getWorkflowData = async (
+  id: string,
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowDataResponse> => {
+  return customFetch<getWorkflowDataResponse>(getGetWorkflowDataUrl(id, key), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type putWorkflowDataResponse200 = {
+  data: DataEntryResponse;
+  status: 200;
+};
+
+export type putWorkflowDataResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type putWorkflowDataResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type putWorkflowDataResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type putWorkflowDataResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type putWorkflowDataResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type putWorkflowDataResponseSuccess = putWorkflowDataResponse200 & {
+  headers: Headers;
+};
+export type putWorkflowDataResponseError = (
+  | putWorkflowDataResponse400
+  | putWorkflowDataResponse403
+  | putWorkflowDataResponse404
+  | putWorkflowDataResponse409
+  | putWorkflowDataResponse422
+) & {
+  headers: Headers;
+};
+
+export type putWorkflowDataResponse = putWorkflowDataResponseSuccess | putWorkflowDataResponseError;
+
+export const getPutWorkflowDataUrl = (id: string, key: string) => {
+  return `/api/v1/workflows/${id}/data/${key}`;
+};
+
+export const putWorkflowData = async (
+  id: string,
+  key: string,
+  putDataEntryRequest: PutDataEntryRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<putWorkflowDataResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<putWorkflowDataResponse>(getPutWorkflowDataUrl(id, key), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(putDataEntryRequest),
+  });
+};
+
+export type deleteWorkflowDataResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowDataResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowDataResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowDataResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteWorkflowDataResponseSuccess = deleteWorkflowDataResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowDataResponseError = (
+  deleteWorkflowDataResponse403 | deleteWorkflowDataResponse404 | deleteWorkflowDataResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowDataResponse =
+  deleteWorkflowDataResponseSuccess | deleteWorkflowDataResponseError;
+
+export const getDeleteWorkflowDataUrl = (id: string, key: string) => {
+  return `/api/v1/workflows/${id}/data/${key}`;
+};
+
+export const deleteWorkflowData = async (
+  id: string,
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowDataResponse> => {
+  return customFetch<deleteWorkflowDataResponse>(getDeleteWorkflowDataUrl(id, key), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -2498,6 +2710,47 @@ export const startRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRunRequest),
+  });
+};
+
+export type useWorkflowExampleResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type useWorkflowExampleResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type useWorkflowExampleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type useWorkflowExampleResponseSuccess = useWorkflowExampleResponse201 & {
+  headers: Headers;
+};
+export type useWorkflowExampleResponseError = (
+  useWorkflowExampleResponse401 | useWorkflowExampleResponse404
+) & {
+  headers: Headers;
+};
+
+export type useWorkflowExampleResponse =
+  useWorkflowExampleResponseSuccess | useWorkflowExampleResponseError;
+
+export const getUseWorkflowExampleUrl = (exampleId: string) => {
+  return `/api/v1/workflow-examples/${exampleId}/workflows`;
+};
+
+export const useWorkflowExample = async (
+  exampleId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<useWorkflowExampleResponse> => {
+  return customFetch<useWorkflowExampleResponse>(getUseWorkflowExampleUrl(exampleId), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -5161,6 +5414,80 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type listWorkflowDataResponse200 = {
+  data: DataEntryListResponse;
+  status: 200;
+};
+
+export type listWorkflowDataResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listWorkflowDataResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listWorkflowDataResponseSuccess = listWorkflowDataResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowDataResponseError = (
+  listWorkflowDataResponse403 | listWorkflowDataResponse404
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowDataResponse =
+  listWorkflowDataResponseSuccess | listWorkflowDataResponseError;
+
+export const getListWorkflowDataUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/data`;
+};
+
+export const listWorkflowData = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowDataResponse> => {
+  return customFetch<listWorkflowDataResponse>(getListWorkflowDataUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listWorkflowExamplesResponse200 = {
+  data: WorkflowExampleResponse[];
+  status: 200;
+};
+
+export type listWorkflowExamplesResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type listWorkflowExamplesResponseSuccess = listWorkflowExamplesResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowExamplesResponseError = listWorkflowExamplesResponse401 & {
+  headers: Headers;
+};
+
+export type listWorkflowExamplesResponse =
+  listWorkflowExamplesResponseSuccess | listWorkflowExamplesResponseError;
+
+export const getListWorkflowExamplesUrl = () => {
+  return `/api/v1/workflow-examples`;
+};
+
+export const listWorkflowExamples = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowExamplesResponse> => {
+  return customFetch<listWorkflowExamplesResponse>(getListWorkflowExamplesUrl(), {
+    ...options,
+    method: 'GET',
   });
 };
 

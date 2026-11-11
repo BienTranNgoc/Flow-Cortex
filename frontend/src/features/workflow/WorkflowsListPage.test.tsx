@@ -278,6 +278,7 @@ describe('WorkflowsListPage', () => {
           ? { status: 503, body: { status: 503 } }
           : { status: 200, body: [DOUYIN, ECHO, FAIL] };
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
@@ -300,6 +301,7 @@ describe('WorkflowsListPage', () => {
         status: 503,
         body: { status: 503, detail: 'Workflows are paused for maintenance.' },
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);

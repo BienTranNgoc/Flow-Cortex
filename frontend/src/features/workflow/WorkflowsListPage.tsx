@@ -16,6 +16,7 @@ import { WorkflowIcon } from '../dashboard/WorkflowIcon';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useWorkflowsQuery } from './useWorkflows';
 import { OwnerCell } from './OwnerCell';
+import { WorkflowExamples } from './WorkflowExamples';
 import './WorkflowsListPage.css';
 
 type PillTone = 'active' | 'failed' | 'attention';
@@ -107,6 +108,8 @@ export function WorkflowsListPage() {
           />
         }
       />
+
+      <WorkflowExamples />
 
       <div className="wf-list__toolbar">
         <label className="wf-list__search" aria-label={t('workflow.list.searchLabel')}>

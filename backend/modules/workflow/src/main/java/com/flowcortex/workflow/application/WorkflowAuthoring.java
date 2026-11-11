@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.flowcortex.workflow.api.NewStep;
+import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.StepEdit;
 import com.flowcortex.workflow.api.UpdateWorkflow;
 import com.flowcortex.workflow.api.WorkflowStepView;
@@ -15,6 +16,9 @@ import java.util.UUID;
 public interface WorkflowAuthoring {
 
     WorkflowView createDraft(UUID ownerId, String name, boolean shared);
+
+    /** A private draft that already holds {@code steps}, in order; the steps pass the same check as a saved workflow's. */
+    WorkflowView createDraft(UUID ownerId, String name, List<NewWorkflowStep> steps);
 
     WorkflowView updateWorkflow(Caller caller, UUID workflowId, UpdateWorkflow update);
 

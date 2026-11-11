@@ -1,0 +1,19 @@
+{
+  "id": "human-in-the-loop",
+  "pattern": "human-in-the-loop",
+  "title": {
+    "en": "Draft, review, then approve",
+    "vi": "Soạn nháp, duyệt, rồi chốt"
+  },
+  "description": {
+    "en": "A first step drafts the text, the run pauses for your review, and the approved text flows on to the last step.",
+    "vi": "Bước đầu soạn nháp văn bản, lượt chạy dừng lại chờ bạn duyệt, rồi văn bản đã duyệt đi tiếp sang bước cuối."
+  },
+  "sampleInput": "Draft: welcome email for new members",
+  "steps": [
+    { "name": "draft", "type": "echo" },
+    { "name": "review", "type": "APPROVAL_CHECKPOINT" },
+    { "name": "approved", "type": "echo" }
+  ],
+  "dataStore": []
+}
