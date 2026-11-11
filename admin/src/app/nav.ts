@@ -8,6 +8,7 @@ import {
   GearSix,
   Headset,
   ListChecks,
+  LockKey,
   Play,
   Pulse,
   ShieldCheck,
@@ -148,6 +149,12 @@ export const NAV: NavGroup[] = [
         path: '/admin-accounts',
         icon: UserGear,
         key: 'system.admin_account.view',
+      },
+      {
+        label: 'common.shell.nav.items.roles',
+        path: '/roles',
+        icon: LockKey,
+        key: 'system.role.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',

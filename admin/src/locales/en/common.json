@@ -79,7 +79,8 @@
         "supportGroups": "Topics",
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
-        "adminAccounts": "Admin accounts"
+        "adminAccounts": "Admin accounts",
+        "roles": "Roles & permissions"
       }
     },
     "noAccess": {

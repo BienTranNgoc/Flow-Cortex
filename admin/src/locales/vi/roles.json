@@ -1,0 +1,192 @@
+{
+  "title": "Vai trò & quyền",
+  "eyebrow": "Hệ thống",
+  "description": "Tạo vai trò cho nhân sự và chọn thao tác mà mỗi vai trò được dùng trong trang quản trị.",
+  "list": {
+    "tableLabel": "Bảng vai trò",
+    "columns": {
+      "name": "Vai trò",
+      "code": "Mã",
+      "type": "Loại",
+      "accounts": "Tài khoản"
+    },
+    "type": {
+      "system": "Hệ thống",
+      "custom": "Tùy chỉnh"
+    },
+    "create": "Tạo vai trò",
+    "loading": "Đang tải vai trò…",
+    "empty": "Chưa có vai trò tùy chỉnh. Các vai trò hệ thống ở trên đã bao phần việc mặc định của nhân sự.",
+    "emptyCreate": "Hãy tạo vai trò tùy chỉnh đầu tiên để một nhóm có bộ quyền riêng.",
+    "retry": "Thử lại",
+    "errors": {
+      "load": "Không tải được danh sách vai trò."
+    },
+    "accountsLink": "{{count}}",
+    "accountsLinkLabel": "Xem các tài khoản đang giữ vai trò {{name}}",
+    "open": "Mở vai trò {{name}}"
+  },
+  "detail": {
+    "titleNew": "Tạo vai trò",
+    "titleView": "Vai trò: {{name}}",
+    "backToRoles": "Quay lại danh sách vai trò",
+    "loading": "Đang tải vai trò…",
+    "notFound": "Không tìm thấy vai trò",
+    "invalidCode": "Mã vai trò này không hợp lệ.",
+    "retry": "Thử lại",
+    "errors": {
+      "load": "Không tải được vai trò này.",
+      "generic": "Không lưu được vai trò. Hãy thử lại.",
+      "deleteGeneric": "Không xóa được vai trò. Hãy thử lại.",
+      "nameRequired": "Hãy nhập tên vai trò.",
+      "nameTooLong": "Tên tối đa {{max}} ký tự.",
+      "descriptionTooLong": "Mô tả tối đa {{max}} ký tự.",
+      "missingView": "Hãy cấp thêm quyền xem cho: {{features}}",
+      "permissionsHeading": "Máy chủ từ chối các quyền sau:"
+    },
+    "fields": {
+      "name": "Tên",
+      "description": "Mô tả",
+      "code": "Mã",
+      "codeHint": "Được tạo từ tên khi tạo vai trò và không bao giờ đổi."
+    },
+    "badges": {
+      "system": "Vai trò hệ thống",
+      "custom": "Vai trò tùy chỉnh",
+      "superAdmin": "Quản trị viên cấp cao"
+    },
+    "notes": {
+      "superAdmin": "Vai trò quản trị viên cấp cao có mọi quyền và không thể thay đổi.",
+      "system": "Vai trò hệ thống: có thể sửa quyền nhưng không thể đổi tên hoặc xóa.",
+      "readOnly": "Bạn chỉ xem được vai trò này, không sửa được.",
+      "endUser": "Vai trò người dùng cuối không có quyền quản trị."
+    },
+    "actions": {
+      "save": "Lưu thay đổi",
+      "saving": "Đang lưu…",
+      "create": "Tạo vai trò",
+      "creating": "Đang tạo…",
+      "reload": "Tải lại",
+      "delete": "Xóa vai trò"
+    },
+    "notice": {
+      "created": "Đã tạo vai trò {{name}}.",
+      "saved_one": "Đã lưu. {{name}} hiện có {{count}} quyền.",
+      "saved_other": "Đã lưu. {{name}} hiện có {{count}} quyền.",
+      "renamed": "Đã lưu. Vai trò giờ có tên {{name}}."
+    },
+    "stale": "Một quản trị viên khác vừa đổi vai trò này khi bạn đang sửa. Bản nháp của bạn vẫn được giữ bên dưới; Tải lại sẽ thay nó bằng các quyền đã lưu.",
+    "partialSave": "Các quyền đã được lưu nhưng tên thì chưa. Hãy sửa tên rồi lưu lại.",
+    "delete": {
+      "title": "Xóa vai trò {{name}}?",
+      "description": "Vai trò và các quyền của nó sẽ bị xóa. Tài khoản không thể giữ một vai trò đã xóa.",
+      "confirm": "Xóa vai trò",
+      "working": "Đang xóa…",
+      "cancel": "Hủy",
+      "heldLink": "Xem các tài khoản đang giữ vai trò này"
+    },
+    "leaveConfirm": "Bạn có thay đổi chưa lưu ở vai trò này. Rời đi mà không lưu?"
+  },
+  "matrix": {
+    "label": "Quyền của {{name}}",
+    "expand": "Mở rộng {{name}}",
+    "collapse": "Thu gọn {{name}}",
+    "count": "{{selected}} / {{total}}",
+    "moduleToggle": "Mọi quyền trong {{name}}",
+    "featureToggle": "Mọi thao tác của {{name}}",
+    "summary": "Đã cấp {{selected}} / {{total}} quyền",
+    "legend": "Cấp một thao tác sẽ cấp luôn quyền xem của mục đó; bỏ quyền xem sẽ bỏ mọi thao tác của mục.",
+    "superAdminOnly": "Chỉ quản trị viên cấp cao",
+    "empty": "Danh mục chưa có quyền nào để hiển thị."
+  },
+  "catalog": {
+    "modules": {
+      "user": "Người dùng",
+      "workflow": "Quy trình",
+      "support": "Hỗ trợ",
+      "content": "Nội dung",
+      "platform": "Nền tảng",
+      "system": "Hệ thống"
+    },
+    "features": {
+      "user": {
+        "account": "Tài khoản"
+      },
+      "workflow": {
+        "run": "Lượt chạy",
+        "workflow": "Quy trình"
+      },
+      "support": {
+        "ticket": "Yêu cầu hỗ trợ"
+      },
+      "content": {
+        "help_topic": "Chủ đề hướng dẫn",
+        "help_article": "Bài hướng dẫn"
+      },
+      "platform": {
+        "setting": "Cài đặt",
+        "sms_outbox": "Hộp thư đi SMS"
+      },
+      "system": {
+        "role": "Vai trò",
+        "admin_account": "Tài khoản quản trị"
+      }
+    },
+    "actions": {
+      "user": {
+        "account": {
+          "view": "Xem tài khoản",
+          "create": "Tạo tài khoản",
+          "update": "Sửa tài khoản",
+          "change_role": "Đổi vai trò",
+          "suspend": "Tạm khóa tài khoản",
+          "delete": "Xóa tài khoản"
+        }
+      },
+      "workflow": {
+        "run": {
+          "view": "Xem lượt chạy"
+        },
+        "workflow": {
+          "manage": "Quản lý quy trình"
+        }
+      },
+      "support": {
+        "ticket": {
+          "view": "Xem yêu cầu",
+          "reply": "Trả lời yêu cầu",
+          "close": "Đóng yêu cầu"
+        }
+      },
+      "content": {
+        "help_topic": {
+          "view": "Xem chủ đề",
+          "manage": "Quản lý chủ đề"
+        },
+        "help_article": {
+          "view": "Xem bài viết",
+          "manage": "Quản lý bài viết"
+        }
+      },
+      "platform": {
+        "setting": {
+          "view": "Xem cài đặt",
+          "update": "Đổi cài đặt"
+        },
+        "sms_outbox": {
+          "view": "Xem hộp thư đi SMS"
+        }
+      },
+      "system": {
+        "role": {
+          "view": "Xem vai trò",
+          "manage": "Quản lý vai trò"
+        },
+        "admin_account": {
+          "view": "Xem tài khoản quản trị",
+          "manage": "Quản lý tài khoản quản trị"
+        }
+      }
+    }
+  }
+}
