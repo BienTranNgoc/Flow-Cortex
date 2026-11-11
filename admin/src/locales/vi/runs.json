@@ -1,7 +1,7 @@
 {
   "title": "Lượt chạy",
   "eyebrow": "Vận hành quy trình",
-  "description": "Mọi lượt chạy quy trình trên toàn nền tảng. Dùng bộ lọc để thu hẹp theo trạng thái.",
+  "description": "Mọi lượt chạy quy trình trên toàn nền tảng. Dùng bộ lọc để thu hẹp theo trạng thái, quy trình hoặc ngày.",
   "noun_one": "lượt chạy",
   "noun_other": "lượt chạy",
   "tableLabel": "Bảng lượt chạy",
@@ -21,5 +21,55 @@
     "error": "Lỗi",
     "cancelling": "Đang dừng",
     "cancelled": "Đã hủy"
+  },
+  "filters": {
+    "from": "Từ ngày",
+    "to": "Đến ngày",
+    "workflowChip": "Quy trình: {{name}}",
+    "removeFilter": "Bỏ bộ lọc",
+    "clear": "Xóa các bộ lọc",
+    "rangeReversed": "Ngày bắt đầu không được sau ngày kết thúc."
+  },
+  "detail": {
+    "title": "Chi tiết lượt chạy",
+    "allRuns": "Tất cả lượt chạy",
+    "notFound": "Không tìm thấy lượt chạy",
+    "notFoundHint": "Lượt chạy này không tồn tại hoặc địa chỉ không đúng.",
+    "loading": "Đang tải lượt chạy…",
+    "loadError": "Không tải được lượt chạy này.",
+    "forbidden": "Bạn không có quyền xem lượt chạy này.",
+    "overview": "Tổng quan",
+    "credits": "Credit đã trừ"
+  },
+  "stop": {
+    "action": "Dừng lượt chạy",
+    "title": "Dừng lượt chạy",
+    "description": "Lượt chạy sẽ dừng sau khi bước hiện tại kết thúc và các bước còn lại bị bỏ qua. Credit đã trừ không được hoàn lại.",
+    "keep": "Tiếp tục chạy",
+    "confirm": "Dừng lượt chạy",
+    "working": "Đang dừng…",
+    "failed": "Không dừng được lượt chạy này. Hãy thử lại."
+  },
+  "steps": {
+    "title": "Các bước",
+    "empty": "Lượt chạy này không có bước nào.",
+    "tableLabel": "Bảng các bước của lượt chạy",
+    "order": "#",
+    "type": "Loại",
+    "mode": "Chế độ",
+    "status": "Trạng thái",
+    "attempt": "Lần thử",
+    "error": "Lỗi",
+    "started": "Bắt đầu",
+    "finished": "Kết thúc",
+    "statuses": {
+      "pending": "Đang chờ",
+      "running": "Đang chạy",
+      "waiting_approval": "Chờ duyệt",
+      "completed": "Hoàn tất",
+      "error": "Lỗi",
+      "skipped": "Đã bỏ qua",
+      "cancelled": "Đã hủy"
+    }
   }
 }

@@ -1,0 +1,54 @@
+{
+  "title": "Workflows",
+  "eyebrow": "Workflow Ops",
+  "description": "Every member's workflows, draft or published, with how much they are used.",
+  "noun_one": "workflow",
+  "noun_other": "workflows",
+  "tableLabel": "Workflows table",
+  "deletedUser": "(deleted user)",
+  "columns": {
+    "name": "Name",
+    "owner": "Owner",
+    "status": "Status",
+    "shared": "Shared",
+    "steps": "Steps",
+    "runs": "Runs",
+    "runs7d": "Runs (7 days)",
+    "lastRun": "Last run",
+    "updated": "Updated"
+  },
+  "status": {
+    "draft": "Draft",
+    "published": "Published"
+  },
+  "shared": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "search": {
+    "label": "Name",
+    "placeholder": "Search by name",
+    "submit": "Search",
+    "clear": "Clear filters"
+  },
+  "report": {
+    "title": "Workflow report",
+    "allWorkflows": "All workflows",
+    "notFound": "Workflow not found",
+    "notFoundHint": "This workflow does not exist, was deleted, or the address is wrong.",
+    "loading": "Loading report…",
+    "loadError": "Could not load this report.",
+    "forbidden": "You do not have permission to view this report.",
+    "viewRuns": "View runs",
+    "counts": "Runs by status",
+    "totalRuns": "Total runs",
+    "lastRun": "Last run",
+    "neverRun": "Never run",
+    "chartTitle": "Runs per day, last 30 days",
+    "chartLabel": "Runs in the last 30 days: {{total}} in total, {{failed}} failed",
+    "chartLegend": "{{total}} runs in the last 30 days, {{failed}} of them failed (red).",
+    "day": "Day",
+    "runs": "Runs",
+    "failed": "Failed"
+  }
+}

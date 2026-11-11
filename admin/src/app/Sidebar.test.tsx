@@ -59,8 +59,23 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /Voice Quota/ })).not.toBeInTheDocument();
   });
 
+  it('links Workflows to /workflows with no coming-soon tag for a holder of its key, and hides it otherwise', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+
+    const link = screen.getByRole('link', { name: /Workflows & Templates/ });
+    expect(link).toHaveAttribute('href', '/workflows');
+    expect(link).not.toHaveTextContent('Coming soon');
+    unmount();
+
+    renderSidebar({
+      permissions: ADMIN_ME.permissions.filter((key) => key !== 'workflow.workflow.view'),
+      adminDisabled: false,
+    });
+    expect(screen.queryByText('Workflows & Templates')).not.toBeInTheDocument();
+  });
+
   it.each([
-    'Workflows & Templates',
     'Approval Queue',
     'Credits & Wallets',
     'Model Providers',

@@ -3,6 +3,8 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.api.AdminRunDetailView;
+import com.flowcortex.workflow.api.AdminRunStepView;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.RunStepOutputView;
@@ -71,9 +73,26 @@ final class WorkflowMapper {
                 outputs(step, isDownloadable), mode(step.getType(), isRemoteType));
     }
 
-    static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail) {
-        return new AdminRunView(run.getId(), workflowName, ownerEmail, wire(run.getStatus().name()),
-                run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt());
+    static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail,
+            Long creditsCharged) {
+        return new AdminRunView(run.getId(), run.getWorkflowId(), workflowName, run.getOwnerId(), ownerEmail,
+                wire(run.getStatus().name()), run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt(),
+                creditsCharged);
+    }
+
+    static AdminRunDetailView toAdminRunDetailView(WorkflowRun run, String workflowName, String ownerEmail,
+            Long creditsCharged, List<RunStep> steps, Predicate<String> isRemoteType) {
+        return new AdminRunDetailView(run.getId(), run.getWorkflowId(), workflowName, run.getOwnerId(), ownerEmail,
+                wire(run.getStatus().name()), run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt(),
+                creditsCharged, steps.stream().map(step -> toAdminRunStepView(step, isRemoteType)).toList());
+    }
+
+    private static AdminRunStepView toAdminRunStepView(RunStep step, Predicate<String> isRemoteType) {
+        Short percent = step.getProgressPercent();
+        return new AdminRunStepView(step.getStepOrder(), step.getType(), mode(step.getType(), isRemoteType),
+                wire(step.getStatus().name()), step.getAttempt(), step.getDeliveryCount(),
+                percent == null ? null : percent.intValue(), step.getErrorCode(), step.getErrorMessage(),
+                step.getPickedUpAt(), step.getStartedAt(), step.getFinishedAt());
     }
 
     static MediaJobView toMediaJobView(RunStep step) {

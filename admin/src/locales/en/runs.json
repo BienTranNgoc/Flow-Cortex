@@ -1,7 +1,7 @@
 {
   "title": "Runs",
   "eyebrow": "Workflow Ops",
-  "description": "Every workflow execution across the platform. Use filters to narrow by status.",
+  "description": "Every workflow execution across the platform. Use filters to narrow by status, workflow or date.",
   "noun_one": "run",
   "noun_other": "runs",
   "tableLabel": "Runs table",
@@ -21,5 +21,55 @@
     "error": "Error",
     "cancelling": "Cancelling",
     "cancelled": "Cancelled"
+  },
+  "filters": {
+    "from": "From date",
+    "to": "To date",
+    "workflowChip": "Workflow: {{name}}",
+    "removeFilter": "Remove filter",
+    "clear": "Clear filters",
+    "rangeReversed": "The start date must not be after the end date."
+  },
+  "detail": {
+    "title": "Run detail",
+    "allRuns": "All runs",
+    "notFound": "Run not found",
+    "notFoundHint": "This run does not exist or the address is wrong.",
+    "loading": "Loading run…",
+    "loadError": "Could not load this run.",
+    "forbidden": "You do not have permission to view this run.",
+    "overview": "Overview",
+    "credits": "Credits charged"
+  },
+  "stop": {
+    "action": "Stop run",
+    "title": "Stop run",
+    "description": "The run stops after its current step finishes and its remaining steps are skipped. Credits already charged are not refunded.",
+    "keep": "Keep running",
+    "confirm": "Stop run",
+    "working": "Stopping…",
+    "failed": "Could not stop this run. Try again."
+  },
+  "steps": {
+    "title": "Steps",
+    "empty": "This run has no steps.",
+    "tableLabel": "Run steps table",
+    "order": "#",
+    "type": "Type",
+    "mode": "Mode",
+    "status": "Status",
+    "attempt": "Attempt",
+    "error": "Error",
+    "started": "Started",
+    "finished": "Finished",
+    "statuses": {
+      "pending": "Pending",
+      "running": "Running",
+      "waiting_approval": "Waiting for approval",
+      "completed": "Completed",
+      "error": "Error",
+      "skipped": "Skipped",
+      "cancelled": "Cancelled"
+    }
   }
 }

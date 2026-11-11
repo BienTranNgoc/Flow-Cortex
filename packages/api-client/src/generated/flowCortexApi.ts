@@ -107,6 +107,10 @@ export const MeResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  workflowrunexport: 'workflow.run.export',
+  workflowruncancel: 'workflow.run.cancel',
+  workflowworkflowview: 'workflow.workflow.view',
+  workflowworkflowexport: 'workflow.workflow.export',
 } as const;
 
 export interface MeResponse {
@@ -957,6 +961,35 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface Step {
+  stepOrder: number;
+  type: string;
+  mode: string;
+  status: string;
+  attempt: number;
+  deliveryCount: number;
+  progressPercent?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  pickedUpAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface AdminRunDetailResponse {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  ownerId: string;
+  ownerEmail?: string;
+  status: string;
+  errorMessage?: string;
+  startedAt: string;
+  finishedAt?: string;
+  creditsCharged?: number;
+  steps: Step[];
+}
+
 export interface AdminAccountResponse {
   id: string;
   email: string;
@@ -1157,6 +1190,71 @@ export interface CapabilitiesResponse {
   productVideoWorkflowId?: string;
 }
 
+export interface BuilderSummaryResponse {
+  totalWorkflows: number;
+  publishedWorkflows: number;
+  totalRuns: number;
+}
+
+export type BuilderChartResponsePeriod =
+  (typeof BuilderChartResponsePeriod)[keyof typeof BuilderChartResponsePeriod];
+
+export const BuilderChartResponsePeriod = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
+
+export interface DayCountResponse {
+  day: string;
+  runs: number;
+  failed: number;
+}
+
+export interface BuilderChartResponse {
+  period: BuilderChartResponsePeriod;
+  series: DayCountResponse[];
+}
+
+export type AdminWorkflowResponseStatus =
+  (typeof AdminWorkflowResponseStatus)[keyof typeof AdminWorkflowResponseStatus];
+
+export const AdminWorkflowResponseStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export interface AdminWorkflowResponse {
+  id: string;
+  name: string;
+  ownerId: string;
+  ownerEmail?: string;
+  status: AdminWorkflowResponseStatus;
+  shared: boolean;
+  steps: number;
+  runs: number;
+  runsLast7Days: number;
+  lastRunAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageViewAdminWorkflowResponse {
+  items: AdminWorkflowResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type WorkflowReportResponseCountsByStatus = { [key: string]: number };
+
+export interface WorkflowReportResponse {
+  workflow: AdminWorkflowResponse;
+  countsByStatus: WorkflowReportResponseCountsByStatus;
+  lastRunAt?: string;
+  series: DayCountResponse[];
+}
+
 export type AdminSupportRequestSummaryType =
   (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
 
@@ -1232,12 +1330,15 @@ export interface SmsOutboxEntryResponse {
 
 export interface AdminRunResponse {
   id: string;
+  workflowId: string;
   workflowName: string;
+  ownerId: string;
   ownerEmail?: string;
   status: string;
   errorMessage?: string;
   startedAt: string;
   finishedAt?: string;
+  creditsCharged?: number;
 }
 
 export interface PageViewAdminRunResponse {
@@ -1272,6 +1373,10 @@ export const RoleResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  workflowrunexport: 'workflow.run.export',
+  workflowruncancel: 'workflow.run.cancel',
+  workflowworkflowview: 'workflow.workflow.view',
+  workflowworkflowexport: 'workflow.workflow.export',
 } as const;
 
 export interface RoleResponse {
@@ -1314,6 +1419,36 @@ export interface PageViewAdminAccountResponse {
   total: number;
 }
 
+export type ListAdminWorkflowsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * @pattern draft|published
+   */
+  status?: ListAdminWorkflowsStatus;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  q?: string;
+};
+
+export type ListAdminWorkflowsStatus =
+  (typeof ListAdminWorkflowsStatus)[keyof typeof ListAdminWorkflowsStatus];
+
+export const ListAdminWorkflowsStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
 export type SearchSupportKbParams = {
   /**
    * @minLength 2
@@ -1326,6 +1461,22 @@ export type OpenRealtimeStreamParams = {
   topic?: string[];
 };
 
+export type GetBuilderRunsChartParams = {
+  /**
+   * @pattern 7d|30d|90d
+   */
+  period?: GetBuilderRunsChartPeriod;
+};
+
+export type GetBuilderRunsChartPeriod =
+  (typeof GetBuilderRunsChartPeriod)[keyof typeof GetBuilderRunsChartPeriod];
+
+export const GetBuilderRunsChartPeriod = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
+
 export type CallbackParams = {
   code?: string;
   state?: string;
@@ -1336,6 +1487,26 @@ export type AuthorizeParams = {
   remember_me?: boolean;
   return_to?: string;
 };
+
+export type ExportAdminWorkflowsParams = {
+  /**
+   * @pattern draft|published
+   */
+  status?: ExportAdminWorkflowsStatus;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  q?: string;
+};
+
+export type ExportAdminWorkflowsStatus =
+  (typeof ExportAdminWorkflowsStatus)[keyof typeof ExportAdminWorkflowsStatus];
+
+export const ExportAdminWorkflowsStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
 
 export type ListAdminSupportRequestsParams = {
   status?: ListAdminSupportRequestsStatus;
@@ -1392,11 +1563,36 @@ export type ListAdminRunsParams = {
    * @pattern running|waiting_approval|completed|error|cancelling|cancelled
    */
   status?: ListAdminRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
 };
 
 export type ListAdminRunsStatus = (typeof ListAdminRunsStatus)[keyof typeof ListAdminRunsStatus];
 
 export const ListAdminRunsStatus = {
+  running: 'running',
+  waiting_approval: 'waiting_approval',
+  completed: 'completed',
+  error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
+} as const;
+
+export type ExportAdminRunsParams = {
+  /**
+   * @pattern running|waiting_approval|completed|error|cancelling|cancelled
+   */
+  status?: ExportAdminRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type ExportAdminRunsStatus =
+  (typeof ExportAdminRunsStatus)[keyof typeof ExportAdminRunsStatus];
+
+export const ExportAdminRunsStatus = {
   running: 'running',
   waiting_approval: 'waiting_approval',
   completed: 'completed',
@@ -4135,6 +4331,42 @@ export const confirmEmail = async (
   });
 };
 
+export type listAdminWorkflowsResponse200 = {
+  data: PageViewAdminWorkflowResponse;
+  status: 200;
+};
+
+export type listAdminWorkflowsResponseSuccess = listAdminWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listAdminWorkflowsResponse = listAdminWorkflowsResponseSuccess;
+
+export const getListAdminWorkflowsUrl = (params?: ListAdminWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/workflows?${stringifiedParams}`
+    : `/api/v1/admin/workflows`;
+};
+
+export const listAdminWorkflows = async (
+  params?: ListAdminWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminWorkflowsResponse> => {
+  return customFetch<listAdminWorkflowsResponse>(getListAdminWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type createAdminWorkflowResponse201 = {
   data: WorkflowResponse;
   status: 201;
@@ -4604,6 +4836,30 @@ export const archiveAdminSupportKbArticle = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<archiveAdminSupportKbArticleResponse> => {
   return customFetch<archiveAdminSupportKbArticleResponse>(getArchiveAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type cancelAdminRunResponse200 = {
+  data: AdminRunDetailResponse;
+  status: 200;
+};
+
+export type cancelAdminRunResponseSuccess = cancelAdminRunResponse200 & {
+  headers: Headers;
+};
+export type cancelAdminRunResponse = cancelAdminRunResponseSuccess;
+
+export const getCancelAdminRunUrl = (id: string) => {
+  return `/api/v1/admin/runs/${id}/cancel`;
+};
+
+export const cancelAdminRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelAdminRunResponse> => {
+  return customFetch<cancelAdminRunResponse>(getCancelAdminRunUrl(id), {
     ...options,
     method: 'POST',
   });
@@ -5751,6 +6007,65 @@ export const capabilities = async (
   });
 };
 
+export type getBuilderSummaryResponse200 = {
+  data: BuilderSummaryResponse;
+  status: 200;
+};
+
+export type getBuilderSummaryResponseSuccess = getBuilderSummaryResponse200 & {
+  headers: Headers;
+};
+export type getBuilderSummaryResponse = getBuilderSummaryResponseSuccess;
+
+export const getGetBuilderSummaryUrl = () => {
+  return `/api/v1/builder/dashboard/summary`;
+};
+
+export const getBuilderSummary = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBuilderSummaryResponse> => {
+  return customFetch<getBuilderSummaryResponse>(getGetBuilderSummaryUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBuilderRunsChartResponse200 = {
+  data: BuilderChartResponse;
+  status: 200;
+};
+
+export type getBuilderRunsChartResponseSuccess = getBuilderRunsChartResponse200 & {
+  headers: Headers;
+};
+export type getBuilderRunsChartResponse = getBuilderRunsChartResponseSuccess;
+
+export const getGetBuilderRunsChartUrl = (params?: GetBuilderRunsChartParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/builder/dashboard/runs-chart?${stringifiedParams}`
+    : `/api/v1/builder/dashboard/runs-chart`;
+};
+
+export const getBuilderRunsChart = async (
+  params?: GetBuilderRunsChartParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBuilderRunsChartResponse> => {
+  return customFetch<getBuilderRunsChartResponse>(getGetBuilderRunsChartUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type callbackResponse302 = {
   data: void;
   status: 302;
@@ -5846,6 +6161,66 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminWorkflowReportResponse200 = {
+  data: WorkflowReportResponse;
+  status: 200;
+};
+
+export type getAdminWorkflowReportResponseSuccess = getAdminWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type getAdminWorkflowReportResponse = getAdminWorkflowReportResponseSuccess;
+
+export const getGetAdminWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/report`;
+};
+
+export const getAdminWorkflowReport = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminWorkflowReportResponse> => {
+  return customFetch<getAdminWorkflowReportResponse>(getGetAdminWorkflowReportUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminWorkflowsResponse200 = {
+  data: string;
+  status: 200;
+};
+
+export type exportAdminWorkflowsResponseSuccess = exportAdminWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type exportAdminWorkflowsResponse = exportAdminWorkflowsResponseSuccess;
+
+export const getExportAdminWorkflowsUrl = (params?: ExportAdminWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/workflows/export?${stringifiedParams}`
+    : `/api/v1/admin/workflows/export`;
+};
+
+export const exportAdminWorkflows = async (
+  params?: ExportAdminWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminWorkflowsResponse> => {
+  return customFetch<exportAdminWorkflowsResponse>(getExportAdminWorkflowsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -6021,6 +6396,66 @@ export const listAdminRuns = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminRunsResponse> => {
   return customFetch<listAdminRunsResponse>(getListAdminRunsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminRunResponse200 = {
+  data: AdminRunDetailResponse;
+  status: 200;
+};
+
+export type getAdminRunResponseSuccess = getAdminRunResponse200 & {
+  headers: Headers;
+};
+export type getAdminRunResponse = getAdminRunResponseSuccess;
+
+export const getGetAdminRunUrl = (id: string) => {
+  return `/api/v1/admin/runs/${id}`;
+};
+
+export const getAdminRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminRunResponse> => {
+  return customFetch<getAdminRunResponse>(getGetAdminRunUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminRunsResponse200 = {
+  data: string;
+  status: 200;
+};
+
+export type exportAdminRunsResponseSuccess = exportAdminRunsResponse200 & {
+  headers: Headers;
+};
+export type exportAdminRunsResponse = exportAdminRunsResponseSuccess;
+
+export const getExportAdminRunsUrl = (params?: ExportAdminRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/runs/export?${stringifiedParams}`
+    : `/api/v1/admin/runs/export`;
+};
+
+export const exportAdminRuns = async (
+  params?: ExportAdminRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminRunsResponse> => {
+  return customFetch<exportAdminRunsResponse>(getExportAdminRunsUrl(params), {
     ...options,
     method: 'GET',
   });

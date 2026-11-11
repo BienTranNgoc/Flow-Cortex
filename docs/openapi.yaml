@@ -1570,6 +1570,52 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/admin/workflows:
+    get:
+      tags:
+      - admin-workflow-reports-controller
+      operationId: listAdminWorkflows
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - published
+          pattern: draft|published
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAdminWorkflowResponse"
     post:
       tags:
       - admin-workflows-controller
@@ -1856,6 +1902,25 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/runs/{id}/cancel:
+    post:
+      tags:
+      - admin-runs-controller
+      operationId: cancelAdminRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRunDetailResponse"
   /api/v1/admin/accounts/{id}/deactivate:
     post:
       tags:
@@ -2637,6 +2702,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/v1/builder/dashboard/summary:
+    get:
+      tags:
+      - builder-dashboard-controller
+      operationId: getBuilderSummary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderSummaryResponse"
+  /api/v1/builder/dashboard/runs-chart:
+    get:
+      tags:
+      - builder-dashboard-controller
+      operationId: getBuilderRunsChart
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          type: string
+          default: 30d
+          enum:
+          - 7d
+          - 30d
+          - 90d
+          pattern: 7d|30d|90d
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderChartResponse"
   /api/v1/auth/oauth/google/callback:
     get:
       tags:
@@ -2698,6 +2799,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/workflows/{id}/report:
+    get:
+      tags:
+      - admin-workflow-reports-controller
+      operationId: getAdminWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportResponse"
+  /api/v1/admin/workflows/export:
+    get:
+      tags:
+      - admin-workflow-reports-controller
+      operationId: exportAdminWorkflows
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - published
+          pattern: draft|published
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
   /api/v1/admin/support/requests:
     get:
       tags:
@@ -2846,6 +2995,24 @@ paths:
           - cancelling
           - cancelled
           pattern: running|waiting_approval|completed|error|cancelling|cancelled
+      - name: workflowId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           description: OK
@@ -2853,6 +3020,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminRunResponse"
+  /api/v1/admin/runs/{id}:
+    get:
+      tags:
+      - admin-runs-controller
+      operationId: getAdminRun
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRunDetailResponse"
+  /api/v1/admin/runs/export:
+    get:
+      tags:
+      - admin-runs-controller
+      operationId: exportAdminRuns
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - running
+          - waiting_approval
+          - completed
+          - error
+          - cancelling
+          - cancelled
+          pattern: running|waiting_approval|completed|error|cancelling|cancelled
+      - name: workflowId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
   /api/v1/admin/roles:
     get:
       tags:
@@ -3113,6 +3343,10 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - workflow.run.export
+            - workflow.run.cancel
+            - workflow.workflow.view
+            - workflow.workflow.export
         adminDisabled:
           type: boolean
       required:
@@ -4388,6 +4622,88 @@ components:
       required:
       - body
       - status
+    AdminRunDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        ownerEmail:
+          type: string
+        status:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        creditsCharged:
+          type: integer
+          format: int64
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Step"
+      required:
+      - id
+      - ownerId
+      - startedAt
+      - status
+      - steps
+      - workflowId
+      - workflowName
+    Step:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+        type:
+          type: string
+        mode:
+          type: string
+        status:
+          type: string
+        attempt:
+          type: integer
+          format: int32
+        deliveryCount:
+          type: integer
+          format: int32
+        progressPercent:
+          type: integer
+          format: int32
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        pickedUpAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - attempt
+      - deliveryCount
+      - mode
+      - status
+      - stepOrder
+      - type
     AdminAccountResponse:
       type: object
       properties:
@@ -4717,6 +5033,145 @@ components:
         productVideoWorkflowId:
           type: string
           format: uuid
+    BuilderSummaryResponse:
+      type: object
+      properties:
+        totalWorkflows:
+          type: integer
+          format: int64
+        publishedWorkflows:
+          type: integer
+          format: int64
+        totalRuns:
+          type: integer
+          format: int64
+      required:
+      - publishedWorkflows
+      - totalRuns
+      - totalWorkflows
+    BuilderChartResponse:
+      type: object
+      properties:
+        period:
+          type: string
+          enum:
+          - 7d
+          - 30d
+          - 90d
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/DayCountResponse"
+      required:
+      - period
+      - series
+    DayCountResponse:
+      type: object
+      properties:
+        day:
+          type: string
+          format: date
+        runs:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+      required:
+      - day
+      - failed
+      - runs
+    AdminWorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        ownerEmail:
+          type: string
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+        shared:
+          type: boolean
+        steps:
+          type: integer
+          format: int32
+        runs:
+          type: integer
+          format: int64
+        runsLast7Days:
+          type: integer
+          format: int64
+        lastRunAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - name
+      - ownerId
+      - runs
+      - runsLast7Days
+      - shared
+      - status
+      - steps
+      - updatedAt
+    PageViewAdminWorkflowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminWorkflowResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    WorkflowReportResponse:
+      type: object
+      properties:
+        workflow:
+          $ref: "#/components/schemas/AdminWorkflowResponse"
+        countsByStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        lastRunAt:
+          type: string
+          format: date-time
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/DayCountResponse"
+      required:
+      - countsByStatus
+      - series
+      - workflow
     AdminSupportRequestPage:
       type: object
       properties:
@@ -4854,8 +5309,14 @@ components:
         id:
           type: string
           format: uuid
+        workflowId:
+          type: string
+          format: uuid
         workflowName:
           type: string
+        ownerId:
+          type: string
+          format: uuid
         ownerEmail:
           type: string
         status:
@@ -4868,10 +5329,15 @@ components:
         finishedAt:
           type: string
           format: date-time
+        creditsCharged:
+          type: integer
+          format: int64
       required:
       - id
+      - ownerId
       - startedAt
       - status
+      - workflowId
       - workflowName
     PageViewAdminRunResponse:
       type: object
@@ -4929,6 +5395,10 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - workflow.run.export
+            - workflow.run.cancel
+            - workflow.workflow.view
+            - workflow.workflow.export
       required:
       - code
       - permissions

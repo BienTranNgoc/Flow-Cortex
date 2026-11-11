@@ -14,6 +14,7 @@ import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { RunDetailPage } from './features/runs/RunDetailPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
@@ -24,9 +25,12 @@ import { RequestsInboxPage } from './features/support/requests/RequestsInboxPage
 import { SupportSettingsPage } from './features/support/settings/SupportSettingsPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
+import { WorkflowReportPage } from './features/workflows/WorkflowReportPage';
+import { WorkflowsPage } from './features/workflows/WorkflowsPage';
 
 const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
+  '/workflows': <WorkflowsPage />,
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
   '/sms-outbox': <SmsOutboxPage />,
@@ -41,6 +45,8 @@ const PAGES: Record<string, ReactElement> = {
 
 /** Pages under a sidebar entry, routable only where that entry is. */
 const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
+  { parent: '/workflows', path: '/workflows/:workflowId', element: <WorkflowReportPage /> },
+  { parent: '/runs', path: '/runs/:runId', element: <RunDetailPage /> },
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
   { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },

@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
@@ -14,6 +15,8 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.workflow.api.AdminRunDetailView;
+import com.flowcortex.workflow.api.AdminRunFilter;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
@@ -73,6 +76,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private static final Pattern UNSAFE_IN_FILE_NAME = Pattern.compile("[\\p{Cc}\\p{Cf}/\\\\]");
     private static final int MAX_FILE_NAME_LENGTH = 255;
 
+    /** Open ends of the admin start-time filter: outside any real run, inside what PostgreSQL stores. */
+    private static final Instant EARLIEST_START = Instant.EPOCH;
+    private static final Instant LATEST_START = Instant.parse("9999-12-31T00:00:00Z");
+
     private static final ObjectMapper OUTPUTS_READER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -88,14 +95,16 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final TransactionTemplate transactionTemplate;
     private final RunStartGuards runStartGuards;
     private final RunUpdates runUpdates;
+    private final CreditAccounts creditAccounts;
     private final boolean workflowEnabled;
 
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, RunUpdates runUpdates, StepExecutorRegistry registry,
             MediaJobs mediaJobs, UserDirectory userDirectory, TransactionTemplate transactionTemplate,
-            RunStartGuards runStartGuards,
+            RunStartGuards runStartGuards, CreditAccounts creditAccounts,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.creditAccounts = creditAccounts;
         this.runUpdates = runUpdates;
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
@@ -294,16 +303,34 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageView<AdminRunView> listAllRuns(int page, int size, String status) {
+    public PageView<AdminRunView> listAllRuns(AdminRunFilter filter, int page, int size) {
+        String status = filter.status();
         Page<RunWithWorkflowName> runs = workflowRunRepository.findAllNewestFirst(
-                status == null ? null : RunStatus.valueOf(status.toUpperCase(Locale.ROOT)), PageRequest.of(page, size));
+                status == null ? null : RunStatus.valueOf(status.toUpperCase(Locale.ROOT)), filter.workflowId(),
+                filter.from() == null ? EARLIEST_START : filter.from(), filter.to() == null ? LATEST_START : filter.to(),
+                PageRequest.of(page, size));
         // One lookup for the whole page, not one per row.
         Map<UUID, String> emails = userDirectory.findEmailsByIds(
                 runs.stream().map(row -> row.run().getOwnerId()).collect(Collectors.toSet()));
+        Map<UUID, Long> charged = creditAccounts.enabled() && runs.hasContent()
+                ? creditAccounts.chargedForRuns(runs.stream().map(row -> row.run().getId()).toList()) : null;
         return new PageView<>(runs.stream()
                 .map(row -> WorkflowMapper.toAdminRunView(row.run(), row.workflowName(),
-                        emails.get(row.run().getOwnerId())))
+                        emails.get(row.run().getOwnerId()),
+                        charged == null ? null : charged.getOrDefault(row.run().getId(), 0L)))
                 .toList(), page, size, runs.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminRunDetailView getAdminRun(UUID runId) {
+        WorkflowRun run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        String workflowName = workflowRepository.findById(run.getWorkflowId()).map(Workflow::getName).orElse(null);
+        String ownerEmail = userDirectory.findEmailsByIds(List.of(run.getOwnerId())).get(run.getOwnerId());
+        Long charged = creditAccounts.enabled() ? creditAccounts.chargedForRun(runId) : null;
+        return WorkflowMapper.toAdminRunDetailView(run, workflowName, ownerEmail, charged,
+                runStepRepository.findByRunIdOrderByStepOrderAsc(runId), registry::isRemote);
     }
 
     @Override

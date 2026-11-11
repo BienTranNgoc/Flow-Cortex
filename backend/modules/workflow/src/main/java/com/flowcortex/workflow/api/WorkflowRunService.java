@@ -60,9 +60,15 @@ public interface WorkflowRunService {
 
     /**
      * Every user's runs, newest first, for the admin console — not owner-scoped, so callers must
-     * be ADMIN-only. {@code status} is a lowercase run status, or {@code null} for all.
+     * be staff-only. Each row carries the credits it was charged when credits are on, from one grouped read.
      */
-    PageView<AdminRunView> listAllRuns(int page, int size, String status);
+    PageView<AdminRunView> listAllRuns(AdminRunFilter filter, int page, int size);
+
+    /**
+     * Any member's run with its steps, without the run's or a step's input and output.
+     * @throws NotFoundException if there is no such run
+     */
+    AdminRunDetailView getAdminRun(UUID runId);
 
     /**
      * Every remote step across all runs, newest first, for the admin console — not owner-scoped.

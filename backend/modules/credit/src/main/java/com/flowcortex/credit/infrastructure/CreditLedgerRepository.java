@@ -2,6 +2,8 @@ package com.flowcortex.credit.infrastructure;
 
 import com.flowcortex.credit.domain.CreditLedgerEntry;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -56,4 +58,9 @@ public interface CreditLedgerRepository extends JpaRepository<CreditLedgerEntry,
     @Query("SELECT COALESCE(SUM(CASE WHEN e.kind = 'debit' THEN e.amount ELSE -e.amount END), 0) "
             + "FROM CreditLedgerEntry e WHERE e.runId = :runId AND e.kind IN ('debit', 'refund')")
     long sumChargedForRun(@Param("runId") UUID runId);
+
+    /** One {@code [run_id, charged]} row per run that has debit or refund entries; the others are absent. */
+    @Query(value = "SELECT run_id, SUM(CASE WHEN kind = 'debit' THEN amount ELSE -amount END) FROM credit_ledger "
+            + "WHERE run_id IN (:runIds) AND kind IN ('debit', 'refund') GROUP BY run_id", nativeQuery = true)
+    List<Object[]> sumChargedForRuns(@Param("runIds") Collection<UUID> runIds);
 }

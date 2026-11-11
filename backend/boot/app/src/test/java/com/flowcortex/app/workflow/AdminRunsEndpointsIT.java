@@ -25,8 +25,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import net.ttddyy.observation.tracing.QueryContext;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -68,8 +71,8 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     record AdminRunItem(
-            UUID id, String workflowName, String ownerEmail, String status, String errorMessage,
-            Instant startedAt, Instant finishedAt) {
+            UUID id, UUID workflowId, String workflowName, UUID ownerId, String ownerEmail, String status,
+            String errorMessage, Instant startedAt, Instant finishedAt, Long creditsCharged) {
     }
 
     record MediaJobItem(
@@ -409,6 +412,361 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(all.items().get(0).errorCode()).isEqualTo("probe_failed");
         assertThat(running.items()).extracting(MediaJobItem::jobId).containsExactly(waiting, pickedUp);
         assertThat(running.total()).isEqualTo(runningBefore + 2);
+    }
+
+    @Test
+    void everyRowsCreditsChargedIsNullWithCreditsOff() {
+        UserView admin = newUser("admin-credits-off");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        UUID run = seedRun(workflow.id(), admin.id(), "completed", null, nextBase());
+
+        PageView<AdminRunItem> page = getPage("/api/v1/admin/runs?size=5", loginAs(admin), RUN_PAGE).getBody();
+
+        assertThat(page.items()).extracting(AdminRunItem::id).contains(run);
+        assertThat(page.items()).allSatisfy(item -> assertThat(item.creditsCharged()).isNull());
+    }
+
+    @Test
+    void workflowAndDateFiltersCombine() {
+        UserView admin = newUser("admin-combine");
+        WorkflowView w = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        WorkflowView v = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant day = nextBase();
+        seedRun(w.id(), admin.id(), "completed", null, day);
+        UUID inRange = seedRun(w.id(), admin.id(), "error", "boom", day.plus(Duration.ofDays(1)));
+        seedRun(w.id(), admin.id(), "completed", null, day.plus(Duration.ofDays(2)));
+        seedRun(v.id(), admin.id(), "error", "boom", day.plus(Duration.ofDays(1)).plusSeconds(3600));
+        String token = loginAs(admin);
+
+        PageView<AdminRunItem> page = getPage("/api/v1/admin/runs?workflowId=" + w.id() + "&from="
+                + day.plus(Duration.ofDays(1)).minusSeconds(60) + "&to=" + day.plus(Duration.ofDays(2)), token,
+                RUN_PAGE).getBody();
+        PageView<AdminRunItem> edge = getPage("/api/v1/admin/runs?workflowId=" + w.id() + "&from="
+                + day.plus(Duration.ofDays(1)) + "&to=" + day.plus(Duration.ofDays(2)), token, RUN_PAGE).getBody();
+        PageView<AdminRunItem> excluded = getPage("/api/v1/admin/runs?workflowId=" + w.id() + "&from="
+                + day.plus(Duration.ofDays(1)).plusSeconds(1) + "&to=" + day.plus(Duration.ofDays(2)), token,
+                RUN_PAGE).getBody();
+
+        assertThat(page.items()).extracting(AdminRunItem::id).containsExactly(inRange);
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.items().get(0).workflowId()).isEqualTo(w.id());
+        assertThat(page.items().get(0).ownerId()).isEqualTo(admin.id());
+        assertThat(edge.items()).extracting(AdminRunItem::id).containsExactly(inRange);
+        assertThat(excluded.total()).isZero();
+    }
+
+    @Test
+    void aRangeWhoseFromIsNotBeforeToIsA400NamingFrom() {
+        String token = loginAs(newUser("admin-bad-range"));
+
+        ResponseEntity<ProblemView> reversed = getPage(
+                "/api/v1/admin/runs?from=2026-11-03T00:00:00Z&to=2026-11-02T00:00:00Z", token, problem());
+        ResponseEntity<String> equal = exchangeCsv(
+                "/api/v1/admin/runs/export?from=2026-11-03T00:00:00Z&to=2026-11-03T00:00:00Z", token);
+        ResponseEntity<ProblemView> badWorkflow = getPage("/api/v1/admin/runs?workflowId=abc", token, problem());
+        ResponseEntity<ProblemView> badDate = getPage("/api/v1/admin/runs?from=yesterday", token, problem());
+
+        assertThat(reversed.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(reversed.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(reversed.getBody().errors()).containsOnlyKeys("from");
+        assertThat(equal.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(equal.getBody()).contains("\"from\"");
+        assertThat(badWorkflow.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badWorkflow.getBody().errors()).containsOnlyKeys("workflowId");
+        assertThat(badDate.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badDate.getBody().errors()).containsOnlyKeys("from");
+    }
+
+    @Test
+    void theDetailListsStepsInOrderWithoutInputOrOutput() {
+        UserView admin = newUser("admin-detail");
+        UserView mai = userService.createUser(admin.id(), uniqueEmail("mai"), "password123", "Mai", "MEMBER");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant base = nextBase();
+        UUID run = seedRun(workflow.id(), mai.id(), "error", "Step 2 failed", base);
+        UUID first = seedStep(run, 1, "echo", "completed", base, null, null, null, null, 1, 0, null);
+        UUID second = seedStep(run, 2, "probe", "error", base.plusSeconds(1), base.plusSeconds(2),
+                base.plusSeconds(3600), base.plusSeconds(120), base.plusSeconds(300), 2, 3, "lease_expired");
+        jdbc.update("UPDATE run_step SET input = 'secret-in', output = 'secret-out' WHERE id IN (?, ?)", first,
+                second);
+        jdbc.update("UPDATE workflow_run SET input = 'secret-run-input' WHERE id = ?", run);
+
+        ResponseEntity<String> raw = get("/api/v1/admin/runs/" + run, loginAs(admin), String.class);
+
+        assertThat(raw.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(raw.getBody()).doesNotContain("\"input\"", "\"output\"", "\"outputs\"", "secret-");
+        AdminRunDetail detail = get("/api/v1/admin/runs/" + run, loginAs(admin), AdminRunDetail.class).getBody();
+        assertThat(detail.ownerEmail()).isEqualTo(mai.email());
+        assertThat(detail.workflowName()).isEqualTo(workflow.name());
+        assertThat(detail.creditsCharged()).isNull();
+        assertThat(detail.steps()).extracting(AdminRunDetail.Step::stepOrder).containsExactly(1, 2);
+        AdminRunDetail.Step failed = detail.steps().get(1);
+        assertThat(failed.status()).isEqualTo("error");
+        assertThat(failed.errorCode()).isEqualTo("lease_expired");
+        assertThat(failed.attempt()).isEqualTo(2);
+        assertThat(failed.deliveryCount()).isEqualTo(3);
+        assertThat(failed.pickedUpAt()).isEqualTo(base.plusSeconds(2));
+        assertThat(detail.steps().get(0).mode()).isEqualTo("inline");
+    }
+
+    @Test
+    void anUnknownRunDetailIs404() {
+        ResponseEntity<ProblemView> response = getPage("/api/v1/admin/runs/" + UUID.randomUUID(),
+                loginAs(newUser("admin-detail-404")), problem());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void theExportHoldsTheFilteredRunsWithItsHeaderAndTotal() {
+        UserView admin = newUser("admin-export");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant base = nextBase();
+        seedRun(workflow.id(), admin.id(), "completed", null, base);
+        UUID older = seedRun(workflow.id(), admin.id(), "error", "Lỗi bước 2,\nthử lại", base.plusSeconds(10));
+        UUID newer = seedRun(workflow.id(), admin.id(), "error", "=cmd", base.plusSeconds(20));
+        seedRun(workflow.id(), admin.id(), "error", "other workflow's twin", base.plusSeconds(30));
+        jdbc.update("UPDATE workflow_run SET workflow_id = ? WHERE error_message = 'other workflow''s twin'",
+                newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null)).id());
+
+        ResponseEntity<String> response = exchangeCsv("/api/v1/admin/runs/export?status=error&workflowId="
+                + workflow.id(), loginAs(admin));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getContentType().toString()).startsWith("text/csv");
+        assertThat(response.getHeaders().getFirst("X-Total-Count")).isEqualTo("2");
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).matches("runs-\\d{8}\\.csv");
+        String body = response.getBody();
+        assertThat(body).startsWith("﻿\"Run ID\",\"Workflow ID\",\"Workflow\",\"Owner email\",\"Status\","
+                + "\"Started at\",\"Finished at\",\"Duration (s)\",\"Credits charged\",\"Error\"\r\n");
+        assertThat(body.indexOf(newer.toString())).isPositive().isLessThan(body.indexOf(older.toString()));
+        assertThat(body).contains("\"'=cmd\"\r\n").contains("\"Lỗi bước 2,\nthử lại\"\r\n").endsWith("\r\n");
+        assertThat(body).contains("\"1\",\"\",");
+    }
+
+    @Test
+    void theExportStopsAtTheNewest1000AndCountsEveryMatch() {
+        UserView admin = newUser("admin-export-cap");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant base = nextBase();
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < 1001; i++) {
+            rows.add(new Object[] {UUID.randomUUID(), workflow.id(), admin.id(), Timestamp.from(base.plusSeconds(i)),
+                    Timestamp.from(base.plusSeconds(i + 1))});
+        }
+        jdbc.batchUpdate("INSERT INTO workflow_run (id, workflow_id, owner_id, status, input, started_at, "
+                + "finished_at) VALUES (?, ?, ?, 'completed', 'seed', ?, ?)", rows);
+
+        ResponseEntity<String> response = exchangeCsv("/api/v1/admin/runs/export?workflowId=" + workflow.id(),
+                loginAs(admin));
+
+        assertThat(response.getHeaders().getFirst("X-Total-Count")).isEqualTo("1001");
+        String[] lines = response.getBody().split("\r\n");
+        assertThat(lines).hasSize(1001);
+        assertThat(lines[1]).contains(base.plusSeconds(1000).toString());
+        assertThat(response.getBody()).doesNotContain(base.toString());
+    }
+
+    @Test
+    void theWorkflowFilteredPageCanBeServedByTheWorkflowStartedIndex() {
+        String plan = jdbc.execute((ConnectionCallback<String>) connection -> {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("SET enable_seqscan = off");
+                try (ResultSet rows = statement.executeQuery("EXPLAIN SELECT wr.id FROM workflow_run wr "
+                        + "WHERE wr.workflow_id = '" + UUID.randomUUID() + "' "
+                        + "ORDER BY wr.started_at DESC, wr.id DESC LIMIT 20")) {
+                    StringBuilder lines = new StringBuilder();
+                    while (rows.next()) {
+                        lines.append(rows.getString(1)).append('\n');
+                    }
+                    return lines.toString();
+                } finally {
+                    statement.execute("RESET enable_seqscan");
+                }
+            }
+        });
+
+        assertThat(plan).contains("idx_workflow_run_workflow_started");
+    }
+
+    @Test
+    void anAdminStopsAnotherMembersRunningRunAndItsPendingStepsAreSkipped() {
+        UserView admin = newUser("admin-stop");
+        UserView mai = userService.createUser(admin.id(), uniqueEmail("mai-stop"), "password123", "Mai", "MEMBER");
+        WorkflowView workflow = newWorkflow(mai.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant base = nextBase();
+        UUID run = seedRun(workflow.id(), mai.id(), "running", null, base);
+        seedStep(run, 1, "probe", "running", base, base.plusSeconds(1), base.plusSeconds(3600), base.plusSeconds(120),
+                base.plusSeconds(300), 1, 1, null);
+        seedStep(run, 2, "echo", "pending", null, null, null, null, null, 1, 0, null);
+        seedStep(run, 3, "echo", "pending", null, null, null, null, null, 1, 0, null);
+
+        ResponseEntity<String> response = post("/api/v1/admin/runs/" + run + "/cancel", loginAs(admin), null,
+                String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).doesNotContain("\"input\"", "\"output\"", "\"outputs\"");
+        assertThat(response.getBody()).contains("\"status\":\"cancelling\"");
+        AdminRunDetail detail = get("/api/v1/admin/runs/" + run, loginAs(admin), AdminRunDetail.class).getBody();
+        assertThat(detail.status()).isEqualTo("cancelling");
+        assertThat(detail.steps()).extracting(AdminRunDetail.Step::status)
+                .containsExactly("running", "skipped", "skipped");
+        assertThat(jdbc.queryForObject("SELECT status FROM workflow_run WHERE id = ?", String.class, run))
+                .isEqualTo("cancelling");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE run_id = ?", Integer.class, run))
+                .isZero();
+    }
+
+    @Test
+    void theMemberSwitchOffStopsNeitherTheMemberNorTheStaffRoute() {
+        UserView admin = newUser("admin-switch");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        UUID run = seedRun(workflow.id(), admin.id(), "waiting_approval", null, nextBase());
+        String token = loginAs(admin);
+
+        ResponseEntity<ProblemView> member = post("/api/v1/runs/" + run + "/cancel", token, null, ProblemView.class);
+        ResponseEntity<AdminRunDetail> staff = post("/api/v1/admin/runs/" + run + "/cancel", token, null,
+                AdminRunDetail.class);
+
+        assertThat(member.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(staff.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(staff.getBody().status()).isEqualTo("cancelled");
+    }
+
+    @Test
+    void anAdminStopOfAFinishedRunIs409UnknownIs404AndAStoppingRunStaysStopping() {
+        UserView admin = newUser("admin-stop-edges");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        Instant base = nextBase();
+        UUID finished = seedRun(workflow.id(), admin.id(), "completed", null, base);
+        UUID stopping = seedRun(workflow.id(), admin.id(), "cancelling", null, base.plusSeconds(1));
+        String token = loginAs(admin);
+
+        ResponseEntity<ProblemView> conflict = post("/api/v1/admin/runs/" + finished + "/cancel", token, null,
+                ProblemView.class);
+        ResponseEntity<ProblemView> unknown = post("/api/v1/admin/runs/" + UUID.randomUUID() + "/cancel", token,
+                null, ProblemView.class);
+        ResponseEntity<AdminRunDetail> again = post("/api/v1/admin/runs/" + stopping + "/cancel", token, null,
+                AdminRunDetail.class);
+
+        assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(jdbc.queryForObject("SELECT status FROM workflow_run WHERE id = ?", String.class, finished))
+                .isEqualTo("completed");
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(again.getBody().status()).isEqualTo("cancelling");
+    }
+
+    @Test
+    void aCustomerSupportCannotStopOrExportRuns() {
+        UserView admin = newUser("admin-support-run-keys");
+        UserView support = userService.createUser(admin.id(), uniqueEmail("support-run"), "password123", "Support",
+                "CUSTOMER_SUPPORT");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        UUID run = seedRun(workflow.id(), admin.id(), "running", null, nextBase());
+        String token = loginAs(support);
+
+        ResponseEntity<ProblemView> stop = post("/api/v1/admin/runs/" + run + "/cancel", token, null,
+                ProblemView.class);
+        ResponseEntity<String> export = exchangeCsv("/api/v1/admin/runs/export", token);
+
+        assertThat(stop.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(export.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(jdbc.queryForObject("SELECT status FROM workflow_run WHERE id = ?", String.class, run))
+                .isEqualTo("running");
+    }
+
+    @Test
+    void anOperationManagerStopsAndExports() {
+        UserView admin = newUser("admin-ops-run-keys");
+        UserView operations = userService.createUser(admin.id(), uniqueEmail("ops-run"), "password123",
+                "Operations", "OPERATION_MANAGER");
+        WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+        UUID run = seedRun(workflow.id(), admin.id(), "waiting_approval", null, nextBase());
+        String token = loginAs(operations);
+
+        ResponseEntity<AdminRunDetail> stop = post("/api/v1/admin/runs/" + run + "/cancel", token, null,
+                AdminRunDetail.class);
+        ResponseEntity<String> export = exchangeCsv("/api/v1/admin/runs/export?workflowId=" + workflow.id(), token);
+
+        assertThat(stop.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(export.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(export.getBody()).contains(run.toString());
+    }
+
+    @Nested
+    @TestPropertySource(properties = "flowcortex.credits.enabled=true")
+    @Import(StatementLogConfig.class)
+    class WithCreditsOn {
+
+        @Test
+        void aPageOfTwentyRunsWithCreditsOnCostsAtMostFiveStatements() {
+            UserView admin = newUser("admin-credits-statements");
+            WorkflowView workflow = newWorkflow(admin.id(), true, new NewWorkflowStep("only", "echo", null));
+            Instant base = nextBase();
+            for (int i = 0; i < 20; i++) {
+                UserView owner = userService.createUser(admin.id(), uniqueEmail("credits-owner-" + i), "password123",
+                        "Owner " + i, "MEMBER");
+                seedRun(workflow.id(), owner.id(), "completed", null, base.plusSeconds(i));
+            }
+            String token = loginAs(admin);
+            statements.clear();
+
+            ResponseEntity<PageView<AdminRunItem>> response =
+                    getPage("/api/v1/admin/runs?page=0&size=20", token, RUN_PAGE);
+
+            assertThat(response.getBody().items()).hasSize(20);
+            List<String> sql = statements.forRequest("/api/v1/admin/runs");
+            assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(5);
+            assertThat(sql.stream().filter(statement -> statement.contains("app_user")).count())
+                    .as("the caller's own check plus one owner-email lookup: %s", sql).isEqualTo(2);
+            assertThat(sql.stream().filter(statement -> statement.contains("credit_ledger")).count())
+                    .as("one grouped ledger read: %s", sql).isEqualTo(1);
+        }
+
+        @Test
+        void aRunRowCarriesDebitsMinusRefunds() {
+            UserView admin = newUser("admin-credits-row");
+            WorkflowView workflow = newWorkflow(admin.id(), false, new NewWorkflowStep("only", "echo", null));
+            Instant base = nextBase();
+            UUID charged = seedRun(workflow.id(), admin.id(), "completed", null, base);
+            UUID free = seedRun(workflow.id(), admin.id(), "completed", null, base.plusSeconds(10));
+            seedLedger(admin.id(), charged, "debit", 30);
+            seedLedger(admin.id(), charged, "refund", 10);
+
+            String token = loginAs(admin);
+            PageView<AdminRunItem> page = getPage("/api/v1/admin/runs?size=2", token, RUN_PAGE).getBody();
+            AdminRunDetail detail = get("/api/v1/admin/runs/" + charged, token, AdminRunDetail.class).getBody();
+
+            Map<UUID, AdminRunItem> byId = page.items().stream()
+                    .collect(Collectors.toMap(AdminRunItem::id, Function.identity()));
+            assertThat(byId.get(charged).creditsCharged()).isEqualTo(20L);
+            assertThat(byId.get(free).creditsCharged()).isZero();
+            assertThat(detail.creditsCharged()).isEqualTo(20L);
+        }
+    }
+
+    private void seedLedger(UUID userId, UUID runId, String kind, long amount) {
+        jdbc.update("INSERT INTO credit_ledger (id, user_id, run_id, kind, amount, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), userId, runId, kind, amount,
+                Timestamp.from(Instant.now()));
+    }
+
+    record AdminRunDetail(
+            UUID id, UUID workflowId, String workflowName, UUID ownerId, String ownerEmail, String status,
+            String errorMessage, Instant startedAt, Instant finishedAt, Long creditsCharged, List<Step> steps) {
+
+        record Step(
+                int stepOrder, String type, String mode, String status, int attempt, int deliveryCount,
+                Integer progressPercent, String errorCode, String errorMessage, Instant pickedUpAt,
+                Instant startedAt, Instant finishedAt) {
+        }
+    }
+
+    private ResponseEntity<String> exchangeCsv(String path, String token) {
+        HttpHeaders headers = bearer(token);
+        headers.setAccept(List.of(MediaType.parseMediaType("text/csv")));
+        return restTemplate.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
     private static Instant nextBase() {

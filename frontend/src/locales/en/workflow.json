@@ -218,5 +218,33 @@
     "sharedWorkflow": "Shared workflow",
     "mine": "Mine",
     "shared": "Shared"
+  },
+  "builderDashboard": {
+    "heading": "Your workflow stats",
+    "lede": "How your workflows are doing and how often they run.",
+    "linkLabel": "Your workflow stats",
+    "loading": "Loading your workflow stats…",
+    "loadError": "Could not load your workflow stats.",
+    "noWorkflows": "You have no workflows yet. Once you own one, its stats appear here.",
+    "totals": {
+      "workflows": "Workflows",
+      "published": "Published",
+      "runs": "Runs"
+    },
+    "period": {
+      "legend": "Period",
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days"
+    },
+    "chart": {
+      "heading": "Runs per day",
+      "label_one": "{{count}} run over the last {{days}} days",
+      "label_other": "{{count}} runs over the last {{days}} days",
+      "tableLabel": "Runs per day, as numbers",
+      "day": "Day",
+      "runs": "Runs",
+      "failed": "Failed"
+    }
   }
 }

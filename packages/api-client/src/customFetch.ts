@@ -12,11 +12,11 @@ const NO_REFRESH_PATHS = [
 ];
 
 /**
- * Fetch used by every generated operation (orval `override.mutator`). A 401 triggers one shared
- * refresh and the request is replayed once with the new token; a replay that is rejected again
- * is returned as is.
+ * Raw fetch with the session behaviour every client call shares: locale and client-id headers,
+ * and on a 401 one shared refresh followed by a single replay with the new token. A replay that
+ * is rejected again is returned as is.
  */
-export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+export async function sessionFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const sentToken = bearerOf(options.headers);
   let response = await fetch(url, {
     ...options,
@@ -29,7 +29,12 @@ export async function customFetch<T>(url: string, options: RequestInit = {}): Pr
       response = await fetch(url, withBearer(options, token));
     }
   }
-  return toResult<T>(response);
+  return response;
+}
+
+/** Fetch used by every generated operation (orval `override.mutator`). */
+export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  return toResult<T>(await sessionFetch(url, options));
 }
 
 function bearerOf(headers: HeadersInit | undefined): string | null {

@@ -64,23 +64,41 @@ public class RunCancellation {
         if (!enabled) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
-        if (workflowRunRepository.requestCancel(runId, currentUserId) == 1) {
+        stop(currentUserId, runId, "member", currentUserId);
+        return currentView(currentUserId, runId);
+    }
+
+    /**
+     * Stops any member's run as staff, with the same effect as the member's own stop but without the
+     * member switch; the answer is read by the caller, since a {@link RunView} carries member content.
+     * @throws NotFoundException if the run doesn't exist
+     * @throws ConflictException if the run is {@code completed} or {@code error}
+     */
+    @Transactional
+    public void cancelRunAsAdmin(UUID adminId, UUID runId) {
+        WorkflowRun run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        stop(run.getOwnerId(), runId, "admin", adminId);
+    }
+
+    private void stop(UUID ownerId, UUID runId, String actor, UUID actorId) {
+        if (workflowRunRepository.requestCancel(runId, ownerId) == 1) {
             int skipped = runStepRepository.skipPending(runId);
             boolean settled = workflowRunRepository.settleCancelled(runId, Instant.now(clock)) == 1;
             runUpdates.touched(runId);
-            LOG.info("Run cancel: outcome=cancel_requested runId={} skippedSteps={} status={}", runId, skipped,
-                    settled ? "cancelled" : "cancelling");
-            return currentView(currentUserId, runId);
+            LOG.info("Run cancel: outcome=cancel_requested runId={} actor={} actorId={} skippedSteps={} status={}",
+                    runId, actor, actorId, skipped, settled ? "cancelled" : "cancelling");
+            return;
         }
-        WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
+        WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, ownerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.ERROR) {
-            LOG.info("Run cancel: outcome=already_finished runId={} status={}", runId, run.getStatus());
+            LOG.info("Run cancel: outcome=already_finished runId={} actor={} actorId={} status={}", runId, actor,
+                    actorId, run.getStatus());
             throw new ConflictException(new LocalizedMessage("workflow.run.alreadyFinished"));
         }
-        LOG.info("Run cancel: outcome=already_stopping runId={} status={}", runId, run.getStatus());
-        return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote, mediaJobs::isDownloadable);
+        LOG.info("Run cancel: outcome=already_stopping runId={} actor={} actorId={} status={}", runId, actor,
+                actorId, run.getStatus());
     }
 
     private RunView currentView(UUID currentUserId, UUID runId) {
