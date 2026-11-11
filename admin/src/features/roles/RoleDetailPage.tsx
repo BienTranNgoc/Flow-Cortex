@@ -251,7 +251,7 @@ function RoleEditor({ role, catalog, back, onReload }: Readonly<RoleEditorProps>
     setProblem(null);
     setPartial(false);
     if (!validate()) return;
-    const sortedKeys = [...keys].sort();
+    const sortedKeys = [...keys].sort((a, b) => a.localeCompare(b));
     setSaving(true);
     let stage: 'create' | 'permissions' | 'rename' = 'create';
     let permissionsSaved = false;
