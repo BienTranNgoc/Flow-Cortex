@@ -15,7 +15,6 @@ import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.domain.AppUser;
-import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;

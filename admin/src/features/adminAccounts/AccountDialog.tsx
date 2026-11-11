@@ -52,9 +52,6 @@ export function AccountDialog({
       className="cortex-admin-account-dialog cortex-admin-accounts-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <form className="cortex-admin-accounts-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>{t(`adminAccounts.dialog.${action}.title`, { name: account.name })}</h2>
