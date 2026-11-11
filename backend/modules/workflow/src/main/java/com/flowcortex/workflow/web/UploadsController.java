@@ -49,7 +49,8 @@ class UploadsController {
         if (!mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        UploadGrant grant = mediaJobs.prepareUpload(UploadPurpose.RUN_INPUT, callerId,request.fileName(), request.size());
+        UploadGrant grant = mediaJobs.prepareUpload(UploadPurpose.RUN_INPUT, callerId, request.fileName(),
+                request.size());
         return ResponseEntity.status(HttpStatus.CREATED).body(UploadResponse.from(grant));
     }
 
