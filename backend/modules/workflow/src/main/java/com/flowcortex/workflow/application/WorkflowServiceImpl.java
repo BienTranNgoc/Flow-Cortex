@@ -162,6 +162,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     @Transactional
     public WorkflowStepView addStep(Caller caller, UUID workflowId, NewStep step) {
         Workflow workflow = lockForWrite(caller, workflowId);
+        requireMayAuthor(caller, workflow, step.type());
         int last = workflowStepRepository.findMaxStepOrder(workflow.getId());
         if (last >= Short.MAX_VALUE) {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.definitionStep.tooMany"), null,
@@ -185,6 +186,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                 .filter(found -> found.getWorkflowId().equals(workflow.getId()))
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.definitionStep.notFound",
                         stepId)));
+        requireMayAuthor(caller, workflow, step.getType());
         requireObjectConfig(edit.config());
         String name = edit.name() == null ? step.getName() : emptyToNull(edit.name());
         String inputRef = edit.inputRef() == null ? step.getInputRef() : emptyToNull(edit.inputRef());
@@ -334,6 +336,17 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         return workflow;
+    }
+
+    /**
+     * A connector call step runs with the workflow owner's credential, so only the owner may add or edit one; an
+     * admin passes {@link #lockForWrite} on any workflow but is refused here.
+     */
+    private static void requireMayAuthor(Caller caller, Workflow workflow, String stepType) {
+        if (ConnectorStepOwnerGuard.isConnectorCall(stepType)
+                && !ConnectorStepOwnerGuard.mayAuthor(caller.userId(), workflow.getOwnerId())) {
+            throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
+        }
     }
 
     private void validateDefinition(List<NewWorkflowStep> steps) {

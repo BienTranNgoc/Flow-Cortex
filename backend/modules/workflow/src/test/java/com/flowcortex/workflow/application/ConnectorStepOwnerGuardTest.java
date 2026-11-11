@@ -59,6 +59,15 @@ class ConnectorStepOwnerGuardTest {
     }
 
     @Test
+    void onlyTheOwnerMayAuthorAConnectorStepAndTheStartRuleFollowsIt() {
+        assertThat(ConnectorStepOwnerGuard.mayAuthor(AUTHOR, AUTHOR)).isTrue();
+        assertThat(ConnectorStepOwnerGuard.mayAuthor(OTHER, AUTHOR)).isFalse();
+        assertThat(ConnectorStepOwnerGuard.isConnectorCall("connector.call")).isTrue();
+        assertThat(ConnectorStepOwnerGuard.isConnectorCall("echo")).isFalse();
+        assertThat(ConnectorStepOwnerGuard.isConnectorCall(null)).isFalse();
+    }
+
+    @Test
     void aWorkflowWithoutConnectorStepsIsNeverRefused() {
         assertThat(ConnectorStepOwnerGuard.firstRefusedStep(OTHER, AUTHOR, List.of(echo(1), echo(2)))).isEmpty();
     }

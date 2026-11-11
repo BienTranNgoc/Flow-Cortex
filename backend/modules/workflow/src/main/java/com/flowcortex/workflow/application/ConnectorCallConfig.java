@@ -159,6 +159,9 @@ record ConnectorCallConfig(String connector, String method, URI url, Map<String,
         if (!"https".equalsIgnoreCase(parsed.getScheme()) || parsed.getHost() == null || parsed.getHost().isEmpty()) {
             return "url must be an absolute https URL with a host";
         }
+        if (parsed.getRawUserInfo() != null) {
+            return "url must not carry a user name or password; save the credential on the connector instead";
+        }
         String rawQuery = parsed.getRawQuery();
         if (rawQuery != null) {
             for (String pair : rawQuery.split("&")) {

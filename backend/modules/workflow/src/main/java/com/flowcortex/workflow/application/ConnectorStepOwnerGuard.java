@@ -47,13 +47,25 @@ class ConnectorStepOwnerGuard implements RunStartGuard {
 
     /** The order of the first connector call step when the starter is not the workflow's owner. */
     static Optional<Integer> firstRefusedStep(UUID starter, UUID workflowOwner, List<StepDef> steps) {
-        if (starter.equals(workflowOwner)) {
+        if (mayAuthor(starter, workflowOwner)) {
             return Optional.empty();
         }
         return steps.stream().filter(ConnectorStepOwnerGuard::callsConnector).map(StepDef::order).findFirst();
     }
 
+    /**
+     * Whether {@code person} may author a connector call step on, or run one from, a workflow owned by
+     * {@code workflowOwner}: the one whose credential sends the request is the one who chose it, so only the owner.
+     */
+    static boolean mayAuthor(UUID person, UUID workflowOwner) {
+        return person.equals(workflowOwner);
+    }
+
+    static boolean isConnectorCall(String stepType) {
+        return ConnectorCallStepExecutor.TYPE.equals(stepType);
+    }
+
     private static boolean callsConnector(StepDef step) {
-        return ConnectorCallStepExecutor.TYPE.equals(step.type());
+        return isConnectorCall(step.type());
     }
 }

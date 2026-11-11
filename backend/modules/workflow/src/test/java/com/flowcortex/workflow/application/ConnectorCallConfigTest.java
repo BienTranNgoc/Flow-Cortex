@@ -251,6 +251,18 @@ class ConnectorCallConfigTest {
         assertThat(result.fault()).contains("api_key").doesNotContain("key_123");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"https://bot:secret_abc@api.notion.com/v1/pages", "https://secret_abc@api.notion.com/v1",
+            "https://:secret_abc@api.notion.com/v1", "https://api.notion.com@evil.example/v1"})
+    void urlCarryingUserInfoIsRefusedWithoutEchoingIt(String url) {
+        ConnectorCallConfig.Result result = ConnectorCallConfig.parse(withUrl(url));
+
+        assertThat(result.config()).isNull();
+        assertThat(result.fault()).isEqualTo(
+                "url must not carry a user name or password; save the credential on the connector instead");
+        assertThat(result.fault()).doesNotContain("secret_abc");
+    }
+
     @Test
     void encodedAndLaterQueryParametersAreChecked() {
         assertRefused(withUrl("https://api.example.com/v1?page=1&access%5Ftoken=x"));

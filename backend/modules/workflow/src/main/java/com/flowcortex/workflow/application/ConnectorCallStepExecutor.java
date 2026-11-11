@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.connector.api.ConnectorException;
@@ -32,6 +33,10 @@ class ConnectorCallStepExecutor implements StepExecutor {
     static final String TYPE = "connector.call";
     /** The connector's worst case is about 40 s (two connects, one retry wait, one read); the rest is margin. */
     private static final Duration MAX_RUNTIME = Duration.ofSeconds(60);
+
+    private static final String TEXT_CONTENT_TYPE = "text/plain; charset=utf-8";
+    private static final ObjectMapper JSON_READER = new ObjectMapper()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     private final ObjectMapper json = new ObjectMapper();
     private final HttpConnector httpConnector;
@@ -88,8 +93,9 @@ class ConnectorCallStepExecutor implements StepExecutor {
         ConnectorCallConfig config = parsed.config();
         UUID owner = runs.findById(context.runId()).map(WorkflowRun::getOwnerId)
                 .orElseThrow(ConnectorCallFailures::runNotFound);
+        Body body = body(config, context.input());
         HttpConnectorRequest request = new HttpConnectorRequest(config.connector(), config.method(),
-                config.url().toString(), config.headers(), body(config, context.input()));
+                config.url().toString(), headers(config.headers(), body), body == null ? null : body.text());
         HttpConnectorResponse response = call(owner, request);
         LOG.info("Connector call {} {} answered {} with {} body characters", config.connector(), config.method(),
                 response.status(), response.body() == null ? 0 : response.body().length());
@@ -99,22 +105,49 @@ class ConnectorCallStepExecutor implements StepExecutor {
         return envelope(response);
     }
 
+    /** The request body as text, and whether that text is a JSON document. */
+    private record Body(String text, boolean json) {
+    }
+
     /**
      * The port sends a string as-is, and a JSON document is just its text, so the input goes verbatim and
      * a {@code body} from the config goes as its JSON text (a text value as the text itself).
      */
-    private static String body(ConnectorCallConfig config, String input) {
+    private static Body body(ConnectorCallConfig config, String input) {
         if (config.bodyFromInput()) {
             if (input == null || input.isBlank() || "null".equals(input.strip())) {
                 throw ConnectorCallFailures.emptyBody();
             }
-            return input;
+            return new Body(input, isJson(input));
         }
         JsonNode body = config.body();
         if (body == null) {
             return null;
         }
-        return body.isTextual() ? body.asText() : body.toString();
+        return body.isTextual() ? new Body(body.asText(), false) : new Body(body.toString(), true);
+    }
+
+    private static boolean isJson(String text) {
+        try {
+            JSON_READER.readTree(text);
+            return true;
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    /**
+     * The port labels any body {@code application/json} when no Content-Type is given, so a text body gets
+     * its own label here unless the config chose one.
+     */
+    private static Map<String, String> headers(Map<String, String> configured, Body body) {
+        if (body == null || body.json()
+                || configured.keySet().stream().anyMatch(name -> name.equalsIgnoreCase("content-type"))) {
+            return configured;
+        }
+        Map<String, String> headers = new LinkedHashMap<>(configured);
+        headers.put("Content-Type", TEXT_CONTENT_TYPE);
+        return headers;
     }
 
     private HttpConnectorResponse call(UUID owner, HttpConnectorRequest request) {

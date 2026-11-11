@@ -97,16 +97,58 @@ class ConnectorCallStepExecutorTest {
         JsonNode body = json.readTree((String) sent().body());
         assertThat(body.isObject()).isTrue();
         assertThat(body.path("title").asText()).isEqualTo("Launch");
+        assertThat(sent().headers()).doesNotContainKey("Content-Type");
     }
 
     @Test
-    void aTextInputIsSentAsText() {
+    void aTextInputIsSentAsTextLabelledAsText() {
         runStartedByOwner();
         when(connector.call(any(), any())).thenReturn(answer(200, "text/plain", "ok"));
 
         executor().execute(context(POST_CONFIG, "Xin chào"));
 
-        assertThat(sent().body()).isEqualTo("Xin chào");
+        HttpConnectorRequest request = sent();
+        assertThat(request.body()).isEqualTo("Xin chào");
+        assertThat(request.headers()).containsExactly(Map.entry("Notion-Version", "2022-06-28"),
+                Map.entry("Content-Type", "text/plain; charset=utf-8"));
+    }
+
+    @Test
+    void textThatOnlyStartsWithJsonIsLabelledAsText() {
+        runStartedByOwner();
+        when(connector.call(any(), any())).thenReturn(answer(200, "text/plain", "ok"));
+
+        executor().execute(context(POST_CONFIG, "{\"a\":1} and more"));
+
+        assertThat(sent().headers()).containsEntry("Content-Type", "text/plain; charset=utf-8");
+    }
+
+    @Test
+    void aTextInputKeepsAContentTypeTheConfigGave() {
+        runStartedByOwner();
+        when(connector.call(any(), any())).thenReturn(answer(200, "text/plain", "ok"));
+        String withType = "{\"connector\":\"notion-main\",\"method\":\"POST\",\"url\":\"https://api.notion.com/v1/x\","
+                + "\"headers\":{\"content-type\":\"text/csv\"},\"bodyFromInput\":true}";
+
+        executor().execute(context(withType, "a,b"));
+
+        assertThat(sent().headers()).containsExactly(Map.entry("content-type", "text/csv"));
+    }
+
+    @Test
+    void theSameStepIsLabelledPerRunByWhatItReceives() {
+        runStartedByOwner();
+        when(connector.call(any(), any())).thenReturn(answer(200, "text/plain", "ok"));
+        ConnectorCallStepExecutor executor = executor();
+
+        executor.execute(context(POST_CONFIG, "{\"title\":\"Launch\"}"));
+        executor.execute(context(POST_CONFIG, "Xin chào"));
+
+        ArgumentCaptor<HttpConnectorRequest> requests = ArgumentCaptor.forClass(HttpConnectorRequest.class);
+        verify(connector, org.mockito.Mockito.times(2)).call(eq(owner), requests.capture());
+        assertThat(requests.getAllValues().get(0).headers()).doesNotContainKey("Content-Type");
+        assertThat(requests.getAllValues().get(1).headers()).containsEntry("Content-Type",
+                "text/plain; charset=utf-8");
     }
 
     @Test
@@ -130,7 +172,9 @@ class ConnectorCallStepExecutorTest {
 
         executor().execute(context(withBody, "ignored"));
 
-        assertThat(json.readTree((String) sent().body())).isEqualTo(json.readTree("{\"a\":[1,2],\"b\":\"c\"}"));
+        HttpConnectorRequest request = sent();
+        assertThat(json.readTree((String) request.body())).isEqualTo(json.readTree("{\"a\":[1,2],\"b\":\"c\"}"));
+        assertThat(request.headers()).isEmpty();
     }
 
     @Test
@@ -142,7 +186,9 @@ class ConnectorCallStepExecutorTest {
 
         executor().execute(context(withText, null));
 
-        assertThat(sent().body()).isEqualTo("plain words");
+        HttpConnectorRequest request = sent();
+        assertThat(request.body()).isEqualTo("plain words");
+        assertThat(request.headers()).containsExactly(Map.entry("Content-Type", "text/plain; charset=utf-8"));
     }
 
     @Test
