@@ -1,6 +1,8 @@
 package com.flowcortex.onboarding.application;
 
+import com.flowcortex.onboarding.application.OnboardingSampleService.SampleWorkflow;
 import com.flowcortex.onboarding.domain.BuilderState;
+import com.flowcortex.onboarding.domain.FirstResultState;
 import com.flowcortex.onboarding.domain.InvalidOnboardingRequest;
 import com.flowcortex.onboarding.domain.OnboardingOpen;
 import com.flowcortex.onboarding.domain.OnboardingTracks;
@@ -20,6 +22,7 @@ import com.flowcortex.workflow.api.RunHistory;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,18 +45,26 @@ public class OnboardingService {
     private final OnboardingRepository repository;
     private final RunHistory runHistory;
     private final OnboardingSwitch onboardingSwitch;
+    private final OnboardingSampleService sample;
+    private final FirstResultService firstResults;
     private final Clock clock;
 
     OnboardingService(OnboardingRepository repository, RunHistory runHistory, OnboardingSwitch onboardingSwitch,
-            Clock clock) {
+            OnboardingSampleService sample, FirstResultService firstResults, Clock clock) {
         this.repository = repository;
         this.runHistory = runHistory;
         this.onboardingSwitch = onboardingSwitch;
+        this.sample = sample;
+        this.firstResults = firstResults;
         this.clock = clock;
     }
 
-    /** The member's stored onboarding plus the first-run fact and the open rule's verdict. */
-    public record Status(OnboardingRecord record, boolean firstRunDone, boolean open, String entry) {
+    /**
+     * The member's stored onboarding plus the first-run fact, the open rule's verdict, the sample
+     * offered in the member's language (null when none) and where the first-result report stands.
+     */
+    public record Status(OnboardingRecord record, boolean firstRunDone, boolean open, String entry,
+            SampleWorkflow sampleWorkflow, FirstResultState firstResult) {
 
         public boolean completed() {
             return record.completedAt() != null;
@@ -73,11 +84,12 @@ public class OnboardingService {
     }
 
     @Transactional(readOnly = true)
-    public Status status(UUID userId) {
+    public Status status(UUID userId, Locale locale) {
         OnboardingRecord record = repository.find(userId).orElseGet(OnboardingRecord::empty);
         boolean firstRunDone = runHistory.hasCompletedRun(userId);
         boolean open = OnboardingOpen.isOpen(record.progress(), firstRunDone, onboardingSwitch.enabled());
-        return new Status(record, firstRunDone, open, OnboardingOpen.entry(record.progress(), open));
+        return new Status(record, firstRunDone, open, OnboardingOpen.entry(record.progress(), open),
+                sample.servedSample(locale).orElse(null), firstResults.state(userId, firstRunDone));
     }
 
     @Transactional
