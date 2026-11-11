@@ -2,7 +2,9 @@ package com.flowcortex.user.application;
 
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.domain.AccountState;
 import com.flowcortex.user.domain.AppUser;
+import java.time.Instant;
 
 /**
  * Maps the internal {@link AppUser} entity to the {@code api} views. The one
@@ -26,7 +28,8 @@ final class AppUserMapper {
                 user.getGoogleSubject() != null);
     }
 
-    static UserView toUserView(AppUser user) {
+    static UserView toUserView(AppUser user, Instant now, boolean staffTarget) {
+        Instant lockedUntil = user.getLockedUntil();
         return new UserView(
                 user.getId(),
                 user.getOwnerId(),
@@ -35,6 +38,13 @@ final class AppUserMapper {
                 user.getRole().name(),
                 user.getStatus().name(),
                 user.getCreatedAt(),
-                user.getUpdatedAt());
+                user.getUpdatedAt(),
+                user.getUsername(),
+                AccountState.of(user.getStatus(), user.getEmailConfirmedAt(), lockedUntil, now).wire(),
+                user.getEmailConfirmedAt(),
+                lockedUntil != null && lockedUntil.isAfter(now) ? lockedUntil : null,
+                UserView.signInMethodsOf(user.hasPassword(), user.getGoogleSubject() != null),
+                user.isAdminDisabled(),
+                staffTarget);
     }
 }

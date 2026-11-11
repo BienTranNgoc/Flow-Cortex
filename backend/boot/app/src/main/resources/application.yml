@@ -254,6 +254,11 @@ flowcortex:
     per-email:
       capacity: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_CAPACITY:3}
       period: ${FLOWCORTEX_REGISTRATION_PER_EMAIL_PERIOD:1h}
+  # Users CSV export (GET /api/v1/users/export): a filter matching more accounts than this is refused
+  # with 422 instead of producing a partial file. The file is built in memory, so raising it raises heap use.
+  users:
+    export:
+      max-rows: ${FLOWCORTEX_USERS_EXPORT_MAX_ROWS:10000}
   # Phone verification by one-time code (/api/v1/me/phone/**): off answers 503 there. On needs an
   # SMS sender (flowcortex.sms.sender below), or startup fails.
   phone-verification:

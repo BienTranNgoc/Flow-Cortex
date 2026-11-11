@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -44,6 +43,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestRestTemplate
 @Import(UserAuthEndpointsIT.UserActivatedEvents.class)
 class UserAuthEndpointsIT extends AbstractUserModuleIT {
+
+    record UserPageView(List<UserResponseView> items, int page, int size, long total) {
+    }
 
     static final String OWNER_EMAIL = "registration-owner@example.com";
     private static final String OWNER_PASSWORD = "owner-password-1";
@@ -310,10 +312,10 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         register(newClientIp(), new RegisterRequest(email, "register-password-1", "Owned"), TokenResponse.class);
         String ownerToken = ownerToken();
 
-        ResponseEntity<UserResponseView[]> list = get("/api/v1/users", ownerToken, UserResponseView[].class);
+        ResponseEntity<UserPageView> list = get("/api/v1/users?size=100", ownerToken, UserPageView.class);
 
         assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
-        UserResponseView registered = Arrays.stream(list.getBody())
+        UserResponseView registered = list.getBody().items().stream()
                 .filter(user -> user.email().equals(email))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("registered user not listed by the owner"));

@@ -4,9 +4,13 @@ import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.AdminPermissions;
+import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
+import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserService;
+import com.flowcortex.user.api.UserStats;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.application.UserMutationPolicy.UserMutation;
 import com.flowcortex.user.domain.AppUser;
@@ -14,6 +18,9 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -41,11 +48,16 @@ class UserServiceImpl implements UserService {
     private final AdminPermissions adminPermissions;
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
+    private final UserDirectoryRepository directory;
+    private final Clock clock;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokenService, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
-            SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard) {
+            SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
+            UserDirectoryRepository directory, Clock clock) {
+        this.directory = directory;
+        this.clock = clock;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -85,16 +97,29 @@ class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserView getUser(UUID callerId, UUID id) {
         AppUser caller = requireActiveCaller(callerId);
-        return AppUserMapper.toUserView(requireOwned(scopeOf(caller), id));
+        return toView(requireOwned(scopeOf(caller), id));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserView> listUsers(UUID callerId) {
+    public PageView<UserView> searchUsers(UUID callerId, UserQuery query, int page, int size) {
         AppUser caller = requireActiveCaller(callerId);
-        return userRepository.findAllByOwnerIdOrderByEmailAsc(scopeOf(caller)).stream()
-                .map(AppUserMapper::toUserView)
-                .toList();
+        query.role().filter(code -> !directory.roleExists(code)).ifPresent(code -> {
+            throw new UnknownRoleException(code);
+        });
+        UUID scope = scopeOf(caller);
+        Instant now = clock.instant();
+        long total = directory.count(scope, query, now);
+        List<UserView> items = total == 0 ? List.of()
+                : directory.page(scope, query, now, (long) page * size, size);
+        return new PageView<>(items, page, size, total);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserStats userStats(UUID callerId) {
+        AppUser caller = requireActiveCaller(callerId);
+        return directory.stats(scopeOf(caller), clock.instant());
     }
 
     @Override
@@ -175,7 +200,7 @@ class UserServiceImpl implements UserService {
     }
 
     /** A super admin acts in the scope of its own id; staff act in the scope of the admin that owns them. */
-    private static UUID scopeOf(AppUser caller) {
+    static UUID scopeOf(AppUser caller) {
         return caller.getRole().isSuperAdmin() ? caller.getId() : caller.getOwnerId();
     }
 
@@ -206,10 +231,14 @@ class UserServiceImpl implements UserService {
 
     private UserView save(AppUser user, String email) {
         try {
-            return AppUserMapper.toUserView(userRepository.saveAndFlush(user));
+            return toView(userRepository.saveAndFlush(user));
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException(new LocalizedMessage("user.emailTaken", email));
         }
+    }
+
+    private UserView toView(AppUser user) {
+        return AppUserMapper.toUserView(user, clock.instant(), directory.staffTarget(user.getRole().name()));
     }
 
     private AppUser requireOwned(UUID ownerId, UUID id) {

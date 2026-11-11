@@ -3,6 +3,9 @@ package com.flowcortex.user.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -16,14 +19,21 @@ import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.AdminPermissions;
+import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
+import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -49,9 +59,11 @@ class UserServiceImplTest {
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
+    private final UserDirectoryRepository directory = mock(UserDirectoryRepository.class);
+    private final Clock clock = Clock.fixed(Instant.parse("2026-11-08T03:04:05Z"), ZoneOffset.UTC);
     private final UserServiceImpl service =
             new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks,
-                    adminPermissions, superAdminInvariant, registrationOwnerGuard);
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, directory, clock);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -222,11 +234,37 @@ class UserServiceImplTest {
         AppUser dung = new AppUser(UUID.randomUUID(), delegated.getId(), "dung@example.com", "$2a$hash", "Dung",
                 Role.MEMBER, UserStatus.ACTIVE);
         when(repository.findById(delegated.getId())).thenReturn(Optional.of(delegated));
-        when(repository.findAllByOwnerIdOrderByEmailAsc(delegated.getId())).thenReturn(List.of(dung));
+        Instant now = clock.instant();
+        when(directory.count(delegated.getId(), UserQuery.all(), now)).thenReturn(1L);
+        when(directory.page(delegated.getId(), UserQuery.all(), now, 0, 100))
+                .thenReturn(List.of(AppUserMapper.toUserView(dung, now, false)));
 
-        assertThat(service.listUsers(delegated.getId())).extracting(UserView::email)
-                .containsExactly("dung@example.com");
-        verify(repository, never()).findAllByOwnerIdOrderByEmailAsc(creatorId);
+        assertThat(service.searchUsers(delegated.getId(), UserQuery.all(), 0, 100).items())
+                .extracting(UserView::email).containsExactly("dung@example.com");
+        verify(directory, never()).count(eq(creatorId), any(), any());
+    }
+
+    @Test
+    void anUnknownRoleFilterIsRefusedAndReadsNoAccount() {
+        AppUser admin = activeOwner(UUID.randomUUID());
+        when(repository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(directory.roleExists("NOPE")).thenReturn(false);
+        UserQuery query = new UserQuery("", Optional.of("NOPE"), Optional.empty(), UserQuery.Sort.NEWEST);
+
+        assertThatThrownBy(() -> service.searchUsers(admin.getId(), query, 0, 20))
+                .isInstanceOf(UnknownRoleException.class);
+        verify(directory, never()).count(any(), any(), any());
+        verify(directory, never()).page(any(), any(), any(), anyLong(), anyInt());
+    }
+
+    @Test
+    void aSuspendedCallerCannotReadTheStats() {
+        AppUser suspended = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "off@example.com", "$2a$hash", "Off",
+                Role.ADMIN, UserStatus.SUSPENDED);
+        when(repository.findById(suspended.getId())).thenReturn(Optional.of(suspended));
+
+        assertThatThrownBy(() -> service.userStats(suspended.getId())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(directory);
     }
 
     @Test
@@ -237,10 +275,13 @@ class UserServiceImplTest {
         AppUser member = new AppUser(UUID.randomUUID(), adminId, "ba@example.com", "$2a$hash", "Ba",
                 Role.MEMBER, UserStatus.ACTIVE);
         when(repository.findById(staff.getId())).thenReturn(Optional.of(staff));
-        when(repository.findAllByOwnerIdOrderByEmailAsc(adminId)).thenReturn(List.of(member, staff));
+        Instant now = clock.instant();
+        when(directory.count(adminId, UserQuery.all(), now)).thenReturn(2L);
+        when(directory.page(adminId, UserQuery.all(), now, 0, 100)).thenReturn(
+                List.of(AppUserMapper.toUserView(member, now, false), AppUserMapper.toUserView(staff, now, true)));
         when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
 
-        assertThat(service.listUsers(staff.getId())).hasSize(2);
+        assertThat(service.searchUsers(staff.getId(), UserQuery.all(), 0, 100).items()).hasSize(2);
         assertThat(service.getUser(staff.getId(), member.getId()).email()).isEqualTo("ba@example.com");
     }
 

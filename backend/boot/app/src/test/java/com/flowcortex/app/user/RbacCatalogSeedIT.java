@@ -52,7 +52,7 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         Map<String, Boolean> catalog = Arrays.stream(Permission.values())
                 .collect(Collectors.toMap(Permission::key, Permission::superAdminOnly));
-        assertThat(catalog).hasSize(21);
+        assertThat(catalog).hasSize(22);
         assertThat(rows).isEqualTo(catalog);
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
@@ -65,7 +65,7 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).hasSize(17).isEqualTo(operationManager);
+        assertThat(keysOf("OPERATION_MANAGER")).hasSize(18).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
                 Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
@@ -81,6 +81,17 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
                 Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         assertThat(workflowManageHolders).isZero();
+    }
+
+    @Test
+    void operationManagerAloneAmongStaffHoldsUserAccountExport() {
+        String export = "user.account.export";
+
+        assertThat(keysOf("OPERATION_MANAGER")).contains(export);
+        assertThat(keysOf("CUSTOMER_SUPPORT")).doesNotContain(export);
+        assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(export);
+        assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(export);
+        assertThat(keysOf("ADMIN")).isEmpty();
     }
 
     @Test

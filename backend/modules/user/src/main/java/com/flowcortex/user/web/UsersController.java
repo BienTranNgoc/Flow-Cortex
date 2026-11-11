@@ -2,15 +2,27 @@ package com.flowcortex.user.web;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.PageView;
+import com.flowcortex.user.api.UserQuery;
+import com.flowcortex.user.api.UserQuery.Sort;
 import com.flowcortex.user.api.UserService;
+import com.flowcortex.user.api.UserStats;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.domain.AccountState;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,6 +36,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,19 +52,40 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 class UsersController {
 
+    private static final int MAX_PAGE_SIZE = 100;
+    /** Keeps {@code page * size} within an {@code int}. */
+    private static final int MAX_PAGE = Integer.MAX_VALUE / MAX_PAGE_SIZE;
+
     private final UserService userService;
 
     UsersController(UserService userService) {
         this.userService = userService;
     }
 
+    @Operation(operationId = "listUsers")
     @RequirePermission(Permission.USER_ACCOUNT_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<List<UserResponse>> list(@AuthenticationPrincipal Jwt jwt) {
-        List<UserResponse> users = userService.listUsers(callerId(jwt)).stream()
-                .map(UserResponse::from)
-                .toList();
-        return ResponseEntity.ok(users);
+    ResponseEntity<PageView<UserResponse>> list(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) int size,
+            @RequestParam(required = false) @Size(max = 100) String q,
+            @RequestParam(required = false) @Pattern(regexp = "^[A-Z][A-Z0-9_]{0,19}$") String role,
+            @Parameter(schema = @Schema(allowableValues = {"active", "pending_confirmation", "locked",
+                    "suspended"}))
+            @RequestParam(required = false)
+            @Pattern(regexp = "active|pending_confirmation|locked|suspended") String state,
+            @Parameter(schema = @Schema(allowableValues = {"newest", "oldest", "email", "name"}))
+            @RequestParam(defaultValue = "newest") @Pattern(regexp = "newest|oldest|email|name") String sort) {
+        UserQuery query = new UserQuery(q, Optional.ofNullable(role),
+                Optional.ofNullable(state).flatMap(AccountState::fromWire), Sort.valueOf(sort.toUpperCase(Locale.ROOT)));
+        return ResponseEntity.ok(userService.searchUsers(callerId(jwt), query, page, size).map(UserResponse::from));
+    }
+
+    @Operation(operationId = "getUserStats")
+    @RequirePermission(Permission.USER_ACCOUNT_VIEW)
+    @GetMapping(value = "/stats", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<UserStats> stats(@AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(userService.userStats(callerId(jwt)));
     }
 
     // @ResponseStatus documents 201 for springdoc/orval — Spring MVC ignores it for a
@@ -116,10 +150,12 @@ class UsersController {
 
     /** Never carries {@code passwordHash} — {@link UserView} does not either. */
     record UserResponse(UUID id, String email, String name, String role, String status, Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt, String username, String state, Instant emailConfirmedAt, Instant lockedUntil,
+            List<String> signInMethods, boolean adminDisabled, boolean staffTarget) {
         static UserResponse from(UserView view) {
             return new UserResponse(view.id(), view.email(), view.name(), view.role(), view.status(),
-                    view.createdAt(), view.updatedAt());
+                    view.createdAt(), view.updatedAt(), view.username(), view.state(), view.emailConfirmedAt(),
+                    view.lockedUntil(), view.signInMethods(), view.adminDisabled(), view.staffTarget());
         }
     }
 }

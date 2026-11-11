@@ -2,6 +2,7 @@ package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserView;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
         assertThat(created.status()).isEqualTo("ACTIVE");
         assertThat(created.role()).isEqualTo("MEMBER");
 
-        List<UserView> list = userService.listUsers(admin.id());
+        List<UserView> list = userService.searchUsers(admin.id(), UserQuery.all(), 0, 100).items();
         assertThat(list).extracting(UserView::email).contains(newEmail);
     }
 
@@ -100,7 +101,8 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(second.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("application/problem+json"));
         long matching =
-                userService.listUsers(admin.id()).stream().filter(u -> u.email().equals(duplicateEmail)).count();
+                userService.searchUsers(admin.id(), UserQuery.all(), 0, 100).items().stream()
+                        .filter(u -> u.email().equals(duplicateEmail)).count();
         assertThat(matching).isEqualTo(1);
     }
 
@@ -152,7 +154,8 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
                 new CreateUserRequestView(uniqueEmail("should-not-be-created"), "password123", "Nope", "MEMBER"),
                 String.class);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(userService.listUsers(admin.id()).stream().map(UserView::email))
+        assertThat(userService.searchUsers(admin.id(), UserQuery.all(), 0, 100).items().stream()
+                .map(UserView::email))
                 .noneMatch(email -> email.contains("should-not-be-created"));
     }
 
