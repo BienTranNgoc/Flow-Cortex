@@ -4,9 +4,9 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import { ArrowsClockwise, Plus } from '@phosphor-icons/react';
-import { useMeQuery } from '../auth/useAuth';
-import { assignableRoles, ROLE_CODES } from './enumLabels';
+import { ROLE_CODES } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
+import { useAssignableRoles } from './useAssignableRoles';
 import { UserRow } from './UserRow';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { usePageTitle } from '../../app/usePageTitle';
@@ -25,7 +25,7 @@ export function UsersPage() {
   const { t } = useTranslation();
   const locale = activeLocale();
   usePageTitle(t('users.title'));
-  const assignable = assignableRoles(useMeQuery().data);
+  const { assignable, names } = useAssignableRoles();
   const usersQuery = useUsersQuery();
   const createMutation = useCreateUserMutation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -68,6 +68,18 @@ export function UsersPage() {
       );
     });
   }, [users, search, statusFilter, roleFilter]);
+  const { filterRoles, filterNames } = useMemo(() => {
+    const customNames: Record<string, string> = {};
+    for (const user of users) {
+      if (user.role && !(ROLE_CODES as readonly string[]).includes(user.role)) {
+        customNames[user.role] = user.roleName;
+      }
+    }
+    return {
+      filterRoles: [...ROLE_CODES, ...Object.keys(customNames)],
+      filterNames: customNames,
+    };
+  }, [users]);
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const newThisWeek = users.filter(
     (user) => user.createdAt && Date.parse(user.createdAt) >= sevenDaysAgo,
@@ -115,10 +127,7 @@ export function UsersPage() {
           />
           <MetricCard
             label={t('users.stats.suspended')}
-            value={formatNumber(
-              users.filter((user) => user.status === 'SUSPENDED').length,
-              locale,
-            )}
+            value={formatNumber(users.filter((user) => user.status === 'SUSPENDED').length, locale)}
           />
           <MetricCard
             label={t('users.stats.newThisWeek')}
@@ -180,7 +189,10 @@ export function UsersPage() {
           <div className="cortex-admin-field">
             <label htmlFor="new-user-role">{t('users.create.role')}</label>
             <select id="new-user-role" {...register('role')}>
-              <RoleOptions roles={assignable.length > 0 ? assignable : DEFAULT_CREATE_ROLES} />
+              <RoleOptions
+                roles={assignable.length > 0 ? assignable : DEFAULT_CREATE_ROLES}
+                names={names}
+              />
             </select>
           </div>
           {createError && !createError.errors && (
@@ -244,7 +256,7 @@ export function UsersPage() {
               onChange={(event) => setRoleFilter(event.target.value)}
             >
               <option value="">{t('users.directory.allRoles')}</option>
-              <RoleOptions roles={ROLE_CODES} />
+              <RoleOptions roles={filterRoles} names={filterNames} />
             </select>
           </div>
         </div>
@@ -254,11 +266,7 @@ export function UsersPage() {
         {usersQuery.isError && (
           <div className="cortex-admin-error" role="alert">
             <p>{t('users.directory.loadError')}</p>
-            <button
-              type="button"
-              className="cortex-admin-btn"
-              onClick={() => usersQuery.refetch()}
-            >
+            <button type="button" className="cortex-admin-btn" onClick={() => usersQuery.refetch()}>
               {t('users.directory.retry')}
             </button>
           </div>

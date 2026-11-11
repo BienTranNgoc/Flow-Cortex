@@ -9,6 +9,8 @@ interface AccountDialogProps {
   readonly account: AdminAccountResponse;
   readonly action: AccountAction;
   readonly roles: readonly string[];
+  /** Names of the custom roles by code. */
+  readonly roleNames: Readonly<Record<string, string>>;
   readonly pending: boolean;
   /** The localized problem text of the last failed attempt, shown inside the dialog. */
   readonly error: string | undefined;
@@ -21,6 +23,7 @@ export function AccountDialog({
   account,
   action,
   roles,
+  roleNames,
   pending,
   error,
   onConfirm,
@@ -64,7 +67,7 @@ export function AccountDialog({
             <select id={roleId} value={role} onChange={(event) => setRole(event.target.value)}>
               {roles.map((code) => (
                 <option key={code} value={code}>
-                  {roleLabel(t, code)}
+                  {roleLabel(t, code, roleNames[code])}
                 </option>
               ))}
             </select>
@@ -76,7 +79,11 @@ export function AccountDialog({
           </p>
         )}
         <div className="cortex-admin-accounts-dialog__actions">
-          <button type="button" className="cortex-admin-btn" onClick={() => dialogRef.current?.close()}>
+          <button
+            type="button"
+            className="cortex-admin-btn"
+            onClick={() => dialogRef.current?.close()}
+          >
             {t('adminAccounts.dialog.cancel')}
           </button>
           <button
@@ -88,7 +95,9 @@ export function AccountDialog({
             }
             disabled={pending || unchanged}
           >
-            {pending ? t('adminAccounts.dialog.working') : t(`adminAccounts.dialog.${action}.confirm`)}
+            {pending
+              ? t('adminAccounts.dialog.working')
+              : t(`adminAccounts.dialog.${action}.confirm`)}
           </button>
         </div>
       </form>

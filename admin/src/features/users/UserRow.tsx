@@ -9,9 +9,10 @@ import { can } from '../../app/permissions';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useMeQuery } from '../auth/useAuth';
-import { assignableRoles, ROLE_CODES, roleLabel, statusLabel } from './enumLabels';
+import { roleLabel, statusLabel } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation } from './useUsers';
 
 /** One row of the users table — view mode, or an inline edit form. */
@@ -20,8 +21,8 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const me = useMeQuery().data;
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
-  const assignable = assignableRoles(me);
-  const role = ROLE_CODES.find((code) => code === user.role) ?? 'MEMBER';
+  const { assignable, names } = useAssignableRoles();
+  const role = user.role || 'MEMBER';
   const status = user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
   const {
     register,
@@ -92,7 +93,11 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
                 disabled={assignable.length === 0}
                 {...register('role')}
               >
-                <RoleOptions roles={assignable} current={role} />
+                <RoleOptions
+                  roles={assignable}
+                  current={role}
+                  names={{ [role]: user.roleName, ...names }}
+                />
               </select>
             </div>
             <div className="cortex-admin-field">
@@ -139,7 +144,9 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       </td>
       <td data-label={t('users.columns.email')}>{user.email}</td>
       <td data-label={t('users.columns.role')}>
-        <span className="cortex-admin-pill cortex-admin-pill--info">{roleLabel(t, user.role)}</span>
+        <span className="cortex-admin-pill cortex-admin-pill--info">
+          {roleLabel(t, user.role, user.roleName)}
+        </span>
       </td>
       <td data-label={t('users.columns.status')}>
         <span

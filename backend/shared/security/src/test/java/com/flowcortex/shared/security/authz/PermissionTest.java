@@ -28,8 +28,8 @@ class PermissionTest {
     @Test
     void onlySystemKeysAreSuperAdminOnly() {
         assertThat(Arrays.stream(Permission.values()).filter(Permission::superAdminOnly))
-                .containsExactly(Permission.SYSTEM_ROLE_VIEW, Permission.SYSTEM_ADMIN_ACCOUNT_VIEW,
-                        Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE);
+                .containsExactly(Permission.SYSTEM_ROLE_VIEW, Permission.SYSTEM_ROLE_MANAGE,
+                        Permission.SYSTEM_ADMIN_ACCOUNT_VIEW, Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE);
         assertThat(Permission.USER_ACCOUNT_VIEW.superAdminOnly()).isFalse();
     }
 

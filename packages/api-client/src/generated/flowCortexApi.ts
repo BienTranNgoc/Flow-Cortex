@@ -8,7 +8,10 @@ import { customFetch } from '../customFetch';
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
-  /** @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR */
+  /**
+   * @minLength 0
+   * @maxLength 20
+   */
   role?: string;
   /** @pattern ACTIVE|SUSPENDED */
   status?: string;
@@ -19,6 +22,7 @@ export interface UserResponse {
   email?: string;
   name?: string;
   role?: string;
+  roleName: string;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -105,6 +109,7 @@ export const MeResponsePermissionsItem = {
   platformsettingupdate: 'platform.setting.update',
   platformsms_outboxview: 'platform.sms_outbox.view',
   systemroleview: 'system.role.view',
+  systemrolemanage: 'system.role.manage',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
 } as const;
@@ -326,6 +331,59 @@ export interface AdminSupportKbArticle {
   updatedAt: string;
 }
 
+export interface ReplacePermissionsRequest {
+  /**
+   * @minItems 0
+   * @maxItems 200
+   * @items.minLength 0
+   * @items.maxLength 100
+   */
+  keys: string[];
+  /** @minimum 0 */
+  expectedVersion: number;
+}
+
+export type RoleResponsePermissionsItem =
+  (typeof RoleResponsePermissionsItem)[keyof typeof RoleResponsePermissionsItem];
+
+export const RoleResponsePermissionsItem = {
+  useraccountview: 'user.account.view',
+  useraccountcreate: 'user.account.create',
+  useraccountupdate: 'user.account.update',
+  useraccountchange_role: 'user.account.change_role',
+  useraccountsuspend: 'user.account.suspend',
+  useraccountdelete: 'user.account.delete',
+  workflowrunview: 'workflow.run.view',
+  workflowworkflowmanage: 'workflow.workflow.manage',
+  supportticketview: 'support.ticket.view',
+  supportticketreply: 'support.ticket.reply',
+  supportticketclose: 'support.ticket.close',
+  contenthelp_topicview: 'content.help_topic.view',
+  contenthelp_topicmanage: 'content.help_topic.manage',
+  contenthelp_articleview: 'content.help_article.view',
+  contenthelp_articlemanage: 'content.help_article.manage',
+  platformsettingview: 'platform.setting.view',
+  platformsettingupdate: 'platform.setting.update',
+  platformsms_outboxview: 'platform.sms_outbox.view',
+  systemroleview: 'system.role.view',
+  systemrolemanage: 'system.role.manage',
+  systemadmin_accountview: 'system.admin_account.view',
+  systemadmin_accountmanage: 'system.admin_account.manage',
+} as const;
+
+export interface RoleResponse {
+  code: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  system: boolean;
+  staff: boolean;
+  superAdmin: boolean;
+  permissions: RoleResponsePermissionsItem[];
+  permissionsVersion: number;
+  accountCount: number;
+}
+
 export interface AdminChatSettingsUpdate {
   enabled: boolean;
 }
@@ -494,7 +552,7 @@ export interface CreateUserRequest {
   name: string;
   /**
    * @minLength 1
-   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   * @maxLength 20
    */
   role: string;
 }
@@ -957,11 +1015,32 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface CreateRoleRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  name: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  description?: string;
+  /**
+   * @minItems 0
+   * @maxItems 200
+   * @items.minLength 0
+   * @items.maxLength 100
+   */
+  permissionKeys?: string[];
+}
+
 export interface AdminAccountResponse {
   id: string;
   email: string;
   name: string;
   role: string;
+  roleName: string;
   status: string;
   adminDisabled: boolean;
   adminDisabledAt?: string;
@@ -1005,10 +1084,24 @@ export interface UpdateStepRequest {
   config?: string;
 }
 
+export interface UpdateRoleRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   * @pattern (?s).*\S.*
+   */
+  name?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  description?: string;
+}
+
 export interface ChangeRoleRequest {
   /**
    * @minLength 1
-   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   * @maxLength 20
    */
   role: string;
 }
@@ -1247,10 +1340,10 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
-export type RoleResponsePermissionsItem =
-  (typeof RoleResponsePermissionsItem)[keyof typeof RoleResponsePermissionsItem];
+export type PermissionCatalogEntryKey =
+  (typeof PermissionCatalogEntryKey)[keyof typeof PermissionCatalogEntryKey];
 
-export const RoleResponsePermissionsItem = {
+export const PermissionCatalogEntryKey = {
   useraccountview: 'user.account.view',
   useraccountcreate: 'user.account.create',
   useraccountupdate: 'user.account.update',
@@ -1270,15 +1363,17 @@ export const RoleResponsePermissionsItem = {
   platformsettingupdate: 'platform.setting.update',
   platformsms_outboxview: 'platform.sms_outbox.view',
   systemroleview: 'system.role.view',
+  systemrolemanage: 'system.role.manage',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
 } as const;
 
-export interface RoleResponse {
-  code: string;
-  staff: boolean;
-  superAdmin: boolean;
-  permissions: RoleResponsePermissionsItem[];
+export interface PermissionCatalogEntry {
+  key: PermissionCatalogEntryKey;
+  module: string;
+  feature: string;
+  action: string;
+  superAdminOnly: boolean;
 }
 
 export interface MediaJobResponse {
@@ -1434,7 +1529,8 @@ export const ListAdminMediaJobsStatus = {
 
 export type ListAdminAccountsParams = {
   /**
-   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   * @minLength 0
+   * @maxLength 20
    */
   role?: string;
   q?: string;
@@ -2164,6 +2260,52 @@ export const updateAdminSupportKbArticle = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminSupportKbArticleRequest),
+  });
+};
+
+export type replaceAdminRolePermissionsResponse200 = {
+  data: RoleResponse;
+  status: 200;
+};
+
+export type replaceAdminRolePermissionsResponseSuccess = replaceAdminRolePermissionsResponse200 & {
+  headers: Headers;
+};
+export type replaceAdminRolePermissionsResponse = replaceAdminRolePermissionsResponseSuccess;
+
+export const getReplaceAdminRolePermissionsUrl = (code: string) => {
+  return `/api/v1/admin/roles/${code}/permissions`;
+};
+
+export const replaceAdminRolePermissions = async (
+  code: string,
+  replacePermissionsRequest: ReplacePermissionsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replaceAdminRolePermissionsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replaceAdminRolePermissionsResponse>(getReplaceAdminRolePermissionsUrl(code), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(replacePermissionsRequest),
   });
 };
 
@@ -4609,6 +4751,74 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
+export type listAdminRolesResponse200 = {
+  data: RoleResponse[];
+  status: 200;
+};
+
+export type listAdminRolesResponseSuccess = listAdminRolesResponse200 & {
+  headers: Headers;
+};
+export type listAdminRolesResponse = listAdminRolesResponseSuccess;
+
+export const getListAdminRolesUrl = () => {
+  return `/api/v1/admin/roles`;
+};
+
+export const listAdminRoles = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminRolesResponse> => {
+  return customFetch<listAdminRolesResponse>(getListAdminRolesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createAdminRoleResponse200 = {
+  data: RoleResponse;
+  status: 200;
+};
+
+export type createAdminRoleResponseSuccess = createAdminRoleResponse200 & {
+  headers: Headers;
+};
+export type createAdminRoleResponse = createAdminRoleResponseSuccess;
+
+export const getCreateAdminRoleUrl = () => {
+  return `/api/v1/admin/roles`;
+};
+
+export const createAdminRole = async (
+  createRoleRequest: CreateRoleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminRoleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminRoleResponse>(getCreateAdminRoleUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createRoleRequest),
+  });
+};
+
 export type deactivateAdminAccountResponse200 = {
   data: AdminAccountResponse;
   status: 200;
@@ -5052,6 +5262,100 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type getAdminRoleResponse200 = {
+  data: RoleResponse;
+  status: 200;
+};
+
+export type getAdminRoleResponseSuccess = getAdminRoleResponse200 & {
+  headers: Headers;
+};
+export type getAdminRoleResponse = getAdminRoleResponseSuccess;
+
+export const getGetAdminRoleUrl = (code: string) => {
+  return `/api/v1/admin/roles/${code}`;
+};
+
+export const getAdminRole = async (
+  code: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminRoleResponse> => {
+  return customFetch<getAdminRoleResponse>(getGetAdminRoleUrl(code), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteAdminRoleResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type deleteAdminRoleResponseSuccess = deleteAdminRoleResponse200 & {
+  headers: Headers;
+};
+export type deleteAdminRoleResponse = deleteAdminRoleResponseSuccess;
+
+export const getDeleteAdminRoleUrl = (code: string) => {
+  return `/api/v1/admin/roles/${code}`;
+};
+
+export const deleteAdminRole = async (
+  code: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminRoleResponse> => {
+  return customFetch<deleteAdminRoleResponse>(getDeleteAdminRoleUrl(code), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminRoleResponse200 = {
+  data: RoleResponse;
+  status: 200;
+};
+
+export type updateAdminRoleResponseSuccess = updateAdminRoleResponse200 & {
+  headers: Headers;
+};
+export type updateAdminRoleResponse = updateAdminRoleResponseSuccess;
+
+export const getUpdateAdminRoleUrl = (code: string) => {
+  return `/api/v1/admin/roles/${code}`;
+};
+
+export const updateAdminRole = async (
+  code: string,
+  updateRoleRequest: UpdateRoleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminRoleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminRoleResponse>(getUpdateAdminRoleUrl(code), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateRoleRequest),
   });
 };
 
@@ -6026,24 +6330,24 @@ export const listAdminRuns = async (
   });
 };
 
-export type listAdminRolesResponse200 = {
-  data: RoleResponse[];
+export type listAdminPermissionCatalogResponse200 = {
+  data: PermissionCatalogEntry[];
   status: 200;
 };
 
-export type listAdminRolesResponseSuccess = listAdminRolesResponse200 & {
+export type listAdminPermissionCatalogResponseSuccess = listAdminPermissionCatalogResponse200 & {
   headers: Headers;
 };
-export type listAdminRolesResponse = listAdminRolesResponseSuccess;
+export type listAdminPermissionCatalogResponse = listAdminPermissionCatalogResponseSuccess;
 
-export const getListAdminRolesUrl = () => {
-  return `/api/v1/admin/roles`;
+export const getListAdminPermissionCatalogUrl = () => {
+  return `/api/v1/admin/permission-catalog`;
 };
 
-export const listAdminRoles = async (
+export const listAdminPermissionCatalog = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<listAdminRolesResponse> => {
-  return customFetch<listAdminRolesResponse>(getListAdminRolesUrl(), {
+): Promise<listAdminPermissionCatalogResponse> => {
+  return customFetch<listAdminPermissionCatalogResponse>(getListAdminPermissionCatalogUrl(), {
     ...options,
     method: 'GET',
   });

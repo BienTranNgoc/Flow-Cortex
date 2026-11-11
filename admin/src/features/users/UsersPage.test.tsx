@@ -160,7 +160,9 @@ describe('UsersPage', () => {
       stubApi({ 'GET /api/v1/users': { status: 200, body: [ALICE] } });
       renderRoute('/users', '/users', <UsersPage />);
 
-      expect(await screen.findByRole('region', { name: viUsers.directory.tableLabel })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('region', { name: viUsers.directory.tableLabel }),
+      ).toBeInTheDocument();
     });
 
     it('shows the Vietnamese heading and the join date in vi-VN conventions', async () => {

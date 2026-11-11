@@ -1,0 +1,192 @@
+{
+  "title": "Roles & permissions",
+  "eyebrow": "System",
+  "description": "Create staff roles and choose which actions each role may use in the admin console.",
+  "list": {
+    "tableLabel": "Roles table",
+    "columns": {
+      "name": "Role",
+      "code": "Code",
+      "type": "Type",
+      "accounts": "Accounts"
+    },
+    "type": {
+      "system": "System",
+      "custom": "Custom"
+    },
+    "create": "Create role",
+    "loading": "Loading roles…",
+    "empty": "No custom roles yet. The system roles above cover the default staff duties.",
+    "emptyCreate": "Create the first custom role to give a team its own set of permissions.",
+    "retry": "Retry",
+    "errors": {
+      "load": "Could not load the roles."
+    },
+    "accountsLink": "{{count}}",
+    "accountsLinkLabel": "Show the accounts holding {{name}}",
+    "open": "Open role {{name}}"
+  },
+  "detail": {
+    "titleNew": "Create role",
+    "titleView": "Role: {{name}}",
+    "backToRoles": "Back to roles",
+    "loading": "Loading role…",
+    "notFound": "Role not found",
+    "invalidCode": "This role code is not valid.",
+    "retry": "Retry",
+    "errors": {
+      "load": "Could not load this role.",
+      "generic": "Could not save the role. Try again.",
+      "deleteGeneric": "Could not delete the role. Try again.",
+      "nameRequired": "Enter a role name.",
+      "nameTooLong": "The name can have at most {{max}} characters.",
+      "descriptionTooLong": "The description can have at most {{max}} characters.",
+      "missingView": "Also grant the view permission for: {{features}}",
+      "permissionsHeading": "The server refused these permissions:"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "code": "Code",
+      "codeHint": "Generated from the name when the role is created and never changes."
+    },
+    "badges": {
+      "system": "System role",
+      "custom": "Custom role",
+      "superAdmin": "Super admin"
+    },
+    "notes": {
+      "superAdmin": "The super admin role holds every permission and cannot be changed.",
+      "system": "A system role: its permissions can be edited, but it cannot be renamed or deleted.",
+      "readOnly": "You can view this role but not change it.",
+      "endUser": "End-user roles carry no admin permissions."
+    },
+    "actions": {
+      "save": "Save changes",
+      "saving": "Saving…",
+      "create": "Create role",
+      "creating": "Creating…",
+      "reload": "Reload",
+      "delete": "Delete role"
+    },
+    "notice": {
+      "created": "Role {{name}} created.",
+      "saved_one": "Saved. {{name}} now has {{count}} permission.",
+      "saved_other": "Saved. {{name}} now has {{count}} permissions.",
+      "renamed": "Saved. The role is now named {{name}}."
+    },
+    "stale": "Another admin changed this role while you were editing. Your draft is kept below; Reload replaces it with the stored permissions.",
+    "partialSave": "The permissions were saved but the name was not. Fix the name and save again.",
+    "delete": {
+      "title": "Delete role {{name}}?",
+      "description": "The role and its permissions are removed. Accounts cannot hold a deleted role.",
+      "confirm": "Delete role",
+      "working": "Deleting…",
+      "cancel": "Cancel",
+      "heldLink": "Show the accounts holding this role"
+    },
+    "leaveConfirm": "You have unsaved changes to this role. Leave without saving?"
+  },
+  "matrix": {
+    "label": "Permissions of {{name}}",
+    "expand": "Expand {{name}}",
+    "collapse": "Collapse {{name}}",
+    "count": "{{selected}} of {{total}}",
+    "moduleToggle": "All permissions in {{name}}",
+    "featureToggle": "All actions of {{name}}",
+    "summary": "{{selected}} of {{total}} permissions granted",
+    "legend": "Granting an action also grants its feature's view permission; removing view removes every action of that feature.",
+    "superAdminOnly": "Super admin only",
+    "empty": "The catalog has no permissions to show."
+  },
+  "catalog": {
+    "modules": {
+      "user": "Users",
+      "workflow": "Workflows",
+      "support": "Support",
+      "content": "Content",
+      "platform": "Platform",
+      "system": "System"
+    },
+    "features": {
+      "user": {
+        "account": "Accounts"
+      },
+      "workflow": {
+        "run": "Runs",
+        "workflow": "Workflows"
+      },
+      "support": {
+        "ticket": "Support requests"
+      },
+      "content": {
+        "help_topic": "Guide topics",
+        "help_article": "Guide articles"
+      },
+      "platform": {
+        "setting": "Settings",
+        "sms_outbox": "SMS outbox"
+      },
+      "system": {
+        "role": "Roles",
+        "admin_account": "Admin accounts"
+      }
+    },
+    "actions": {
+      "user": {
+        "account": {
+          "view": "View accounts",
+          "create": "Create accounts",
+          "update": "Edit accounts",
+          "change_role": "Change roles",
+          "suspend": "Suspend accounts",
+          "delete": "Delete accounts"
+        }
+      },
+      "workflow": {
+        "run": {
+          "view": "View runs"
+        },
+        "workflow": {
+          "manage": "Manage workflows"
+        }
+      },
+      "support": {
+        "ticket": {
+          "view": "View requests",
+          "reply": "Reply to requests",
+          "close": "Close requests"
+        }
+      },
+      "content": {
+        "help_topic": {
+          "view": "View topics",
+          "manage": "Manage topics"
+        },
+        "help_article": {
+          "view": "View articles",
+          "manage": "Manage articles"
+        }
+      },
+      "platform": {
+        "setting": {
+          "view": "View settings",
+          "update": "Change settings"
+        },
+        "sms_outbox": {
+          "view": "View the SMS outbox"
+        }
+      },
+      "system": {
+        "role": {
+          "view": "View roles",
+          "manage": "Manage roles"
+        },
+        "admin_account": {
+          "view": "View admin accounts",
+          "manage": "Manage admin accounts"
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,8 @@ import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { RoleDetailPage } from './features/roles/RoleDetailPage';
+import { RolesPage } from './features/roles/RolesPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
@@ -32,6 +34,7 @@ const PAGES: Record<string, ReactElement> = {
   '/sms-outbox': <SmsOutboxPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
+  '/roles': <RolesPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,
   '/support/requests': <RequestsInboxPage />,
@@ -42,6 +45,8 @@ const PAGES: Record<string, ReactElement> = {
 /** Pages under a sidebar entry, routable only where that entry is. */
 const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
+  { parent: '/roles', path: '/roles/new', element: <RoleDetailPage /> },
+  { parent: '/roles', path: '/roles/:code', element: <RoleDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
   { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },
 ];

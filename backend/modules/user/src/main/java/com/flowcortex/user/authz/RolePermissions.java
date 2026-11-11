@@ -24,7 +24,7 @@ public class RolePermissions {
 
     public Set<Permission> keysOf(Role role) {
         List<String> keys = jdbc.queryForList(
-                "SELECT permission_key FROM role_permission WHERE role_code = ?", String.class, role.name());
+                "SELECT permission_key FROM role_permission WHERE role_code = ?", String.class, role.code());
         Set<Permission> held = EnumSet.noneOf(Permission.class);
         for (String key : keys) {
             Permission.fromKey(key).ifPresentOrElse(held::add,

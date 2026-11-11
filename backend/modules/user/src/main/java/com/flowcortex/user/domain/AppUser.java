@@ -1,6 +1,7 @@
 package com.flowcortex.user.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -54,7 +55,7 @@ public class AppUser {
     @Column(name = "email_confirmed_at")
     private Instant emailConfirmedAt;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RoleConverter.class)
     @Column(name = "role", nullable = false)
     private Role role;
 
@@ -322,10 +323,14 @@ public class AppUser {
         touch();
     }
 
-    /** A change to an end-user role clears the admin deactivation, so a later promotion starts active. */
-    public void changeRole(Role role) {
+    /**
+     * A change to an end-user role clears the admin deactivation, so a later promotion starts active.
+     *
+     * @param adminAccount whether the new role is a staff or super-admin role, from the role table
+     */
+    public void changeRole(Role role, boolean adminAccount) {
         this.role = role;
-        if (!role.isStaff() && !role.isSuperAdmin()) {
+        if (!adminAccount) {
             this.adminDisabledAt = null;
             this.adminDisabledBy = null;
         }

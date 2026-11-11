@@ -15,7 +15,6 @@ import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.domain.AppUser;
-import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
@@ -579,7 +578,7 @@ class AuthServiceImpl implements AuthService {
         }
         AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
         String unusable = owner == null ? "owner_not_found"
-                : owner.getRole() != Role.ADMIN ? "owner_not_admin"
+                : !owner.getRole().isSuperAdmin() ? "owner_not_admin"
                 : owner.getStatus() != UserStatus.ACTIVE ? "owner_not_active"
                 : null;
         if (unusable != null) {

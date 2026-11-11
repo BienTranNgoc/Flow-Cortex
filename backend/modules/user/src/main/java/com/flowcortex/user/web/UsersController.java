@@ -4,6 +4,7 @@ import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -32,8 +33,9 @@ import org.springframework.web.bind.annotation.RestController;
  * outside that scope is a 404, not a 403 — {@link UserService} enforces that; this controller
  * just relays what it throws.
  *
- * <p>Role/status are constrained by Jakarta Bean Validation, so an invalid value fails through
- * the same {@code MethodArgumentNotValidException} -> 400-problem path as any other validation.
+ * <p>A status outside the known values fails Jakarta Bean Validation, through the same
+ * {@code MethodArgumentNotValidException} -> 400-problem path as any other validation; a role code
+ * is checked against the role table by {@link UserService} and answers 400 {@code role.unknown}.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -94,8 +96,7 @@ class UsersController {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private static final String ROLE_CODES =
-            "ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR";
+    private static final int ROLE_CODE_MAX = 20;
 
     record CreateUserRequest(
             @NotBlank @Email String email,
@@ -103,23 +104,24 @@ class UsersController {
             // real limit is bytes, enforced by @MaxUtf8Bytes.
             @NotBlank @Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password,
             @NotBlank String name,
-            @NotBlank @Pattern(regexp = ROLE_CODES) String role) {
+            @NotBlank @Size(min = 1, max = ROLE_CODE_MAX) String role) {
     }
 
     /** Partial update — a {@code null} field is left unchanged. */
     record UpdateUserRequest(
             @Email String email,
             String name,
-            @Pattern(regexp = ROLE_CODES) String role,
+            @Size(max = ROLE_CODE_MAX) String role,
             @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {
     }
 
     /** Never carries {@code passwordHash} — {@link UserView} does not either. */
-    record UserResponse(UUID id, String email, String name, String role, String status, Instant createdAt,
+    record UserResponse(UUID id, String email, String name, String role,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String roleName, String status, Instant createdAt,
             Instant updatedAt) {
         static UserResponse from(UserView view) {
-            return new UserResponse(view.id(), view.email(), view.name(), view.role(), view.status(),
-                    view.createdAt(), view.updatedAt());
+            return new UserResponse(view.id(), view.email(), view.name(), view.role(), view.roleName(),
+                    view.status(), view.createdAt(), view.updatedAt());
         }
     }
 }
