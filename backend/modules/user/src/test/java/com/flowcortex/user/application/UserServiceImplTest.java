@@ -19,7 +19,6 @@ import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
-import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
