@@ -43,3 +43,92 @@ jobs:
 
       - name: Test
         run: uv run --frozen --no-build pytest -rs
+
+  # The white-block preview: the scene script against the pinned Blender, then the
+  # preview-runtime image (whose build runs its own render gate) and the render-cost
+  # measurement inside it. Blender renders on Mesa's software rasteriser here, as in production.
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BLENDER_VERSION: 4.5.14
+      BLENDER_SHA256: 9ba871ff2ecd36526b77432745980b7e6664ecd0c7ca11c48849073dcfe06da3
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.21'
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: worker/uv.lock
+
+      - name: Restore the Blender archive
+        id: blender-archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/blender-archive
+          key: blender-${{ env.BLENDER_SHA256 }}
+
+      - name: Download the Blender archive
+        if: steps.blender-archive.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/blender-archive"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/blender-archive/blender.tar.xz" \
+            "https://download.blender.org/release/Blender4.5/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+
+      - name: Install Blender
+        run: |
+          echo "$BLENDER_SHA256  $RUNNER_TEMP/blender-archive/blender.tar.xz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar -xJf "$RUNNER_TEMP/blender-archive/blender.tar.xz" --strip-components=1 \
+            -C "$RUNNER_TEMP/blender"
+          echo "BLENDER_BIN=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
+      - name: Install ffmpeg and the software GL stack
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg \
+            libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6 \
+            libgl1 libegl1 libegl-mesa0 libgl1-mesa-dri
+
+      - name: Install
+        run: uv sync --locked --no-build
+
+      - name: Scene tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          uv run --frozen --no-build pytest tests/test_preview_scene.py -rs \
+            --junitxml="$RUNNER_TEMP/scene.xml"
+          if grep -q '<skipped' "$RUNNER_TEMP/scene.xml"; then
+            echo "::error::a scene test was skipped: BLENDER_BIN did not reach the tests"
+            exit 1
+          fi
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the preview-runtime image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: worker
+          platforms: linux/amd64
+          target: preview-runtime
+          load: true
+          tags: flowcortex-worker-preview:ci
+          cache-from: type=gha,scope=worker-preview
+          cache-to: type=gha,scope=worker-preview,mode=max
+
+      - name: Measure the render cost
+        # No --device: the container sees no GPU, so Blender renders on llvmpipe, as production does.
+        run: |
+          docker run --rm --cpus=4 --network none \
+            -v "$GITHUB_WORKSPACE/worker/tests/fixtures/preview:/fixtures:ro" \
+            -v "$GITHUB_WORKSPACE/worker/scripts/preview_bench.py:/bench/preview_bench.py:ro" \
+            --entrypoint /app/.venv/bin/python \
+            flowcortex-worker-preview:ci /bench/preview_bench.py /fixtures
