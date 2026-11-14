@@ -1,0 +1,62 @@
+{
+  "characters": [
+    {"id": "ch_lan", "kind": "character", "name": "Lan", "clayColor": [255, 255, 255]},
+    {"id": "ch_thu", "kind": "character", "name": "Thư", "clayColor": [40, 110, 255]},
+    {"id": "ch_minh", "kind": "character", "name": "Minh", "clayColor": [40, 200, 70]},
+    {"id": "ch_san", "kind": "location", "name": "Sân trường", "clayColor": [255, 0, 0]}
+  ],
+  "story": {
+    "shots": [
+      {
+        "id": "sh_trao",
+        "order": 2,
+        "title": "Lan trao quà cho Minh",
+        "durationTargetMs": 6000,
+        "characterIds": ["ch_lan", "ch_thu", "ch_minh"],
+        "dialogue": [
+          {"characterId": "ch_lan", "text": "Minh ơi, chờ chút!", "lang": "vi"},
+          {"characterId": "ch_minh", "text": "Ơ, Lan à?", "lang": "vi"},
+          {"characterId": "ch_lan", "text": "Quà sinh nhật của anh nè.", "lang": "vi"}
+        ],
+        "staging": {
+          "v": 1,
+          "setId": "set_san",
+          "shotType": "group",
+          "size": "LS",
+          "move": "static",
+          "angle": "eye",
+          "frame": [
+            {"characterId": "ch_lan", "role": "subject", "position": null, "gaze": null, "lookAtId": null,
+             "faceAngleDeg": null},
+            {"characterId": "ch_thu", "role": "subject", "position": null, "gaze": null, "lookAtId": null,
+             "faceAngleDeg": null},
+            {"characterId": "ch_minh", "role": "subject", "position": null, "gaze": null, "lookAtId": null,
+             "faceAngleDeg": null}
+          ],
+          "actions": [
+            {"characterId": "ch_lan", "text": "đi lại chỗ Minh", "afterLine": 1, "propIds": [], "touch": null,
+             "motion": "walk_to", "targetId": "ch_minh"},
+            {"characterId": "ch_minh", "text": "quay sang Lan", "afterLine": 1, "propIds": [], "touch": null,
+             "motion": "turn_to", "targetId": "ch_lan"},
+            {"characterId": "ch_lan", "text": "đưa hộp quà cho Minh", "afterLine": 2, "propIds": ["pr_qua"],
+             "touch": null, "motion": "hand_over", "targetId": "ch_minh"}
+          ],
+          "cutToNext": null
+        }
+      }
+    ],
+    "sets": [
+      {
+        "id": "set_san",
+        "name": "Sân trường",
+        "locationId": "ch_san",
+        "space": "outdoor",
+        "leftCharacterId": "ch_lan",
+        "cameraPositions": {"wide": "", "twoClose": "", "single": []},
+        "backdrops": [],
+        "fixedPieces": ["ghế đá", "gốc cây"],
+        "props": [{"id": "pr_qua", "name": "hộp quà", "count": 1}]
+      }
+    ]
+  }
+}

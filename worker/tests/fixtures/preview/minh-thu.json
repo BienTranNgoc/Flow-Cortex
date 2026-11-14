@@ -1,0 +1,307 @@
+{
+  "schema": "xood.video-project/3",
+  "id": "prj_minhthu0000000000000001",
+  "rev": 0,
+  "name": "Minh và Thư",
+  "createdAt": "2026-10-24T08:00:00.000Z",
+  "updatedAt": "2026-10-24T08:00:00.000Z",
+  "origin": null,
+  "canvas": {
+    "width": 720,
+    "height": 1280,
+    "fps": 30,
+    "sampleRate": 48000
+  },
+  "output": {
+    "captionTrackId": null,
+    "voiceTrackId": null,
+    "overlayLang": "vi",
+    "lanes": {
+      "captions": true,
+      "voice": true,
+      "overlays": true,
+      "music": true
+    }
+  },
+  "assets": {
+    "ast_minh_mat": {
+      "kind": "image",
+      "status": "ready",
+      "role": "character_ref",
+      "ref": {
+        "drive": "di_minh_mat"
+      },
+      "probe": {
+        "width": 768,
+        "height": 1024,
+        "bytes": 120000
+      }
+    },
+    "ast_minh_than": {
+      "kind": "image",
+      "status": "ready",
+      "role": "character_ref",
+      "ref": {
+        "drive": "di_minh_than"
+      },
+      "probe": {
+        "width": 768,
+        "height": 1024,
+        "bytes": 120000
+      }
+    },
+    "ast_thu_mat": {
+      "kind": "image",
+      "status": "ready",
+      "role": "character_ref",
+      "ref": {
+        "drive": "di_thu_mat"
+      },
+      "probe": {
+        "width": 768,
+        "height": 1024,
+        "bytes": 120000
+      }
+    },
+    "ast_thu_than": {
+      "kind": "image",
+      "status": "ready",
+      "role": "character_ref",
+      "ref": {
+        "drive": "di_thu_than"
+      },
+      "probe": {
+        "width": 768,
+        "height": 1024,
+        "bytes": 120000
+      }
+    },
+    "ast_quan": {
+      "kind": "image",
+      "status": "ready",
+      "role": "character_ref",
+      "ref": {
+        "drive": "di_quan"
+      },
+      "probe": {
+        "width": 768,
+        "height": 1024,
+        "bytes": 120000
+      }
+    }
+  },
+  "timeline": {
+    "scenes": [],
+    "overlays": [],
+    "captions": {
+      "style": {
+        "preset": "gold_karaoke",
+        "fontFamily": "DejaVu Sans",
+        "fontSize": "medium",
+        "textColor": "#FFFFFF",
+        "highlightColor": "#FFE000",
+        "highlightMode": "sweep",
+        "position": "bottom",
+        "bold": true,
+        "outlineWidth": "medium",
+        "backdrop": "none",
+        "marginPct": 15.625,
+        "maxSyllablesPerLine": 4
+      },
+      "styles": {},
+      "tracks": {}
+    },
+    "voice": {
+      "tracks": {}
+    },
+    "music": {
+      "clips": [],
+      "duck": {
+        "enabled": true
+      }
+    }
+  },
+  "characters": [
+    {
+      "v": 1,
+      "id": "ch_minh",
+      "kind": "character",
+      "name": "Minh",
+      "look": "",
+      "refs": [
+        "ast_minh_mat",
+        "ast_minh_than"
+      ],
+      "voice": null,
+      "providers": {
+        "byteplus": null,
+        "kling": null
+      },
+      "clayColor": [
+        200,
+        200,
+        200
+      ],
+      "consent": null,
+      "source": null
+    },
+    {
+      "v": 1,
+      "id": "ch_thu",
+      "kind": "character",
+      "name": "Thư",
+      "look": "",
+      "refs": [
+        "ast_thu_mat",
+        "ast_thu_than"
+      ],
+      "voice": null,
+      "providers": {
+        "byteplus": null,
+        "kling": null
+      },
+      "clayColor": [
+        200,
+        200,
+        200
+      ],
+      "consent": null,
+      "source": null
+    },
+    {
+      "v": 1,
+      "id": "ch_quan",
+      "kind": "location",
+      "name": "Quán cà phê",
+      "look": "",
+      "refs": [
+        "ast_quan"
+      ],
+      "voice": null,
+      "providers": {
+        "byteplus": null,
+        "kling": null
+      },
+      "clayColor": [
+        200,
+        200,
+        200
+      ],
+      "consent": null,
+      "source": null
+    }
+  ],
+  "story": {
+    "v": 1,
+    "logline": "Minh gặp lại Thư ở quán cà phê cũ.",
+    "audience": "",
+    "scriptAssetId": null,
+    "moodboardAssetIds": [],
+    "beats": [],
+    "shots": [
+      {
+        "id": "sh1",
+        "order": 1,
+        "beatId": null,
+        "title": "Minh chào Thư khi gặp lại",
+        "shotSize": "",
+        "camera": "",
+        "durationTargetMs": 5000,
+        "characterIds": [
+          "ch_minh",
+          "ch_thu"
+        ],
+        "dialogue": [
+          {
+            "characterId": "ch_minh",
+            "text": "Thư, chào em.",
+            "lang": "vi",
+            "role": "greet",
+            "acting": "Cười gượng, giọng nhỏ."
+          }
+        ],
+        "clay": null,
+        "promptTemplate": "",
+        "negative": "",
+        "takes": [],
+        "activeTakeId": null,
+        "placePolicy": "cut_tail",
+        "sceneId": null,
+        "status": "planned",
+        "staging": {
+          "v": 1,
+          "setId": "set_quan",
+          "shotType": "single",
+          "size": "CU",
+          "move": "static",
+          "angle": "eye",
+          "frame": [
+            {
+              "characterId": "ch_minh",
+              "role": "subject",
+              "position": "center",
+              "gaze": "frame_left",
+              "lookAtId": "ch_thu",
+              "faceAngleDeg": 25
+            }
+          ],
+          "actions": [
+            {
+              "characterId": "ch_minh",
+              "text": "đặt cốc cà phê xuống bàn",
+              "afterLine": 0,
+              "propIds": [
+                "pr_coc"
+              ],
+              "touch": null
+            }
+          ],
+          "cutToNext": null
+        }
+      }
+    ],
+    "notes": [],
+    "ideas": [],
+    "mood": null,
+    "sets": [
+      {
+        "id": "set_quan",
+        "name": "Quán cà phê",
+        "locationId": "ch_quan",
+        "space": "room",
+        "leftCharacterId": "ch_thu",
+        "cameraPositions": {
+          "wide": "",
+          "twoClose": "",
+          "single": [
+            {
+              "characterId": "ch_minh",
+              "text": "từ cạnh ghế của Thư"
+            }
+          ]
+        },
+        "backdrops": [
+          {
+            "characterId": "ch_minh",
+            "text": "quầy pha chế mờ phía sau"
+          }
+        ],
+        "fixedPieces": [
+          "bàn gỗ tròn",
+          "cửa sổ rèm mỏng"
+        ],
+        "props": [
+          {
+            "id": "pr_coc",
+            "name": "cốc cà phê",
+            "count": 2
+          }
+        ]
+      }
+    ]
+  },
+  "renders": [],
+  "template": null,
+  "ui": {},
+  "x": {}
+}

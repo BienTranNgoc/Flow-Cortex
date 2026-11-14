@@ -1,0 +1,1383 @@
+{
+ "characters": [
+  {
+   "v": 1,
+   "id": "chdzzaqdt3y0",
+   "kind": "character",
+   "look": "Vị vua trung niên, râu dài, mũ vàng, áo bào đỏ, ánh mắt uy nghiêm nhưng đầy yêu thương",
+   "name": "Vua Hùng",
+   "refs": [
+    "ast_25c2e4d02afc8f711341b2f5",
+    "ast_d5612453ba0b77ec771f4ad4"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    255,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "chlaga4oi65c",
+   "kind": "character",
+   "look": "Thiếu nữ dịu dàng, tóc đen dài, áo lụa hồng, đôi mắt trong sáng ẩn chứa nỗi bâng khuâng trước số phận",
+   "name": "Mị Nương",
+   "refs": [
+    "ast_0959f20cc423af3f234f1bc0",
+    "ast_aad02720e0ac1f7cc040f573"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    46,
+    110,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "ch1e3uxqn9eq",
+   "kind": "character",
+   "look": "Thần núi vạm vỡ, tóc bạc, áo xanh đậm, đứng vững như đá",
+   "name": "Sơn Tinh",
+   "refs": [
+    "ast_3fa9181d2ca6be97942a47b6",
+    "ast_35107e0d53cfe62de153f4cb"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    99,
+    71
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "ch5wo0fw8y8p",
+   "kind": "character",
+   "look": "Nam thần nước, khoảng ba mươi tuổi, vạm vỡ, tóc dài xanh đen buộc cao, râu ngắn, áo giáp bạc vảy cá, áo choàng xanh lam như sóng, ánh mắt kiêu hãnh và giận dữ",
+   "name": "Thủy Tinh",
+   "refs": [
+    "ast_87fed8d3cd43947811e82628",
+    "ast_644f0d3bd130258f5501740c"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    60,
+    200,
+    120
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "ch0rz2g2eziw",
+   "kind": "character",
+   "look": "Người dân áo nâu bạc màu, tay bám chặt mái nhà tranh, ánh mắt lo âu nhưng kiên cường",
+   "name": "Dân Làng",
+   "refs": [
+    "ast_acc41bdb56e79008ebff27a2",
+    "ast_de8b43f0d14e512305bc4ed2"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    200,
+    40
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "chfrmkn85e6y",
+   "kind": "location",
+   "look": "",
+   "name": "Cung Điện Vua Hùng · không người",
+   "refs": [
+    "ast_90ac7532f36da425e382ccb6"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    170,
+    90,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "ch2yg76uacd9",
+   "kind": "location",
+   "look": "",
+   "name": "Núi Tản Viên · không người",
+   "refs": [
+    "ast_b4a599f641b81d922e34bab7"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    0,
+    200,
+    220
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "chks1dt5e73t",
+   "kind": "location",
+   "look": "",
+   "name": "Biển Nước Dâng · không người",
+   "refs": [
+    "ast_3ad75dca82a72fbecb4e3595"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    140,
+    0
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "cht8y2jm8w89",
+   "kind": "location",
+   "look": "",
+   "name": "Đường Rước Dâu · không người",
+   "refs": [
+    "ast_4ccbc851456c008fcfcbb6e7"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    255,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  }
+ ],
+ "story": {
+  "shots": [
+   {
+    "id": "sha4gxydda6v",
+    "clay": null,
+    "order": 1,
+    "takes": [],
+    "title": "Người Cha Và Lời Bàn",
+    "beatId": "bznmoumkiw0",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setoaa4hdqyru",
+     "shotType": "two_shot",
+     "size": "MS",
+     "move": "static",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "chdzzaqdt3y0",
+       "role": "subject",
+       "position": "left",
+       "gaze": "lens",
+       "lookAtId": "chlaga4oi65c",
+       "faceAngleDeg": 15
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "chdzzaqdt3y0",
+       "faceAngleDeg": 15
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "chdzzaqdt3y0",
+       "text": "Vua Hùng ngồi trên ngai vàng, nhìn Mị Nương với ánh mắt uy nghiêm và yêu thương, bắt đầu nói chuyện kén chồng.",
+       "afterLine": 0,
+       "propIds": [
+        "prjtrde7iucy"
+       ],
+       "touch": null
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "text": "Mị Nương khẽ ngước nhìn cha rồi cúi đầu lắng nghe, ánh mắt bâng khuâng.",
+       "afterLine": 1,
+       "propIds": [],
+       "touch": null,
+       "motion": "nod",
+       "targetId": "chdzzaqdt3y0"
+      }
+     ],
+     "cutToNext": "gaze",
+     "summary": "Vua Hùng ngồi trên ngai, gọi Mị Nương lại gần, dịu dàng bàn chuyện kén chồng. Mị Nương cúi đầu lắng nghe, ánh mắt bâng khuâng.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "chdzzaqdt3y0",
+      "text": "Mị Nương, con đã đến tuổi cài trâm. Cha muốn kén cho con một người chồng xứng đáng.",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Vua Hùng nhìn con gái bằng ánh mắt vừa uy nghiêm vừa yêu thương, giọng trầm ấm."
+     },
+     {
+      "characterId": "chlaga4oi65c",
+      "text": "Con xin vâng ý cha. Nhưng… người ấy là ai, con chưa dám nghĩ tới.",
+      "lang": "vi",
+      "role": "answer",
+      "acting": "Mị Nương khẽ ngước nhìn cha rồi lại cúi xuống, giọng nhẹ như gió."
+     },
+     {
+      "characterId": "chdzzaqdt3y0",
+      "text": "Trời sẽ định, cha sẽ chọn. Người nào tài đức, người ấy được cưới con.",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Vua Hùng gật đầu, giọng khẳng định nhưng ẩn chứa nỗi băn khoăn."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chdzzaqdt3y0",
+     "chlaga4oi65c"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 9000
+   },
+   {
+    "id": "sh0lb3z48a4w",
+    "clay": null,
+    "order": 2,
+    "takes": [],
+    "title": "Hai Thần Cầu Hôn",
+    "beatId": "bchd9lc10xr",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setil69hzoo7i",
+     "shotType": "group",
+     "size": "LS",
+     "move": "static",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "role": "subject",
+       "position": "left",
+       "gaze": "frame_right",
+       "lookAtId": "chdzzaqdt3y0",
+       "faceAngleDeg": 20
+      },
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "role": "subject",
+       "position": "center",
+       "gaze": "frame_right",
+       "lookAtId": "chdzzaqdt3y0",
+       "faceAngleDeg": 20
+      },
+      {
+       "characterId": "chdzzaqdt3y0",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "ch1e3uxqn9eq",
+       "faceAngleDeg": 20
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "text": "Sơn Tinh bước vào sân rồng, chắp tay trước Vua Hùng, giọng vang như sấm, tự giới thiệu cầu hôn Mị Nương.",
+       "afterLine": 0,
+       "propIds": [
+        "prs1zir2j97s"
+       ],
+       "touch": null
+      },
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "text": "Thủy Tinh bước lên một bước, liếc Sơn Tinh đầy thách thức rồi cũng chắp tay cầu hôn với giọng đanh và kiêu hãnh.",
+       "afterLine": 1,
+       "propIds": [
+        "prs1zir2j97s"
+       ],
+       "touch": null,
+       "motion": "walk_to",
+       "targetId": "chdzzaqdt3y0"
+      },
+      {
+       "characterId": "chdzzaqdt3y0",
+       "text": "Vua Hùng đứng dậy, giọng vang lớn, tay chỉ ra ngoài cổng, tuyên bố điều kiện sính lễ.",
+       "afterLine": 2,
+       "propIds": [
+        "pr51bebnuss1"
+       ],
+       "touch": null,
+       "motion": "stand_up"
+      }
+     ],
+     "cutToNext": "action",
+     "summary": "Sơn Tinh và Thủy Tinh cùng bước vào sân rồng, đứng đối diện nhau. Cả hai chắp tay trước Vua Hùng, hào sảng tự giới thiệu.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch1e3uxqn9eq",
+      "text": "Tâu Đại Vương, thần là Sơn Tinh, chúa tể núi Tản Viên. Thần xin cầu hôn công chúa Mị Nương.",
+      "lang": "vi",
+      "role": "greet",
+      "acting": "Sơn Tinh đứng thẳng, giọng vang như sấm núi, ánh mắt bình thản tự tin."
+     },
+     {
+      "characterId": "ch5wo0fw8y8p",
+      "text": "Tâu Đại Vương, thần là Thủy Tinh, chúa tể bốn bể. Tài năng thần không kém ai — thần cũng xin cầu hôn!",
+      "lang": "vi",
+      "role": "greet",
+      "acting": "Thủy Tinh bước lên một bước, giọng đanh và kiêu hãnh, ánh mắt liếc Sơn Tinh đầy thách thức."
+     },
+     {
+      "characterId": "chdzzaqdt3y0",
+      "text": "Hai vị đều tài giỏi, ta không thể thiên vị. Ai mang đủ lễ vật: voi chín ngà, gà chín cựa, ngựa chín hồng mao — đến trước, người ấy cưới Mị Nương!",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Vua Hùng đứng dậy, giọng vang lớn, tay chỉ ra ngoài cổng."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch1e3uxqn9eq",
+     "ch5wo0fw8y8p",
+     "chdzzaqdt3y0"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 11000
+   },
+   {
+    "id": "shn1o10sws6d",
+    "clay": null,
+    "order": 3,
+    "takes": [],
+    "title": "Thần Núi Đến Trước",
+    "beatId": "bchd9lc10xr",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setil69hzoo7i",
+     "shotType": "group",
+     "size": "MS",
+     "move": "static",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "role": "subject",
+       "position": "left",
+       "gaze": "frame_right",
+       "lookAtId": "chdzzaqdt3y0",
+       "faceAngleDeg": 20
+      },
+      {
+       "characterId": "chdzzaqdt3y0",
+       "role": "subject",
+       "position": "center",
+       "gaze": "frame_left",
+       "lookAtId": "ch1e3uxqn9eq",
+       "faceAngleDeg": 20
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "chdzzaqdt3y0",
+       "faceAngleDeg": 20
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "text": "Sơn Tinh bước tới chắp tay kính cẩn dâng đủ lễ vật, giọng điềm tĩnh.",
+       "afterLine": 0,
+       "propIds": [
+        "pr51bebnuss1"
+       ],
+       "touch": null,
+       "motion": "walk_to",
+       "targetId": "chdzzaqdt3y0"
+      },
+      {
+       "characterId": "chdzzaqdt3y0",
+       "text": "Vua Hùng gật đầu uy nghi, xúc động kìm nén, ra hiệu cho Mị Nương bước theo Sơn Tinh.",
+       "afterLine": 1,
+       "propIds": [],
+       "touch": null,
+       "motion": "nod",
+       "targetId": "chlaga4oi65c"
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "text": "Mị Nương rưng rưng cúi đầu trước cha rồi nhẹ nhàng bước theo Sơn Tinh.",
+       "afterLine": 2,
+       "propIds": [],
+       "touch": null,
+       "motion": "walk_to",
+       "targetId": "ch1e3uxqn9eq"
+      }
+     ],
+     "cutToNext": "action",
+     "summary": "Sáng sớm, Sơn Tinh dẫn đầy đủ sính lễ đến trước. Vua Hùng chấp thuận, Mị Nương bước ra cùng Sơn Tinh.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch1e3uxqn9eq",
+      "text": "Tâu Đại Vương, Sơn Tinh xin dâng đủ lễ vật theo lời ước!",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Sơn Tinh bước tới, giọng điềm tĩnh, chắp tay kính cẩn."
+     },
+     {
+      "characterId": "chdzzaqdt3y0",
+      "text": "Đúng hẹn, đủ lễ — ta thuận lòng! Mị Nương, con hãy theo chàng.",
+      "lang": "vi",
+      "role": "agree",
+      "acting": "Vua Hùng gật đầu uy nghi, giọng đầy xúc động kìm nén."
+     },
+     {
+      "characterId": "chlaga4oi65c",
+      "text": "Con… cảm ơn cha. Con sẽ không quên ơn cha suốt đời.",
+      "lang": "vi",
+      "role": "answer",
+      "acting": "Mị Nương rưng rưng, cúi đầu trước cha rồi nhẹ nhàng bước theo Sơn Tinh."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch1e3uxqn9eq",
+     "chdzzaqdt3y0",
+     "chlaga4oi65c"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 9000
+   },
+   {
+    "id": "shqacibhe9zj",
+    "clay": null,
+    "order": 4,
+    "takes": [],
+    "title": "Lời Hứa Trên Núi",
+    "beatId": "bj7uu0l0ib2",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "set1pnzwr33lk",
+     "shotType": "two_shot",
+     "size": "MCU",
+     "move": "push_in",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "role": "subject",
+       "position": "left",
+       "gaze": "frame_right",
+       "lookAtId": "chlaga4oi65c",
+       "faceAngleDeg": 20
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "ch1e3uxqn9eq",
+       "faceAngleDeg": 20
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "text": "Sơn Tinh dừng lại giữa núi rừng, quay sang Mị Nương nói lời hứa che chở, giọng ấm và vững chắc như đá núi.",
+       "afterLine": 0,
+       "propIds": [
+        "prgle2vs42ep"
+       ],
+       "touch": null,
+       "motion": "turn_to",
+       "targetId": "chlaga4oi65c"
+      },
+      {
+       "characterId": "chlaga4oi65c",
+       "text": "Mị Nương nhìn lên Sơn Tinh, mắt long lanh, giọng thì thầm nhẹ như hơi gió.",
+       "afterLine": 1,
+       "propIds": [],
+       "touch": null
+      }
+     ],
+     "cutToNext": "gaze",
+     "summary": "Sơn Tinh dừng lại giữa núi rừng, quay sang Mị Nương nói lời hứa nguyện che chở.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch1e3uxqn9eq",
+      "text": "Mị Nương, dù trời đất có đổi thay, ta sẽ luôn là vách núi che chở cho nàng.",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Sơn Tinh nhìn thẳng vào mắt Mị Nương, giọng ấm và vững chắc như đá núi."
+     },
+     {
+      "characterId": "chlaga4oi65c",
+      "text": "Em tin chàng…",
+      "lang": "vi",
+      "role": "react",
+      "acting": "Mị Nương nhìn lên, mắt long lanh, giọng thì thầm nhẹ như hơi gió."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch1e3uxqn9eq",
+     "chlaga4oi65c"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 7000
+   },
+   {
+    "id": "shi0pqlmxlab",
+    "clay": null,
+    "order": 5,
+    "takes": [],
+    "title": "Thủy Tinh Nổi Giận",
+    "beatId": "bj7uu0l0ib2",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setuly6ww4zzn",
+     "shotType": "single",
+     "size": "MLS",
+     "move": "tilt",
+     "angle": "low",
+     "frame": [
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "role": "subject",
+       "position": "center",
+       "gaze": "lens",
+       "lookAtId": null,
+       "faceAngleDeg": 0
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "text": "Thủy Tinh hét lên giận dữ, tay giơ cao, sóng nước bắt đầu dâng sau lưng, giọng như sấm giữa biển.",
+       "afterLine": 0,
+       "propIds": [
+        "pr47ujudnqo7",
+        "pr69nm50ixhq"
+       ],
+       "touch": null,
+       "motion": "raise_arms"
+      },
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "text": "Thủy Tinh bước tới từng bước, ánh mắt đỏ rực, sóng vỗ dữ dội xung quanh, thề nhấn chìm tất cả.",
+       "afterLine": 1,
+       "propIds": [
+        "pr69nm50ixhq"
+       ],
+       "touch": null,
+       "motion": "walk_to"
+      }
+     ],
+     "cutToNext": "sound",
+     "summary": "Thủy Tinh đến muộn, lễ vật chưa mang tới thì Mị Nương đã đi. Hắn gầm lên, hô mưa dâng nước cuồn cuộn.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch5wo0fw8y8p",
+      "text": "Sơn Tinh! Ngươi cướp đi thứ ta muốn — ta sẽ không tha!",
+      "lang": "vi",
+      "role": "accuse",
+      "acting": "Thủy Tinh hét lên, tay giơ cao, sóng nước bắt đầu dâng sau lưng hắn, giọng như sấm giữa biển."
+     },
+     {
+      "characterId": "ch5wo0fw8y8p",
+      "text": "Nước ta sẽ nhấn chìm tất cả! Ngươi có núi cao đến đâu, ta cũng vươn tới!",
+      "lang": "vi",
+      "role": "threaten",
+      "acting": "Thủy Tinh bước tới từng bước, ánh mắt đỏ rực, sóng vỗ dữ dội xung quanh."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch5wo0fw8y8p"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 8000
+   },
+   {
+    "id": "shl7jm2qjs2e",
+    "clay": null,
+    "order": 6,
+    "takes": [],
+    "title": "Núi Cao Hơn Nước",
+    "beatId": "bn0odlyxccb",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "set1pnzwr33lk",
+     "shotType": "two_shot",
+     "size": "MS",
+     "move": "static",
+     "angle": "low",
+     "frame": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "role": "subject",
+       "position": "left",
+       "gaze": "frame_right",
+       "lookAtId": "ch5wo0fw8y8p",
+       "faceAngleDeg": 10
+      },
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "ch1e3uxqn9eq",
+       "faceAngleDeg": 10
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "text": "Sơn Tinh đứng vững như tảng đá, giơ hai tay lên, núi đồi nhô cao theo từng đợt sóng dâng, giọng vang rền giữa đất trời.",
+       "afterLine": 0,
+       "propIds": [
+        "pr1xhp5klab9",
+        "prgle2vs42ep"
+       ],
+       "touch": null,
+       "motion": "raise_arms",
+       "targetId": "ch5wo0fw8y8p"
+      }
+     ],
+     "cutToNext": "action",
+     "summary": "Sơn Tinh bình tĩnh đáp trả — tay hắn giơ lên, núi đồi nhô cao theo từng đợt sóng dâng. Cuộc chiến kỳ vĩ diễn ra.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch1e3uxqn9eq",
+      "text": "Ngươi dâng nước bao nhiêu, núi ta cao bấy nhiêu! Đất này — ta không nhường!",
+      "lang": "vi",
+      "role": "answer",
+      "acting": "Sơn Tinh đứng vững như tảng đá, giơ hai tay, giọng vang rền giữa đất trời."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch1e3uxqn9eq",
+     "ch5wo0fw8y8p"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 8000
+   },
+   {
+    "id": "shftfwnby77a",
+    "clay": null,
+    "order": 7,
+    "takes": [],
+    "title": "Dân Làng Đắp Đê",
+    "beatId": "bn0odlyxccb",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setuly6ww4zzn",
+     "shotType": "single",
+     "size": "MS",
+     "move": "handheld",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "ch0rz2g2eziw",
+       "role": "subject",
+       "position": "center",
+       "gaze": "lens",
+       "lookAtId": null,
+       "faceAngleDeg": 10
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch0rz2g2eziw",
+       "text": "Người dân hô to đắp đê, giọng khàn nhưng đầy quyết tâm, truyền tay nhau bao đất nặng.",
+       "afterLine": 0,
+       "propIds": [
+        "pr69nm50ixhq",
+        "pr47ujudnqo7"
+       ],
+       "touch": null
+      }
+     ],
+     "cutToNext": "action",
+     "summary": "Dân làng áo nâu lam lũ kéo nhau đắp đê, truyền tay nhau bao đất, mồ hôi nhễ nhại nhưng không ai bỏ cuộc.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch0rz2g2eziw",
+      "text": "Đắp đê lên! Không để nước nhấn chìm làng ta!",
+      "lang": "vi",
+      "role": "tell",
+      "acting": "Một người dân hô to, giọng khàn khàn nhưng đầy quyết tâm, cả đám người cùng hưởng ứng."
+     },
+     {
+      "characterId": "ch0rz2g2eziw",
+      "text": "Cùng nhau! Một tay không làm nên núi, trăm tay dời được sông!",
+      "lang": "vi",
+      "role": "agree",
+      "acting": "Tiếng hô vang lên đồng thanh từ cả đoàn người đắp đê, tay truyền tay những bao đất nặng."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch0rz2g2eziw",
+     "ch1e3uxqn9eq"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 9000
+   },
+   {
+    "id": "shxdfdhyr5a0",
+    "clay": null,
+    "order": 8,
+    "takes": [],
+    "title": "Thủy Tinh Rút Lui Và Lời Thề",
+    "beatId": "b3vcvjrh3lx",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "setuly6ww4zzn",
+     "shotType": "single",
+     "size": "MCU",
+     "move": "pull_back",
+     "angle": "eye",
+     "frame": [
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "role": "subject",
+       "position": "center",
+       "gaze": "lens",
+       "lookAtId": null,
+       "faceAngleDeg": 0
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "ch5wo0fw8y8p",
+       "text": "Thủy Tinh quay lưng, từng bước lùi vào dòng nước rút, giọng trầm lạnh thề sẽ trở lại mỗi năm.",
+       "afterLine": 0,
+       "propIds": [
+        "pr47ujudnqo7"
+       ],
+       "touch": null
+      }
+     ],
+     "cutToNext": "hard",
+     "summary": "Nước rút dần. Thủy Tinh đứng giữa dòng nước lùi, ngước nhìn núi cao, giọng lạnh mà đau, thề sẽ trở lại.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "ch5wo0fw8y8p",
+      "text": "Lần này… ta thua. Nhưng ta thề — mỗi năm ta sẽ trở lại. Đời đời, kiếp kiếp!",
+      "lang": "vi",
+      "role": "threaten",
+      "acting": "Thủy Tinh quay lưng, giọng trầm và lạnh, từng bước lùi vào dòng nước rút, ánh mắt vẫn hừng hực."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "ch5wo0fw8y8p"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 5000
+   },
+   {
+    "id": "shp7x64ze5zv",
+    "clay": null,
+    "order": 9,
+    "takes": [],
+    "title": "Mị Nương Nhìn Về Đồng Bằng",
+    "beatId": "b3vcvjrh3lx",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "setId": "set1pnzwr33lk",
+     "shotType": "two_shot",
+     "size": "MLS",
+     "move": "static",
+     "angle": "high",
+     "frame": [
+      {
+       "characterId": "chlaga4oi65c",
+       "role": "subject",
+       "position": "right",
+       "gaze": "frame_left",
+       "lookAtId": "ch1e3uxqn9eq",
+       "faceAngleDeg": 15
+      },
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "role": "subject",
+       "position": "left",
+       "gaze": "frame_right",
+       "lookAtId": "chlaga4oi65c",
+       "faceAngleDeg": 15
+      }
+     ],
+     "actions": [
+      {
+       "characterId": "chlaga4oi65c",
+       "text": "Mị Nương thì thầm nhìn xuống đồng bằng nước rút, mắt không rời những mái nhà tranh nhỏ bé phía dưới, giọng nghẹn lại.",
+       "afterLine": 0,
+       "propIds": [
+        "prgle2vs42ep"
+       ],
+       "touch": null
+      },
+      {
+       "characterId": "ch1e3uxqn9eq",
+       "text": "Sơn Tinh đặt tay lên vai Mị Nương, giọng ấm mà trầm, mắt nhìn về phía chân trời xa, an ủi nàng.",
+       "afterLine": 1,
+       "propIds": [
+        "pr1xhp5klab9"
+       ],
+       "touch": {
+        "characterId": "chlaga4oi65c",
+        "zone": "shoulder"
+       },
+       "motion": "reach",
+       "targetId": "chlaga4oi65c"
+      }
+     ],
+     "cutToNext": "hard",
+     "summary": "Trên đỉnh núi, Mị Nương đứng cạnh Sơn Tinh, nhìn xuống đồng bằng nước rút, mái nhà tranh hiện dần. Ánh chiều tà nhuộm vàng hai bóng người. Nàng không nói, chỉ để một giọt nước mắt lặng lẽ lăn.",
+     "origin": {
+      "engine": "llm",
+      "engineVersion": "claude-sonnet-4-6/2",
+      "jobId": "7a1e4ad2-1d06-4369-884c-b0f68d5f96b8",
+      "proposal": 0,
+      "references": []
+     }
+    },
+    "dialogue": [
+     {
+      "characterId": "chlaga4oi65c",
+      "text": "Chàng ơi… mỗi năm họ lại chịu vậy sao?",
+      "lang": "vi",
+      "role": "react",
+      "acting": "Mị Nương thì thầm, giọng nghẹn lại, mắt không rời những mái nhà tranh nhỏ bé phía dưới."
+     },
+     {
+      "characterId": "ch1e3uxqn9eq",
+      "text": "Vì vậy ta sẽ không bao giờ buông tay. Và họ — họ cũng không bao giờ bỏ cuộc.",
+      "lang": "vi",
+      "role": "comfort",
+      "acting": "Sơn Tinh đặt tay lên vai Mị Nương, giọng ấm mà trầm, mắt nhìn về phía chân trời."
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chlaga4oi65c",
+     "ch1e3uxqn9eq"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 5000
+   }
+  ],
+  "sets": [
+   {
+    "id": "setoaa4hdqyru",
+    "name": "Cung Điện Vua Hùng",
+    "props": [
+     {
+      "id": "prjtrde7iucy",
+      "name": "ngai vàng",
+      "count": 1
+     },
+     {
+      "id": "prfvcau1vogh",
+      "name": "rèm lụa đỏ",
+      "count": 2
+     },
+     {
+      "id": "pr7vo128j4mq",
+      "name": "đuốc lửa",
+      "count": 4
+     }
+    ],
+    "space": "room",
+    "backdrops": [],
+    "locationId": "chfrmkn85e6y",
+    "fixedPieces": [
+     "cột gỗ chạm rồng",
+     "bệ ngọc"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "chdzzaqdt3y0"
+   },
+   {
+    "id": "set1uzmkf7emx",
+    "name": "Núi Tản Viên",
+    "props": [
+     {
+      "id": "pr2qp40c6w2l",
+      "name": "đá núi",
+      "count": 5
+     },
+     {
+      "id": "pr2ojvvqe7t7",
+      "name": "cây cổ thụ",
+      "count": 3
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": "ch2yg76uacd9",
+    "fixedPieces": [
+     "đỉnh núi cao",
+     "mây trắng bao phủ"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": null
+   },
+   {
+    "id": "setefhswmyi92",
+    "name": "Biển Nước Dâng",
+    "props": [
+     {
+      "id": "prt6o1k1lj9g",
+      "name": "sóng nước",
+      "count": 1
+     },
+     {
+      "id": "pr96xn6o3869",
+      "name": "cây bị ngập",
+      "count": 4
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": "chks1dt5e73t",
+    "fixedPieces": [
+     "chân núi ngập nước",
+     "bầu trời bão tố"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": null
+   },
+   {
+    "id": "setoedb318wtl",
+    "name": "Đường Rước Dâu",
+    "props": [
+     {
+      "id": "pr5zawds70mu",
+      "name": "kiệu hoa",
+      "count": 1
+     },
+     {
+      "id": "pr1hzi071fs8",
+      "name": "đèn lồng đỏ",
+      "count": 6
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": "cht8y2jm8w89",
+    "fixedPieces": [
+     "con đường núi",
+     "hoa rừng"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": null
+   },
+   {
+    "id": "set6jsibsw4ge",
+    "name": "Cung đình Vua Hùng",
+    "props": [
+     {
+      "id": "pr3h8potvtt3",
+      "name": "ngai vàng",
+      "count": 1
+     },
+     {
+      "id": "prb0jby8llt4",
+      "name": "cột trụ gỗ sơn đỏ",
+      "count": 4
+     },
+     {
+      "id": "pra0t4kldg2k",
+      "name": "bình hoa",
+      "count": 2
+     }
+    ],
+    "space": "room",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "ngai vàng trung tâm",
+     "rèm vàng sau ngai"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "chdzzaqdt3y0"
+   },
+   {
+    "id": "set9emx5cpey7",
+    "name": "Sân cung điện",
+    "props": [
+     {
+      "id": "prive33czwb2",
+      "name": "thảm đỏ",
+      "count": 1
+     },
+     {
+      "id": "prv9idnn5o7j",
+      "name": "lư hương đồng",
+      "count": 2
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "cổng cung lớn phía sau",
+     "bậc thềm đá"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "ch1e3uxqn9eq"
+   },
+   {
+    "id": "set3ikwru4b2y",
+    "name": "Chân núi và đồng bằng",
+    "props": [
+     {
+      "id": "prv48i02q4t1",
+      "name": "đá tảng",
+      "count": 5
+     },
+     {
+      "id": "pr690e89forw",
+      "name": "cây cổ thụ",
+      "count": 3
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "dãy núi phía xa",
+     "dòng sông uốn lượn"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "ch5wo0fw8y8p"
+   },
+   {
+    "id": "settb7kg21nw3",
+    "name": "Làng dân",
+    "props": [
+     {
+      "id": "pre3q4d9ix8y",
+      "name": "mái nhà tranh",
+      "count": 4
+     },
+     {
+      "id": "prnoqu7cczc5",
+      "name": "bao cát đắp đê",
+      "count": 10
+     },
+     {
+      "id": "pr1nfga272of",
+      "name": "cuốc xẻng",
+      "count": 6
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "con đê đất dài",
+     "nước lũ dâng phía sau"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": null
+   },
+   {
+    "id": "setil69hzoo7i",
+    "name": "Sân Rồng – Tiền Điện",
+    "props": [
+     {
+      "id": "prs1zir2j97s",
+      "name": "cờ phướn",
+      "count": 6
+     },
+     {
+      "id": "pr51bebnuss1",
+      "name": "mâm lễ vật",
+      "count": 2
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "bậc thềm đá",
+     "cổng tam quan",
+     "hai hàng lính gác"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "ch1e3uxqn9eq"
+   },
+   {
+    "id": "set1pnzwr33lk",
+    "name": "Núi Rừng – Lãnh Địa Sơn Tinh",
+    "props": [
+     {
+      "id": "pr1xhp5klab9",
+      "name": "tảng đá lớn",
+      "count": 3
+     },
+     {
+      "id": "prgle2vs42ep",
+      "name": "cây cổ thụ",
+      "count": 2
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "vách núi xanh",
+     "mây mù bao phủ"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "ch1e3uxqn9eq"
+   },
+   {
+    "id": "setuly6ww4zzn",
+    "name": "Đồng Bằng – Nơi Dâng Nước",
+    "props": [
+     {
+      "id": "pr47ujudnqo7",
+      "name": "mái nhà tranh",
+      "count": 5
+     },
+     {
+      "id": "pr69nm50ixhq",
+      "name": "bao đất",
+      "count": 10
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "dòng sông chảy",
+     "đê đất cao dần"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "ch5wo0fw8y8p"
+   }
+  ]
+ }
+}
