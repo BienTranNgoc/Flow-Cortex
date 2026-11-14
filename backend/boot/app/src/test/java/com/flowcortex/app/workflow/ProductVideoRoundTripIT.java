@@ -1,6 +1,7 @@
 package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import tools.jackson.databind.JsonNode;
@@ -47,7 +49,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
 
     @BeforeEach
     void prepareQueues() {
-        org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
+        doReturn(true).when(AopTestUtils.<MediaJobs>getUltimateTargetObject(mediaJobs)).isEnabled();
         for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs",
                 "media.render.jobs")) {
             amqpAdmin.purgeQueue(queue, false);

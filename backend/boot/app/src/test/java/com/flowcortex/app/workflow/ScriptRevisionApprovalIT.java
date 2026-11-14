@@ -1,6 +1,7 @@
 package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
@@ -27,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -59,7 +61,7 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
 
     @BeforeEach
     void enableMediaEngineAndDrainProviderQueues() {
-        org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
+        doReturn(true).when(AopTestUtils.<MediaJobs>getUltimateTargetObject(mediaJobs)).isEnabled();
         amqpAdmin.purgeQueue("provider.jobs", false);
     }
 
