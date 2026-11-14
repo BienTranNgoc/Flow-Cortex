@@ -74,3 +74,24 @@ no edit to the image.
 **Scene tests** — `BLENDER_BIN=/path/to/blender uv run pytest tests/test_preview_scene.py -rs`
 (skipped without `BLENDER_BIN`; about a minute on a 12-core machine, software rendering). The
 `preview` CI job runs them against the pinned tarball, builds the image and measures the cost.
+
+### Preview render cost
+
+Measured by the `preview` CI job inside the built `preview-runtime` image: `docker run --cpus=4
+--network none`, no `--device`, `preview_bench.py` over the 22 shots of the five fixture documents
+at 9:16 (96 to 264 frames each, 3504 frames per version), through the real handler and
+`ProcessRunner`. The bench fails, and prints no figures, unless every run reports a `llvmpipe`
+renderer. Seconds are the handler call's wall time, as the job watchdog counts it.
+
+| | per shot P50 | per shot P95 | per frame P50 | per frame P95 |
+|---|---|---|---|---|
+| preview | 27.43 s | 46.76 s | 0.187 s | 0.219 s |
+| send version | 53.77 s | 94.27 s | 0.362 s | 0.439 s |
+
+Slowest single runs: 56.76 s (preview) and 115.96 s (send version). A job with `send: true` runs
+both, so its cost is their sum. CPU: AMD EPYC 9V45 96-Core Processor (a GitHub-hosted
+`ubuntu-latest` runner limited to 4 CPUs), renderer `llvmpipe (LLVM 19.1.7, 256 bits)`, Blender
+4.5.14 LTS. Run: https://github.com/BienTranNgoc/Flow-Cortex/actions/runs/43612114231 (job
+`worker / preview`, step "Measure the render cost"). The 22 shots are a sample: shot length is
+unbounded, so the enum owner sets the capability's max-runtime from the per-frame P95 and a cap
+on the frame count, not from the per-shot figure alone.
