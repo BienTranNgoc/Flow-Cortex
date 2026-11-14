@@ -133,6 +133,14 @@ def test_frame_count_rounds_and_never_drops_below_one(ms: int, frames: int) -> N
     assert build_card(doc, "sh1", "16:9")["frame"]["frameCount"] == frames
 
 
+@pytest.mark.parametrize("ms", [math.inf, -math.inf, math.nan, 1e308])
+def test_a_duration_whose_frame_count_cannot_be_computed_is_refused(ms: float) -> None:
+    doc = minh_thu()
+    doc["story"]["shots"][0]["durationTargetMs"] = ms
+    with pytest.raises(ValueError, match="Shot 1: durationTargetMs"):
+        build_card(doc, "sh1", "9:16")
+
+
 def refused(mutate: Any, aspect: str = "9:16") -> str:
     doc = minh_thu()
     mutate(doc)

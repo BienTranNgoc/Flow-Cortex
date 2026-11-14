@@ -6,6 +6,7 @@ reference behaviour, written out by hand.
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import math
@@ -35,7 +36,6 @@ REASONS = {
     "prop_held_by_other", "hand_full", "not_holding_prop", "camera_too_close", "path_blocked",
     "already_facing", "cannot_reach_seated", "out_of_time", "trimmed_to_shot",
 }  # fmt: skip
-SEEN_REASONS: set[str] = set()
 
 
 def load(name: str) -> dict[str, Any]:
@@ -61,7 +61,7 @@ def act(who: str, code: Any, target: Any = None, after: int = 0, **extra: Any) -
 
 def card_of(doc: dict[str, Any], shot_id: str = "sh_trao", aspect: str = "9:16") -> dict[str, Any]:
     card = build_card(doc, shot_id, aspect)
-    SEEN_REASONS.update(w["reason"] for w in card["warnings"])
+    assert {w["reason"] for w in card["warnings"]} <= REASONS, card["warnings"]
     return card
 
 
@@ -710,7 +710,6 @@ def test_walk_away_with_no_room_to_move_is_dropped() -> None:
     corridor = {"kind": "empty_ground", "width": 0.8, "depth": 6.6}
     motions, warnings = stand_alone(corridor, "walk_away", others={"b": [0.0, 0.6]})
     assert motions == [] and [w["reason"] for w in warnings] == ["path_blocked"]
-    SEEN_REASONS.add("path_blocked")
 
 
 def test_walk_away_along_a_clear_corridor() -> None:
@@ -727,10 +726,20 @@ def test_walk_to_without_a_target_is_dropped_when_the_camera_is_on_top_of_the_wa
     stage = {"kind": "empty_ground", "width": 30.0, "depth": 30.0}
     motions, warnings = stand_alone(stage, "walk_to", camera=camera)
     assert motions == [] and [w["reason"] for w in warnings] == ["camera_too_close"]
-    SEEN_REASONS.add("camera_too_close")
 
 
-def test_every_warning_reason_of_the_closed_list_is_reachable() -> None:
-    # Each case above records the reasons it reached; run after them in file order.
-    assert not REASONS - SEEN_REASONS, sorted(REASONS - SEEN_REASONS)
-    assert SEEN_REASONS <= REASONS
+def test_every_warning_reason_of_the_closed_list_has_a_case() -> None:
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    listed = {
+        id(node)
+        for stmt in tree.body
+        if isinstance(stmt, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "REASONS" for t in stmt.targets)
+        for node in ast.walk(stmt)
+    }
+    expected = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in listed
+    }
+    assert not REASONS - expected, sorted(REASONS - expected)

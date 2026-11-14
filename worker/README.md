@@ -86,10 +86,9 @@ renderer. Seconds are the handler call's wall time, as the job watchdog counts i
 | | per shot P50 | per shot P95 | per frame P50 | per frame P95 |
 |---|---|---|---|---|
 | preview | 27.43 s | 46.76 s | 0.187 s | 0.219 s |
-| send version | 53.77 s | 94.27 s | 0.362 s | 0.439 s |
+| job with `send: true` (preview + send) | 53.77 s | 94.27 s | 0.362 s | 0.439 s |
 
-Slowest single runs: 56.76 s (preview) and 115.96 s (send version). A job with `send: true` runs
-both, so its cost is their sum. CPU: AMD EPYC 9V45 96-Core Processor (a GitHub-hosted
+Slowest single runs: 56.76 s (preview) and 115.96 s (job with `send: true`). CPU: AMD EPYC 9V45 96-Core Processor (a GitHub-hosted
 `ubuntu-latest` runner limited to 4 CPUs), renderer `llvmpipe (LLVM 19.1.7, 256 bits)`, Blender
 4.5.14 LTS. Run: https://github.com/BienTranNgoc/Flow-Cortex/actions/runs/43612114231 (job
 `worker / preview`, step "Measure the render cost"). The 22 shots are a sample: shot length is

@@ -2,10 +2,11 @@
 """Render-cost measurement of the preview_video handler, run inside the preview-runtime image.
 
 Renders every shot of every storyboard document in a fixtures directory at 9:16, as the preview
-and as the send version, through the real handler and ProcessRunner. Prints per-run seconds,
-then P50 and P95 per shot and per frame for each version, with the CPU model, the Blender
-version and the GL renderer. Exits 1, printing no figures, unless every run reports a
-llvmpipe renderer: a GPU render would understate the cost of production, which has no GPU.
+and as a job with send: true (the preview render plus the send render), through the real handler
+and ProcessRunner. Prints per-run seconds, then P50 and P95 per shot and per frame for each
+of the two, with the CPU model, the Blender version and the GL renderer. Exits 1, printing no
+figures, unless every run reports a llvmpipe renderer: a GPU render would understate the cost of
+production, which has no GPU.
 
 The container runs under `--cpus=4` and no /dev/dri. A shot renders in a fresh scratch
 directory, and the wall time of the handler call is what the job watchdog would count.
@@ -29,7 +30,7 @@ from flowcortex_worker.handlers import preview_video
 from flowcortex_worker.runtime import ProcessRunner
 
 ASPECT = "9:16"
-VERSIONS = (("preview", False), ("send", True))
+VERSIONS = (("preview", False), ("send job", True))
 
 
 @dataclass
@@ -100,7 +101,7 @@ def main(argv: list[str]) -> int:
                 run = render(name, doc, shot["id"], version, send)
                 runs.append(run)
                 print(
-                    f"{version:7} {name} {shot['id']}: {run.frames} frames, {run.seconds:.2f} s "
+                    f"{version:8} {name} {shot['id']}: {run.frames} frames, {run.seconds:.2f} s "
                     f"({run.seconds / run.frames:.3f} s/frame, blender {run.render_seconds:.2f} s)",
                     flush=True,
                 )
@@ -121,7 +122,7 @@ def main(argv: list[str]) -> int:
         per_shot = [run.seconds for run in mine]
         per_frame = [run.seconds / run.frames for run in mine]
         print(
-            f"{version:7} per shot P50 {percentile(per_shot, 0.5):.2f} s "
+            f"{version:8} per shot P50 {percentile(per_shot, 0.5):.2f} s "
             f"P95 {percentile(per_shot, 0.95):.2f} s | "
             f"per frame P50 {percentile(per_frame, 0.5):.3f} s "
             f"P95 {percentile(per_frame, 0.95):.3f} s"

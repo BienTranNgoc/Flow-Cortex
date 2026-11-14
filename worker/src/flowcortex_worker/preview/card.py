@@ -288,7 +288,12 @@ def build_card(doc: Any, shot_id: str, aspect: str) -> Card:
         or duration_ms <= 0
     ):
         raise ValueError(f"Shot {label}: durationTargetMs must be a positive number")
-    frame_count = max(1, round(duration_ms * FPS / 1000))
+    try:
+        frame_count = max(1, round(duration_ms * FPS / 1000))
+    except (OverflowError, ValueError):
+        raise ValueError(
+            f"Shot {label}: durationTargetMs must be a finite number whose frame count fits"
+        ) from None
     frame["frameCount"] = frame_count
 
     characters = {

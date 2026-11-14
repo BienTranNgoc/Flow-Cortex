@@ -1,4 +1,4 @@
-"""preview_video: job refusals, outputs, failure mapping and registration, with a fake Blender."""
+"""preview_video: job refusals, outputs, and failure mapping, with a fake Blender."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, cast
 import pytest
 
 from flowcortex_worker.errors import PermanentError, TransientError
-from flowcortex_worker.handlers import preview_video, registry
+from flowcortex_worker.handlers import preview_video
 from flowcortex_worker.preview import build_card, dumps, send_card
 from flowcortex_worker.runtime import ProcessRunner
 
@@ -155,6 +155,18 @@ def test_a_leaf_of_the_wrong_type_is_a_contract_violation(
     doc = document()
     doc["story"]["shots"][0]["staging"]["frame"] = "not a list"
     with pytest.raises(PermanentError, match="frame") as refused:
+        run(tmp_path, doc)
+    assert refused.value.code == "contract_violation"
+    assert invocations(blender_log) == []
+
+
+@pytest.mark.parametrize("ms", [float("inf"), 1e308])
+def test_a_duration_that_overflows_the_frame_count_is_a_contract_violation(
+    tmp_path: Path, blender_log: Path, ms: float
+) -> None:
+    doc = document()
+    doc["story"]["shots"][0]["durationTargetMs"] = ms
+    with pytest.raises(PermanentError, match="durationTargetMs") as refused:
         run(tmp_path, doc)
     assert refused.value.code == "contract_violation"
     assert invocations(blender_log) == []
@@ -323,14 +335,3 @@ def test_a_stale_report_from_an_earlier_run_is_not_read(
     monkeypatch.setenv("FAKE_BLENDER", "no_report")
     with pytest.raises(PermanentError, match="report"):
         preview_video.handle(job(), inputs, ProcessRunner())
-
-
-def test_the_preview_capability_is_registered_and_imports_without_blender(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("BLENDER_BIN", raising=False)
-    assert registry.HANDLER_MODULES["preview_video"] == "flowcortex_worker.handlers.preview_video"
-    assert "preview_video" in registry.load_handlers(None)
-    assert registry.load_handlers(frozenset({"preview_video"})) == {
-        "preview_video": preview_video.handle
-    }

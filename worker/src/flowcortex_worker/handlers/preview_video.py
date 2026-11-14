@@ -42,7 +42,7 @@ def handle(
     try:
         card = build_card(doc, shot_id, aspect)
         send_version = send_card(card) if send else None
-    except (KeyError, TypeError, ValueError) as refused:
+    except (ArithmeticError, KeyError, TypeError, ValueError) as refused:
         raise PermanentError("contract_violation", f"preview_video: {refused}") from refused
     blender = _blender()
 
@@ -126,9 +126,7 @@ def _blender() -> str:
     return path
 
 
-def _render(
-    blender: str, card: Path, out: Path, processes: ProcessRunner
-) -> dict[str, Any]:
+def _render(blender: str, card: Path, out: Path, processes: ProcessRunner) -> dict[str, Any]:
     report_path = out.with_name(out.name + ".report.json")
     out.unlink(missing_ok=True)
     report_path.unlink(missing_ok=True)
