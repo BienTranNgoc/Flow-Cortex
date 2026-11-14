@@ -25,6 +25,7 @@ HANDLER_MODULES: dict[str, str] = {
     "align_audio": "flowcortex_worker.handlers.align_audio",
     "render_video": "flowcortex_worker.handlers.render_video",
     "caption_burn": "flowcortex_worker.handlers.caption_burn",
+    "preview_video": "flowcortex_worker.handlers.preview_video",
 }
 
 
