@@ -6,7 +6,7 @@ import {
   type ScriptRevisionResponse,
 } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
@@ -15,7 +15,7 @@ import viWorkflow from '../../locales/vi/workflow.json';
 import {
   renderRoute as renderRouteBare,
   settled,
-  stubApi,
+  stubApi as stubApiWithoutInputs,
   type FakeReply,
   type Handler,
 } from '../../test/fakeApi';
@@ -59,6 +59,15 @@ function push(event = 'run.updated') {
     throw new Error('the page holds no open stream');
   }
   act(() => stream.options.onEvent({ id: null, event, data: '{"runId":"r1"}' }));
+}
+
+/** Every run here has no uploaded files unless a test says otherwise. */
+function stubApi(routes: Record<string, Handler>) {
+  return stubApiWithoutInputs({
+    'GET /api/v1/runs/r1/inputs': { status: 200, body: [] },
+    'GET /api/v1/runs/R1/inputs': { status: 200, body: [] },
+    ...routes,
+  });
 }
 
 function runReads(calls: Array<{ path: string }>): number {
@@ -237,7 +246,10 @@ describe('RunProgressPage', () => {
       screen.getByText('The media engine was too busy to start this in time. Try running again.'),
     ).toBeInTheDocument();
     await settled(queryClient);
-    expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
+    expect(calls.map((call) => call.path).sort()).toEqual([
+      '/api/v1/runs/r1',
+      '/api/v1/runs/r1/inputs',
+    ]);
   });
 
   it('shows no file line for a run whose first step is inline', async () => {
@@ -1400,7 +1412,10 @@ describe('RunProgressPage', () => {
         '/workflows/w1',
       );
       await settled(queryClient);
-      expect(calls.map((call) => call.path)).toEqual(['/api/v1/runs/r1']);
+      expect(calls.map((call) => call.path).sort()).toEqual([
+        '/api/v1/runs/r1',
+        '/api/v1/runs/r1/inputs',
+      ]);
     });
 
     it('announces the step the page selects after a pushed update, and nothing on first render', async () => {
@@ -1583,6 +1598,58 @@ describe('RunProgressPage', () => {
         expect(heading).not.toHaveFocus();
         expect(heading).toHaveAttribute('tabindex', '-1');
       });
+    });
+  });
+
+  describe('the files uploaded for the run', () => {
+    const farFuture = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const image = (url: string, expiresAt: string) => ({
+      bindingKey: 'image',
+      kind: 'image',
+      mimeType: 'image/png',
+      url,
+      expiresAt,
+    });
+
+    it('renews an expired link on a load error instead of calling the file gone', async () => {
+      let reads = 0;
+      const { queryClient } = renderRun(completedCheck(), {
+        'GET /api/v1/runs/r1/inputs': () => {
+          reads += 1;
+          const expired = new Date(Date.now() - 60 * 1000).toISOString();
+          return {
+            status: 200,
+            body: [reads === 1 ? image('/old.png', expired) : image('/new.png', farFuture)],
+          };
+        },
+      });
+
+      const first = await screen.findByAltText('Input image 1');
+      expect(first).toHaveAttribute('src', '/old.png');
+      fireEvent.error(first);
+
+      await waitFor(() =>
+        expect(screen.getByAltText('Input image 1')).toHaveAttribute('src', '/new.png'),
+      );
+      expect(screen.queryByText('This file is no longer stored')).not.toBeInTheDocument();
+      expect(reads).toBe(2);
+      await settled(queryClient);
+    });
+
+    it('says the file is no longer stored when an unexpired link still fails', async () => {
+      let reads = 0;
+      const { queryClient } = renderRun(completedCheck(), {
+        'GET /api/v1/runs/r1/inputs': () => {
+          reads += 1;
+          return { status: 200, body: [image('/live.png', farFuture)] };
+        },
+      });
+
+      fireEvent.error(await screen.findByAltText('Input image 1'));
+
+      expect(await screen.findByText('This file is no longer stored')).toBeInTheDocument();
+      await settled(queryClient);
+      expect(reads).toBe(1);
     });
   });
 
