@@ -2,6 +2,8 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,12 +27,13 @@ class StepExecutorRegistry {
     private final Map<String, StepExecutor> byType = new LinkedHashMap<>();
 
     @Autowired
-    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts) {
-        this(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts));
+    StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs) {
+        this(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate, tts));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
-        this(executors(mediaJobs, clock));
+        this(executors(mediaJobs, clock, null, null));
     }
 
     StepExecutorRegistry(List<StepExecutor> executors) {
@@ -41,13 +44,15 @@ class StepExecutorRegistry {
         }
     }
 
-    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock) {
+    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock, VendorJobLedger vendorLedger,
+            VendorJobsProperties vendorJobs) {
         List<StepExecutor> executors = new ArrayList<>(List.of(new EchoStepExecutor(), new FailStepExecutor()));
         executors.add(new ProviderStepExecutor("generate_script", "product_ad_v1", mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_storyboard", "product_ad_storyboard_v1",
                 mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
-        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock));
+        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock,
+                vendorLedger, vendorJobs));
         Arrays.stream(MediaCapability.values())
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);
