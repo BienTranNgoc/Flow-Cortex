@@ -16,6 +16,7 @@ import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
@@ -41,6 +42,7 @@ function ContainedOutlet() {
         title: t('common.errorView.title'),
         message: t('common.errorView.message'),
         reload: t('common.errorView.reload'),
+        retry: t('common.errorView.retry'),
       }}
     >
       <Outlet />
@@ -55,9 +57,11 @@ const SupportWidget = lazy(() =>
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
   return supportWidget ? (
-    <Suspense fallback={null}>
-      <SupportWidget />
-    </Suspense>
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <SupportWidget />
+      </Suspense>
+    </ErrorBoundary>
   ) : null;
 }
 
@@ -97,6 +101,7 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
           </Route>
           <Route
             element={

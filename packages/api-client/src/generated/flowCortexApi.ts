@@ -5,6 +5,25 @@
  * OpenAPI spec version: v1.0
  */
 import { customFetch } from '../customFetch';
+export interface ReorderStepsRequest {
+  /**
+   * @minItems 0
+   * @maxItems 32767
+   */
+  stepIds: string[];
+}
+
+export type ProblemDetailProperties = { [key: string]: unknown };
+
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  properties?: ProblemDetailProperties;
+}
+
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
@@ -47,17 +66,6 @@ export interface SetPasswordRequest {
   lastName: string;
   /** @pattern ^[a-z0-9_]{3,20}$ */
   username?: string;
-}
-
-export type ProblemDetailProperties = { [key: string]: unknown };
-
-export interface ProblemDetail {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  properties?: ProblemDetailProperties;
 }
 
 export interface AccessTokenResponse {
@@ -910,6 +918,108 @@ export interface SendCodeResponse {
   expiresAt: string;
 }
 
+export type EmailLinkUnsubscribedList =
+  (typeof EmailLinkUnsubscribedList)[keyof typeof EmailLinkUnsubscribedList];
+
+export const EmailLinkUnsubscribedList = {
+  care: 'care',
+  marketing: 'marketing',
+} as const;
+
+export interface EmailLinkUnsubscribed {
+  unsubscribed: boolean;
+  list: EmailLinkUnsubscribedList;
+  maskedEmail: string;
+}
+
+export interface EmailLinkOneClick {
+  ok: boolean;
+}
+
+export interface TelegramRefreshChatsRequest {
+  chatId?: number;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  title?: string;
+  /** @pattern private|group|supergroup|channel */
+  type?: string;
+}
+
+export interface Chat {
+  id?: number;
+  title?: string;
+  type?: string;
+}
+
+export interface TelegramChatList {
+  chats?: Chat[];
+}
+
+export interface TelegramConnectRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  botToken: string;
+}
+
+export interface TelegramConnection {
+  provider?: string;
+  botUsername?: string;
+  botId?: number;
+  state?: string;
+  chats?: Chat[];
+  defaultChatId?: number;
+  usageEnabled?: boolean;
+}
+
+export type SaveRequestExtraHeaders = { [key: string]: string };
+
+export interface SaveRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  key?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  label?: string;
+  /** @pattern bearer|header|query */
+  authType: string;
+  /**
+   * @minLength 0
+   * @maxLength 4096
+   */
+  token?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  baseUrl?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  headerName?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  paramName?: string;
+  extraHeaders?: SaveRequestExtraHeaders;
+}
+
+export interface Saved {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+}
+
 export interface Attachment {
   uploadId?: string;
   fileName?: string;
@@ -1142,6 +1252,67 @@ export interface UpdateStepRequest {
   config?: string;
 }
 
+export interface TelegramDefaultChatRequest {
+  chatId: number;
+}
+
+export interface TelegramDefaultChat {
+  state?: string;
+  defaultChatId?: number;
+}
+
+export type EdgeKind = (typeof EdgeKind)[keyof typeof EdgeKind];
+
+export const EdgeKind = {
+  previous: 'previous',
+  reference: 'reference',
+  outputInput: 'outputInput',
+} as const;
+
+export interface Edge {
+  fromStepId?: string;
+  toStepId?: string;
+  kind: EdgeKind;
+}
+
+export type NodeMode = (typeof NodeMode)[keyof typeof NodeMode];
+
+export const NodeMode = {
+  inline: 'inline',
+  remote: 'remote',
+} as const;
+
+export interface Node {
+  id?: string;
+  stepOrder?: number;
+  name?: string;
+  type?: string;
+  mode: NodeMode;
+  readsRunInput?: boolean;
+}
+
+export type ProblemKind = (typeof ProblemKind)[keyof typeof ProblemKind];
+
+export const ProblemKind = {
+  MALFORMED: 'MALFORMED',
+  UNKNOWN_STEP: 'UNKNOWN_STEP',
+  AMBIGUOUS_NAME: 'AMBIGUOUS_NAME',
+  NOT_EARLIER: 'NOT_EARLIER',
+} as const;
+
+export interface Problem {
+  stepId?: string;
+  stepOrder?: number;
+  kind: ProblemKind;
+}
+
+export interface WorkflowGraphResponse {
+  workflowId?: string;
+  nodes?: Node[];
+  edges?: Edge[];
+  problems?: Problem[];
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -1248,6 +1419,14 @@ export interface SupportAssistantConversation {
 }
 
 export interface OutputUrlResponse {
+  url: string;
+  expiresAt: string;
+}
+
+export interface RunInputResponse {
+  bindingKey: string;
+  kind: string;
+  mimeType: string;
   url: string;
   expiresAt: string;
 }
@@ -1435,8 +1614,40 @@ export interface FeaturesResponse {
   chat: boolean;
 }
 
+export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
+
+export const EmailLinkViewList = {
+  care: 'care',
+  marketing: 'marketing',
+} as const;
+
+export interface EmailLinkView {
+  valid: boolean;
+  list: EmailLinkViewList;
+  unsubscribed: boolean;
+  maskedEmail: string;
+}
+
 export interface BalanceResponse {
   balance?: number;
+  granted?: number;
+}
+
+export interface TelegramHealth {
+  valid?: boolean;
+  provider?: string;
+  botUsername?: string;
+  reason?: string;
+}
+
+export interface Summary {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+  headerName?: string;
+  paramName?: string;
+  extraHeaderNames?: string[];
 }
 
 export interface ChatConversationList {
@@ -1566,6 +1777,14 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export type UnsubscribeEmailLinkParams = {
+  src?: string;
+};
+
+export type OneClickUnsubscribeEmailLinkParams = {
+  src?: string;
+};
+
 export type SearchSupportKbParams = {
   /**
    * @minLength 2
@@ -1683,6 +1902,79 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type reorderWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderWorkflowStepsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type reorderWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderWorkflowStepsResponseError = (
+  | reorderWorkflowStepsResponse400
+  | reorderWorkflowStepsResponse403
+  | reorderWorkflowStepsResponse404
+  | reorderWorkflowStepsResponse409
+  | reorderWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderWorkflowStepsResponse = reorderWorkflowStepsResponseError;
+
+export const getReorderWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/steps/order`;
+};
+
+export const reorderWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderWorkflowStepsResponse>(getReorderWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
+  });
+};
 
 export type getResponse200 = {
   data: UserResponse;
@@ -1976,6 +2268,73 @@ export const updateProfile = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(profileUpdateRequest),
+  });
+};
+
+export type reorderAdminWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderAdminWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderAdminWorkflowStepsResponseError = (
+  | reorderAdminWorkflowStepsResponse400
+  | reorderAdminWorkflowStepsResponse404
+  | reorderAdminWorkflowStepsResponse409
+  | reorderAdminWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminWorkflowStepsResponse = reorderAdminWorkflowStepsResponseError;
+
+export const getReorderAdminWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/order`;
+};
+
+export const reorderAdminWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminWorkflowStepsResponse>(getReorderAdminWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
   });
 };
 
@@ -2596,6 +2955,11 @@ export type addStepResponse404 = {
   status: 404;
 };
 
+export type addStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type addStepResponse422 = {
   data: ProblemDetail;
   status: 422;
@@ -2605,7 +2969,11 @@ export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
 export type addStepResponseError = (
-  addStepResponse400 | addStepResponse403 | addStepResponse404 | addStepResponse422
+  | addStepResponse400
+  | addStepResponse403
+  | addStepResponse404
+  | addStepResponse409
+  | addStepResponse422
 ) & {
   headers: Headers;
 };
@@ -3937,6 +4305,349 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type unsubscribeEmailLinkResponse200 = {
+  data: EmailLinkUnsubscribed;
+  status: 200;
+};
+
+export type unsubscribeEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type unsubscribeEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type unsubscribeEmailLinkResponseSuccess = unsubscribeEmailLinkResponse200 & {
+  headers: Headers;
+};
+export type unsubscribeEmailLinkResponseError = (
+  unsubscribeEmailLinkResponse404 | unsubscribeEmailLinkResponse429
+) & {
+  headers: Headers;
+};
+
+export type unsubscribeEmailLinkResponse =
+  unsubscribeEmailLinkResponseSuccess | unsubscribeEmailLinkResponseError;
+
+export const getUnsubscribeEmailLinkUrl = (token: string, params?: UnsubscribeEmailLinkParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/email-links/${token}/unsubscribe?${stringifiedParams}`
+    : `/api/v1/email-links/${token}/unsubscribe`;
+};
+
+export const unsubscribeEmailLink = async (
+  token: string,
+  params?: UnsubscribeEmailLinkParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<unsubscribeEmailLinkResponse> => {
+  return customFetch<unsubscribeEmailLinkResponse>(getUnsubscribeEmailLinkUrl(token, params), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type oneClickUnsubscribeEmailLinkResponse200 = {
+  data: EmailLinkOneClick;
+  status: 200;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type oneClickUnsubscribeEmailLinkResponseSuccess =
+  oneClickUnsubscribeEmailLinkResponse200 & {
+    headers: Headers;
+  };
+export type oneClickUnsubscribeEmailLinkResponseError = (
+  oneClickUnsubscribeEmailLinkResponse404 | oneClickUnsubscribeEmailLinkResponse429
+) & {
+  headers: Headers;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse =
+  oneClickUnsubscribeEmailLinkResponseSuccess | oneClickUnsubscribeEmailLinkResponseError;
+
+export const getOneClickUnsubscribeEmailLinkUrl = (
+  token: string,
+  params?: OneClickUnsubscribeEmailLinkParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/email-links/${token}/one-click?${stringifiedParams}`
+    : `/api/v1/email-links/${token}/one-click`;
+};
+
+export const oneClickUnsubscribeEmailLink = async (
+  token: string,
+  params?: OneClickUnsubscribeEmailLinkParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oneClickUnsubscribeEmailLinkResponse> => {
+  return customFetch<oneClickUnsubscribeEmailLinkResponse>(
+    getOneClickUnsubscribeEmailLinkUrl(token, params),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
+};
+
+export type refreshChatsResponse200 = {
+  data: TelegramChatList;
+  status: 200;
+};
+
+export type refreshChatsResponseSuccess = refreshChatsResponse200 & {
+  headers: Headers;
+};
+export type refreshChatsResponse = refreshChatsResponseSuccess;
+
+export const getRefreshChatsUrl = () => {
+  return `/api/v1/connectors/telegram/refresh-chats`;
+};
+
+export const refreshChats = async (
+  telegramRefreshChatsRequest?: TelegramRefreshChatsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<refreshChatsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<refreshChatsResponse>(getRefreshChatsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramRefreshChatsRequest),
+  });
+};
+
+export type connectResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type connectResponseSuccess = connectResponse200 & {
+  headers: Headers;
+};
+export type connectResponse = connectResponseSuccess;
+
+export const getConnectUrl = () => {
+  return `/api/v1/connectors/telegram/connect`;
+};
+
+export const connect = async (
+  telegramConnectRequest: TelegramConnectRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<connectResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<connectResponse>(getConnectUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramConnectRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: Summary[];
+  status: 200;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1Response = list1ResponseSuccess;
+
+export const getList1Url = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveResponse200 = {
+  data: Saved;
+  status: 200;
+};
+
+export type saveResponseSuccess = saveResponse200 & {
+  headers: Headers;
+};
+export type saveResponse = saveResponseSuccess;
+
+export const getSaveUrl = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const save = async (
+  saveRequest: SaveRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveResponse>(getSaveUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveRequest),
+  });
+};
+
+export type reportClientErrorResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type reportClientErrorResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reportClientErrorResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reportClientErrorResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reportClientErrorResponseSuccess = reportClientErrorResponse204 & {
+  headers: Headers;
+};
+export type reportClientErrorResponseError = (
+  reportClientErrorResponse400 | reportClientErrorResponse413 | reportClientErrorResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportClientErrorResponse =
+  reportClientErrorResponseSuccess | reportClientErrorResponseError;
+
+export const getReportClientErrorUrl = () => {
+  return `/api/v1/client-errors`;
+};
+
+/**
+ * @summary Report an error the web app contained
+ */
+export const reportClientError = async (
+  reportClientErrorBody: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportClientErrorResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportClientErrorResponse>(getReportClientErrorUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', ...getHeaders(options?.headers) },
+    body: reportClientErrorBody,
   });
 };
 
@@ -5337,6 +6048,67 @@ export const updateWorkflow = async (
   });
 };
 
+export type deleteWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowStepResponseError = (
+  | deleteWorkflowStepResponse400
+  | deleteWorkflowStepResponse403
+  | deleteWorkflowStepResponse404
+  | deleteWorkflowStepResponse409
+  | deleteWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowStepResponse =
+  deleteWorkflowStepResponseSuccess | deleteWorkflowStepResponseError;
+
+export const getDeleteWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowStepResponse> => {
+  return customFetch<deleteWorkflowStepResponse>(getDeleteWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type updateStepResponse400 = {
   data: ProblemDetail;
   status: 400;
@@ -5352,13 +6124,22 @@ export type updateStepResponse404 = {
   status: 404;
 };
 
+export type updateStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type updateStepResponse422 = {
   data: ProblemDetail;
   status: 422;
 };
 
 export type updateStepResponseError = (
-  updateStepResponse400 | updateStepResponse403 | updateStepResponse404 | updateStepResponse422
+  | updateStepResponse400
+  | updateStepResponse403
+  | updateStepResponse404
+  | updateStepResponse409
+  | updateStepResponse422
 ) & {
   headers: Headers;
 };
@@ -5399,6 +6180,51 @@ export const updateStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type setDefaultChatResponse200 = {
+  data: TelegramDefaultChat;
+  status: 200;
+};
+
+export type setDefaultChatResponseSuccess = setDefaultChatResponse200 & {
+  headers: Headers;
+};
+export type setDefaultChatResponse = setDefaultChatResponseSuccess;
+
+export const getSetDefaultChatUrl = () => {
+  return `/api/v1/connectors/telegram/default-chat`;
+};
+
+export const setDefaultChat = async (
+  telegramDefaultChatRequest: TelegramDefaultChatRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setDefaultChatResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setDefaultChatResponse>(getSetDefaultChatUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramDefaultChatRequest),
   });
 };
 
@@ -5523,6 +6349,61 @@ export const updateAdminWorkflow = async (
   });
 };
 
+export type deleteAdminWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteAdminWorkflowStepResponseSuccess = deleteAdminWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminWorkflowStepResponseError = (
+  | deleteAdminWorkflowStepResponse400
+  | deleteAdminWorkflowStepResponse404
+  | deleteAdminWorkflowStepResponse409
+  | deleteAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowStepResponse =
+  deleteAdminWorkflowStepResponseSuccess | deleteAdminWorkflowStepResponseError;
+
+export const getDeleteAdminWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteAdminWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminWorkflowStepResponse> => {
+  return customFetch<deleteAdminWorkflowStepResponse>(getDeleteAdminWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type updateAdminWorkflowStepResponse400 = {
   data: ProblemDetail;
   status: 400;
@@ -5588,6 +6469,47 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type getWorkflowGraphResponse200 = {
+  data: WorkflowGraphResponse;
+  status: 200;
+};
+
+export type getWorkflowGraphResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getWorkflowGraphResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowGraphResponseSuccess = getWorkflowGraphResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowGraphResponseError = (
+  getWorkflowGraphResponse401 | getWorkflowGraphResponse404
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowGraphResponse =
+  getWorkflowGraphResponseSuccess | getWorkflowGraphResponseError;
+
+export const getGetWorkflowGraphUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/graph`;
+};
+
+export const getWorkflowGraph = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowGraphResponse> => {
+  return customFetch<getWorkflowGraphResponse>(getGetWorkflowGraphUrl(id), {
+    ...options,
+    method: 'GET',
   });
 };
 
@@ -6029,6 +6951,30 @@ export const getOutputUrl = async (
   });
 };
 
+export type getRunInputsResponse200 = {
+  data: RunInputResponse[];
+  status: 200;
+};
+
+export type getRunInputsResponseSuccess = getRunInputsResponse200 & {
+  headers: Headers;
+};
+export type getRunInputsResponse = getRunInputsResponseSuccess;
+
+export const getGetRunInputsUrl = (id: string) => {
+  return `/api/v1/runs/${id}/inputs`;
+};
+
+export const getRunInputs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunInputsResponse> => {
+  return customFetch<getRunInputsResponse>(getGetRunInputsUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type openRealtimeStreamResponse200 = {
   data: string;
   status: 200;
@@ -6227,6 +7173,44 @@ export const features = async (
   });
 };
 
+export type viewEmailLinkResponse200 = {
+  data: EmailLinkView;
+  status: 200;
+};
+
+export type viewEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type viewEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type viewEmailLinkResponseSuccess = viewEmailLinkResponse200 & {
+  headers: Headers;
+};
+export type viewEmailLinkResponseError = (viewEmailLinkResponse404 | viewEmailLinkResponse429) & {
+  headers: Headers;
+};
+
+export type viewEmailLinkResponse = viewEmailLinkResponseSuccess | viewEmailLinkResponseError;
+
+export const getViewEmailLinkUrl = (token: string) => {
+  return `/api/v1/email-links/${token}`;
+};
+
+export const viewEmailLink = async (
+  token: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<viewEmailLinkResponse> => {
+  return customFetch<viewEmailLinkResponse>(getViewEmailLinkUrl(token), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type balanceResponse200 = {
   data: BalanceResponse;
   status: 200;
@@ -6245,6 +7229,50 @@ export const balance = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<balanceResponse> => {
   return customFetch<balanceResponse>(getBalanceUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type readResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type readResponseSuccess = readResponse200 & {
+  headers: Headers;
+};
+export type readResponse = readResponseSuccess;
+
+export const getReadUrl = () => {
+  return `/api/v1/connectors/telegram`;
+};
+
+export const read = async (options?: Parameters<typeof customFetch>[1]): Promise<readResponse> => {
+  return customFetch<readResponse>(getReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type health1Response200 = {
+  data: TelegramHealth;
+  status: 200;
+};
+
+export type health1ResponseSuccess = health1Response200 & {
+  headers: Headers;
+};
+export type health1Response = health1ResponseSuccess;
+
+export const getHealth1Url = () => {
+  return `/api/v1/connectors/telegram/health`;
+};
+
+export const health1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<health1Response> => {
+  return customFetch<health1Response>(getHealth1Url(), {
     ...options,
     method: 'GET',
   });
@@ -6615,5 +7643,29 @@ export const listAdminMediaJobs = async (
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type disconnectResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type disconnectResponseSuccess = disconnectResponse200 & {
+  headers: Headers;
+};
+export type disconnectResponse = disconnectResponseSuccess;
+
+export const getDisconnectUrl = (provider: string) => {
+  return `/api/v1/connectors/${provider}`;
+};
+
+export const disconnect = async (
+  provider: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<disconnectResponse> => {
+  return customFetch<disconnectResponse>(getDisconnectUrl(provider), {
+    ...options,
+    method: 'DELETE',
   });
 };

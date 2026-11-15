@@ -3,7 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.flowcortex.workflow.application.provider.GeminiException;
+import com.flowcortex.llm.api.LlmJsonResult;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -117,10 +117,25 @@ final class DubSegments {
                 "Vietnamese dubbing was switched off while this video was being processed. Start again later.");
     }
 
-    static StepFailedException providerFailure(GeminiException e) {
-        String message = "provider_quota_exceeded".equals(e.code())
-                ? "Today's free AI quota is used up. Try again later."
-                : "The AI service isn't answering right now. Try again in a few minutes.";
-        return new StepFailedException(e.code(), message);
+    static StepFailedException providerFailure(LlmJsonResult.Kind kind) {
+        if (kind == LlmJsonResult.Kind.QUOTA_EXCEEDED) {
+            return new StepFailedException("provider_quota_exceeded",
+                    "Today's free AI quota is used up. Try again later.");
+        }
+        return new StepFailedException("provider_unavailable",
+                "The AI service isn't answering right now. Try again in a few minutes.");
+    }
+
+    /**
+     * The lines a JSON slot call came to, or {@code null} when it answered nothing usable (blocked, or a
+     * 200 without content), which the caller treats like any answer that is not a line list.
+     */
+    static Map<Integer, String> lines(ObjectMapper json, LlmJsonResult result) {
+        return switch (result) {
+            case LlmJsonResult.Answered answered -> lines(json, answered.json());
+            case LlmJsonResult.Blocked blocked -> null;
+            case LlmJsonResult.Failed failed when failed.kind() == LlmJsonResult.Kind.UNUSABLE -> null;
+            case LlmJsonResult.Failed failed -> throw providerFailure(failed.kind());
+        };
     }
 }

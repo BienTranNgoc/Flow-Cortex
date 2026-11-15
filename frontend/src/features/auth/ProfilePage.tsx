@@ -128,7 +128,7 @@ export function ProfilePage() {
               {credits !== undefined && (
                 <li>
                   <span className="profile-stats__value">
-                    {formatNumber(credits, activeLocale())}
+                    {formatNumber(credits.balance, activeLocale())}
                   </span>
                   <span className="profile-stats__label">{t('auth.profile.stats.credits')}</span>
                 </li>

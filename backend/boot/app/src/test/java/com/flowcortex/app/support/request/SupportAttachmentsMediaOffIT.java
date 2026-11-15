@@ -28,7 +28,6 @@ import org.springframework.http.ResponseEntity;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.support.enabled=true",
         "flowcortex.media.enabled=false",
-        "flowcortex.support.mail.interval=PT24H",
         "flowcortex.support.retention.interval=PT24H"})
 @AutoConfigureTestRestTemplate
 class SupportAttachmentsMediaOffIT extends AbstractPostgresBootTest {

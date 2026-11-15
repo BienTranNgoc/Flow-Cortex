@@ -250,7 +250,9 @@ What to know about the media path:
     `SEEDANCE_BASE_URL`; list the exact host, because `*.example.com` does not match
     `example.com` itself): add it to the file `EGRESS_ACL_FILE` names, then run
     `docker compose up -d --force-recreate egress-proxy`. No image is rebuilt and the
-    backend and workers are not restarted. `compose.aws.yaml` refuses to start until
+    backend and workers are not restarted. A member's HTTP connector reaches only hosts on
+    this list: until its host is added, its calls fail with `connector.upstreamUnavailable`.
+    `compose.aws.yaml` refuses to start until
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
     host to it, plus the five registry hosts the payments region gate downloads from:
     `ftp.apnic.net`, `ftp.arin.net`, `ftp.ripe.net`, `ftp.lacnic.net`, `ftp.afrinic.net`.
@@ -318,6 +320,12 @@ the member app reads it once per session.
   over STARTTLS, so account mail never lands in a sink there. To try a relay
   from the local stack, set the same four plus `SPRING_MAIL_SMTP_AUTH=true` and
   `SPRING_MAIL_SMTP_STARTTLS=true` in `.env`.
+  Every mail comes from one sender, `FLOWCORTEX_MAIL_FROM_NAME`
+  <`FLOWCORTEX_MAIL_FROM`> (default `Nodi <no-reply@flow-cortex.dev>`), and carries a text
+  and an HTML part. `FLOWCORTEX_MAIL_LINK_SECRET` (at least 32 bytes) and
+  `FLOWCORTEX_APP_PUBLIC_URL` become required once a care or promotional mail exists;
+  `FLOWCORTEX_MAIL_LINK_RATE_LIMIT` and `FLOWCORTEX_MAIL_LINK_RATE_WINDOW` (defaults 10 per
+  `60s`) bound the public unsubscribe-link calls.
   Accounts still unconfirmed after `FLOWCORTEX_AUTH_UNCONFIRMED_ACCOUNT_RETENTION`
   (72h) are deleted.
 - **SMS.** No SMS is delivered. Compose sets `FLOWCORTEX_SMS_SENDER=outbox`, so each code

@@ -22,18 +22,24 @@ dependencies {
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
+    implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:onboarding"))
+    implementation(project(":modules:mail"))
     implementation(project(":modules:connector"))
     implementation(project(":modules:billing"))
     implementation(project(":modules:chat"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
+    // The limiter store builds its own Hikari pool from Boot's JdbcConnectionDetails.
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
     // Boot 4 moved the MVC test slice out of spring-boot-starter-test.
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(platform("org.testcontainers:testcontainers-bom:${providers.gradleProperty("testcontainersVersion").get()}"))
@@ -58,6 +64,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-resttestclient")
     testImplementation("org.springframework.boot:spring-boot-restclient")
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // The publication ITs declare their own @ApplicationModuleListener probes.
+    testImplementation("org.springframework.modulith:spring-modulith-events-api")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.flywaydb:flyway-database-postgresql")
