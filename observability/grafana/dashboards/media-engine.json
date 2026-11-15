@@ -101,8 +101,8 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "media.jobs queue depth",
-      "description": "Messages waiting (ready) and in progress (unacked) on media.jobs, and dead-lettered jobs.",
+      "title": "Media job queues",
+      "description": "Messages waiting (ready) and in progress (unacked) on the media.jobs and media.render.jobs lanes, and their dead-lettered jobs.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
@@ -111,20 +111,20 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\", queue=\"media.jobs\"})",
-          "legendFormat": "ready"
+          "expr": "sum by (queue) (rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs\"})",
+          "legendFormat": "ready {{queue}}"
         },
         {
           "refId": "B",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\", queue=\"media.jobs\"})",
-          "legendFormat": "unacked"
+          "expr": "sum by (queue) (rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs|media\\\\.render\\\\.jobs\"})",
+          "legendFormat": "unacked {{queue}}"
         },
         {
           "refId": "C",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rabbitmq_queue_messages{job=\"rabbitmq-per-object\", queue=\"media.jobs.dlq\"})",
-          "legendFormat": "dead-lettered (media.jobs.dlq)"
+          "expr": "sum by (queue) (rabbitmq_queue_messages{job=\"rabbitmq-per-object\", queue=~\"media\\\\.jobs\\\\.dlq|media\\\\.render\\\\.jobs\\\\.dlq\"})",
+          "legendFormat": "dead-lettered {{queue}}"
         }
       ]
     }
