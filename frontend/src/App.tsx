@@ -41,6 +41,7 @@ function ContainedOutlet() {
         title: t('common.errorView.title'),
         message: t('common.errorView.message'),
         reload: t('common.errorView.reload'),
+        retry: t('common.errorView.retry'),
       }}
     >
       <Outlet />
@@ -55,9 +56,11 @@ const SupportWidget = lazy(() =>
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
   return supportWidget ? (
-    <Suspense fallback={null}>
-      <SupportWidget />
-    </Suspense>
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <SupportWidget />
+      </Suspense>
+    </ErrorBoundary>
   ) : null;
 }
 

@@ -1,32 +1,47 @@
 import { Component, type ReactNode } from 'react';
+import { recoveryFor } from './errorRecovery';
 import { reportClientError } from './reportClientError';
 
 export interface ErrorBoundaryLabels {
   title: string;
   message: string;
   reload: string;
+  /** When present the first failure of a page offers Try again before Reload. */
+  retry?: string;
 }
 
-interface ErrorBoundaryProps {
+type ErrorBoundaryProps = {
   children: ReactNode;
-  /** Required so a missing translation is a type error, never an English fallback. */
-  labels: ErrorBoundaryLabels;
+  /** `root` is the whole-app view; `page` is one route's area. */
+  variant?: 'root' | 'page';
   /** Defaults to reloading the page. */
   onReload?: () => void;
-}
+} & (
+  | {
+      /** Required so a missing translation is a type error, never an English fallback. */
+      labels: ErrorBoundaryLabels;
+      fallback?: never;
+    }
+  | {
+      /** Rendered in place of the children after a failure, with no error view. */
+      fallback: ReactNode;
+      labels?: never;
+    }
+);
 
 interface ErrorBoundaryState {
   failed: boolean;
+  failedRetries: number;
 }
 
 /**
- * Contains a render failure of its children: shows a recoverable error view with a reload action in their
- * place, so the surrounding shell keeps working, and reports the failure once.
+ * Contains a render failure of its children: shows a recoverable error view in their place (Try again,
+ * then Reload) or a silent fallback, so the surrounding shell keeps working, and reports each failure once.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  override state: ErrorBoundaryState = { failed: false };
+  override state: ErrorBoundaryState = { failed: false, failedRetries: 0 };
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
+  static getDerivedStateFromError(): Partial<ErrorBoundaryState> {
     return { failed: true };
   }
 
@@ -34,19 +49,38 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     reportClientError(error);
   }
 
+  private readonly retry = () => {
+    this.setState((state) => ({ failed: false, failedRetries: state.failedRetries + 1 }));
+  };
+
   override render() {
     if (!this.state.failed) {
       return this.props.children;
     }
-    const { labels } = this.props;
+    const { labels, fallback, variant = 'page' } = this.props;
+    const recovery = recoveryFor({
+      variant,
+      failedRetries: this.state.failedRetries,
+      canRetry: Boolean(labels?.retry),
+      silent: labels === undefined,
+    });
+    if (recovery === 'silent' || labels === undefined) {
+      return fallback;
+    }
     const reload = this.props.onReload ?? (() => window.location.reload());
     return (
-      <section className="error-view">
+      <section className={variant === 'root' ? 'error-view error-view--root' : 'error-view'}>
         <h1>{labels.title}</h1>
         <p role="alert">{labels.message}</p>
-        <button type="button" onClick={reload}>
-          {labels.reload}
-        </button>
+        {recovery === 'retry' ? (
+          <button type="button" onClick={this.retry}>
+            {labels.retry}
+          </button>
+        ) : (
+          <button type="button" onClick={reload}>
+            {labels.reload}
+          </button>
+        )}
       </section>
     );
   }
