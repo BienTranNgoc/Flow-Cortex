@@ -74,7 +74,7 @@ spring:
 
   # The event publication registry is the outbox for job messages. Outstanding publications are
   # not republished on restart — a job in flight would be dispatched twice; failed ones are resubmitted
-  # by the media module instead. A completed publication is deleted: the run step is the record.
+  # by the jobs module instead. A completed publication is deleted: the run step is the record.
   modulith:
     events:
       republish-outstanding-events-on-restart: false
@@ -165,6 +165,12 @@ jdbc:
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
 # profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
+  # Cluster job runner: each pass looks for due jobs every poll-interval; with the runner off the
+  # instance registers and runs no scheduled job (the integration suite turns it off).
+  jobs:
+    poll-interval: ${FLOWCORTEX_JOBS_POLL_INTERVAL:5s}
+    runner:
+      enabled: ${FLOWCORTEX_JOBS_RUNNER_ENABLED:true}
   # The member app's public origin; links in outgoing mail point here. No default: with email
   # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:

@@ -7,6 +7,7 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Support",
         allowedDependencies = {
+                "jobs :: api",
                 "user :: api",
                 "media :: api",
                 "llm :: api",
