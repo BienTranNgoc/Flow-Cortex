@@ -25,11 +25,14 @@ import com.flowcortex.workflow.domain.VisibilityChangeTrigger;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowLinkGrant;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.domain.WorkflowVersion;
+import com.flowcortex.workflow.domain.WorkflowVersionSource;
 import com.flowcortex.workflow.domain.WorkflowVisibilityAuditEntry;
 import com.flowcortex.workflow.infrastructure.WorkflowAccessLogRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowLinkGrantRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowVisibilityAuditRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -61,9 +64,12 @@ class WorkflowSharingServiceTest {
     private static final String SECRET = "workflow-share-hash-secret-for-unit-tests-0123456789";
     private static final ShareOrigin ORIGIN = ShareOrigin.of("203.0.113.7", "Mozilla/5.0");
 
-    private final WorkflowServiceImpl arbiter = mock(WorkflowServiceImpl.class);
+    private final WorkflowWriteAccess arbiter = mock(WorkflowWriteAccess.class);
+    private final VersionWriter versionWriter = mock(VersionWriter.class);
     private final WorkflowRepository workflows = mock(WorkflowRepository.class);
     private final WorkflowStepRepository steps = mock(WorkflowStepRepository.class);
+    private final WorkflowVersionRepository versions = mock(WorkflowVersionRepository.class);
+    private final ServedDefinitions served = new ServedDefinitions(steps, versions);
     private final WorkflowLinkGrantRepository grants = mock(WorkflowLinkGrantRepository.class);
     private final WorkflowAccessLogRepository accessLogs = mock(WorkflowAccessLogRepository.class);
     private final WorkflowVisibilityAuditRepository audits = mock(WorkflowVisibilityAuditRepository.class);
@@ -71,8 +77,8 @@ class WorkflowSharingServiceTest {
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final WorkflowAccessLog accessLog = new WorkflowAccessLog(accessLogs, new AccessorKeys(SECRET),
             mock(PlatformTransactionManager.class), clock);
-    private final WorkflowSharingService service = new WorkflowSharingService(arbiter, workflows, steps, grants,
-            accessLogs, audits, accessLog, users, clock, mock(PlatformTransactionManager.class));
+    private final WorkflowSharingService service = new WorkflowSharingService(arbiter, versionWriter, workflows,
+            served, grants, accessLogs, audits, accessLog, users, clock, mock(PlatformTransactionManager.class));
 
     private Workflow locked(Workflow workflow) {
         when(arbiter.lockForWrite(any(), eq(workflow.getId()))).thenReturn(workflow);
@@ -291,6 +297,59 @@ class WorkflowSharingServiceTest {
         assertThat(byAdmin.getChangedBy()).isEqualTo(CLEO);
     }
 
+    /** A service whose version writer is real, so a tier change can be checked for the pointer it leaves. */
+    private WorkflowSharingService withRealVersionWriter() {
+        when(versions.save(any())).thenAnswer(call -> call.getArgument(0));
+        return new WorkflowSharingService(arbiter, new VersionWriter(versions, workflows, steps), workflows, served,
+                grants, accessLogs, audits, accessLog, users, clock, mock(PlatformTransactionManager.class));
+    }
+
+    @Test
+    void goingPublicOrUnlistedPinsThePublishedVersion() {
+        WorkflowSharingService pinning = withRealVersionWriter();
+        for (WorkflowVisibility target : List.of(WorkflowVisibility.PUBLIC, WorkflowVisibility.UNLISTED)) {
+            Workflow workflow = locked(privateWorkflow());
+            when(steps.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(List.of(
+                    new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Caption", "echo", null)));
+
+            pinning.setVisibility(Caller.member(ANA), workflow.getId(), target, null, ORIGIN);
+
+            assertThat(workflow.getPublishedVersionId()).as(target.wire()).isNotNull();
+        }
+    }
+
+    @Test
+    void goingPrivateSetsNoPointer() {
+        WorkflowSharingService pinning = withRealVersionWriter();
+        Workflow workflow = locked(unlisted("K", null));
+        Workflow draft = locked(Workflow.draft(UUID.randomUUID(), ANA, "D"));
+
+        pinning.setVisibility(Caller.member(ANA), workflow.getId(), WorkflowVisibility.PRIVATE, null, ORIGIN);
+        pinning.setVisibility(Caller.member(ANA), draft.getId(), WorkflowVisibility.PUBLIC, null, ORIGIN);
+
+        assertThat(workflow.getPublishedVersionId()).isNull();
+        assertThat(draft.getPublishedVersionId()).isNull();
+        verify(versions, never()).save(any());
+    }
+
+    @Test
+    void aShareLinkServesThePublishedVersionNotTheLiveDraft() {
+        Workflow workflow = published(unlisted("K", null));
+        when(steps.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Unpublished edit", "echo", null)));
+        WorkflowVersion pointed = new WorkflowVersion(UUID.randomUUID(), workflow.getId(), 1, null,
+                WorkflowVersionSource.PUBLISH, null, WorkflowSnapshots.of(workflow, List.of(new WorkflowStep(
+                        UUID.randomUUID(), workflow.getId(), (short) 1, "Caption", "echo", null))).toString(),
+                ANA, NOW);
+        workflow.pointTo(pointed.getId());
+        when(versions.findByIdIn(any())).thenReturn(List.of(pointed));
+
+        assertThat(service.sharedView(null, "K", ORIGIN).steps())
+                .containsExactly(new SharedWorkflowView.Step(1, "Caption", "echo"));
+        assertThat(service.sharedView(ANA, "K", ORIGIN).steps())
+                .containsExactly(new SharedWorkflowView.Step(1, "Unpublished edit", "echo"));
+    }
+
     // --- key admission ---
 
     private Workflow published(Workflow workflow) {
@@ -442,8 +501,8 @@ class WorkflowSharingServiceTest {
 
     @Test
     void theAccessLogEntryIsWrittenOutsideTheReadAndGrantTransactions() {
-        WorkflowSharingService scoped = new WorkflowSharingService(arbiter, workflows, steps, grants, accessLogs,
-                audits, accessLog, users, clock, new ScopeOnlyTransactionManager());
+        WorkflowSharingService scoped = new WorkflowSharingService(arbiter, versionWriter, workflows, served, grants,
+                accessLogs, audits, accessLog, users, clock, new ScopeOnlyTransactionManager());
         Workflow workflow = published(unlisted("K", null));
         List<Boolean> grantInTransaction = new ArrayList<>();
         List<Boolean> logInTransaction = new ArrayList<>();

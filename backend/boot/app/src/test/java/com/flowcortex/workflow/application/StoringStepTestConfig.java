@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Every step type of the production registry plus {@value #TYPE}, an inline step that stores one
@@ -24,7 +25,10 @@ public class StoringStepTestConfig {
     @Bean
     @Primary
     StepExecutorRegistry registryWithAStoringStep(@Qualifier("stepExecutorRegistry") StepExecutorRegistry production,
-            MediaJobs mediaJobs) {
+            MediaJobs mediaJobs, JdbcTemplate jdbcTemplate) {
+        // The start-up price check depends on this bean, so the row exists before it runs.
+        jdbcTemplate.update("INSERT INTO capability_pricing (capability, estimator_kind) VALUES (?, 'free') "
+                + "ON CONFLICT DO NOTHING", TYPE);
         List<StepExecutor> executors = new ArrayList<>();
         production.knownTypes().forEach(type -> executors.add(production.find(type).orElseThrow()));
         executors.add(new StoringStepExecutor(mediaJobs));

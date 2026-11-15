@@ -161,7 +161,7 @@ class TelemetryRedactionTest extends AbstractWorkflowHttpIT {
         assertThat(download.getBody().url()).contains("X-Amz-Signature=");
 
         assertThat(output.getAll())
-                .contains("Upload grant issued: bucket=" + UPLOAD_BUCKET + " key=" + user.id() + "/"
+                .contains("Upload grant issued: purpose=RUN_INPUT bucket=" + UPLOAD_BUCKET + " key=" + user.id() + "/"
                         + grant.getBody().uploadId())
                 .contains("Download URL issued: bucket=" + MEDIA_BUCKET + " key=runs/" + runId
                         + "/steps/1/video-details.json")

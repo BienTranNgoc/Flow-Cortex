@@ -4,7 +4,8 @@ import com.flowcortex.support.kb.KnowledgeBaseService.AdminArticle;
 import com.flowcortex.support.kb.KnowledgeBaseService.AdminArticleList;
 import com.flowcortex.support.kb.KnowledgeBaseService.AdminGroup;
 import com.flowcortex.support.kb.KnowledgeBaseService.ArticleDraft;
-import com.flowcortex.support.web.SupportCaller;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,8 +24,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,11 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
 class AdminKbController {
 
     private final KnowledgeBaseService knowledgeBase;
-    private final SupportCaller caller;
 
-    AdminKbController(KnowledgeBaseService knowledgeBase, SupportCaller caller) {
+    AdminKbController(KnowledgeBaseService knowledgeBase) {
         this.knowledgeBase = knowledgeBase;
-        this.caller = caller;
     }
 
     @Schema(name = "AdminSupportKbGroupRequest")
@@ -73,9 +70,9 @@ class AdminKbController {
     }
 
     @Operation(operationId = "listAdminSupportKbGroups")
+    @RequirePermission(Permission.CONTENT_HELP_TOPIC_VIEW)
     @GetMapping(value = "/groups", produces = MediaType.APPLICATION_JSON_VALUE)
-    List<AdminGroup> groups(@AuthenticationPrincipal Jwt jwt) {
-        caller.requireAdmin(jwt);
+    List<AdminGroup> groups() {
         return knowledgeBase.adminGroups();
     }
 
@@ -89,9 +86,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "409", description = "group-name-taken",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
     @PostMapping(value = "/groups", produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<AdminGroup> createGroup(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody GroupRequest body) {
-        caller.requireAdmin(jwt);
+    ResponseEntity<AdminGroup> createGroup(@Valid @RequestBody GroupRequest body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(knowledgeBase.createGroup(body.name().strip()));
     }
 
@@ -106,10 +103,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "409", description = "group-name-taken",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
     @PutMapping(value = "/groups/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminGroup renameGroup(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-            @Valid @RequestBody GroupRequest body) {
-        caller.requireAdmin(jwt);
+    AdminGroup renameGroup(@PathVariable UUID id, @Valid @RequestBody GroupRequest body) {
         return knowledgeBase.renameGroup(id, body.name().strip());
     }
 
@@ -118,9 +114,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "400", description = "validation-failed (errors), group-order-mismatch",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
     @PutMapping(value = "/groups/order", produces = MediaType.APPLICATION_JSON_VALUE)
-    List<AdminGroup> reorderGroups(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody GroupOrderRequest body) {
-        caller.requireAdmin(jwt);
+    List<AdminGroup> reorderGroups(@Valid @RequestBody GroupOrderRequest body) {
         return knowledgeBase.reorderGroups(body.ids());
     }
 
@@ -133,17 +129,17 @@ class AdminKbController {
     @ApiResponse(responseCode = "409", description = "group-not-empty (articleCount)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
     @DeleteMapping("/groups/{id}")
-    ResponseEntity<Void> deleteGroup(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        caller.requireAdmin(jwt);
+    ResponseEntity<Void> deleteGroup(@PathVariable UUID id) {
         knowledgeBase.deleteGroup(id);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(operationId = "listAdminSupportKbArticles")
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_VIEW)
     @GetMapping(value = "/articles", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminArticleList articles(@AuthenticationPrincipal Jwt jwt) {
-        caller.requireAdmin(jwt);
+    AdminArticleList articles() {
         return knowledgeBase.adminArticles();
     }
 
@@ -152,9 +148,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "404", description = "article-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_VIEW)
     @GetMapping(value = "/articles/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminArticle article(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        caller.requireAdmin(jwt);
+    AdminArticle article(@PathVariable UUID id) {
         return knowledgeBase.adminArticle(id);
     }
 
@@ -170,10 +166,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "409", description = "slug-taken, featured-full, featured-position-taken",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
     @PostMapping(value = "/articles", produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<AdminArticle> createArticle(@AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ArticleRequest body) {
-        caller.requireAdmin(jwt);
+    ResponseEntity<AdminArticle> createArticle(@Valid @RequestBody ArticleRequest body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(knowledgeBase.createArticle(body.draft()));
     }
 
@@ -188,10 +183,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "409", description = "slug-taken, featured-full, featured-position-taken",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
     @PutMapping(value = "/articles/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminArticle updateArticle(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-            @Valid @RequestBody ArticleRequest body) {
-        caller.requireAdmin(jwt);
+    AdminArticle updateArticle(@PathVariable UUID id, @Valid @RequestBody ArticleRequest body) {
         return knowledgeBase.updateArticle(id, body.draft());
     }
 
@@ -200,9 +194,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "404", description = "article-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
     @PostMapping(value = "/articles/{id}/publish", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminArticle publish(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        caller.requireAdmin(jwt);
+    AdminArticle publish(@PathVariable UUID id) {
         return knowledgeBase.publish(id);
     }
 
@@ -211,9 +205,9 @@ class AdminKbController {
     @ApiResponse(responseCode = "404", description = "article-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
     @PostMapping(value = "/articles/{id}/archive", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminArticle archive(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        caller.requireAdmin(jwt);
+    AdminArticle archive(@PathVariable UUID id) {
         return knowledgeBase.archive(id);
     }
 }

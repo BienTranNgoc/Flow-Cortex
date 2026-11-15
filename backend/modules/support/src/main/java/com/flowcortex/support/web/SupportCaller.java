@@ -5,7 +5,6 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import java.util.UUID;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
@@ -26,14 +25,5 @@ public class SupportCaller {
         UUID id = UUID.fromString(jwt.getSubject());
         return userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.current.notFound", id)));
-    }
-
-    /** The role is read from the row, not the token, so an admin demoted since sign-in is refused at once. */
-    public CurrentUser requireAdmin(Jwt jwt) {
-        CurrentUser user = require(jwt);
-        if (!"ADMIN".equals(user.role())) {
-            throw new AccessDeniedException("User " + user.id() + " is not an ADMIN");
-        }
-        return user;
     }
 }
