@@ -1,0 +1,268 @@
+{
+  "source": "google/fonts@67bc647ce1910e92f461bcc82aae30f21d21a9cc",
+  "families": [
+    {
+      "family": "Be Vietnam Pro",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "be-vietnam-pro",
+      "emPerLine": 0.6553
+    },
+    {
+      "family": "Roboto",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "roboto",
+      "emPerLine": 0.8332
+    },
+    {
+      "family": "Inter",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "inter",
+      "emPerLine": 0.6992
+    },
+    {
+      "family": "Nunito",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "nunito",
+      "emPerLine": 0.7262
+    },
+    {
+      "family": "Mulish",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "mulish",
+      "emPerLine": 0.7342
+    },
+    {
+      "family": "Barlow",
+      "group": "sans",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "barlow",
+      "emPerLine": 0.7348
+    },
+    {
+      "family": "Oswald",
+      "group": "display",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "oswald",
+      "emPerLine": 0.5875
+    },
+    {
+      "family": "Anton",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "anton",
+      "emPerLine": 0.5769
+    },
+    {
+      "family": "Bungee",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "bungee",
+      "emPerLine": 0.3885
+    },
+    {
+      "family": "Paytone One",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "paytone-one",
+      "emPerLine": 0.6135
+    },
+    {
+      "family": "Chakra Petch",
+      "group": "display",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "chakra-petch",
+      "emPerLine": 0.5513
+    },
+    {
+      "family": "Pacifico",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "pacifico",
+      "emPerLine": 0.5168
+    },
+    {
+      "family": "Lobster",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "lobster",
+      "emPerLine": 0.6711
+    },
+    {
+      "family": "Charm",
+      "group": "script",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "charm",
+      "emPerLine": 0.425
+    },
+    {
+      "family": "Patrick Hand",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "patrick-hand",
+      "emPerLine": 0.7386
+    },
+    {
+      "family": "Itim",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "itim",
+      "emPerLine": 0.8333
+    },
+    {
+      "family": "Mali",
+      "group": "script",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "mali",
+      "emPerLine": 0.4713
+    },
+    {
+      "family": "Pangolin",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "pangolin",
+      "emPerLine": 0.6605
+    },
+    {
+      "family": "Sriracha",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "sriracha",
+      "emPerLine": 0.565
+    },
+    {
+      "family": "Baloo 2",
+      "group": "fun",
+      "weights": [
+        400,
+        700
+      ],
+      "slug": "baloo-2",
+      "emPerLine": 0.6353
+    },
+    {
+      "family": "Tilt Neon",
+      "group": "fun",
+      "weights": [
+        400
+      ],
+      "slug": "tilt-neon",
+      "emPerLine": 0.6219
+    },
+    {
+      "family": "Neonderthaw",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "neonderthaw",
+      "emPerLine": 0.5931
+    },
+    {
+      "family": "Grenze Gotisch",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "grenze-gotisch",
+      "emPerLine": 0.6707
+    },
+    {
+      "family": "Sedgwick Ave Display",
+      "group": "script",
+      "weights": [
+        400
+      ],
+      "slug": "sedgwick-ave-display",
+      "emPerLine": 0.322
+    },
+    {
+      "family": "Bangers",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "bangers",
+      "emPerLine": 0.5692
+    },
+    {
+      "family": "Bungee Inline",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "bungee-inline",
+      "emPerLine": 0.3885
+    },
+    {
+      "family": "Bungee Shade",
+      "group": "display",
+      "weights": [
+        400
+      ],
+      "slug": "bungee-shade",
+      "emPerLine": 0.3885
+    },
+    {
+      "family": "Kablammo",
+      "group": "fun",
+      "weights": [
+        400
+      ],
+      "slug": "kablammo",
+      "emPerLine": 0.6456
+    }
+  ]
+}

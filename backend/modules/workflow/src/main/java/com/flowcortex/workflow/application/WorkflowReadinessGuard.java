@@ -17,7 +17,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses a run of a workflow with a step that cannot work as configured: a configuration that is
+ * Refuses a run of a workflow with no steps, or with a step that cannot work as configured: a configuration that is
  * not a JSON object, an empty {@code profile}, or an input reference to a step that does not run
  * before it. Every failing step is reported as {@code errors["step<order>"] = reason}.
  */
@@ -32,6 +32,9 @@ class WorkflowReadinessGuard implements RunStartGuard {
 
     @Override
     public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
+        if (steps.isEmpty()) {
+            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete.noSteps"), CODE);
+        }
         Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
         Integer firstFailing = null;
         for (StepDef step : steps) {
