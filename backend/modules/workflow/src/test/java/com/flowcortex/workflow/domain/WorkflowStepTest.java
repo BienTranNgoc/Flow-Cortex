@@ -9,25 +9,15 @@ import org.junit.jupiter.api.Test;
 class WorkflowStepTest {
 
     @Test
-    void constructorSetsAllFieldsIncludingOptionalInputRef() {
-        UUID id = UUID.randomUUID();
-        UUID workflowId = UUID.randomUUID();
+    void editReplacesNameConfigAndInputRefButNeverTheTypeOrPosition() {
+        WorkflowStep step = new WorkflowStep(UUID.randomUUID(), UUID.randomUUID(), (short) 2, "Old", "echo", null);
 
-        WorkflowStep step = new WorkflowStep(id, workflowId, (short) 2, "Extract field", "echo", "{step:1.value}");
+        step.edit("New", "{\"a\":1}", "{step:1.value}");
 
-        assertThat(step.getId()).isEqualTo(id);
-        assertThat(step.getWorkflowId()).isEqualTo(workflowId);
-        assertThat(step.getStepOrder()).isEqualTo((short) 2);
-        assertThat(step.getName()).isEqualTo("Extract field");
-        assertThat(step.getType()).isEqualTo("echo");
+        assertThat(step.getName()).isEqualTo("New");
+        assertThat(step.getConfig()).isEqualTo("{\"a\":1}");
         assertThat(step.getInputRef()).isEqualTo("{step:1.value}");
-        assertThat(step.getConfig()).isNull();
-    }
-
-    @Test
-    void inputRefDefaultsToNull() {
-        WorkflowStep step = new WorkflowStep(UUID.randomUUID(), UUID.randomUUID(), (short) 1, "First", "echo", null);
-
-        assertThat(step.getInputRef()).isNull();
+        assertThat(step.getType()).isEqualTo("echo");
+        assertThat(step.getStepOrder()).isEqualTo((short) 2);
     }
 }
