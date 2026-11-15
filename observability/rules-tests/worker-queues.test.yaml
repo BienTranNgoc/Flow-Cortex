@@ -1,0 +1,65 @@
+rule_files:
+  - ../rules/worker-queues.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.render.jobs"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.jobs"}'
+        values: '1+0x14 0+0x30'
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="provider.jobs"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="provider.video.jobs"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue="media.results"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages{job="rabbitmq-per-object",queue="media.jobs.dlq"}'
+        values: '1+0x30'
+      - series: 'rabbitmq_queue_messages{job="rabbitmq-per-object",queue="provider.results.dlq"}'
+        values: '1+0x3 0+0x30'
+    alert_rule_test:
+      # Backlog held for 15 minutes: the render, provider and provider-video
+      # queues fire, each with its own remedy; the drained media.jobs queue and
+      # the unlisted media.results queue stay quiet.
+      - eval_time: 16m
+        alertname: WorkerQueueBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: rabbitmq-per-object
+              queue: media.render.jobs
+            exp_annotations:
+              summary: "Queue media.render.jobs has had ready messages for 15 minutes"
+              description: "media.render.jobs has not emptied for 15 minutes (consumers busy or absent). Raise MEDIA_RENDER_WORKERS."
+          - exp_labels:
+              severity: warning
+              job: rabbitmq-per-object
+              queue: provider.jobs
+            exp_annotations:
+              summary: "Queue provider.jobs has had ready messages for 15 minutes"
+              description: "provider.jobs has not emptied for 15 minutes (consumers busy or absent). This lane has a single container; check its logs and whether a job is stuck."
+          - exp_labels:
+              severity: warning
+              job: rabbitmq-per-object
+              queue: provider.video.jobs
+            exp_annotations:
+              summary: "Queue provider.video.jobs has had ready messages for 15 minutes"
+              description: "provider.video.jobs has not emptied for 15 minutes (consumers busy or absent). Raise PROVIDER_VIDEO_WORKERS."
+      # Dead letter held past 5 minutes fires; the one purged at 4 minutes does not.
+      - eval_time: 16m
+        alertname: WorkerDeadLetters
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: rabbitmq-per-object
+              queue: media.jobs.dlq
+            exp_annotations:
+              summary: "Dead-letter queue media.jobs.dlq holds messages"
+              description: "A dead-letter queue has no TTL or consumer, so this alert fires until the queue is emptied. Inspect the message in the management UI (127.0.0.1:15672), then run `docker compose exec rabbitmq rabbitmqctl purge_queue media.jobs.dlq` once it has been handled."
+      # Not yet 5 minutes for any dead-letter queue.
+      - eval_time: 4m
+        alertname: WorkerDeadLetters
+        exp_alerts: []
