@@ -14,6 +14,7 @@ include(
     ":modules:support",
     ":modules:space",
     ":modules:realtime",
+    ":modules:mail",
     ":modules:connector",
     ":modules:billing",
     ":modules:chat",

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.app.MailParts;
 import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
 import com.flowcortex.support.request.SupportReplyMailRequested;
@@ -436,7 +437,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
                 Long.class)).isEqualTo(1);
         assertThat(output.getAll().lines()
                 .filter(line -> line.contains("support.reply.mail outcome=failed request=" + number
-                        + " error=MailSendException")).count()).isEqualTo(6);
+                        + " error=send_failed")).count()).isEqualTo(6);
         assertThat(output.getAll()).contains("outbox outcome=gave_up").doesNotContain(member.email());
     }
 
@@ -866,7 +867,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
             for (MimeMessage message : sent) {
                 try {
                     if (message.getAllRecipients()[0].toString().equals(address)) {
-                        bodies.add(String.valueOf(message.getContent()));
+                        bodies.add(MailParts.textOf(message));
                     }
                 } catch (MessagingException | IOException e) {
                     throw new IllegalStateException("Could not read a captured message", e);

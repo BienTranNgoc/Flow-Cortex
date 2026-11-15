@@ -1,6 +1,5 @@
 package com.flowcortex.user.emailconfirm;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -9,10 +8,9 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Email confirmation of self-registered accounts, bound from {@code flowcortex.auth.email-confirmation.*}.
- * Off: register confirms the account at once and signs the member in. {@code from} is the sender
- * address of the confirmation mail. An account still unconfirmed {@code unconfirmed-account-retention}
- * after it was created, with no link left that could confirm it, is deleted, {@code purge-batch-size}
- * accounts per transaction. {@code password-setup-validity} bounds both the emailed set-password link
+ * Off: register confirms the account at once and signs the member in. An account still unconfirmed
+ * {@code unconfirmed-account-retention} after it was created, with no link left that could confirm it,
+ * is deleted, {@code purge-batch-size} accounts per transaction. {@code password-setup-validity} bounds both the emailed set-password link
  * and the token a password-setup form must present.
  */
 @Validated
@@ -20,7 +18,6 @@ import org.springframework.validation.annotation.Validated;
 public record EmailConfirmationProperties(
         boolean enabled,
         @NotNull @DefaultValue("24h") Duration validity,
-        @NotBlank @DefaultValue("no-reply@flow-cortex.dev") String from,
         @NotNull @DefaultValue("72h") Duration unconfirmedAccountRetention,
         @NotNull @DefaultValue("30m") Duration passwordSetupValidity,
         @DefaultValue("500") int purgeBatchSize) {
