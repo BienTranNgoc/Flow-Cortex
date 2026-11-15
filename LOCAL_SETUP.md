@@ -252,7 +252,8 @@ What to know about the media path:
     `docker compose up -d --force-recreate egress-proxy`. No image is rebuilt and the
     backend and workers are not restarted. `compose.aws.yaml` refuses to start until
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
-    host to it.
+    host to it, plus the five registry hosts the payments region gate downloads from:
+    `ftp.apnic.net`, `ftp.arin.net`, `ftp.ripe.net`, `ftp.lacnic.net`, `ftp.afrinic.net`.
   - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
     connecting directly. Why and what else was weighed: `docs/ADR.md`, ADR-0010.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
@@ -292,6 +293,12 @@ the member app reads it once per session.
 | `FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED` | an upload whose first bytes do not match its type is refused | the bytes are not checked (the size caps still apply) |
 | `FLOWCORTEX_WORKFLOW_CANCEL_ENABLED` | a member can stop a running run | stopping answers 503 and the button is hidden |
 | `FLOWCORTEX_CREDITS_ENABLED` | runs are charged per step from a 1000-credit signup grant, and refunded on system failures | no balance check, charge or refund, and no balance in the header |
+
+- **Payments region gate.** `FLOWCORTEX_BILLING_REGION_GATE_MODE` takes `off` (nobody is
+  placed), `shadow` (the default: callers outside Vietnam are counted and logged, never refused)
+  or `enforce` (they are refused with 403 on payment-opening requests). Anything else reads as
+  `shadow`. A change needs a backend restart. `..._REFRESH_INTERVAL` and `..._REFRESH_INITIAL_DELAY`
+  set the pace of the registry download (ISO-8601, default `PT24H` and `PT10M`).
 
 - **Email.** Every email the backend sends lands in Mailpit at
   <http://localhost:8025>; open the confirmation link from there. The link points
