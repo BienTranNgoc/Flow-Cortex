@@ -28,10 +28,12 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -193,8 +195,13 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         List<NewWorkflowStep> definition = new ArrayList<>(definitionOf(stepsOf(workflow)));
         definition.add(new NewWorkflowStep(step.name(), step.type(), step.inputRef(), step.config()));
         validateDefinition(definition);
+        UUID newId = UUID.randomUUID();
+        List<StepReferences.Step> before = referenceStepsOf(stepsOf(workflow));
+        List<StepReferences.Step> after = new ArrayList<>(before);
+        after.add(new StepReferences.Step(newId, last + 1, step.name(), step.inputRef()));
+        requireReferencesIntact(before, after, newId);
 
-        WorkflowStep saved = workflowStepRepository.save(new WorkflowStep(UUID.randomUUID(), workflow.getId(),
+        WorkflowStep saved = workflowStepRepository.save(new WorkflowStep(newId, workflow.getId(),
                 (short) (last + 1), step.name(), step.type(), step.inputRef(), step.config()));
         return WorkflowMapper.toStepView(saved, registry::isRemote);
     }
@@ -219,6 +226,14 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                                 other.getConfig()))
                 .toList();
         validateDefinition(definition);
+        List<StepReferences.Step> before = referenceStepsOf(stepsOf(workflow));
+        List<StepReferences.Step> after = before.stream()
+                .map(other -> other.id().equals(stepId)
+                        ? new StepReferences.Step(stepId, other.order(), name, inputRef)
+                        : other)
+                .toList();
+        boolean changesReference = !Objects.equals(inputRef, step.getInputRef());
+        requireReferencesIntact(before, after, changesReference ? stepId : null);
 
         step.edit(name, config, inputRef);
         return WorkflowMapper.toStepView(workflowStepRepository.save(step), registry::isRemote);
@@ -356,6 +371,50 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         return workflow;
+    }
+
+    private static List<StepReferences.Step> referenceStepsOf(List<WorkflowStep> steps) {
+        return steps.stream()
+                .map(step -> new StepReferences.Step(step.getId(), step.getStepOrder(), step.getName(),
+                        step.getInputRef()))
+                .toList();
+    }
+
+    /**
+     * Refuses a write whose touched step reads a broken reference, or that turns another step's clean
+     * reference broken. A reference that was already broken and is left as is never blocks the write.
+     */
+    private static void requireReferencesIntact(List<StepReferences.Step> before, List<StepReferences.Step> after,
+            UUID touchedId) {
+        Map<UUID, StepReferences.Problem> problemsBefore = StepReferences.analyze(before);
+        Map<UUID, StepReferences.Problem> problemsAfter = StepReferences.analyze(after);
+        if (touchedId != null && problemsAfter.containsKey(touchedId)) {
+            throw new UnprocessableEntityException(new LocalizedMessage("workflow.definitionStep.referenceInvalid"),
+                    "WORKFLOW_STEP_REFERENCE_INVALID", Map.of("inputRef", referenceReason(problemsAfter.get(touchedId))));
+        }
+        List<StepReferences.Step> broken = after.stream()
+                .filter(reader -> problemsAfter.containsKey(reader.id()) && !problemsBefore.containsKey(reader.id())
+                        && before.stream().anyMatch(old -> old.id().equals(reader.id())))
+                .sorted(Comparator.comparingInt(StepReferences.Step::order))
+                .toList();
+        if (!broken.isEmpty()) {
+            String name = problemsAfter.get(broken.get(0).id()).detail();
+            String readers = broken.stream().map(reader -> String.valueOf(reader.order()))
+                    .collect(Collectors.joining(", "));
+            throw new ConflictException(new LocalizedMessage("workflow.definitionStep.nameReferenced", name, readers));
+        }
+    }
+
+    private static LocalizedMessage referenceReason(StepReferences.Problem problem) {
+        boolean positional = !problem.detail().isEmpty() && problem.detail().chars().allMatch(Character::isDigit);
+        return switch (problem.kind()) {
+            case MALFORMED -> new LocalizedMessage("workflow.reference.malformed");
+            case UNKNOWN_STEP -> positional
+                    ? new LocalizedMessage("workflow.reference.unknownOrder", problem.detail())
+                    : new LocalizedMessage("workflow.reference.unknownName", problem.detail());
+            case AMBIGUOUS_NAME -> new LocalizedMessage("workflow.reference.ambiguousName", problem.detail());
+            case NOT_EARLIER -> new LocalizedMessage("workflow.reference.notEarlier", problem.detail());
+        };
     }
 
     private void validateDefinition(List<NewWorkflowStep> steps) {

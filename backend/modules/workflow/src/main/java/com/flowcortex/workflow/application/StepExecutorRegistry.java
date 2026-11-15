@@ -74,6 +74,11 @@ class StepExecutorRegistry {
         return find(type).map(executor -> executor.mode() == StepExecutor.Mode.REMOTE).orElse(false);
     }
 
+    /** How the engine feeds a step of this type with this config; an unknown type reads a resolved input. */
+    StepExecutor.InputPolicy inputPolicy(String type, String config) {
+        return find(type).map(executor -> executor.inputPolicy(config)).orElse(StepExecutor.InputPolicy.RESOLVED);
+    }
+
     /** Whether the step type reads an uploaded file, so a workflow using it must start with a media step. */
     boolean usesStoredInput(String type) {
         return find(type).map(executor -> executor.inputPolicy() != StepExecutor.InputPolicy.RESOLVED).orElse(false);
