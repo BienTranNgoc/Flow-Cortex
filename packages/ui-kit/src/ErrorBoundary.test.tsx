@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { MockInstance } from 'vitest';
 import { ErrorBoundary } from './ErrorBoundary';
 import { reportClientError } from './reportClientError';
@@ -12,6 +12,17 @@ const LABELS = {
   message: 'This page could not be shown. Reload it to try again.',
   reload: 'Reload',
 };
+
+const RETRY_LABELS = { ...LABELS, retry: 'Try again' };
+
+const flaky = { broken: false };
+
+function Flaky() {
+  if (flaky.broken) {
+    throw new TypeError('flaky');
+  }
+  return <p>Run page</p>;
+}
 
 type ConsoleSpy = MockInstance<Parameters<Console['error']>, void>;
 
@@ -30,17 +41,7 @@ describe('ErrorBoundary', () => {
     consoleError.mockRestore();
   });
 
-  it('renders its children when nothing throws', () => {
-    render(
-      <ErrorBoundary labels={LABELS}>
-        <p>Run page</p>
-      </ErrorBoundary>,
-    );
-
-    expect(screen.getByText('Run page')).toBeInTheDocument();
-  });
-
-  it('contains a render failure in an error view with a Reload action', () => {
+  it('contains a render failure in an error view with a Reload action when it cannot retry', () => {
     render(
       <div>
         <nav>Workflows</nav>
@@ -52,29 +53,65 @@ describe('ErrorBoundary', () => {
 
     expect(screen.getByRole('heading', { name: 'Something went wrong' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.getByText('Workflows')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/^This page could not be shown\. Reload it to try again\.$/);
   });
 
-  it('shows the heading, message and reload action it is given', () => {
+  it('offers Try again on the first failure and renders the children again', () => {
+    flaky.broken = true;
     render(
-      <ErrorBoundary
-        labels={{
-          title: 'Đã xảy ra lỗi',
-          message: 'Không thể hiển thị trang này. Hãy tải lại để thử lần nữa.',
-          reload: 'Tải lại',
-        }}
-      >
+      <ErrorBoundary labels={RETRY_LABELS}>
+        <Flaky />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
+    flaky.broken = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(screen.getByText('Run page')).toBeInTheDocument();
+  });
+
+  it('offers Reload when the retry fails too, and Reload calls onReload', () => {
+    const reload = vi.fn();
+    flaky.broken = true;
+    render(
+      <ErrorBoundary labels={RETRY_LABELS} onReload={reload}>
+        <Flaky />
+      </ErrorBoundary>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Reload only on the whole-app view and marks it', () => {
+    const { container } = render(
+      <ErrorBoundary variant="root" labels={RETRY_LABELS}>
         <Explodes />
       </ErrorBoundary>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Đã xảy ra lỗi' })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /^Không thể hiển thị trang này\. Hãy tải lại để thử lần nữa\.$/,
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(container.querySelector('.error-view--root')).not.toBeNull();
+  });
+
+  it('renders the silent fallback and reports once', () => {
+    render(
+      <div>
+        <ErrorBoundary fallback={<p>Quiet</p>}>
+          <Explodes />
+        </ErrorBoundary>
+      </div>,
     );
-    expect(screen.getByRole('button', { name: 'Tải lại' })).toBeInTheDocument();
-    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+
+    expect(screen.getByText('Quiet')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(clientEvents(consoleError)).toHaveLength(1);
   });
 
   it('reports the failure once as a structured event with the route and the error name', () => {
@@ -90,19 +127,6 @@ describe('ErrorBoundary', () => {
         { route: '/workflows/w1/runs/r1', name: 'TypeError' },
       ],
     ]);
-  });
-
-  it('reloads the page from the Reload action', () => {
-    const reload = vi.fn();
-    render(
-      <ErrorBoundary labels={LABELS} onReload={reload}>
-        <Explodes />
-      </ErrorBoundary>,
-    );
-
-    screen.getByRole('button', { name: 'Reload' }).click();
-
-    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 
