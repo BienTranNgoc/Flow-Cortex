@@ -137,8 +137,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
 
     @Override
     @Transactional
-    public WorkflowView createDraft(UUID ownerId, String name, boolean shared) {
-        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name, shared));
+    public WorkflowView createDraft(UUID ownerId, String name) {
+        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name));
         return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable);
     }
 
@@ -173,9 +173,6 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         Workflow workflow = writeAccess.lockForWrite(caller, workflowId);
         if (update.name() != null && !update.name().equals(workflow.getName())) {
             workflow.rename(update.name());
-        }
-        if (update.shared() != null && update.shared() != workflow.isShared()) {
-            workflow.setShared(update.shared());
         }
         if (update.status() != null) {
             WorkflowStatus status = WorkflowStatus.valueOf(update.status().toUpperCase(Locale.ROOT));

@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -73,6 +74,7 @@ class VersionWriter {
 
     /** The single place that says who the published definition is for. */
     private static boolean servesOtherMembers(Workflow workflow) {
-        return workflow.isShared() && workflow.getStatus() == WorkflowStatus.PUBLISHED;
+        return workflow.getVisibility() != WorkflowVisibility.PRIVATE
+                && workflow.getStatus() == WorkflowStatus.PUBLISHED;
     }
 }

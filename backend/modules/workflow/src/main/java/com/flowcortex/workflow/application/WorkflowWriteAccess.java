@@ -7,7 +7,6 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.Workflow;
-import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import jakarta.validation.ConstraintViolation;
@@ -43,17 +42,30 @@ class WorkflowWriteAccess {
     Workflow lockForWrite(Caller caller, UUID workflowId) {
         Workflow workflow = workflowRepository.findByIdAndDeletedAtIsNull(workflowId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
-        if (!caller.admin() && !workflow.getOwnerId().equals(caller.userId())) {
-            boolean visible = workflow.isShared() && workflow.getStatus() == WorkflowStatus.PUBLISHED;
-            if (!visible) {
-                throw new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId));
-            }
-            throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
-        }
+        requireOwnerOrAdmin(caller, workflow);
         if (ProductVideoWorkflow.ID.equals(workflow.getId())) {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         return workflow;
+    }
+
+    /** The owner and visibility rule of {@link #lockForWrite} for a read, without the row lock. */
+    Workflow loadForOwnerRead(Caller caller, UUID workflowId) {
+        Workflow workflow = workflowRepository.findActiveById(workflowId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        requireOwnerOrAdmin(caller, workflow);
+        return workflow;
+    }
+
+    /** 404 for a caller who cannot see the workflow, 403 for one who can but does not own it. */
+    private void requireOwnerOrAdmin(Caller caller, Workflow workflow) {
+        if (caller.admin() || workflow.getOwnerId().equals(caller.userId())) {
+            return;
+        }
+        if (workflowRepository.findVisibleTo(workflow.getId(), caller.userId()).isEmpty()) {
+            throw new NotFoundException(new LocalizedMessage("workflow.notFound", workflow.getId()));
+        }
+        throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
     }
 
     /** @throws ConstraintViolationException one violation per step the engine cannot run, at {@code steps[i]} */
