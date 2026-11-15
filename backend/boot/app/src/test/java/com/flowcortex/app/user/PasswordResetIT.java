@@ -541,7 +541,8 @@ class PasswordResetIT extends AbstractUserModuleIT {
         }
 
         List<String> lines = output.getAll().lines()
-                .filter(line -> line.contains("password_reset outcome=") || line.contains("email_confirmation outcome="))
+                .filter(line -> line.contains("password_reset outcome=") || line.contains("email_confirmation outcome=")
+                        || line.contains("mail.send "))
                 .toList();
         assertThat(linesContaining(lines, "password_reset outcome=skipped reason=unknown_email")).isEqualTo(1);
         assertThat(linesContaining(lines, "password_reset outcome=confirmation_link userId=" + userIdOf(unconfirmed)))
@@ -556,8 +557,8 @@ class PasswordResetIT extends AbstractUserModuleIT {
                 .asString().contains("limit=ip ");
         assertThat(linesContaining(lines, "password_reset outcome=completed userId=" + userIdOf(withPassword)))
                 .isEqualTo(1);
-        assertThat(lines).filteredOn(line -> line.contains("email_confirmation outcome=send_failed userId="
-                + userIdOf(failing))).singleElement().asString().contains("mail=password_reset_sent");
+        assertThat(lines).filteredOn(line -> line.contains("mail.send key=reset-password outcome=failed memberId="
+                + userIdOf(failing))).hasSize(1);
         assertThat(lines).allSatisfy(line -> assertThat(line)
                 .doesNotContain(unknown, unconfirmed, noPassword, google, withPassword, failing));
     }

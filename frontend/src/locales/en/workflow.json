@@ -72,6 +72,13 @@
     "loadError": "Could not load this run."
   },
   "file": "File: {{name}}",
+  "inputs": {
+    "heading": "Inputs",
+    "imageAlt": "Input image {{number}}",
+    "loading": "Loading inputs…",
+    "loadError": "Could not load the inputs of this run.",
+    "expired": "This file is no longer stored"
+  },
   "download": {
     "summary": "Download summary (.txt)",
     "technical": "Download technical details (JSON file)",
