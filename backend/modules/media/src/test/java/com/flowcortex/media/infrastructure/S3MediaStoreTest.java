@@ -148,6 +148,21 @@ class S3MediaStoreTest {
     }
 
     @Test
+    void anObjectWrittenWithARetentionCarriesOnlyThatTag() throws IOException {
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        HttpServer server = fakeStore(200, "", headers);
+        try (S3MediaStore local = storeAt(server)) {
+            local.put("flowcortex-media", "runs/r/inputs/image_1", "image/png", new byte[] {1, 2, 3},
+                    S3MediaStore.RUN_INPUT_RETENTION);
+        } finally {
+            server.stop(0);
+        }
+
+        assertThat(headers).containsEntry("x-amz-tagging", "flowcortex-retention=run-input")
+                .containsEntry("content-type", "image/png");
+    }
+
+    @Test
     void retaggingReplacesTheObjectsTagSetWithTheNamedRetention() throws IOException {
         List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);

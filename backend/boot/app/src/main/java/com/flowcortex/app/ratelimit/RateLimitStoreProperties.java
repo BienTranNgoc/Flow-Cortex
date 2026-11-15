@@ -11,10 +11,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxPoolSize       connections the limiter store may hold open
  * @param connectionTimeout how long a call waits for a free connection (Hikari's minimum is 250 ms)
  * @param lockTimeout       how long a call waits for another call's row lock on the same bucket
+ * @param statementTimeout  how long the server runs one statement before cancelling it (a stalled store)
  */
 @ConfigurationProperties("flowcortex.rate-limit.store")
 record RateLimitStoreProperties(
         @DefaultValue("8") int maxPoolSize,
         @DefaultValue("250ms") Duration connectionTimeout,
-        @DefaultValue("200ms") Duration lockTimeout) {
+        @DefaultValue("200ms") Duration lockTimeout,
+        @DefaultValue("500ms") Duration statementTimeout) {
 }

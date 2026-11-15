@@ -59,20 +59,18 @@ function post(reportingApp: ClientErrorApp, kind: ClientErrorKind, name: string,
     route,
     ...(lang ? { lang } : {}),
   });
-  void deliver(body);
-}
-
-async function deliver(body: string): Promise<void> {
-  try {
-    await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body,
-      credentials: 'omit',
-      keepalive: true,
-      referrerPolicy: 'no-referrer',
-    });
-  } catch {
-    // Best-effort delivery: a failed post must never become a new page error.
-  }
+  // Best-effort delivery: the executor turns a synchronous fetch throw into a rejection, so no failure
+  // becomes a new page error.
+  void new Promise<Response>((resolve) => {
+    resolve(
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body,
+        credentials: 'omit',
+        keepalive: true,
+        referrerPolicy: 'no-referrer',
+      }),
+    );
+  }).catch(() => {});
 }
