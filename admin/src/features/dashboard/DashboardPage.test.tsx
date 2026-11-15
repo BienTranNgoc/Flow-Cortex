@@ -2,7 +2,7 @@ import { setToken } from '@flow-cortex/api-client';
 import { screen } from '@testing-library/react';
 import i18n from '../../lib/i18n';
 import viDashboard from '../../locales/vi/dashboard.json';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { ADMIN_ME, renderRoute, staffMe, stubApi } from '../../test/fakeApi';
 import { DashboardPage } from './DashboardPage';
 
 const RUNS_PATH = 'GET /api/v1/admin/runs';
@@ -16,6 +16,7 @@ afterEach(() => {
 describe('DashboardPage', () => {
   it('shows totals from server pages and account dates from the user list', async () => {
     const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/users': {
         status: 200,
         body: [
@@ -73,6 +74,21 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('private provider message')).not.toBeInTheDocument();
   });
 
+  it('leaves the user list unread and shows no error for a caller without user.account.view', async () => {
+    const calls = stubApi({
+      'GET /api/v1/auth/me': {
+        status: 200,
+        body: staffMe('CUSTOMER_SUPPORT', ['workflow.run.view']),
+      },
+      [RUNS_PATH]: { status: 200, body: { items: [], page: 0, size: 20, total: 7 } },
+    });
+    renderRoute('/dashboard', '/dashboard', <DashboardPage />);
+
+    expect((await screen.findAllByText('7')).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(calls.some((call) => call.path === '/api/v1/users')).toBe(false);
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');
@@ -83,6 +99,7 @@ describe('DashboardPage', () => {
 
     it('renders the heading, metric cards, status pills and empty state in Vietnamese', async () => {
       stubApi({
+        'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
         'GET /api/v1/users': { status: 200, body: [] },
         [RUNS_PATH]: { status: 200, body: { items: [], page: 0, size: 20, total: 1200 } },
       });
@@ -100,7 +117,7 @@ describe('DashboardPage', () => {
         'href',
         '/runs',
       );
-      expect(screen.getByRole('button', { name: viDashboard.refresh })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: viDashboard.refresh })).toBeInTheDocument();
     });
   });
 });

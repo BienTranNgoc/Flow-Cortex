@@ -87,6 +87,7 @@ erDiagram
   media_asset {
     uuid id PK "upload id for uploaded inputs"
     uuid owner_id "application-enforced owner scope"
+    uuid space_id "personal space of the owner, NOT NULL, no FK"
     varchar kind "image | audio | video | binary"
     varchar bucket
     varchar object_key UK
