@@ -18,6 +18,14 @@ public interface WorkflowStepRepository extends JpaRepository<WorkflowStep, UUID
     int findMaxStepOrder(@Param("workflowId") UUID workflowId);
 
     /**
+     * Removes every step of the workflow in one statement, flushing pending changes first and clearing the context
+     * after, so steps re-inserted with the same ids and orders do not collide with deleted rows.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM WorkflowStep s WHERE s.workflowId = :workflowId")
+    int deleteAllByWorkflowId(@Param("workflowId") UUID workflowId);
+
+    /**
      * Negates the order of the given steps so their final orders can be written without meeting the unique
      * constraint; every parked row must be given its order back by {@link #setOrder}.
      */
