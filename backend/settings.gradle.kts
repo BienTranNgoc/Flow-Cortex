@@ -20,4 +20,5 @@ include(
     ":modules:chat",
     ":shared:web",
     ":shared:security",
+    ":shared:ratelimit",
 )
