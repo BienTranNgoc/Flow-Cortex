@@ -1,8 +1,12 @@
 import { getToken, setToken } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import {
+  resetOnboardingSession,
+  useOnboardingSession,
+} from '../features/onboarding/onboardingSession';
 import i18n from '../lib/i18n';
 import { stubApi } from '../test/fakeApi';
 import { UserMenu } from './UserMenu';
@@ -117,7 +121,9 @@ describe('UserMenu', () => {
 
         expect(within(panel).getByRole('link', { name: 'Cài đặt tài khoản' })).toBeInTheDocument();
         expect(within(panel).getByRole('link', { name: 'Dịch vụ đã kết nối' })).toBeInTheDocument();
-        expect(within(panel).getByRole('link', { name: 'Trợ giúp và tài liệu' })).toBeInTheDocument();
+        expect(
+          within(panel).getByRole('link', { name: 'Trợ giúp và tài liệu' }),
+        ).toBeInTheDocument();
         expect(within(panel).getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
         expect(within(panel).getByText('Phút GPU')).toBeInTheDocument();
         expect(within(panel).getByText('84.500')).toBeInTheDocument();
@@ -134,5 +140,47 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('button', { name: /open account menu/i }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
     expect(getToken()).toBeNull();
+  });
+
+  describe('Replay guide', () => {
+    const FEATURES = {
+      emailConfirmation: false,
+      phoneVerification: false,
+      uploadContentCheck: false,
+      runCancellation: false,
+      credits: false,
+      passwordReset: false,
+      supportWidget: false,
+      supportAssistant: false,
+      onboarding: true,
+    };
+
+    async function openMenu(entry: string | null) {
+      const user = userEvent.setup();
+      const calls = stubApi({
+        'GET /api/v1/features': { status: 200, body: FEATURES },
+        'GET /api/v1/onboarding/status': { status: 200, body: { entry, progress: {} } },
+      });
+      renderMenu();
+      await waitFor(() =>
+        expect(calls.some((call) => call.path === '/api/v1/onboarding/status')).toBe(true),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      await user.click(screen.getByRole('button', { name: /open account menu/i }));
+      return user;
+    }
+
+    it('is listed once the status has loaded with no entry, and starts a replay', async () => {
+      const user = await openMenu(null);
+      await user.click(await screen.findByRole('button', { name: 'Replay guide' }));
+      expect(screen.queryByRole('button', { name: 'Replay guide' })).not.toBeInTheDocument();
+      expect(renderHook(() => useOnboardingSession()).result.current.replayRequested).toBe(true);
+      act(() => resetOnboardingSession());
+    });
+
+    it('is not listed while the first-time journey is due', async () => {
+      await openMenu('first');
+      expect(screen.queryByRole('button', { name: 'Replay guide' })).not.toBeInTheDocument();
+    });
   });
 });

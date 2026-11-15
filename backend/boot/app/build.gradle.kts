@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":modules:support"))
     implementation(project(":modules:space"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:onboarding"))
     implementation(project(":modules:mail"))
     implementation(project(":modules:connector"))
     implementation(project(":modules:billing"))
