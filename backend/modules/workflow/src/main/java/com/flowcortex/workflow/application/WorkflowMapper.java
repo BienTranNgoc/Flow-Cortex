@@ -34,12 +34,13 @@ final class WorkflowMapper {
         return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
-                steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType));
+                steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
+                wire(workflow.getStatus().name()));
     }
 
-    private static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {
+    static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {
         return new WorkflowStepView(step.getId(), step.getStepOrder(), step.getName(), step.getType(),
-                mode(step.getType(), isRemoteType));
+                mode(step.getType(), isRemoteType), step.getInputRef(), step.getConfig());
     }
 
     private static String mode(String type, Predicate<String> isRemoteType) {

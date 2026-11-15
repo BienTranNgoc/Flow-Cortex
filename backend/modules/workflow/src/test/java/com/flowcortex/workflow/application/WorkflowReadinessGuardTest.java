@@ -95,7 +95,15 @@ class WorkflowReadinessGuardTest {
                 new StepDef(4, "Blank config", "echo", "  ", null));
 
         assertThatCode(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT)).doesNotThrowAnyException();
-        assertThatCode(() -> guard.check(OWNER, WORKFLOW, List.of(), CONTEXT)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aWorkflowWithNoStepsIsRefusedAsIncomplete() {
+        assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, List.of(), CONTEXT))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("WORKFLOW_INCOMPLETE");
+                    assertThat(english(e.getDetail())).isEqualTo("This workflow has no steps yet. Add a step to run it.");
+                });
     }
 
     @Test
