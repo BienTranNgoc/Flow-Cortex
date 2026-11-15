@@ -35,17 +35,23 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ProblemDetail;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * The workflow run engine end to end, exercised through the real {@code
- * api} ports. The reaper runs every 200 ms here so a stuck step is closed within
- * the poll timeout; stuck states are seeded with SQL because nothing in-process can
- * produce a worker that stopped heartbeating.
+ * api} ports. The cluster runner is on here and the reaper runs every 200 ms, so a stuck step is
+ * closed within the poll timeout; the context is discarded afterwards so its runner stops. Stuck
+ * states are seeded with SQL because nothing in-process can produce a worker that stopped
+ * heartbeating.
  */
 @Testcontainers
-@SpringBootTest(properties = "flowcortex.workflow.reaper-interval-ms=200")
+@SpringBootTest(properties = {
+    "flowcortex.workflow.reaper-interval-ms=200",
+    "flowcortex.jobs.runner.enabled=true",
+    "flowcortex.jobs.poll-interval=100ms"})
+@DirtiesContext
 class WorkflowRunEngineIT extends AbstractWorkflowModuleIT {
 
     @Autowired

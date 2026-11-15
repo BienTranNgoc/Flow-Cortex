@@ -4825,6 +4825,9 @@ components:
         balance:
           type: integer
           format: int64
+        granted:
+          type: integer
+          format: int64
     ChatConversationList:
       type: object
       properties:
