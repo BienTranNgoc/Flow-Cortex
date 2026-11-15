@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,12 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Encrypts on the way in, decrypts only in {@link #readTokens}; logs the provider and the outcome, never a token. */
+/**
+ * Encrypts on the way in, decrypts only in {@link #readTokens} and in the handle {@link #readActive} returns;
+ * logs the provider and the outcome, never a token.
+ */
 @Service
 class ConnectorCredentialsImpl implements ConnectorCredentials {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConnectorCredentialsImpl.class);
-    private static final Pattern PROVIDER = Pattern.compile("[a-z][a-z0-9_-]{0,63}");
     private static final TypeReference<Map<String, Object>> METADATA = new TypeReference<>() { };
 
     private final ConnectorAuthRepository repository;
@@ -71,17 +72,28 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
         requireProvider(provider);
         return repository.findByUserIdAndProvider(userId, provider)
                 .filter(ConnectorAuth::isActive)
-                .map(row -> {
-                    try {
-                        String refresh = row.getRefreshToken();
-                        return new ConnectorTokens(cipher.decrypt(userId, provider, row.getAccessToken()),
-                                refresh == null ? null : cipher.decrypt(userId, provider, refresh),
-                                row.getExpiresAt(), List.copyOf(row.getScopes()));
-                    } catch (RuntimeException ex) {
-                        LOG.warn("Connector {} credential unreadable", provider);
-                        throw ex;
-                    }
-                });
+                .map(row -> decrypt(userId, provider, row));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ActiveCredential> readActive(UUID userId, String provider) {
+        requireProvider(provider);
+        return repository.findByUserIdAndProvider(userId, provider)
+                .filter(ConnectorAuth::isActive)
+                .map(row -> new ActiveCredential(view(row), () -> decrypt(userId, provider, row)));
+    }
+
+    private ConnectorTokens decrypt(UUID userId, String provider, ConnectorAuth row) {
+        try {
+            String refresh = row.getRefreshToken();
+            return new ConnectorTokens(cipher.decrypt(userId, provider, row.getAccessToken()),
+                    refresh == null ? null : cipher.decrypt(userId, provider, refresh),
+                    row.getExpiresAt(), List.copyOf(row.getScopes()));
+        } catch (RuntimeException ex) {
+            LOG.warn("Connector {} credential unreadable", provider);
+            throw ex;
+        }
     }
 
     @Override
@@ -116,6 +128,20 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
 
     @Override
     @Transactional
+    public boolean mergeMetadata(UUID userId, String provider, Map<String, Object> patch,
+            Map<String, Object> requires) {
+        requireProvider(provider);
+        if (patch == null) {
+            throw new IllegalArgumentException("patch must not be null");
+        }
+        boolean changed = repository.mergeMetadata(userId, provider, serialize(patch),
+                requires == null ? null : serialize(requires), Instant.now(clock)) > 0;
+        LOG.info("Connector {} metadata merge {}", provider, changed ? "applied" : "ignored");
+        return changed;
+    }
+
+    @Override
+    @Transactional
     public boolean disconnect(UUID userId, String provider) {
         requireProvider(provider);
         boolean deleted = repository.deleteByUserAndProvider(userId, provider) > 0;
@@ -141,8 +167,9 @@ class ConnectorCredentialsImpl implements ConnectorCredentials {
     }
 
     private static void requireProvider(String provider) {
-        if (provider == null || !PROVIDER.matcher(provider).matches()) {
-            throw new IllegalArgumentException("provider must match " + PROVIDER.pattern());
+        if (provider == null || !ConnectorCredentials.PROVIDER_PATTERN.matcher(provider).matches()) {
+            throw new IllegalArgumentException(
+                    "provider must match " + ConnectorCredentials.PROVIDER_PATTERN.pattern());
         }
     }
 
