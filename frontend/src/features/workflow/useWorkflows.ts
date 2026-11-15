@@ -8,6 +8,7 @@ import {
   getReviewTasks,
   getRevisions,
   getRun,
+  getRunInputs,
   getWorkflow,
   listWorkflows,
   rejectTask,
@@ -20,6 +21,7 @@ import {
 import type {
   ApproveReviewTaskRequest,
   ProductVideoRunRequest,
+  RunInputResponse,
   StartRunRequest,
   UploadRequest,
 } from '@flow-cortex/api-client';
@@ -87,6 +89,37 @@ export function useRunQuery(runId: string | undefined) {
   });
   useRunEvents(runId, query.data?.status, query.refetch);
   return query;
+}
+
+const INPUT_URL_REFRESH_LEAD_MS = 60_000;
+// A stale timer longer than ~24.8 days overflows setTimeout and fires at once.
+const MAX_INPUT_STALE_MS = 24 * 60 * 60 * 1000;
+
+/** Whether a signed link is expired or about to be, so a failed load means "renew", not "gone". */
+export function inputUrlNeedsRenewal(expiresAt: string, now = Date.now()): boolean {
+  const expiry = Date.parse(expiresAt);
+  return Number.isNaN(expiry) || now >= expiry - INPUT_URL_REFRESH_LEAD_MS;
+}
+
+/** Milliseconds until the earliest link needs renewing; 0 when none is known or one already does. */
+function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
+  const expiries = (inputs ?? []).map((input) => Date.parse(input.expiresAt));
+  if (expiries.length === 0 || expiries.some(Number.isNaN)) {
+    return 0;
+  }
+  const untilRefresh = Math.min(...expiries) - INPUT_URL_REFRESH_LEAD_MS - Date.now();
+  return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
+}
+
+/** The run's uploaded files with signed links, renewed before the first expires while the tab stays open. */
+export function useRunInputsQuery(runId: string) {
+  return useQuery({
+    queryKey: ['runs', runId, 'inputs'],
+    queryFn: () => unwrap(getRunInputs(runId, authHeaders())),
+    enabled: Boolean(runId),
+    staleTime: (query) => untilInputRefresh(query.state.data),
+    refetchInterval: (query) => untilInputRefresh(query.state.data) || false,
+  });
 }
 
 /**
