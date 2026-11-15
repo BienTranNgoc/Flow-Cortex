@@ -271,6 +271,49 @@ class WorkflowEndpointsIT extends AbstractWorkflowHttpIT {
                 .doesNotContain("objectKey", "flowcortex-media", "flowcortex-uploads", "owner/upload", "bucket");
     }
 
+    @Test
+    void aDraftIsListedAndReadableOnlyByItsOwner() {
+        UserView owner = newUser("http-draft-owner");
+        UserView viewer = newUser("http-draft-viewer");
+        UUID draftId = insertWorkflow(owner.id(), "draft", true, null);
+        String ownerToken = loginAs(owner);
+        String viewerToken = loginAs(viewer);
+
+        ResponseEntity<WorkflowResponseView[]> ownerList =
+                get("/api/v1/workflows", ownerToken, WorkflowResponseView[].class);
+        ResponseEntity<WorkflowResponseView[]> viewerList =
+                get("/api/v1/workflows", viewerToken, WorkflowResponseView[].class);
+
+        assertThat(ownerList.getBody()).extracting(WorkflowResponseView::id).contains(draftId);
+        assertThat(viewerList.getBody()).extracting(WorkflowResponseView::id).doesNotContain(draftId);
+        assertThat(get("/api/v1/workflows/" + draftId, ownerToken, String.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(get("/api/v1/workflows/" + draftId, viewerToken, String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void aDeletedWorkflowIsNotFoundEvenForItsOwner() {
+        UserView owner = newUser("http-deleted-owner");
+        UUID deletedId = insertWorkflow(owner.id(), "published", true, Timestamp.from(Instant.now()));
+        String token = loginAs(owner);
+
+        ResponseEntity<WorkflowResponseView[]> list = get("/api/v1/workflows", token, WorkflowResponseView[].class);
+
+        assertThat(list.getBody()).extracting(WorkflowResponseView::id).doesNotContain(deletedId);
+        assertThat(get("/api/v1/workflows/" + deletedId, token, String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private UUID insertWorkflow(UUID ownerId, String status, boolean shared, Timestamp deletedAt) {
+        UUID id = UUID.randomUUID();
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbcTemplate.update("INSERT INTO workflow (id, owner_id, name, is_shared, created_at, updated_at, status, "
+                + "deleted_at) VALUES (?, ?, 'Seeded', ?, ?, ?, ?, ?)", id, ownerId, shared, now, now, status,
+                deletedAt);
+        return id;
+    }
+
     private RunResponseView awaitTerminalHttp(String token, UUID runId, Duration timeout) {
         long deadline = System.currentTimeMillis() + timeout.toMillis();
         RunResponseView last = get("/api/v1/runs/" + runId, token, RunResponseView.class).getBody();
