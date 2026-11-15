@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 @Component
 class InputResolver {
 
-    private static final Pattern REF_PATTERN = Pattern.compile("^\\{step:(\\d+)(?:\\.(\\w+))?}$");
+    static final Pattern REF_PATTERN = Pattern.compile("^\\{step:(\\d+)(?:\\.(\\w+))?}$");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
