@@ -13,6 +13,8 @@ include(
     ":modules:support",
     ":modules:space",
     ":modules:realtime",
+    ":modules:connector",
+    ":modules:billing",
     ":modules:chat",
     ":shared:web",
     ":shared:security",
