@@ -139,7 +139,7 @@ def test_transient_retry_budget_publishes_terminal_error() -> None:
     conn.deliver(job_body(), headers={"x-delivery-count": 3})
     waits: list[float] = []
 
-    def fail(job: Any, runner: Any) -> Any:
+    def fail(job: Any, runner: Any, report: Any) -> Any:
         raise TransientError("provider unavailable")
 
     run_consumer(
@@ -164,7 +164,7 @@ def test_transient_retry_budget_error_keeps_the_transient_reason() -> None:
     conn = FakeConnection()
     conn.deliver(job_body(), headers={"x-delivery-count": 3})
 
-    def fail(job: Any, runner: Any) -> Any:
+    def fail(job: Any, runner: Any, report: Any) -> Any:
         raise TransientError("provider unavailable")
 
     run_consumer(
@@ -181,7 +181,7 @@ def test_unconfirmed_budget_exhausted_result_is_requeued() -> None:
     conn.deliver(job_body(), headers={"x-delivery-count": 3})
     waits: list[float] = []
 
-    def fail(job: Any, runner: Any) -> Any:
+    def fail(job: Any, runner: Any, report: Any) -> Any:
         raise TransientError("provider unavailable")
 
     def start(c: FakeConnection) -> None:

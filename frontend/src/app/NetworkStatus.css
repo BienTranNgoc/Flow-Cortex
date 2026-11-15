@@ -1,0 +1,62 @@
+.network-status {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.network-status__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 32px);
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.network-status__pill[data-mode='rate-limited'] {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.network-status__pill[data-mode='reconnecting'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.network-status__icon {
+  flex-shrink: 0;
+}
+
+.network-status__pill[data-mode='reconnecting'] .network-status__icon {
+  animation: network-status-spin 1.2s linear infinite;
+}
+
+@keyframes network-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-status__pill[data-mode='reconnecting'] .network-status__icon {
+    animation: none;
+  }
+}
