@@ -3,5 +3,15 @@
   "runAnyway": "Vẫn chạy",
   "estimatedCost": "Chi phí ước tính: {{amount}} Credit",
   "chargedSoFarOne": "Đã tính cho lượt chạy này: {{amount}} Credit",
-  "chargedSoFarOther": "Đã tính cho lượt chạy này: {{amount}} Credit"
+  "chargedSoFarOther": "Đã tính cho lượt chạy này: {{amount}} Credit",
+  "wallet": {
+    "aria": "{{amount}} Credit, {{tier}}. Mở trang cá nhân",
+    "used": "Đã dùng {{used}} / {{granted}} Credit",
+    "tier": {
+      "ok": "số dư ổn",
+      "low": "số dư thấp",
+      "critical": "số dư rất thấp",
+      "exhausted": "đã hết Credit"
+    }
+  }
 }

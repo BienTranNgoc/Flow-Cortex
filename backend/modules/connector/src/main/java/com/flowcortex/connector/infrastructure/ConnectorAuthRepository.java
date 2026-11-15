@@ -55,6 +55,14 @@ public interface ConnectorAuthRepository extends Repository<ConnectorAuth, UUID>
     int setUsage(@Param("userId") UUID userId, @Param("provider") String provider,
             @Param("enabled") boolean enabled, @Param("now") Instant now);
 
+    /** Active rows only; a {@code null} {@code requires} skips the containment precondition. */
+    @Modifying
+    @Query(value = "UPDATE connector_auth SET metadata = metadata || CAST(:patch AS jsonb), updated_at = :now "
+            + "WHERE user_id = :userId AND provider = :provider AND is_active "
+            + "AND (CAST(:requires AS jsonb) IS NULL OR metadata @> CAST(:requires AS jsonb))", nativeQuery = true)
+    int mergeMetadata(@Param("userId") UUID userId, @Param("provider") String provider,
+            @Param("patch") String patch, @Param("requires") String requires, @Param("now") Instant now);
+
     @Modifying
     @Query(value = "DELETE FROM connector_auth WHERE user_id = :userId AND provider = :provider", nativeQuery = true)
     int deleteByUserAndProvider(@Param("userId") UUID userId, @Param("provider") String provider);

@@ -43,7 +43,7 @@ final class WorkflowMapper {
                 mode(step.getType(), isRemoteType), step.getInputRef(), step.getConfig());
     }
 
-    private static String mode(String type, Predicate<String> isRemoteType) {
+    static String mode(String type, Predicate<String> isRemoteType) {
         return isRemoteType.test(type) ? "remote" : "inline";
     }
 

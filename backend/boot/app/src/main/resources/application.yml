@@ -74,7 +74,7 @@ spring:
 
   # The event publication registry is the outbox for job messages. Outstanding publications are
   # not republished on restart — a job in flight would be dispatched twice; failed ones are resubmitted
-  # by the media module instead. A completed publication is deleted: the run step is the record.
+  # by the jobs module instead. A completed publication is deleted: the run step is the record.
   modulith:
     events:
       republish-outstanding-events-on-restart: false
@@ -165,10 +165,26 @@ jdbc:
 # 'dev' profile (application-dev.yml) supplies a fallback; every other
 # profile/environment must set JWT_SECRET or JwtKeyConfig fails startup loudly.
 flowcortex:
+  # Cluster job runner: each pass looks for due jobs every poll-interval; with the runner off the
+  # instance registers and runs no scheduled job (the integration suite turns it off).
+  jobs:
+    poll-interval: ${FLOWCORTEX_JOBS_POLL_INTERVAL:5s}
+    runner:
+      enabled: ${FLOWCORTEX_JOBS_RUNNER_ENABLED:true}
   # The member app's public origin; links in outgoing mail point here. No default: with email
   # confirmation on, startup fails until it is set (the dev profile uses http://localhost:5173).
   app:
     public-url: ${FLOWCORTEX_APP_PUBLIC_URL:}
+  # The one sender of every mail. link-secret (>= 32 bytes) signs unsubscribe links and, together with
+  # flowcortex.app.public-url, becomes required once the catalog holds a care or promotional key.
+  mail:
+    from: ${FLOWCORTEX_MAIL_FROM:no-reply@flow-cortex.dev}
+    from-name: ${FLOWCORTEX_MAIL_FROM_NAME:Nodi}
+    link-secret: ${FLOWCORTEX_MAIL_LINK_SECRET:}
+    links:
+      rate-limit:
+        capacity: ${FLOWCORTEX_MAIL_LINK_RATE_LIMIT:10}
+        period: ${FLOWCORTEX_MAIL_LINK_RATE_WINDOW:60s}
   security:
     jwt-secret: ${JWT_SECRET:}
     # Browser origins allowed to call /api/v1/** cross-origin (comma-separated, never `*` while
@@ -212,7 +228,7 @@ flowcortex:
     # spring.mail.host, or startup fails. A reset link works once, for `validity`. Each client IP
     # and each email (trimmed, lower-cased) gets `capacity` requests per `period`, refilled
     # gradually; over it answers 429 with Retry-After. `submit-per-ip` limits new-password
-    # submissions per client IP the same way. Limits are per backend instance.
+    # submissions per client IP the same way. Budgets are shared by every backend instance.
     password-reset:
       enabled: ${FLOWCORTEX_AUTH_PASSWORD_RESET_ENABLED:false}
       validity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_VALIDITY:1h}
@@ -232,12 +248,31 @@ flowcortex:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
-  # gradually; over it answers 429 with Retry-After before the password is checked. Limits are per
-  # backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
+  # gradually; over it answers 429 with Retry-After before the password is checked. Budgets are
+  # shared by every backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
   login:
     failures-per-ip:
       capacity: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY:20}
       period: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD:15m}
+  # Public intake for errors the web apps contain (POST /api/v1/client-errors, no token needed).
+  # Off answers 204 to everything without reading, limiting, logging or counting. Each client
+  # address gets `capacity` reports per `period`; over it answers 429 with Retry-After. Env var + restart.
+  client-errors:
+    enabled: ${FLOWCORTEX_CLIENT_ERRORS_ENABLED:true}
+    per-ip:
+      capacity: ${FLOWCORTEX_CLIENT_ERRORS_PER_IP_CAPACITY:10}
+      period: ${FLOWCORTEX_CLIENT_ERRORS_PER_IP_PERIOD:1m}
+  # Rate-limit budgets live in the database (table rate_limit_bucket) so every backend instance
+  # shares them. The store has its own small connection pool: a stalled store admits the request
+  # after `connection-timeout`, `lock-timeout` or `statement-timeout` instead of holding it. Full buckets are swept
+  # every `sweep-interval`.
+  rate-limit:
+    sweep-interval: ${FLOWCORTEX_RATE_LIMIT_SWEEP_INTERVAL:PT10M}
+    store:
+      max-pool-size: ${FLOWCORTEX_RATE_LIMIT_STORE_MAX_POOL_SIZE:8}
+      connection-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_CONNECTION_TIMEOUT:250ms}
+      lock-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_LOCK_TIMEOUT:200ms}
+      statement-timeout: ${FLOWCORTEX_RATE_LIMIT_STORE_STATEMENT_TIMEOUT:500ms}
   # Kill switch for the admin console's API (/api/v1/admin/**): off answers 503 there, after the
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
@@ -245,7 +280,7 @@ flowcortex:
   # Public self-registration. Accounts belong to the ADMIN named here, who lists and suspends them
   # under /api/v1/users; empty, unknown, not an ADMIN or not ACTIVE closes registration (403).
   # Each client IP and each email (trimmed, lower-cased) gets `capacity` attempts per `period`,
-  # refilled gradually; over it answers 429 with Retry-After. Limits are per backend instance.
+  # refilled gradually; over it answers 429 with Retry-After. Budgets are shared by every backend instance.
   registration:
     owner-email: ${FLOWCORTEX_REGISTRATION_OWNER_EMAIL:}
     per-ip:
@@ -260,7 +295,7 @@ flowcortex:
     enabled: ${FLOWCORTEX_PHONE_VERIFICATION_ENABLED:false}
     # Send-code quotas, over the last 24 h unless noted; each refusal answers 429 with Retry-After.
     # A member's sends and distinct numbers count "number already verified" answers too. The
-    # per-IP bucket is per backend instance; the rest are read from the database.
+    # per-IP budget is shared by every backend instance; the rest are read from the database.
     limits:
       allowed-country-codes: ${FLOWCORTEX_PHONE_ALLOWED_COUNTRY_CODES:84}
       user-sends-per-day: ${FLOWCORTEX_PHONE_USER_SENDS_PER_DAY:10}
@@ -282,6 +317,13 @@ flowcortex:
   connectors:
     encryption:
       current: ${FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT:}
+    # Off means every Telegram route and send answers 503 and no request leaves for Telegram.
+    # api.telegram.org must also be on the egress proxy's allowlist.
+    telegram:
+      enabled: ${FLOWCORTEX_CONNECTORS_TELEGRAM_ENABLED:false}
+      api-base-url: https://api.telegram.org
+      read-timeout: 8s
+      send-timeout: 15s
   # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
@@ -290,24 +332,12 @@ flowcortex:
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
-  # Every registered step type needs a cost here, or startup fails.
+  # Prices live in the rate_card and capability_pricing tables, not here. Every registered step type
+  # needs a capability_pricing row and an active rate_card row, or startup fails. To change a price,
+  # in one migration: UPDATE the key's open rate_card row SET effective_to = T, then INSERT the new
+  # open-ended row with effective_from = T.
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
-    step-costs:
-      echo: 1
-      fail: 20
-      # Brackets make the map binder keep the key exactly as written (upper case).
-      "[APPROVAL_CHECKPOINT]": 0
-      probe: 10
-      extract_audio: 50
-      align_audio: 50
-      generate_script: 100
-      generate_speech: 100
-      generate_storyboard: 100
-      generate_video: 200
-      render_video: 200
-      translate: 100
-      tts: 100
   # Payments region gate: off places nobody, shadow only counts callers outside Vietnam,
   # enforce refuses them on payment-opening handlers. The refresh pace is for the registry download.
   billing:
@@ -357,7 +387,8 @@ flowcortex:
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,
-  # like the switches above. The key is never logged.
+  # like the switches above. The key is never logged. The models, retries and timeouts live in
+  # flowcortex.llm.gemini.slots (dub-translate, dub-speech).
   dub:
     enabled: ${FLOWCORTEX_DUB_ENABLED:false}
     # How fast a voice reads Vietnamese: a line may have floor(rate x slot seconds) characters.
@@ -367,17 +398,6 @@ flowcortex:
     voices:
       female: Kore
       male: Charon
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
-      base-url: https://generativelanguage.googleapis.com/v1beta
-      # Tried in order; the later one is the fallback.
-      translate-models: gemini-3.5-flash-lite,gemini-3.8-flash
-      tts-models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
-      # Per model: attempts, the waits between them, and how long one call may take. The dub
-      # steps' max run times are derived from these.
-      attempts: 3
-      retry-waits: 10s,30s
-      call-timeout: 60s
     # The translate and tts steps hold a thread for as long as the provider takes (up to minutes
     # in an outage), so they run on their own threads and never starve the shared async pool.
     # `size` run at once, `queue-capacity` wait; a step arriving with both full fails
@@ -390,8 +410,8 @@ flowcortex:
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
   # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
-  # and logs a config error. read-timeout applies to each socket read; answer-timeout bounds one
-  # whole answer.
+  # and logs a config error. read-timeout bounds each request; answer-timeout bounds one whole
+  # answer.
   llm:
     gemini:
       api-key: ${GEMINI_API_KEY:}
@@ -399,6 +419,20 @@ flowcortex:
       connect-timeout: ${GEMINI_CONNECT_TIMEOUT:5s}
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
       answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
+      # Model chains by purpose. Per model: attempts, the waits between them and how long one call
+      # may take; the models are tried in order, the later one is the fallback. The dub steps' max
+      # run times are derived from these.
+      slots:
+        dub-translate:
+          models: gemini-3.5-flash-lite,gemini-3.8-flash
+          attempts: 3
+          retry-waits: 10s,30s
+          call-timeout: 60s
+        dub-speech:
+          models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
+          attempts: 3
+          retry-waits: 10s,30s
+          call-timeout: 60s
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
   support:
@@ -415,8 +449,6 @@ flowcortex:
       member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
       guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
-    mail:
-      from: ${FLOWCORTEX_SUPPORT_MAIL_FROM:no-reply@flow-cortex.dev}
   # Main chat. Off: the page is hidden by the features flag. The console's chat switch gates sends on top
   # of it. Restart to apply. Limits count member messages; the sweeper fails a turn still running
   # sweep-grace after turn-timeout.

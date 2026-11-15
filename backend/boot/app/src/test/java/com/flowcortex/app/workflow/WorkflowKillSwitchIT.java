@@ -33,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.NestedTestConfiguration;
@@ -48,8 +49,8 @@ import software.amazon.awssdk.services.s3.S3Client;
  * context refuses) — standing in for a run completed before the flag was later flipped off.
  *
  * <p>The nested classes cover the dub switch, which counts only together with the provider key.
- * The context with dubbing on starts last: its reaper would otherwise move the run the switched-off
- * case seeds through a dub step that is available there.
+ * Only the {@code DubSwitchedOff} context runs the cluster runner, and so the reaper; the other
+ * contexts keep it off, and that one is discarded when its class ends.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.workflow.enabled=false")
@@ -129,7 +130,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
 
         @DynamicPropertySource
         static void provider(DynamicPropertyRegistry registry) {
-            registry.add("flowcortex.dub.gemini.base-url", PROVIDER::baseUrl);
+            registry.add("flowcortex.llm.gemini.base-url", PROVIDER::baseUrl);
         }
 
         WorkflowView dubWorkflow(UUID ownerId) {
@@ -160,8 +161,11 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=false",
-        "flowcortex.dub.gemini.api-key=fake-key-3c9e",
-        "flowcortex.workflow.reaper-interval-ms=300"})
+        "flowcortex.llm.gemini.api-key=fake-key-3c9e",
+        "flowcortex.workflow.reaper-interval-ms=300",
+        "flowcortex.jobs.runner.enabled=true",
+        "flowcortex.jobs.poll-interval=100ms"})
+    @DirtiesContext
     @AutoConfigureTestRestTemplate
     class DubSwitchedOff extends DubContext {
 
@@ -219,7 +223,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=true",
-        "flowcortex.dub.gemini.api-key="})
+        "flowcortex.llm.gemini.api-key="})
     @AutoConfigureTestRestTemplate
     class DubKeyMissing extends DubContext {
 
@@ -239,7 +243,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=true",
-        "flowcortex.dub.gemini.api-key=fake-key-3c9e"})
+        "flowcortex.llm.gemini.api-key=fake-key-3c9e"})
     @AutoConfigureTestRestTemplate
     class DubAvailable extends DubContext {
 
