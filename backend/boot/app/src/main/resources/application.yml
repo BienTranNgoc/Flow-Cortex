@@ -290,24 +290,12 @@ flowcortex:
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
   # Run credits: off means no balance check at start, no debit or refund, no balance shown.
-  # Every registered step type needs a cost here, or startup fails.
+  # Prices live in the rate_card and capability_pricing tables, not here. Every registered step type
+  # needs a capability_pricing row and an active rate_card row, or startup fails. To change a price,
+  # in one migration: UPDATE the key's open rate_card row SET effective_to = T, then INSERT the new
+  # open-ended row with effective_from = T.
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
-    step-costs:
-      echo: 1
-      fail: 20
-      # Brackets make the map binder keep the key exactly as written (upper case).
-      "[APPROVAL_CHECKPOINT]": 0
-      probe: 10
-      extract_audio: 50
-      align_audio: 50
-      generate_script: 100
-      generate_speech: 100
-      generate_storyboard: 100
-      generate_video: 200
-      render_video: 200
-      translate: 100
-      tts: 100
   # Payments region gate: off places nobody, shadow only counts callers outside Vietnam,
   # enforce refuses them on payment-opening handlers. The refresh pace is for the registry download.
   billing:
@@ -347,7 +335,8 @@ flowcortex:
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,
-  # like the switches above. The key is never logged.
+  # like the switches above. The key is never logged. The models, retries and timeouts live in
+  # flowcortex.llm.gemini.slots (dub-translate, dub-speech).
   dub:
     enabled: ${FLOWCORTEX_DUB_ENABLED:false}
     # How fast a voice reads Vietnamese: a line may have floor(rate x slot seconds) characters.
@@ -357,17 +346,6 @@ flowcortex:
     voices:
       female: Kore
       male: Charon
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
-      base-url: https://generativelanguage.googleapis.com/v1beta
-      # Tried in order; the later one is the fallback.
-      translate-models: gemini-3.5-flash-lite,gemini-3.8-flash
-      tts-models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
-      # Per model: attempts, the waits between them, and how long one call may take. The dub
-      # steps' max run times are derived from these.
-      attempts: 3
-      retry-waits: 10s,30s
-      call-timeout: 60s
     # The translate and tts steps hold a thread for as long as the provider takes (up to minutes
     # in an outage), so they run on their own threads and never starve the shared async pool.
     # `size` run at once, `queue-capacity` wait; a step arriving with both full fails
@@ -380,8 +358,8 @@ flowcortex:
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
   # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
-  # and logs a config error. read-timeout applies to each socket read; answer-timeout bounds one
-  # whole answer.
+  # and logs a config error. read-timeout bounds each request; answer-timeout bounds one whole
+  # answer.
   llm:
     gemini:
       api-key: ${GEMINI_API_KEY:}
@@ -389,6 +367,20 @@ flowcortex:
       connect-timeout: ${GEMINI_CONNECT_TIMEOUT:5s}
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
       answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
+      # Model chains by purpose. Per model: attempts, the waits between them and how long one call
+      # may take; the models are tried in order, the later one is the fallback. The dub steps' max
+      # run times are derived from these.
+      slots:
+        dub-translate:
+          models: gemini-3.5-flash-lite,gemini-3.8-flash
+          attempts: 3
+          retry-waits: 10s,30s
+          call-timeout: 60s
+        dub-speech:
+          models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
+          attempts: 3
+          retry-waits: 10s,30s
+          call-timeout: 60s
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
   support:
