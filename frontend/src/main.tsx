@@ -1,6 +1,6 @@
 import '@fontsource-variable/google-sans-flex';
 import { setLocaleProvider } from '@flow-cortex/api-client';
-import { ErrorBoundary } from '@flow-cortex/ui-kit';
+import { configureClientErrorReporting, ErrorBoundary } from '@flow-cortex/ui-kit';
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { App } from './App';
 import { initTheme } from './app/useTheme';
 
 setLocaleProvider(activeLocale);
+configureClientErrorReporting({ app: 'member' });
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

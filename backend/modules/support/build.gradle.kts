@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.
@@ -18,8 +19,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     // The convention plugin brings only the Modulith core starter, which has no events API.
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")
-    implementation("com.bucket4j:bucket4j_jdk17-core:${providers.gradleProperty("bucket4jVersion").get()}")
-    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("tools.jackson.core:jackson-databind")
     implementation("io.micrometer:micrometer-core")
     implementation("io.micrometer:context-propagation")
@@ -29,4 +28,5 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("io.micrometer:micrometer-observation-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
 }
