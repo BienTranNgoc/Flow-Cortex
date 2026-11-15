@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { App } from '../App';
-import { ADMIN_ME, MEMBER_ME, settled, stubApi, testQueryClient } from '../test/fakeApi';
+import { ADMIN_ME, MEMBER_ME, settled, staffMe, stubApi, testQueryClient } from '../test/fakeApi';
 import { queryClient } from './queryClient';
 import { RequireAdminApp } from './RequireAdminApp';
 
@@ -159,14 +159,14 @@ describe('RequireAdminApp', () => {
     );
   });
 
-  it('shows a MEMBER "No access" with sign-out and makes no admin API call', async () => {
+  it('shows an account holding no key "No access" with sign-out and makes no admin API call', async () => {
     const calls = stubApi({ 'GET /api/v1/auth/me': { status: 200, body: MEMBER_ME } });
     setToken('member-token', true);
     window.history.pushState({}, '', '/runs');
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'No access' })).toBeInTheDocument();
-    expect(screen.getByText(/does not have the ADMIN role/)).toBeInTheDocument();
+    expect(screen.getByText(/has no admin permissions/)).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Admin navigation' })).not.toBeInTheDocument();
     await settled(queryClient);
     expect(calls.map((call) => call.path)).toEqual(['/api/v1/auth/me']);
@@ -197,7 +197,48 @@ describe('RequireAdminApp', () => {
     ).toHaveLength(0);
   });
 
-  it('renders its children for an ADMIN', async () => {
+  it('shows a deactivated admin the "deactivated" screen with sign-out and makes no admin API call', async () => {
+    const calls = stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: { ...ADMIN_ME, adminDisabled: true } },
+      'POST /api/v1/auth/logout': { status: 204 },
+    });
+    setToken('admin-token-deactivated', true);
+    window.history.pushState({}, '', '/runs');
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Your admin account is deactivated' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin navigation' })).not.toBeInTheDocument();
+    await settled(queryClient);
+    expect(calls.map((call) => call.path)).toEqual(['/api/v1/auth/me']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('renders its children for a staff caller holding one key', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': {
+        status: 200,
+        body: staffMe('CUSTOMER_SUPPORT', ['support.ticket.view']),
+      },
+    });
+    setToken('staff-token-children', true);
+    render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/runs']}>
+          <RequireAdminApp>
+            <p>admin content</p>
+          </RequireAdminApp>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('admin content')).toBeInTheDocument();
+  });
+
+  it('renders its children for a super admin', async () => {
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-children', true);
     render(

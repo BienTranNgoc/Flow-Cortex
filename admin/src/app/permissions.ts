@@ -1,28 +1,15 @@
-export const ACTIONS = [
-  'console.enter',
-  'runs.view',
-  'mediaJobs.view',
-  'workflows.view',
-  'approvals.view',
-  'credits.view',
-  'providers.view',
-  'features.toggle',
-  'audit.view',
-  'voice.view',
-  'health.view',
-  'users.manage',
-  'support.manage',
-] as const;
+import type { MeResponse, MeResponsePermissionsItem } from '@flow-cortex/api-client';
 
-export type Action = (typeof ACTIONS)[number];
+export type PermissionKey = MeResponsePermissionsItem;
 
-/** The one table both the route guards and the sidebar read. */
-const GRANTS: Record<string, readonly Action[]> = {
-  ADMIN: ACTIONS,
-  MEMBER: [],
-};
+export type Caller = Pick<MeResponse, 'permissions' | 'adminDisabled'>;
 
-/** Single arbiter: a role may use `action` only when listed in its grant row. */
-export function can(role: string | undefined, action: Action): boolean {
-  return role !== undefined && Object.hasOwn(GRANTS, role) && (GRANTS[role]?.includes(action) ?? false);
+/** Single arbiter for the sidebar, the routes and the pages: a key counts only for an admin account that is not deactivated. */
+export function can(me: Caller | undefined, key: PermissionKey): boolean {
+  return me !== undefined && !me.adminDisabled && me.permissions.includes(key);
+}
+
+/** The console admits a caller holding at least one key and not deactivated. */
+export function canEnterConsole(me: Caller | undefined): boolean {
+  return me !== undefined && !me.adminDisabled && me.permissions.length > 0;
 }

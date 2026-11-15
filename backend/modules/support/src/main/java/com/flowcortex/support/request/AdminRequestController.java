@@ -1,9 +1,12 @@
 package com.flowcortex.support.request;
 
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.Count;
 import com.flowcortex.support.web.SupportCaller;
+import com.flowcortex.user.api.AdminPermissions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -40,13 +43,15 @@ class AdminRequestController {
 
     private final RequestService requests;
     private final SupportCaller caller;
+    private final AdminPermissions adminPermissions;
 
-    AdminRequestController(RequestService requests, SupportCaller caller) {
+    AdminRequestController(RequestService requests, SupportCaller caller, AdminPermissions adminPermissions) {
         this.requests = requests;
         this.caller = caller;
+        this.adminPermissions = adminPermissions;
     }
 
-    /** {@code status} is the request's status after the reply. */
+    /** {@code status} is the request's status after the reply; {@code resolved} also needs the close key. */
     @Schema(name = "AdminSupportRequestReply")
     record AdminReplyRequest(
             @Schema(requiredMode = RequiredMode.REQUIRED) String body,
@@ -66,8 +71,9 @@ class AdminRequestController {
     @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, errors.page)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminPage list(@AuthenticationPrincipal Jwt jwt,
+    AdminPage list(
             @Parameter(schema = @Schema(allowableValues = {"new", "in_progress", "waiting_member", "resolved",
                     "closed"}))
             @RequestParam(required = false) String status,
@@ -76,14 +82,13 @@ class AdminRequestController {
             @Parameter(schema = @Schema(type = "integer", format = "int32", defaultValue = "0", minimum = "0",
                     maximum = "" + RequestService.MAX_PAGE))
             @RequestParam(defaultValue = "0") int page) {
-        caller.requireAdmin(jwt);
         return requests.page(status, type, page);
     }
 
     @Operation(operationId = "countOpenSupportRequests")
+    @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
     @GetMapping(value = "/open-count", produces = MediaType.APPLICATION_JSON_VALUE)
-    Count openCount(@AuthenticationPrincipal Jwt jwt) {
-        caller.requireAdmin(jwt);
+    Count openCount() {
         return new Count(requests.openCount());
     }
 
@@ -92,9 +97,9 @@ class AdminRequestController {
     @ApiResponse(responseCode = "404", description = "request-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
     @GetMapping(value = "/{number}", produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminDetail detail(@AuthenticationPrincipal Jwt jwt, @PathVariable long number) {
-        caller.requireAdmin(jwt);
+    AdminDetail detail(@PathVariable long number) {
         return requests.adminDetail(number);
     }
 
@@ -115,13 +120,17 @@ class AdminRequestController {
     @ApiResponse(responseCode = "503", description = "attachments-unavailable (uploadIds sent)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_REPLY)
     @PostMapping(value = "/{number}/messages", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminDetail> reply(@AuthenticationPrincipal Jwt jwt, @PathVariable long number,
             @Parameter(schema = @Schema(format = "uuid"))
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody AdminReplyRequest body) {
-        UUID adminId = caller.requireAdmin(jwt).id();
+        UUID adminId = caller.require(jwt).id();
+        if ("resolved".equals(body.status())) {
+            adminPermissions.require(adminId, Permission.SUPPORT_TICKET_CLOSE);
+        }
         AdminDetail replied = requests.adminReply(adminId, number, body.body(), body.uploadIds(), body.status(),
                 IdempotencyGuard.key(idempotencyKey));
         return ResponseEntity.status(HttpStatus.CREATED).body(replied);
@@ -138,10 +147,10 @@ class AdminRequestController {
     @ApiResponse(responseCode = "409", description = "transition-not-allowed, request-state-changed",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_CLOSE)
     @PutMapping(value = "/{number}/status", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminDetail status(@AuthenticationPrincipal Jwt jwt, @PathVariable long number, @RequestBody StatusRequest body) {
-        caller.requireAdmin(jwt);
+    AdminDetail status(@PathVariable long number, @RequestBody StatusRequest body) {
         return requests.setStatus(number, body.status());
     }
 }
