@@ -9,24 +9,30 @@ import org.junit.jupiter.api.Test;
 class WorkflowTest {
 
     @Test
-    void constructorSetsAllFieldsAndTimestamps() {
-        UUID id = UUID.randomUUID();
-        UUID ownerId = UUID.randomUUID();
+    void theConstructorCreatesAPublishedWorkflowAndDraftCreatesADraft() {
+        UUID owner = UUID.randomUUID();
 
-        Workflow workflow = new Workflow(id, ownerId, "Demo", true);
-
-        assertThat(workflow.getId()).isEqualTo(id);
-        assertThat(workflow.getOwnerId()).isEqualTo(ownerId);
-        assertThat(workflow.getName()).isEqualTo("Demo");
-        assertThat(workflow.isShared()).isTrue();
-        assertThat(workflow.getCreatedAt()).isNotNull();
-        assertThat(workflow.getUpdatedAt()).isEqualTo(workflow.getCreatedAt());
+        assertThat(new Workflow(UUID.randomUUID(), owner, "Demo", true).getStatus())
+                .isEqualTo(WorkflowStatus.PUBLISHED);
+        Workflow draft = Workflow.draft(UUID.randomUUID(), owner, "Demo", false);
+        assertThat(draft.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
+        assertThat(draft.getDeletedAt()).isNull();
     }
 
     @Test
-    void notSharedByDefaultArgument() {
-        Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Private", false);
+    void mutatorsChangeTheFieldAndMarkDeletedStampsTheTime() throws InterruptedException {
+        Workflow workflow = Workflow.draft(UUID.randomUUID(), UUID.randomUUID(), "Demo", false);
+        Thread.sleep(2);
 
-        assertThat(workflow.isShared()).isFalse();
+        workflow.rename("Renamed");
+        workflow.setShared(true);
+        workflow.changeStatus(WorkflowStatus.PUBLISHED);
+        workflow.markDeleted();
+
+        assertThat(workflow.getName()).isEqualTo("Renamed");
+        assertThat(workflow.isShared()).isTrue();
+        assertThat(workflow.getStatus()).isEqualTo(WorkflowStatus.PUBLISHED);
+        assertThat(workflow.getDeletedAt()).isNotNull();
+        assertThat(workflow.getUpdatedAt()).isAfter(workflow.getCreatedAt());
     }
 }

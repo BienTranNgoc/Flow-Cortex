@@ -166,7 +166,7 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
         UserView user = newUser("uploads-images");
         String token = loginAs(user);
         WorkflowView workflow = newWorkflow(user.id(), false,
-                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+                new NewWorkflowStep("Render", "render_video", null, "{\"profile\":\"vertical_ad_v1\"}"));
         byte[] png = ImageFixtures.png();
         byte[] webp = ImageFixtures.webp();
         UploadResponseView first = grant(token, "first.png", png.length).getBody();
