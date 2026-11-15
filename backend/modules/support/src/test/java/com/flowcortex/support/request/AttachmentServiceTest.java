@@ -16,13 +16,12 @@ import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.StoredAttachment;
-import com.flowcortex.media.api.UploadGrant;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.web.SupportProblemException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,8 +49,8 @@ class AttachmentServiceTest {
         assertUnavailable(() -> service.grant(owner, "anh.png", 2048));
         assertUnavailable(() -> service.keep(owner, UUID.randomUUID(), UUID.randomUUID(), List.of(UUID.randomUUID())));
         assertThat(service.keep(owner, UUID.randomUUID(), UUID.randomUUID(), List.of())).isEmpty();
-        verify(mediaJobs, never()).prepareUpload(any(), anyString(), anyLong());
-        verify(mediaJobs, never()).resolveImageUploads(any(), any());
+        verify(mediaJobs, never()).prepareUpload(any(), any(), anyString(), anyLong());
+        verify(mediaJobs, never()).resolveImageUploads(any(), any(), any());
     }
 
     @Test
@@ -69,20 +68,14 @@ class AttachmentServiceTest {
     }
 
     @Test
-    void aPdfOrAnImageOverFiveMegabytesIsRefusedBeforeAnythingIsSigned() {
+    void aGrantRefusalIsMappedByItsFieldToTheSupportSentences() {
+        when(mediaJobs.prepareUpload(UploadPurpose.SUPPORT_ATTACHMENT, owner, "hoa-don.pdf", 2048))
+                .thenThrow(new UploadRejectedException("fileName", new LocalizedMessage("upload.typeMany", "a", "b")));
+        when(mediaJobs.prepareUpload(UploadPurpose.SUPPORT_ATTACHMENT, owner, "anh.jpg", 5L * 1024 * 1024 + 1))
+                .thenThrow(new UploadRejectedException("size", new LocalizedMessage("upload.sizeMegabytes", 5, "x")));
+
         assertRejected(() -> service.grant(owner, "hoa-don.pdf", 2048), "support.attachment.typeNotAllowed");
-        assertRejected(() -> service.grant(owner, "anh", 2048), "support.attachment.typeNotAllowed");
         assertRejected(() -> service.grant(owner, "anh.jpg", 5L * 1024 * 1024 + 1), "support.attachment.tooLarge");
-        verify(mediaJobs, never()).prepareUpload(any(), anyString(), anyLong());
-    }
-
-    @Test
-    void anImageWithinTheLimitIsSignedByTheMediaEngine() {
-        UploadGrant grant = new UploadGrant(UUID.randomUUID(), "https://store/put", "PUT", Map.of(), Instant.now(),
-                10L);
-        when(mediaJobs.prepareUpload(owner, "ANH.WEBP", 5L * 1024 * 1024)).thenReturn(grant);
-
-        assertThat(service.grant(owner, "ANH.WEBP", 5L * 1024 * 1024)).isSameAs(grant);
     }
 
     @Test
@@ -103,14 +96,18 @@ class AttachmentServiceTest {
         List<MediaAssetInput> inputs = List.of(new MediaAssetInput(upload,
                 new MediaJobInput("image_1", "flowcortex-uploads", owner + "/" + upload)));
         StoredAttachment kept = new StoredAttachment("flowcortex-media", "support/x/1", "image/png", 40L);
-        when(mediaJobs.resolveImageUploads(owner, List.of(upload))).thenReturn(inputs);
+        when(mediaJobs.resolveImageUploads(UploadPurpose.SUPPORT_ATTACHMENT, owner, List.of(upload)))
+                .thenReturn(inputs);
         when(mediaJobs.keepAttachments("support/" + request + "/" + message, inputs, AttachmentService.MAX_BYTES))
                 .thenReturn(List.of(kept))
-                .thenThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.notAnImage")));
+                .thenThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.attachmentNotImage")))
+                .thenThrow(new UploadRejectedException("uploadIds", new LocalizedMessage("upload.imageTooLarge")));
 
         assertThat(service.keep(owner, request, message, List.of(upload))).containsExactly(kept);
         assertRejected(() -> service.keep(owner, request, message, List.of(upload)),
                 "support.attachment.notImage");
+        assertRejected(() -> service.keep(owner, request, message, List.of(upload)),
+                "support.attachment.tooManyPixels");
         assertThat(service.keep(owner, request, message, List.of())).isEmpty();
     }
 

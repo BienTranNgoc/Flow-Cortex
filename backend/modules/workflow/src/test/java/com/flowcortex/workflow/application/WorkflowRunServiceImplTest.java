@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
@@ -348,7 +349,7 @@ class WorkflowRunServiceImplTest {
                 new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "uploads", "a")),
                 new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "uploads", "b")));
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveImageUploads(ownerId, uploadIds)).thenReturn(assets);
+        when(mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds)).thenReturn(assets);
         UUID runId = UUID.randomUUID();
         List<MediaAssetInput> copied = List.of(
                 new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "media",
@@ -453,6 +454,26 @@ class WorkflowRunServiceImplTest {
                     .toList();
         });
         return upload;
+    }
+
+    @Test
+    void aNamedReferenceIsStoredAsTheOrderOfTheNamedStepWhenTheRunStarts() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "draft", "echo", null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "voice", "echo", "{step:1}"),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 3, "mix", "echo", "{step:draft.title}"));
+        when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowRunRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.startRun(ownerId, workflow.getId(), "hello");
+
+        assertThat(savedSteps()).extracting(RunStep::getInputRef)
+                .containsExactly(null, "{step:1}", "{step:1.title}");
     }
 
     @SuppressWarnings("unchecked")

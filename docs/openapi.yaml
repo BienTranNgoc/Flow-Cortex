@@ -7,6 +7,55 @@ servers:
 security:
 - BearerAuth: []
 paths:
+  /api/v1/workflows/{id}/steps/order:
+    put:
+      tags:
+      - workflows-controller
+      operationId: reorderWorkflowSteps
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderStepsRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users/{id}:
     get:
       tags:
@@ -169,6 +218,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/admin/workflows/{id}/steps/order:
+    put:
+      tags:
+      - admin-workflows-controller
+      operationId: reorderAdminWorkflowSteps
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderStepsRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/settings:
     get:
       tags:
@@ -686,6 +778,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "404":
           description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
           content:
             application/problem+json:
               schema:
@@ -1353,6 +1451,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/onboarding/reset:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: resetOnboarding
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResetResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/quiz:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveOnboardingQuiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingQuizBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSaveResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - onboarding-controller
+      operationId: patchOnboardingQuiz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingQuizBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSaveResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/progress:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveOnboardingProgress
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingProgressBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingProgressResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: the journey is closed or switched off; nothing was changed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors names each bad field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/builder/progress:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: saveBuilderOnboardingProgress
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuilderProgressBody"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderOnboardingResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors.state)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/builder/complete:
+    post:
+      tags:
+      - onboarding-controller
+      operationId: completeBuilderOnboarding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuilderCompleteBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuilderOnboardingResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: onboarding-invalid (errors.reason)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -1389,6 +1659,178 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/email-links/{token}/unsubscribe:
+    post:
+      tags:
+      - email-links-controller
+      operationId: unsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkUnsubscribed"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/email-links/{token}/one-click:
+    post:
+      tags:
+      - email-links-controller
+      operationId: oneClickUnsubscribeEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: src
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkOneClick"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/connectors/telegram/refresh-chats:
+    post:
+      tags:
+      - telegram-connector-controller
+      operationId: refreshChats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramRefreshChatsRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramChatList"
+  /api/v1/connectors/telegram/connect:
+    post:
+      tags:
+      - telegram-connector-controller
+      operationId: connect
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramConnectRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramConnection"
+  /api/v1/connectors/http:
+    get:
+      tags:
+      - http-connector-controller
+      operationId: list_1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Summary"
+    post:
+      tags:
+      - http-connector-controller
+      operationId: save
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Saved"
+  /api/v1/client-errors:
+    post:
+      tags:
+      - client-errors-controller
+      summary: Report an error the web app contained
+      operationId: reportClientError
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        "204":
+          description: "Accepted, or ignored while the intake is off"
+        "400":
+          description: "client_error_content_type, client_error_unreadable, client_error_invalid"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: client_error_too_large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: client_error_rate_limited (Retry-After)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/chat/conversations:
     get:
       tags:
@@ -2330,6 +2772,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/steps/{stepId}:
+    delete:
+      tags:
+      - workflows-controller
+      operationId: deleteWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
     patch:
       tags:
       - workflows-controller
@@ -2368,6 +2860,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "404":
           description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
           content:
             application/problem+json:
               schema:
@@ -2420,6 +2918,24 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/telegram/default-chat:
+    patch:
+      tags:
+      - telegram-connector-controller
+      operationId: setDefaultChat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramDefaultChatRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramDefaultChat"
   /api/v1/admin/workflows/{id}:
     delete:
       tags:
@@ -2502,6 +3018,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/workflows/{id}/steps/{stepId}:
+    delete:
+      tags:
+      - admin-workflows-controller
+      operationId: deleteAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
     patch:
       tags:
       - admin-workflows-controller
@@ -2546,6 +3106,37 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "422":
           description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/graph:
+    get:
+      tags:
+      - workflow-graph-controller
+      operationId: getWorkflowGraph
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowGraphResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
           content:
             application/problem+json:
               schema:
@@ -2906,6 +3497,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OutputUrlResponse"
+  /api/v1/runs/{id}/inputs:
+    get:
+      tags:
+      - runs-controller
+      operationId: getRunInputs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunInputResponse"
   /api/v1/realtime/stream:
     get:
       tags:
@@ -2949,6 +3561,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/status:
+    get:
+      tags:
+      - onboarding-controller
+      operationId: getOnboardingStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingStatusResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/onboarding/result:
+    get:
+      tags:
+      - onboarding-controller
+      operationId: getOnboardingResult
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResultResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone:
     get:
       tags:
@@ -2986,6 +3634,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
       security: []
+  /api/v1/email-links/{token}:
+    get:
+      tags:
+      - email-links-controller
+      operationId: viewEmailLink
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailLinkView"
+        "404":
+          description: This unsubscribe link is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too many attempts with this link. Try again later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/credits/balance:
     get:
       tags:
@@ -2998,6 +3677,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceResponse"
+  /api/v1/connectors/telegram:
+    get:
+      tags:
+      - telegram-connector-controller
+      operationId: read
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramConnection"
+  /api/v1/connectors/telegram/health:
+    get:
+      tags:
+      - telegram-connector-controller
+      operationId: health_1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TelegramHealth"
   /api/v1/chat/conversations/{id}/messages:
     get:
       tags:
@@ -3295,8 +3998,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/connectors/{provider}:
+    delete:
+      tags:
+      - connector-controller
+      operationId: disconnect
+      parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
+    ReorderStepsRequest:
+      type: object
+      properties:
+        stepIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 32767
+          minItems: 0
+      required:
+      - stepIds
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties: {}
     UpdateUserRequest:
       type: object
       properties:
@@ -3358,25 +4106,6 @@ components:
       - lastName
       - password
       - passwordSetupToken
-    ProblemDetail:
-      type: object
-      properties:
-        type:
-          type: string
-          format: uri
-        title:
-          type: string
-        status:
-          type: integer
-          format: int32
-        detail:
-          type: string
-        instance:
-          type: string
-          format: uri
-        properties:
-          type: object
-          additionalProperties: {}
     AccessTokenResponse:
       type: object
       properties:
@@ -4490,6 +5219,188 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    OnboardingResetResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+      required:
+      - completed
+    OnboardingQuizBody:
+      type: object
+      properties:
+        purposes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing_content
+            - automation
+            - documents_reports
+            - customer_care
+            - research
+            - other
+        source:
+          type:
+          - string
+          - "null"
+          enum:
+          - facebook
+          - tiktok
+          - linkedin
+          - google
+          - referral
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        industries:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing
+            - sales
+            - finance
+            - hr
+            - tech
+            - other
+        contentTypes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - text
+            - image
+            - audio
+            - video
+            - spreadsheet
+            - document
+            - slide
+        usageType:
+          type:
+          - string
+          - "null"
+          enum:
+          - personal
+          - team
+        finished:
+          type: boolean
+        skipped:
+          type: boolean
+    QuizSaveResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        skipped:
+          type: boolean
+      required:
+      - completed
+      - completedAt
+    OnboardingProgressBody:
+      type: object
+      properties:
+        step:
+          type: string
+          enum:
+          - welcome
+          - tour:home
+          - survey-intro
+          - quiz
+          - done
+        question:
+          type: integer
+          format: int32
+          maximum: 6
+          minimum: 1
+        surveyDeferred:
+          type: boolean
+        finished:
+          type: boolean
+    OnboardingProgress:
+      type: object
+      properties:
+        v:
+          type: integer
+          format: int32
+        step:
+          type: string
+          enum:
+          - welcome
+          - tour:home
+          - survey-intro
+          - quiz
+          - done
+        question:
+          type: integer
+          format: int32
+          maximum: 6
+          minimum: 1
+        surveyDeferredAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OnboardingProgressResponse:
+      type: object
+      properties:
+        progress:
+          $ref: "#/components/schemas/OnboardingProgress"
+        completedAt:
+          type: string
+          format: date-time
+      required:
+      - progress
+    BuilderProgressBody:
+      type: object
+      properties:
+        state:
+          type: string
+      required:
+      - state
+    BuilderOnboardingResponse:
+      type: object
+      properties:
+        state:
+          type: string
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - completedAt
+      - state
+    BuilderCompleteBody:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+          - skipped
+          - finished
     VerifyCodeRequest:
       type: object
       properties:
@@ -4537,6 +5448,136 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    EmailLinkUnsubscribed:
+      type: object
+      properties:
+        unsubscribed:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+    EmailLinkOneClick:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+      - ok
+    TelegramRefreshChatsRequest:
+      type: object
+      properties:
+        chatId:
+          type: integer
+          format: int64
+        title:
+          type: string
+          maxLength: 255
+          minLength: 0
+        type:
+          type: string
+          pattern: private|group|supergroup|channel
+    Chat:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          type: string
+    TelegramChatList:
+      type: object
+      properties:
+        chats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chat"
+    TelegramConnectRequest:
+      type: object
+      properties:
+        botToken:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - botToken
+    TelegramConnection:
+      type: object
+      properties:
+        provider:
+          type: string
+        botUsername:
+          type: string
+        botId:
+          type: integer
+          format: int64
+        state:
+          type: string
+        chats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chat"
+        defaultChatId:
+          type: integer
+          format: int64
+        usageEnabled:
+          type: boolean
+    SaveRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 100
+          minLength: 0
+        label:
+          type: string
+          maxLength: 100
+          minLength: 0
+        authType:
+          type: string
+          pattern: bearer|header|query
+        token:
+          type: string
+          maxLength: 4096
+          minLength: 0
+        baseUrl:
+          type: string
+          maxLength: 2048
+          minLength: 0
+        headerName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        paramName:
+          type: string
+          maxLength: 100
+          minLength: 0
+        extraHeaders:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - authType
+    Saved:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        authType:
+          type: string
+        baseUrl:
+          type: string
     Attachment:
       type: object
       properties:
@@ -4855,6 +5896,22 @@ components:
         versionId:
           type: string
           format: uuid
+    TelegramDefaultChatRequest:
+      type: object
+      properties:
+        chatId:
+          type: integer
+          format: int64
+      required:
+      - chatId
+    TelegramDefaultChat:
+      type: object
+      properties:
+        state:
+          type: string
+        defaultChatId:
+          type: integer
+          format: int64
     WorkflowVersionPageResponse:
       type: object
       properties:
@@ -4921,6 +5978,81 @@ components:
       required:
       - snapshot
       - version
+    Edge:
+      type: object
+      properties:
+        fromStepId:
+          type: string
+          format: uuid
+        toStepId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - previous
+          - reference
+          - outputInput
+      required:
+      - kind
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+        type:
+          type: string
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+        readsRunInput:
+          type: boolean
+      required:
+      - mode
+    Problem:
+      type: object
+      properties:
+        stepId:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        kind:
+          type: string
+          enum:
+          - MALFORMED
+          - UNKNOWN_STEP
+          - AMBIGUOUS_NAME
+          - NOT_EARLIER
+      required:
+      - kind
+    WorkflowGraphResponse:
+      type: object
+      properties:
+        workflowId:
+          type: string
+          format: uuid
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Node"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Edge"
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/Problem"
     DiffSideResponse:
       type: object
       properties:
@@ -5213,6 +6345,171 @@ components:
       required:
       - expiresAt
       - url
+    RunInputResponse:
+      type: object
+      properties:
+        bindingKey:
+          type: string
+        kind:
+          type: string
+        mimeType:
+          type: string
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - bindingKey
+      - expiresAt
+      - kind
+      - mimeType
+      - url
+    OnboardingStatusResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        completedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        purposes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing_content
+            - automation
+            - documents_reports
+            - customer_care
+            - research
+            - other
+        source:
+          type:
+          - string
+          - "null"
+          enum:
+          - facebook
+          - tiktok
+          - linkedin
+          - google
+          - referral
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        industries:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - marketing
+            - sales
+            - finance
+            - hr
+            - tech
+            - other
+        contentTypes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            enum:
+            - text
+            - image
+            - audio
+            - video
+            - spreadsheet
+            - document
+            - slide
+        usageType:
+          type:
+          - string
+          - "null"
+          enum:
+          - personal
+          - team
+        progress:
+          $ref: "#/components/schemas/OnboardingProgress"
+        firstRunDone:
+          type: boolean
+        open:
+          type: boolean
+        entry:
+          type:
+          - string
+          - "null"
+          enum:
+          - first
+      required:
+      - aiLevel
+      - completed
+      - completedAt
+      - contentTypes
+      - entry
+      - firstRunDone
+      - industries
+      - open
+      - progress
+      - purposes
+      - source
+      - usageType
+    OnboardingResultResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        industry:
+          type: string
+          enum:
+          - marketing
+          - sales
+          - finance
+          - hr
+          - tech
+          - other
+        track:
+          type: string
+          enum:
+          - marketing
+          - sales
+          - finance
+          - hr
+          - tech
+          - other
+        aiLevel:
+          type:
+          - string
+          - "null"
+          enum:
+          - beginner
+          - tried
+          - automation
+          - builder
+        usageType:
+          type: string
+          enum:
+          - personal
+          - team
+      required:
+      - aiLevel
+      - completed
+      - industry
+      - track
+      - usageType
     HealthResponse:
       type: object
       properties:
@@ -5243,24 +6540,79 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        onboarding:
+          type: boolean
         chat:
           type: boolean
       required:
       - chat
       - credits
       - emailConfirmation
+      - onboarding
       - passwordReset
       - phoneVerification
       - runCancellation
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EmailLinkView:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        list:
+          type: string
+          enum:
+          - care
+          - marketing
+        unsubscribed:
+          type: boolean
+        maskedEmail:
+          type: string
+      required:
+      - list
+      - maskedEmail
+      - unsubscribed
+      - valid
     BalanceResponse:
       type: object
       properties:
         balance:
           type: integer
           format: int64
+        granted:
+          type: integer
+          format: int64
+    TelegramHealth:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        provider:
+          type: string
+        botUsername:
+          type: string
+        reason:
+          type: string
+    Summary:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        authType:
+          type: string
+        baseUrl:
+          type: string
+        headerName:
+          type: string
+        paramName:
+          type: string
+        extraHeaderNames:
+          type: array
+          items:
+            type: string
     ChatConversationList:
       type: object
       properties:

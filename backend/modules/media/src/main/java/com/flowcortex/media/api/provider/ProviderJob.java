@@ -4,6 +4,7 @@ import com.flowcortex.media.api.MediaJob;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -29,7 +30,16 @@ public record ProviderJob(
         @NotNull @Pattern(regexp = ProviderJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,
         @NotNull @Min(1) Integer maxRuntimeSeconds,
-        @NotNull Instant issuedAt) {
+        @NotNull Instant issuedAt,
+        // Only generate_video jobs carry the block; omitted from the wire when null.
+        @JsonInclude(JsonInclude.Include.NON_NULL) @Valid VendorLedger vendorLedger) {
+
+    public ProviderJob(String schemaVersion, UUID jobId, UUID runId, UUID correlationId, Integer stepOrder,
+            String capability, Map<String, Object> params, List<ProviderInput> inputs, String outputPrefix,
+            Integer attempt, Integer maxRuntimeSeconds, Instant issuedAt) {
+        this(schemaVersion, jobId, runId, correlationId, stepOrder, capability, params, inputs, outputPrefix,
+                attempt, maxRuntimeSeconds, issuedAt, null);
+    }
 
     /**
      * Same pattern as {@code outputPrefix} in the provider job schema: attempt-scoped only, unlike
