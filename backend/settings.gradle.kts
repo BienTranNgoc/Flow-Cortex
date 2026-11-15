@@ -14,6 +14,8 @@ include(
     ":modules:space",
     ":modules:realtime",
     ":modules:onboarding",
+    ":modules:connector",
+    ":modules:billing",
     ":modules:chat",
     ":shared:web",
     ":shared:security",
