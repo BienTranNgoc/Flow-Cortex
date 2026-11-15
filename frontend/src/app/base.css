@@ -277,6 +277,11 @@ a {
   transform: none;
 }
 
+/* A page that fills the width (the chat page) lifts the cap on its own shell. */
+.app-content:has(> .chat-page) {
+  max-width: none;
+}
+
 /* A link that is a page's next action gets the same 44px target as a button. */
 .action-link {
   display: inline-flex;

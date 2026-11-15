@@ -94,6 +94,63 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{id}:
+    put:
+      tags:
+      - conversation-controller
+      operationId: renameChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationTitle"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - conversation-controller
+      operationId: deleteChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile:
     put:
       tags:
@@ -352,6 +409,145 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/chat/settings:
+    get:
+      tags:
+      - admin-chat-settings-controller
+      operationId: getAdminChatSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminChatSettings"
+    put:
+      tags:
+      - admin-chat-settings-controller
+      operationId: updateAdminChatSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminChatSettingsUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminChatSettings"
+        "400":
+          description: validation-failed (errors.enabled)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows:
+    get:
+      tags:
+      - workflows-controller
+      operationId: listWorkflows
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowResponse"
+    post:
+      tags:
+      - workflows-controller
+      operationId: createWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflows/{id}/steps:
+    post:
+      tags:
+      - workflows-controller
+      operationId: addStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -904,6 +1100,278 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/chat/conversations:
+    get:
+      tags:
+      - conversation-controller
+      operationId: listChatConversations
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversationList"
+    post:
+      tags:
+      - conversation-controller
+      operationId: createChatConversation
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversationCreated"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: idempotency-key-reused
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: chat-quota (resumeAt); no conversation is created
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: chat-disabled; no conversation is created
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{conversationId}/messages:
+    post:
+      tags:
+      - message-controller
+      operationId: sendChatMessage
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatSendMessage"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageSent"
+        "400":
+          description: "validation-failed (errors.text, errors.attachments, errors.Idempotency-Key)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: chat-turn-in-progress
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: idempotency-key-reused
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: chat-quota (resumeAt)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: chat-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{conversationId}/messages/{messageId}/stop:
+    post:
+      tags:
+      - message-controller
+      operationId: stopChatMessage
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          description: Accepted
+        "404":
+          description: chat-conversation-not-found or chat-message-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{conversationId}/messages/{messageId}/retry:
+    post:
+      tags:
+      - message-controller
+      operationId: retryChatMessage
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageSent"
+        "400":
+          description: validation-failed (errors.Idempotency-Key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found or chat-message-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: chat-turn-in-progress or chat-turn-not-retryable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: idempotency-key-reused
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: chat-quota (resumeAt)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: chat-disabled
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{conversationId}/cards/{messageId}/confirm:
+    post:
+      tags:
+      - card-controller
+      operationId: confirmChatCard
+      parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCardConfirm"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCardConfirmed"
+        "400":
+          description: chat-card-invalid (errors per refused field)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: "INSUFFICIENT_CREDITS (balance, required, shortfall); no run\
+            \ is started"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found or chat-message-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: chat-card-images-expired
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -1101,6 +1569,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/admin/workflows:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: createAdminWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/admin/workflows/{id}/steps:
+    post:
+      tags:
+      - admin-workflows-controller
+      operationId: addAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowStepResponse"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -1297,20 +1856,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-  /api/v1/workflows:
-    get:
-      tags:
-      - workflows-controller
-      operationId: listWorkflows
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkflowResponse"
   /api/v1/workflows/{id}:
     get:
       tags:
@@ -1330,6 +1875,265 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+    delete:
+      tags:
+      - workflows-controller
+      operationId: deleteWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - workflows-controller
+      operationId: updateStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/{id}:
+    delete:
+      tags:
+      - admin-workflows-controller
+      operationId: deleteAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/{id}/steps/{stepId}:
+    patch:
+      tags:
+      - admin-workflows-controller
+      operationId: updateAdminWorkflowStep
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStepRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/settings:
     get:
       tags:
@@ -1731,6 +2535,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceResponse"
+  /api/v1/chat/conversations/{id}/messages:
+    get:
+      tags:
+      - conversation-controller
+      operationId: listChatMessages
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/capabilities:
     get:
       tags:
@@ -2091,6 +2922,26 @@ components:
         expiresIn:
           type: integer
           format: int64
+    ChatConversationTitle:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 80
+    ChatConversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        lastActivityAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
     ProfileUpdateRequest:
       type: object
       properties:
@@ -2423,6 +3274,114 @@ components:
       - status
       - title
       - updatedAt
+    AdminChatSettingsUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required:
+      - enabled
+    AdminChatSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - enabled
+    CreateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        shared:
+          type: boolean
+      required:
+      - name
+    WorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        isShared:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStepResponse"
+        estimatedCredits:
+          type: integer
+          format: int64
+        available:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      required:
+      - available
+    WorkflowStepResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        stepOrder:
+          type: integer
+          format: int32
+        name:
+          type: string
+        type:
+          type: string
+        mode:
+          type: string
+          enum:
+          - inline
+          - remote
+        inputRef:
+          type:
+          - string
+          - "null"
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - mode
+    CreateStepRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
+      required:
+      - type
     RunOptionsRequest:
       type: object
       properties:
@@ -3005,6 +3964,133 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    Attachment:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+    ChatConversationCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 80
+        firstMessage:
+          $ref: "#/components/schemas/ChatFirstMessage"
+      required:
+      - firstMessage
+    ChatFirstMessage:
+      type: object
+      properties:
+        text:
+          type: string
+          maxLength: 4000
+          minLength: 1
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+          maxItems: 10
+    ChatConversationCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        lastActivityAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        userMessage:
+          $ref: "#/components/schemas/ChatMessage"
+        assistantMessageId:
+          type: string
+          format: uuid
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        seq:
+          type: integer
+          format: int32
+        role:
+          type: string
+        kind:
+          type: string
+        body:
+          type: string
+        payload:
+          type:
+          - object
+          - "null"
+          description: Card or run payload; shape depends on kind
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ChatSendMessage:
+      type: object
+      properties:
+        text:
+          type: string
+          maxLength: 4000
+          minLength: 1
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+          maxItems: 10
+    ChatMessageSent:
+      type: object
+      properties:
+        userMessage:
+          $ref: "#/components/schemas/ChatMessage"
+        assistantMessageId:
+          type: string
+          format: uuid
+    ChatCardConfirm:
+      type: object
+      properties:
+        acknowledgeCost:
+          type: boolean
+        productVideo:
+          $ref: "#/components/schemas/ChatCardProductVideo"
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+          maxItems: 10
+    ChatCardProductVideo:
+      type: object
+      properties:
+        productName:
+          type: string
+        description:
+          type: string
+        cta:
+          type: string
+        price:
+          type: string
+        promotion:
+          type: string
+    ChatCardConfirmed:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        card:
+          $ref: "#/components/schemas/ChatMessage"
     ResetPasswordRequest:
       type: object
       properties:
@@ -3152,53 +4238,35 @@ components:
       required:
       - body
       - status
-    WorkflowResponse:
+    UpdateWorkflowRequest:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
         name:
           type: string
-        isShared:
+          maxLength: 255
+          minLength: 0
+          pattern: (?s)\s*\S.*
+        shared:
           type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        steps:
-          type: array
-          items:
-            $ref: "#/components/schemas/WorkflowStepResponse"
-        estimatedCredits:
-          type: integer
-          format: int64
-        available:
-          type: boolean
-      required:
-      - available
-    WorkflowStepResponse:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        stepOrder:
-          type: integer
-          format: int32
-        name:
-          type: string
-        type:
-          type: string
-        mode:
+        status:
           type: string
           enum:
-          - inline
-          - remote
-      required:
-      - mode
+          - draft
+          - published
+          pattern: draft|published
+    UpdateStepRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 0
+        inputRef:
+          type: string
+          maxLength: 255
+          minLength: 0
+        config:
+          type: string
     SupportSettings:
       type: object
       properties:
@@ -3423,7 +4491,10 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        chat:
+          type: boolean
       required:
+      - chat
       - credits
       - emailConfirmation
       - passwordReset
@@ -3438,6 +4509,15 @@ components:
         balance:
           type: integer
           format: int64
+    ChatConversationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatConversation"
+        chatEnabled:
+          type: boolean
     CapabilitiesResponse:
       type: object
       properties:

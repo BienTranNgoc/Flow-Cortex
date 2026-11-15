@@ -9,6 +9,8 @@ import { Layout } from './Layout';
 import { Sidebar } from './Sidebar';
 import type { SidebarMode } from './sidebarMode';
 
+vi.mock('./useFeatures', () => ({ useFeatures: () => ({ chat: false }) }));
+
 /**
  * jsdom has no `showModal`/`close`; these mirror the browser closely enough for the drawer's own
  * logic, and Escape fires `cancel` the way a browser does for an open modal dialog.

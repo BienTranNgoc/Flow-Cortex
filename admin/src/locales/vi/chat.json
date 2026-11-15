@@ -1,0 +1,18 @@
+{
+  "common": {
+    "loading": "Đang tải…",
+    "loadFailed": "Không thể tải dữ liệu.",
+    "retry": "Thử lại",
+    "saveFailed": "Không thể lưu. Vui lòng thử lại."
+  },
+  "settings": {
+    "eyebrow": "Trò chuyện",
+    "title": "Cài đặt trò chuyện",
+    "description": "Tắt trò chuyện có hiệu lực ngay: thành viên không gửi được tin nhắn mới cho đến khi bật lại.",
+    "toggle": "Trò chuyện",
+    "stateOn": "Bật",
+    "stateOff": "Tắt",
+    "changedBy": "{{state}} bởi {{who}} lúc {{at}}",
+    "changedAt": "{{state}} lúc {{at}}"
+  }
+}

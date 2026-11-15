@@ -48,7 +48,7 @@ ALLOWED_FONTS: tuple[str, ...] = (
 # libass prints its font choice only at -loglevel verbose. It names the PostScript face, not the
 # family, so the family is looked up again from the file. The "failed to find any fallback" line
 # has no "(" after "fontselect:" and does not match.
-_FONTSELECT_RE = re.compile(r"fontselect:\s*\(([^,]+),[^)]*\)\s*->\s*([^,]+),")
+_FONTSELECT_RE = re.compile(r"fontselect:\s*\(([^,]+),[^)]*\)\s*->\s*([^,\s][^,]*),")
 _GLYPH_MISS_RE = re.compile(r"Glyph 0x([0-9A-Fa-f]+) not found")
 
 # Latin Extended-A/B, Latin Extended Additional and the combining marks of NFD input. A missing

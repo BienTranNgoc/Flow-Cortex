@@ -3,6 +3,7 @@ import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation } from 'react-router-dom';
 import { DOCS_ICON, DOCS_SUB_ITEMS, primaryNavItems } from './navItems';
+import { useFeatures } from './useFeatures';
 import './Sidebar.css';
 
 interface SidebarNavProps {
@@ -21,13 +22,22 @@ interface EntryProps {
   readonly onNavigate?: (() => void) | undefined;
 }
 
-function Entry({ to, label, icon: EntryIcon, rail, end = false, onNavigate }: Readonly<EntryProps>) {
+function Entry({
+  to,
+  label,
+  icon: EntryIcon,
+  rail,
+  end = false,
+  onNavigate,
+}: Readonly<EntryProps>) {
   return (
     <NavLink
       to={to}
       end={end}
       onClick={onNavigate}
-      className={({ isActive }) => (isActive ? 'sidebar-nav__link is-current' : 'sidebar-nav__link')}
+      className={({ isActive }) =>
+        isActive ? 'sidebar-nav__link is-current' : 'sidebar-nav__link'
+      }
     >
       {({ isActive }) => (
         <>
@@ -52,6 +62,7 @@ function Entry({ to, label, icon: EntryIcon, rail, end = false, onNavigate }: Re
 export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const { chat } = useFeatures();
   const onDocs = pathname.startsWith('/docs');
   const [docsOpen, setDocsOpen] = useState(onDocs);
   const docsListId = useId();
@@ -66,7 +77,7 @@ export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
   return (
     <nav className="sidebar-nav" aria-label={t('common.nav.label')}>
       <ul className="sidebar-nav__list">
-        {primaryNavItems(t).map((item) => (
+        {primaryNavItems(t, { chat }).map((item) => (
           <li key={item.to}>
             <Entry
               to={item.to}
@@ -104,7 +115,11 @@ export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
                 />
               </button>
               {docsOpen && (
-                <ul id={docsListId} className="sidebar-nav__sublist" aria-label={t('common.nav.docsGroup')}>
+                <ul
+                  id={docsListId}
+                  className="sidebar-nav__sublist"
+                  aria-label={t('common.nav.docsGroup')}
+                >
                   {DOCS_SUB_ITEMS.map((item) => (
                     <li key={item.to}>
                       <NavLink

@@ -1,5 +1,6 @@
 import { createAppI18n } from '@flow-cortex/i18n';
 import enAuth from '../locales/en/auth.json';
+import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
@@ -8,6 +9,7 @@ import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
 import enUsers from '../locales/en/users.json';
 import viAuth from '../locales/vi/auth.json';
+import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
@@ -28,6 +30,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: viDashboard,
     smsOutbox: viSmsOutbox,
     support: viSupport,
+    chat: viChat,
   },
   en: {
     common: enCommon,
@@ -38,6 +41,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: enDashboard,
     smsOutbox: enSmsOutbox,
     support: enSupport,
+    chat: enChat,
   },
 });
 

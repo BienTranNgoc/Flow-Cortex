@@ -34,6 +34,7 @@ jobs:
                      GF_SECURITY_ADMIN_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
             sed -i "s|^$key=.*|$key=$(openssl rand -hex 24)|" .env
           done
+          sed -i "s|^FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1=.*|FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1=$(openssl rand -base64 32)|" .env
           if grep -nE '^[A-Z0-9_]+=change-me' .env; then
             echo "::error::.env still holds a change-me placeholder"
             exit 1

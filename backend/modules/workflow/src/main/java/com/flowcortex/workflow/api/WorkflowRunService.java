@@ -38,6 +38,14 @@ public interface WorkflowRunService {
     RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName, RunOptions options, boolean acknowledgeCost);
 
+    /**
+     * {@link #startRun(UUID, UUID, String, UUID, List, String, RunOptions, boolean)} with default options, made
+     * idempotent per owner by {@code requestKey} ({@code null}: not idempotent). A key {@code currentUserId} already used returns that run
+     * unchanged, before any cost guard or upload copy; two racing starts with one key create one run.
+     */
+    RunView startRun(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
+            String originalName, boolean acknowledgeCost, String requestKey);
+
     /** {@link #startRun(UUID, UUID, String, UUID, String)} without an upload: a workflow whose first step takes text. */
     RunView startRun(UUID currentUserId, UUID workflowId, String input);
 
