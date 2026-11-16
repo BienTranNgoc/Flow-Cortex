@@ -5,10 +5,29 @@
  * OpenAPI spec version: v1.0
  */
 import { customFetch } from '../customFetch';
+export interface ReorderStepsRequest {
+  /**
+   * @minItems 0
+   * @maxItems 32767
+   */
+  stepIds: string[];
+}
+
+export type ProblemDetailProperties = { [key: string]: unknown };
+
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  properties?: ProblemDetailProperties;
+}
+
 export interface UpdateUserRequest {
   email?: string;
   name?: string;
-  /** @pattern ADMIN|MEMBER|CREATOR */
+  /** @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR */
   role?: string;
   /** @pattern ACTIVE|SUSPENDED */
   status?: string;
@@ -49,26 +68,54 @@ export interface SetPasswordRequest {
   username?: string;
 }
 
-export type ProblemDetailProperties = { [key: string]: unknown };
-
-export interface ProblemDetail {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  properties?: ProblemDetailProperties;
-}
-
 export interface AccessTokenResponse {
   accessToken?: string;
   expiresIn?: number;
+}
+
+export interface ChatConversationTitle {
+  /** @maxLength 80 */
+  title?: string;
+}
+
+export interface ChatConversation {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
 }
 
 export interface ProfileUpdateRequest {
   /** @minLength 1 */
   name: string;
 }
+
+export type MeResponsePermissionsItem =
+  (typeof MeResponsePermissionsItem)[keyof typeof MeResponsePermissionsItem];
+
+export const MeResponsePermissionsItem = {
+  useraccountview: 'user.account.view',
+  useraccountcreate: 'user.account.create',
+  useraccountupdate: 'user.account.update',
+  useraccountchange_role: 'user.account.change_role',
+  useraccountsuspend: 'user.account.suspend',
+  useraccountdelete: 'user.account.delete',
+  workflowrunview: 'workflow.run.view',
+  workflowworkflowmanage: 'workflow.workflow.manage',
+  supportticketview: 'support.ticket.view',
+  supportticketreply: 'support.ticket.reply',
+  supportticketclose: 'support.ticket.close',
+  contenthelp_topicview: 'content.help_topic.view',
+  contenthelp_topicmanage: 'content.help_topic.manage',
+  contenthelp_articleview: 'content.help_article.view',
+  contenthelp_articlemanage: 'content.help_article.manage',
+  platformsettingview: 'platform.setting.view',
+  platformsettingupdate: 'platform.setting.update',
+  platformsms_outboxview: 'platform.sms_outbox.view',
+  systemroleview: 'system.role.view',
+  systemadmin_accountview: 'system.admin_account.view',
+  systemadmin_accountmanage: 'system.admin_account.manage',
+} as const;
 
 export interface MeResponse {
   id?: string;
@@ -78,6 +125,8 @@ export interface MeResponse {
   status?: string;
   hasPassword?: boolean;
   passwordSetupRequired?: boolean;
+  permissions: MeResponsePermissionsItem[];
+  adminDisabled: boolean;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -285,6 +334,124 @@ export interface AdminSupportKbArticle {
   updatedAt: string;
 }
 
+export interface AdminChatSettingsUpdate {
+  enabled: boolean;
+}
+
+export interface AdminChatSettings {
+  enabled: boolean;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface CreateWorkflowRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  name: string;
+  shared?: boolean;
+}
+
+export type WorkflowResponseStatus =
+  (typeof WorkflowResponseStatus)[keyof typeof WorkflowResponseStatus];
+
+export const WorkflowResponseStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export type WorkflowStepResponseMode =
+  (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
+
+export const WorkflowStepResponseMode = {
+  inline: 'inline',
+  remote: 'remote',
+} as const;
+
+export interface WorkflowStepResponse {
+  id?: string;
+  stepOrder?: number;
+  name?: string;
+  type?: string;
+  mode: WorkflowStepResponseMode;
+  /** @nullable */
+  inputRef?: string | null;
+  /** @nullable */
+  config?: string | null;
+}
+
+export interface WorkflowResponse {
+  id?: string;
+  name?: string;
+  isShared?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  steps?: WorkflowStepResponse[];
+  estimatedCredits?: number;
+  available: boolean;
+  status?: WorkflowResponseStatus;
+  /** @nullable */
+  publishedVersionId?: string | null;
+  /** @nullable */
+  servedVersion?: number | null;
+}
+
+export interface SaveVersionRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  changelog?: string;
+}
+
+export type WorkflowVersionResponseSource =
+  (typeof WorkflowVersionResponseSource)[keyof typeof WorkflowVersionResponseSource];
+
+export const WorkflowVersionResponseSource = {
+  manual: 'manual',
+  publish: 'publish',
+  rollback: 'rollback',
+  hotfix: 'hotfix',
+} as const;
+
+export interface WorkflowVersionResponse {
+  id: string;
+  version: number;
+  /** @nullable */
+  changelog?: string | null;
+  source: WorkflowVersionResponseSource;
+  /** @nullable */
+  restoredFromVersion?: number | null;
+  /** @nullable */
+  publishedBy?: string | null;
+  publishedAt: string;
+  /** @nullable */
+  releasedAt?: string | null;
+  published: boolean;
+}
+
+export interface VersionSavedResponse {
+  version: WorkflowVersionResponse;
+  deduplicated: boolean;
+}
+
+export interface CreateStepRequest {
+  /** @minLength 1 */
+  type: string;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  name?: string;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  inputRef?: string;
+  config?: string;
+}
+
 /**
  * @pattern female|male
  */
@@ -366,6 +533,33 @@ export interface RunResponse {
   chargedCredits?: number;
 }
 
+export interface PinVersionRequest {
+  /** @minimum 1 */
+  version: number;
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  reason?: string;
+}
+
+export interface VersionPinResponse {
+  /** @nullable */
+  pinnedVersion?: number | null;
+  /** @nullable */
+  reason?: string | null;
+  /** @nullable */
+  pinnedAt?: string | null;
+}
+
+export interface HotfixRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  note?: string;
+}
+
 export interface CreateUserRequest {
   /** @minLength 1 */
   email: string;
@@ -378,7 +572,7 @@ export interface CreateUserRequest {
   name: string;
   /**
    * @minLength 1
-   * @pattern ADMIN|MEMBER|CREATOR
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
    */
   role: string;
 }
@@ -621,6 +815,183 @@ export interface ProductVideoRunRequest {
   acknowledgeCost?: boolean;
 }
 
+export interface OnboardingResetResponse {
+  completed: boolean;
+}
+
+export type OnboardingQuizBodyPurposesItem =
+  (typeof OnboardingQuizBodyPurposesItem)[keyof typeof OnboardingQuizBodyPurposesItem];
+
+export const OnboardingQuizBodyPurposesItem = {
+  marketing_content: 'marketing_content',
+  automation: 'automation',
+  documents_reports: 'documents_reports',
+  customer_care: 'customer_care',
+  research: 'research',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodySource =
+  (typeof OnboardingQuizBodySource)[keyof typeof OnboardingQuizBodySource] | null;
+
+export const OnboardingQuizBodySource = {
+  facebook: 'facebook',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  google: 'google',
+  referral: 'referral',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodyAiLevel =
+  (typeof OnboardingQuizBodyAiLevel)[keyof typeof OnboardingQuizBodyAiLevel] | null;
+
+export const OnboardingQuizBodyAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingQuizBodyIndustriesItem =
+  (typeof OnboardingQuizBodyIndustriesItem)[keyof typeof OnboardingQuizBodyIndustriesItem];
+
+export const OnboardingQuizBodyIndustriesItem = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingQuizBodyContentTypesItem =
+  (typeof OnboardingQuizBodyContentTypesItem)[keyof typeof OnboardingQuizBodyContentTypesItem];
+
+export const OnboardingQuizBodyContentTypesItem = {
+  text: 'text',
+  image: 'image',
+  audio: 'audio',
+  video: 'video',
+  spreadsheet: 'spreadsheet',
+  document: 'document',
+  slide: 'slide',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingQuizBodyUsageType =
+  (typeof OnboardingQuizBodyUsageType)[keyof typeof OnboardingQuizBodyUsageType] | null;
+
+export const OnboardingQuizBodyUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+export interface OnboardingQuizBody {
+  /** @nullable */
+  purposes?: OnboardingQuizBodyPurposesItem[] | null;
+  /** @nullable */
+  source?: OnboardingQuizBodySource;
+  /** @nullable */
+  aiLevel?: OnboardingQuizBodyAiLevel;
+  /** @nullable */
+  industries?: OnboardingQuizBodyIndustriesItem[] | null;
+  /** @nullable */
+  contentTypes?: OnboardingQuizBodyContentTypesItem[] | null;
+  /** @nullable */
+  usageType?: OnboardingQuizBodyUsageType;
+  finished?: boolean;
+  skipped?: boolean;
+}
+
+export interface QuizSaveResponse {
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+  skipped?: boolean;
+}
+
+export type OnboardingProgressBodyStep =
+  (typeof OnboardingProgressBodyStep)[keyof typeof OnboardingProgressBodyStep];
+
+export const OnboardingProgressBodyStep = {
+  welcome: 'welcome',
+  'tour:home': 'tour:home',
+  'survey-intro': 'survey-intro',
+  quiz: 'quiz',
+  done: 'done',
+} as const;
+
+export interface OnboardingProgressBody {
+  step?: OnboardingProgressBodyStep;
+  /**
+   * @minimum 1
+   * @maximum 6
+   */
+  question?: number;
+  surveyDeferred?: boolean;
+  finished?: boolean;
+}
+
+export type OnboardingProgressStep =
+  (typeof OnboardingProgressStep)[keyof typeof OnboardingProgressStep];
+
+export const OnboardingProgressStep = {
+  welcome: 'welcome',
+  'tour:home': 'tour:home',
+  'survey-intro': 'survey-intro',
+  quiz: 'quiz',
+  done: 'done',
+} as const;
+
+export interface OnboardingProgress {
+  v?: number;
+  step?: OnboardingProgressStep;
+  /**
+   * @minimum 1
+   * @maximum 6
+   */
+  question?: number;
+  surveyDeferredAt?: string;
+  finishedAt?: string;
+  updatedAt?: string;
+}
+
+export interface OnboardingProgressResponse {
+  progress: OnboardingProgress;
+  completedAt?: string;
+}
+
+export interface BuilderProgressBody {
+  state: string;
+}
+
+export interface BuilderOnboardingResponse {
+  state: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export type BuilderCompleteBodyReason =
+  (typeof BuilderCompleteBodyReason)[keyof typeof BuilderCompleteBodyReason];
+
+export const BuilderCompleteBodyReason = {
+  skipped: 'skipped',
+  finished: 'finished',
+} as const;
+
+export interface BuilderCompleteBody {
+  reason?: BuilderCompleteBodyReason;
+}
+
 export interface VerifyCodeRequest {
   /** @pattern ^\d{6}$ */
   code: string;
@@ -644,6 +1015,194 @@ export interface SendCodeResponse {
   /** Seconds before a resend is accepted */
   resendAfterSeconds: number;
   expiresAt: string;
+}
+
+export type EmailLinkUnsubscribedList =
+  (typeof EmailLinkUnsubscribedList)[keyof typeof EmailLinkUnsubscribedList];
+
+export const EmailLinkUnsubscribedList = {
+  care: 'care',
+  marketing: 'marketing',
+} as const;
+
+export interface EmailLinkUnsubscribed {
+  unsubscribed: boolean;
+  list: EmailLinkUnsubscribedList;
+  maskedEmail: string;
+}
+
+export interface EmailLinkOneClick {
+  ok: boolean;
+}
+
+export interface TelegramRefreshChatsRequest {
+  chatId?: number;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  title?: string;
+  /** @pattern private|group|supergroup|channel */
+  type?: string;
+}
+
+export interface Chat {
+  id?: number;
+  title?: string;
+  type?: string;
+}
+
+export interface TelegramChatList {
+  chats?: Chat[];
+}
+
+export interface TelegramConnectRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  botToken: string;
+}
+
+export interface TelegramConnection {
+  provider?: string;
+  botUsername?: string;
+  botId?: number;
+  state?: string;
+  chats?: Chat[];
+  defaultChatId?: number;
+  usageEnabled?: boolean;
+}
+
+export type SaveRequestExtraHeaders = { [key: string]: string };
+
+export interface SaveRequest {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  key?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  label?: string;
+  /** @pattern bearer|header|query */
+  authType: string;
+  /**
+   * @minLength 0
+   * @maxLength 4096
+   */
+  token?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  baseUrl?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  headerName?: string;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  paramName?: string;
+  extraHeaders?: SaveRequestExtraHeaders;
+}
+
+export interface Saved {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+}
+
+export interface Attachment {
+  uploadId?: string;
+  fileName?: string;
+}
+
+export interface ChatFirstMessage {
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   */
+  text?: string;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatConversationCreate {
+  /** @maxLength 80 */
+  title?: string;
+  firstMessage: ChatFirstMessage;
+}
+
+/**
+ * Card or run payload; shape depends on kind
+ * @nullable
+ */
+export type ChatMessagePayload = { [key: string]: unknown } | null;
+
+export interface ChatMessage {
+  id?: string;
+  seq?: number;
+  role?: string;
+  kind?: string;
+  body?: string;
+  /**
+   * Card or run payload; shape depends on kind
+   * @nullable
+   */
+  payload?: ChatMessagePayload;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface ChatConversationCreated {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+  userMessage?: ChatMessage;
+  assistantMessageId?: string;
+}
+
+export interface ChatSendMessage {
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   */
+  text?: string;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatMessageSent {
+  userMessage?: ChatMessage;
+  assistantMessageId?: string;
+}
+
+export interface ChatCardProductVideo {
+  productName?: string;
+  description?: string;
+  cta?: string;
+  price?: string;
+  promotion?: string;
+}
+
+export interface ChatCardConfirm {
+  acknowledgeCost?: boolean;
+  productVideo?: ChatCardProductVideo;
+  /** @maxItems 10 */
+  attachments?: Attachment[];
+}
+
+export interface ChatCardConfirmed {
+  runId?: string;
+  card?: ChatMessage;
 }
 
 export interface ResetPasswordRequest {
@@ -755,31 +1314,223 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
-export type WorkflowStepResponseMode =
-  (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
+export interface AdminAccountResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  adminDisabled: boolean;
+  adminDisabledAt?: string;
+  createdAt: string;
+}
 
-export const WorkflowStepResponseMode = {
+/**
+ * @pattern draft|published
+ */
+export type UpdateWorkflowRequestStatus =
+  (typeof UpdateWorkflowRequestStatus)[keyof typeof UpdateWorkflowRequestStatus];
+
+export const UpdateWorkflowRequestStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export interface UpdateWorkflowRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   * @pattern (?s)\s*\S.*
+   */
+  name?: string;
+  shared?: boolean;
+  /** @pattern draft|published */
+  status?: UpdateWorkflowRequestStatus;
+}
+
+export interface RenameVersionRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  changelog: string;
+}
+
+export interface UpdateStepRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  name?: string;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  inputRef?: string;
+  config?: string;
+}
+
+export interface PublishedVersionRequest {
+  versionId?: string;
+}
+
+export interface TelegramDefaultChatRequest {
+  chatId: number;
+}
+
+export interface TelegramDefaultChat {
+  state?: string;
+  defaultChatId?: number;
+}
+
+export interface ChangeRoleRequest {
+  /**
+   * @minLength 1
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   */
+  role: string;
+}
+
+export interface WorkflowVersionPageResponse {
+  items: WorkflowVersionResponse[];
+  /** @nullable */
+  nextBeforeVersion?: number | null;
+}
+
+export interface SnapshotStepResponse {
+  id: string;
+  stepOrder: number;
+  /** @nullable */
+  name?: string | null;
+  type: string;
+  /** @nullable */
+  inputRef?: string | null;
+  /** @nullable */
+  config?: string | null;
+}
+
+export interface SnapshotResponse {
+  name: string;
+  skeleton: boolean;
+  steps: SnapshotStepResponse[];
+}
+
+export interface WorkflowVersionDetailResponse {
+  version: WorkflowVersionResponse;
+  snapshot: SnapshotResponse;
+}
+
+export type EdgeKind = (typeof EdgeKind)[keyof typeof EdgeKind];
+
+export const EdgeKind = {
+  previous: 'previous',
+  reference: 'reference',
+  outputInput: 'outputInput',
+} as const;
+
+export interface Edge {
+  fromStepId?: string;
+  toStepId?: string;
+  kind: EdgeKind;
+}
+
+export type NodeMode = (typeof NodeMode)[keyof typeof NodeMode];
+
+export const NodeMode = {
   inline: 'inline',
   remote: 'remote',
 } as const;
 
-export interface WorkflowStepResponse {
+export interface Node {
   id?: string;
   stepOrder?: number;
   name?: string;
   type?: string;
-  mode: WorkflowStepResponseMode;
+  mode: NodeMode;
+  readsRunInput?: boolean;
 }
 
-export interface WorkflowResponse {
-  id?: string;
-  name?: string;
-  isShared?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-  steps?: WorkflowStepResponse[];
-  estimatedCredits?: number;
-  available: boolean;
+export type ProblemKind = (typeof ProblemKind)[keyof typeof ProblemKind];
+
+export const ProblemKind = {
+  MALFORMED: 'MALFORMED',
+  UNKNOWN_STEP: 'UNKNOWN_STEP',
+  AMBIGUOUS_NAME: 'AMBIGUOUS_NAME',
+  NOT_EARLIER: 'NOT_EARLIER',
+} as const;
+
+export interface Problem {
+  stepId?: string;
+  stepOrder?: number;
+  kind: ProblemKind;
+}
+
+export interface WorkflowGraphResponse {
+  workflowId?: string;
+  nodes?: Node[];
+  edges?: Edge[];
+  problems?: Problem[];
+}
+
+export interface DiffSideResponse {
+  ref: string;
+  /** @nullable */
+  version?: number | null;
+}
+
+export interface JsonNode {}
+
+export interface NameChangeResponse {
+  changed: boolean;
+  /** @nullable */
+  before?: string | null;
+  /** @nullable */
+  after?: string | null;
+}
+
+export type StepChangeResponseStatus =
+  (typeof StepChangeResponseStatus)[keyof typeof StepChangeResponseStatus];
+
+export const StepChangeResponseStatus = {
+  added: 'added',
+  removed: 'removed',
+  modified: 'modified',
+  moved: 'moved',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StepChangeResponseBefore = { [key: string]: JsonNode } | null;
+
+/**
+ * @nullable
+ */
+export type StepChangeResponseAfter = { [key: string]: JsonNode } | null;
+
+export interface StepChangeResponse {
+  stepId: string;
+  status: StepChangeResponseStatus;
+  /** @nullable */
+  fromOrder?: number | null;
+  /** @nullable */
+  toOrder?: number | null;
+  /** @nullable */
+  name?: string | null;
+  type: string;
+  changedFields: string[];
+  /** @nullable */
+  before?: StepChangeResponseBefore;
+  /** @nullable */
+  after?: StepChangeResponseAfter;
+}
+
+export interface WorkflowVersionDiffResponse {
+  source: DiffSideResponse;
+  target: DiffSideResponse;
+  skeleton: boolean;
+  name: NameChangeResponse;
+  steps: StepChangeResponse[];
 }
 
 export interface SupportSettings {
@@ -892,6 +1643,177 @@ export interface OutputUrlResponse {
   expiresAt: string;
 }
 
+export interface RunInputResponse {
+  bindingKey: string;
+  kind: string;
+  mimeType: string;
+  url: string;
+  expiresAt: string;
+}
+
+export type OnboardingStatusResponsePurposesItem =
+  (typeof OnboardingStatusResponsePurposesItem)[keyof typeof OnboardingStatusResponsePurposesItem];
+
+export const OnboardingStatusResponsePurposesItem = {
+  marketing_content: 'marketing_content',
+  automation: 'automation',
+  documents_reports: 'documents_reports',
+  customer_care: 'customer_care',
+  research: 'research',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseSource =
+  (typeof OnboardingStatusResponseSource)[keyof typeof OnboardingStatusResponseSource] | null;
+
+export const OnboardingStatusResponseSource = {
+  facebook: 'facebook',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  google: 'google',
+  referral: 'referral',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseAiLevel =
+  (typeof OnboardingStatusResponseAiLevel)[keyof typeof OnboardingStatusResponseAiLevel] | null;
+
+export const OnboardingStatusResponseAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingStatusResponseIndustriesItem =
+  (typeof OnboardingStatusResponseIndustriesItem)[keyof typeof OnboardingStatusResponseIndustriesItem];
+
+export const OnboardingStatusResponseIndustriesItem = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingStatusResponseContentTypesItem =
+  (typeof OnboardingStatusResponseContentTypesItem)[keyof typeof OnboardingStatusResponseContentTypesItem];
+
+export const OnboardingStatusResponseContentTypesItem = {
+  text: 'text',
+  image: 'image',
+  audio: 'audio',
+  video: 'video',
+  spreadsheet: 'spreadsheet',
+  document: 'document',
+  slide: 'slide',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseUsageType =
+  (typeof OnboardingStatusResponseUsageType)[keyof typeof OnboardingStatusResponseUsageType] | null;
+
+export const OnboardingStatusResponseUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingStatusResponseEntry =
+  (typeof OnboardingStatusResponseEntry)[keyof typeof OnboardingStatusResponseEntry] | null;
+
+export const OnboardingStatusResponseEntry = {
+  first: 'first',
+} as const;
+
+export interface OnboardingStatusResponse {
+  completed: boolean;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  purposes: OnboardingStatusResponsePurposesItem[] | null;
+  /** @nullable */
+  source: OnboardingStatusResponseSource;
+  /** @nullable */
+  aiLevel: OnboardingStatusResponseAiLevel;
+  /** @nullable */
+  industries: OnboardingStatusResponseIndustriesItem[] | null;
+  /** @nullable */
+  contentTypes: OnboardingStatusResponseContentTypesItem[] | null;
+  /** @nullable */
+  usageType: OnboardingStatusResponseUsageType;
+  progress: OnboardingProgress;
+  firstRunDone: boolean;
+  open: boolean;
+  /** @nullable */
+  entry: OnboardingStatusResponseEntry;
+}
+
+export type OnboardingResultResponseIndustry =
+  (typeof OnboardingResultResponseIndustry)[keyof typeof OnboardingResultResponseIndustry];
+
+export const OnboardingResultResponseIndustry = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+export type OnboardingResultResponseTrack =
+  (typeof OnboardingResultResponseTrack)[keyof typeof OnboardingResultResponseTrack];
+
+export const OnboardingResultResponseTrack = {
+  marketing: 'marketing',
+  sales: 'sales',
+  finance: 'finance',
+  hr: 'hr',
+  tech: 'tech',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OnboardingResultResponseAiLevel =
+  (typeof OnboardingResultResponseAiLevel)[keyof typeof OnboardingResultResponseAiLevel] | null;
+
+export const OnboardingResultResponseAiLevel = {
+  beginner: 'beginner',
+  tried: 'tried',
+  automation: 'automation',
+  builder: 'builder',
+} as const;
+
+export type OnboardingResultResponseUsageType =
+  (typeof OnboardingResultResponseUsageType)[keyof typeof OnboardingResultResponseUsageType];
+
+export const OnboardingResultResponseUsageType = {
+  personal: 'personal',
+  team: 'team',
+} as const;
+
+export interface OnboardingResultResponse {
+  completed: boolean;
+  industry: OnboardingResultResponseIndustry;
+  track: OnboardingResultResponseTrack;
+  /** @nullable */
+  aiLevel: OnboardingResultResponseAiLevel;
+  usageType: OnboardingResultResponseUsageType;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -908,10 +1830,49 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  onboarding: boolean;
+  chat: boolean;
+}
+
+export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
+
+export const EmailLinkViewList = {
+  care: 'care',
+  marketing: 'marketing',
+} as const;
+
+export interface EmailLinkView {
+  valid: boolean;
+  list: EmailLinkViewList;
+  unsubscribed: boolean;
+  maskedEmail: string;
 }
 
 export interface BalanceResponse {
   balance?: number;
+  granted?: number;
+}
+
+export interface TelegramHealth {
+  valid?: boolean;
+  provider?: string;
+  botUsername?: string;
+  reason?: string;
+}
+
+export interface Summary {
+  key?: string;
+  label?: string;
+  authType?: string;
+  baseUrl?: string;
+  headerName?: string;
+  paramName?: string;
+  extraHeaderNames?: string[];
+}
+
+export interface ChatConversationList {
+  items?: ChatConversation[];
+  chatEnabled?: boolean;
 }
 
 export interface CapabilitiesResponse {
@@ -1010,6 +1971,40 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+export type RoleResponsePermissionsItem =
+  (typeof RoleResponsePermissionsItem)[keyof typeof RoleResponsePermissionsItem];
+
+export const RoleResponsePermissionsItem = {
+  useraccountview: 'user.account.view',
+  useraccountcreate: 'user.account.create',
+  useraccountupdate: 'user.account.update',
+  useraccountchange_role: 'user.account.change_role',
+  useraccountsuspend: 'user.account.suspend',
+  useraccountdelete: 'user.account.delete',
+  workflowrunview: 'workflow.run.view',
+  workflowworkflowmanage: 'workflow.workflow.manage',
+  supportticketview: 'support.ticket.view',
+  supportticketreply: 'support.ticket.reply',
+  supportticketclose: 'support.ticket.close',
+  contenthelp_topicview: 'content.help_topic.view',
+  contenthelp_topicmanage: 'content.help_topic.manage',
+  contenthelp_articleview: 'content.help_article.view',
+  contenthelp_articlemanage: 'content.help_article.manage',
+  platformsettingview: 'platform.setting.view',
+  platformsettingupdate: 'platform.setting.update',
+  platformsms_outboxview: 'platform.sms_outbox.view',
+  systemroleview: 'system.role.view',
+  systemadmin_accountview: 'system.admin_account.view',
+  systemadmin_accountmanage: 'system.admin_account.manage',
+} as const;
+
+export interface RoleResponse {
+  code: string;
+  staff: boolean;
+  superAdmin: boolean;
+  permissions: RoleResponsePermissionsItem[];
+}
+
 export interface MediaJobResponse {
   jobId: string;
   runId: string;
@@ -1035,6 +2030,40 @@ export interface PageViewMediaJobResponse {
   size: number;
   total: number;
 }
+
+export interface PageViewAdminAccountResponse {
+  items: AdminAccountResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type ListWorkflowVersionsParams = {
+  /**
+   * @minimum 1
+   */
+  beforeVersion?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type UnsubscribeEmailLinkParams = {
+  src?: string;
+};
+
+export type OneClickUnsubscribeEmailLinkParams = {
+  src?: string;
+};
+
+export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
+
+export type DiffWorkflowVersionsParams = {
+  source?: string;
+  target?: string;
+};
 
 export type SearchSupportKbParams = {
   /**
@@ -1153,6 +2182,97 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type ListAdminAccountsParams = {
+  /**
+   * @pattern ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+   */
+  role?: string;
+  q?: string;
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
+export type reorderWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderWorkflowStepsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type reorderWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderWorkflowStepsResponseError = (
+  | reorderWorkflowStepsResponse400
+  | reorderWorkflowStepsResponse403
+  | reorderWorkflowStepsResponse404
+  | reorderWorkflowStepsResponse409
+  | reorderWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderWorkflowStepsResponse = reorderWorkflowStepsResponseError;
+
+export const getReorderWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/steps/order`;
+};
+
+export const reorderWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderWorkflowStepsResponse>(getReorderWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
+  });
+};
 
 export type getResponse200 = {
   data: UserResponse;
@@ -1307,6 +2427,103 @@ export const setPassword = async (
   });
 };
 
+export type renameChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type renameChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameChatConversationResponseSuccess = renameChatConversationResponse200 & {
+  headers: Headers;
+};
+export type renameChatConversationResponseError = (
+  renameChatConversationResponse400 | renameChatConversationResponse404
+) & {
+  headers: Headers;
+};
+
+export type renameChatConversationResponse =
+  renameChatConversationResponseSuccess | renameChatConversationResponseError;
+
+export const getRenameChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}`;
+};
+
+export const renameChatConversation = async (
+  id: string,
+  chatConversationTitle: ChatConversationTitle,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameChatConversationResponse>(getRenameChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationTitle),
+  });
+};
+
+export type deleteChatConversationResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteChatConversationResponseSuccess = deleteChatConversationResponse204 & {
+  headers: Headers;
+};
+export type deleteChatConversationResponseError = deleteChatConversationResponse404 & {
+  headers: Headers;
+};
+
+export type deleteChatConversationResponse =
+  deleteChatConversationResponseSuccess | deleteChatConversationResponseError;
+
+export const getDeleteChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}`;
+};
+
+export const deleteChatConversation = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteChatConversationResponse> => {
+  return customFetch<deleteChatConversationResponse>(getDeleteChatConversationUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type updateProfileResponse200 = {
   data: MeResponse;
   status: 200;
@@ -1349,6 +2566,73 @@ export const updateProfile = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(profileUpdateRequest),
+  });
+};
+
+export type reorderAdminWorkflowStepsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminWorkflowStepsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reorderAdminWorkflowStepsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminWorkflowStepsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reorderAdminWorkflowStepsResponseError = (
+  | reorderAdminWorkflowStepsResponse400
+  | reorderAdminWorkflowStepsResponse404
+  | reorderAdminWorkflowStepsResponse409
+  | reorderAdminWorkflowStepsResponse422
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminWorkflowStepsResponse = reorderAdminWorkflowStepsResponseError;
+
+export const getReorderAdminWorkflowStepsUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/order`;
+};
+
+export const reorderAdminWorkflowSteps = async (
+  id: string,
+  reorderStepsRequest: ReorderStepsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminWorkflowStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminWorkflowStepsResponse>(getReorderAdminWorkflowStepsUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reorderStepsRequest),
   });
 };
 
@@ -1774,6 +3058,475 @@ export const updateAdminSupportKbArticle = async (
   });
 };
 
+export type getAdminChatSettingsResponse200 = {
+  data: AdminChatSettings;
+  status: 200;
+};
+
+export type getAdminChatSettingsResponseSuccess = getAdminChatSettingsResponse200 & {
+  headers: Headers;
+};
+export type getAdminChatSettingsResponse = getAdminChatSettingsResponseSuccess;
+
+export const getGetAdminChatSettingsUrl = () => {
+  return `/api/v1/admin/chat/settings`;
+};
+
+export const getAdminChatSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminChatSettingsResponse> => {
+  return customFetch<getAdminChatSettingsResponse>(getGetAdminChatSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateAdminChatSettingsResponse200 = {
+  data: AdminChatSettings;
+  status: 200;
+};
+
+export type updateAdminChatSettingsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminChatSettingsResponseSuccess = updateAdminChatSettingsResponse200 & {
+  headers: Headers;
+};
+export type updateAdminChatSettingsResponseError = updateAdminChatSettingsResponse400 & {
+  headers: Headers;
+};
+
+export type updateAdminChatSettingsResponse =
+  updateAdminChatSettingsResponseSuccess | updateAdminChatSettingsResponseError;
+
+export const getUpdateAdminChatSettingsUrl = () => {
+  return `/api/v1/admin/chat/settings`;
+};
+
+export const updateAdminChatSettings = async (
+  adminChatSettingsUpdate: AdminChatSettingsUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminChatSettingsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminChatSettingsResponse>(getUpdateAdminChatSettingsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminChatSettingsUpdate),
+  });
+};
+
+export type listWorkflowsResponse200 = {
+  data: WorkflowResponse[];
+  status: 200;
+};
+
+export type listWorkflowsResponseSuccess = listWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowsResponse = listWorkflowsResponseSuccess;
+
+export const getListWorkflowsUrl = () => {
+  return `/api/v1/workflows`;
+};
+
+export const listWorkflows = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowsResponse> => {
+  return customFetch<listWorkflowsResponse>(getListWorkflowsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type createWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type createWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
+  headers: Headers;
+};
+export type createWorkflowResponseError = (
+  | createWorkflowResponse400
+  | createWorkflowResponse403
+  | createWorkflowResponse404
+  | createWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createWorkflowResponse = createWorkflowResponseSuccess | createWorkflowResponseError;
+
+export const getCreateWorkflowUrl = () => {
+  return `/api/v1/workflows`;
+};
+
+export const createWorkflow = async (
+  createWorkflowRequest: CreateWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createWorkflowResponse>(getCreateWorkflowUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createWorkflowRequest),
+  });
+};
+
+export type listWorkflowVersionsResponse200 = {
+  data: WorkflowVersionPageResponse;
+  status: 200;
+};
+
+export type listWorkflowVersionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listWorkflowVersionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listWorkflowVersionsResponseSuccess = listWorkflowVersionsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowVersionsResponseError = (
+  listWorkflowVersionsResponse400 | listWorkflowVersionsResponse404
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowVersionsResponse =
+  listWorkflowVersionsResponseSuccess | listWorkflowVersionsResponseError;
+
+export const getListWorkflowVersionsUrl = (id: string, params?: ListWorkflowVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/versions?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/versions`;
+};
+
+export const listWorkflowVersions = async (
+  id: string,
+  params?: ListWorkflowVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowVersionsResponse> => {
+  return customFetch<listWorkflowVersionsResponse>(getListWorkflowVersionsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveWorkflowVersionResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type saveWorkflowVersionResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type saveWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type saveWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type saveWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type saveWorkflowVersionResponseSuccess = (
+  saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
+) & {
+  headers: Headers;
+};
+export type saveWorkflowVersionResponseError = (
+  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
+) & {
+  headers: Headers;
+};
+
+export type saveWorkflowVersionResponse =
+  saveWorkflowVersionResponseSuccess | saveWorkflowVersionResponseError;
+
+export const getSaveWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/versions`;
+};
+
+export const saveWorkflowVersion = async (
+  id: string,
+  saveVersionRequest?: SaveVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveWorkflowVersionResponse>(getSaveWorkflowVersionUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveVersionRequest),
+  });
+};
+
+export type rollbackWorkflowVersionResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type rollbackWorkflowVersionResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type rollbackWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type rollbackWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type rollbackWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type rollbackWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type rollbackWorkflowVersionResponseSuccess = (
+  rollbackWorkflowVersionResponse200 | rollbackWorkflowVersionResponse201
+) & {
+  headers: Headers;
+};
+export type rollbackWorkflowVersionResponseError = (
+  | rollbackWorkflowVersionResponse400
+  | rollbackWorkflowVersionResponse403
+  | rollbackWorkflowVersionResponse404
+  | rollbackWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type rollbackWorkflowVersionResponse =
+  rollbackWorkflowVersionResponseSuccess | rollbackWorkflowVersionResponseError;
+
+export const getRollbackWorkflowVersionUrl = (id: string, version: number) => {
+  return `/api/v1/workflows/${id}/versions/${version}/rollback`;
+};
+
+export const rollbackWorkflowVersion = async (
+  id: string,
+  version: number,
+  saveVersionRequest?: SaveVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<rollbackWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<rollbackWorkflowVersionResponse>(getRollbackWorkflowVersionUrl(id, version), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveVersionRequest),
+  });
+};
+
+export type addStepResponse201 = {
+  data: WorkflowStepResponse;
+  status: 201;
+};
+
+export type addStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type addStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type addStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type addStepResponseSuccess = addStepResponse201 & {
+  headers: Headers;
+};
+export type addStepResponseError = (
+  | addStepResponse400
+  | addStepResponse403
+  | addStepResponse404
+  | addStepResponse409
+  | addStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addStepResponse = addStepResponseSuccess | addStepResponseError;
+
+export const getAddStepUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/steps`;
+};
+
+export const addStep = async (
+  id: string,
+  createStepRequest: CreateStepRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<addStepResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<addStepResponse>(getAddStepUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createStepRequest),
+  });
+};
+
 export type startRunResponse200 = {
   data: RunResponse;
   status: 200;
@@ -1817,6 +3570,216 @@ export const startRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(startRunRequest),
+  });
+};
+
+export type getWorkflowVersionPinResponse200 = {
+  data: VersionPinResponse;
+  status: 200;
+};
+
+export type getWorkflowVersionPinResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowVersionPinResponseSuccess = getWorkflowVersionPinResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowVersionPinResponseError = getWorkflowVersionPinResponse404 & {
+  headers: Headers;
+};
+
+export type getWorkflowVersionPinResponse =
+  getWorkflowVersionPinResponseSuccess | getWorkflowVersionPinResponseError;
+
+export const getGetWorkflowVersionPinUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const getWorkflowVersionPin = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowVersionPinResponse> => {
+  return customFetch<getWorkflowVersionPinResponse>(getGetWorkflowVersionPinUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type pinWorkflowVersionResponse200 = {
+  data: VersionPinResponse;
+  status: 200;
+};
+
+export type pinWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type pinWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pinWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
+  headers: Headers;
+};
+export type pinWorkflowVersionResponseError = (
+  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type pinWorkflowVersionResponse =
+  pinWorkflowVersionResponseSuccess | pinWorkflowVersionResponseError;
+
+export const getPinWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const pinWorkflowVersion = async (
+  id: string,
+  pinVersionRequest: PinVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<pinWorkflowVersionResponse>(getPinWorkflowVersionUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(pinVersionRequest),
+  });
+};
+
+export type unpinWorkflowVersionResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type unpinWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
+  headers: Headers;
+};
+export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
+  headers: Headers;
+};
+
+export type unpinWorkflowVersionResponse =
+  unpinWorkflowVersionResponseSuccess | unpinWorkflowVersionResponseError;
+
+export const getUnpinWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/pin`;
+};
+
+export const unpinWorkflowVersion = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<unpinWorkflowVersionResponse> => {
+  return customFetch<unpinWorkflowVersionResponse>(getUnpinWorkflowVersionUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type hotfixWorkflowResponse200 = {
+  data: VersionSavedResponse;
+  status: 200;
+};
+
+export type hotfixWorkflowResponse201 = {
+  data: VersionSavedResponse;
+  status: 201;
+};
+
+export type hotfixWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type hotfixWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type hotfixWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type hotfixWorkflowResponseSuccess = (
+  hotfixWorkflowResponse200 | hotfixWorkflowResponse201
+) & {
+  headers: Headers;
+};
+export type hotfixWorkflowResponseError = (
+  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
+) & {
+  headers: Headers;
+};
+
+export type hotfixWorkflowResponse = hotfixWorkflowResponseSuccess | hotfixWorkflowResponseError;
+
+export const getHotfixWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/hotfix`;
+};
+
+export const hotfixWorkflow = async (
+  id: string,
+  hotfixRequest?: HotfixRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<hotfixWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<hotfixWorkflowResponse>(getHotfixWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(hotfixRequest),
   });
 };
 
@@ -2626,6 +4589,356 @@ export const startProductVideoRun = async (
   });
 };
 
+export type resetOnboardingResponse200 = {
+  data: OnboardingResetResponse;
+  status: 200;
+};
+
+export type resetOnboardingResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type resetOnboardingResponseSuccess = resetOnboardingResponse200 & {
+  headers: Headers;
+};
+export type resetOnboardingResponseError = resetOnboardingResponse401 & {
+  headers: Headers;
+};
+
+export type resetOnboardingResponse = resetOnboardingResponseSuccess | resetOnboardingResponseError;
+
+export const getResetOnboardingUrl = () => {
+  return `/api/v1/onboarding/reset`;
+};
+
+export const resetOnboarding = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetOnboardingResponse> => {
+  return customFetch<resetOnboardingResponse>(getResetOnboardingUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type saveOnboardingQuizResponse200 = {
+  data: QuizSaveResponse;
+  status: 200;
+};
+
+export type saveOnboardingQuizResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveOnboardingQuizResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveOnboardingQuizResponseSuccess = saveOnboardingQuizResponse200 & {
+  headers: Headers;
+};
+export type saveOnboardingQuizResponseError = (
+  saveOnboardingQuizResponse401 | saveOnboardingQuizResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveOnboardingQuizResponse =
+  saveOnboardingQuizResponseSuccess | saveOnboardingQuizResponseError;
+
+export const getSaveOnboardingQuizUrl = () => {
+  return `/api/v1/onboarding/quiz`;
+};
+
+export const saveOnboardingQuiz = async (
+  onboardingQuizBody: OnboardingQuizBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveOnboardingQuizResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveOnboardingQuizResponse>(getSaveOnboardingQuizUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingQuizBody),
+  });
+};
+
+export type patchOnboardingQuizResponse200 = {
+  data: QuizSaveResponse;
+  status: 200;
+};
+
+export type patchOnboardingQuizResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type patchOnboardingQuizResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type patchOnboardingQuizResponseSuccess = patchOnboardingQuizResponse200 & {
+  headers: Headers;
+};
+export type patchOnboardingQuizResponseError = (
+  patchOnboardingQuizResponse401 | patchOnboardingQuizResponse422
+) & {
+  headers: Headers;
+};
+
+export type patchOnboardingQuizResponse =
+  patchOnboardingQuizResponseSuccess | patchOnboardingQuizResponseError;
+
+export const getPatchOnboardingQuizUrl = () => {
+  return `/api/v1/onboarding/quiz`;
+};
+
+export const patchOnboardingQuiz = async (
+  onboardingQuizBody: OnboardingQuizBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<patchOnboardingQuizResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<patchOnboardingQuizResponse>(getPatchOnboardingQuizUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingQuizBody),
+  });
+};
+
+export type saveOnboardingProgressResponse200 = {
+  data: OnboardingProgressResponse;
+  status: 200;
+};
+
+export type saveOnboardingProgressResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveOnboardingProgressResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type saveOnboardingProgressResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveOnboardingProgressResponseSuccess = saveOnboardingProgressResponse200 & {
+  headers: Headers;
+};
+export type saveOnboardingProgressResponseError = (
+  | saveOnboardingProgressResponse401
+  | saveOnboardingProgressResponse409
+  | saveOnboardingProgressResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveOnboardingProgressResponse =
+  saveOnboardingProgressResponseSuccess | saveOnboardingProgressResponseError;
+
+export const getSaveOnboardingProgressUrl = () => {
+  return `/api/v1/onboarding/progress`;
+};
+
+export const saveOnboardingProgress = async (
+  onboardingProgressBody: OnboardingProgressBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveOnboardingProgressResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveOnboardingProgressResponse>(getSaveOnboardingProgressUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(onboardingProgressBody),
+  });
+};
+
+export type saveBuilderOnboardingProgressResponse200 = {
+  data: BuilderOnboardingResponse;
+  status: 200;
+};
+
+export type saveBuilderOnboardingProgressResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type saveBuilderOnboardingProgressResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type saveBuilderOnboardingProgressResponseSuccess =
+  saveBuilderOnboardingProgressResponse200 & {
+    headers: Headers;
+  };
+export type saveBuilderOnboardingProgressResponseError = (
+  saveBuilderOnboardingProgressResponse401 | saveBuilderOnboardingProgressResponse422
+) & {
+  headers: Headers;
+};
+
+export type saveBuilderOnboardingProgressResponse =
+  saveBuilderOnboardingProgressResponseSuccess | saveBuilderOnboardingProgressResponseError;
+
+export const getSaveBuilderOnboardingProgressUrl = () => {
+  return `/api/v1/onboarding/builder/progress`;
+};
+
+export const saveBuilderOnboardingProgress = async (
+  builderProgressBody: BuilderProgressBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveBuilderOnboardingProgressResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveBuilderOnboardingProgressResponse>(getSaveBuilderOnboardingProgressUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(builderProgressBody),
+  });
+};
+
+export type completeBuilderOnboardingResponse200 = {
+  data: BuilderOnboardingResponse;
+  status: 200;
+};
+
+export type completeBuilderOnboardingResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type completeBuilderOnboardingResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type completeBuilderOnboardingResponseSuccess = completeBuilderOnboardingResponse200 & {
+  headers: Headers;
+};
+export type completeBuilderOnboardingResponseError = (
+  completeBuilderOnboardingResponse401 | completeBuilderOnboardingResponse422
+) & {
+  headers: Headers;
+};
+
+export type completeBuilderOnboardingResponse =
+  completeBuilderOnboardingResponseSuccess | completeBuilderOnboardingResponseError;
+
+export const getCompleteBuilderOnboardingUrl = () => {
+  return `/api/v1/onboarding/builder/complete`;
+};
+
+export const completeBuilderOnboarding = async (
+  builderCompleteBody?: BuilderCompleteBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<completeBuilderOnboardingResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<completeBuilderOnboardingResponse>(getCompleteBuilderOnboardingUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(builderCompleteBody),
+  });
+};
+
 export type verifyResponse200 = {
   data: PhoneResponse;
   status: 200;
@@ -2713,6 +5026,790 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type unsubscribeEmailLinkResponse200 = {
+  data: EmailLinkUnsubscribed;
+  status: 200;
+};
+
+export type unsubscribeEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type unsubscribeEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type unsubscribeEmailLinkResponseSuccess = unsubscribeEmailLinkResponse200 & {
+  headers: Headers;
+};
+export type unsubscribeEmailLinkResponseError = (
+  unsubscribeEmailLinkResponse404 | unsubscribeEmailLinkResponse429
+) & {
+  headers: Headers;
+};
+
+export type unsubscribeEmailLinkResponse =
+  unsubscribeEmailLinkResponseSuccess | unsubscribeEmailLinkResponseError;
+
+export const getUnsubscribeEmailLinkUrl = (token: string, params?: UnsubscribeEmailLinkParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/email-links/${token}/unsubscribe?${stringifiedParams}`
+    : `/api/v1/email-links/${token}/unsubscribe`;
+};
+
+export const unsubscribeEmailLink = async (
+  token: string,
+  params?: UnsubscribeEmailLinkParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<unsubscribeEmailLinkResponse> => {
+  return customFetch<unsubscribeEmailLinkResponse>(getUnsubscribeEmailLinkUrl(token, params), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type oneClickUnsubscribeEmailLinkResponse200 = {
+  data: EmailLinkOneClick;
+  status: 200;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type oneClickUnsubscribeEmailLinkResponseSuccess =
+  oneClickUnsubscribeEmailLinkResponse200 & {
+    headers: Headers;
+  };
+export type oneClickUnsubscribeEmailLinkResponseError = (
+  oneClickUnsubscribeEmailLinkResponse404 | oneClickUnsubscribeEmailLinkResponse429
+) & {
+  headers: Headers;
+};
+
+export type oneClickUnsubscribeEmailLinkResponse =
+  oneClickUnsubscribeEmailLinkResponseSuccess | oneClickUnsubscribeEmailLinkResponseError;
+
+export const getOneClickUnsubscribeEmailLinkUrl = (
+  token: string,
+  params?: OneClickUnsubscribeEmailLinkParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/email-links/${token}/one-click?${stringifiedParams}`
+    : `/api/v1/email-links/${token}/one-click`;
+};
+
+export const oneClickUnsubscribeEmailLink = async (
+  token: string,
+  params?: OneClickUnsubscribeEmailLinkParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oneClickUnsubscribeEmailLinkResponse> => {
+  return customFetch<oneClickUnsubscribeEmailLinkResponse>(
+    getOneClickUnsubscribeEmailLinkUrl(token, params),
+    {
+      ...options,
+      method: 'POST',
+    },
+  );
+};
+
+export type refreshChatsResponse200 = {
+  data: TelegramChatList;
+  status: 200;
+};
+
+export type refreshChatsResponseSuccess = refreshChatsResponse200 & {
+  headers: Headers;
+};
+export type refreshChatsResponse = refreshChatsResponseSuccess;
+
+export const getRefreshChatsUrl = () => {
+  return `/api/v1/connectors/telegram/refresh-chats`;
+};
+
+export const refreshChats = async (
+  telegramRefreshChatsRequest?: TelegramRefreshChatsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<refreshChatsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<refreshChatsResponse>(getRefreshChatsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramRefreshChatsRequest),
+  });
+};
+
+export type connectResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type connectResponseSuccess = connectResponse200 & {
+  headers: Headers;
+};
+export type connectResponse = connectResponseSuccess;
+
+export const getConnectUrl = () => {
+  return `/api/v1/connectors/telegram/connect`;
+};
+
+export const connect = async (
+  telegramConnectRequest: TelegramConnectRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<connectResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<connectResponse>(getConnectUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramConnectRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: Summary[];
+  status: 200;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1Response = list1ResponseSuccess;
+
+export const getList1Url = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveResponse200 = {
+  data: Saved;
+  status: 200;
+};
+
+export type saveResponseSuccess = saveResponse200 & {
+  headers: Headers;
+};
+export type saveResponse = saveResponseSuccess;
+
+export const getSaveUrl = () => {
+  return `/api/v1/connectors/http`;
+};
+
+export const save = async (
+  saveRequest: SaveRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveResponse>(getSaveUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveRequest),
+  });
+};
+
+export type reportClientErrorResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type reportClientErrorResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reportClientErrorResponse413 = {
+  data: ProblemDetail;
+  status: 413;
+};
+
+export type reportClientErrorResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reportClientErrorResponseSuccess = reportClientErrorResponse204 & {
+  headers: Headers;
+};
+export type reportClientErrorResponseError = (
+  reportClientErrorResponse400 | reportClientErrorResponse413 | reportClientErrorResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportClientErrorResponse =
+  reportClientErrorResponseSuccess | reportClientErrorResponseError;
+
+export const getReportClientErrorUrl = () => {
+  return `/api/v1/client-errors`;
+};
+
+/**
+ * @summary Report an error the web app contained
+ */
+export const reportClientError = async (
+  reportClientErrorBody: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportClientErrorResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportClientErrorResponse>(getReportClientErrorUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', ...getHeaders(options?.headers) },
+    body: reportClientErrorBody,
+  });
+};
+
+export type listChatConversationsResponse200 = {
+  data: ChatConversationList;
+  status: 200;
+};
+
+export type listChatConversationsResponseSuccess = listChatConversationsResponse200 & {
+  headers: Headers;
+};
+export type listChatConversationsResponse = listChatConversationsResponseSuccess;
+
+export const getListChatConversationsUrl = () => {
+  return `/api/v1/chat/conversations`;
+};
+
+export const listChatConversations = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatConversationsResponse> => {
+  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createChatConversationResponse201 = {
+  data: ChatConversationCreated;
+  status: 201;
+};
+
+export type createChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createChatConversationResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createChatConversationResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type createChatConversationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type createChatConversationResponseSuccess = createChatConversationResponse201 & {
+  headers: Headers;
+};
+export type createChatConversationResponseError = (
+  | createChatConversationResponse400
+  | createChatConversationResponse422
+  | createChatConversationResponse429
+  | createChatConversationResponse503
+) & {
+  headers: Headers;
+};
+
+export type createChatConversationResponse =
+  createChatConversationResponseSuccess | createChatConversationResponseError;
+
+export const getCreateChatConversationUrl = () => {
+  return `/api/v1/chat/conversations`;
+};
+
+export const createChatConversation = async (
+  chatConversationCreate?: ChatConversationCreate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createChatConversationResponse>(getCreateChatConversationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationCreate),
+  });
+};
+
+export type sendChatMessageResponse202 = {
+  data: ChatMessageSent;
+  status: 202;
+};
+
+export type sendChatMessageResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type sendChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type sendChatMessageResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type sendChatMessageResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type sendChatMessageResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type sendChatMessageResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type sendChatMessageResponseSuccess = sendChatMessageResponse202 & {
+  headers: Headers;
+};
+export type sendChatMessageResponseError = (
+  | sendChatMessageResponse400
+  | sendChatMessageResponse404
+  | sendChatMessageResponse409
+  | sendChatMessageResponse422
+  | sendChatMessageResponse429
+  | sendChatMessageResponse503
+) & {
+  headers: Headers;
+};
+
+export type sendChatMessageResponse = sendChatMessageResponseSuccess | sendChatMessageResponseError;
+
+export const getSendChatMessageUrl = (conversationId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages`;
+};
+
+export const sendChatMessage = async (
+  conversationId: string,
+  chatSendMessage: ChatSendMessage,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<sendChatMessageResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<sendChatMessageResponse>(getSendChatMessageUrl(conversationId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatSendMessage),
+  });
+};
+
+export type stopChatMessageResponse202 = {
+  data: void;
+  status: 202;
+};
+
+export type stopChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type stopChatMessageResponseSuccess = stopChatMessageResponse202 & {
+  headers: Headers;
+};
+export type stopChatMessageResponseError = stopChatMessageResponse404 & {
+  headers: Headers;
+};
+
+export type stopChatMessageResponse = stopChatMessageResponseSuccess | stopChatMessageResponseError;
+
+export const getStopChatMessageUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages/${messageId}/stop`;
+};
+
+export const stopChatMessage = async (
+  conversationId: string,
+  messageId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<stopChatMessageResponse> => {
+  return customFetch<stopChatMessageResponse>(getStopChatMessageUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type retryChatMessageResponse202 = {
+  data: ChatMessageSent;
+  status: 202;
+};
+
+export type retryChatMessageResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type retryChatMessageResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryChatMessageResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryChatMessageResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryChatMessageResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type retryChatMessageResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryChatMessageResponseSuccess = retryChatMessageResponse202 & {
+  headers: Headers;
+};
+export type retryChatMessageResponseError = (
+  | retryChatMessageResponse400
+  | retryChatMessageResponse404
+  | retryChatMessageResponse409
+  | retryChatMessageResponse422
+  | retryChatMessageResponse429
+  | retryChatMessageResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryChatMessageResponse =
+  retryChatMessageResponseSuccess | retryChatMessageResponseError;
+
+export const getRetryChatMessageUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/messages/${messageId}/retry`;
+};
+
+export const retryChatMessage = async (
+  conversationId: string,
+  messageId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryChatMessageResponse> => {
+  return customFetch<retryChatMessageResponse>(getRetryChatMessageUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type confirmChatCardResponse200 = {
+  data: ChatCardConfirmed;
+  status: 200;
+};
+
+export type confirmChatCardResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type confirmChatCardResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type confirmChatCardResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type confirmChatCardResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type confirmChatCardResponseSuccess = confirmChatCardResponse200 & {
+  headers: Headers;
+};
+export type confirmChatCardResponseError = (
+  | confirmChatCardResponse400
+  | confirmChatCardResponse402
+  | confirmChatCardResponse404
+  | confirmChatCardResponse409
+) & {
+  headers: Headers;
+};
+
+export type confirmChatCardResponse = confirmChatCardResponseSuccess | confirmChatCardResponseError;
+
+export const getConfirmChatCardUrl = (conversationId: string, messageId: string) => {
+  return `/api/v1/chat/conversations/${conversationId}/cards/${messageId}/confirm`;
+};
+
+export const confirmChatCard = async (
+  conversationId: string,
+  messageId: string,
+  chatCardConfirm?: ChatCardConfirm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<confirmChatCardResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<confirmChatCardResponse>(getConfirmChatCardUrl(conversationId, messageId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatCardConfirm),
+  });
+};
+
+export type recordPaymentJourneyEventResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type recordPaymentJourneyEventResponse400 = {
+  data: void;
+  status: 400;
+};
+
+export type recordPaymentJourneyEventResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type recordPaymentJourneyEventResponse415 = {
+  data: void;
+  status: 415;
+};
+
+export type recordPaymentJourneyEventResponse429 = {
+  data: void;
+  status: 429;
+};
+
+export type recordPaymentJourneyEventResponseSuccess = recordPaymentJourneyEventResponse204 & {
+  headers: Headers;
+};
+export type recordPaymentJourneyEventResponseError = (
+  | recordPaymentJourneyEventResponse400
+  | recordPaymentJourneyEventResponse401
+  | recordPaymentJourneyEventResponse415
+  | recordPaymentJourneyEventResponse429
+) & {
+  headers: Headers;
+};
+
+export type recordPaymentJourneyEventResponse =
+  recordPaymentJourneyEventResponseSuccess | recordPaymentJourneyEventResponseError;
+
+export const getRecordPaymentJourneyEventUrl = () => {
+  return `/api/v1/billing/journey-events`;
+};
+
+/**
+ * Records one observation a payment page made. Never changes a payment.
+ * @summary Record a payment journey observation
+ */
+export const recordPaymentJourneyEvent = async (
+  recordPaymentJourneyEventBody: RecordPaymentJourneyEventBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<recordPaymentJourneyEventResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<recordPaymentJourneyEventResponse>(getRecordPaymentJourneyEventUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recordPaymentJourneyEventBody),
   });
 };
 
@@ -3133,6 +6230,157 @@ export const confirmEmail = async (
   });
 };
 
+export type createAdminWorkflowResponse201 = {
+  data: WorkflowResponse;
+  status: 201;
+};
+
+export type createAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminWorkflowResponseSuccess = createAdminWorkflowResponse201 & {
+  headers: Headers;
+};
+export type createAdminWorkflowResponseError = (
+  | createAdminWorkflowResponse400
+  | createAdminWorkflowResponse404
+  | createAdminWorkflowResponse409
+  | createAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminWorkflowResponse =
+  createAdminWorkflowResponseSuccess | createAdminWorkflowResponseError;
+
+export const getCreateAdminWorkflowUrl = () => {
+  return `/api/v1/admin/workflows`;
+};
+
+export const createAdminWorkflow = async (
+  createWorkflowRequest: CreateWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminWorkflowResponse>(getCreateAdminWorkflowUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createWorkflowRequest),
+  });
+};
+
+export type addAdminWorkflowStepResponse201 = {
+  data: WorkflowStepResponse;
+  status: 201;
+};
+
+export type addAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type addAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type addAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type addAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type addAdminWorkflowStepResponseSuccess = addAdminWorkflowStepResponse201 & {
+  headers: Headers;
+};
+export type addAdminWorkflowStepResponseError = (
+  | addAdminWorkflowStepResponse400
+  | addAdminWorkflowStepResponse404
+  | addAdminWorkflowStepResponse409
+  | addAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type addAdminWorkflowStepResponse =
+  addAdminWorkflowStepResponseSuccess | addAdminWorkflowStepResponseError;
+
+export const getAddAdminWorkflowStepUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/steps`;
+};
+
+export const addAdminWorkflowStep = async (
+  id: string,
+  createStepRequest: CreateStepRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<addAdminWorkflowStepResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<addAdminWorkflowStepResponse>(getAddAdminWorkflowStepUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createStepRequest),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -3456,26 +6704,51 @@ export const archiveAdminSupportKbArticle = async (
   });
 };
 
-export type listWorkflowsResponse200 = {
-  data: WorkflowResponse[];
+export type deactivateAdminAccountResponse200 = {
+  data: AdminAccountResponse;
   status: 200;
 };
 
-export type listWorkflowsResponseSuccess = listWorkflowsResponse200 & {
+export type deactivateAdminAccountResponseSuccess = deactivateAdminAccountResponse200 & {
   headers: Headers;
 };
-export type listWorkflowsResponse = listWorkflowsResponseSuccess;
+export type deactivateAdminAccountResponse = deactivateAdminAccountResponseSuccess;
 
-export const getListWorkflowsUrl = () => {
-  return `/api/v1/workflows`;
+export const getDeactivateAdminAccountUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/deactivate`;
 };
 
-export const listWorkflows = async (
+export const deactivateAdminAccount = async (
+  id: string,
   options?: Parameters<typeof customFetch>[1],
-): Promise<listWorkflowsResponse> => {
-  return customFetch<listWorkflowsResponse>(getListWorkflowsUrl(), {
+): Promise<deactivateAdminAccountResponse> => {
+  return customFetch<deactivateAdminAccountResponse>(getDeactivateAdminAccountUrl(id), {
     ...options,
-    method: 'GET',
+    method: 'POST',
+  });
+};
+
+export type activateAdminAccountResponse200 = {
+  data: AdminAccountResponse;
+  status: 200;
+};
+
+export type activateAdminAccountResponseSuccess = activateAdminAccountResponse200 & {
+  headers: Headers;
+};
+export type activateAdminAccountResponse = activateAdminAccountResponseSuccess;
+
+export const getActivateAdminAccountUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/activate`;
+};
+
+export const activateAdminAccount = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<activateAdminAccountResponse> => {
+  return customFetch<activateAdminAccountResponse>(getActivateAdminAccountUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -3498,6 +6771,880 @@ export const getWorkflow = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getWorkflowResponse> => {
   return customFetch<getWorkflowResponse>(getGetWorkflowUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteWorkflowResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowResponseError = (
+  | deleteWorkflowResponse400
+  | deleteWorkflowResponse403
+  | deleteWorkflowResponse404
+  | deleteWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowResponse = deleteWorkflowResponseSuccess | deleteWorkflowResponseError;
+
+export const getDeleteWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}`;
+};
+
+export const deleteWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowResponse> => {
+  return customFetch<deleteWorkflowResponse>(getDeleteWorkflowUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateWorkflowResponseError = (
+  | updateWorkflowResponse400
+  | updateWorkflowResponse403
+  | updateWorkflowResponse404
+  | updateWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateWorkflowResponse = updateWorkflowResponseError;
+
+export const getUpdateWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}`;
+};
+
+export const updateWorkflow = async (
+  id: string,
+  updateWorkflowRequest: UpdateWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateWorkflowResponse>(getUpdateWorkflowUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateWorkflowRequest),
+  });
+};
+
+export type getWorkflowVersionResponse200 = {
+  data: WorkflowVersionDetailResponse;
+  status: 200;
+};
+
+export type getWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowVersionResponseSuccess = getWorkflowVersionResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowVersionResponseError = getWorkflowVersionResponse404 & {
+  headers: Headers;
+};
+
+export type getWorkflowVersionResponse =
+  getWorkflowVersionResponseSuccess | getWorkflowVersionResponseError;
+
+export const getGetWorkflowVersionUrl = (id: string, version: number) => {
+  return `/api/v1/workflows/${id}/versions/${version}`;
+};
+
+export const getWorkflowVersion = async (
+  id: string,
+  version: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowVersionResponse> => {
+  return customFetch<getWorkflowVersionResponse>(getGetWorkflowVersionUrl(id, version), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type renameWorkflowVersionResponse200 = {
+  data: WorkflowVersionResponse;
+  status: 200;
+};
+
+export type renameWorkflowVersionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type renameWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type renameWorkflowVersionResponseSuccess = renameWorkflowVersionResponse200 & {
+  headers: Headers;
+};
+export type renameWorkflowVersionResponseError = (
+  | renameWorkflowVersionResponse400
+  | renameWorkflowVersionResponse403
+  | renameWorkflowVersionResponse404
+  | renameWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type renameWorkflowVersionResponse =
+  renameWorkflowVersionResponseSuccess | renameWorkflowVersionResponseError;
+
+export const getRenameWorkflowVersionUrl = (id: string, version: number) => {
+  return `/api/v1/workflows/${id}/versions/${version}`;
+};
+
+export const renameWorkflowVersion = async (
+  id: string,
+  version: number,
+  renameVersionRequest: RenameVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameWorkflowVersionResponse>(getRenameWorkflowVersionUrl(id, version), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(renameVersionRequest),
+  });
+};
+
+export type deleteWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteWorkflowStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type deleteWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowStepResponseError = (
+  | deleteWorkflowStepResponse400
+  | deleteWorkflowStepResponse403
+  | deleteWorkflowStepResponse404
+  | deleteWorkflowStepResponse409
+  | deleteWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowStepResponse =
+  deleteWorkflowStepResponseSuccess | deleteWorkflowStepResponseError;
+
+export const getDeleteWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowStepResponse> => {
+  return customFetch<deleteWorkflowStepResponse>(getDeleteWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateStepResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updateStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateStepResponseError = (
+  | updateStepResponse400
+  | updateStepResponse403
+  | updateStepResponse404
+  | updateStepResponse409
+  | updateStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateStepResponse = updateStepResponseError;
+
+export const getUpdateStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/workflows/${id}/steps/${stepId}`;
+};
+
+export const updateStep = async (
+  id: string,
+  stepId: string,
+  updateStepRequest: UpdateStepRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateStepResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateStepResponse>(getUpdateStepUrl(id, stepId), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type setPublishedWorkflowVersionResponse200 = {
+  data: WorkflowResponse;
+  status: 200;
+};
+
+export type setPublishedWorkflowVersionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type setPublishedWorkflowVersionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type setPublishedWorkflowVersionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type setPublishedWorkflowVersionResponseSuccess = setPublishedWorkflowVersionResponse200 & {
+  headers: Headers;
+};
+export type setPublishedWorkflowVersionResponseError = (
+  | setPublishedWorkflowVersionResponse403
+  | setPublishedWorkflowVersionResponse404
+  | setPublishedWorkflowVersionResponse422
+) & {
+  headers: Headers;
+};
+
+export type setPublishedWorkflowVersionResponse =
+  setPublishedWorkflowVersionResponseSuccess | setPublishedWorkflowVersionResponseError;
+
+export const getSetPublishedWorkflowVersionUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/published-version`;
+};
+
+export const setPublishedWorkflowVersion = async (
+  id: string,
+  publishedVersionRequest?: PublishedVersionRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setPublishedWorkflowVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setPublishedWorkflowVersionResponse>(getSetPublishedWorkflowVersionUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publishedVersionRequest),
+  });
+};
+
+export type setDefaultChatResponse200 = {
+  data: TelegramDefaultChat;
+  status: 200;
+};
+
+export type setDefaultChatResponseSuccess = setDefaultChatResponse200 & {
+  headers: Headers;
+};
+export type setDefaultChatResponse = setDefaultChatResponseSuccess;
+
+export const getSetDefaultChatUrl = () => {
+  return `/api/v1/connectors/telegram/default-chat`;
+};
+
+export const setDefaultChat = async (
+  telegramDefaultChatRequest: TelegramDefaultChatRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setDefaultChatResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setDefaultChatResponse>(getSetDefaultChatUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(telegramDefaultChatRequest),
+  });
+};
+
+export type deleteAdminWorkflowResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteAdminWorkflowResponseSuccess = deleteAdminWorkflowResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminWorkflowResponseError = (
+  | deleteAdminWorkflowResponse400
+  | deleteAdminWorkflowResponse404
+  | deleteAdminWorkflowResponse409
+  | deleteAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowResponse =
+  deleteAdminWorkflowResponseSuccess | deleteAdminWorkflowResponseError;
+
+export const getDeleteAdminWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}`;
+};
+
+export const deleteAdminWorkflow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminWorkflowResponse> => {
+  return customFetch<deleteAdminWorkflowResponse>(getDeleteAdminWorkflowUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowResponseError = (
+  | updateAdminWorkflowResponse400
+  | updateAdminWorkflowResponse404
+  | updateAdminWorkflowResponse409
+  | updateAdminWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateAdminWorkflowResponse = updateAdminWorkflowResponseError;
+
+export const getUpdateAdminWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}`;
+};
+
+export const updateAdminWorkflow = async (
+  id: string,
+  updateWorkflowRequest: UpdateWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminWorkflowResponse>(getUpdateAdminWorkflowUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateWorkflowRequest),
+  });
+};
+
+export type deleteAdminWorkflowStepResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type deleteAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type deleteAdminWorkflowStepResponseSuccess = deleteAdminWorkflowStepResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminWorkflowStepResponseError = (
+  | deleteAdminWorkflowStepResponse400
+  | deleteAdminWorkflowStepResponse404
+  | deleteAdminWorkflowStepResponse409
+  | deleteAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminWorkflowStepResponse =
+  deleteAdminWorkflowStepResponseSuccess | deleteAdminWorkflowStepResponseError;
+
+export const getDeleteAdminWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
+};
+
+export const deleteAdminWorkflowStep = async (
+  id: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminWorkflowStepResponse> => {
+  return customFetch<deleteAdminWorkflowStepResponse>(getDeleteAdminWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminWorkflowStepResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminWorkflowStepResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminWorkflowStepResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type updateAdminWorkflowStepResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateAdminWorkflowStepResponseError = (
+  | updateAdminWorkflowStepResponse400
+  | updateAdminWorkflowStepResponse404
+  | updateAdminWorkflowStepResponse409
+  | updateAdminWorkflowStepResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateAdminWorkflowStepResponse = updateAdminWorkflowStepResponseError;
+
+export const getUpdateAdminWorkflowStepUrl = (id: string, stepId: string) => {
+  return `/api/v1/admin/workflows/${id}/steps/${stepId}`;
+};
+
+export const updateAdminWorkflowStep = async (
+  id: string,
+  stepId: string,
+  updateStepRequest: UpdateStepRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminWorkflowStepResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminWorkflowStepResponse>(getUpdateAdminWorkflowStepUrl(id, stepId), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type changeAdminAccountRoleResponse200 = {
+  data: AdminAccountResponse;
+  status: 200;
+};
+
+export type changeAdminAccountRoleResponseSuccess = changeAdminAccountRoleResponse200 & {
+  headers: Headers;
+};
+export type changeAdminAccountRoleResponse = changeAdminAccountRoleResponseSuccess;
+
+export const getChangeAdminAccountRoleUrl = (id: string) => {
+  return `/api/v1/admin/accounts/${id}/role`;
+};
+
+export const changeAdminAccountRole = async (
+  id: string,
+  changeRoleRequest: ChangeRoleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<changeAdminAccountRoleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<changeAdminAccountRoleResponse>(getChangeAdminAccountRoleUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(changeRoleRequest),
+  });
+};
+
+export type getWorkflowGraphResponse200 = {
+  data: WorkflowGraphResponse;
+  status: 200;
+};
+
+export type getWorkflowGraphResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getWorkflowGraphResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowGraphResponseSuccess = getWorkflowGraphResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowGraphResponseError = (
+  getWorkflowGraphResponse401 | getWorkflowGraphResponse404
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowGraphResponse =
+  getWorkflowGraphResponseSuccess | getWorkflowGraphResponseError;
+
+export const getGetWorkflowGraphUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/graph`;
+};
+
+export const getWorkflowGraph = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowGraphResponse> => {
+  return customFetch<getWorkflowGraphResponse>(getGetWorkflowGraphUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type diffWorkflowVersionsResponse200 = {
+  data: WorkflowVersionDiffResponse;
+  status: 200;
+};
+
+export type diffWorkflowVersionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type diffWorkflowVersionsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type diffWorkflowVersionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type diffWorkflowVersionsResponseSuccess = diffWorkflowVersionsResponse200 & {
+  headers: Headers;
+};
+export type diffWorkflowVersionsResponseError = (
+  | diffWorkflowVersionsResponse400
+  | diffWorkflowVersionsResponse403
+  | diffWorkflowVersionsResponse404
+) & {
+  headers: Headers;
+};
+
+export type diffWorkflowVersionsResponse =
+  diffWorkflowVersionsResponseSuccess | diffWorkflowVersionsResponseError;
+
+export const getDiffWorkflowVersionsUrl = (id: string, params?: DiffWorkflowVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/diff?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/diff`;
+};
+
+export const diffWorkflowVersions = async (
+  id: string,
+  params?: DiffWorkflowVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<diffWorkflowVersionsResponse> => {
+  return customFetch<diffWorkflowVersionsResponse>(getDiffWorkflowVersionsUrl(id, params), {
     ...options,
     method: 'GET',
   });
@@ -3941,6 +8088,30 @@ export const getOutputUrl = async (
   });
 };
 
+export type getRunInputsResponse200 = {
+  data: RunInputResponse[];
+  status: 200;
+};
+
+export type getRunInputsResponseSuccess = getRunInputsResponse200 & {
+  headers: Headers;
+};
+export type getRunInputsResponse = getRunInputsResponseSuccess;
+
+export const getGetRunInputsUrl = (id: string) => {
+  return `/api/v1/runs/${id}/inputs`;
+};
+
+export const getRunInputs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRunInputsResponse> => {
+  return customFetch<getRunInputsResponse>(getGetRunInputsUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type openRealtimeStreamResponse200 = {
   data: string;
   status: 200;
@@ -3999,6 +8170,72 @@ export const openRealtimeStream = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<openRealtimeStreamResponse> => {
   return customFetch<openRealtimeStreamResponse>(getOpenRealtimeStreamUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getOnboardingStatusResponse200 = {
+  data: OnboardingStatusResponse;
+  status: 200;
+};
+
+export type getOnboardingStatusResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getOnboardingStatusResponseSuccess = getOnboardingStatusResponse200 & {
+  headers: Headers;
+};
+export type getOnboardingStatusResponseError = getOnboardingStatusResponse401 & {
+  headers: Headers;
+};
+
+export type getOnboardingStatusResponse =
+  getOnboardingStatusResponseSuccess | getOnboardingStatusResponseError;
+
+export const getGetOnboardingStatusUrl = () => {
+  return `/api/v1/onboarding/status`;
+};
+
+export const getOnboardingStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getOnboardingStatusResponse> => {
+  return customFetch<getOnboardingStatusResponse>(getGetOnboardingStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getOnboardingResultResponse200 = {
+  data: OnboardingResultResponse;
+  status: 200;
+};
+
+export type getOnboardingResultResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type getOnboardingResultResponseSuccess = getOnboardingResultResponse200 & {
+  headers: Headers;
+};
+export type getOnboardingResultResponseError = getOnboardingResultResponse401 & {
+  headers: Headers;
+};
+
+export type getOnboardingResultResponse =
+  getOnboardingResultResponseSuccess | getOnboardingResultResponseError;
+
+export const getGetOnboardingResultUrl = () => {
+  return `/api/v1/onboarding/result`;
+};
+
+export const getOnboardingResult = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getOnboardingResultResponse> => {
+  return customFetch<getOnboardingResultResponse>(getGetOnboardingResultUrl(), {
     ...options,
     method: 'GET',
   });
@@ -4073,6 +8310,44 @@ export const features = async (
   });
 };
 
+export type viewEmailLinkResponse200 = {
+  data: EmailLinkView;
+  status: 200;
+};
+
+export type viewEmailLinkResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type viewEmailLinkResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type viewEmailLinkResponseSuccess = viewEmailLinkResponse200 & {
+  headers: Headers;
+};
+export type viewEmailLinkResponseError = (viewEmailLinkResponse404 | viewEmailLinkResponse429) & {
+  headers: Headers;
+};
+
+export type viewEmailLinkResponse = viewEmailLinkResponseSuccess | viewEmailLinkResponseError;
+
+export const getViewEmailLinkUrl = (token: string) => {
+  return `/api/v1/email-links/${token}`;
+};
+
+export const viewEmailLink = async (
+  token: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<viewEmailLinkResponse> => {
+  return customFetch<viewEmailLinkResponse>(getViewEmailLinkUrl(token), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type balanceResponse200 = {
   data: BalanceResponse;
   status: 200;
@@ -4091,6 +8366,84 @@ export const balance = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<balanceResponse> => {
   return customFetch<balanceResponse>(getBalanceUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type readResponse200 = {
+  data: TelegramConnection;
+  status: 200;
+};
+
+export type readResponseSuccess = readResponse200 & {
+  headers: Headers;
+};
+export type readResponse = readResponseSuccess;
+
+export const getReadUrl = () => {
+  return `/api/v1/connectors/telegram`;
+};
+
+export const read = async (options?: Parameters<typeof customFetch>[1]): Promise<readResponse> => {
+  return customFetch<readResponse>(getReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type health1Response200 = {
+  data: TelegramHealth;
+  status: 200;
+};
+
+export type health1ResponseSuccess = health1Response200 & {
+  headers: Headers;
+};
+export type health1Response = health1ResponseSuccess;
+
+export const getHealth1Url = () => {
+  return `/api/v1/connectors/telegram/health`;
+};
+
+export const health1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<health1Response> => {
+  return customFetch<health1Response>(getHealth1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listChatMessagesResponse200 = {
+  data: ChatMessage[];
+  status: 200;
+};
+
+export type listChatMessagesResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listChatMessagesResponseSuccess = listChatMessagesResponse200 & {
+  headers: Headers;
+};
+export type listChatMessagesResponseError = listChatMessagesResponse404 & {
+  headers: Headers;
+};
+
+export type listChatMessagesResponse =
+  listChatMessagesResponseSuccess | listChatMessagesResponseError;
+
+export const getListChatMessagesUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/messages`;
+};
+
+export const listChatMessages = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatMessagesResponse> => {
+  return customFetch<listChatMessagesResponse>(getListChatMessagesUrl(id), {
     ...options,
     method: 'GET',
   });
@@ -4394,6 +8747,29 @@ export const listAdminRuns = async (
   });
 };
 
+export type listAdminRolesResponse200 = {
+  data: RoleResponse[];
+  status: 200;
+};
+
+export type listAdminRolesResponseSuccess = listAdminRolesResponse200 & {
+  headers: Headers;
+};
+export type listAdminRolesResponse = listAdminRolesResponseSuccess;
+
+export const getListAdminRolesUrl = () => {
+  return `/api/v1/admin/roles`;
+};
+
+export const listAdminRoles = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminRolesResponse> => {
+  return customFetch<listAdminRolesResponse>(getListAdminRolesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminMediaJobsResponse200 = {
   data: PageViewMediaJobResponse;
   status: 200;
@@ -4427,5 +8803,65 @@ export const listAdminMediaJobs = async (
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type listAdminAccountsResponse200 = {
+  data: PageViewAdminAccountResponse;
+  status: 200;
+};
+
+export type listAdminAccountsResponseSuccess = listAdminAccountsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAccountsResponse = listAdminAccountsResponseSuccess;
+
+export const getListAdminAccountsUrl = (params?: ListAdminAccountsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/accounts?${stringifiedParams}`
+    : `/api/v1/admin/accounts`;
+};
+
+export const listAdminAccounts = async (
+  params?: ListAdminAccountsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAccountsResponse> => {
+  return customFetch<listAdminAccountsResponse>(getListAdminAccountsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type disconnectResponse200 = {
+  data: void;
+  status: 200;
+};
+
+export type disconnectResponseSuccess = disconnectResponse200 & {
+  headers: Headers;
+};
+export type disconnectResponse = disconnectResponseSuccess;
+
+export const getDisconnectUrl = (provider: string) => {
+  return `/api/v1/connectors/${provider}`;
+};
+
+export const disconnect = async (
+  provider: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<disconnectResponse> => {
+  return customFetch<disconnectResponse>(getDisconnectUrl(provider), {
+    ...options,
+    method: 'DELETE',
   });
 };

@@ -17,6 +17,8 @@ import java.util.UUID;
 @Table(name = "workflow")
 public class Workflow {
 
+    public static final UUID SYSTEM_OWNER_ID = new UUID(0, 0);
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -36,18 +38,67 @@ public class Workflow {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "status", nullable = false)
+    private WorkflowStatus status;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "published_version_id")
+    private UUID publishedVersionId;
+
     /** Required by JPA. */
     protected Workflow() {
     }
 
+    /** Creates a published workflow. */
     public Workflow(UUID id, UUID ownerId, String name, boolean shared) {
+        this(id, ownerId, name, shared, WorkflowStatus.PUBLISHED);
+    }
+
+    public static Workflow draft(UUID id, UUID ownerId, String name, boolean shared) {
+        return new Workflow(id, ownerId, name, shared, WorkflowStatus.DRAFT);
+    }
+
+    private Workflow(UUID id, UUID ownerId, String name, boolean shared, WorkflowStatus status) {
         this.id = id;
         this.ownerId = ownerId;
         this.name = name;
         this.shared = shared;
+        this.status = status;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    public void rename(String name) {
+        this.name = name;
+        touch();
+    }
+
+    public void setShared(boolean shared) {
+        this.shared = shared;
+        touch();
+    }
+
+    public void changeStatus(WorkflowStatus status) {
+        this.status = status;
+        touch();
+    }
+
+    /** Moves the version non-owners are served; the caller guarantees it belongs to this workflow. */
+    public void pointTo(UUID versionId) {
+        this.publishedVersionId = versionId;
+        touch();
+    }
+
+    public void markDeleted() {
+        this.deletedAt = Instant.now();
+        touch();
+    }
+
+    private void touch() {
+        this.updatedAt = Instant.now();
     }
 
     public UUID getId() {
@@ -72,5 +123,22 @@ public class Workflow {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public WorkflowStatus getStatus() {
+        return status;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public UUID getPublishedVersionId() {
+        return publishedVersionId;
+    }
+
+    /** True for the migration-maintained seed workflows, which are served live and never versioned. */
+    public boolean isSystemOwned() {
+        return SYSTEM_OWNER_ID.equals(ownerId);
     }
 }

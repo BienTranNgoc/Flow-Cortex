@@ -24,6 +24,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
 
     Optional<WorkflowRun> findByIdAndOwnerId(UUID id, UUID ownerId);
 
+    boolean existsByOwnerIdAndStatus(UUID ownerId, RunStatus status);
+
+    Optional<WorkflowRun> findByOwnerIdAndRequestKey(UUID ownerId, String requestKey);
+
     /**
      * Running runs with no step in flight: nothing will move them unless someone advances them
      * (a pending next step whose advance was lost, or all steps completed but the run not closed).

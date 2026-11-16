@@ -8,26 +8,25 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
-import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
+import { ADMIN_ME, MEMBER_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { stubMatchMedia } from '../test/matchMedia';
 import type { NavGroup } from './nav';
+import type { Caller } from './permissions';
 import { queryClient } from './queryClient';
 import { Sidebar } from './Sidebar';
 import { useLiveNav } from './useLiveNav';
 
 const OPEN_COUNT_PATH = '/api/v1/admin/support/requests/open-count';
 
-function LiveSidebar({ role, collapsed }: Readonly<{ role: string; collapsed: boolean }>) {
-  return (
-    <Sidebar role={role} collapsed={collapsed} onToggle={() => {}} nav={useLiveNav(role)} />
-  );
+function LiveSidebar({ me, collapsed }: Readonly<{ me: Caller; collapsed: boolean }>) {
+  return <Sidebar me={me} collapsed={collapsed} onToggle={() => {}} nav={useLiveNav(me)} />;
 }
 
-function renderSidebar(role: string, collapsed = false) {
+function renderSidebar(me: Caller, collapsed = false) {
   return render(
     <QueryClientProvider client={testQueryClient()}>
       <MemoryRouter>
-        <LiveSidebar role={role} collapsed={collapsed} />
+        <LiveSidebar me={me} collapsed={collapsed} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -42,7 +41,7 @@ afterEach(() => {
 describe('Sidebar', () => {
   it('links dashboard and permitted entries, and shows disabled items as inert text', () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-    renderSidebar('ADMIN');
+    renderSidebar(ADMIN_ME);
 
     expect(screen.getByRole('link', { name: /Dashboard/ })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: /Runs/ })).toHaveAttribute('href', '/runs');
@@ -73,7 +72,7 @@ describe('Sidebar', () => {
     'shows %s as a disabled "Coming soon" entry, never a link',
     (label) => {
       stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-      renderSidebar('ADMIN');
+      renderSidebar(ADMIN_ME);
 
       const entry = screen.getByText(label).closest('[aria-disabled]');
       expect(entry).toHaveAttribute('aria-disabled', 'true');
@@ -82,17 +81,31 @@ describe('Sidebar', () => {
     },
   );
 
-  it('shows no entry a role may not use', () => {
+  it('links no entry for a caller holding no key and reads no open count', () => {
     const calls = stubApi({});
-    renderSidebar('MEMBER');
+    renderSidebar(MEMBER_ME);
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(calls).toHaveLength(0);
   });
 
+  it('links Admin accounts in the System group only with system.admin_account.view', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+    expect(screen.getByRole('link', { name: 'Admin accounts' })).toHaveAttribute(
+      'href',
+      '/admin-accounts',
+    );
+    unmount();
+
+    renderSidebar({ ...ADMIN_ME, permissions: ['user.account.view'] });
+    expect(screen.queryByRole('link', { name: 'Admin accounts' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Users' })).toBeInTheDocument();
+  });
+
   it('groups the Help Center pages under "Support" with the open request count on Requests', async () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 4 } } });
-    renderSidebar('ADMIN');
+    renderSidebar(ADMIN_ME);
 
     const group = screen.getByRole('list', { name: 'Support' });
     expect(group).toContainElement(screen.getByRole('link', { name: 'Guide articles' }));
@@ -108,14 +121,14 @@ describe('Sidebar', () => {
 
   it('names a single open request in the singular', async () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 1 } } });
-    renderSidebar('ADMIN');
+    renderSidebar(ADMIN_ME);
 
     expect(await screen.findByRole('link', { name: 'Requests, 1 open request' })).toBeInTheDocument();
   });
 
   it('shows no count on Requests while nothing is open', async () => {
     const calls = stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-    renderSidebar('ADMIN');
+    renderSidebar(ADMIN_ME);
 
     await vi.waitFor(() => expect(calls.some((call) => call.path === OPEN_COUNT_PATH)).toBe(true));
     expect(screen.getByRole('link', { name: 'Requests' })).not.toHaveTextContent(/\d/);
@@ -138,11 +151,11 @@ describe('Sidebar', () => {
 
   it('switches between expanded and icon-only mode', async () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-    const { container } = renderSidebar('ADMIN');
+    const { container } = renderSidebar(ADMIN_ME);
     expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass('cortex-admin-nav--collapsed');
     expect(screen.getByText('Dashboard')).toBeVisible();
 
-    renderSidebar('ADMIN', true);
+    renderSidebar(ADMIN_ME, true);
     expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
@@ -150,7 +163,7 @@ describe('Sidebar', () => {
     const onToggle = vi.fn();
     const { rerender } = render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed={false} onToggle={onToggle} />
+        <Sidebar me={ADMIN_ME} collapsed={false} onToggle={onToggle} />
       </MemoryRouter>,
     );
     const nav = screen.getByRole('navigation', { name: 'Admin navigation' });
@@ -164,7 +177,7 @@ describe('Sidebar', () => {
 
     rerender(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={onToggle} />
+        <Sidebar me={ADMIN_ME} collapsed onToggle={onToggle} />
       </MemoryRouter>,
     );
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute(
@@ -176,7 +189,7 @@ describe('Sidebar', () => {
   it('shows the Nodi mark, the wordmark and the Admin label as the sidebar brand', () => {
     render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed={false} onToggle={() => {}} />
       </MemoryRouter>,
     );
     const brand = screen.getByText('nodi').parentElement as HTMLElement;
@@ -187,7 +200,7 @@ describe('Sidebar', () => {
   it('marks the current entry and draws its icon filled, the others regular', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
-        <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed={false} onToggle={() => {}} />
       </MemoryRouter>,
     );
     const current = screen.getByRole('link', { name: /Dashboard/ });
@@ -206,7 +219,7 @@ describe('Sidebar', () => {
     for (const collapsed of [false, true]) {
       const { container, unmount } = render(
         <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed={collapsed} onToggle={() => {}} />
+          <Sidebar me={ADMIN_ME} collapsed={collapsed} onToggle={() => {}} />
         </MemoryRouter>,
       );
       expect(container.querySelectorAll('[title]')).toHaveLength(0);
@@ -217,7 +230,7 @@ describe('Sidebar', () => {
   it('gives a disabled rail entry a tooltip that names its coming-soon tag, and no link', () => {
     render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} />
       </MemoryRouter>,
     );
     const entry = screen.getByText('Voice Quota').closest('[aria-disabled]');
@@ -231,7 +244,7 @@ describe('Sidebar', () => {
   it('places a rail tooltip at the hovered or focused entry, so it can escape the scrolling list', () => {
     render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} />
       </MemoryRouter>,
     );
     const link = screen.getByRole('link', { name: /Runs/ });
@@ -251,7 +264,7 @@ describe('Sidebar', () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} />
       </MemoryRouter>,
     );
     const entry = screen.getByText('Voice Quota').closest('[aria-disabled]') as HTMLElement;
@@ -275,7 +288,7 @@ describe('Sidebar', () => {
   it('follows the entry with the open rail tooltip when the list scrolls', () => {
     const { container } = render(
       <MemoryRouter>
-        <Sidebar role="ADMIN" collapsed onToggle={() => {}} />
+        <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} />
       </MemoryRouter>,
     );
     const link = screen.getByRole('link', { name: /Runs/ });
@@ -296,9 +309,9 @@ describe('Sidebar', () => {
         id: 'support',
         label: 'common.shell.nav.groups.overview',
         items: [
-          { label: 'Support', path: '/support', icon: Lifebuoy, action: 'runs.view', badge: 3 },
-          { label: 'Empty', path: '/empty', icon: Lifebuoy, action: 'runs.view', badge: 0 },
-          { label: 'Plain', path: '/plain', icon: Lifebuoy, action: 'runs.view' },
+          { label: 'Support', path: '/support', icon: Lifebuoy, key: 'workflow.run.view', badge: 3 },
+          { label: 'Empty', path: '/empty', icon: Lifebuoy, key: 'workflow.run.view', badge: 0 },
+          { label: 'Plain', path: '/plain', icon: Lifebuoy, key: 'workflow.run.view' },
         ],
       },
     ];
@@ -306,7 +319,7 @@ describe('Sidebar', () => {
     it('shows the number beside an expanded label and reads it as part of the name', () => {
       render(
         <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} nav={SUPPORT} />
+          <Sidebar me={ADMIN_ME} collapsed={false} onToggle={() => {}} nav={SUPPORT} />
         </MemoryRouter>,
       );
       const link = screen.getByRole('link', { name: 'Support, 3' });
@@ -316,7 +329,7 @@ describe('Sidebar', () => {
     it('marks the rail icon and words the tooltip and the name as "label, count"', () => {
       render(
         <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed onToggle={() => {}} nav={SUPPORT} />
+          <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} nav={SUPPORT} />
         </MemoryRouter>,
       );
       const link = screen.getByRole('link', { name: 'Support, 3' });
@@ -329,7 +342,7 @@ describe('Sidebar', () => {
     it('shows nothing for a zero or an absent count', () => {
       const { container } = render(
         <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed={false} onToggle={() => {}} nav={SUPPORT} />
+          <Sidebar me={ADMIN_ME} collapsed={false} onToggle={() => {}} nav={SUPPORT} />
         </MemoryRouter>,
       );
       for (const name of ['Empty', 'Plain']) {
@@ -380,7 +393,7 @@ describe('Sidebar', () => {
       stubMatchMedia(false);
       render(
         <MemoryRouter>
-          <Sidebar role="ADMIN" collapsed onToggle={() => {}} drawerOpen onDrawerClose={() => {}} />
+          <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} drawerOpen onDrawerClose={() => {}} />
         </MemoryRouter>,
       );
       const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });
@@ -396,7 +409,7 @@ describe('Sidebar', () => {
       const { container } = render(
         <MemoryRouter>
           <Sidebar
-            role="ADMIN"
+            me={ADMIN_ME}
             collapsed={false}
             onToggle={() => {}}
             drawerOpen
@@ -414,7 +427,7 @@ describe('Sidebar', () => {
       render(
         <MemoryRouter>
           <Sidebar
-            role="ADMIN"
+            me={ADMIN_ME}
             collapsed={false}
             onToggle={() => {}}
             drawerOpen
@@ -452,7 +465,7 @@ describe('Sidebar', () => {
 
     it('labels the groups, links, disabled entries and system status in Vietnamese', () => {
       stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
-      renderSidebar('ADMIN');
+      renderSidebar(ADMIN_ME);
       const { nav } = viCommon.shell;
 
       expect(screen.getByRole('navigation', { name: nav.label })).toBeInTheDocument();

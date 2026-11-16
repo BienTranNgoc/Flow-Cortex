@@ -1,5 +1,6 @@
 import i18n from '../../lib/i18n';
-import { roleLabel, statusLabel } from './enumLabels';
+import { ADMIN_ME, staffMe } from '../../test/fakeApi';
+import { assignableRoles, roleLabel, statusLabel } from './enumLabels';
 
 describe('enumLabels', () => {
   const t = i18n.t.bind(i18n);
@@ -14,5 +15,23 @@ describe('enumLabels', () => {
 
   it('shows no role label when the account has no role', () => {
     expect(roleLabel(t, undefined)).toBe('');
+  });
+
+  it('offers no role without the change-role key, end-user roles with it, every role with the admin-account key too', () => {
+    const noKey = staffMe('CUSTOMER_SUPPORT', ['user.account.view']);
+    const manager = staffMe('OPERATION_MANAGER', ['user.account.change_role']);
+
+    expect(assignableRoles(undefined)).toEqual([]);
+    expect(assignableRoles(noKey)).toEqual([]);
+    expect(assignableRoles(manager)).toEqual(['MEMBER', 'CREATOR']);
+    expect(assignableRoles(ADMIN_ME)).toEqual([
+      'ADMIN',
+      'OPERATION_MANAGER',
+      'CUSTOMER_SUPPORT',
+      'CONTENT_EDITOR',
+      'PLATFORM_OPERATOR',
+      'MEMBER',
+      'CREATOR',
+    ]);
   });
 });

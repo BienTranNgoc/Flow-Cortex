@@ -28,6 +28,12 @@ services:
       OTEL_LOGS_EXPORTER: otlp
       OTEL_METRICS_EXPORTER: otlp
 
+  render-worker:
+    environment:
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+
   # Lets Prometheus scrape without a token. The metrics then also answer
   # unauthenticated on the store's published port, 127.0.0.1:9000 (loopback
   # only); a shared host needs a bearer token instead.
@@ -113,6 +119,7 @@ services:
       - --web.cors.origin=http://127\.0\.0\.1:9090
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - "127.0.0.1:9090:9090"

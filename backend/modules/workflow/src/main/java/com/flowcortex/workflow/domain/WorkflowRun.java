@@ -52,6 +52,9 @@ public class WorkflowRun {
     @Column(name = "options", updatable = false)
     private String options;
 
+    @Column(name = "request_key", updatable = false)
+    private String requestKey;
+
     /** Required by JPA. */
     protected WorkflowRun() {
     }
@@ -61,6 +64,13 @@ public class WorkflowRun {
     }
 
     public WorkflowRun(UUID id, UUID workflowId, UUID ownerId, String input, String options, Instant startedAt) {
+        this(id, workflowId, ownerId, input, options, startedAt, null);
+    }
+
+    /** {@code requestKey} is unique per owner when present: it names the start request that created this run. */
+    public WorkflowRun(UUID id, UUID workflowId, UUID ownerId, String input, String options, Instant startedAt,
+            String requestKey) {
+        this.requestKey = requestKey;
         this.id = id;
         this.workflowId = workflowId;
         this.ownerId = ownerId;

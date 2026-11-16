@@ -1,10 +1,16 @@
 import { withLocale } from './locale';
+import { emitNetworkSignal } from './networkSignals';
 import { refreshAccessToken } from './session';
 import { getToken } from './tokenStore';
 
 const STREAM_PATH = '/api/v1/realtime/stream';
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30_000;
+/** Three missed server heartbeats (the hub pings every 15 s). */
+const IDLE_TIMEOUT_MS = 45_000;
+let nextStreamId = 0;
+
+type Outcome = 'retry' | 'reauth' | 'stop';
 
 export interface StreamEvent {
   id: string | null;
@@ -18,6 +24,8 @@ export interface EventStreamOptions {
   onEvent: (event: StreamEvent) => void;
   /** Called every time a connection is accepted, the first one and each reconnect. */
   onOpen?: () => void;
+  /** Drops and reconnects a connection that delivers no bytes for this long. */
+  idleTimeoutMs?: number;
 }
 
 export interface EventStream {
@@ -103,7 +111,7 @@ function isFinalRefusal(status: number): boolean {
  * topic or a second 401 ends the stream.
  */
 export function openEventStream(options: EventStreamOptions): EventStream {
-  const { topics, onEvent, onOpen } = options;
+  const { topics, onEvent, onOpen, idleTimeoutMs = IDLE_TIMEOUT_MS } = options;
   const query = topics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
   const url = `${STREAM_PATH}?${query}`;
   let closed = false;
@@ -111,6 +119,30 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const streamId = (nextStreamId += 1);
+  let down = false;
+
+  function markDown(): void {
+    if (!down) {
+      down = true;
+      emitNetworkSignal({ type: 'stream-down', streamId });
+    }
+  }
+
+  function markUp(): void {
+    if (down) {
+      down = false;
+      emitNetworkSignal({ type: 'stream-up', streamId });
+    }
+  }
+
+  const clearIdle = () => {
+    if (idleTimer !== null) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
 
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
@@ -118,11 +150,21 @@ export function openEventStream(options: EventStreamOptions): EventStream {
       timer = setTimeout(resolve, ms);
     });
 
-  /** Reads until the server ends the body; true when the stream was closed meanwhile. */
+  /** Reads until the body ends or goes silent past the idle timeout; true when closed meanwhile. */
   async function pump(body: ReadableStream<Uint8Array>, onActivity: () => void): Promise<boolean> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     const parser = new SseParser();
+    // A path that dies without FIN or RST leaves read() pending for good; cancelling the reader
+    // ends it, and aborting the request frees the socket.
+    const armIdle = () => {
+      clearIdle();
+      idleTimer = setTimeout(() => {
+        controller?.abort();
+        reader.cancel().catch(() => undefined);
+      }, idleTimeoutMs);
+    };
+    armIdle();
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -132,6 +174,7 @@ export function openEventStream(options: EventStreamOptions): EventStream {
         if (done) {
           return false;
         }
+        armIdle();
         onActivity();
         for (const event of parser.feed(decoder.decode(value, { stream: true }))) {
           if (event.id !== null) {
@@ -141,62 +184,83 @@ export function openEventStream(options: EventStreamOptions): EventStream {
         }
       }
     } finally {
+      clearIdle();
       reader.releaseLock();
     }
   }
 
-  async function run(): Promise<void> {
-    let failures = 0;
-    let refreshedOn401 = false;
-    while (!closed) {
-      controller = new AbortController();
-      try {
-        const headers = withLocale({ Accept: 'text/event-stream' });
-        const token = getToken();
-        if (token) {
-          headers.set('Authorization', `Bearer ${token}`);
-        }
-        if (lastEventId !== null) {
-          headers.set('Last-Event-ID', lastEventId);
-        }
-        const response = await fetch(url, { headers, signal: controller.signal });
-        if (closed) {
-          return;
-        }
-        if (response.status === 401) {
-          if (refreshedOn401 || (await refreshAccessToken()) === null) {
-            return;
-          }
-          refreshedOn401 = true;
-          continue;
-        }
-        if (isFinalRefusal(response.status)) {
-          return;
-        }
-        if (response.ok && response.body) {
-          refreshedOn401 = false;
-          onOpen?.();
-          if (await pump(response.body, () => (failures = 0))) {
-            return;
-          }
-        }
-      } catch {
-        // A failed connect or a broken body is retried below; only close() ends the loop.
-        if (closed) {
-          return;
-        }
+  /** One connection attempt: connect, then pump until the body ends. */
+  async function connectOnce(state: { refreshedOn401: boolean; failures: number }): Promise<Outcome> {
+    controller = new AbortController();
+    try {
+      const headers = withLocale({ Accept: 'text/event-stream' });
+      const token = getToken();
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
       }
-      await sleep(backoffDelay(failures));
-      failures += 1;
+      if (lastEventId !== null) {
+        headers.set('Last-Event-ID', lastEventId);
+      }
+      const response = await fetch(url, { headers, signal: controller.signal });
+      if (closed) {
+        return 'stop';
+      }
+      if (response.status === 401) {
+        if (state.refreshedOn401 || (await refreshAccessToken()) === null) {
+          return 'stop';
+        }
+        state.refreshedOn401 = true;
+        return 'reauth';
+      }
+      if (isFinalRefusal(response.status)) {
+        return 'stop';
+      }
+      if (response.status === 429) {
+        markUp();
+        emitNetworkSignal({ type: 'rate-limited', waitSeconds: null });
+      } else if (response.ok && response.body) {
+        state.refreshedOn401 = false;
+        markUp();
+        onOpen?.();
+        if (await pump(response.body, () => (state.failures = 0))) {
+          return 'stop';
+        }
+      } else {
+        markDown();
+      }
+    } catch {
+      // A failed connect or a broken body is retried; only close() ends the loop.
+      if (closed) {
+        return 'stop';
+      }
+      markDown();
+    }
+    return 'retry';
+  }
+
+  async function run(): Promise<void> {
+    const state = { refreshedOn401: false, failures: 0 };
+    while (!closed) {
+      const outcome = await connectOnce(state);
+      if (outcome === 'stop') {
+        return;
+      }
+      if (outcome === 'retry') {
+        await sleep(backoffDelay(state.failures));
+        state.failures += 1;
+      }
     }
   }
 
-  void run();
+  // However the loop ends (close, refused topic, second 401) the stream stops counting as down.
+  void run().finally(markUp);
 
   return {
     close() {
       closed = true;
+      markUp();
       controller?.abort();
+      clearIdle();
       if (timer !== null) {
         clearTimeout(timer);
       }
