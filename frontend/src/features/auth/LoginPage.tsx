@@ -198,9 +198,10 @@ export function LoginPage() {
       }
       return lockedText ?? failureMessage(loginMutation, t, 'auth.login.retryLater');
     }
-    return oauthError ? (
-      <Trans i18nKey={oauthErrorKey(oauthError)} components={{ help: helpLink }} />
-    ) : undefined;
+    if (oauthError === 'account_inactive') {
+      return <Trans i18nKey="auth.oauthError.accountInactive" components={{ help: helpLink }} />;
+    }
+    return oauthError ? t(oauthErrorKey(oauthError)) : undefined;
   })();
   const dataState = submitState(submitSucceeded, isPending);
 
