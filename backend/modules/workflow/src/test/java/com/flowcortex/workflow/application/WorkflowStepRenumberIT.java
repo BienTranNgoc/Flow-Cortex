@@ -43,7 +43,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({WorkflowServiceImpl.class, WorkflowStepRenumberIT.Beans.class})
+@Import({WorkflowServiceImpl.class, WorkflowWriteAccess.class, VersionWriter.class, ServedDefinitions.class,
+        WorkflowStepRenumberIT.Beans.class})
 @Testcontainers
 class WorkflowStepRenumberIT {
 
