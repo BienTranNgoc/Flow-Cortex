@@ -427,6 +427,14 @@ describe('LoginPage', () => {
         );
         expect(screen.queryByRole('link', { name: 'contact support' })).not.toBeInTheDocument();
       });
+
+      it('builds the help link without carrying other query parameters', async () => {
+        stubApi(flags(true));
+        renderLogin(null, '?oauth_error=account_inactive&next=%2F%2Fevil.example&help=requests');
+
+        const link = await screen.findByRole('link', { name: 'contact support' });
+        expect(link).toHaveAttribute('href', '/login?oauth_error=account_inactive&help=home');
+      });
     });
   });
 

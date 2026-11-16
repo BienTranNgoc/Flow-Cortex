@@ -69,6 +69,9 @@ interface LoginState {
   email?: string;
 }
 
+/** Only the inactive-account sentence links to help; the link carries no query value from the address bar. */
+const HELP_FROM_INACTIVE_ACCOUNT = '?oauth_error=account_inactive&help=home';
+
 function localTime(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -161,9 +164,7 @@ export function LoginPage() {
     : undefined;
   const resetLink = <Link to="/forgot-password" />;
   // A link to a panel that never opens would be a dead end, so the sentence stays plain text.
-  const helpParams = new URLSearchParams(searchParams);
-  helpParams.set('help', 'home');
-  const helpLink = supportWidget ? <Link to={{ search: `?${helpParams}` }} /> : <></>;
+  const helpLink = supportWidget ? <Link to={{ search: HELP_FROM_INACTIVE_ACCOUNT }} /> : <></>;
   const alertBody = (() => {
     if (notConfirmed) return t('auth.login.emailNotConfirmed');
     if (wrongCredentials) return failureMessage(loginMutation, t, 'auth.login.failedFallback');
