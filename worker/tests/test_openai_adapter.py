@@ -284,12 +284,114 @@ def test_generate_script_rejects_oversize_payload_at_boundary(
         adapter.generate_script(SAMPLE_PAYLOAD)
 
 
-def test_generate_script_rejects_response_that_is_not_json(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_script_rejects_response_that_is_not_json(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     _patch_urlopen(monkeypatch, _http_response(_ok_body("not json")))
     adapter = _adapter()
 
-    with pytest.raises(PermanentError, match="response format"):
+    with caplog.at_level("WARNING"), pytest.raises(PermanentError, match="response format"):
         adapter.generate_script(SAMPLE_PAYLOAD)
+
+    assert any(getattr(record, "finishReason", None) == "stop" for record in caplog.records)
+    assert any(getattr(record, "contentLength", None) == 8 for record in caplog.records)
+    assert all("not json" not in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    "wrapped",
+    [
+        '```json\n{"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}\n```',
+        '```\n{"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}\n```',
+        '<thought>Phân tích {sản phẩm}</thought>\n{"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}',
+        'Dưới đây là kịch bản:\n{"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}\nChúc bạn bán tốt!',
+        [{"type": "text", "text": '```json\n{"script": "Mở đầu rồi lợi ích. Đặt mua ngay"}\n```'}],
+    ],
+)
+def test_generate_script_extracts_json_from_proxy_wrapped_content(
+    monkeypatch: pytest.MonkeyPatch, wrapped: Any
+) -> None:
+    _patch_urlopen(monkeypatch, _http_response(_ok_body(wrapped)))
+
+    assert _adapter("https://llm-proxy.example/v1").generate_script(SAMPLE_PAYLOAD) == (
+        "Mở đầu rồi lợi ích. Đặt mua ngay"
+    )
+
+
+def test_generate_script_rejects_null_content_without_crashing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_urlopen(monkeypatch, _http_response(_ok_body(cast(Any, None))))
+
+    with pytest.raises(PermanentError, match="response format"):
+        _adapter().generate_script(SAMPLE_PAYLOAD)
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_hint"),
+    [
+        ("Upstream temporarily unavailable, please retry.", "upstream_temporarily_unavailable"),
+        ("Service unavailable, try again later.", "service_unavailable"),
+        ("Model overloaded, please retry.", "please_retry"),
+        ("Rate limit reached for this route.", "rate_limited"),
+    ],
+)
+def test_generate_script_classifies_masked_200_transient_content_as_transient(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    content: str,
+    expected_hint: str,
+) -> None:
+    body = _ok_body(content)
+    body["usage"] = {"prompt_tokens": 0, "completion_tokens": 12, "total_tokens": 12}
+    _patch_urlopen(monkeypatch, _http_response(body))
+
+    with caplog.at_level("WARNING"), pytest.raises(TransientError) as raised:
+        _adapter("https://llm-proxy.example/v1").generate_script(SAMPLE_PAYLOAD)
+
+    assert raised.value.retry_after_seconds is None
+    assert any(
+        getattr(record, "matchedHint", None) == expected_hint for record in caplog.records
+    )
+    assert any(getattr(record, "promptTokens", None) == 0 for record in caplog.records)
+    assert all(content not in record.getMessage() for record in caplog.records)
+
+
+def test_generate_script_rejects_long_prose_even_if_containing_hint_words(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    long_prose = "Please retry again. " * 20
+    assert len(long_prose) > 300
+    _patch_urlopen(monkeypatch, _http_response(_ok_body(long_prose)))
+
+    with pytest.raises(PermanentError, match="response format"):
+        _adapter().generate_script(SAMPLE_PAYLOAD)
+
+
+@pytest.mark.parametrize(
+    ("error_obj", "transient"),
+    [
+        ({"code": "upstream_error", "message": "Upstream temporarily unavailable"}, True),
+        ({"code": "invalid_api_key", "message": "secret token rejected"}, False),
+    ],
+)
+def test_generate_script_classifies_http_200_error_object(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    error_obj: dict[str, str],
+    transient: bool,
+) -> None:
+    _patch_urlopen(monkeypatch, _http_response({"error": error_obj}))
+    expected_exc: type[Exception] = TransientError if transient else PermanentError
+
+    with caplog.at_level("WARNING"), pytest.raises(expected_exc):
+        _adapter("https://llm-proxy.example/v1").generate_script(SAMPLE_PAYLOAD)
+
+    assert any(
+        getattr(record, "providerErrorCode", None) == error_obj["code"]
+        for record in caplog.records
+    )
+    assert all(error_obj["message"] not in record.getMessage() for record in caplog.records)
 
 
 @pytest.mark.parametrize("status", [400, 401, 403])

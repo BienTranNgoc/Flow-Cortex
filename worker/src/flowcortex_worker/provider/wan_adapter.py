@@ -29,6 +29,7 @@ from .adapter import (
 from .contracts.provider_job import ProductAdPayload
 from .vendor_jobs import (
     RESULT_GONE_STATUSES,
+    WORKER_USER_AGENT,
     VendorJobEnded,
     VendorJobTimeout,
     VendorResultGone,
@@ -211,6 +212,7 @@ class WanAdapter:
             headers={
                 "Authorization": f"Bearer {self.config.api_key}",
                 "Content-Type": "application/json",
+                "User-Agent": WORKER_USER_AGENT,
             },
         )
         try:
@@ -267,7 +269,7 @@ class WanAdapter:
             req = urllib.request.Request(
                 url,
                 method="GET",
-                headers={"User-Agent": "FlowCortexWorker/1.0 (compatible; Mozilla/5.0)"},
+                headers={"User-Agent": WORKER_USER_AGENT},
             )
             with urllib.request.urlopen(
                 req,

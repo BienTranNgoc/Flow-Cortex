@@ -9,9 +9,14 @@ from conftest import FakeConnection, FakeStorage, assert_valid, published, run_c
 
 from flowcortex_worker.contracts.media_progress import VendorTaskReport
 from flowcortex_worker.errors import PermanentError, TransientError
-from flowcortex_worker.provider.__main__ import make_execute_job, provider_queue
+from flowcortex_worker.provider.__main__ import (
+    MAX_TRANSIENT_REDELIVERIES,
+    make_execute_job,
+    provider_queue,
+)
 from flowcortex_worker.provider.adapter import FixtureProviderAdapter
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+from flowcortex_worker.provider.openai_adapter import OpenAIConfig, OpenAIProviderAdapter
 from flowcortex_worker.provider.vendor_jobs import VendorJobTimeout
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
@@ -286,3 +291,87 @@ def test_any_other_provider_queue_refuses_to_start(
 
     with pytest.raises(RuntimeError, match=r"provider\.jobs, provider\.video\.jobs"):
         provider_queue()
+
+
+def test_masked_200_upstream_error_on_script_job_requeues_until_budget_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+    import urllib.request
+    from unittest.mock import MagicMock
+
+    payload_body = json.dumps(
+        {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "Upstream temporarily unavailable, please retry.",
+                    },
+                }
+            ],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 12, "total_tokens": 12},
+        }
+    ).encode()
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        response = MagicMock()
+        response.read = MagicMock(return_value=io.BytesIO(payload_body).read())
+        response.__enter__ = MagicMock(return_value=response)
+        response.__exit__ = MagicMock(return_value=False)
+        return response
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    adapter = OpenAIProviderAdapter(
+        OpenAIConfig(api_key="sk-test", base_url="https://llm-proxy.example/v1", model="m")
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    # First delivery: requeued with default 5 s exponential backoff, no terminal result published.
+    conn = FakeConnection()
+    conn.deliver(provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD))
+    waits: list[float] = []
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=waits.append,
+        until=settled,
+    )
+    assert published(conn, "result") == []
+    assert conn.consume.rejects == [(1, True)]
+    assert waits == [5.0]
+
+    # Final delivery at MAX_TRANSIENT_REDELIVERIES: answered with terminal failure and acked.
+    exhausted_conn = FakeConnection()
+    exhausted_conn.deliver(
+        provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD),
+        headers={"x-delivery-count": MAX_TRANSIENT_REDELIVERIES},
+    )
+    run_consumer(
+        exhausted_conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=lambda s: None,
+        until=settled,
+    )
+    result = assert_valid(published(exhausted_conn, "result")[0].body, "media-result")
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "provider_request_failed"
+    assert result["error"]["retryable"] is False
+    assert exhausted_conn.consume.acks == [1]

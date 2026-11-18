@@ -32,6 +32,7 @@ PROBE_GONE_STATUSES = frozenset({400, 401, 403, 404, 410})
 # A result download answering one of these means the clip is no longer retrievable.
 RESULT_GONE_STATUSES = frozenset({403, 404, 410})
 _PROBE_TIMEOUT_SECONDS = 30.0
+WORKER_USER_AGENT = "FlowCortexWorker/1.0 (compatible; Mozilla/5.0)"
 
 
 class VendorJobEnded(PermanentError):
@@ -190,6 +191,7 @@ def fetch_status(
 ) -> tuple[int, bytes]:
     """One request returning status and body whatever the status; transport errors raise."""
     request_headers = dict(headers)
+    request_headers.setdefault("User-Agent", WORKER_USER_AGENT)
     if byte_range:
         request_headers["Range"] = "bytes=0-0"
     request = urllib.request.Request(url, method=method, headers=request_headers)

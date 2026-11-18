@@ -34,8 +34,11 @@ from .contracts.provider_job import ProductAdPayload
 
 PROVIDER_EDGE = "edge"
 DEFAULT_EDGE_VOICE = "vi-VN-NamMinhNeural"
-DEFAULT_EDGE_RATE = "+0%"
+DEFAULT_EDGE_RATE = "+10%"
 DEFAULT_EDGE_TIMEOUT_SECONDS = 60.0
+_MAX_SPEECH_MS = 10_000
+_SOFT_FIT_CEILING_MS = 11_500
+_TARGET_FIT_MS = 9_850
 
 
 @dataclass(frozen=True)
@@ -102,8 +105,18 @@ class EdgeSpeechAdapter:
             raise TransientError(f"Edge TTS failed: {type(exc).__name__}") from exc
         abort.check()
 
-        wav = _to_wav(mp3, abort)
+        base_tempo = _rate_factor(self.config.rate)
+        wav = (
+            _to_wav(mp3, abort)
+            if abs(base_tempo - 1.0) < 1e-6
+            else _to_wav(mp3, abort, atempo=base_tempo)
+        )
         duration_ms = _validate_wav(wav)
+        if _MAX_SPEECH_MS < duration_ms <= _SOFT_FIT_CEILING_MS:
+            abort.check()
+            combined_tempo = min(2.0, base_tempo * (duration_ms / _TARGET_FIT_MS))
+            wav = _to_wav(mp3, abort, atempo=combined_tempo)
+            duration_ms = _validate_wav(wav)
         return SpeechArtifact(
             body=wav,
             duration_ms=duration_ms,
@@ -136,7 +149,9 @@ async def _cancellable_download(script: str, config: EdgeConfig, abort: Abort) -
 
 async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
     chunks = bytearray()
-    communicate = edge_tts.Communicate(script, voice=config.voice, rate=config.rate)
+    # Edge rejects non-zero SSML prosody rates on vi-VN voices with NoAudioReceived, so tempo
+    # adjustments run locally via ffmpeg while preserving the declared speed in speech metadata.
+    communicate = edge_tts.Communicate(script, voice=config.voice, rate="+0%")
     async for chunk in communicate.stream():
         if chunk.get("type") == "audio":
             chunks.extend(chunk["data"])
@@ -145,7 +160,7 @@ async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
     return bytes(chunks)
 
 
-def _to_wav(mp3: bytes, abort: Abort) -> bytes:
+def _to_wav(mp3: bytes, abort: Abort, *, atempo: float | None = None) -> bytes:
     if not mp3:
         raise PermanentError("provider_response_invalid", "Edge TTS produced empty audio")
     with tempfile.TemporaryDirectory(prefix=TEMP_PREFIX) as directory:
@@ -153,25 +168,30 @@ def _to_wav(mp3: bytes, abort: Abort) -> bytes:
         source = root / "speech.mp3"
         output = root / "speech.wav"
         source.write_bytes(mp3)
+        command = [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-nostdin",
+            "-y",
+            "-i",
+            str(source),
+        ]
+        if atempo is not None:
+            command.extend(["-filter:a", f"atempo={atempo:.6f}"])
+        command.extend(
+            [
+                "-ac",
+                "1",
+                "-ar",
+                "24000",
+                "-c:a",
+                "pcm_s16le",
+                str(output),
+            ]
+        )
         try:
-            completed = abort.run(
-                [
-                    "ffmpeg",
-                    "-v",
-                    "error",
-                    "-nostdin",
-                    "-y",
-                    "-i",
-                    str(source),
-                    "-ac",
-                    "1",
-                    "-ar",
-                    "24000",
-                    "-c:a",
-                    "pcm_s16le",
-                    str(output),
-                ]
-            )
+            completed = abort.run(command)
         except OSError as exc:
             raise PermanentError(
                 "provider_response_invalid", "Edge TTS audio could not be normalized"
@@ -181,6 +201,12 @@ def _to_wav(mp3: bytes, abort: Abort) -> bytes:
                 "provider_response_invalid", "Edge TTS audio could not be normalized"
             )
         return output.read_bytes()
+
+
+def _rate_factor(rate: str) -> float:
+    if not _valid_rate(rate):
+        raise PermanentError("provider_request_failed", "EDGE_TTS_RATE must match +N% or -N%")
+    return max(0.5, min(2.0, 1.0 + int(rate[:-1]) / 100.0))
 
 
 def _validate_wav(body: bytes) -> int:

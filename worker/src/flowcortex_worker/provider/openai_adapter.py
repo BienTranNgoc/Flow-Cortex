@@ -14,6 +14,7 @@ import base64
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -189,8 +190,9 @@ _SYSTEM_PROMPT = (
     "- Do not include emojis, hashtags, scene directions, or timestamps.\n\n"
 
     "DURATION CONSTRAINTS:\n"
-    "- Target 22-30 Vietnamese whitespace-separated words in total.\n"
-    "- Optimize for approximately 10 seconds of natural speech.\n"
+    "- Target 22-28 Vietnamese whitespace-separated words in total.\n"
+    "- Optimize for approximately 8.5 to 9.5 seconds of natural speech "
+    "so punctuation pauses and numbers stay under 10 seconds.\n"
     "- Prioritize the hook, strongest benefit, and CTA.\n"
     "- If the supplied CTA, price, or promotion makes the target "
     "impossible, preserve required information and minimize other text.\n\n"
@@ -402,15 +404,66 @@ class OpenAIProviderAdapter:
             raise PermanentError(
                 "provider_response_invalid", "provider response was not valid JSON"
             ) from exc
+        if (
+            isinstance(parsed, dict)
+            and "choices" not in parsed
+            and isinstance(parsed.get("error"), dict)
+        ):
+            err = parsed["error"]
+            code = str(err.get("code") or err.get("type") or "unknown")[:100]
+            hint = _transient_hint_for_text(
+                " ".join(str(err.get(k) or "") for k in ("code", "type", "message"))
+            )
+            log.warning(
+                "provider returned error object in HTTP 200 body",
+                extra={"providerErrorCode": code, "matchedHint": hint},
+            )
+            if hint is not None:
+                raise TransientError(f"provider masked transient failure: {hint}")
+            raise PermanentError(
+                "provider_request_failed", "provider returned an error in HTTP 200 response"
+            )
         try:
-            raw = parsed["choices"][0]["message"]["content"]
+            choice = parsed["choices"][0]
+            raw = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise PermanentError(
                 "provider_response_invalid", "provider response has no message content"
             ) from exc
         try:
-            result = json.loads(raw)
-        except json.JSONDecodeError as exc:
+            result = _parse_structured_content(raw)
+        except ValueError as exc:
+            finish_reason = choice.get("finish_reason") if isinstance(choice, dict) else None
+            usage = parsed.get("usage") if isinstance(parsed, dict) else None
+            prompt_tokens = usage.get("prompt_tokens") if isinstance(usage, dict) else None
+            raw_text = _extract_text_content(raw)
+            transient_hint = (
+                _transient_hint_for_text(raw_text) if raw_text is not None else None
+            )
+            if transient_hint is not None:
+                log.warning(
+                    "provider returned masked transient error",
+                    extra={
+                        "finishReason": finish_reason,
+                        "contentLength": len(raw_text) if raw_text is not None else None,
+                        "promptTokens": prompt_tokens,
+                        "matchedHint": transient_hint,
+                    },
+                )
+                raise TransientError(
+                    f"provider masked transient failure: {transient_hint}"
+                ) from exc
+            log.warning(
+                "provider returned invalid structured content",
+                extra={
+                    "finishReason": finish_reason,
+                    "contentType": type(raw).__name__,
+                    "contentLength": len(raw) if isinstance(raw, str) else None,
+                    "startsWithFence": isinstance(raw, str) and raw.lstrip().startswith("```"),
+                    "hasJsonBrace": isinstance(raw, str) and "{" in raw,
+                    "promptTokens": prompt_tokens,
+                },
+            )
             raise PermanentError(
                 "provider_response_invalid", "provider did not honour the response format"
             ) from exc
@@ -491,6 +544,93 @@ class OpenAIProviderAdapter:
                 "image_url": {"url": f"data:{mime};base64,{encoded}", "detail": "high"},
             },
         ]
+
+
+_THINK_BLOCK_RE = re.compile(
+    r"<(?:think|thought)>.*?</(?:think|thought)>", re.DOTALL | re.IGNORECASE
+)
+_CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
+_MAX_TRANSIENT_MESSAGE_CHARS = 300
+_TRANSIENT_CONTENT_HINTS: tuple[tuple[str, str], ...] = (
+    ("upstream_temporarily_unavailable", "upstream temporarily unavailable"),
+    ("temporarily_unavailable", "temporarily unavailable"),
+    ("service_unavailable", "service unavailable"),
+    ("bad_gateway", "bad gateway"),
+    ("gateway_timeout", "gateway timeout"),
+    ("upstream_error", "upstream error"),
+    ("please_retry", "please retry"),
+    ("try_again_later", "try again later"),
+    ("model_overloaded", "overloaded"),
+    ("rate_limited", "rate limit"),
+)
+
+
+def _transient_hint_for_text(text: str) -> str | None:
+    normalized = text.strip().lower()
+    if not normalized or len(normalized) > _MAX_TRANSIENT_MESSAGE_CHARS:
+        return None
+    for label, pattern in _TRANSIENT_CONTENT_HINTS:
+        if pattern in normalized:
+            return label
+    return None
+
+
+def _extract_text_content(raw: Any) -> str | None:
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = [
+            part["text"]
+            for part in raw
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+        ]
+        return "".join(parts) if parts else None
+    return None
+
+
+def _parse_structured_content(raw: Any) -> Any:
+    """Parse JSON from `choices[0].message.content`, tolerating proxy fences or preamble text."""
+    if isinstance(raw, dict):
+        return raw
+    text = _extract_text_content(raw)
+    if text is None:
+        raise ValueError("content is not text")
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError("content is empty")
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        pass
+
+    cleaned = _THINK_BLOCK_RE.sub("", stripped).strip()
+    if cleaned and cleaned != stripped:
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+
+    for match in _CODE_FENCE_RE.finditer(cleaned):
+        candidate = match.group(1).strip()
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    decoder = json.JSONDecoder()
+    index = cleaned.find("{")
+    while index != -1:
+        try:
+            obj, _ = decoder.raw_decode(cleaned, index)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+        index = cleaned.find("{", index + 1)
+
+    raise ValueError("no valid JSON object in content")
 
 
 def _image_mime(body: bytes) -> str:

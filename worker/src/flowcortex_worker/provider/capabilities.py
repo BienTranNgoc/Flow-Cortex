@@ -48,6 +48,9 @@ from .vendor_jobs import (
 
 # Providers that fetch the reference image themselves from a URL instead of taking its bytes.
 _URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE})
+_CLIP_WIDTH = 480
+_CLIP_HEIGHT = 854
+_CLIP_CRF = "18"
 
 log = logging.getLogger("flowcortex_provider_worker.vendor_jobs")
 
@@ -463,13 +466,15 @@ def _normalize_video(body: bytes, context: ExecutionContext) -> bytes:
             "-t",
             "5",
             "-vf",
-            "scale=360:640:force_original_aspect_ratio=decrease,"
-            "pad=360:640:(ow-iw)/2:(oh-ih)/2:black",
+            f"scale={_CLIP_WIDTH}:{_CLIP_HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={_CLIP_WIDTH}:{_CLIP_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black",
             "-an",
             "-c:v",
             "libx264",
             "-preset",
             "fast",
+            "-crf",
+            _CLIP_CRF,
             "-pix_fmt",
             "yuv420p",
             "-movflags",
