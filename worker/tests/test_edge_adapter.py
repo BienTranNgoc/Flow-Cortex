@@ -226,6 +226,126 @@ def test_stream_without_audio_chunks_is_transient(monkeypatch: pytest.MonkeyPatc
     assert str(raised.value) == "Edge TTS returned no audio"
 
 
+def test_in_process_retry_recovers_from_transient_no_audio_without_logging_script(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def flaky_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise edge_errors.NoAudioReceived("silent")
+        return b"mp3"
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", flaky_download)
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
+
+    with captured_logs() as lines:
+        artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig()).generate_speech(
+            SpeechRequest("Đặt mua bí mật", REVISION_ID), ProcessRunner()
+        )
+
+    assert calls == 3
+    assert artifact.duration_ms == 1000
+    warnings = [line for line in lines if line["level"] == "WARNING"]
+    assert len(warnings) == 2
+    assert [w["downloadAttempt"] for w in warnings] == [1, 2]
+    assert all(w["errorType"] == "NoAudioReceived" for w in warnings)
+    assert all("Đặt mua bí mật" not in json.dumps(line) for line in lines)
+
+
+def test_in_process_retry_recovers_from_websocket_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def flaky_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise edge_errors.WebSocketError("dropped")
+        return b"mp3"
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", flaky_download)
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
+
+    artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig()).generate_speech(
+        SpeechRequest("Đặt mua", REVISION_ID), ProcessRunner()
+    )
+
+    assert calls == 2
+    assert artifact.provider == "edge"
+
+
+def test_in_process_retry_exhaustion_preserves_transient_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def failing_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        raise edge_errors.NoAudioReceived("silent")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", failing_download)
+
+    with pytest.raises(TransientError, match="Edge TTS returned no audio"):
+        _speak(ProcessRunner())
+
+    assert calls == edge_adapter._MAX_DOWNLOAD_ATTEMPTS
+
+
+def test_in_process_retry_does_not_retry_permanent_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def rejected_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        raise edge_errors.UnexpectedResponse("bad")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", rejected_download)
+
+    with pytest.raises(PermanentError) as raised:
+        _speak(ProcessRunner())
+
+    assert raised.value.code == "provider_response_invalid"
+    assert calls == 1
+
+
+def test_kill_during_retry_backoff_stops_immediately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retrying = threading.Event()
+
+    async def failing_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        retrying.set()
+        raise edge_errors.NoAudioReceived("silent")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (30.0,))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", failing_download)
+    runner = ProcessRunner()
+
+    def kill_once_waiting() -> None:
+        if retrying.wait(5):
+            time.sleep(0.05)
+            runner.kill("shutdown")
+
+    threading.Thread(target=kill_once_waiting, daemon=True).start()
+    began = time.monotonic()
+
+    with pytest.raises(ProcessKilled, match="shutdown"):
+        _speak(runner)
+
+    assert time.monotonic() - began < 5
+
+
 def test_kill_during_download_stops_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     streaming = threading.Event()
 

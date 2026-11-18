@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 import os
+import random
 import tempfile
 import wave
 from dataclasses import dataclass
@@ -32,6 +34,8 @@ from ..storage import TEMP_PREFIX
 from .adapter import Abort, SpeechArtifact, SpeechIdentity, SpeechRequest
 from .contracts.provider_job import ProductAdPayload
 
+log = logging.getLogger("flowcortex_provider_worker.edge")
+
 PROVIDER_EDGE = "edge"
 DEFAULT_EDGE_VOICE = "vi-VN-NamMinhNeural"
 DEFAULT_EDGE_RATE = "+10%"
@@ -39,6 +43,16 @@ DEFAULT_EDGE_TIMEOUT_SECONDS = 60.0
 _MAX_SPEECH_MS = 10_000
 _SOFT_FIT_CEILING_MS = 11_500
 _TARGET_FIT_MS = 9_850
+_MAX_DOWNLOAD_ATTEMPTS = 4
+_RETRY_DELAYS_SECONDS: tuple[float, ...] = (0.5, 1.0, 1.5)
+_TRANSPORT_ERRORS = (
+    WebSocketError,
+    SkewAdjustmentError,
+    TimeoutError,
+    ConnectionError,
+    OSError,
+    ClientError,
+)
 
 
 @dataclass(frozen=True)
@@ -77,14 +91,7 @@ class EdgeSpeechAdapter:
             raise TransientError(
                 f"Edge TTS handshake failed with HTTP {exc.status}"
             ) from exc
-        except (
-            WebSocketError,
-            SkewAdjustmentError,
-            TimeoutError,
-            ConnectionError,
-            OSError,
-            ClientError,
-        ) as exc:
+        except _TRANSPORT_ERRORS as exc:
             raise TransientError(f"Edge TTS connection failed: {type(exc).__name__}") from exc
         except NoAudioReceived as exc:
             raise TransientError("Edge TTS returned no audio") from exc
@@ -144,7 +151,36 @@ async def _cancellable_download(script: str, config: EdgeConfig, abort: Abort) -
             loop.call_soon_threadsafe(task.cancel)
 
     abort.on_kill(cancel)
-    return await asyncio.wait_for(_download_mp3(script, config), config.timeout_seconds)
+    return await asyncio.wait_for(_download_with_retries(script, config), config.timeout_seconds)
+
+
+async def _download_with_retries(script: str, config: EdgeConfig) -> bytes:
+    # Edge Read Aloud frequently drops WebSocket turns with 1006/NoAudioReceived in short bursts;
+    # absorb transient drops in-process before burning a broker redelivery and its 5-20 s backoff.
+    for attempt in range(1, _MAX_DOWNLOAD_ATTEMPTS):
+        try:
+            return await _download_mp3(script, config)
+        except (NoAudioReceived, *_TRANSPORT_ERRORS) as exc:
+            delay = _retry_delay_seconds(attempt)
+            log.warning(
+                "Edge TTS transient failure; retrying in-process",
+                extra={
+                    "downloadAttempt": attempt,
+                    "maxDownloadAttempts": _MAX_DOWNLOAD_ATTEMPTS,
+                    "voice": config.voice,
+                    "errorType": type(exc).__name__,
+                    "delaySeconds": round(delay, 3),
+                },
+            )
+            if delay > 0:
+                await asyncio.sleep(delay)
+    return await _download_mp3(script, config)
+
+
+def _retry_delay_seconds(attempt: int) -> float:
+    index = min(attempt - 1, len(_RETRY_DELAYS_SECONDS) - 1)
+    base = _RETRY_DELAYS_SECONDS[index]
+    return 0.0 if base <= 0 else base * random.uniform(0.8, 1.2)
 
 
 async def _download_mp3(script: str, config: EdgeConfig) -> bytes:
