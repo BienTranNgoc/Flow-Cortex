@@ -1,7 +1,8 @@
 import { setToken, type WorkflowResponse } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import { renderRoute, stubApi, type Handler, type RecordedCall } from '../../test/fakeApi';
 import { FakeXhr } from '../../test/fakeXhr';
@@ -68,9 +69,7 @@ async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByLabelText('Product name *');
   await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
   await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
-  await user.upload(screen.getByLabelText(/Product image/), [
-    image('front.png'),
-  ]);
+  await user.upload(screen.getByLabelText(/Product image/), [image('front.png')]);
 }
 
 describe('ProductVideoStartForm', () => {
@@ -163,7 +162,9 @@ describe('ProductVideoStartForm', () => {
     ]);
 
     expect(
-      screen.getByText('Files of this type must be at most 10 MB. Accepted: .jpg, .jpeg, .png, .webp.'),
+      screen.getByText(
+        'Files of this type must be at most 10 MB. Accepted: .jpg, .jpeg, .png, .webp.',
+      ),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Start run' }));
     expect(sent(calls)).toEqual([]);
@@ -202,7 +203,9 @@ describe('ProductVideoStartForm', () => {
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
     act(() => FakeXhr.instances[0]!.failNetwork());
 
-    expect(await screen.findByText("One of the uploads didn't finish. Try again.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("One of the uploads didn't finish. Try again."),
+    ).toBeInTheDocument();
     expect(sent(calls).map((call) => call.path)).toEqual(['/api/v1/uploads']);
 
     await user.click(screen.getByRole('button', { name: 'Retry' }));
@@ -211,7 +214,9 @@ describe('ProductVideoStartForm', () => {
 
     expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
     expect(sent(calls).filter((call) => call.path === '/api/v1/uploads')).toHaveLength(2);
-    expect(sent(calls).filter((call) => call.path === '/api/v1/product-videos/runs')).toHaveLength(1);
+    expect(sent(calls).filter((call) => call.path === '/api/v1/product-videos/runs')).toHaveLength(
+      1,
+    );
   });
 
   it('shows a 503 from the run start on the form', async () => {
@@ -228,9 +233,7 @@ describe('ProductVideoStartForm', () => {
     await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
     act(() => FakeXhr.instances[0]!.respond(200));
 
-    expect(
-      await screen.findByText('Product video is currently disabled'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Product video is currently disabled')).toBeInTheDocument();
   });
 
   describe('in Vietnamese', () => {
@@ -245,7 +248,9 @@ describe('ProductVideoStartForm', () => {
       const user = userEvent.setup();
       renderForm();
 
-      expect(await screen.findByRole('form', { name: 'Bắt đầu lượt chạy video sản phẩm' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('form', { name: 'Bắt đầu lượt chạy video sản phẩm' }),
+      ).toBeInTheDocument();
       expect(screen.getByLabelText('Tên sản phẩm *')).toBeInTheDocument();
       expect(screen.getByLabelText('Mô tả *')).toBeInTheDocument();
       const picker = screen.getByLabelText('Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *');
@@ -255,5 +260,76 @@ describe('ProductVideoStartForm', () => {
       expect(screen.getByText('Đã chọn 1 ảnh: front.png')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Bắt đầu lượt chạy' })).toBeInTheDocument();
     });
+  });
+
+  it('updates live 9:16 preview, supports image replacement/removal, and prefills draft state', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const fullSevenSteps: WorkflowResponse = {
+      ...PRODUCT_VIDEO,
+      estimatedCredits: 25,
+      steps: [
+        { id: 's1', stepOrder: 1, type: 'generate_script', mode: 'remote' },
+        { id: 's2', stepOrder: 2, type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
+        { id: 's3', stepOrder: 3, type: 'generate_storyboard', mode: 'remote' },
+        { id: 's4', stepOrder: 4, type: 'generate_speech', mode: 'remote' },
+        { id: 's5', stepOrder: 5, type: 'generate_video', mode: 'remote' },
+        { id: 's6', stepOrder: 6, type: 'generate_video', mode: 'remote' },
+        { id: 's7', stepOrder: 7, type: 'render_video', mode: 'remote' },
+      ],
+    };
+
+    stubApi({
+      'GET /api/v1/workflows': { status: 200, body: [fullSevenSteps] },
+      'GET /api/v1/capabilities': {
+        status: 200,
+        body: {
+          mediaEnabled: true,
+          productVideoEnabled: true,
+          productVideoWorkflowId: PRODUCT_VIDEO_ID,
+        },
+      },
+      [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: fullSevenSteps },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: `/workflows/${PRODUCT_VIDEO_ID}`,
+              state: {
+                productDraft: {
+                  productName: 'Warm Flask',
+                  description: 'Keeps coffee hot 12h.',
+                },
+              },
+            },
+          ]}
+        >
+          <Routes>
+            <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText('Product name *')).toHaveValue('Warm Flask');
+    expect(screen.getByLabelText('Description *')).toHaveValue('Keeps coffee hot 12h.');
+
+    const preview = screen.getByRole('region', { name: '9:16 preview' });
+    expect(within(preview).getByText('Warm Flask')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '7-step pipeline' })).not.toBeInTheDocument();
+    expect(screen.getByText('Estimated cost: 25 credits')).toBeInTheDocument();
+
+    const picker = screen.getByLabelText('Product image (JPG/PNG/WebP, ≤ 10 MB) *');
+    await user.upload(picker, [image('bottle.png')]);
+    expect(screen.getByText('1 image selected: bottle.png')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(screen.queryByText('1 image selected: bottle.png')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Call to action *')).not.toBeInTheDocument();
   });
 });

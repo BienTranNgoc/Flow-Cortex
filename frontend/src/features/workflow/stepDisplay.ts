@@ -39,14 +39,65 @@ const LABEL_KEYS: Record<string, string> = {
   probe: 'workflow.step.label.probe',
   extract_audio: 'workflow.step.label.extract_audio',
   [CHECKPOINT]: 'workflow.step.label.review',
+  generate_script: 'workflow.step.label.generate_script',
+  generate_storyboard: 'workflow.step.label.generate_storyboard',
+  generate_speech: 'workflow.step.label.generate_speech',
+  generate_video: 'workflow.step.label.generate_video',
+  render_video: 'workflow.step.label.render_video',
 };
+
+type StepIdentity = Pick<RunStepResponse, 'id' | 'stepOrder' | 'type'>;
 
 /** The id of the element holding a node's name, so the detail panel can be labelled by it. */
 export const stepNameId = (stepId: string) => `pipeline-name-${stepId}`;
 
-export function stepLabel(step: RunStepResponse, t: TFunction): string {
+/** Resolves a member-facing step label, numbering repeated `generate_video` scenes and using Ad Video script review wording when flagged. */
+export function stepLabel(
+  step: StepIdentity,
+  t: TFunction,
+  steps?: readonly StepIdentity[],
+  isProductVideo = false,
+): string {
+  if (step.type === CHECKPOINT && isProductVideo) {
+    return t('workflow.step.label.reviewScript');
+  }
+  if (step.type === 'generate_video' && steps) {
+    const videoSteps = steps.filter((s) => s.type === 'generate_video');
+    if (videoSteps.length > 1) {
+      const idx = videoSteps.findIndex((s) =>
+        step.id && s.id ? s.id === step.id : s.stepOrder === step.stepOrder,
+      );
+      if (idx >= 0) {
+        return t('workflow.step.label.generate_video_numbered', { n: idx + 1 });
+      }
+    }
+  }
   const key = LABEL_KEYS[step.type ?? ''];
   return key ? t(key) : t('workflow.step.fallback', { order: step.stepOrder });
+}
+
+/** Formats non-negative elapsed seconds into `MM:SS` (or `H:MM:SS` beyond an hour). */
+export function formatElapsedClock(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(clamped / 3600);
+  const mins = Math.floor((clamped % 3600) / 60);
+  const secs = clamped % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(mins)}:${pad(secs)}` : `${pad(mins)}:${pad(secs)}`;
+}
+
+/** Computes whole elapsed seconds between ISO timestamps, falling back to `nowMs` when ongoing. */
+export function computeElapsedSeconds(
+  startedAt: string | undefined,
+  finishedAt: string | undefined,
+  nowMs: number,
+): number | null {
+  if (!startedAt) return null;
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return null;
+  const end = finishedAt ? Date.parse(finishedAt) : nowMs;
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, Math.floor((end - start) / 1000));
 }
 
 /** The step a waiting run is paused on: its first pending approval checkpoint. */

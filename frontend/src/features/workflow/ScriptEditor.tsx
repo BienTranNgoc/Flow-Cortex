@@ -40,7 +40,10 @@ export function ScriptEditor({
   const save = useSaveRevisionMutation(runId, task.id ?? '');
   const dirty = draft.trim() !== saved.trim();
   const revisionIsCurrent = latest?.id === task.currentRevisionId && task.version !== undefined;
-  const tooLong = wordCount(draft) > MAX_SCRIPT_WORDS;
+  const words = wordCount(draft);
+  const tooLong = words > MAX_SCRIPT_WORDS;
+  const estimatedSeconds = Math.max(0, Math.round(words / 3));
+  const meterPercent = Math.min(100, Math.round((words / MAX_SCRIPT_WORDS) * 100));
 
   // Another tab can move the current revision while this one is open; adopting its text is what
   // makes the 409 below the answer, rather than this editor silently holding text nobody can approve.
@@ -58,7 +61,11 @@ export function ScriptEditor({
 
   return (
     <div className="script-editor">
-      <RevisionHistory revisions={revisions} approvedRevisionId={task.approvedRevisionId} />
+      <RevisionHistory
+        revisions={revisions}
+        approvedRevisionId={task.approvedRevisionId}
+        onSelectRevision={setDraft}
+      />
       <div className="field">
         <label htmlFor="script-draft">{t('workflow.script.label')}</label>
         <textarea
@@ -68,6 +75,18 @@ export function ScriptEditor({
           onChange={(event) => setDraft(event.target.value)}
           aria-describedby={tooLong ? 'script-length-warning' : undefined}
         />
+        <div className={tooLong ? 'pv-script-meter pv-script-meter--over' : 'pv-script-meter'}>
+          <span className="pv-script-meter-text">
+            {t('workflow.script.meter', {
+              words,
+              max: MAX_SCRIPT_WORDS,
+              seconds: estimatedSeconds,
+            })}
+          </span>
+          <div className="pv-script-meter-track">
+            <div className="pv-script-meter-fill" style={{ width: `${meterPercent}%` }} />
+          </div>
+        </div>
         {/* The live region stays mounted so the warning is announced when it appears. */}
         <div aria-live="polite">
           {tooLong && (
@@ -148,9 +167,11 @@ function useWarnOnUnsavedChanges(dirty: boolean) {
 function RevisionHistory({
   revisions,
   approvedRevisionId,
+  onSelectRevision,
 }: Readonly<{
   revisions: ScriptRevisionResponse[];
   approvedRevisionId: string | undefined;
+  onSelectRevision: (content: string) => void;
 }>) {
   const { t } = useTranslation();
   if (revisions.length === 0) {
@@ -160,13 +181,22 @@ function RevisionHistory({
     <ol className="revision-history" aria-label={t('workflow.script.history')}>
       {revisions.map((revision) => (
         <li key={revision.id}>
-          <span className="revision-number">
-            {t('workflow.script.revision', { number: revision.revisionNumber })}
-          </span>
-          {revision.id === approvedRevisionId && (
-            <span className="revision-approved">{t('workflow.script.approved')}</span>
-          )}
-          <span className="revision-preview">{revision.content}</span>
+          <button
+            type="button"
+            className="pv-revision-btn"
+            aria-label={t('workflow.script.loadRevision', { number: revision.revisionNumber })}
+            onClick={() => onSelectRevision(revision.content ?? '')}
+          >
+            <span className="pv-revision-head">
+              <span className="revision-number">
+                {t('workflow.script.revision', { number: revision.revisionNumber })}
+              </span>
+              {revision.id === approvedRevisionId && (
+                <span className="revision-approved">{t('workflow.script.approved')}</span>
+              )}
+            </span>
+            <span className="revision-preview">{revision.content}</span>
+          </button>
         </li>
       ))}
     </ol>

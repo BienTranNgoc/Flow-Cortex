@@ -26,11 +26,35 @@
     "label": {
       "probe": "Kiểm tra tệp",
       "extract_audio": "Tách âm thanh gốc",
-      "review": "Bước duyệt"
+      "review": "Bước duyệt",
+      "reviewScript": "Duyệt kịch bản",
+      "generate_script": "Viết kịch bản",
+      "generate_storyboard": "Lập phân cảnh",
+      "generate_speech": "Tạo giọng đọc",
+      "generate_video": "Tạo cảnh",
+      "generate_video_numbered": "Tạo cảnh {{n}}",
+      "render_video": "Ghép video"
     },
     "fallback": "Bước {{order}}",
     "progress": "Tiến độ bước {{order}}",
     "waitingToStart": "Đang chờ bắt đầu…",
+    "activity": {
+      "elapsed": "Đã chạy {{time}}",
+      "waitingPickup": "Đang chờ tiếp nhận…",
+      "running": {
+        "generate_script_named": "Đang viết kịch bản cho «{{name}}»…",
+        "generate_script": "Đang viết kịch bản…",
+        "generate_storyboard": "Đang chia 2 phân cảnh 9:16…",
+        "generate_speech": "Đang tạo tệp giọng đọc…",
+        "generate_video": "Đang tạo cảnh video 9:16…",
+        "render_video": "Đang ghép cảnh và giọng đọc…",
+        "fallback": "Đang xử lý bước này…"
+      },
+      "pending": {
+        "APPROVAL_CHECKPOINT": "Chờ bước trước xong để duyệt kịch bản.",
+        "default": "Chờ bước trước hoàn tất."
+      }
+    },
     "timing": {
       "timeTaken": "Thời gian thực hiện",
       "startTime": "Thời điểm bắt đầu",
@@ -45,7 +69,12 @@
       "duration": "Thời lượng",
       "dimensions": "Kích thước",
       "videoCodec": "Codec video",
-      "audioCodec": "Codec âm thanh"
+      "audioCodec": "Codec âm thanh",
+      "voice": "Giọng đọc",
+      "speechSpeed": "Tốc độ đọc",
+      "aspectRatio": "Tỉ lệ",
+      "resolution": "Độ phân giải",
+      "format": "Định dạng"
     },
     "showRaw": "Xem dữ liệu gốc",
     "hideRaw": "Ẩn dữ liệu gốc"
@@ -54,7 +83,8 @@
     "region": "Các bước",
     "hint": "Chọn một bước để xem kết quả.",
     "retried": "Đã thử lại {{n}} lần",
-    "notConfigured": "Chưa cấu hình"
+    "notConfigured": "Chưa cấu hình",
+    "headingCount": "{{done}}/{{total}}"
   },
   "run": {
     "heading": {
@@ -67,6 +97,7 @@
       "cancelled": "Lượt chạy đã bị hủy"
     },
     "headingOther": "Lượt chạy: {{status}}",
+    "stepProgress": "Bước {{current}} / {{total}}",
     "back": "Quay lại quy trình",
     "noRun": "Chưa chọn lượt chạy.",
     "loading": "Đang tải lượt chạy…",
@@ -92,7 +123,30 @@
     "playFailed": "Không phát được video. Hãy tải video xuống.",
     "hideVideo": "Ẩn video",
     "loadingVideo": "Đang tải video…",
-    "watchVideo": "Xem video"
+    "watchVideo": "Xem video",
+    "generatedSpeechTitle": "Giọng đọc ({{name}})",
+    "listenPreview": "Nghe thử giọng đọc",
+    "hideAudio": "Ẩn trình phát",
+    "loadingAudio": "Đang tải âm thanh…",
+    "audioFailed": "Không phát được âm thanh thử.",
+    "cannotPlayAudio": "Trình duyệt không phát được tệp âm thanh này.",
+    "intermediateAudioNote": "Chỉ nghe thử — không tải riêng tệp này.",
+    "watchClip": "Xem thử cảnh",
+    "hideClip": "Ẩn cảnh",
+    "intermediateClipNote": "Chỉ xem thử — sẽ được ghép vào video cuối.",
+    "finalShowcaseBadge": "Hoàn tất",
+    "finalShowcaseHeading": "Video đã sẵn sàng",
+    "specAspect": "Tỉ lệ khung hình",
+    "specAspectVal": "{{ratio}} (Dọc)",
+    "specResolution": "Độ phân giải",
+    "specResolutionVal": "{{width}} × {{height}} px",
+    "specDuration": "Thời lượng",
+    "specDurationVal": "{{seconds}}s",
+    "specFormat": "Định dạng",
+    "specFormatVal": "MP4 (H.264 / AAC)",
+    "downloadFinalVideo": "Tải video (.mp4)",
+    "downloadFinalStepVideo": "Tải video ({{name}})",
+    "createAnother": "Tạo video khác"
   },
   "approval": {
     "region": "Duyệt trước khi lượt chạy tiếp tục",
@@ -113,6 +167,7 @@
   "script": {
     "label": "Kịch bản cần duyệt",
     "tooLong": "Kịch bản này có thể dài hơn video 10 giây. Hãy giữ khoảng {{max}} từ — lời đọc dài hơn 10 giây sẽ làm dừng lượt chạy.",
+    "meter": "{{words}} / {{max}} từ · Ước tính ~{{seconds}}s / 10s",
     "save": "Lưu bản sửa",
     "saving": "Đang lưu…",
     "unsaved": "Có thay đổi chưa lưu — hãy lưu bản sửa trước khi duyệt.",
@@ -120,7 +175,17 @@
     "leaveConfirm": "Bạn có thay đổi kịch bản chưa lưu. Rời khỏi trang này?",
     "history": "Các bản sửa kịch bản",
     "revision": "Bản sửa {{number}}",
-    "approved": "Đã duyệt"
+    "approved": "Đã duyệt",
+    "loadRevision": "Nạp bản sửa {{number}} vào trình soạn thảo",
+    "clickToLoadHint": "Chọn một bản sửa trước đó để khôi phục nội dung."
+  },
+  "storyboard": {
+    "heading": "Bảng phân cảnh 2 cảnh",
+    "scene1Title": "Cảnh 1 · Giới thiệu sản phẩm (0s – 5s)",
+    "scene2Title": "Cảnh 2 · Điểm nhấn & Chốt đơn (5s – 10s)",
+    "referenceImage": "Ảnh tham chiếu gốc",
+    "copyPrompt": "Sao chép gợi ý cảnh",
+    "copied": "Đã sao chép"
   },
   "start": {
     "formLabel": "Bắt đầu lượt chạy",
@@ -149,7 +214,30 @@
     "image": "Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *",
     "imageSelected": "Đã chọn 1 ảnh: {{name}}",
     "uploadingImage": "Đang tải lên ảnh {{index}}",
-    "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại."
+    "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại.",
+    "aspectRatioBadge": "9:16 Dọc",
+    "durationBadge": "10s",
+    "voiceBadge": "Giọng tiếng Việt",
+    "creditsBadge": "~{{amount}} tín dụng",
+    "specAspectShort": "9:16",
+    "specDurationShort": "10s",
+    "specFormatShort": "MP4",
+    "productNamePlaceholder": "Ví dụ: Bình giữ nhiệt Inox 500ml",
+    "descriptionPlaceholder": "Nêu điểm nổi bật chính của sản phẩm…",
+    "charCount": "{{count}} / {{max}} ký tự",
+    "dropzoneTitle": "Kéo thả ảnh vào đây hoặc nhấn để chọn",
+    "dropzoneHint": "1 ảnh rõ sản phẩm · JPG, PNG hoặc WebP · tối đa 10 MB",
+    "changeImage": "Thay ảnh",
+    "removeImage": "Xóa ảnh",
+    "fileReady": "Sẵn sàng ({{size}})",
+    "imagePreviewAlt": "Xem trước ảnh sản phẩm đã chọn",
+    "previewHeading": "Xem trước 9:16",
+    "previewBadge": "9:16",
+    "previewEmptyImage": "Ảnh sản phẩm",
+    "previewPlaceholderTitle": "Tên sản phẩm",
+    "previewPlaceholderDesc": "Lời thoại ~25–30 từ cho video dọc 10s.",
+    "briefSummary": "Thông tin sản phẩm",
+    "retryWithBrief": "Tạo lại với nội dung này"
   },
   "validation": {
     "noFile": "Hãy chọn một tệp video hoặc âm thanh để tải lên",

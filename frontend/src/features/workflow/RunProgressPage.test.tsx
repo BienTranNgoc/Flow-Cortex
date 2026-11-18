@@ -1428,7 +1428,11 @@ describe('RunProgressPage', () => {
           body: [{ id: 't1', runId: 'r1', status: 'pending', originalPayload: 'Draft caption' }],
         },
       });
-      renderRoute('/workflows/:workflowId/runs/:runId', '/workflows/w1/runs/r1', <RunProgressPage />);
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
       const announcement = () => screen.getByRole('main').querySelector('[role="status"]');
 
       await screen.findByRole('region', { name: 'Step 1' });
@@ -1989,6 +1993,387 @@ describe('RunProgressPage', () => {
         await screen.findByRole('button', { name: 'Download extracted audio (WAV)' }),
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Step 3/ })).toHaveTextContent('Skipped');
+    });
+  });
+
+  describe('Product Video studio run progress & showcase', () => {
+    function productVideoSteps(completedAll = true): RunStepResponse[] {
+      return [
+        step({
+          id: 's1',
+          stepOrder: 1,
+          type: 'generate_script',
+          mode: 'remote',
+          status: 'completed',
+          output: 'Short catchy opening for the bottle.',
+        }),
+        step({
+          id: 's2',
+          stepOrder: 2,
+          type: 'APPROVAL_CHECKPOINT',
+          mode: 'inline',
+          status: 'completed',
+        }),
+        step({
+          id: 's3',
+          stepOrder: 3,
+          type: 'generate_storyboard',
+          mode: 'remote',
+          status: 'completed',
+          output: JSON.stringify({
+            profile: 'product_ad_storyboard_v1',
+            scene1Prompt: 'Wide tabletop shot with warm morning light.',
+            scene2Prompt: 'Macro pour shot with crisp overlay badge.',
+          }),
+        }),
+        step({
+          id: 's4',
+          stepOrder: 4,
+          type: 'generate_speech',
+          mode: 'remote',
+          status: 'completed',
+          output: JSON.stringify({
+            profile: 'vi_voice_v1',
+            durationMs: 9200,
+            voice: 'vi-VN-HoaiMyNeural',
+            speed: '+0%',
+            format: 'wav',
+          }),
+          outputs: [
+            { name: 'speech.wav', mime: 'audio/wav', bytes: 80_000 },
+            { name: 'manifest.json', mime: 'application/json', bytes: 400 },
+          ],
+        }),
+        step({
+          id: 's5',
+          stepOrder: 5,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'completed',
+          output: JSON.stringify({ aspectRatio: '9:16', durationSeconds: 5, resolution: '480p' }),
+          outputs: [{ name: 'clip.mp4', mime: 'video/mp4', bytes: 300_000 }],
+        }),
+        step({
+          id: 's6',
+          stepOrder: 6,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'completed',
+          output: JSON.stringify({ aspectRatio: '9:16', durationSeconds: 5, resolution: '480p' }),
+          outputs: [{ name: 'clip.mp4', mime: 'video/mp4', bytes: 310_000 }],
+        }),
+        step({
+          id: 's7',
+          stepOrder: 7,
+          type: 'render_video',
+          mode: 'remote',
+          status: completedAll ? 'completed' : 'error',
+          ...(completedAll
+            ? {
+                output: JSON.stringify({
+                  profile: 'vertical_ad_v1',
+                  aspectRatio: '9:16',
+                  durationSeconds: 10,
+                  width: 480,
+                  height: 854,
+                }),
+                outputs: [
+                  { name: 'video.mp4', mime: 'video/mp4', bytes: 950_000 },
+                  { name: 'manifest.json', mime: 'application/json', bytes: 500 },
+                ],
+              }
+            : {
+                errorCode: 'provider_timeout',
+                outputs: [],
+              }),
+        }),
+      ];
+    }
+
+    it('renders brief banner, storyboard prompts, preview-only intermediates, and single final video download', async () => {
+      const user = userEvent.setup();
+      vi.mocked(openInCurrentTab).mockReset();
+
+      const pvRun = run(productVideoSteps(true), {
+        status: 'completed',
+        input: JSON.stringify({
+          productName: 'Smart Bottle',
+          description: 'Double-wall stainless steel vacuum flask.',
+        }),
+      });
+
+      stubApi({
+        'GET /api/v1/runs/r1': { status: 200, body: pvRun },
+        'GET /api/v1/runs/r1/inputs': {
+          status: 200,
+          body: [
+            {
+              bindingKey: 'image_1',
+              kind: 'image',
+              mimeType: 'image/png',
+              url: 'http://localhost:9000/in/bottle.png',
+              expiresAt: '2099-01-01T00:00:00Z',
+            },
+          ],
+        },
+        'GET /api/v1/runs/r1/steps/7/outputs/video.mp4/url': {
+          status: 200,
+          body: {
+            url: 'http://localhost:9000/out/video.mp4?sig=1',
+            expiresAt: '2099-01-01T00:00:00Z',
+          },
+        },
+      });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      const briefBanner = await screen.findByRole('region', { name: 'Product brief' });
+      expect(within(briefBanner).getByText('Smart Bottle')).toBeInTheDocument();
+      expect(await within(briefBanner).findByAltText('Input image 1')).toHaveAttribute(
+        'src',
+        'http://localhost:9000/in/bottle.png',
+      );
+
+      const showcase = await screen.findByRole('region', { name: 'Video is ready' });
+      expect(within(showcase).getByText('9:16 (Vertical)')).toBeInTheDocument();
+      expect(within(showcase).getByText('480 × 854 px')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(showcase.querySelector('video')).toHaveAttribute(
+          'src',
+          'http://localhost:9000/out/video.mp4?sig=1',
+        ),
+      );
+
+      await user.click(within(showcase).getByRole('button', { name: 'Download video (.mp4)' }));
+      await waitFor(() =>
+        expect(openInCurrentTab).toHaveBeenCalledWith('http://localhost:9000/out/video.mp4?sig=1'),
+      );
+
+      // Step 7 detail allows only the final video download and hides summary/manifest/Show raw.
+      const step7Panel = screen.getByRole('region', { name: 'Final render' });
+      expect(
+        within(step7Panel).queryByRole('button', { name: 'Show raw' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(step7Panel).queryByRole('button', { name: 'Download summary (.txt)' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(step7Panel).queryByRole('button', {
+          name: 'Download technical details (JSON file)',
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(step7Panel).getByRole('button', { name: 'Download video (video.mp4)' }),
+      ).toBeInTheDocument();
+
+      // Step 3 displays 2-scene storyboard prompts cleanly.
+      await user.click(screen.getByRole('button', { name: /Storyboard/ }));
+      const storyboardPanel = screen.getByRole('region', { name: '2-scene storyboard' });
+      expect(
+        within(storyboardPanel).getByText('Wide tabletop shot with warm morning light.'),
+      ).toBeInTheDocument();
+      expect(
+        within(storyboardPanel).getByText('Macro pour shot with crisp overlay badge.'),
+      ).toBeInTheDocument();
+
+      // Step 4 & Step 5-6 allow preview only, with zero download buttons anywhere in step detail.
+      await user.click(screen.getByRole('button', { name: /Voice-over/ }));
+      const speechPanel = screen.getByRole('region', { name: 'Voice-over' });
+      expect(
+        within(speechPanel).getByRole('button', { name: 'Listen to voice-over' }),
+      ).toBeInTheDocument();
+      expect(
+        within(speechPanel).queryByRole('button', { name: /Download/i }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Video clip 1/ }));
+      const clip1Panel = screen.getByRole('region', { name: 'Video clip 1' });
+      expect(within(clip1Panel).getByRole('button', { name: 'Preview clip' })).toBeInTheDocument();
+      expect(
+        within(clip1Panel).queryByRole('button', { name: /Download/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('renders live activity card with header overview and pending step preview when progressPercent is absent', async () => {
+      const user = userEvent.setup();
+      const runningPv = run(
+        [
+          step({
+            id: 's1',
+            stepOrder: 1,
+            type: 'generate_script',
+            mode: 'remote',
+            status: 'running',
+            pickedUpAt: '2026-11-18T10:00:02.000Z',
+            startedAt: '2026-11-18T10:00:00.000Z',
+          }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'APPROVAL_CHECKPOINT',
+            mode: 'inline',
+            status: 'pending',
+          }),
+          step({
+            id: 's3',
+            stepOrder: 3,
+            type: 'generate_storyboard',
+            mode: 'remote',
+            status: 'pending',
+          }),
+        ],
+        {
+          status: 'running',
+          startedAt: '2026-11-18T10:00:00.000Z',
+          input: JSON.stringify({
+            productName: 'Windbreaker Jacket',
+            description: 'Lightweight water-resistant street jacket.',
+          }),
+        },
+      );
+      stubApi({
+        'GET /api/v1/features': { status: 200, body: { runCancellation: true } },
+        'GET /api/v1/runs/r1': { status: 200, body: runningPv },
+      });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      expect(await screen.findByText('Step 1 / 3')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Stop workflow' })).toBeInTheDocument();
+
+      const step1Panel = screen.getByRole('region', { name: 'Write script' });
+      expect(
+        within(step1Panel).getByRole('heading', { name: '1. Write script' }),
+      ).toBeInTheDocument();
+      expect(
+        within(step1Panel).getByRole('progressbar', { name: 'Step 1 progress' }),
+      ).toBeInTheDocument();
+      expect(
+        within(step1Panel).getByText('Writing script for "Windbreaker Jacket"…'),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Review script/ }));
+      const reviewPanel = screen.getByRole('region', { name: 'Review script' });
+      expect(within(reviewPanel).getByText('Pauses here for script review.')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /Storyboard/ }));
+      const boardPanel = screen.getByRole('region', { name: 'Storyboard' });
+      expect(within(boardPanel).getByText('Waiting for previous step.')).toBeInTheDocument();
+    });
+
+    it('offers edit-and-retry navigation with prefilled productDraft state on a failed run', async () => {
+      const user = userEvent.setup();
+      function WorkflowDraftProbe() {
+        const { state } = useLocation();
+        return <pre data-testid="draft-state">{JSON.stringify(state)}</pre>;
+      }
+
+      const failedRun = run(productVideoSteps(false), {
+        status: 'error',
+        input: JSON.stringify({
+          productName: 'Smart Bottle',
+          description: 'Double-wall stainless steel vacuum flask.',
+        }),
+      });
+      stubApi({ 'GET /api/v1/runs/r1': { status: 200, body: failedRun } });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+        <Route path="/workflows/:workflowId" element={<WorkflowDraftProbe />} />,
+      );
+
+      const retryLink = await screen.findByRole('link', { name: 'Edit details & start new run' });
+      await user.click(retryLink);
+
+      const probe = await screen.findByTestId('draft-state');
+      expect(JSON.parse(probe.textContent ?? '{}')).toEqual({
+        productDraft: {
+          productName: 'Smart Bottle',
+          description: 'Double-wall stainless steel vacuum flask.',
+        },
+      });
+    });
+
+    it('supports loading an earlier revision into the ScriptEditor', async () => {
+      const user = userEvent.setup();
+      const revisions: ScriptRevisionResponse[] = [
+        {
+          id: 'rev-1',
+          revisionNumber: 1,
+          content: 'First crisp ad line.',
+          createdAt: '2026-10-01T10:00:00Z',
+        },
+        {
+          id: 'rev-2',
+          revisionNumber: 2,
+          content: 'Second longer draft line for testing restoration.',
+          createdAt: '2026-10-01T10:01:00Z',
+        },
+      ];
+      stubApi({
+        'GET /api/v1/runs/r1': {
+          status: 200,
+          body: run(
+            [
+              step({
+                type: 'generate_script',
+                mode: 'remote',
+                status: 'completed',
+                output: 'First crisp ad line.',
+              }),
+              step({
+                id: 's2',
+                stepOrder: 2,
+                type: 'APPROVAL_CHECKPOINT',
+                mode: 'inline',
+                status: 'pending',
+              }),
+            ],
+            {
+              status: 'waiting_approval',
+              input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+            },
+          ),
+        },
+        'GET /api/v1/runs/r1/review-tasks': {
+          status: 200,
+          body: [
+            {
+              id: 't1',
+              runId: 'r1',
+              runStepId: 's2',
+              reviewType: 'APPROVAL_CHECKPOINT',
+              status: 'pending',
+              originalPayload: 'First crisp ad line.',
+              version: 1,
+              currentRevisionId: 'rev-2',
+            },
+          ],
+        },
+        'GET /api/v1/review-tasks/t1/revisions': { status: 200, body: revisions },
+      });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      const editor = await screen.findByLabelText('Script to approve');
+      expect(editor).toHaveValue('Second longer draft line for testing restoration.');
+
+      await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
+      expect(editor).toHaveValue('First crisp ad line.');
     });
   });
 });

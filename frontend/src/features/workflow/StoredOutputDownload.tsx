@@ -9,6 +9,9 @@ interface StoredOutputDownloadProps {
   runId: string;
   stepOrder: number;
   output: RunStepOutputResponse;
+  allowDownload?: boolean | undefined;
+  downloadLabel?: string | undefined;
+  previewNote?: string | undefined;
 }
 
 function label(output: RunStepOutputResponse, t: TFunction): string {
@@ -18,24 +21,40 @@ function label(output: RunStepOutputResponse, t: TFunction): string {
   return t('workflow.download.named', { name: output.name });
 }
 
+function isVideoOutput(output: RunStepOutputResponse): boolean {
+  return Boolean(output.mime?.startsWith('video/') || output.name.endsWith('.mp4'));
+}
+
+function isAudioOutput(output: RunStepOutputResponse): boolean {
+  return Boolean(
+    output.mime?.startsWith('audio/') ||
+    output.name.endsWith('.wav') ||
+    output.name.endsWith('.mp3'),
+  );
+}
+
+/** Step artifact viewer and downloader, supporting preview-only intermediate outputs for Ad Video. */
 export function StoredOutputDownload({
   runId,
   stepOrder,
   output,
+  allowDownload = true,
+  downloadLabel,
+  previewNote,
 }: Readonly<StoredOutputDownloadProps>) {
   const { t } = useTranslation();
   const outputUrl = useOutputUrlMutation(runId, stepOrder, output.name);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [showVideo, setShowVideo] = useState(false);
-  const [videoRetried, setVideoRetried] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [showMedia, setShowMedia] = useState(false);
+  const [mediaRetried, setMediaRetried] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
 
-  const isVideo = output.mime?.startsWith('video/') || output.name.endsWith('.mp4');
+  const isVideo = isVideoOutput(output);
+  const isAudio = isAudioOutput(output);
+  const opening = useRef(0);
 
-  // Links are presigned for a limited time, so every download and every opening of the player
-  // asks for a new one rather than reusing a link that may have expired since.
   const download = () => {
-    if (outputUrl.isPending) {
+    if (!allowDownload || outputUrl.isPending) {
       return;
     }
     outputUrl.mutate(undefined, {
@@ -43,50 +62,111 @@ export function StoredOutputDownload({
     });
   };
 
-  // Hiding the player starts a new opening, so a link that arrives for an earlier one is dropped
-  // instead of reopening the player the member just closed.
-  const opening = useRef(0);
-
-  const loadVideo = () => {
+  const loadMedia = () => {
     const current = opening.current;
     outputUrl.mutate(undefined, {
       onSuccess: ({ url }) => {
         if (opening.current !== current) {
           return;
         }
-        setVideoUrl(url);
-        setShowVideo(true);
+        setMediaUrl(url);
+        setShowMedia(true);
       },
     });
   };
 
-  const toggleVideo = () => {
-    if (showVideo) {
+  const toggleMedia = () => {
+    if (showMedia) {
       opening.current += 1;
-      setShowVideo(false);
-      setVideoUrl(null);
+      setShowMedia(false);
+      setMediaUrl(null);
       return;
     }
     if (outputUrl.isPending) {
       return;
     }
-    setVideoRetried(false);
-    setVideoFailed(false);
-    loadVideo();
+    setMediaRetried(false);
+    setMediaFailed(false);
+    loadMedia();
   };
 
-  // A link that expired while the player was open fails to load; one fresh link recovers it,
-  // and a second failure is not a stale link, so it is reported instead of retried.
-  const retryVideo = () => {
-    if (videoRetried || outputUrl.isPending) {
-      setVideoFailed(true);
+  // Recover once on an expired presigned media URL before surfacing a playback error.
+  const retryMedia = () => {
+    if (mediaRetried || outputUrl.isPending) {
+      setMediaFailed(true);
       return;
     }
-    setVideoRetried(true);
-    loadVideo();
+    setMediaRetried(true);
+    loadMedia();
   };
 
+  if (isAudio && !allowDownload) {
+    return (
+      <div className="pv-media-card">
+        <div className="video-artifact-header">
+          <div className="video-artifact-title">
+            <span>{t('workflow.download.generatedSpeechTitle', { name: output.name })}</span>
+          </div>
+        </div>
+
+        {showMedia && mediaUrl && (
+          <audio
+            className="pv-audio-player"
+            controls
+            controlsList="nodownload"
+            autoPlay
+            src={mediaUrl}
+            onError={retryMedia}
+          >
+            <track kind="captions" />
+            {t('workflow.download.cannotPlayAudio')}
+          </audio>
+        )}
+        {showMedia && mediaFailed && (
+          <p role="alert" className="run-step-download-error">
+            {t('workflow.download.audioFailed')}
+          </p>
+        )}
+
+        <div className="video-artifact-actions run-step-downloads">
+          <button
+            type="button"
+            className="video-toggle-btn"
+            onClick={toggleMedia}
+            aria-disabled={outputUrl.isPending}
+            aria-busy={outputUrl.isPending}
+          >
+            <span>
+              {showMedia
+                ? t('workflow.download.hideAudio')
+                : outputUrl.isPending
+                  ? t('workflow.download.loadingAudio')
+                  : t('workflow.download.listenPreview')}
+            </span>
+          </button>
+        </div>
+
+        <p className="pv-intermediate-note">
+          {previewNote ?? t('workflow.download.intermediateAudioNote')}
+        </p>
+
+        {outputUrl.isError && (
+          <p role="alert" className="run-step-download-error">
+            {t('workflow.download.linkError')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   if (isVideo) {
+    const watchText = allowDownload
+      ? t('workflow.download.watchVideo')
+      : t('workflow.download.watchClip');
+    const hideText = allowDownload
+      ? t('workflow.download.hideVideo')
+      : t('workflow.download.hideClip');
+
     return (
       <div className="video-artifact-card">
         <div className="video-artifact-header">
@@ -116,21 +196,23 @@ export function StoredOutputDownload({
           </div>
         </div>
 
-        {showVideo && videoUrl && (
+        {showMedia && mediaUrl && (
           <div className="video-player-frame">
             <video
               className="video-player-element"
               controls
+              controlsList={allowDownload ? undefined : 'nodownload'}
               autoPlay
               playsInline
-              src={videoUrl}
-              onError={retryVideo}
+              src={mediaUrl}
+              onError={retryMedia}
             >
+              <track kind="captions" />
               {t('workflow.download.cannotPlay')}
             </video>
           </div>
         )}
-        {showVideo && videoFailed && (
+        {showMedia && mediaFailed && (
           <p role="alert" className="run-step-download-error">
             {t('workflow.download.playFailed')}
           </p>
@@ -140,59 +222,63 @@ export function StoredOutputDownload({
           <button
             type="button"
             className="video-toggle-btn"
-            onClick={toggleVideo}
+            onClick={toggleMedia}
             aria-disabled={outputUrl.isPending}
             aria-busy={outputUrl.isPending}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              {showVideo ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              {showMedia ? (
                 <rect x="6" y="4" width="4" height="16" />
               ) : (
                 <polygon points="5 3 19 12 5 21 5 3" />
               )}
             </svg>
             <span>
-              {showVideo
-                ? t('workflow.download.hideVideo')
+              {showMedia
+                ? hideText
                 : outputUrl.isPending
                   ? t('workflow.download.loadingVideo')
-                  : t('workflow.download.watchVideo')}
+                  : watchText}
             </span>
           </button>
 
-          <button
-            type="button"
-            className="video-download-btn action-cta"
-            onClick={download}
-            aria-disabled={outputUrl.isPending}
-            aria-busy={outputUrl.isPending}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          {allowDownload && (
+            <button
+              type="button"
+              className="video-download-btn action-cta"
+              onClick={download}
+              aria-disabled={outputUrl.isPending}
+              aria-busy={outputUrl.isPending}
             >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>
-              {outputUrl.isPending ? t('workflow.download.gettingFile') : label(output, t)}
-            </span>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>
+                {outputUrl.isPending
+                  ? t('workflow.download.gettingFile')
+                  : (downloadLabel ?? label(output, t))}
+              </span>
+            </button>
+          )}
         </div>
+
+        {!allowDownload && (
+          <p className="pv-intermediate-note">
+            {previewNote ?? t('workflow.download.intermediateClipNote')}
+          </p>
+        )}
 
         {outputUrl.isError && (
           <p role="alert" className="run-step-download-error">
@@ -203,6 +289,10 @@ export function StoredOutputDownload({
     );
   }
 
+  if (!allowDownload) {
+    return null;
+  }
+
   return (
     <div className="run-step-downloads">
       <button
@@ -211,7 +301,9 @@ export function StoredOutputDownload({
         aria-disabled={outputUrl.isPending}
         aria-busy={outputUrl.isPending}
       >
-        {outputUrl.isPending ? t('workflow.download.gettingFile') : label(output, t)}
+        {outputUrl.isPending
+          ? t('workflow.download.gettingFile')
+          : (downloadLabel ?? label(output, t))}
       </button>
       {outputUrl.isError && (
         <p role="alert" className="run-step-download-error">

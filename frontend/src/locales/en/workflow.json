@@ -26,11 +26,35 @@
     "label": {
       "probe": "Inspect the file",
       "extract_audio": "Extract source audio",
-      "review": "Review"
+      "review": "Review",
+      "reviewScript": "Review script",
+      "generate_script": "Write script",
+      "generate_storyboard": "Storyboard",
+      "generate_speech": "Voice-over",
+      "generate_video": "Video clip",
+      "generate_video_numbered": "Video clip {{n}}",
+      "render_video": "Final render"
     },
     "fallback": "Step {{order}}",
     "progress": "Step {{order}} progress",
     "waitingToStart": "Waiting to start…",
+    "activity": {
+      "elapsed": "Elapsed {{time}}",
+      "waitingPickup": "Waiting to start…",
+      "running": {
+        "generate_script_named": "Writing script for \"{{name}}\"…",
+        "generate_script": "Writing script…",
+        "generate_storyboard": "Planning 2 vertical scenes…",
+        "generate_speech": "Generating voice-over…",
+        "generate_video": "Generating 9:16 video clip…",
+        "render_video": "Assembling clips and audio…",
+        "fallback": "Working on this step…"
+      },
+      "pending": {
+        "APPROVAL_CHECKPOINT": "Pauses here for script review.",
+        "default": "Waiting for previous step."
+      }
+    },
     "timing": {
       "timeTaken": "Time taken",
       "startTime": "Start time",
@@ -45,7 +69,12 @@
       "duration": "Duration",
       "dimensions": "Dimensions",
       "videoCodec": "Video codec",
-      "audioCodec": "Audio codec"
+      "audioCodec": "Audio codec",
+      "voice": "Voice",
+      "speechSpeed": "Speed",
+      "aspectRatio": "Aspect ratio",
+      "resolution": "Resolution",
+      "format": "Format"
     },
     "showRaw": "Show raw",
     "hideRaw": "Hide raw"
@@ -54,7 +83,8 @@
     "region": "Steps",
     "hint": "Select a step to see its result.",
     "retried": "Retried {{n}}×",
-    "notConfigured": "Not configured"
+    "notConfigured": "Not configured",
+    "headingCount": "{{done}}/{{total}}"
   },
   "run": {
     "heading": {
@@ -67,6 +97,7 @@
       "cancelled": "Run cancelled"
     },
     "headingOther": "Run {{status}}",
+    "stepProgress": "Step {{current}} / {{total}}",
     "back": "Back to workflow",
     "noRun": "No run selected.",
     "loading": "Loading run…",
@@ -92,7 +123,30 @@
     "playFailed": "Could not play the video. Download it instead.",
     "hideVideo": "Hide video",
     "loadingVideo": "Loading the video…",
-    "watchVideo": "Watch video"
+    "watchVideo": "Watch video",
+    "generatedSpeechTitle": "Voice-over ({{name}})",
+    "listenPreview": "Listen to voice-over",
+    "hideAudio": "Hide audio",
+    "loadingAudio": "Loading audio…",
+    "audioFailed": "Could not play the audio preview.",
+    "cannotPlayAudio": "Your browser cannot play this audio file.",
+    "intermediateAudioNote": "Preview only — intermediate files are not downloaded.",
+    "watchClip": "Preview clip",
+    "hideClip": "Hide clip",
+    "intermediateClipNote": "Preview only — assembled into the final video.",
+    "finalShowcaseBadge": "Ready",
+    "finalShowcaseHeading": "Video is ready",
+    "specAspect": "Aspect ratio",
+    "specAspectVal": "{{ratio}} (Vertical)",
+    "specResolution": "Resolution",
+    "specResolutionVal": "{{width}} × {{height}} px",
+    "specDuration": "Duration",
+    "specDurationVal": "{{seconds}}s",
+    "specFormat": "Format",
+    "specFormatVal": "MP4 (H.264 / AAC)",
+    "downloadFinalVideo": "Download video (.mp4)",
+    "downloadFinalStepVideo": "Download video ({{name}})",
+    "createAnother": "Create another"
   },
   "approval": {
     "region": "Review before the run continues",
@@ -113,6 +167,7 @@
   "script": {
     "label": "Script to approve",
     "tooLong": "This script is likely longer than the 10-second video. Keep it to about {{max}} words — a voice-over longer than 10 seconds stops the run.",
+    "meter": "{{words}} / {{max}} words · Est. ~{{seconds}}s / 10s",
     "save": "Save revision",
     "saving": "Saving…",
     "unsaved": "Unsaved changes — save a revision before approving.",
@@ -120,7 +175,17 @@
     "leaveConfirm": "You have unsaved script changes. Leave this page?",
     "history": "Script revisions",
     "revision": "Revision {{number}}",
-    "approved": "Approved"
+    "approved": "Approved",
+    "loadRevision": "Load revision {{number}} into editor",
+    "clickToLoadHint": "Select an earlier revision to restore its text."
+  },
+  "storyboard": {
+    "heading": "2-scene storyboard",
+    "scene1Title": "Scene 1 · Product hook (0s – 5s)",
+    "scene2Title": "Scene 2 · Feature & close (5s – 10s)",
+    "referenceImage": "Source product image",
+    "copyPrompt": "Copy scene prompt",
+    "copied": "Copied"
   },
   "start": {
     "formLabel": "Start run",
@@ -149,7 +214,30 @@
     "image": "Product image (JPG/PNG/WebP, ≤ 10 MB) *",
     "imageSelected": "1 image selected: {{name}}",
     "uploadingImage": "Uploading image {{index}}",
-    "uploadsUnfinished": "One of the uploads didn't finish. Try again."
+    "uploadsUnfinished": "One of the uploads didn't finish. Try again.",
+    "aspectRatioBadge": "9:16 Vertical",
+    "durationBadge": "10s",
+    "voiceBadge": "Vietnamese voice",
+    "creditsBadge": "~{{amount}} credits",
+    "specAspectShort": "9:16",
+    "specDurationShort": "10s",
+    "specFormatShort": "MP4",
+    "productNamePlaceholder": "e.g. Insulated Tumbler 500ml",
+    "descriptionPlaceholder": "Key benefits or product highlights…",
+    "charCount": "{{count}} / {{max}} chars",
+    "dropzoneTitle": "Drag & drop a photo, or browse",
+    "dropzoneHint": "1 clear product photo · JPG, PNG, or WebP · up to 10 MB",
+    "changeImage": "Replace photo",
+    "removeImage": "Remove",
+    "fileReady": "Ready ({{size}})",
+    "imagePreviewAlt": "Selected product photo preview",
+    "previewHeading": "9:16 preview",
+    "previewBadge": "9:16",
+    "previewEmptyImage": "Product photo",
+    "previewPlaceholderTitle": "Product name",
+    "previewPlaceholderDesc": "~25–30 words for a 10s vertical video.",
+    "briefSummary": "Product brief",
+    "retryWithBrief": "Edit details & start new run"
   },
   "validation": {
     "noFile": "Choose a video or audio file to upload",
