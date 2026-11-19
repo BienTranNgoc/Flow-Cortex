@@ -15,8 +15,9 @@ from typing import Any, Literal, Protocol, cast
 from pydantic import ValidationError
 
 from ..contracts.media_progress import VendorTaskReport
-from ..errors import PermanentError
+from ..errors import PermanentError, StaleDelivery
 from .adapter import (
+    CancelResult,
     ScriptAdapter,
     SpeechAdapter,
     SpeechIdentity,
@@ -36,6 +37,7 @@ from .contracts.provider_job import (
     VendorLedger,
 )
 from .contracts.provider_speech_result import ProviderSpeechData
+from .control import ControlClient, JobControlSession, SiblingFailedSignal
 from .seedance_adapter import PROVIDER_SEEDANCE
 from .vendor_jobs import (
     ProbeRegistry,
@@ -95,6 +97,7 @@ class ExecutionContext:
     abort: Any
     report: Callable[[VendorTaskReport], None] = _discard_report
     probes: ProbeRegistry = field(default_factory=dict)
+    control: ControlClient | None = None
 
 
 Handler = Callable[
@@ -221,48 +224,85 @@ def _generate_video(
     fingerprint = (
         vendor_fingerprint(identity, adapter.vendor_scope(), request) if ledger else None
     )
-    task_id = _load_video_task(context, idempotency_key, identity)
-    attached: VendorCandidate | None = None
-    if task_id is None:
-        if ledger is not None and fingerprint is not None:
-            attached = select_attach(
-                ledger.candidates,
-                fingerprint,
-                context.probes,
-                lambda candidate, status: _report_verdict(context, candidate, status),
-            )
-        task_id = (
-            attached.vendorJobId
-            if attached is not None
-            else _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
-        )
-        _store_video_task(context, task_id, idempotency_key, identity)
+    session: JobControlSession | None = (
+        context.control.open_session(job.runId, job.jobId, job.attempt, abort=context.abort)
+        if context.control is not None
+        else None
+    )
     try:
-        video = adapter.await_video(task_id, context.abort)
-    except VendorJobEnded as exc:
-        if attached is not None:
-            _report_verdict(context, attached, exc.status)
-        elif ledger is not None:
-            context.report(
-                VendorTaskReport(
-                    vendor=identity.provider,
-                    model=identity.model,
-                    vendorJobId=task_id,
-                    status=exc.status,
+        task_id = _load_video_task(context, idempotency_key, identity)
+        if session is not None:
+            initial = session.await_initial()
+            if initial == "discard_stale":
+                raise StaleDelivery(f"Job {job.jobId} attempt {job.attempt} is stale before submit")
+            if initial == "cancel_sibling_failed":
+                if task_id is not None:
+                    _cancel_on_sibling_failed(
+                        adapter, identity, ledger, task_id, context, job,
+                        "Sibling clip failed before worker resumed",
+                    )
+                raise PermanentError("sibling_failed", "Sibling clip failed before submit")
+            session.start_polling()
+        active_abort = session.wrapped_abort() if session is not None else context.abort
+        attached: VendorCandidate | None = None
+        if task_id is None:
+            if ledger is not None and fingerprint is not None:
+                attached = select_attach(
+                    ledger.candidates,
+                    fingerprint,
+                    context.probes,
+                    lambda candidate, status: _report_verdict(context, candidate, status),
                 )
+            if attached is not None:
+                task_id = attached.vendorJobId
+            else:
+                task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+            _store_video_task(context, task_id, idempotency_key, identity)
+            if session is not None and attached is None:
+                _guard_post_submit(session, adapter, identity, ledger, task_id, context, job)
+        try:
+            video = adapter.await_video(task_id, active_abort)
+        except SiblingFailedSignal:
+            _cancel_on_sibling_failed(
+                adapter, identity, ledger, task_id, context, job,
+                "Sibling clip failed while polling video", attached=attached,
             )
-        raise
-    except VendorJobTimeout as exc:
-        if attached is not None:
-            raise exc.with_ledger(str(attached.vendorTaskId)) from exc
-        raise
-    except VendorResultGone:
-        if attached is None:
+        except VendorJobEnded as exc:
+            if attached is not None:
+                _report_verdict(context, attached, exc.status)
+            elif ledger is not None:
+                context.report(
+                    VendorTaskReport(
+                        vendor=identity.provider,
+                        model=identity.model,
+                        vendorJobId=task_id,
+                        status=exc.status,
+                    )
+                )
             raise
-        _report_verdict(context, attached, "gone")
-        task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
-        _store_video_task(context, task_id, idempotency_key, identity)
-        video = adapter.await_video(task_id, context.abort)
+        except VendorJobTimeout as exc:
+            if attached is not None:
+                raise exc.with_ledger(str(attached.vendorTaskId)) from exc
+            raise
+        except VendorResultGone:
+            if attached is None:
+                raise
+            _report_verdict(context, attached, "gone")
+            attached = None
+            task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+            _store_video_task(context, task_id, idempotency_key, identity)
+            if session is not None:
+                _guard_post_submit(session, adapter, identity, ledger, task_id, context, job)
+            try:
+                video = adapter.await_video(task_id, active_abort)
+            except SiblingFailedSignal:
+                _cancel_on_sibling_failed(
+                    adapter, identity, ledger, task_id, context, job,
+                    "Sibling clip failed while polling video",
+                )
+    finally:
+        if session is not None:
+            session.close()
     if video.provider_task_id != task_id:
         raise PermanentError(
             "provider_response_invalid",
@@ -324,6 +364,74 @@ def _submit_recorded(
             len(ledger.candidates),
         )
     return task_id
+
+
+def _guard_post_submit(
+    session: JobControlSession,
+    adapter: VideoAdapter,
+    identity: VideoIdentity,
+    ledger: VendorLedger | None,
+    task_id: str,
+    context: ExecutionContext,
+    job: GenerateVideoJob,
+) -> None:
+    if session.is_stale():
+        raise StaleDelivery(f"Job {job.jobId} attempt {job.attempt} became stale during submit")
+    if session.is_sibling_failed():
+        _cancel_on_sibling_failed(
+            adapter, identity, ledger, task_id, context, job,
+            "Sibling clip failed during submit",
+        )
+
+
+def _cancel_on_sibling_failed(
+    adapter: VideoAdapter,
+    identity: VideoIdentity,
+    ledger: VendorLedger | None,
+    task_id: str,
+    context: ExecutionContext,
+    job: GenerateVideoJob,
+    reason: str,
+    *,
+    attached: VendorCandidate | None = None,
+) -> Any:
+    cancel_result: CancelResult = adapter.cancel_video(task_id)
+    if attached is not None:
+        _report_verdict(context, attached, "failed")
+    elif ledger is not None:
+        context.report(
+            VendorTaskReport(
+                vendor=identity.provider,
+                model=identity.model,
+                vendorJobId=task_id,
+                status="failed",
+            )
+        )
+    if cancel_result.confirmed:
+        log.info(
+            "vendor_job outcome=cancelled_sibling_failed vendor=%s "
+            "vendorTaskId=%s runId=%s jobId=%s attempt=%s",
+            identity.provider,
+            task_id,
+            job.runId,
+            job.jobId,
+            job.attempt,
+        )
+        raise PermanentError("sibling_failed", f"{reason} (cancelled provider task {task_id})")
+    log.warning(
+        "vendor_job outcome=cancel_unconfirmed vendor=%s "
+        "vendorTaskId=%s runId=%s jobId=%s attempt=%s detail=%s",
+        identity.provider,
+        task_id,
+        job.runId,
+        job.jobId,
+        job.attempt,
+        cancel_result.reason,
+    )
+    raise PermanentError(
+        "sibling_failed",
+        f"{reason}; cancel unconfirmed for provider task {task_id}: {cancel_result.reason}",
+    )
 
 
 def _report_verdict(

@@ -15,6 +15,7 @@ from typing import Any, NoReturn, cast
 from ..errors import PermanentError, TransientError
 from .adapter import (
     Abort,
+    CancelResult,
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
@@ -44,6 +45,10 @@ PROVIDER_WAN = "wan"
 _MAX_VIDEO_BYTES = 100 * 1024 * 1024
 _DOWNLOAD_ATTEMPTS = 4
 _TERMINAL_FAILURES = {"failed", "canceled"}
+_CANCEL_ATTEMPTS = 3
+_CANCEL_RETRY_DELAYS = (1.0, 2.0)
+_CANCEL_TIMEOUT_SECONDS = 10.0
+_CANCEL_SETTLED_STATUSES = {"canceled", "cancelled", "succeeded", "failed"}
 
 
 @dataclass(frozen=True)
@@ -169,7 +174,70 @@ class WanAdapter:
             if time.monotonic() >= deadline:
                 raise VendorJobTimeout(PROVIDER_WAN, task_id)
             remaining = max(0.0, deadline - time.monotonic())
-            time.sleep(min(self.config.poll_interval_seconds, remaining))
+            delay = min(self.config.poll_interval_seconds, remaining)
+            wait_fn = getattr(abort, "wait", None)
+            if callable(wait_fn):
+                wait_fn(delay)
+            else:
+                time.sleep(delay)
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        url = f"{self._task_url(task_id)}/cancel"
+        last_reason = "cancel request failed"
+        for attempt in range(1, _CANCEL_ATTEMPTS + 1):
+            request = urllib.request.Request(
+                url,
+                data=b"",
+                method="POST",
+                headers={
+                    "Authorization": f"Bearer {self.config.api_key}",
+                    "User-Agent": WORKER_USER_AGENT,
+                },
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=_CANCEL_TIMEOUT_SECONDS) as response:
+                    parsed = json.loads(response.read())
+                if not isinstance(parsed, dict):
+                    last_reason = "cancel response was not a JSON object"
+                else:
+                    status = (_string(parsed, "status") or "").lower()
+                    if status in _CANCEL_SETTLED_STATUSES:
+                        log.info(
+                            "Wan prediction cancel settled",
+                            extra={"providerTaskId": task_id, "taskStatus": status},
+                        )
+                        return CancelResult(confirmed=True, status=status)
+                    last_reason = f"unexpected prediction status '{status or 'missing'}'"
+            except urllib.error.HTTPError as exc:
+                last_reason = f"HTTP {exc.code}"
+                log.warning(
+                    "Wan prediction cancel HTTP error",
+                    extra={
+                        "providerTaskId": task_id,
+                        "status": exc.code,
+                        "cancelAttempt": attempt,
+                    },
+                )
+                if exc.code not in (408, 429) and not (500 <= exc.code < 600):
+                    return CancelResult(confirmed=False, reason=last_reason)
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+                last_reason = type(exc).__name__
+                log.warning(
+                    "Wan prediction cancel failed",
+                    extra={
+                        "providerTaskId": task_id,
+                        "errorType": last_reason,
+                        "cancelAttempt": attempt,
+                    },
+                )
+            if attempt < _CANCEL_ATTEMPTS:
+                time.sleep(_CANCEL_RETRY_DELAYS[attempt - 1])
+        log.warning(
+            "Wan prediction %s cancel unconfirmed after retries",
+            task_id,
+            extra={"providerTaskId": task_id, "reason": last_reason},
+        )
+        return CancelResult(confirmed=False, reason=last_reason)
 
     def probe_video(self, task_id: str) -> VendorProbe:
         body = probe_json(

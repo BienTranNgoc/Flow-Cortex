@@ -37,6 +37,12 @@ const STATUS_PATHS: Record<StepState, ReactNode> = {
   ),
   completed: <path d="M3.5 8.5l3 3 6-7" />,
   error: <path d="M4 4l8 8M12 4l-8 8" />,
+  stopped: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <rect x="6" y="6" width="4" height="4" fill="currentColor" stroke="none" />
+    </>
+  ),
   skipped: (
     <>
       <circle cx="8" cy="8" r="5.5" />

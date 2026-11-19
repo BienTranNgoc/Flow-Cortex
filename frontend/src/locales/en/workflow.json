@@ -9,6 +9,7 @@
     "contract_violation": "The media engine rejected this job. Try again later.",
     "speech_too_long": "The approved script is too long for the 10-second video. Start a new run with a shorter script.",
     "provider_timeout": "The provider took too long. The job is kept, so a later try with identical content will not start it from scratch.",
+    "sibling_failed": "Stopped because the other video clip failed.",
     "APPROVAL_REJECTED": "You rejected this content, so the run stopped.",
     "reapedInline": "This step stopped before it finished. Try running again.",
     "noMessage": "This step stopped with an error."
@@ -20,6 +21,7 @@
       "running": "Running",
       "completed": "Completed",
       "error": "Error",
+      "stopped": "Stopped",
       "skipped": "Skipped",
       "needsYou": "Needs you"
     },

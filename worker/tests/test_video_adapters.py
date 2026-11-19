@@ -28,6 +28,7 @@ from pydantic import ValidationError
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
 from flowcortex_worker.provider.adapter import (
+    CancelResult,
     FixtureProviderAdapter,
     VendorProbe,
     VideoAbort,
@@ -173,6 +174,9 @@ class _NoLedgerAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         raise AssertionError("a job without a ledger has no fingerprint")
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=False, reason="not implemented")
 
 
 # ---------------------------------------------------------------------------

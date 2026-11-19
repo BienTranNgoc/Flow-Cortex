@@ -2375,5 +2375,88 @@ describe('RunProgressPage', () => {
       await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
       expect(editor).toHaveValue('First crisp ad line.');
     });
+
+    it('renders two running video clips together and keeps polling after error until sibling settles as Stopped', async () => {
+      const runningClip = (order: 5 | 6) =>
+        step({
+          id: `s${order}`,
+          stepOrder: order,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'running',
+          pickedUpAt: '2026-11-18T10:00:01Z',
+          outputs: [],
+        });
+      let currentRun = run([runningClip(5), runningClip(6)], { status: 'running' });
+
+      stubApi({
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: currentRun }),
+      });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      const pipeline = await screen.findByRole('region', { name: 'Steps' });
+      const activeNodes = [...pipeline.querySelectorAll('.pipeline-node[data-state="running"]')];
+      expect(activeNodes).toHaveLength(2);
+      expect(within(pipeline).getByText('Video clip 1')).toBeInTheDocument();
+      expect(within(pipeline).getByText('Video clip 2')).toBeInTheDocument();
+      expect(openStreams()).toHaveLength(1);
+
+      // Clip 2 fails while Clip 1 is still running: run enters error, stream must stay open.
+      currentRun = run(
+        [
+          runningClip(5),
+          step({
+            id: 's6',
+            stepOrder: 6,
+            type: 'generate_video',
+            mode: 'remote',
+            status: 'error',
+            errorCode: 'provider_request_failed',
+            errorMessage: 'Provider error on clip 2',
+            outputs: [],
+          }),
+        ],
+        { status: 'error', errorMessage: 'Provider error on clip 2' },
+      );
+      push();
+
+      await waitFor(() =>
+        expect(pipeline.querySelector('.pipeline-node[data-state="error"]')).not.toBeNull(),
+      );
+      expect(pipeline.querySelector('.pipeline-node[data-state="running"]')).not.toBeNull();
+      expect(openStreams()).toHaveLength(1);
+
+      // Clip 1 settles with sibling_failed: shows Stopped badge, explains why, and closes the stream.
+      currentRun = run(
+        [
+          step({
+            id: 's5',
+            stepOrder: 5,
+            type: 'generate_video',
+            mode: 'remote',
+            status: 'error',
+            errorCode: 'sibling_failed',
+            errorMessage: 'sibling failed',
+            outputs: [],
+          }),
+          currentRun.steps![1]!,
+        ],
+        { status: 'error', errorMessage: 'Provider error on clip 2' },
+      );
+      push();
+
+      const stoppedNode = await waitFor(() => {
+        const el = pipeline.querySelector('.pipeline-node[data-state="stopped"]');
+        expect(el).not.toBeNull();
+        return el as HTMLElement;
+      });
+      expect(within(stoppedNode).getByText('Stopped')).toBeInTheDocument();
+      await waitFor(() => expect(openStreams()).toHaveLength(0));
+    });
   });
 });

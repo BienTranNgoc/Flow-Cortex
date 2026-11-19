@@ -7,6 +7,7 @@ import {
   edgeState,
   formatElapsedClock,
   selectedStep,
+  stateWord,
   stepDuration,
   stepKey,
   stepLabel,
@@ -373,5 +374,31 @@ describe('product video step labels', () => {
       22,
     );
     expect(computeElapsedSeconds(undefined, end, 0)).toBeNull();
+  });
+
+  it('maps sibling_failed to stopped state and focuses the root-cause error step first', () => {
+    const en = i18n.getFixedT('en');
+    const viT = i18n.getFixedT('vi');
+    const stoppedSibling = step({
+      id: 's5',
+      stepOrder: 5,
+      type: 'generate_video',
+      status: 'error',
+      errorCode: 'sibling_failed',
+    });
+    const failedClip = step({
+      id: 's6',
+      stepOrder: 6,
+      type: 'generate_video',
+      status: 'error',
+      errorCode: 'provider_request_failed',
+    });
+    const steps = [stoppedSibling, failedClip];
+
+    expect(stepState(stoppedSibling, steps, 'error')).toBe('stopped');
+    expect(stepState(failedClip, steps, 'error')).toBe('error');
+    expect(stateWord('stopped', en)).toBe('Stopped');
+    expect(stateWord('stopped', viT)).toBe('Đã dừng');
+    expect(defaultStep(steps, 'error')?.id).toBe('s6');
   });
 });

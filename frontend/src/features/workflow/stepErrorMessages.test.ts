@@ -33,4 +33,13 @@ describe('stepErrorSentence', () => {
       expect(stepErrorSentence('speech_too_long', fromServer, true, en, 'en')).toBe(fromServer);
     });
   });
+
+  it('renders localized messages for sibling_failed in English and Vietnamese', () => {
+    expect(stepErrorSentence('sibling_failed', 'sibling failed', true, en, 'en')).toBe(
+      'Stopped because the other video clip failed.',
+    );
+    expect(stepErrorSentence('sibling_failed', 'sibling failed', true, vi, 'vi')).toBe(
+      viWorkflow.stepError.sibling_failed,
+    );
+  });
 });

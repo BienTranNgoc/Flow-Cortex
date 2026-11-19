@@ -20,7 +20,8 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         CONTRACT_VIOLATION("contract_violation"),
         RUN_TIMEOUT("run_timeout"),
         DURATION_EXCEEDED("duration_exceeded"),
-        NO_AUDIO_STREAM("no_audio_stream");
+        NO_AUDIO_STREAM("no_audio_stream"),
+        SIBLING_FAILED("sibling_failed");
 
         private final String value;
 

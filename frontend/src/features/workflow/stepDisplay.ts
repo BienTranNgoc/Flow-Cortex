@@ -4,7 +4,7 @@ import { formatDateTime, formatNumber } from '../../lib/format';
 import type { Locale } from '../../lib/i18n';
 
 export type StepState =
-  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'skipped' | 'needs-you';
+  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'stopped' | 'skipped' | 'needs-you';
 export type EdgeState = 'done' | 'active' | 'broken' | 'pending';
 
 /** The member's own pick, with the run status and the step waiting for approval at that moment. */
@@ -25,6 +25,7 @@ const STATE_WORD_KEYS: Record<StepState, string> = {
   running: 'workflow.step.state.running',
   completed: 'workflow.step.state.completed',
   error: 'workflow.step.state.error',
+  stopped: 'workflow.step.state.stopped',
   skipped: 'workflow.step.state.skipped',
   'needs-you': 'workflow.step.state.needsYou',
 };
@@ -123,8 +124,9 @@ export function stepState(
   switch (step.status) {
     case 'running':
       return step.pickedUpAt ? 'running' : 'waiting';
-    case 'completed':
     case 'error':
+      return step.errorCode === 'sibling_failed' ? 'stopped' : 'error';
+    case 'completed':
     case 'skipped':
       return step.status;
     default:
@@ -148,6 +150,7 @@ export function defaultStep(
 ): RunStepResponse | undefined {
   return (
     needsYouStep(steps, runStatus) ??
+    steps.find((step) => step.status === 'error' && step.errorCode !== 'sibling_failed') ??
     steps.find((step) => step.status === 'error') ??
     steps.find((step) => step.status === 'running') ??
     steps.filter((step) => step.status === 'completed').at(-1) ??

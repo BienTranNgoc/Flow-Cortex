@@ -8,9 +8,10 @@ import pytest
 from conftest import FakeConnection, FakeStorage, assert_valid, published, run_consumer, settled
 
 from flowcortex_worker.contracts.media_progress import VendorTaskReport
-from flowcortex_worker.errors import PermanentError, TransientError
+from flowcortex_worker.errors import PermanentError, StaleDelivery, TransientError
 from flowcortex_worker.provider.__main__ import (
     MAX_TRANSIENT_REDELIVERIES,
+    _build_adapter,
     make_execute_job,
     provider_queue,
 )
@@ -375,3 +376,59 @@ def test_masked_200_upstream_error_on_script_job_requeues_until_budget_exhausted
     assert result["error"]["code"] == "provider_request_failed"
     assert result["error"]["retryable"] is False
     assert exhausted_conn.consume.acks == [1]
+
+
+def test_stale_delivery_acks_without_publishing_result() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job(
+            "generate_video",
+            "vertical_ad_clip_v1",
+            {"prompt": "p", "sourceRevisionId": REVISION_ID},
+        )
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    def stale_execute(job: Any, runner: Any, report: Any) -> Any:
+        raise StaleDelivery("stale attempt")
+
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.video.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=stale_execute,
+        until=settled,
+    )
+
+    assert published(conn, "result") == []
+    assert conn.consume.acks == [1]
+
+
+def test_parallel_clips_flag_restricts_video_worker_to_wan_or_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED", "true")
+    monkeypatch.setenv("VIDEO_PROVIDER", "seedance")
+    monkeypatch.setenv("SEEDANCE_API_KEY", "sk-test")
+
+    with pytest.raises(RuntimeError, match=r"wan.*fixture"):
+        _build_adapter(video_enabled=True)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "veo")
+    monkeypatch.setenv("VEO_API_KEY", "vk-test")
+    with pytest.raises(RuntimeError, match=r"wan.*fixture"):
+        _build_adapter(video_enabled=True)
+
+    # Non-video worker on provider.jobs is unaffected by VIDEO_PROVIDER=seedance.
+    _build_adapter(video_enabled=False)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "fixture")
+    _build_adapter(video_enabled=True)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "wan-test")
+    _build_adapter(video_enabled=True)

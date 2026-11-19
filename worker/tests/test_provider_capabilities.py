@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from flowcortex_worker.contracts.media_progress import VendorTaskReport
 from flowcortex_worker.errors import PermanentError
 from flowcortex_worker.provider.adapter import (
+    CancelResult,
     FixtureProviderAdapter,
     SpeechIdentity,
     SpeechRequest,
@@ -474,6 +475,9 @@ class LedgerVideoAdapter:
 
     def probe_video(self, task_id: str) -> VendorProbe:
         raise AssertionError("probes come from the context registry")
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=False, reason="not implemented")
 
     def await_video(self, task_id: str, abort: Any) -> VideoArtifact:
         self.events.append(f"await:{task_id}")

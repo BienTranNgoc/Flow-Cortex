@@ -90,6 +90,13 @@ class VideoArtifact:
     mime: str = "video/mp4"
 
 
+@dataclass(frozen=True)
+class CancelResult:
+    confirmed: bool
+    status: str | None = None
+    reason: str | None = None
+
+
 class VideoAbort(Protocol):
     def check(self) -> None: ...
 
@@ -118,6 +125,8 @@ class VideoAdapter(Protocol):
     def vendor_scope(self) -> dict[str, str]:
         """Endpoint host and key hash that scope this adapter's job ids (see `vendor_scope`)."""
         ...
+
+    def cancel_video(self, task_id: str) -> CancelResult: ...
 
 
 class ProviderAdapter(ScriptAdapter, SpeechAdapter, VideoAdapter, Protocol):
@@ -168,6 +177,9 @@ class CapabilityProviderAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         return self.video_adapter.vendor_scope()
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return self.video_adapter.cancel_video(task_id)
 
 
 class FixtureProviderAdapter:
@@ -238,6 +250,9 @@ class FixtureProviderAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         return {"endpoint": "fixture", "account": "fixture"}
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=True, status="canceled")
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         abort.check()

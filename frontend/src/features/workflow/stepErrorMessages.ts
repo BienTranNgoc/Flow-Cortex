@@ -12,6 +12,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   contract_violation: 'workflow.stepError.contract_violation',
   speech_too_long: 'workflow.stepError.speech_too_long',
   provider_timeout: 'workflow.stepError.provider_timeout',
+  sibling_failed: 'workflow.stepError.sibling_failed',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
 };
 
