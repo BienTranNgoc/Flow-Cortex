@@ -7,11 +7,6 @@
   overflow-wrap: anywhere;
 }
 
-.run-step-code {
-  color: var(--ink-3);
-  font-size: 0.85rem;
-}
-
 .run-step-waiting {
   margin: 0.35rem 0 0;
   color: var(--ink-3);
@@ -177,11 +172,6 @@
   .run-input-media {
     transition: none;
   }
-}
-
-.run-step-failure .run-step-code {
-  display: block;
-  margin-top: 0.25rem;
 }
 
 .field-error p {

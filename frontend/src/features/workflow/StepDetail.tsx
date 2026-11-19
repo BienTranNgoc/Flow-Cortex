@@ -184,9 +184,9 @@ export function StepDetail({
                 step.mode === 'remote',
                 t,
                 locale,
+                step.type,
               )}
             </p>
-            {step.errorCode && <small className="run-step-code">{step.errorCode}</small>}
           </div>
         )}
       </div>

@@ -167,11 +167,9 @@ function renderRun(body: RunResponse, extra: Record<string, Handler> = {}) {
   return { calls, queryClient };
 }
 
-/** The page's main text outside the small-print error code, which is shown verbatim for support. */
+/** The page's main text shown to members. */
 function memberText(): string {
-  const main = screen.getByRole('main').cloneNode(true) as HTMLElement;
-  main.querySelectorAll('.run-step-code').forEach((code) => code.remove());
-  return main.textContent ?? '';
+  return screen.getByRole('main').textContent ?? '';
 }
 
 /** jsdom's Blob has no `text()`. */
@@ -334,8 +332,13 @@ describe('RunProgressPage', () => {
     ],
     ['media_disabled', engineMessage, 'The media engine is switched off right now.'],
     ['contract_violation', engineMessage, 'The media engine rejected this job. Try again later.'],
-    [null, 'Unsupported step type: resize', 'Unsupported step type: resize'],
-    ['thumbnail_failed', 'The thumbnail could not be made.', 'The thumbnail could not be made.'],
+    [
+      'provider_request_failed',
+      'transient retry budget exhausted after 3 redeliveries: upstream_temporarily_unavailable',
+      'The AI service is temporarily unavailable and could not finish this step. Try running again in a few minutes.',
+    ],
+    [null, 'Unsupported step type: resize', 'This step stopped with an error.'],
+    ['thumbnail_failed', 'The thumbnail could not be made.', 'This step stopped with an error.'],
     [null, null, 'This step stopped with an error.'],
   ])('a remote step that ended in error with code %s and message %s', (code, message, sentence) => {
     beforeEach(() => {
@@ -360,21 +363,21 @@ describe('RunProgressPage', () => {
 
       expect(occurrences(text, sentence)).toBe(1);
       expect(text).not.toContain(engineMessage);
+      if (message !== null) {
+        expect(text).not.toContain(message);
+      }
       for (const word of ENGINE_WORDS) {
         expect(text.toLowerCase()).not.toContain(word);
       }
     });
 
-    it('shows the code only as small print, and the way back to the workflow', async () => {
+    it('hides technical error codes from members and keeps the way back to the workflow', async () => {
       await screen.findByText(sentence);
       const codes = screen.getByRole('main').querySelectorAll('.run-step-code');
 
-      if (code === null) {
-        expect(codes).toHaveLength(0);
-      } else {
-        expect([...codes].map((element) => [element.tagName, element.textContent])).toEqual([
-          ['SMALL', code],
-        ]);
+      expect(codes).toHaveLength(0);
+      if (code !== null) {
+        expect(memberText()).not.toContain(code);
       }
       expect(screen.getByRole('link', { name: 'Back to workflow' })).toHaveAttribute(
         'href',
@@ -405,9 +408,32 @@ describe('RunProgressPage', () => {
         await screen.findByText('This step stopped before it finished. Try running again.'),
       ).toBeInTheDocument();
       expect(memberText().toLowerCase()).not.toContain('media engine');
-      expect(screen.getByRole('main').querySelector('.run-step-code')?.textContent).toBe(code);
+      expect(screen.getByRole('main').querySelector('.run-step-code')).toBeNull();
     },
   );
+
+  it('uses AI-step timeout wording rather than file wording when generate_script hits run_timeout', async () => {
+    renderRun(
+      run(
+        [
+          step({
+            type: 'generate_script',
+            mode: 'remote',
+            status: 'error',
+            pickedUpAt: '2026-10-01T10:00:01Z',
+            errorCode: 'run_timeout',
+            errorMessage: 'run deadline exceeded',
+          }),
+        ],
+        { status: 'error', errorMessage: 'run deadline exceeded' },
+      ),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('This step took too long and was stopped. Try running again.');
+    expect(alert.textContent?.toLowerCase()).not.toContain('file');
+    expect(screen.getByRole('main').querySelector('.run-step-code')).toBeNull();
+  });
 
   it('explains a run that failed with no failing step', async () => {
     renderRun(
@@ -1296,7 +1322,7 @@ describe('RunProgressPage', () => {
       expect(within(panel).getByRole('alert')).toHaveTextContent(
         'You rejected this content, so the run stopped.',
       );
-      expect(panel.querySelector('.run-step-code')?.textContent).toBe('APPROVAL_REJECTED');
+      expect(panel.querySelector('.run-step-code')).toBeNull();
       expect(screen.queryByLabelText('Content to approve')).not.toBeInTheDocument();
     });
 
@@ -1699,7 +1725,8 @@ describe('RunProgressPage', () => {
 
       await user.click(screen.getByRole('button', { name: /Bước 2/ }));
 
-      expect(screen.getByRole('alert').textContent).toBe(unknownMessage);
+      expect(screen.getByRole('alert').textContent).toBe(viWorkflow.stepError.noMessage);
+      expect(screen.getByRole('alert').textContent).not.toContain(unknownMessage);
     });
   });
 
