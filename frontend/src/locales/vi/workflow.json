@@ -2,14 +2,38 @@
   "stepError": {
     "input_rejected": "Không dùng được tệp vừa tải lên. Hãy tải tệp lên lại.",
     "probe_failed": "Không đọc được tệp này dưới dạng âm thanh hoặc video. Hãy tải lên một tệp video hoặc âm thanh (ví dụ .mp4).",
+    "audio_extraction_failed": "Không tách được âm thanh từ tệp vừa tải lên. Hãy kiểm tra tệp và thử lại.",
+    "audio_alignment_failed": "Không căn chỉnh được âm thanh cho video này. Hãy thử chạy lại.",
+    "audio_alignment_out_of_range": "Thời lượng giọng đọc chênh lệch quá nhiều so với video gốc nên không thể căn chỉnh.",
+    "duration_exceeded": "Tệp vượt quá thời lượng tối đa cho phép. Hãy tải lên tệp ngắn hơn.",
+    "no_audio_stream": "Tệp tải lên không có âm thanh. Hãy chọn tệp có âm thanh và thử lại.",
     "lease_expired": "Bộ xử lý media đã ngừng phản hồi. Hãy thử chạy lại.",
     "queue_timeout": "Bộ xử lý media quá bận nên không bắt đầu kịp. Hãy thử chạy lại.",
     "run_timeout": "Tệp này xử lý quá lâu nên đã bị dừng. Hãy thử một tệp ngắn hơn.",
     "media_disabled": "Bộ xử lý media hiện đang tắt.",
     "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
-    "provider_timeout": "Nhà cung cấp xử lý quá lâu. Tác vụ vẫn được giữ, thử lại sau sẽ không bị tạo lại từ đầu nếu nội dung giống hệt.",
+    "provider_capability_unavailable": "Tính năng AI cho bước này hiện chưa khả dụng. Hãy thử lại sau.",
+    "provider_request_failed": "Dịch vụ AI tạm thời gián đoạn và chưa thể hoàn thành bước này. Hãy thử chạy lại sau ít phút.",
+    "provider_response_invalid": "Dịch vụ AI trả về kết quả không hợp lệ ở bước này. Hãy thử chạy lại.",
+    "provider_timeout": "Dịch vụ AI xử lý quá lâu ở bước này. Hãy thử chạy lại sau ít phút.",
+    "provider_quota_exceeded": "Dịch vụ AI hiện đang vượt giới hạn xử lý. Hãy thử chạy lại sau ít phút.",
+    "provider_unavailable": "Dịch vụ AI hiện tạm thời không phản hồi. Hãy thử chạy lại sau ít phút.",
+    "sibling_failed": "Đã dừng do cảnh quay còn lại gặp lỗi.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
+    "INSUFFICIENT_CREDITS": "Không đủ credit để chạy bước này. Hãy nạp thêm credit rồi thử lại.",
+    "dub_disabled": "Tính năng lồng tiếng hiện đang tạm tắt.",
+    "store_unavailable": "Không lưu được tệp kết quả do hệ thống lưu trữ tạm thời gián đoạn. Hãy thử chạy lại.",
+    "translation_invalid": "Không thể tạo bản dịch hợp lệ ở bước này. Hãy thử chạy lại.",
+    "context": {
+      "ai": {
+        "run_timeout": "Bước này xử lý quá lâu nên đã bị dừng. Hãy thử chạy lại.",
+        "queue_timeout": "Hệ thống đang bận nên chưa thể bắt đầu bước này kịp lúc. Hãy thử chạy lại.",
+        "lease_expired": "Kết nối xử lý bị gián đoạn giữa chừng. Hãy thử chạy lại.",
+        "contract_violation": "Yêu cầu ở bước này không thể xử lý. Hãy thử lại sau.",
+        "media_disabled": "Dịch vụ xử lý hiện đang tạm tắt."
+      }
+    },
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
   },
@@ -20,17 +44,42 @@
       "running": "Đang chạy",
       "completed": "Hoàn tất",
       "error": "Lỗi",
+      "stopped": "Đã dừng",
       "skipped": "Đã bỏ qua",
       "needsYou": "Cần bạn xử lý"
     },
     "label": {
       "probe": "Kiểm tra tệp",
       "extract_audio": "Tách âm thanh gốc",
-      "review": "Bước duyệt"
+      "review": "Bước duyệt",
+      "reviewScript": "Duyệt kịch bản",
+      "generate_script": "Viết kịch bản",
+      "generate_storyboard": "Lập phân cảnh",
+      "generate_speech": "Tạo giọng đọc",
+      "generate_video": "Tạo cảnh",
+      "generate_video_numbered": "Tạo cảnh {{n}}",
+      "render_video": "Ghép video"
     },
     "fallback": "Bước {{order}}",
     "progress": "Tiến độ bước {{order}}",
     "waitingToStart": "Đang chờ bắt đầu…",
+    "activity": {
+      "elapsed": "Đã chạy {{time}}",
+      "waitingPickup": "Đang chờ tiếp nhận…",
+      "running": {
+        "generate_script_named": "Đang viết kịch bản cho «{{name}}»…",
+        "generate_script": "Đang viết kịch bản…",
+        "generate_storyboard": "Đang chia 2 phân cảnh 9:16…",
+        "generate_speech": "Đang tạo tệp giọng đọc…",
+        "generate_video": "Đang tạo cảnh video 9:16…",
+        "render_video": "Đang ghép cảnh và giọng đọc…",
+        "fallback": "Đang xử lý bước này…"
+      },
+      "pending": {
+        "APPROVAL_CHECKPOINT": "Chờ bước trước xong để duyệt kịch bản.",
+        "default": "Chờ bước trước hoàn tất."
+      }
+    },
     "timing": {
       "timeTaken": "Thời gian thực hiện",
       "startTime": "Thời điểm bắt đầu",
@@ -45,7 +94,12 @@
       "duration": "Thời lượng",
       "dimensions": "Kích thước",
       "videoCodec": "Codec video",
-      "audioCodec": "Codec âm thanh"
+      "audioCodec": "Codec âm thanh",
+      "voice": "Giọng đọc",
+      "speechSpeed": "Tốc độ đọc",
+      "aspectRatio": "Tỉ lệ",
+      "resolution": "Độ phân giải",
+      "format": "Định dạng"
     },
     "showRaw": "Xem dữ liệu gốc",
     "hideRaw": "Ẩn dữ liệu gốc"
@@ -54,7 +108,8 @@
     "region": "Các bước",
     "hint": "Chọn một bước để xem kết quả.",
     "retried": "Đã thử lại {{n}} lần",
-    "notConfigured": "Chưa cấu hình"
+    "notConfigured": "Chưa cấu hình",
+    "headingCount": "{{done}}/{{total}}"
   },
   "run": {
     "heading": {
@@ -67,6 +122,7 @@
       "cancelled": "Lượt chạy đã bị hủy"
     },
     "headingOther": "Lượt chạy: {{status}}",
+    "stepProgress": "Bước {{current}} / {{total}}",
     "back": "Quay lại quy trình",
     "noRun": "Chưa chọn lượt chạy.",
     "loading": "Đang tải lượt chạy…",
@@ -92,7 +148,30 @@
     "playFailed": "Không phát được video. Hãy tải video xuống.",
     "hideVideo": "Ẩn video",
     "loadingVideo": "Đang tải video…",
-    "watchVideo": "Xem video"
+    "watchVideo": "Xem video",
+    "generatedSpeechTitle": "Giọng đọc ({{name}})",
+    "listenPreview": "Nghe thử giọng đọc",
+    "hideAudio": "Ẩn trình phát",
+    "loadingAudio": "Đang tải âm thanh…",
+    "audioFailed": "Không phát được âm thanh thử.",
+    "cannotPlayAudio": "Trình duyệt không phát được tệp âm thanh này.",
+    "intermediateAudioNote": "Chỉ nghe thử — không tải riêng tệp này.",
+    "watchClip": "Xem thử cảnh",
+    "hideClip": "Ẩn cảnh",
+    "intermediateClipNote": "Chỉ xem thử — sẽ được ghép vào video cuối.",
+    "finalShowcaseBadge": "Hoàn tất",
+    "finalShowcaseHeading": "Video đã sẵn sàng",
+    "specAspect": "Tỉ lệ khung hình",
+    "specAspectVal": "{{ratio}} (Dọc)",
+    "specResolution": "Độ phân giải",
+    "specResolutionVal": "{{width}} × {{height}} px",
+    "specDuration": "Thời lượng",
+    "specDurationVal": "{{seconds}}s",
+    "specFormat": "Định dạng",
+    "specFormatVal": "MP4 (H.264 / AAC)",
+    "downloadFinalVideo": "Tải video (.mp4)",
+    "downloadFinalStepVideo": "Tải video ({{name}})",
+    "createAnother": "Tạo video khác"
   },
   "approval": {
     "region": "Duyệt trước khi lượt chạy tiếp tục",
@@ -113,6 +192,7 @@
   "script": {
     "label": "Kịch bản cần duyệt",
     "tooLong": "Kịch bản này có thể dài hơn video 10 giây. Hãy giữ khoảng {{max}} từ — lời đọc dài hơn 10 giây sẽ làm dừng lượt chạy.",
+    "meter": "{{words}} / {{max}} từ · Ước tính ~{{seconds}}s / 10s",
     "save": "Lưu bản sửa",
     "saving": "Đang lưu…",
     "unsaved": "Có thay đổi chưa lưu — hãy lưu bản sửa trước khi duyệt.",
@@ -120,7 +200,17 @@
     "leaveConfirm": "Bạn có thay đổi kịch bản chưa lưu. Rời khỏi trang này?",
     "history": "Các bản sửa kịch bản",
     "revision": "Bản sửa {{number}}",
-    "approved": "Đã duyệt"
+    "approved": "Đã duyệt",
+    "loadRevision": "Nạp bản sửa {{number}} vào trình soạn thảo",
+    "clickToLoadHint": "Chọn một bản sửa trước đó để khôi phục nội dung."
+  },
+  "storyboard": {
+    "heading": "Bảng phân cảnh 2 cảnh",
+    "scene1Title": "Cảnh 1 · Giới thiệu sản phẩm (0s – 5s)",
+    "scene2Title": "Cảnh 2 · Điểm nhấn & Chốt đơn (5s – 10s)",
+    "referenceImage": "Ảnh tham chiếu gốc",
+    "copyPrompt": "Sao chép gợi ý cảnh",
+    "copied": "Đã sao chép"
   },
   "start": {
     "formLabel": "Bắt đầu lượt chạy",
@@ -149,7 +239,30 @@
     "image": "Ảnh sản phẩm (JPG/PNG/WebP, tối đa 10 MB) *",
     "imageSelected": "Đã chọn 1 ảnh: {{name}}",
     "uploadingImage": "Đang tải lên ảnh {{index}}",
-    "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại."
+    "uploadsUnfinished": "Một trong các tệp ảnh chưa tải lên xong. Hãy thử lại.",
+    "aspectRatioBadge": "9:16 Dọc",
+    "durationBadge": "10s",
+    "voiceBadge": "Giọng tiếng Việt",
+    "creditsBadge": "~{{amount}} tín dụng",
+    "specAspectShort": "9:16",
+    "specDurationShort": "10s",
+    "specFormatShort": "MP4",
+    "productNamePlaceholder": "Ví dụ: Bình giữ nhiệt Inox 500ml",
+    "descriptionPlaceholder": "Nêu điểm nổi bật chính của sản phẩm…",
+    "charCount": "{{count}} / {{max}} ký tự",
+    "dropzoneTitle": "Kéo thả ảnh vào đây hoặc nhấn để chọn",
+    "dropzoneHint": "1 ảnh rõ sản phẩm · JPG, PNG hoặc WebP · tối đa 10 MB",
+    "changeImage": "Thay ảnh",
+    "removeImage": "Xóa ảnh",
+    "fileReady": "Sẵn sàng ({{size}})",
+    "imagePreviewAlt": "Xem trước ảnh sản phẩm đã chọn",
+    "previewHeading": "Xem trước 9:16",
+    "previewBadge": "9:16",
+    "previewEmptyImage": "Ảnh sản phẩm",
+    "previewPlaceholderTitle": "Tên sản phẩm",
+    "previewPlaceholderDesc": "Lời thoại ~25–30 từ cho video dọc 10s.",
+    "briefSummary": "Thông tin sản phẩm",
+    "retryWithBrief": "Tạo lại với nội dung này"
   },
   "validation": {
     "noFile": "Hãy chọn một tệp video hoặc âm thanh để tải lên",

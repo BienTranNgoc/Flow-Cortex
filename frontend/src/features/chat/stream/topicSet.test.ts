@@ -44,4 +44,13 @@ describe('chatTopics', () => {
 
     expect(chatTopics(CONVERSATION, runs).topics).toEqual(['chat:c0nversati0n-id', 'run:run-1']);
   });
+
+  it('keeps subscribing to an errored run while a step is still running', () => {
+    const runs = [
+      { runId: 'RUN-1', status: 'error', hasRunningStep: true },
+      { runId: 'RUN-2', status: 'error', hasRunningStep: false },
+    ];
+
+    expect(chatTopics(CONVERSATION, runs).topics).toEqual(['chat:c0nversati0n-id', 'run:run-1']);
+  });
 });

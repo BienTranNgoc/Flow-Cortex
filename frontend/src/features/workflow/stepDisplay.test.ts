@@ -2,9 +2,12 @@ import type { RunStepResponse } from '@flow-cortex/api-client';
 import i18n from '../../lib/i18n';
 import {
   choiceTakenBack,
+  computeElapsedSeconds,
   defaultStep,
   edgeState,
+  formatElapsedClock,
   selectedStep,
+  stateWord,
   stepDuration,
   stepKey,
   stepLabel,
@@ -303,7 +306,9 @@ describe('stepDuration', () => {
   it('groups thousands in vi durations and sizes', () => {
     const vi = i18n.getFixedT('vi');
 
-    expect(stepDuration(step({ output: '{"durationSeconds": 3600}' }), vi, 'vi')).toBe('3.600 giây');
+    expect(stepDuration(step({ output: '{"durationSeconds": 3600}' }), vi, 'vi')).toBe(
+      '3.600 giây',
+    );
     expect(outputFields({ sourceBytes: 1500 * 1024 * 1024 }, vi, 'vi')).toEqual([
       { label: 'Source', value: '1.500,0 MB' },
     ]);
@@ -320,5 +325,80 @@ describe('formatTime', () => {
   it('returns null for undefined or invalid input', () => {
     expect(formatTime(undefined, 'en')).toBeNull();
     expect(formatTime('invalid', 'en')).toBeNull();
+  });
+});
+
+describe('product video step labels', () => {
+  const en = i18n.getFixedT('en');
+  const viT = i18n.getFixedT('vi');
+
+  it('names ad video workflow steps and numbers multiple generate_video scenes in EN and VI', () => {
+    const pipeline = [
+      step({ id: 's1', stepOrder: 1, type: 'generate_script' }),
+      step({ id: 's2', stepOrder: 2, type: 'APPROVAL_CHECKPOINT' }),
+      step({ id: 's3', stepOrder: 3, type: 'generate_storyboard' }),
+      step({ id: 's4', stepOrder: 4, type: 'generate_speech' }),
+      step({ id: 's5', stepOrder: 5, type: 'generate_video' }),
+      step({ id: 's6', stepOrder: 6, type: 'generate_video' }),
+      step({ id: 's7', stepOrder: 7, type: 'render_video' }),
+    ];
+
+    expect(stepLabel(pipeline[0]!, en, pipeline, true)).toBe('Write script');
+    expect(stepLabel(pipeline[1]!, en, pipeline, true)).toBe('Review script');
+    expect(stepLabel(pipeline[1]!, en, pipeline, false)).toBe('Review');
+    expect(stepLabel(pipeline[2]!, en, pipeline, true)).toBe('Storyboard');
+    expect(stepLabel(pipeline[3]!, en, pipeline, true)).toBe('Voice-over');
+    expect(stepLabel(pipeline[4]!, en, pipeline, true)).toBe('Video clip 1');
+    expect(stepLabel(pipeline[5]!, en, pipeline, true)).toBe('Video clip 2');
+    expect(stepLabel(pipeline[6]!, en, pipeline, true)).toBe('Final render');
+
+    expect(stepLabel(pipeline[0]!, viT, pipeline, true)).toBe('Viết kịch bản');
+    expect(stepLabel(pipeline[1]!, viT, pipeline, true)).toBe('Duyệt kịch bản');
+    expect(stepLabel(pipeline[1]!, viT, pipeline, false)).toBe('Bước duyệt');
+    expect(stepLabel(pipeline[2]!, viT, pipeline, true)).toBe('Lập phân cảnh');
+    expect(stepLabel(pipeline[3]!, viT, pipeline, true)).toBe('Tạo giọng đọc');
+    expect(stepLabel(pipeline[4]!, viT, pipeline, true)).toBe('Tạo cảnh 1');
+    expect(stepLabel(pipeline[5]!, viT, pipeline, true)).toBe('Tạo cảnh 2');
+    expect(stepLabel(pipeline[6]!, viT, pipeline, true)).toBe('Ghép video');
+  });
+
+  it('formats elapsed clocks in MM:SS and H:MM:SS cleanly', () => {
+    expect(formatElapsedClock(0)).toBe('00:00');
+    expect(formatElapsedClock(18)).toBe('00:18');
+    expect(formatElapsedClock(3665)).toBe('1:01:05');
+
+    const start = '2026-11-18T10:00:00.000Z';
+    const end = '2026-11-18T10:01:15.000Z';
+    expect(computeElapsedSeconds(start, end, 0)).toBe(75);
+    expect(computeElapsedSeconds(start, undefined, Date.parse('2026-11-18T10:00:22.000Z'))).toBe(
+      22,
+    );
+    expect(computeElapsedSeconds(undefined, end, 0)).toBeNull();
+  });
+
+  it('maps sibling_failed to stopped state and focuses the root-cause error step first', () => {
+    const en = i18n.getFixedT('en');
+    const viT = i18n.getFixedT('vi');
+    const stoppedSibling = step({
+      id: 's5',
+      stepOrder: 5,
+      type: 'generate_video',
+      status: 'error',
+      errorCode: 'sibling_failed',
+    });
+    const failedClip = step({
+      id: 's6',
+      stepOrder: 6,
+      type: 'generate_video',
+      status: 'error',
+      errorCode: 'provider_request_failed',
+    });
+    const steps = [stoppedSibling, failedClip];
+
+    expect(stepState(stoppedSibling, steps, 'error')).toBe('stopped');
+    expect(stepState(failedClip, steps, 'error')).toBe('error');
+    expect(stateWord('stopped', en)).toBe('Stopped');
+    expect(stateWord('stopped', viT)).toBe('Đã dừng');
+    expect(defaultStep(steps, 'error')?.id).toBe('s6');
   });
 });

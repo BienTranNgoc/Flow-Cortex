@@ -16,6 +16,7 @@ ErrorCode = Literal[
     "run_timeout",
     "duration_exceeded",
     "no_audio_stream",
+    "sibling_failed",
 ]
 
 
@@ -34,6 +35,10 @@ class TransientError(Exception):
     def __init__(self, message: str, *, retry_after_seconds: float | None = None) -> None:
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
+
+
+class StaleDelivery(Exception):
+    """Delivery is no longer active on the backend and should be acknowledged without a result."""
 
 
 MAX_BACKOFF_SECONDS = 60.0

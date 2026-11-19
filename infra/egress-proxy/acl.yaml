@@ -21,3 +21,4 @@ default:
     - ftp.lacnic.net
     - ftp.afrinic.net
     - api.telegram.org
+    - api.vilao.ai

@@ -13,6 +13,7 @@ import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { formatCredits } from '../credits/formatCredits';
 import { invalidateBalance } from '../credits/useBalance';
 import './WorkflowPages.css';
+import './ProductVideoStudio.css';
 import { MediaStartForm } from './MediaStartForm';
 import { Pipeline } from './Pipeline';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
@@ -184,11 +185,27 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
     <div>
       <PageHeading title={workflow?.name ?? t('workflow.detail.heading')} />
       {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
+      {isProductVideo && (
+        <div className="pv-studio-pills">
+          <span className="pv-pill pv-pill--accent">
+            {t('workflow.productVideo.aspectRatioBadge')}
+          </span>
+          <span className="pv-pill">{t('workflow.productVideo.durationBadge')}</span>
+          <span className="pv-pill">{t('workflow.productVideo.voiceBadge')}</span>
+          {typeof workflow?.estimatedCredits === 'number' && (
+            <span className="pv-pill">
+              {t('workflow.productVideo.creditsBadge', {
+                amount: formatCredits(workflow.estimatedCredits, activeLocale()),
+              })}
+            </span>
+          )}
+        </div>
+      )}
       {workflowQuery.isError && <p role="alert">{t('workflow.detail.loadError')}</p>}
       {(workflowQuery.isLoading || capabilitiesQuery.isPending) && (
         <output>{t('workflow.detail.loading')}</output>
       )}
-      {workflow?.steps && workflow.steps.length > 0 && (
+      {workflow?.steps && workflow.steps.length > 0 && (!isProductVideo || incomplete) && (
         <Pipeline
           steps={workflow.steps.map((step) => ({
             id: stepKey(step),

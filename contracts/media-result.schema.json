@@ -106,7 +106,8 @@
             "contract_violation",
             "run_timeout",
             "duration_exceeded",
-            "no_audio_stream"
+            "no_audio_stream",
+            "sibling_failed"
           ]
         },
         "message": { "type": "string" },
