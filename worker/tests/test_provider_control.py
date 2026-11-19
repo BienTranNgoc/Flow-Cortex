@@ -270,7 +270,9 @@ def test_cancel_before_submit_blocks_submit_and_fails_with_sibling_failed() -> N
     assert broker.declared_reply_queues[0][1:] == (True, True)
 
 
-def test_cancel_during_submit_cancels_immediately_once_prediction_id_received() -> None:
+def test_cancel_during_submit_cancels_immediately_once_prediction_id_received(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = 0
 
     def responder(req: MediaControlRequest, props: Any, ch: _ScriptedRpcChannel) -> None:
@@ -284,21 +286,21 @@ def test_cancel_during_submit_cancels_immediately_once_prediction_id_received() 
         ControlConfig(amqp_url="amqp://unused", poll_interval_seconds=0.02),
         connect=broker.connect,
     )
-    submit_ready = threading.Event()
+    job = _video_job()
+    reports: list[Any] = []
+    context = _context(FakeStorage(), client, reports)
+    session = client.open_session(RUN_ID, JOB_ID, 1, abort=context.abort)
+    monkeypatch.setattr(client, "open_session", lambda *args, **kwargs: session)
 
     def slow_submit() -> str:
-        deadline = time.monotonic() + 2.0
-        while calls < 2 and time.monotonic() < deadline:
-            time.sleep(0.01)
-        submit_ready.set()
+        assert session.wake_event.wait(timeout=5.0)
+        assert session.is_sibling_failed()
         return "pred-during-submit"
 
     adapter = _RecordingVideoAdapter(on_submit=slow_submit)
-    reports: list[Any] = []
     with client_guard(client), pytest.raises(PermanentError) as exc_info:
-        execute(_video_job(), adapter, _context(FakeStorage(), client, reports))
+        execute(job, adapter, context)
 
-    assert submit_ready.is_set()
     assert exc_info.value.code == "sibling_failed"
     assert adapter.submitted == 1
     assert adapter.awaited == []
