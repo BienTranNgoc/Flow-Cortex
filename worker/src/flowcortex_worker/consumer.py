@@ -389,6 +389,7 @@ class Consumer:
 
     def _execute(self, job: Any, delivery: Delivery, stack: ExitStack) -> Result:
         runner = delivery.runner
+        runner.set_deadline_monotonic(time.monotonic() + job.maxRuntimeSeconds)
         watchdog = threading.Timer(job.maxRuntimeSeconds, runner.kill, args=("run_timeout",))
         watchdog.daemon = True
         watchdog.start()

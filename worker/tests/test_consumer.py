@@ -170,6 +170,26 @@ def test_a_run_past_its_maximum_is_killed_and_answered_run_timeout() -> None:
     assert conn.consume.acks == [1]
 
 
+def test_execute_sets_monotonic_deadline_on_runner_alongside_watchdog() -> None:
+    conn = FakeConnection()
+    conn.deliver(job_body(maxRuntimeSeconds=42))
+    seen: list[float | None] = []
+
+    def inspect_deadline(
+        job: Any, inputs: Mapping[str, Path], processes: ProcessRunner
+    ) -> HandlerOutcome:
+        seen.append(processes.deadline_monotonic)
+        return HandlerOutcome(data={}, files=[])
+
+    before = time.monotonic()
+    run_consumer(conn, resolve=lambda c: inspect_deadline, until=settled)
+    after = time.monotonic()
+
+    assert len(seen) == 1
+    assert seen[0] is not None
+    assert before + 42 <= seen[0] <= after + 42
+
+
 def test_output_prefix_not_matching_the_run_is_a_contract_violation() -> None:
     conn = FakeConnection()
     body = job_body()

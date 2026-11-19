@@ -98,6 +98,7 @@ class ExecutionContext:
     report: Callable[[VendorTaskReport], None] = _discard_report
     probes: ProbeRegistry = field(default_factory=dict)
     control: ControlClient | None = None
+    deadline_monotonic: float | None = None
 
 
 Handler = Callable[
@@ -132,7 +133,10 @@ def _generate_script(
     if not isinstance(job, GenerateScriptJob):
         raise UnsupportedCapability("generate_script received the wrong job shape")
     script = adapter.generate_script(
-        job.params.payload, _fetch_reference_image(job, context)
+        job.params.payload,
+        _fetch_reference_image(job, context),
+        abort=context.abort,
+        deadline_monotonic=context.deadline_monotonic,
     )
     return ProviderOutcome(
         data={"profile": "product_ad_v1", "language": "vi", "script": script}
@@ -191,6 +195,8 @@ def _generate_storyboard(
     storyboard = adapter.generate_storyboard(
         StoryboardRequest(payload.script, payload.sourceRevisionId),
         reference_image=reference_image,
+        abort=context.abort,
+        deadline_monotonic=context.deadline_monotonic,
     )
     data = {
         "profile": "product_ad_storyboard_v1",

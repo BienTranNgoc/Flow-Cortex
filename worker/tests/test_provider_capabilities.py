@@ -40,6 +40,7 @@ from flowcortex_worker.provider.vendor_jobs import (
     vendor_fingerprint,
     vendor_scope,
 )
+from flowcortex_worker.runtime import ProcessKilled, ProcessRunner
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
@@ -193,6 +194,90 @@ def test_storyboard_fetches_and_passes_reference_image() -> None:
 
     adapter.generate_storyboard.assert_called_once()
     assert adapter.generate_storyboard.call_args.kwargs.get("reference_image") == image
+
+
+def test_script_and_storyboard_thread_abort_and_deadline_monotonic() -> None:
+    storage = MagicMock()
+    abort = ProcessRunner(deadline_monotonic=1234.5)
+    context = ExecutionContext(
+        storage=storage,
+        bucket=BUCKET,
+        output_prefix=f"runs/{RUN_ID}/steps/1/attempts/1/",
+        abort=abort,
+        deadline_monotonic=1234.5,
+    )
+
+    script_adapter = MagicMock()
+    script_adapter.generate_script.return_value = "Kịch bản"
+    execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_script",
+                "product_ad_v1",
+                {"productName": "Bình giữ nhiệt", "description": "Giữ nhiệt"},
+            )
+        ),
+        script_adapter,
+        context,
+    )
+    assert script_adapter.generate_script.call_args.kwargs["abort"] is abort
+    assert script_adapter.generate_script.call_args.kwargs["deadline_monotonic"] == 1234.5
+
+    storyboard_adapter = MagicMock()
+    storyboard_adapter.generate_storyboard.return_value = MagicMock(
+        scene_1_prompt="Scene 1", scene_2_prompt="Scene 2"
+    )
+    execute(
+        ProviderJob.model_validate(
+            job(
+                "generate_storyboard",
+                "product_ad_storyboard_v1",
+                {"script": "Approved script", "sourceRevisionId": REVISION_ID},
+            )
+        ),
+        storyboard_adapter,
+        context,
+    )
+    assert storyboard_adapter.generate_storyboard.call_args.kwargs["abort"] is abort
+    assert storyboard_adapter.generate_storyboard.call_args.kwargs["deadline_monotonic"] == 1234.5
+
+
+def test_fixture_adapter_checks_abort_on_script_and_storyboard() -> None:
+    runner = ProcessRunner()
+    runner.kill("shutdown")
+    context = ExecutionContext(
+        storage=MagicMock(),
+        bucket=BUCKET,
+        output_prefix=f"runs/{RUN_ID}/steps/1/attempts/1/",
+        abort=runner,
+        deadline_monotonic=9999.0,
+    )
+
+    with pytest.raises(ProcessKilled, match="shutdown"):
+        execute(
+            ProviderJob.model_validate(
+                job(
+                    "generate_script",
+                    "product_ad_v1",
+                    {"productName": "Bình", "description": "Giữ nhiệt"},
+                )
+            ),
+            FixtureProviderAdapter(),
+            context,
+        )
+
+    with pytest.raises(ProcessKilled, match="shutdown"):
+        execute(
+            ProviderJob.model_validate(
+                job(
+                    "generate_storyboard",
+                    "product_ad_storyboard_v1",
+                    {"script": "Approved script", "sourceRevisionId": REVISION_ID},
+                )
+            ),
+            FixtureProviderAdapter(),
+            context,
+        )
 
 
 def test_speech_is_typed_wav_that_fits_the_ten_second_video() -> None:

@@ -221,6 +221,7 @@ def make_execute_job(
             report=report,
             probes=build_probe_registry(adapter, os.environ) if is_video else {},
             control=control if is_video else None,
+            deadline_monotonic=runner.deadline_monotonic,
         )
         outcome = execute(ProviderJob(root=job), adapter, context)
         runner.check()
@@ -299,6 +300,7 @@ def _build_adapter(
         or os.environ.get("FLOWCORTEX_PROVIDER_SCRIPT_MODEL", "").strip()
         or _OPENAI_SCRIPT_MODEL
     )
+    script_fallback_model = os.environ.get("SCRIPT_PROVIDER_FALLBACK_MODEL", "").strip() or None
     speech_base_url = (
         os.environ.get("SPEECH_PROVIDER_BASE_URL", "").strip()
         or legacy_base_url
@@ -326,7 +328,11 @@ def _build_adapter(
         video_model = generic_video_model
 
     script_adapter = _build_script_adapter(
-        script_provider, script_api_key, script_base_url, script_model,
+        script_provider,
+        script_api_key,
+        script_base_url,
+        script_model,
+        fallback_model=script_fallback_model,
         explicit=bool(os.environ.get("SCRIPT_PROVIDER", "").strip()),
     )
     speech_adapter = _build_speech_adapter(
@@ -347,10 +353,22 @@ def _build_adapter(
 
 
 def _build_script_adapter(
-    provider: str, api_key: str, base_url: str, model: str, explicit: bool = False
+    provider: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    *,
+    fallback_model: str | None = None,
+    explicit: bool = False,
 ) -> ScriptAdapter:
     if provider == PROVIDER_OPENAI:
-        return select_adapter(provider, api_key, base_url=base_url, model=model)
+        return select_adapter(
+            provider,
+            api_key,
+            base_url=base_url,
+            model=model,
+            fallback_model=fallback_model,
+        )
     if provider == PROVIDER_FIXTURE:
         return FixtureProviderAdapter()
     if provider == PROVIDER_EDGE:

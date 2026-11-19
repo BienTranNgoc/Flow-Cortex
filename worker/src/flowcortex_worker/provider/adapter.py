@@ -97,16 +97,30 @@ class CancelResult:
     reason: str | None = None
 
 
+class ScriptAbort(Protocol):
+    def check(self) -> None: ...
+
+
 class VideoAbort(Protocol):
     def check(self) -> None: ...
 
 
 class ScriptAdapter(Protocol):
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str: ...
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact: ...
 class SpeechAdapter(Protocol):
     def speech_identity(self) -> SpeechIdentity: ...
@@ -148,14 +162,34 @@ class CapabilityProviderAdapter:
     video_adapter: VideoAdapter
 
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str:
-        return self.script_adapter.generate_script(payload, reference_image)
+        return self.script_adapter.generate_script(
+            payload,
+            reference_image,
+            abort=abort,
+            deadline_monotonic=deadline_monotonic,
+        )
 
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
-        return self.script_adapter.generate_storyboard(request, reference_image)
+        return self.script_adapter.generate_storyboard(
+            request,
+            reference_image,
+            abort=abort,
+            deadline_monotonic=deadline_monotonic,
+        )
 
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
@@ -186,8 +220,15 @@ class FixtureProviderAdapter:
     """Deterministic local adapter for development and contract tests."""
 
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str:
+        if abort is not None:
+            abort.check()
         parts = [
             f"Khám phá {payload.productName}.",
             payload.description,
@@ -203,8 +244,15 @@ class FixtureProviderAdapter:
         return " ".join(parts)
 
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
+        if abort is not None:
+            abort.check()
         return StoryboardArtifact(
             "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
             "realistic movement, clean background, no text.",
