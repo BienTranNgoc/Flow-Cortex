@@ -15,6 +15,7 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.infrastructure.WorkflowDataEntryRepository;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -80,7 +81,8 @@ class WorkflowExamplesTest {
         UUID owner = UUID.randomUUID();
         UUID draftId = UUID.randomUUID();
         when(authoring.createDraft(eq(owner), any(), any(List.class)))
-                .thenReturn(new WorkflowView(draftId, owner, "n", false, null, null, List.of(), true, "draft"));
+                .thenReturn(new WorkflowView(draftId, owner, "n", WorkflowVisibility.PRIVATE, null, null, List.of(), true,
+                        "draft", null, null));
 
         examples.instantiate(owner, "load-template", Locale.ENGLISH);
 
