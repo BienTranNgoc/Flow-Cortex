@@ -80,6 +80,7 @@ class AuthServiceImpl implements AuthService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final AccountCredentials accountCredentials;
     private final LoginAttemptRecorder loginAttempts;
     private final LoginRateLimiter loginRateLimiter;
     private final RegistrationRateLimiter registrationRateLimiter;
@@ -96,7 +97,8 @@ class AuthServiceImpl implements AuthService {
     private final PasswordResetSubmitLimiter passwordResetSubmitLimiter;
 
     AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService, LoginAttemptRecorder loginAttempts,
+            RefreshTokenService refreshTokenService, AccountCredentials accountCredentials,
+            LoginAttemptRecorder loginAttempts,
             LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
             GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, RegistrationProperties registration,
             Clock clock, ApplicationEventPublisher events, PlatformTransactionManager transactionManager,
@@ -106,6 +108,7 @@ class AuthServiceImpl implements AuthService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.accountCredentials = accountCredentials;
         this.loginAttempts = loginAttempts;
         this.loginRateLimiter = loginRateLimiter;
         this.registrationRateLimiter = registrationRateLimiter;
@@ -215,7 +218,7 @@ class AuthServiceImpl implements AuthService {
             Optional<EmailConfirmationService.Confirmed> spent = emailConfirmation.confirm(rawToken);
             spent.filter(EmailConfirmationService.Confirmed::firstConfirmation).ifPresent(first -> {
                 AppUser account = first.account();
-                refreshTokenService.revokeAllFor(account.getId());
+                accountCredentials.revokeAllFor(account.getId());
                 // A suspended account is activated by the admin who reactivates it, not by its link.
                 if (account.getStatus() == UserStatus.ACTIVE) {
                     events.publishEvent(new UserActivatedEvent(account.getId()));
@@ -281,7 +284,7 @@ class AuthServiceImpl implements AuthService {
                         setup.username());
                 userRepository.saveAndFlush(account);
                 emailConfirmation.retireOpenLinks(userId);
-                refreshTokenService.revokeAllFor(userId);
+                accountCredentials.revokeAllFor(userId);
                 emailConfirmation.mailPasswordSetNotice(userId, account.getEmail());
                 return account;
             });
@@ -522,7 +525,7 @@ class AuthServiceImpl implements AuthService {
                 account.confirmEmailDroppingUnprovenChoices(Instant.now(clock), googleName);
                 userRepository.saveAndFlush(account);
                 emailConfirmation.retireOpenLinks(userId);
-                refreshTokenService.revokeAllFor(userId);
+                accountCredentials.revokeAllFor(userId);
                 events.publishEvent(new UserActivatedEvent(userId));
                 return new Claim(account, null);
             });

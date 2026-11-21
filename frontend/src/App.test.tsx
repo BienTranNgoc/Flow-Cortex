@@ -188,20 +188,24 @@ describe('App', () => {
     });
   });
 
-  it('contains a page that throws inside the layout, with Reload and one structured event', async () => {
+  it('contains a page that throws inside the layout, with Try again and one structured event', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+    stubApi({
+      ...MEMBER_ME,
+      ...FEATURES_OFF,
+      'GET /api/v1/runs/tray': { status: 200, body: { active: [], recent: [] } },
+    });
     setToken('t', true);
     window.history.pushState({}, '', '/');
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(nav).toHaveTextContent('Home');
     expect(nav).toHaveTextContent('Workflows');
     expect(nav).toHaveTextContent('Docs');
-    expect(nav).not.toHaveTextContent('Runs');
+    expect(nav).toHaveTextContent('Runs');
     expect(nav).not.toHaveTextContent('Integrations');
     expect(consoleError.mock.calls.filter(([first]) => first === 'client_error')).toEqual([
       ['client_error', { route: '/', name: 'TypeError' }],
@@ -221,14 +225,14 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     pages.homeThrows = false;
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     await user.click(within(nav).getByRole('link', { name: 'Home' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Home page' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
 
     setToken(null);
@@ -269,7 +273,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(nav).toHaveTextContent('Home');
@@ -284,7 +288,7 @@ describe('App', () => {
     consoleError.mockRestore();
   });
 
-  it.each(['/runs', '/integrations'])(
+  it.each(['/integrations'])(
     'sends %s to / while the demo pages are off',
     async (path) => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -294,7 +298,7 @@ describe('App', () => {
 
       render(<App />);
 
-      expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(window.location.pathname).toBe('/');
 
       setToken(null);
@@ -313,7 +317,7 @@ describe('App', () => {
     try {
       render(<App />);
 
-      expect(await screen.findByRole('heading', { name: 'Recent runs' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Runs', level: 1 })).toBeInTheDocument();
       const nav = screen.getByRole('navigation', { name: 'Main navigation' });
       expect(within(nav).getByRole('link', { name: 'Runs' })).toBeInTheDocument();
       expect(within(nav).getByRole('link', { name: 'Integrations' })).toBeInTheDocument();

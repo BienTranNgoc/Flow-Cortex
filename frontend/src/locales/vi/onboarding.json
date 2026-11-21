@@ -1,0 +1,109 @@
+{
+  "close": "Đóng",
+  "welcome": {
+    "title": "Chào mừng đến với FlowCortex",
+    "text": "Hướng dẫn hai phút: xem nhanh giao diện, rồi trả lời sáu câu hỏi ngắn để FlowCortex phù hợp hơn với cách bạn làm việc.",
+    "start": "Bắt đầu",
+    "skip": "Bỏ qua"
+  },
+  "tour": {
+    "title": "Làm quen với giao diện",
+    "text": "Thanh bên đưa bạn đến các quy trình, lượt chạy và tài liệu. Mọi thứ bạn xây dựng đều nằm ở đây.",
+    "next": "Tiếp theo",
+    "back": "Quay lại",
+    "skip": "Bỏ qua"
+  },
+  "survey": {
+    "title": "Cho chúng tôi biết về công việc của bạn",
+    "text": "Sáu câu hỏi nhanh. Câu nào cũng không bắt buộc và bạn có thể bỏ qua.",
+    "start": "Bắt đầu khảo sát",
+    "later": "Để sau",
+    "back": "Quay lại"
+  },
+  "quiz": {
+    "counter": "Câu {{n}} trên {{total}}",
+    "next": "Tiếp theo",
+    "finish": "Hoàn tất",
+    "back": "Quay lại",
+    "skip": "Bỏ qua",
+    "retry": "Thử lại",
+    "saving": "Đang lưu…",
+    "saveFailed": "Chúng tôi chưa lưu được câu trả lời. Lựa chọn của bạn vẫn được giữ, vui lòng thử lại.",
+    "multiHint": "Chọn bao nhiêu tùy ý.",
+    "singleHint": "Chọn một.",
+    "q1": {
+      "title": "Bạn muốn dùng FlowCortex để làm gì?",
+      "options": {
+        "marketing_content": "Nội dung marketing",
+        "automation": "Tự động hóa công việc",
+        "documents_reports": "Tài liệu và báo cáo",
+        "customer_care": "Chăm sóc khách hàng",
+        "research": "Nghiên cứu",
+        "other": "Việc khác"
+      }
+    },
+    "q2": {
+      "title": "Bạn biết đến chúng tôi qua đâu?",
+      "options": {
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "linkedin": "LinkedIn",
+        "google": "Tìm kiếm Google",
+        "referral": "Bạn bè hoặc đồng nghiệp",
+        "other": "Nguồn khác"
+      }
+    },
+    "q3": {
+      "title": "Bạn quen với các công cụ AI đến mức nào?",
+      "options": {
+        "beginner": "Tôi mới bắt đầu",
+        "tried": "Tôi đã thử vài công cụ",
+        "automation": "Tôi tự động hóa công việc bằng AI",
+        "builder": "Tôi xây dựng sản phẩm AI"
+      }
+    },
+    "q4": {
+      "title": "Bạn làm việc trong lĩnh vực nào?",
+      "options": {
+        "marketing": "Marketing",
+        "sales": "Bán hàng",
+        "finance": "Tài chính",
+        "hr": "Nhân sự",
+        "tech": "Công nghệ",
+        "other": "Lĩnh vực khác"
+      }
+    },
+    "q5": {
+      "title": "Bạn thường làm việc với loại nội dung nào?",
+      "options": {
+        "text": "Văn bản",
+        "image": "Hình ảnh",
+        "audio": "Âm thanh",
+        "video": "Video",
+        "spreadsheet": "Bảng tính",
+        "document": "Tài liệu",
+        "slide": "Bài thuyết trình"
+      }
+    },
+    "q6": {
+      "title": "Ai sẽ dùng FlowCortex?",
+      "options": {
+        "personal": "Chỉ mình tôi",
+        "team": "Nhóm của tôi"
+      }
+    }
+  },
+  "done": {
+    "title": "Mọi thứ đã sẵn sàng",
+    "text": "Đây là những gì chúng ta đã đi qua. Bạn có thể xem lại hướng dẫn này bất cứ lúc nào từ menu tài khoản.",
+    "stepsLabel": "Các bước của hướng dẫn",
+    "steps": {
+      "interface": "Đã xem qua giao diện",
+      "survey": "Đã trả lời khảo sát"
+    },
+    "action": "Bắt đầu dùng FlowCortex"
+  },
+  "menu": {
+    "replay": "Xem lại hướng dẫn"
+  }
+}

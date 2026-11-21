@@ -161,9 +161,7 @@ export function AdminAccountsPage() {
         </div>
 
         {notice && (
-          <p role="status" className="cortex-admin-form-success">
-            {notice}
-          </p>
+          <output className="cortex-admin-form-success">{notice}</output>
         )}
 
         {query.isError && (

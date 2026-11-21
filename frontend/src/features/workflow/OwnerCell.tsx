@@ -22,10 +22,10 @@ function toneFor(seed: string): (typeof TONES)[number] {
   return TONES[hash % TONES.length]!;
 }
 
-/** The API reports only whether a workflow is shared, not who owns it: a personal workflow is "You", a shared one "Shared team". */
+/** The API reports only a workflow's visibility, not who owns it: a personal workflow is "You", a shared one "Shared team". */
 export function OwnerCell({ workflow }: Readonly<OwnerCellProps>) {
   const { t } = useTranslation();
-  const mine = !workflow.isShared;
+  const mine = workflow.visibility !== 'public';
   const displayName = t(mine ? 'workflow.owner.you' : 'workflow.owner.sharedTeam');
   const tone = toneFor(workflow.id ?? workflow.name ?? 'wf');
 

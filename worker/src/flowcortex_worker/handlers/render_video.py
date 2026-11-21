@@ -8,6 +8,8 @@ from pathlib import Path
 
 from ..contracts.media_job import MediaJob
 from ..errors import PermanentError
+from ..render.document import PROJECT_PROFILES
+from ..render.execute import render_project
 from ..runtime import ProcessRunner
 from . import HandlerOutcome, OutputFile
 
@@ -23,6 +25,20 @@ MAX_IMAGES = 10
 
 
 def handle(
+    job: MediaJob,
+    inputs: Mapping[str, Path],
+    processes: ProcessRunner,
+) -> HandlerOutcome:
+    profile = job.params.get("profile")
+    if profile in PROJECT_PROFILES:
+        return render_project(job, inputs, processes)
+    if profile != PROFILE:
+        allowed = ", ".join(repr(name) for name in (PROFILE, *PROJECT_PROFILES))
+        raise PermanentError("contract_violation", f"render_video requires profile {allowed}")
+    return _render_product_video(job, inputs, processes)
+
+
+def _render_product_video(
     job: MediaJob,
     inputs: Mapping[str, Path],
     processes: ProcessRunner,
@@ -127,12 +143,6 @@ def handle(
 def _validate_inputs(
     job: MediaJob, inputs: Mapping[str, Path]
 ) -> tuple[int, Path, Path, Path]:
-    if job.params.get("profile") != PROFILE:
-        raise PermanentError(
-            "contract_violation",
-            f"render_video requires profile {PROFILE!r}",
-        )
-
     keys = [ref.key for ref in job.inputs]
     if len(keys) != len(set(keys)):
         raise PermanentError("contract_violation", "render_video input keys must be unique")

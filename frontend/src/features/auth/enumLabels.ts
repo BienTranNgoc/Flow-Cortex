@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-const ROLES: readonly string[] = [
+const ROLES: ReadonlySet<string> = new Set([
   'ADMIN',
   'MEMBER',
   'CREATOR',
@@ -8,7 +8,7 @@ const ROLES: readonly string[] = [
   'CUSTOMER_SUPPORT',
   'CONTENT_EDITOR',
   'PLATFORM_OPERATOR',
-];
+]);
 const STATUSES: readonly string[] = ['ACTIVE', 'SUSPENDED'];
 
 /** The role's label in the active language; a code this app does not know is shown as sent. */
@@ -16,7 +16,7 @@ export function roleLabel(t: TFunction, role: string | undefined): string {
   if (!role) {
     return '';
   }
-  return ROLES.includes(role) ? t(`auth.profile.role.${role}`) : role;
+  return ROLES.has(role) ? t(`auth.profile.role.${role}`) : role;
 }
 
 /** The account status's label in the active language; an unknown code is shown as sent, none as ''. */
