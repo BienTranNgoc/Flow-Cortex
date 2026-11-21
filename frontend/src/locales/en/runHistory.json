@@ -1,0 +1,109 @@
+{
+  "page": {
+    "title": "Runs",
+    "lede": "Every run you started, with its result and what it cost.",
+    "loadError": "Could not load your runs.",
+    "retry": "Try again",
+    "emptyNone": "You have no runs yet. Start one from a workflow.",
+    "emptyNoneAction": "Go to Workflows",
+    "emptyNoMatch": "No run matches these filters.",
+    "emptyNoMatchAction": "Clear filters",
+    "total": "{{n}} in total",
+    "listLabel": "Run history"
+  },
+  "filters": {
+    "legend": "Filter runs",
+    "status": "Status",
+    "statusAll": "All statuses",
+    "workflow": "Workflow",
+    "workflowAll": "All workflows",
+    "from": "From",
+    "to": "To",
+    "favorites": "Starred only",
+    "clear": "Clear filters"
+  },
+  "status": {
+    "running": "Running",
+    "waiting_approval": "Waiting for approval",
+    "completed": "Completed",
+    "error": "Failed",
+    "cancelling": "Stopping",
+    "cancelled": "Cancelled"
+  },
+  "row": {
+    "started": "Started {{time}}",
+    "duration": "Took {{duration}}",
+    "credits": "{{amount}} credits",
+    "star": "Star {{name}}",
+    "unstar": "Remove the star from {{name}}",
+    "starFailed": "Could not change the star. Try again.",
+    "actions": "Actions for {{name}}",
+    "open": "Open run {{name}}",
+    "rename": "Rename",
+    "delete": "Delete"
+  },
+  "rename": {
+    "title": "Rename run",
+    "label": "Run name",
+    "hint": "Up to {{max}} characters. Leave it empty to show the workflow name again.",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "failed": "Could not rename the run. Try again."
+  },
+  "delete": {
+    "title": "Delete this run?",
+    "text": "“{{name}}” leaves your run history. This cannot be undone.",
+    "keep": "Keep run",
+    "confirm": "Delete run",
+    "deleting": "Deleting…",
+    "failed": "Could not delete the run. Try again.",
+    "stillActive": "This run is still in progress, so it cannot be deleted yet."
+  },
+  "pager": {
+    "label": "Run pages",
+    "previous": "Previous",
+    "next": "Next",
+    "position": "Page {{page}} of {{pages}}"
+  },
+  "export": {
+    "button": "Export CSV",
+    "busy": "Exporting…",
+    "failed": "Could not export the runs. Try again.",
+    "capped": "The file holds the first {{cap}} of {{total}} runs. Narrow the filters to export the rest."
+  },
+  "usage": {
+    "title": "Usage",
+    "range": "Period",
+    "days7": "7 days",
+    "days30": "30 days",
+    "days90": "90 days",
+    "runs": "Runs",
+    "failed": "Failed",
+    "failureRate": "{{rate}}% failed",
+    "creditsSpent": "Credits spent",
+    "balance": "Balance",
+    "loadError": "Could not load the usage figures.",
+    "chartLabel": "Runs per day",
+    "chartTable": "Runs per day, as numbers",
+    "day": "Day",
+    "failedRuns": "Failed runs",
+    "credits": "Credits",
+    "topWorkflows": "Top workflows",
+    "topNone": "No runs in this period.",
+    "topLine": "{{runs}} runs",
+    "topAverage": "{{amount}} credits per run"
+  },
+  "tray": {
+    "button": "Runs",
+    "buttonWithCount": "Runs, {{n}} running",
+    "panelLabel": "Runs",
+    "running": "Running",
+    "finished": "Finished in the last 24 hours",
+    "emptyRunning": "Nothing is running.",
+    "emptyFinished": "Nothing finished recently.",
+    "viewAll": "View all runs",
+    "loadError": "Could not load your runs.",
+    "retry": "Try again"
+  }
+}

@@ -35,6 +35,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 class BrokerOutageIT extends AbstractIsolatedBrokerIT {
 
     private static final String SHORT_CONNECT_TIMEOUT = "--spring.rabbitmq.connection-timeout=2s";
+    // Only the job runner resubmits; the context that needs it has a database of its own.
+    private static final String JOB_RUNNER_ON = "--flowcortex.jobs.runner.enabled=true";
 
     @Test
     void aBrokerThatDoesNotAnswerAtStartupKeepsTheBackendNotReadyUntilItAnswers(CapturedOutput output)
@@ -71,7 +73,7 @@ class BrokerOutageIT extends AbstractIsolatedBrokerIT {
         String vhost = newVirtualHost();
         String database = newDatabase();
         try (ConfigurableApplicationContext context = startApplication(vhost, jdbcUrl(database), builder -> { },
-                SHORT_CONNECT_TIMEOUT)) {
+                SHORT_CONNECT_TIMEOUT, JOB_RUNNER_ON)) {
             assertThat(context.getBean(ApplicationAvailability.class).getReadinessState())
                     .isEqualTo(ReadinessState.ACCEPTING_TRAFFIC);
             JdbcTemplate jdbc = context.getBean(JdbcTemplate.class);

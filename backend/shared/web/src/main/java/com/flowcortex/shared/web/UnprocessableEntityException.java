@@ -9,7 +9,7 @@ import java.util.Map;
  * and whose optional {@code errors} names offending fields, each optionally with a machine
  * {@code reasons} entry.
  */
-public class UnprocessableEntityException extends RuntimeException {
+public class UnprocessableEntityException extends RuntimeException implements LocalizedProblem {
 
     private final LocalizedMessage detail;
     private final String code;
@@ -36,6 +36,11 @@ public class UnprocessableEntityException extends RuntimeException {
 
     /** The bundle key for the problem detail. */
     public LocalizedMessage getDetail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
         return detail;
     }
 

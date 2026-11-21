@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useSaveUi } from '../features/auth/useAccountPreferences';
+import { AccountPreferencesSync } from './AccountPreferencesSync';
 import { Footer } from './Footer';
+import { NetworkStatus } from './NetworkStatus';
 import { routeFocusTarget } from './routeFocus';
 import { Sidebar } from './Sidebar';
 import { useIsDesktop, useSidebarMode } from './sidebarMode';
 import { Topbar } from './Topbar';
+import { useTheme } from './useTheme';
 
 /** Signed-in shell: sidebar, topbar, page canvas and footer. User administration lives in the admin SPA. */
 export function Layout() {
   const { t } = useTranslation();
-  const { mode, toggle } = useSidebarMode();
+  const { mode, setMode, toggle } = useSidebarMode();
+  const { theme, setTheme } = useTheme();
+  const saveUi = useSaveUi();
   const isDesktop = useIsDesktop();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
@@ -43,6 +49,13 @@ export function Layout() {
 
   return (
     <div className="app-shell" data-sidebar={isDesktop ? mode : 'drawer'}>
+      <NetworkStatus />
+      <AccountPreferencesSync
+        theme={theme}
+        setTheme={setTheme}
+        sidebarMode={mode}
+        setSidebarMode={setMode}
+      />
       <a
         href="#main"
         className="skip-link"
@@ -56,7 +69,10 @@ export function Layout() {
       <Sidebar
         isDesktop={isDesktop}
         mode={mode}
-        onToggleMode={toggle}
+        onToggleMode={() => {
+          toggle();
+          saveUi.mutate({ sidebarMode: mode === 'pinned' ? 'rail' : 'pinned' });
+        }}
         drawerOpen={drawerOpen}
         onDrawerOpenChange={setDrawerOpen}
       />
@@ -65,6 +81,12 @@ export function Layout() {
           showMenuButton={!isDesktop}
           drawerOpen={drawerOpen}
           onOpenMenu={() => setDrawerOpen(true)}
+          theme={theme}
+          onToggleTheme={() => {
+            const next = theme === 'light' ? 'dark' : 'light';
+            setTheme(next);
+            saveUi.mutate({ theme: next });
+          }}
         />
         <main id="main" ref={mainRef} className="app-main" tabIndex={-1}>
           <Outlet />

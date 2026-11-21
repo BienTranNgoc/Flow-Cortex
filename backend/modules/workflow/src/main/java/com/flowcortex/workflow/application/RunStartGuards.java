@@ -30,10 +30,14 @@ class RunStartGuards {
     }
 
     void check(UUID ownerId, UUID workflowId, List<WorkflowStep> steps, StartContext context) {
-        List<StepDef> defs = steps.stream()
+        checkDefs(ownerId, workflowId, steps.stream()
                 .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
                         step.getInputRef()))
-                .toList();
+                .toList(), context);
+    }
+
+    /** Runs every guard over {@code defs}, which may be only the steps a run retry re-executes. */
+    void checkDefs(UUID ownerId, UUID workflowId, List<StepDef> defs, StartContext context) {
         for (RunStartGuard guard : guards) {
             guard.check(ownerId, workflowId, defs, context);
         }

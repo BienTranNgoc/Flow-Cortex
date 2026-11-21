@@ -17,6 +17,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -85,6 +86,11 @@ class ThrowawayTestController {
         throw new AccessDeniedException("not an admin");
     }
 
+    @GetMapping("/test/admin-disabled")
+    String triggerAdminDisabled() {
+        throw new AdminDisabledException();
+    }
+
     @GetMapping("/test/locked")
     String triggerLocked() {
         throw new AccountLockedException(new LocalizedMessage("auth.accountLocked", LOCKED_UNTIL), LOCKED_UNTIL);
@@ -112,9 +118,17 @@ class ThrowawayTestController {
         throw new IllegalStateException("db password is hunter2");
     }
 
+    @PostMapping("/test/typed")
+    String triggerTypedBody(@RequestBody TypedRequest request) {
+        return "ok";
+    }
+
     @PostMapping("/test/constraints")
     String triggerConstraints(@Valid @RequestBody ConstraintsRequest request) {
         return "ok";
+    }
+
+    record TypedRequest(Boolean bookmarked, List<UUID> images) {
     }
 
     record ThrowawayRequest(@NotBlank String name) {

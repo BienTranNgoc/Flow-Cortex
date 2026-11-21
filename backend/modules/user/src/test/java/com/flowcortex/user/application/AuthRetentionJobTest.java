@@ -7,6 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.flowcortex.user.infrastructure.RefreshTokenRepository;
+import com.flowcortex.user.pat.PersonalAccessTokenRepository;
+import com.flowcortex.user.stepup.StepUpProofRepository;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,8 +25,18 @@ class AuthRetentionJobTest {
 
     private final NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
     private final RefreshTokenRepository refreshTokens = mock(RefreshTokenRepository.class);
-    private final AuthRetentionJob job = new AuthRetentionJob(jdbc, refreshTokens,
+    private final StepUpProofRepository stepUpProofs = mock(StepUpProofRepository.class);
+    private final PersonalAccessTokenRepository accessTokens = mock(PersonalAccessTokenRepository.class);
+    private final AuthRetentionJob job = new AuthRetentionJob(jdbc, refreshTokens, stepUpProofs, accessTokens,
             new AuthRetentionProperties(Duration.ofDays(90)), Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @Test
+    void purgeDeletesSpentStepUpProofsAndDeadAccessTokens() {
+        job.purge();
+
+        verify(stepUpProofs).deleteSpentBefore(NOW);
+        verify(accessTokens).deleteDead(NOW.minus(Duration.ofDays(90)));
+    }
 
     @Test
     void purgeDeletesAuditRowsOlderThanTheRetentionAndDeadRefreshTokens() {

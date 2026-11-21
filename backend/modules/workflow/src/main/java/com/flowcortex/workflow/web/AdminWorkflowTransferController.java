@@ -1,6 +1,8 @@
 package com.flowcortex.workflow.web;
 
 import com.flowcortex.credit.api.CreditAccounts;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.workflow.application.WorkflowTransferService;
 import com.flowcortex.workflow.application.WorkflowTransferService.Exported;
 import com.flowcortex.workflow.application.WorkflowTransferService.ImportResult;
@@ -22,7 +24,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,7 +41,6 @@ import org.springframework.web.servlet.LocaleResolver;
  */
 @RestController
 @RequestMapping("/api/v1/admin/workflows")
-@PreAuthorize("hasRole('ADMIN')")
 class AdminWorkflowTransferController {
 
     private final WorkflowTransferService transferService;
@@ -69,9 +69,10 @@ class AdminWorkflowTransferController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "exportAdminWorkflow")
+    @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @GetMapping(value = "/{id}/export", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<String> exportWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        UUID adminId = currentUserResolver.requireAdmin(jwt);
+        UUID adminId = currentUserResolver.require(jwt);
         Exported exported = transferService.export(adminId, id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -96,10 +97,11 @@ class AdminWorkflowTransferController {
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             schema = @Schema(implementation = WorkflowArtifactDocument.class)))
+    @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @PostMapping(value = "/import/review", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ImportReviewResponse> reviewImport(@AuthenticationPrincipal Jwt jwt, HttpServletRequest request) {
-        UUID adminId = currentUserResolver.requireAdmin(jwt);
+        UUID adminId = currentUserResolver.require(jwt);
         byte[] body = readCapped(request);
         Locale locale = localeResolver.resolveLocale(request);
         return ResponseEntity.ok(ImportReviewResponse.from(transferService.review(adminId, body),
@@ -116,11 +118,12 @@ class AdminWorkflowTransferController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "importAdminWorkflow")
+    @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<WorkflowResponse> importWorkflow(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ImportWorkflowRequest request) {
-        UUID adminId = currentUserResolver.requireAdmin(jwt);
+        UUID adminId = currentUserResolver.require(jwt);
         ImportResult result = transferService.importReviewed(adminId, request.token(),
                 request.acknowledgeOutboundTargets());
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)

@@ -15,6 +15,7 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -88,7 +89,7 @@ class WorkflowForkServiceTest {
         Workflow fork = saved.getValue();
         assertThat(fork.getOwnerId()).isEqualTo(BINH);
         assertThat(fork.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
-        assertThat(fork.isShared()).isFalse();
+        assertThat(fork.getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
         assertThat(fork.isAllowFork()).isFalse();
         assertThat(fork.getForkedFromId()).isEqualTo(source.getId());
         assertThat(fork.getId()).isNotEqualTo(source.getId());

@@ -147,6 +147,26 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void aMismatchedFieldTypeNamesTheField() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarked\":\"yes\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.errors.bookmarked").value("has the wrong type"));
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"images\":[\"x\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.images").value("has the wrong type"));
+    }
+
+    @Test
+    void anotherUnreadableBodyKeepsTheBare400() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON).content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
     void aValidationFailureIsWrittenInVietnamese() throws Exception {
         mockMvc.perform(post("/test/validate")
                         .header(HttpHeaders.ACCEPT_LANGUAGE, "vi")
@@ -235,11 +255,20 @@ class GlobalExceptionHandlerTest {
                         "Bạn cần đăng nhập để tiếp tục."),
                 Arguments.of("/test/forbidden", 403, "You do not have permission to perform this action",
                         "Bạn không có quyền thực hiện thao tác này."),
+                Arguments.of("/test/admin-disabled", 403, "Your admin access has been deactivated",
+                        "Quyền quản trị của bạn đã bị vô hiệu hóa. Hãy liên hệ quản trị viên cấp cao."),
                 Arguments.of("/test/optimistic-lock", 409,
                         "The resource was changed by another request; reload it and try again",
                         "Dữ liệu vừa được một yêu cầu khác thay đổi. Hãy tải lại trang rồi thử lại."),
                 Arguments.of("/test/locked", 423, "Account is locked until 2026-01-01T10:15:30Z",
                         "Tài khoản đang tạm khóa đến 2026-01-01T10:15:30Z. Hãy đăng nhập lại sau thời điểm đó."));
+    }
+
+    @Test
+    void aDeactivatedAdminGetsItsOwnProblemType() throws Exception {
+        mockMvc.perform(get("/test/admin-disabled"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("https://flow-cortex.dev/problems/admin-disabled"));
     }
 
     @Test

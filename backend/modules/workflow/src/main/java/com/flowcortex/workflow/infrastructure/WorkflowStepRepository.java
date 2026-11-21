@@ -24,4 +24,18 @@ public interface WorkflowStepRepository extends JpaRepository<WorkflowStep, UUID
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM WorkflowStep s WHERE s.workflowId = :workflowId")
     int deleteAllByWorkflowId(@Param("workflowId") UUID workflowId);
+
+    /**
+     * Negates the order of the given steps so their final orders can be written without meeting the unique
+     * constraint; every parked row must be given its order back by {@link #setOrder}.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE workflow_step SET step_order = -step_order "
+            + "WHERE workflow_id = :workflowId AND id IN (:ids)", nativeQuery = true)
+    int parkOrders(@Param("workflowId") UUID workflowId, @Param("ids") List<UUID> ids);
+
+    /** Writes {@code step_order}, the one column the entity cannot update. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE workflow_step SET step_order = :order WHERE id = :id", nativeQuery = true)
+    int setOrder(@Param("id") UUID id, @Param("order") short order);
 }

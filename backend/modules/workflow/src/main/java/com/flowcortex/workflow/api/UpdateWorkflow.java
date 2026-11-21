@@ -2,12 +2,12 @@ package com.flowcortex.workflow.api;
 
 /**
  * A partial change to a workflow: a {@code null} field stays as it is. {@code status} is the wire value
- * {@code draft} or {@code published}.
+ * {@code draft} or {@code published}. Visibility changes go through the sharing service, never here.
  */
-public record UpdateWorkflow(String name, Boolean shared, String status, Boolean allowFork) {
+public record UpdateWorkflow(String name, String status, Boolean allowFork) {
 
     /** A change that leaves the fork switch as it is. */
-    public UpdateWorkflow(String name, Boolean shared, String status) {
-        this(name, shared, status, null);
+    public UpdateWorkflow(String name, String status) {
+        this(name, status, null);
     }
 }

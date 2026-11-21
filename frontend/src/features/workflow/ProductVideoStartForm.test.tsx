@@ -12,7 +12,7 @@ const PRODUCT_VIDEO_ID = '9aa35334-b672-4b6c-93e8-1a4c2cc14301';
 const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
-  isShared: true,
+  visibility: 'public',
   available: true,
   allowFork: false,
   forkCount: 0,

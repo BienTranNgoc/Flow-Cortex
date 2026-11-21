@@ -16,7 +16,7 @@ import { WorkflowDetailPage } from './WorkflowDetailPage';
 const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
-  isShared: true,
+  visibility: 'public',
   available: true,
   allowFork: false,
   forkCount: 0,
@@ -26,7 +26,7 @@ const CHECK: WorkflowResponse = {
 const ECHO: WorkflowResponse = {
   id: 'w1',
   name: 'Echo Demo',
-  isShared: true,
+  visibility: 'public',
   available: true,
   allowFork: false,
   forkCount: 0,
@@ -45,7 +45,7 @@ const GRANT = {
 const INCOMPLETE: WorkflowResponse = {
   id: 'w1',
   name: 'Incomplete Demo (step 2 not configured)',
-  isShared: true,
+  visibility: 'public',
   available: true,
   allowFork: false,
   forkCount: 0,
@@ -129,7 +129,7 @@ describe('WorkflowDetailPage', () => {
     const THREE: WorkflowResponse = {
       id: 'w1',
       name: 'Three steps',
-      isShared: true,
+      visibility: 'public',
       available: true,
       allowFork: false,
       forkCount: 0,

@@ -25,4 +25,10 @@ public interface UserDirectory {
      * no row is absent from the map. Not the suspension gate {@link #findById} is.
      */
     Map<UUID, String> findEmailsByIds(Collection<UUID> ids);
+
+    /**
+     * The display name of each id that still has a row, SUSPENDED ones included, in one lookup; an
+     * id with no row is absent from the map. Never exposes an email.
+     */
+    Map<UUID, String> findNamesByIds(Collection<UUID> ids);
 }

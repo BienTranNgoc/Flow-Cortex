@@ -205,7 +205,7 @@ public class WorkflowTransferService {
                     "OUTBOUND_ACK_REQUIRED");
         }
         Workflow workflow = workflowRepository
-                .save(Workflow.draft(UUID.randomUUID(), adminId, artifact.name(), false));
+                .save(Workflow.draft(UUID.randomUUID(), adminId, artifact.name()));
         List<WorkflowStep> steps = stepRepository.saveAll(WorkflowCarry.copySteps(artifact.steps(), workflow.getId()));
         row.markImported(workflow.getId(), now);
         reviewRepository.save(row);

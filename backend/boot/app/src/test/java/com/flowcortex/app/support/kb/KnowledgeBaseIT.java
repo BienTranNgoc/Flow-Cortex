@@ -373,6 +373,27 @@ class KnowledgeBaseIT extends AbstractPostgresBootTest {
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    @Test
+    void aCustomerSupportCannotReadArticles() {
+        UserView owner = userService.createInitialAdmin(uniqueEmail("kb-support-owner"), "password123", "Owner");
+        UserView support = userService.createUser(owner.id(), uniqueEmail("kb-support"), "password123", "Support",
+                "CUSTOMER_SUPPORT");
+        UserView editor = userService.createUser(owner.id(), uniqueEmail("kb-editor"), "password123", "Editor",
+                "CONTENT_EDITOR");
+        String supportToken = login(support.email());
+
+        ResponseEntity<Problem> articles = exchange(HttpMethod.GET, "/api/v1/admin/support/kb/articles",
+                supportToken, null, Problem.class);
+        ResponseEntity<Problem> groups = exchange(HttpMethod.GET, "/api/v1/admin/support/kb/groups", supportToken,
+                null, Problem.class);
+
+        assertThat(articles.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(articles.getBody().type()).isEqualTo(PROBLEMS.resolve("forbidden"));
+        assertThat(groups.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange(HttpMethod.GET, "/api/v1/admin/support/kb/articles", login(editor.email()), null,
+                AdminArticleList.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
     @Nested
     @TestPropertySource(properties = "flowcortex.support.contact-email=")
     class WithoutAContact {

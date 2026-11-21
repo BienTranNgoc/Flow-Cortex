@@ -19,6 +19,7 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.application.WorkflowTransferService.ImportResult;
 import com.flowcortex.workflow.application.WorkflowTransferService.ReviewView;
 import com.flowcortex.workflow.domain.Workflow;
@@ -286,7 +287,7 @@ class WorkflowTransferServiceTest {
         assertThat(saved.getValue().getOwnerId()).isEqualTo(ADMIN);
         assertThat(saved.getValue().getName()).isEqualTo("Daily recap");
         assertThat(saved.getValue().getStatus()).isEqualTo(WorkflowStatus.DRAFT);
-        assertThat(saved.getValue().isShared()).isFalse();
+        assertThat(saved.getValue().getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
         assertThat(saved.getValue().isAllowFork()).isFalse();
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<WorkflowStep>> steps = ArgumentCaptor.forClass(List.class);
@@ -316,7 +317,7 @@ class WorkflowTransferServiceTest {
 
     @Test
     void aRepeatedImportReturnsTheSameWorkflowWith200() {
-        Workflow made = Workflow.draft(UUID.randomUUID(), ADMIN, "Daily recap", false);
+        Workflow made = Workflow.draft(UUID.randomUUID(), ADMIN, "Daily recap");
         WorkflowImportReview row = storedReview(ADMIN, artifactBytes("A", step(1, "echo", null, null)), false,
                 NOW.minus(Duration.ofHours(3)));
         row.markImported(made.getId(), NOW.minus(Duration.ofHours(3)));
