@@ -52,6 +52,8 @@ class SpaceBackfillIT extends AbstractPostgresBootTest {
         try (InputStream in = new ClassPathResource(MIGRATION).getInputStream()) {
             backfill = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
+        // The seeded assets carry no space, which the NOT NULL constraint refuses; the DDL rolls back with the test.
+        jdbc.execute("ALTER TABLE media_asset ALTER COLUMN space_id DROP NOT NULL");
         confirmedA = user(true);
         confirmedB = user(true);
         unconfirmed = user(false);
@@ -126,7 +128,7 @@ class SpaceBackfillIT extends AbstractPostgresBootTest {
         UUID id = UUID.randomUUID();
         Timestamp now = Timestamp.from(Instant.now());
         jdbc.update("INSERT INTO app_user (id, owner_id, email, password_hash, name, role, status, created_at,"
-                + " updated_at, email_confirmed_at) VALUES (?, ?, ?, 'x', 'Seeded', 'USER', 'ACTIVE', ?, ?, ?)",
+                + " updated_at, email_confirmed_at) VALUES (?, ?, ?, 'x', 'Seeded', 'MEMBER', 'ACTIVE', ?, ?, ?)",
                 id, id, id + "@space-backfill.test", now, now, confirmed ? now : null);
         return id;
     }

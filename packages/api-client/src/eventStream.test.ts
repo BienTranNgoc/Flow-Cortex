@@ -1,4 +1,5 @@
 import { openEventStream, type StreamEvent } from './eventStream';
+import { subscribeNetworkSignals, type NetworkSignal } from './networkSignals';
 import { setToken } from './tokenStore';
 
 const encoder = new TextEncoder();
@@ -306,6 +307,70 @@ describe('openEventStream', () => {
     expect(events).toEqual([]);
   });
 
+  describe('idle watchdog', () => {
+    it('drops a connection that stays silent for 45 seconds and reconnects with the last event id', async () => {
+      const first = liveStream();
+      const second = liveStream();
+      const handle = open([first.response, second.response]);
+      await settle();
+      first.push('id: a:1\nevent: run.updated\ndata: {}\n\n');
+      await settle();
+      const { signal } = requestOf(fetchStub, 0);
+
+      await vi.advanceTimersByTimeAsync(44_999);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(signal?.aborted).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fetchStub).toHaveBeenCalledTimes(2);
+      expect(requestOf(fetchStub, 1).headers.get('Last-Event-ID')).toBe('a:1');
+      expect(onOpen).toHaveBeenCalledTimes(2);
+      handle.close();
+    });
+
+    it('re-arms on every chunk, a heartbeat comment included', async () => {
+      const stream = liveStream();
+      const handle = open([stream.response]);
+      await settle();
+      const { signal } = requestOf(fetchStub, 0);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      stream.push(': ping\n\n');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(signal?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(signal?.aborted).toBe(true);
+      handle.close();
+    });
+
+    it('honours a custom idle timeout', async () => {
+      const stream = liveStream();
+      fetchStub = vi.fn(async (_url: string) => stream.response);
+      vi.stubGlobal('fetch', fetchStub);
+      const handle = openEventStream({ topics: ['run:r1'], onEvent: () => undefined, idleTimeoutMs: 5000 });
+      await settle();
+      const { signal } = requestOf(fetchStub, 0);
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(signal?.aborted).toBe(true);
+      handle.close();
+    });
+
+    it('leaves no timer running after close', async () => {
+      const stream = liveStream();
+      const handle = open([stream.response]);
+      await settle();
+
+      handle.close();
+      await settle();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
   it('ends the loop on close while waiting to reconnect', async () => {
     const handle = open([problem(503)]);
     await settle();
@@ -314,5 +379,80 @@ describe('openEventStream', () => {
     await vi.advanceTimersByTimeAsync(60_000);
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
+  });
+
+  describe('network signals', () => {
+    let signals: NetworkSignal[];
+    let unsubscribe: () => void;
+
+    beforeEach(() => {
+      signals = [];
+      unsubscribe = subscribeNetworkSignals((signal) => signals.push(signal));
+    });
+
+    afterEach(() => unsubscribe());
+
+    const types = () => signals.map((signal) => signal.type);
+
+    it('sends one stream-down for a rejected fetch, however many retries follow', async () => {
+      const handle = open([
+        () => {
+          throw new TypeError('network down');
+        },
+        () => {
+          throw new TypeError('network down');
+        },
+      ]);
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(types()).toEqual(['stream-down']);
+      handle.close();
+    });
+
+    it('sends stream-up for the same stream when a later connection opens', async () => {
+      const stream = liveStream();
+      const handle = open([
+        () => {
+          throw new TypeError('network down');
+        },
+        stream.response,
+      ]);
+      await settle();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(types()).toEqual(['stream-down', 'stream-up']);
+      expect(signals[1]).toMatchObject({ streamId: (signals[0] as { streamId: number }).streamId });
+      handle.close();
+    });
+
+    it('sends nothing when the body ends cleanly', async () => {
+      const stream = liveStream();
+      const handle = open([stream.response, liveStream().response]);
+      await settle();
+      stream.end();
+      await settle();
+
+      expect(signals).toEqual([]);
+      handle.close();
+    });
+
+    it('reports a 429 as rate-limited with no wait, without counting as down', async () => {
+      const handle = open([problem(429)]);
+      await settle();
+
+      expect(signals).toEqual([{ type: 'rate-limited', waitSeconds: null }]);
+      handle.close();
+    });
+
+    it('sends stream-up when close() ends a stream that is down', async () => {
+      const handle = open([problem(503)]);
+      await settle();
+      expect(types()).toEqual(['stream-down']);
+
+      handle.close();
+
+      expect(types()).toEqual(['stream-down', 'stream-up']);
+    });
   });
 });

@@ -15,18 +15,27 @@ function isRunKey(key: readonly unknown[]): boolean {
   return key.length === 2 && key[0] === 'runs';
 }
 
+const POLL_MS = 90_000;
+
+export interface Wallet {
+  readonly balance: number;
+  readonly granted: number;
+}
+
 /**
- * The member's balance, or `undefined` while credits are off, loading, or the request failed.
- * Every run the app shows lives under `['runs', id]`, so a run that lands in a terminal status
- * refreshes the balance whichever page polled it.
+ * The member's wallet, or `undefined` while credits are off or no read has succeeded; a failed
+ * background read keeps the last value. Runs live under `['runs', id]`, so a terminal one
+ * refreshes the balance whichever page polled it. A hidden tab does not poll.
  */
-export function useBalance(): number | undefined {
+export function useBalance(): Wallet | undefined {
   const { credits } = useFeatures();
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: BALANCE_KEY,
     queryFn: () => unwrap(balance(authHeaders())),
     enabled: credits,
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -44,8 +53,8 @@ export function useBalance(): number | undefined {
     });
   }, [credits, queryClient]);
 
-  if (!credits || query.isError) {
+  if (!credits || query.data?.balance === undefined) {
     return undefined;
   }
-  return query.data?.balance;
+  return { balance: query.data.balance, granted: query.data.granted ?? 0 };
 }

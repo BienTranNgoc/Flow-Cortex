@@ -1,4 +1,11 @@
-import { BookOpen, FlowArrow, House, PlugsConnected, Play } from '@phosphor-icons/react';
+import {
+  BookOpen,
+  ChatsCircle,
+  FlowArrow,
+  House,
+  PlugsConnected,
+  Play,
+} from '@phosphor-icons/react';
 import { DOCS_ICON, primaryNavItems } from './navItems';
 
 const labels = () => primaryNavItems().map((item) => item.label);
@@ -8,14 +15,14 @@ describe('primaryNavItems', () => {
     vi.unstubAllEnvs();
   });
 
-  it('lists only the core pages while the demo pages flag is off', () => {
+  it('lists Home, Workflows and Runs while the demo pages flag is off', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
-    expect(labels()).toEqual(['Home', 'Workflows']);
+    expect(labels()).toEqual(['Home', 'Workflows', 'Runs']);
   });
 
-  it('adds Runs and Integrations once the flag turns on, without re-importing the module', () => {
+  it('adds Integrations once the flag turns on, without re-importing the module', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
-    expect(labels()).toEqual(['Home', 'Workflows']);
+    expect(labels()).toEqual(['Home', 'Workflows', 'Runs']);
 
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
     expect(labels()).toEqual(['Home', 'Workflows', 'Runs', 'Integrations']);
@@ -31,5 +38,22 @@ describe('primaryNavItems', () => {
       ['Integrations', PlugsConnected],
     ]);
     expect(DOCS_ICON).toBe(BookOpen);
+  });
+
+  it('adds Chat after Runs only while the chat switch is on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+    const withChat = primaryNavItems(undefined, { chat: true });
+    expect(withChat.map((item) => item.label)).toEqual([
+      'Home',
+      'Workflows',
+      'Runs',
+      'Chat',
+      'Integrations',
+    ]);
+    expect(withChat.find((item) => item.label === 'Chat')?.to).toBe('/chat');
+    expect(withChat.find((item) => item.label === 'Chat')?.icon).toBe(ChatsCircle);
+    expect(primaryNavItems(undefined, { chat: false }).map((item) => item.label)).not.toContain(
+      'Chat',
+    );
   });
 });

@@ -313,6 +313,7 @@ describe('Help Center switch', () => {
       credits: false,
       supportWidget,
       supportAssistant: false,
+      chat: false,
     },
   });
 

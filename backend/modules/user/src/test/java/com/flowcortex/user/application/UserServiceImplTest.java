@@ -3,14 +3,20 @@ package com.flowcortex.user.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
@@ -18,6 +24,7 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
@@ -38,8 +46,12 @@ class UserServiceImplTest {
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
+    private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
+    private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
+    private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks,
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard);
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -200,6 +212,113 @@ class UserServiceImplTest {
 
         assertThat(admin.ownerId()).isEqualTo(admin.id());
         assertThat(admin.role()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void aDelegatedAdminKeepsItsOwnScope() {
+        UUID creatorId = UUID.randomUUID();
+        AppUser delegated = new AppUser(UUID.randomUUID(), creatorId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        AppUser dung = new AppUser(UUID.randomUUID(), delegated.getId(), "dung@example.com", "$2a$hash", "Dung",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(delegated.getId())).thenReturn(Optional.of(delegated));
+        when(repository.findAllByOwnerIdOrderByEmailAsc(delegated.getId())).thenReturn(List.of(dung));
+
+        assertThat(service.listUsers(delegated.getId())).extracting(UserView::email)
+                .containsExactly("dung@example.com");
+        verify(repository, never()).findAllByOwnerIdOrderByEmailAsc(creatorId);
+    }
+
+    @Test
+    void aStaffCallerActsInTheScopeOfTheAdminThatOwnsIt() {
+        UUID adminId = UUID.randomUUID();
+        AppUser staff = new AppUser(UUID.randomUUID(), adminId, "linh@example.com", "$2a$hash", "Linh",
+                Role.CUSTOMER_SUPPORT, UserStatus.ACTIVE);
+        AppUser member = new AppUser(UUID.randomUUID(), adminId, "ba@example.com", "$2a$hash", "Ba",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(staff.getId())).thenReturn(Optional.of(staff));
+        when(repository.findAllByOwnerIdOrderByEmailAsc(adminId)).thenReturn(List.of(member, staff));
+        when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
+
+        assertThat(service.listUsers(staff.getId())).hasSize(2);
+        assertThat(service.getUser(staff.getId(), member.getId()).email()).isEqualTo("ba@example.com");
+    }
+
+    @Test
+    void aMissingKeyRefusesTheChangeAndWritesNothing() {
+        UUID adminId = UUID.randomUUID();
+        AppUser manager = new AppUser(UUID.randomUUID(), adminId, "minh@example.com", "$2a$hash", "Minh",
+                Role.OPERATION_MANAGER, UserStatus.ACTIVE);
+        AppUser member = new AppUser(UUID.randomUUID(), adminId, "ba@example.com", "$2a$hash", "Ba",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(manager.getId())).thenReturn(Optional.of(manager));
+        when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
+        doThrow(new AccessDeniedException("Missing permission"))
+                .when(adminPermissions).require(manager.getId(), Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE);
+
+        assertThatThrownBy(() -> service.updateUser(manager.getId(), member.getId(), null, null,
+                "CUSTOMER_SUPPORT", null)).isInstanceOf(AccessDeniedException.class);
+
+        assertThat(member.getRole()).isEqualTo(Role.MEMBER);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void theSuperAdminInvariantRunsBeforeTheTargetIsChanged() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser other = new AppUser(UUID.randomUUID(), adminId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, other.getId())).thenReturn(Optional.of(other));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            assertThat(other.getRole()).isEqualTo(Role.ADMIN);
+            assertThat(other.getStatus()).isEqualTo(UserStatus.ACTIVE);
+            return null;
+        }).when(superAdminInvariant).assertNotLastActive(other);
+
+        service.updateUser(adminId, other.getId(), null, null, "MEMBER", "SUSPENDED");
+
+        verify(superAdminInvariant).assertNotLastActive(other);
+        assertThat(other.getRole()).isEqualTo(Role.MEMBER);
+    }
+
+    @Test
+    void aRefusedRegistrationOwnerChangeWritesNothing() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser owner = new AppUser(UUID.randomUUID(), adminId, "an@example.com", "$2a$hash", "An",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, owner.getId())).thenReturn(Optional.of(owner));
+        doThrow(new ConflictException(new LocalizedMessage("user.registrationOwner")))
+                .when(registrationOwnerGuard).assertNotRegistrationOwner(owner);
+
+        assertThatThrownBy(() -> service.updateUser(adminId, owner.getId(), null, null, "OPERATION_MANAGER", null))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.deleteUser(adminId, owner.getId())).isInstanceOf(ConflictException.class);
+
+        assertThat(owner.getRole()).isEqualTo(Role.ADMIN);
+        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).delete(any());
+        verifyNoInteractions(superAdminInvariant);
+    }
+
+    @Test
+    void deletingChecksTheInvariantBeforeTheRowIsDeleted() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser other = new AppUser(UUID.randomUUID(), adminId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, other.getId())).thenReturn(Optional.of(other));
+
+        service.deleteUser(adminId, other.getId());
+
+        var order = inOrder(superAdminInvariant, repository);
+        order.verify(superAdminInvariant).assertNotLastActive(other);
+        order.verify(repository).delete(other);
     }
 
     /** {@code requireActiveCaller} loads this row for every {@code ownerId} argument above. */

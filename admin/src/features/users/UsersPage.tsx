@@ -4,6 +4,9 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
 import { ArrowsClockwise, Plus } from '@phosphor-icons/react';
+import { useMeQuery } from '../auth/useAuth';
+import { assignableRoles, ROLE_CODES } from './enumLabels';
+import { RoleOptions } from './RoleOptions';
 import { UserRow } from './UserRow';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import { usePageTitle } from '../../app/usePageTitle';
@@ -16,11 +19,13 @@ import { activeLocale } from '../../lib/i18n';
 import { useCreateUserMutation, useUsersQuery } from './useUsers';
 
 const EMPTY_USERS: NonNullable<ReturnType<typeof useUsersQuery>['data']> = [];
+const DEFAULT_CREATE_ROLES = ['MEMBER'];
 
 export function UsersPage() {
   const { t } = useTranslation();
   const locale = activeLocale();
   usePageTitle(t('users.title'));
+  const assignable = assignableRoles(useMeQuery().data);
   const usersQuery = useUsersQuery();
   const createMutation = useCreateUserMutation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -175,8 +180,7 @@ export function UsersPage() {
           <div className="cortex-admin-field">
             <label htmlFor="new-user-role">{t('users.create.role')}</label>
             <select id="new-user-role" {...register('role')}>
-              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
-              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
+              <RoleOptions roles={assignable.length > 0 ? assignable : DEFAULT_CREATE_ROLES} />
             </select>
           </div>
           {createError && !createError.errors && (
@@ -240,9 +244,7 @@ export function UsersPage() {
               onChange={(event) => setRoleFilter(event.target.value)}
             >
               <option value="">{t('users.directory.allRoles')}</option>
-              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
-              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
-              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
+              <RoleOptions roles={ROLE_CODES} />
             </select>
           </div>
         </div>

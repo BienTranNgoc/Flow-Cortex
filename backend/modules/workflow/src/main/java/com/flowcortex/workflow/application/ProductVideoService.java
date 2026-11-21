@@ -4,10 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
+import com.flowcortex.workflow.api.ProductVideoRuns;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
@@ -21,12 +23,16 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -35,7 +41,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Starts the seeded Product Video workflow with an immutable product/asset snapshot. */
 @Service
-public class ProductVideoService {
+public class ProductVideoService implements ProductVideoRuns {
 
     private final WorkflowRepository workflows;
     private final WorkflowStepRepository workflowSteps;
@@ -50,14 +56,27 @@ public class ProductVideoService {
     private final boolean enabled;
     private final boolean workflowEnabled;
     private final RunUpdates runUpdates;
+    private final Tracer tracer;
     private final ObjectMapper json = new ObjectMapper();
 
+    @Autowired
     ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
             RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards,
+            ObjectProvider<Tracer> tracer,
             @Value("${flowcortex.product-video.enabled:false}") boolean enabled,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this(workflows, workflowSteps, runs, runSteps, productInputs, mediaJobs, registry, events, runUpdates,
+                transactions, runStartGuards, tracer.getIfAvailable(() -> Tracer.NOOP), enabled, workflowEnabled);
+    }
+
+    ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
+            WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
+            MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
+            RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards, Tracer tracer,
+            boolean enabled, boolean workflowEnabled) {
+        this.tracer = tracer;
         this.runUpdates = runUpdates;
         this.workflows = workflows;
         this.workflowSteps = workflowSteps;
@@ -78,6 +97,20 @@ public class ProductVideoService {
     }
 
     public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost) {
+        return startRun(ownerId, draft, uploadIds, acknowledgeCost, null);
+    }
+
+    @Override
+    public RunView start(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost,
+            String requestKey) {
+        ProductVideoDraft validated = ProductVideoDraft.of(draft.productName(), draft.description(), draft.cta(),
+                draft.price(), draft.promotion(), draft.aspectRatio());
+        ProductVideoDraft.requireUploads(uploadIds);
+        return startRun(ownerId, validated, uploadIds, acknowledgeCost, requestKey);
+    }
+
+    private RunView startRun(UUID ownerId, ProductVideoDraft draft, List<UUID> uploadIds, boolean acknowledgeCost,
+            String requestKey) {
         if (!enabled || !workflowEnabled) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     new LocalizedMessage("workflow.productVideo.disabled"));
@@ -87,18 +120,33 @@ public class ProductVideoService {
         }
         Workflow workflow = workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
+        // A retried start answers with its run before any cost guard or object copy runs again.
+        Optional<RunView> started = RunRequestKeys.existing(runs, runSteps, registry, mediaJobs::isDownloadable,
+                ownerId, requestKey);
+        if (started.isPresent()) {
+            return started.get();
+        }
+        return RunRequestKeys.orWinner(
+                () -> startNew(ownerId, workflow, draft, uploadIds, acknowledgeCost, requestKey),
+                runs, runSteps, registry, mediaJobs::isDownloadable, ownerId, requestKey);
+    }
+
+    private RunView startNew(UUID ownerId, Workflow workflow, ProductVideoDraft draft, List<UUID> uploadIds,
+            boolean acknowledgeCost, String requestKey) {
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
-        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
+        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds);
         String productJson = productJson(draft);
         // Copied before the run's transaction opens, so no database transaction waits on the object store.
         UUID runId = UUID.randomUUID();
         List<MediaAssetInput> copies = mediaJobs.copyRunInputs(runId, assets);
         String assetJson = json(copies.stream().map(MediaAssetInput::input).toList());
         Instant now = Instant.now();
+        String traceId = CurrentTrace.idFor(tracer);
 
         return transactions.execute(status -> {
-            WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, now));
+            WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, null,
+                    now, requestKey).withTraceId(traceId));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
             mediaJobs.bindRunInputs(run.getId(), copies);

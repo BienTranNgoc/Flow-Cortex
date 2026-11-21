@@ -1,5 +1,6 @@
 package com.flowcortex.support.assistant;
 
+import com.flowcortex.llm.api.AnswerText;
 import com.flowcortex.llm.api.LlmJsonResult;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.ConversationStore.StoredConversation;
@@ -22,15 +23,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.commonmark.node.AbstractVisitor;
-import org.commonmark.node.HtmlBlock;
-import org.commonmark.node.HtmlInline;
-import org.commonmark.node.Image;
-import org.commonmark.node.Link;
-import org.commonmark.node.LinkReferenceDefinition;
-import org.commonmark.node.Node;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.markdown.MarkdownRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -54,9 +46,6 @@ class AssistantService {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Logger LOG = LoggerFactory.getLogger(AssistantService.class);
-
-    private static final Parser MARKDOWN = Parser.builder().build();
-    private static final MarkdownRenderer MARKDOWN_OUT = MarkdownRenderer.builder().build();
 
     private final AssistantSwitch assistantSwitch;
     private final String model;
@@ -256,68 +245,6 @@ class AssistantService {
         return question.codePointCount(0, question.length());
     }
 
-    /**
-     * The answer with every Markdown link and image reduced to its text, reference definitions and raw
-     * HTML removed: the provider could otherwise point outside the retrieved articles, which reach the
-     * reader as sources. Works on the parsed document, because no pattern matches the CommonMark link
-     * grammar (nested parentheses, titles, destinations on the next line, reference-style links).
-     */
-    static String withoutLinks(String text) {
-        Node document = MARKDOWN.parse(text);
-        LinkFlattener flattener = new LinkFlattener();
-        document.accept(flattener);
-        return flattener.changed ? MARKDOWN_OUT.render(document).strip() : text.strip();
-    }
-
-    /**
-     * Replaces each link and image by its children (the visible text or alt text) and drops the rest.
-     * An answer it leaves alone is kept byte for byte, so the Markdown writer only ever escapes text
-     * of an answer that had markup to remove.
-     */
-    private static final class LinkFlattener extends AbstractVisitor {
-
-        private boolean changed;
-
-        @Override
-        public void visit(Link link) {
-            flatten(link);
-        }
-
-        @Override
-        public void visit(Image image) {
-            flatten(image);
-        }
-
-        @Override
-        public void visit(LinkReferenceDefinition definition) {
-            drop(definition);
-        }
-
-        @Override
-        public void visit(HtmlInline html) {
-            drop(html);
-        }
-
-        @Override
-        public void visit(HtmlBlock html) {
-            drop(html);
-        }
-
-        private void drop(Node node) {
-            changed = true;
-            node.unlink();
-        }
-
-        private void flatten(Node node) {
-            changed = true;
-            visitChildren(node);
-            for (Node child = node.getFirstChild(); child != null; child = node.getFirstChild()) {
-                node.insertBefore(child);
-            }
-            node.unlink();
-        }
-    }
-
     /** The provider's result as an answer, or empty when it gave none and the question is refunded. */
     static Optional<Answer> answer(LlmJsonResult result, List<ScoredArticle> retrieved) {
         return switch (result) {
@@ -334,7 +261,7 @@ class AssistantService {
         } catch (JacksonException e) {
             return Optional.empty();
         }
-        String text = root.path("answer").isString() ? withoutLinks(root.path("answer").asString()) : "";
+        String text = root.path("answer").isString() ? AnswerText.withoutLinks(root.path("answer").asString()) : "";
         if (!root.path("answered").asBoolean(false) || text.isEmpty()) {
             return Optional.of(new Answer("no_answer", NO_ANSWER, List.of()));
         }

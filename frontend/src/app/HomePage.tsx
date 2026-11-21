@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMeQuery } from '../features/auth/useAuth';
 import { problemDetailOf } from '../lib/problemMessage';
+import { HomePrompt } from '../features/chat/HomePrompt';
+import { useFeatures } from './useFeatures';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
 import { FilterBar } from '../features/dashboard/FilterBar';
 import { SearchBar } from '../features/dashboard/SearchBar';
@@ -24,6 +26,7 @@ const PLACEHOLDER_CARDS = 4;
 
 export function HomePage() {
   const { t } = useTranslation();
+  const { chat } = useFeatures();
   const meQuery = useMeQuery();
   const workflowsQuery = useWorkflowsQuery();
   const workflows = workflowsQuery.data ?? [];
@@ -32,7 +35,8 @@ export function HomePage() {
   const hasWorkflows = workflows.length > 0;
   const workflowsReady = !workflowsQuery.isLoading && !workflowsQuery.isError;
 
-  if (meQuery.isLoading) return <output className="dashboard-loading">{t('common.home.loading')}</output>;
+  if (meQuery.isLoading)
+    return <output className="dashboard-loading">{t('common.home.loading')}</output>;
   if (meQuery.isError) {
     return (
       <div className="launchpad">
@@ -62,6 +66,7 @@ export function HomePage() {
           </Link>
         }
       />
+      {chat && <HomePrompt />}
 
       <section className="launchpad-cards" aria-labelledby="launchpad-cards-title">
         <header className="launchpad-cards__head">
@@ -89,7 +94,10 @@ export function HomePage() {
           <StatusBlock
             kind="error"
             message={problemDetailOf(workflowsQuery.error) ?? t('common.home.loadWorkflowsError')}
-            action={{ label: t('common.state.retry'), onClick: () => void workflowsQuery.refetch() }}
+            action={{
+              label: t('common.state.retry'),
+              onClick: () => void workflowsQuery.refetch(),
+            }}
           />
         )}
         {workflowsReady && hasWorkflows && filtered.length === 0 && (

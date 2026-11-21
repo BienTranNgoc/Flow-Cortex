@@ -81,8 +81,8 @@ export function WorkflowsListPage() {
     if (!visible) return undefined;
     const q = query.trim().toLowerCase();
     return visible.filter((workflow) => {
-      if (scope === 'shared' && !workflow.isShared) return false;
-      if (scope === 'mine' && workflow.isShared) return false;
+      if (scope === 'shared' && workflow.visibility !== 'public') return false;
+      if (scope === 'mine' && workflow.visibility === 'public') return false;
       if (q === '') return true;
       return safeName(workflow, t).toLowerCase().includes(q);
     });
