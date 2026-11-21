@@ -199,7 +199,7 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
         UserView user = newUser("uploads-run-inputs");
         String token = loginAs(user);
         WorkflowView workflow = newWorkflow(user.id(), false,
-                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+                new NewWorkflowStep("Render", "render_video", null, "{\"profile\":\"vertical_ad_v1\"}"));
         byte[] png = ImageFixtures.png();
         byte[] webp = ImageFixtures.webp();
         UploadResponseView first = grant(token, "first.png", png.length).getBody();
@@ -255,7 +255,7 @@ class UploadsEndpointIT extends AbstractWorkflowHttpIT {
         UserView user = newUser("uploads-image-pixels");
         String token = loginAs(user);
         WorkflowView workflow = newWorkflow(user.id(), false,
-                new NewWorkflowStep("Render", "render_video", "{\"profile\":\"vertical_ad_v1\"}"));
+                new NewWorkflowStep("Render", "render_video", null, "{\"profile\":\"vertical_ad_v1\"}"));
         byte[] huge = ImageFixtures.png(5001, 5000);
         UploadResponseView upload = grant(token, "huge.png", huge.length).getBody();
         assertThat(put(upload, "image/png", huge, huge.length, null)).isEqualTo(200);
