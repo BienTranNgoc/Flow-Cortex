@@ -1,6 +1,7 @@
 package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
 
 import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.media.api.MediaJobs;
@@ -23,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import tools.jackson.databind.JsonNode;
@@ -48,8 +50,9 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
 
     @BeforeEach
     void prepareQueues() {
-        org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
-        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs")) {
+        doReturn(true).when(AopTestUtils.<MediaJobs>getUltimateTargetObject(mediaJobs)).isEnabled();
+        for (String queue : List.of("provider.jobs", "provider.video.jobs", "media.jobs",
+                "media.render.jobs")) {
             amqpAdmin.purgeQueue(queue, false);
         }
     }
@@ -122,7 +125,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
         // Every provider job of the run was taken off its own queue; nothing went to the wrong one.
         assertThat(rabbit.receive("provider.jobs", 200)).isNull();
 
-        JsonNode renderJob = receiveJob("media.jobs", runId, "render_video");
+        JsonNode renderJob = receiveJob("media.render.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
                 renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString()))

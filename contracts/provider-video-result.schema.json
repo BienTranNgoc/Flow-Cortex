@@ -27,6 +27,8 @@
     "sourceRevisionId": { "type": "string", "format": "uuid" },
     "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "providerTaskId": { "type": "string", "minLength": 1, "maxLength": 200 },
-    "format": { "const": "mp4" }
+    "format": { "const": "mp4" },
+    "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "requestKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   }
 }

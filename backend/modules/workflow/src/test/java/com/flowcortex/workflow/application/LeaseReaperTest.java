@@ -78,6 +78,11 @@ class LeaseReaperTest {
     }
 
     @Test
+    void theClusterClaimOnTheReaperLastsTwoMinutes() {
+        assertThat(reaper.lease()).isEqualTo(Duration.ofMinutes(2));
+    }
+
+    @Test
     void everyCodeIsCountedFromZeroForBothModesBeforeAnyStepIsReaped() {
         for (String code : List.of("queue_timeout", "lease_expired", "run_timeout")) {
             for (String mode : List.of("inline", "remote")) {

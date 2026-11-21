@@ -18,6 +18,11 @@
     },
     {
       "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": ["arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/1/*"]
+    },
+    {
+      "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:PutObjectTagging", "s3:GetObject"],
       "Resource": ["arn:aws:s3:::flowcortex-media/support/*"]
     },

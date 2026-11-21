@@ -18,6 +18,8 @@ const DISABLED: FakeReply = {
 function run(overrides: Partial<AdminRunResponse> = {}): AdminRunResponse {
   return {
     id: 'run-1',
+    workflowId: 'w-1',
+    ownerId: 'u-1',
     workflowName: 'Resize video',
     ownerEmail: 'member1@flowcortex.dev',
     status: 'completed',
