@@ -59,7 +59,8 @@ function post(reportingApp: ClientErrorApp, kind: ClientErrorKind, name: string,
     route,
     ...(lang ? { lang } : {}),
   });
-  // Best-effort delivery: a failed post, thrown or rejected, must never become a new page error.
+  // Best-effort delivery: the executor turns a synchronous fetch throw into a rejection, so no failure
+  // becomes a new page error.
   void new Promise<Response>((resolve) => {
     resolve(
       fetch(ENDPOINT, {

@@ -11,9 +11,10 @@ from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.contracts.media_progress import MediaProgress
 from flowcortex_worker.contracts.media_result import MediaError, MediaResult
 from flowcortex_worker.errors import ErrorCode
-from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob, ProviderJob
 from flowcortex_worker.provider.contracts.provider_script_result import ProviderScriptData
 from flowcortex_worker.provider.contracts.provider_speech_result import ProviderSpeechData
+from flowcortex_worker.provider.contracts.provider_video_result import ProviderVideoData
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
@@ -333,6 +334,111 @@ def test_job_values_outside_the_schema_fail(change: dict[str, Any]) -> None:
 
     with pytest.raises(ValidationError):
         MediaJob.model_validate(payload)
+
+
+FINGERPRINT = "b" * 64
+REQUEST_KEY = "c" * 64
+
+
+def video_job(candidates: int | None) -> dict[str, Any]:
+    message = provider_job("generate_script") | {
+        "capability": "generate_video",
+        "params": {
+            "profile": "vertical_ad_clip_v1",
+            "payload": {"prompt": "Cinematic water pour", "sourceRevisionId": REVISION_ID},
+        },
+    }
+    if candidates is not None:
+        message["vendorLedger"] = {
+            "requestKey": REQUEST_KEY,
+            "candidates": [
+                {
+                    "vendorTaskId": JOB_ID,
+                    "vendor": "seedance",
+                    "model": "seedance-1",
+                    "fingerprint": FINGERPRINT,
+                    "vendorJobId": f"job-{n}",
+                    "handle": {},
+                }
+                for n in range(candidates)
+            ],
+        }
+    return message
+
+
+def vendor_task_progress() -> dict[str, Any]:
+    return progress() | {
+        "kind": "vendor_task",
+        "vendorTask": {
+            "vendor": "seedance",
+            "model": "seedance-1",
+            "fingerprint": FINGERPRINT,
+            "requestKey": REQUEST_KEY,
+            "vendorJobId": "job-1",
+            "handle": {},
+            "status": "running",
+            "vendorCreatedAt": AT,
+        },
+    }
+
+
+def video_data() -> dict[str, Any]:
+    return {
+        "profile": "vertical_ad_clip_v1",
+        "durationSeconds": 5,
+        "provider": "seedance",
+        "model": "seedance-1",
+        "aspectRatio": "9:16",
+        "resolution": "720p",
+        "sourceRevisionId": REVISION_ID,
+        "idempotencyKey": IDEMPOTENCY_KEY,
+        "providerTaskId": "task-1",
+        "format": "mp4",
+    }
+
+
+def test_video_job_validates_with_a_five_candidate_ledger_and_without_one() -> None:
+    with_ledger = ProviderJob.model_validate(video_job(5)).root
+    without_ledger = ProviderJob.model_validate(video_job(None)).root
+
+    assert isinstance(with_ledger, GenerateVideoJob)
+    assert with_ledger.vendorLedger is not None
+    assert len(with_ledger.vendorLedger.candidates) == 5
+    assert isinstance(without_ledger, GenerateVideoJob)
+    assert without_ledger.vendorLedger is None
+
+
+def test_video_job_with_six_candidates_fails() -> None:
+    with pytest.raises(ValidationError):
+        ProviderJob.model_validate(video_job(6))
+
+
+def test_vendor_task_progress_validates_and_a_report_with_a_bad_status_fails() -> None:
+    MediaProgress.model_validate(vendor_task_progress())
+    bad = vendor_task_progress()
+    bad["vendorTask"]["status"] = "succeeded"
+    with pytest.raises(ValidationError):
+        MediaProgress.model_validate(bad)
+
+
+def test_video_result_validates_with_and_without_the_ledger_fields() -> None:
+    ProviderVideoData.model_validate(video_data())
+    ProviderVideoData.model_validate(
+        video_data() | {"fingerprint": FINGERPRINT, "requestKey": REQUEST_KEY}
+    )
+    with pytest.raises(ValidationError):
+        ProviderVideoData.model_validate(video_data() | {"fingerprint": "short"})
+
+
+def test_provider_timeout_error_code_validates() -> None:
+    MediaResult.model_validate(
+        result()
+        | {
+            "status": "error",
+            "outputs": [],
+            "error": {"code": "provider_timeout", "message": "slow", "retryable": True},
+        }
+    )
 
 
 def test_transient_budget_matches_the_broker_delivery_limit() -> None:

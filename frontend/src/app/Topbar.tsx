@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useBalance } from '../features/credits/useBalance';
 import { WalletBadge } from '../features/credits/WalletBadge';
+import { RunTray } from '../features/runHistory/RunTray';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { useTheme } from './useTheme';
 import { UserMenu } from './UserMenu';
@@ -38,6 +39,7 @@ export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<Topb
       )}
       <div className="topbar__actions">
         {credits !== undefined && <WalletBadge wallet={credits} />}
+        <RunTray />
         <AppLanguageToggle />
         <ThemeToggle
           theme={theme}

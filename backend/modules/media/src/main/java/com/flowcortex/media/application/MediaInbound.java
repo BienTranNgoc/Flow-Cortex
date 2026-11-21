@@ -6,6 +6,7 @@ import com.flowcortex.media.api.MediaJobProgressed;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.media.api.MediaVendorTaskReported;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -52,7 +53,12 @@ public class MediaInbound {
     @Transactional
     public void acceptProgress(MediaProgress progress) {
         requireValid(progress);
-        events.publishEvent(new MediaJobProgressed(progress));
+        if (progress.kind() == MediaProgress.Kind.VENDOR_TASK) {
+            events.publishEvent(new MediaVendorTaskReported(progress.vendorTask(), progress.runId(),
+                    progress.jobId()));
+        } else {
+            events.publishEvent(new MediaJobProgressed(progress));
+        }
     }
 
     private <T> void requireValid(T message) {
