@@ -11,8 +11,11 @@
                 "user :: api",
                 "media :: api",
                 "llm :: api",
+                "settings :: api",
+                "mail :: api",
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.support;

@@ -1,0 +1,54 @@
+{
+  "title": "Quy trình",
+  "eyebrow": "Vận hành quy trình",
+  "description": "Quy trình của mọi thành viên, bản nháp hay đã xuất bản, cùng mức độ được sử dụng.",
+  "noun_one": "quy trình",
+  "noun_other": "quy trình",
+  "tableLabel": "Bảng quy trình",
+  "deletedUser": "(người dùng đã bị xóa)",
+  "columns": {
+    "name": "Tên",
+    "owner": "Chủ sở hữu",
+    "status": "Trạng thái",
+    "shared": "Chia sẻ",
+    "steps": "Số bước",
+    "runs": "Lượt chạy",
+    "runs7d": "Lượt chạy (7 ngày)",
+    "lastRun": "Lần chạy gần nhất",
+    "updated": "Cập nhật"
+  },
+  "status": {
+    "draft": "Bản nháp",
+    "published": "Đã xuất bản"
+  },
+  "shared": {
+    "yes": "Có",
+    "no": "Không"
+  },
+  "search": {
+    "label": "Tên",
+    "placeholder": "Tìm theo tên",
+    "submit": "Tìm kiếm",
+    "clear": "Xóa các bộ lọc"
+  },
+  "report": {
+    "title": "Báo cáo quy trình",
+    "allWorkflows": "Tất cả quy trình",
+    "notFound": "Không tìm thấy quy trình",
+    "notFoundHint": "Quy trình này không tồn tại, đã bị xóa hoặc địa chỉ không đúng.",
+    "loading": "Đang tải báo cáo…",
+    "loadError": "Không tải được báo cáo này.",
+    "forbidden": "Bạn không có quyền xem báo cáo này.",
+    "viewRuns": "Xem lượt chạy",
+    "counts": "Lượt chạy theo trạng thái",
+    "totalRuns": "Tổng lượt chạy",
+    "lastRun": "Lần chạy gần nhất",
+    "neverRun": "Chưa từng chạy",
+    "chartTitle": "Lượt chạy mỗi ngày, 30 ngày qua",
+    "chartLabel": "Lượt chạy trong 30 ngày qua: tổng {{total}}, {{failed}} lỗi",
+    "chartLegend": "{{total}} lượt chạy trong 30 ngày qua, trong đó {{failed}} lượt lỗi (màu đỏ).",
+    "day": "Ngày",
+    "runs": "Lượt chạy",
+    "failed": "Lỗi"
+  }
+}

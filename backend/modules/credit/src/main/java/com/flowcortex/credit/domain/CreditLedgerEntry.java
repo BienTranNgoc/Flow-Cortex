@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -19,6 +20,9 @@ public class CreditLedgerEntry {
     public static final String DEBIT = "debit";
     public static final String REFUND = "refund";
 
+    /** Kinds that add new credit to a wallet; a refund only returns a charge. */
+    public static final Set<String> CREDITING_KINDS = Set.of(GRANT);
+
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -31,6 +35,9 @@ public class CreditLedgerEntry {
 
     @Column(name = "run_step_id", updatable = false)
     private UUID runStepId;
+
+    @Column(name = "attempt", nullable = false, updatable = false)
+    private short attempt;
 
     @Column(name = "kind", nullable = false, updatable = false, length = 10)
     private String kind;
@@ -58,6 +65,10 @@ public class CreditLedgerEntry {
 
     public UUID getRunStepId() {
         return runStepId;
+    }
+
+    public short getAttempt() {
+        return attempt;
     }
 
     public String getKind() {

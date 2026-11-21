@@ -9,7 +9,10 @@ import {
   getRevisions,
   getRun,
   getRunInputs,
+  getRunLog,
+  getStepOutputPeaks,
   getWorkflow,
+  listWorkflowExamples,
   listWorkflows,
   rejectTask,
   requestUpload,
@@ -17,14 +20,17 @@ import {
   startProductVideoRun,
   startRun,
   unwrap,
+  useWorkflowExample as createDraftFromExample,
 } from '@flow-cortex/api-client';
 import type {
   ApproveReviewTaskRequest,
+  GetRunLogLevel,
   ProductVideoRunRequest,
   RunInputResponse,
   StartRunRequest,
   UploadRequest,
 } from '@flow-cortex/api-client';
+import { activeLocale } from '../../lib/i18n';
 import { useRunEvents } from './useRunEvents';
 
 /** What a reviewer decided: the edited text for a plain checkpoint, the revision for a script one. */
@@ -42,17 +48,44 @@ export function useWorkflowsQuery() {
   });
 }
 
+type SuccessData<T> = Extract<T, { status: 200 | 201 }> extends { data: infer D } ? D : never;
+
+/** `unwrap` narrowed to the success body: it throws for every status >= 400. */
+async function unwrapSuccess<T extends { status: number; data: unknown }>(
+  request: Promise<T>,
+): Promise<SuccessData<T>> {
+  return (await unwrap(request)) as SuccessData<T>;
+}
+
+/** The starter examples, listed in the interface language. */
+export function useWorkflowExamplesQuery() {
+  const locale = activeLocale();
+  return useQuery({
+    queryKey: ['workflow-examples', locale],
+    queryFn: () => unwrapSuccess(listWorkflowExamples(authHeaders())),
+  });
+}
+
+/** Creates a draft from an example; the member's workflow list refreshes on success. */
+export function useUseWorkflowExampleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (exampleId: string) => unwrapSuccess(createDraftFromExample(exampleId, authHeaders())),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workflows'] }),
+  });
+}
+
 export function useWorkflowQuery(id: string) {
   return useQuery({
     queryKey: ['workflows', id],
-    queryFn: () => unwrap(getWorkflow(id, authHeaders())),
+    queryFn: () => unwrap(getWorkflow(id, undefined, authHeaders())),
     enabled: Boolean(id),
   });
 }
 
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
-    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, undefined, authHeaders())),
   });
 }
 
@@ -209,6 +242,44 @@ function approveBody(input: ApproveTaskInput): ApproveReviewTaskRequest | undefi
     };
   }
   return input.reviewedPayload === undefined ? undefined : { reviewedPayload: input.reviewedPayload };
+}
+
+/** A 404 or 503 answers the same again within the minute, so only other failures retry (twice). */
+function retryUnlessRefused(failures: number, error: unknown): boolean {
+  if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+    return false;
+  }
+  return failures < 2;
+}
+
+/** The run's log at one level filter; loaded only once the panel is open. */
+export function useRunLogQuery(runId: string, level: GetRunLogLevel, enabled: boolean) {
+  return useQuery({
+    queryKey: ['runs', runId, 'log', level],
+    queryFn: () => unwrap(getRunLog(runId, { level }, authHeaders())),
+    enabled: enabled && Boolean(runId),
+    retry: retryUnlessRefused,
+  });
+}
+
+/**
+ * The 120 peaks of one stored sound. The server keeps the answer per attempt, so once one arrives
+ * (`null` included) it is not asked for again; the key sits outside `runs` so a run refresh
+ * after a decision does not refetch it.
+ */
+export function useOutputPeaksQuery(
+  runId: string,
+  stepOrder: number,
+  name: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['run-peaks', runId, stepOrder, name],
+    queryFn: () => unwrap(getStepOutputPeaks(runId, stepOrder, name, authHeaders())),
+    enabled: enabled && Boolean(runId),
+    retry: retryUnlessRefused,
+    staleTime: Infinity,
+  });
 }
 
 export function useRejectTaskMutation(runId: string, taskId: string) {

@@ -12,7 +12,9 @@ interface StepExecutor {
 
     enum Mode {
         INLINE,
-        REMOTE
+        REMOTE,
+        /** Starts a child run in the claim and finishes when that run ends. */
+        NESTED
     }
 
     /** Which thread pool an inline step runs on; a step that waits on a provider must not hold a shared thread. */

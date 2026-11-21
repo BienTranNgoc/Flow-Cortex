@@ -322,6 +322,7 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     "user.auth-retention", 3_600_000L,
                     "user.unconfirmed-account-purge", 3_600_000L,
                     "user.phone-retention", 3_600_000L,
+                    "user.admin-audit-origin-retention", 3_600_000L,
                     "support.assistant-retention", 3_600_000L,
                     "support.request-auto-close", 3_600_000L,
                     "asset.registration-sweep", 120_000L);

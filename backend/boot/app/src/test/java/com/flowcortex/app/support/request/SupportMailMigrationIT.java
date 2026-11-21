@@ -34,7 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class SupportMailMigrationIT extends AbstractPostgresBootTest {
 
-    private static final String MIGRATION = "db/migration/V2026.11.10.031__support_mail_outbox_to_event_publication.sql";
+    private static final String MIGRATION = "db/migration/V2026.11.10.102__support_mail_outbox_to_event_publication.sql";
     private static final String LISTENER = "support.reply-mail";
     private static final Instant CREATED = Instant.parse("2026-11-10T08:00:00Z");
 

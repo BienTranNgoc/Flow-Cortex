@@ -51,14 +51,17 @@ class RunStepTransactions {
     private final CreditAccounts creditAccounts;
     private final RunUpdates runUpdates;
     private final ApplicationEventPublisher events;
+    private final ChildRuns childRuns;
 
     RunStepTransactions(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            CreditAccounts creditAccounts, RunUpdates runUpdates, ApplicationEventPublisher events) {
+            CreditAccounts creditAccounts, RunUpdates runUpdates, ApplicationEventPublisher events,
+            ChildRuns childRuns) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.creditAccounts = creditAccounts;
         this.runUpdates = runUpdates;
         this.events = events;
+        this.childRuns = childRuns;
     }
 
     /**
@@ -90,7 +93,7 @@ class RunStepTransactions {
             return ClaimOutcome.LOST;
         }
         runUpdates.touched(runId);
-        if (!charge(runId, stepId)) {
+        if (!charge(runId, stepId, attempt)) {
             failRunning(runId, stepId, attempt, InsufficientCreditsException.CODE, NOT_ENOUGH_CREDITS, now);
             return ClaimOutcome.FAILED;
         }
@@ -176,7 +179,8 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
-        creditAccounts.refundStep(runId, stepId, code);
+        creditAccounts.refundStep(runId, stepId, attempt, code);
+        childRuns.stopChildOfStep(stepId);
         if (settleIfCancelling(runId, now)) {
             return true;
         }
@@ -184,6 +188,7 @@ class RunStepTransactions {
         if (run.markError(message, now)) {
             workflowRunRepository.save(run);
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
         }
         return true;
@@ -201,8 +206,9 @@ class RunStepTransactions {
         if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
-            runUpdates.touched(runId);
             events.publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
+            runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
     }
@@ -213,18 +219,19 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
+        childRuns.finished(runId);
         LOG.info("Workflow run finished: runId={} status=cancelled", runId);
         return true;
     }
 
     /** Charges the run's owner for a step just claimed; {@code false} when they cannot pay for it. */
-    private boolean charge(UUID runId, UUID stepId) {
+    private boolean charge(UUID runId, UUID stepId, short attempt) {
         if (!creditAccounts.enabled()) {
             return true;
         }
         String type = runStepRepository.findById(stepId).map(RunStep::getType)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.runStep.notFound", stepId)));
-        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, type);
+        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, attempt, type);
     }
 
     private WorkflowRun requireRun(UUID runId) {

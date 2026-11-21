@@ -25,6 +25,7 @@ import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.application.provider.ProviderStepPool;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
@@ -57,6 +58,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.TaskScheduler;
@@ -83,6 +85,7 @@ class RunAdvancerTest {
     private final TaskScheduler scheduler = mock(TaskScheduler.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final NestedStepExecutor nested = new NestedStepExecutor();
         private final StepExecutorRegistry registry = new StepExecutorRegistry(List.of(
                 new EchoStepExecutor(),
                 new FailStepExecutor(),
@@ -90,12 +93,13 @@ class RunAdvancerTest {
                 new ProviderStepExecutor(),
                 new StoringStepExecutor(),
                 new VoiceStepExecutor(),
+                nested,
                 new RemoteStepExecutor(MediaCapability.PROBE.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.EXTRACT_AUDIO.value(), mediaJobs, clock),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs, clock)));
     private final RunStepTransactions transactions =
             new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
-                    mock(RunUpdates.class), mock(ApplicationEventPublisher.class));
+                    mock(RunUpdates.class), mock(ApplicationEventPublisher.class), mock(ChildRuns.class));
     private final ReviewCheckpointTransactions checkpoints = mock(ReviewCheckpointTransactions.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -110,6 +114,11 @@ class RunAdvancerTest {
     }
 
     private final RunAdvancer advancer = advancer(Runnable::run);
+
+    private final VendorJobLedger ledger = mock(VendorJobLedger.class);
+    private final RunAdvancer withLedger = new RunAdvancer(workflowRunRepository, runStepRepository, transactions,
+            new InputResolver(), registry, Runnable::run, Runnable::run, scheduler, Tracer.NOOP,
+            ObservationRegistry.NOOP, meters, LEASE, clock, checkpoints, validator, ledger);
 
     private final UUID runId = UUID.randomUUID();
     private final UUID workflowId = UUID.randomUUID();
@@ -180,6 +189,48 @@ class RunAdvancerTest {
         @Override
         public String execute(StepContext context) {
             return context.input().toUpperCase(java.util.Locale.ROOT);
+        }
+    }
+
+    /** A nested type: starts its child in the claim, so what it saw there is recorded for the tests. */
+    private final class NestedStepExecutor implements StepExecutor {
+
+        static final Duration MAX_RUNTIME = Duration.ofHours(2);
+
+        final List<Thread> threads = new java.util.ArrayList<>();
+        boolean claimedBeforeExecute;
+        boolean pickedUpBeforeExecute;
+        RuntimeException failure;
+
+        @Override
+        public String type() {
+            return "nested";
+        }
+
+        @Override
+        public Mode mode() {
+            return Mode.NESTED;
+        }
+
+        @Override
+        public Duration maxRuntime() {
+            return MAX_RUNTIME;
+        }
+
+        @Override
+        public String execute(StepContext context) {
+            threads.add(Thread.currentThread());
+            claimedBeforeExecute = invoked("claimPending");
+            pickedUpBeforeExecute = invoked("recordPickup");
+            if (failure != null) {
+                throw failure;
+            }
+            return null;
+        }
+
+        private boolean invoked(String method) {
+            return org.mockito.Mockito.mockingDetails(runStepRepository).getInvocations().stream()
+                    .anyMatch(invocation -> invocation.getMethod().getName().equals(method));
         }
     }
 
@@ -556,6 +607,74 @@ class RunAdvancerTest {
     }
 
     @Test
+    void aNestedStepRunsItsExecutorInsideTheClaim() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        org.springframework.core.task.TaskExecutor taskExecutor = mock(org.springframework.core.task.TaskExecutor.class);
+        List<Runnable> providerTasks = new java.util.ArrayList<>();
+
+        advancer(taskExecutor, providerTasks::add).on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(nested.threads).containsExactly(Thread.currentThread());
+        assertThat(nested.claimedBeforeExecute).isTrue();
+        assertThat(nested.pickedUpBeforeExecute).isFalse();
+        verify(taskExecutor, never()).execute(any());
+        assertThat(providerTasks).isEmpty();
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void aNestedStepRecordsItsDeadlineRightAfterTheClaim() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        Instant runDeadline = NOW.plus(NestedStepExecutor.MAX_RUNTIME);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).recordPickup(step.getId(), (short) 1, NOW, runDeadline.plus(LEASE), runDeadline,
+                (short) 0);
+        verify(scheduler, never()).scheduleAtFixedRate(any(), any(Instant.class), any(Duration.class));
+    }
+
+    @Test
+    void aNestedStepWhoseDeadlineWriteFindsItClosedAlreadyIsLeftAlone() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(0);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void aNestedStepFailingInTheClaimIsNotPickedUp() {
+        RunStep step = pending(1, "nested");
+        givenRun(List.of(step));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        nested.failure = new StepFailedException("workflow_call_cycle", "no");
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("workflow_call_cycle"), eq("no"), eq(NOW));
+        verify(runStepRepository, never()).recordPickup(any(), anyShort(), any(), any(), any(), anyShort());
+    }
+
+    @Test
+    void aNestedStepIsNotReportedRemote() {
+        assertThat(registry.isRemote("nested")).isFalse();
+        assertThat(registry.remoteTypes()).doesNotContain("nested");
+    }
+
+    @Test
     void aRemoteStepIsEnqueuedInsideTheClaimAndTheAdvanceReturnsWithoutWaiting() {
         givenMediaEnabled();
         RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "probe", UPLOAD_REF);
@@ -798,6 +917,74 @@ class RunAdvancerTest {
         verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "speech_too_long",
                 "The approved script reads for 13.4 s, longer than the 10 s video. "
                         + "Start a new run with a shorter script.", NOW);
+    }
+
+    @Test
+    void aCompletedVideoResultConsumesItsLedgerRowOnceAfterTheStepCompleted() {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        Map<String, Object> data = videoData();
+
+        withLedger.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null, data,
+                null)));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(runStepRepository, ledger);
+        order.verify(runStepRepository).completeIfRunning(eq(step.getId()), eq(runId), eq((short) 1), any(), any(),
+                eq(NOW));
+        order.verify(ledger).consume(runId, step.getId(), "generate_video", data);
+        verify(ledger, org.mockito.Mockito.times(1)).consume(any(), any(), any(), any());
+    }
+
+    @Test
+    void aVideoResultThatLostTheCasNeverConsumes() {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+
+        withLedger.onRemoteCompleted(new MediaJobCompleted(result(step, MediaResult.Status.COMPLETED, null,
+                videoData(), null)));
+
+        verify(ledger, never()).consume(any(), any(), any(), any());
+    }
+
+    @Test
+    void aConsumeThatFailsTwiceLeavesTheStepCompleted(CapturedOutput output) {
+        RunStep step = videoStep();
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"))
+                .when(ledger).consume(any(), any(), any(), any());
+
+        assertThatCode(() -> withLedger.onRemoteCompleted(new MediaJobCompleted(result(step,
+                MediaResult.Status.COMPLETED, null, videoData(), null)))).doesNotThrowAnyException();
+
+        verify(ledger, org.mockito.Mockito.times(2)).consume(any(), any(), any(), any());
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+        assertThat(output).contains("outcome=consume_failed");
+    }
+
+    private RunStep videoStep() {
+        givenMediaEnabled();
+        RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "generate_video", "{}");
+        step.markRunning(NOW, NOW.plus(PROBE_QUEUE));
+        givenRun(List.of(step));
+        givenTiming(step);
+        return step;
+    }
+
+    private static Map<String, Object> videoData() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("profile", "vertical_ad_clip_v1");
+        data.put("durationSeconds", 5);
+        data.put("provider", "seedance");
+        data.put("model", "seedance-1");
+        data.put("aspectRatio", "9:16");
+        data.put("resolution", "720p");
+        data.put("sourceRevisionId", UUID.randomUUID());
+        data.put("idempotencyKey", "a".repeat(64));
+        data.put("providerTaskId", "cgt-1");
+        data.put("format", "mp4");
+        data.put("fingerprint", "b".repeat(64));
+        data.put("requestKey", "c".repeat(64));
+        return data;
     }
 
     private RunStep speechStep(String input) {

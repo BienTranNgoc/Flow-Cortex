@@ -8,7 +8,8 @@ public enum MediaCapability {
     PROBE("probe"),
     EXTRACT_AUDIO("extract_audio"),
     ALIGN_AUDIO("align_audio"),
-    RENDER_VIDEO("render_video");
+    RENDER_VIDEO("render_video"),
+    SEPARATE_AUDIO("separate_audio");
 
     private final String value;
 

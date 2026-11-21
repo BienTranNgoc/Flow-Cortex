@@ -130,7 +130,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
 
         @DynamicPropertySource
         static void provider(DynamicPropertyRegistry registry) {
-            registry.add("flowcortex.dub.gemini.base-url", PROVIDER::baseUrl);
+            registry.add("flowcortex.llm.gemini.base-url", PROVIDER::baseUrl);
         }
 
         WorkflowView dubWorkflow(UUID ownerId) {
@@ -161,7 +161,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=false",
-        "flowcortex.dub.gemini.api-key=fake-key-3c9e",
+        "flowcortex.llm.gemini.api-key=fake-key-3c9e",
         "flowcortex.workflow.reaper-interval-ms=300",
         "flowcortex.jobs.runner.enabled=true",
         "flowcortex.jobs.poll-interval=100ms"})
@@ -223,7 +223,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=true",
-        "flowcortex.dub.gemini.api-key="})
+        "flowcortex.llm.gemini.api-key="})
     @AutoConfigureTestRestTemplate
     class DubKeyMissing extends DubContext {
 
@@ -243,7 +243,7 @@ class WorkflowKillSwitchIT extends AbstractWorkflowHttpIT {
     @NestedTestConfiguration(NestedTestConfiguration.EnclosingConfiguration.OVERRIDE)
     @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.dub.enabled=true",
-        "flowcortex.dub.gemini.api-key=fake-key-3c9e"})
+        "flowcortex.llm.gemini.api-key=fake-key-3c9e"})
     @AutoConfigureTestRestTemplate
     class DubAvailable extends DubContext {
 

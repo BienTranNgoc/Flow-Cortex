@@ -17,7 +17,7 @@ export function authHeaders(): RequestInit {
  */
 export async function unwrap<T extends { status: number; data: unknown }>(
   promise: Promise<T>,
-): Promise<T['data']> {
+): Promise<SuccessOf<T>['data']> {
   const response = await promise;
   if (response.status >= 400) {
     if (response.status === 401) {
@@ -29,5 +29,12 @@ export async function unwrap<T extends { status: number; data: unknown }>(
     const problem = response.data as unknown as ProblemDetail;
     throw new ApiError(response.status, problem);
   }
-  return response.data;
+  return response.data as SuccessOf<T>['data'];
 }
+
+type SuccessStatus = 200 | 201 | 202 | 203 | 204 | 205 | 206;
+
+/** The 2xx members of a generated response union, so documented error responses never widen `data`. */
+type SuccessOf<T extends { status: number }> = [Extract<T, { status: SuccessStatus }>] extends [never]
+  ? T
+  : Extract<T, { status: SuccessStatus }>;
