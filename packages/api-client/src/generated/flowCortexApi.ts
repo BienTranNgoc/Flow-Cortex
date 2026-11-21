@@ -115,6 +115,12 @@ export const MeResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  aiproviderview: 'ai.provider.view',
+  aiproviderupdate: 'ai.provider.update',
+  workflowrunexport: 'workflow.run.export',
+  workflowruncancel: 'workflow.run.cancel',
+  workflowworkflowview: 'workflow.workflow.view',
+  workflowworkflowexport: 'workflow.workflow.export',
 } as const;
 
 export interface MeResponse {
@@ -342,6 +348,50 @@ export interface AdminChatSettings {
   enabled: boolean;
   updatedBy?: string;
   updatedAt?: string;
+}
+
+export interface AiModelRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  modelKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  providerKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  displayName: string;
+  /**
+   * @minimum 1
+   * @maximum 8192
+   */
+  maxOutputTokens?: number;
+  supportsVision?: boolean;
+  supportsAudio?: boolean;
+  active?: boolean;
+  /**
+   * @minimum 0
+   * @maximum 32767
+   */
+  displayOrder?: number;
+}
+
+export interface AiModel {
+  modelKey: string;
+  providerKey: string;
+  displayName: string;
+  maxOutputTokens: number;
+  supportsVision: boolean;
+  supportsAudio: boolean;
+  active: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateWorkflowRequest {
@@ -1024,6 +1074,26 @@ export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
 }
 
+export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof StepUpRequestPurpose];
+
+export const StepUpRequestPurpose = {
+  PAT_CREATE: 'PAT_CREATE',
+} as const;
+
+export interface StepUpRequest {
+  /**
+   * @minLength 0
+   * @maxLength 72
+   */
+  password: string;
+  purpose: StepUpRequestPurpose;
+}
+
+export interface StepUpResponse {
+  stepUpProof: string;
+  expiresAt: string;
+}
+
 export interface VerifyCodeRequest {
   /** @pattern ^\d{6}$ */
   code: string;
@@ -1046,6 +1116,32 @@ export interface SendCodeResponse {
   maskedPhone: string;
   /** Seconds before a resend is accepted */
   resendAfterSeconds: number;
+  expiresAt: string;
+}
+
+export interface CreateApiTokenRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  name: string;
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  expiresInDays?: number;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof: string;
+}
+
+export interface CreatedApiToken {
+  id: string;
+  name: string;
+  token: string;
+  createdAt: string;
   expiresAt: string;
 }
 
@@ -1344,6 +1440,44 @@ export interface AdminSupportRequestReply {
   /** @maxItems 3 */
   uploadIds?: string[];
   status: AdminSupportRequestReplyStatus;
+}
+
+export interface Step {
+  stepOrder: number;
+  type: string;
+  mode: string;
+  status: string;
+  attempt: number;
+  deliveryCount: number;
+  progressPercent?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  pickedUpAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface AdminRunDetailResponse {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  ownerId: string;
+  ownerEmail?: string;
+  status: string;
+  errorMessage?: string;
+  startedAt: string;
+  finishedAt?: string;
+  creditsCharged?: number;
+  steps: Step[];
+}
+
+export interface ProbeResult {
+  ok?: boolean;
+  tested?: boolean;
+  code?: string;
+  latencyMs?: number;
+  outputTokens?: number;
+  missingSettings?: string[];
 }
 
 export interface AdminAccountResponse {
@@ -1678,12 +1812,6 @@ export interface WorkflowVersionDiffResponse {
 export interface AccessLogPageResponse {
   data?: Entry[];
   meta?: Meta;
-}
-
-export interface Step {
-  stepOrder?: number;
-  name?: string;
-  type?: string;
 }
 
 export interface SharedWorkflowResponse {
@@ -2072,6 +2200,16 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface ApiTokenView {
+  id: string;
+  name: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Null until the token is first used */
+  lastUsedAt?: string;
+  expired: boolean;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -2088,6 +2226,7 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  personalAccessTokens: boolean;
   onboarding: boolean;
   chat: boolean;
 }
@@ -2137,6 +2276,71 @@ export interface CapabilitiesResponse {
   mediaEnabled?: boolean;
   productVideoEnabled?: boolean;
   productVideoWorkflowId?: string;
+}
+
+export interface BuilderSummaryResponse {
+  totalWorkflows: number;
+  publishedWorkflows: number;
+  totalRuns: number;
+}
+
+export type BuilderChartResponsePeriod =
+  (typeof BuilderChartResponsePeriod)[keyof typeof BuilderChartResponsePeriod];
+
+export const BuilderChartResponsePeriod = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
+
+export interface DayCountResponse {
+  day: string;
+  runs: number;
+  failed: number;
+}
+
+export interface BuilderChartResponse {
+  period: BuilderChartResponsePeriod;
+  series: DayCountResponse[];
+}
+
+export type AdminWorkflowResponseStatus =
+  (typeof AdminWorkflowResponseStatus)[keyof typeof AdminWorkflowResponseStatus];
+
+export const AdminWorkflowResponseStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export interface AdminWorkflowResponse {
+  id: string;
+  name: string;
+  ownerId: string;
+  ownerEmail?: string;
+  status: AdminWorkflowResponseStatus;
+  shared: boolean;
+  steps: number;
+  runs: number;
+  runsLast7Days: number;
+  lastRunAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PageViewAdminWorkflowResponse {
+  items: AdminWorkflowResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type WorkflowReportResponseCountsByStatus = { [key: string]: number };
+
+export interface WorkflowReportResponse {
+  workflow: AdminWorkflowResponse;
+  countsByStatus: WorkflowReportResponseCountsByStatus;
+  lastRunAt?: string;
+  series: DayCountResponse[];
 }
 
 export type AdminSupportRequestSummaryType =
@@ -2214,12 +2418,15 @@ export interface SmsOutboxEntryResponse {
 
 export interface AdminRunResponse {
   id: string;
+  workflowId: string;
   workflowName: string;
+  ownerId: string;
   ownerEmail?: string;
   status: string;
   errorMessage?: string;
   startedAt: string;
   finishedAt?: string;
+  creditsCharged?: number;
 }
 
 export interface PageViewAdminRunResponse {
@@ -2254,6 +2461,12 @@ export const RoleResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  aiproviderview: 'ai.provider.view',
+  aiproviderupdate: 'ai.provider.update',
+  workflowrunexport: 'workflow.run.export',
+  workflowruncancel: 'workflow.run.cancel',
+  workflowworkflowview: 'workflow.workflow.view',
+  workflowworkflowexport: 'workflow.workflow.export',
 } as const;
 
 export interface RoleResponse {
@@ -2284,6 +2497,50 @@ export interface MediaJobResponse {
 
 export interface PageViewMediaJobResponse {
   items: MediaJobResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface AiProviderSlotModel {
+  modelKey?: string;
+  status?: string;
+}
+
+export interface AiProviderSlot {
+  name?: string;
+  models?: AiProviderSlotModel[];
+}
+
+export interface AiProviderView {
+  key?: string;
+  configured?: boolean;
+  missingSettings?: string[];
+  liveCheckable?: boolean;
+  slots?: AiProviderSlot[];
+}
+
+export interface AiProviderCategory {
+  category?: string;
+  providers?: AiProviderView[];
+}
+
+export interface AiProviderOverview {
+  categories?: AiProviderCategory[];
+}
+
+export interface VendorModel {
+  id?: string;
+  displayName?: string;
+}
+
+export interface VendorModels {
+  models?: VendorModel[];
+  failure?: string;
+}
+
+export interface PageViewAiModel {
+  items: AiModel[];
   page: number;
   size: number;
   total: number;
@@ -2325,6 +2582,49 @@ export type OneClickUnsubscribeEmailLinkParams = {
 };
 
 export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
+
+export type ListAdminWorkflowsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * @pattern draft|published
+   */
+  status?: ListAdminWorkflowsStatus;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  q?: string;
+};
+
+export type ListAdminWorkflowsStatus =
+  (typeof ListAdminWorkflowsStatus)[keyof typeof ListAdminWorkflowsStatus];
+
+export const ListAdminWorkflowsStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export type ListAdminAiModelsParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
 
 export type GetWorkflowParams = {
   key?: string;
@@ -2441,6 +2741,22 @@ export type OpenRealtimeStreamParams = {
   topic?: string[];
 };
 
+export type GetBuilderRunsChartParams = {
+  /**
+   * @pattern 7d|30d|90d
+   */
+  period?: GetBuilderRunsChartPeriod;
+};
+
+export type GetBuilderRunsChartPeriod =
+  (typeof GetBuilderRunsChartPeriod)[keyof typeof GetBuilderRunsChartPeriod];
+
+export const GetBuilderRunsChartPeriod = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
+
 export type CallbackParams = {
   code?: string;
   state?: string;
@@ -2451,6 +2767,26 @@ export type AuthorizeParams = {
   remember_me?: boolean;
   return_to?: string;
 };
+
+export type ExportAdminWorkflowsParams = {
+  /**
+   * @pattern draft|published
+   */
+  status?: ExportAdminWorkflowsStatus;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  q?: string;
+};
+
+export type ExportAdminWorkflowsStatus =
+  (typeof ExportAdminWorkflowsStatus)[keyof typeof ExportAdminWorkflowsStatus];
+
+export const ExportAdminWorkflowsStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
 
 export type ListAdminSupportRequestsParams = {
   status?: ListAdminSupportRequestsStatus;
@@ -2507,11 +2843,36 @@ export type ListAdminRunsParams = {
    * @pattern running|waiting_approval|completed|error|cancelling|cancelled
    */
   status?: ListAdminRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
 };
 
 export type ListAdminRunsStatus = (typeof ListAdminRunsStatus)[keyof typeof ListAdminRunsStatus];
 
 export const ListAdminRunsStatus = {
+  running: 'running',
+  waiting_approval: 'waiting_approval',
+  completed: 'completed',
+  error: 'error',
+  cancelling: 'cancelling',
+  cancelled: 'cancelled',
+} as const;
+
+export type ExportAdminRunsParams = {
+  /**
+   * @pattern running|waiting_approval|completed|error|cancelling|cancelled
+   */
+  status?: ExportAdminRunsStatus;
+  workflowId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type ExportAdminRunsStatus =
+  (typeof ExportAdminRunsStatus)[keyof typeof ExportAdminRunsStatus];
+
+export const ExportAdminRunsStatus = {
   running: 'running',
   waiting_approval: 'waiting_approval',
   completed: 'completed',
@@ -3497,6 +3858,136 @@ export const updateAdminChatSettings = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminChatSettingsUpdate),
+  });
+};
+
+export type getAdminAiModelResponse200 = {
+  data: AiModel;
+  status: 200;
+};
+
+export type getAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminAiModelResponseSuccess = getAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type getAdminAiModelResponseError = getAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminAiModelResponse = getAdminAiModelResponseSuccess | getAdminAiModelResponseError;
+
+export const getGetAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const getAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminAiModelResponse> => {
+  return customFetch<getAdminAiModelResponse>(getGetAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type replaceAdminAiModelResponse200 = {
+  data: AiModel;
+  status: 200;
+};
+
+export type replaceAdminAiModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replaceAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replaceAdminAiModelResponseSuccess = replaceAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type replaceAdminAiModelResponseError = (
+  replaceAdminAiModelResponse400 | replaceAdminAiModelResponse404
+) & {
+  headers: Headers;
+};
+
+export type replaceAdminAiModelResponse =
+  replaceAdminAiModelResponseSuccess | replaceAdminAiModelResponseError;
+
+export const getReplaceAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const replaceAdminAiModel = async (
+  modelKey: string,
+  aiModelRequest: AiModelRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replaceAdminAiModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replaceAdminAiModelResponse>(getReplaceAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(aiModelRequest),
+  });
+};
+
+export type deleteAdminAiModelResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminAiModelResponseSuccess = deleteAdminAiModelResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminAiModelResponseError = deleteAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminAiModelResponse =
+  deleteAdminAiModelResponseSuccess | deleteAdminAiModelResponseError;
+
+export const getDeleteAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const deleteAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminAiModelResponse> => {
+  return customFetch<deleteAdminAiModelResponse>(getDeleteAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -5620,6 +6111,82 @@ export const completeBuilderOnboarding = async (
   });
 };
 
+export type stepUpResponse200 = {
+  data: StepUpResponse;
+  status: 200;
+};
+
+export type stepUpResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type stepUpResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type stepUpResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type stepUpResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type stepUpResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type stepUpResponseSuccess = stepUpResponse200 & {
+  headers: Headers;
+};
+export type stepUpResponseError = (
+  stepUpResponse400 | stepUpResponse403 | stepUpResponse409 | stepUpResponse422 | stepUpResponse429
+) & {
+  headers: Headers;
+};
+
+export type stepUpResponse = stepUpResponseSuccess | stepUpResponseError;
+
+export const getStepUpUrl = () => {
+  return `/api/v1/me/step-up`;
+};
+
+export const stepUp = async (
+  stepUpRequest: StepUpRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<stepUpResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<stepUpResponse>(getStepUpUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(stepUpRequest),
+  });
+};
+
 export type verifyResponse200 = {
   data: PhoneResponse;
   status: 200;
@@ -5707,6 +6274,114 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: ApiTokenView[];
+  status: 200;
+};
+
+export type list1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type list1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1ResponseError = (list1Response403 | list1Response503) & {
+  headers: Headers;
+};
+
+export type list1Response = list1ResponseSuccess | list1ResponseError;
+
+export const getList1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type create1Response201 = {
+  data: CreatedApiToken;
+  status: 201;
+};
+
+export type create1Response400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type create1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type create1Response409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type create1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type create1ResponseSuccess = create1Response201 & {
+  headers: Headers;
+};
+export type create1ResponseError = (
+  create1Response400 | create1Response403 | create1Response409 | create1Response503
+) & {
+  headers: Headers;
+};
+
+export type create1Response = create1ResponseSuccess | create1ResponseError;
+
+export const getCreate1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const create1 = async (
+  createApiTokenRequest: CreateApiTokenRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<create1Response> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<create1Response>(getCreate1Url(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createApiTokenRequest),
   });
 };
 
@@ -5915,24 +6590,24 @@ export const connect = async (
   });
 };
 
-export type list1Response200 = {
+export type list2Response200 = {
   data: Summary[];
   status: 200;
 };
 
-export type list1ResponseSuccess = list1Response200 & {
+export type list2ResponseSuccess = list2Response200 & {
   headers: Headers;
 };
-export type list1Response = list1ResponseSuccess;
+export type list2Response = list2ResponseSuccess;
 
-export const getList1Url = () => {
+export const getList2Url = () => {
   return `/api/v1/connectors/http`;
 };
 
-export const list1 = async (
+export const list2 = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<list1Response> => {
-  return customFetch<list1Response>(getList1Url(), {
+): Promise<list2Response> => {
+  return customFetch<list2Response>(getList2Url(), {
     ...options,
     method: 'GET',
   });
@@ -6911,6 +7586,42 @@ export const confirmEmail = async (
   });
 };
 
+export type listAdminWorkflowsResponse200 = {
+  data: PageViewAdminWorkflowResponse;
+  status: 200;
+};
+
+export type listAdminWorkflowsResponseSuccess = listAdminWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listAdminWorkflowsResponse = listAdminWorkflowsResponseSuccess;
+
+export const getListAdminWorkflowsUrl = (params?: ListAdminWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/workflows?${stringifiedParams}`
+    : `/api/v1/admin/workflows`;
+};
+
+export const listAdminWorkflows = async (
+  params?: ListAdminWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminWorkflowsResponse> => {
+  return customFetch<listAdminWorkflowsResponse>(getListAdminWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type createAdminWorkflowResponse201 = {
   data: WorkflowResponse;
   status: 201;
@@ -7380,6 +8091,196 @@ export const archiveAdminSupportKbArticle = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<archiveAdminSupportKbArticleResponse> => {
   return customFetch<archiveAdminSupportKbArticleResponse>(getArchiveAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type cancelAdminRunResponse200 = {
+  data: AdminRunDetailResponse;
+  status: 200;
+};
+
+export type cancelAdminRunResponseSuccess = cancelAdminRunResponse200 & {
+  headers: Headers;
+};
+export type cancelAdminRunResponse = cancelAdminRunResponseSuccess;
+
+export const getCancelAdminRunUrl = (id: string) => {
+  return `/api/v1/admin/runs/${id}/cancel`;
+};
+
+export const cancelAdminRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelAdminRunResponse> => {
+  return customFetch<cancelAdminRunResponse>(getCancelAdminRunUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type testAdminAiProviderResponse200 = {
+  data: ProbeResult;
+  status: 200;
+};
+
+export type testAdminAiProviderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type testAdminAiProviderResponseSuccess = testAdminAiProviderResponse200 & {
+  headers: Headers;
+};
+export type testAdminAiProviderResponseError = testAdminAiProviderResponse404 & {
+  headers: Headers;
+};
+
+export type testAdminAiProviderResponse =
+  testAdminAiProviderResponseSuccess | testAdminAiProviderResponseError;
+
+export const getTestAdminAiProviderUrl = (providerKey: string) => {
+  return `/api/v1/admin/ai/providers/${providerKey}/test`;
+};
+
+export const testAdminAiProvider = async (
+  providerKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<testAdminAiProviderResponse> => {
+  return customFetch<testAdminAiProviderResponse>(getTestAdminAiProviderUrl(providerKey), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type listAdminAiModelsResponse200 = {
+  data: PageViewAiModel;
+  status: 200;
+};
+
+export type listAdminAiModelsResponseSuccess = listAdminAiModelsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiModelsResponse = listAdminAiModelsResponseSuccess;
+
+export const getListAdminAiModelsUrl = (params?: ListAdminAiModelsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/models?${stringifiedParams}`
+    : `/api/v1/admin/ai/models`;
+};
+
+export const listAdminAiModels = async (
+  params?: ListAdminAiModelsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiModelsResponse> => {
+  return customFetch<listAdminAiModelsResponse>(getListAdminAiModelsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createAdminAiModelResponse201 = {
+  data: AiModel;
+  status: 201;
+};
+
+export type createAdminAiModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminAiModelResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminAiModelResponseSuccess = createAdminAiModelResponse201 & {
+  headers: Headers;
+};
+export type createAdminAiModelResponseError = (
+  createAdminAiModelResponse400 | createAdminAiModelResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminAiModelResponse =
+  createAdminAiModelResponseSuccess | createAdminAiModelResponseError;
+
+export const getCreateAdminAiModelUrl = () => {
+  return `/api/v1/admin/ai/models`;
+};
+
+export const createAdminAiModel = async (
+  aiModelRequest: AiModelRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminAiModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminAiModelResponse>(getCreateAdminAiModelUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(aiModelRequest),
+  });
+};
+
+export type testAdminAiModelResponse200 = {
+  data: ProbeResult;
+  status: 200;
+};
+
+export type testAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type testAdminAiModelResponseSuccess = testAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type testAdminAiModelResponseError = testAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type testAdminAiModelResponse =
+  testAdminAiModelResponseSuccess | testAdminAiModelResponseError;
+
+export const getTestAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}/test`;
+};
+
+export const testAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<testAdminAiModelResponse> => {
+  return customFetch<testAdminAiModelResponse>(getTestAdminAiModelUrl(modelKey), {
     ...options,
     method: 'POST',
   });
@@ -9976,6 +10877,65 @@ export const capabilities = async (
   });
 };
 
+export type getBuilderSummaryResponse200 = {
+  data: BuilderSummaryResponse;
+  status: 200;
+};
+
+export type getBuilderSummaryResponseSuccess = getBuilderSummaryResponse200 & {
+  headers: Headers;
+};
+export type getBuilderSummaryResponse = getBuilderSummaryResponseSuccess;
+
+export const getGetBuilderSummaryUrl = () => {
+  return `/api/v1/builder/dashboard/summary`;
+};
+
+export const getBuilderSummary = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBuilderSummaryResponse> => {
+  return customFetch<getBuilderSummaryResponse>(getGetBuilderSummaryUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBuilderRunsChartResponse200 = {
+  data: BuilderChartResponse;
+  status: 200;
+};
+
+export type getBuilderRunsChartResponseSuccess = getBuilderRunsChartResponse200 & {
+  headers: Headers;
+};
+export type getBuilderRunsChartResponse = getBuilderRunsChartResponseSuccess;
+
+export const getGetBuilderRunsChartUrl = (params?: GetBuilderRunsChartParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/builder/dashboard/runs-chart?${stringifiedParams}`
+    : `/api/v1/builder/dashboard/runs-chart`;
+};
+
+export const getBuilderRunsChart = async (
+  params?: GetBuilderRunsChartParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBuilderRunsChartResponse> => {
+  return customFetch<getBuilderRunsChartResponse>(getGetBuilderRunsChartUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type callbackResponse302 = {
   data: void;
   status: 302;
@@ -10071,6 +11031,66 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminWorkflowReportResponse200 = {
+  data: WorkflowReportResponse;
+  status: 200;
+};
+
+export type getAdminWorkflowReportResponseSuccess = getAdminWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type getAdminWorkflowReportResponse = getAdminWorkflowReportResponseSuccess;
+
+export const getGetAdminWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflows/${id}/report`;
+};
+
+export const getAdminWorkflowReport = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminWorkflowReportResponse> => {
+  return customFetch<getAdminWorkflowReportResponse>(getGetAdminWorkflowReportUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminWorkflowsResponse200 = {
+  data: string;
+  status: 200;
+};
+
+export type exportAdminWorkflowsResponseSuccess = exportAdminWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type exportAdminWorkflowsResponse = exportAdminWorkflowsResponseSuccess;
+
+export const getExportAdminWorkflowsUrl = (params?: ExportAdminWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/workflows/export?${stringifiedParams}`
+    : `/api/v1/admin/workflows/export`;
+};
+
+export const exportAdminWorkflows = async (
+  params?: ExportAdminWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminWorkflowsResponse> => {
+  return customFetch<exportAdminWorkflowsResponse>(getExportAdminWorkflowsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -10251,6 +11271,66 @@ export const listAdminRuns = async (
   });
 };
 
+export type getAdminRunResponse200 = {
+  data: AdminRunDetailResponse;
+  status: 200;
+};
+
+export type getAdminRunResponseSuccess = getAdminRunResponse200 & {
+  headers: Headers;
+};
+export type getAdminRunResponse = getAdminRunResponseSuccess;
+
+export const getGetAdminRunUrl = (id: string) => {
+  return `/api/v1/admin/runs/${id}`;
+};
+
+export const getAdminRun = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminRunResponse> => {
+  return customFetch<getAdminRunResponse>(getGetAdminRunUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAdminRunsResponse200 = {
+  data: string;
+  status: 200;
+};
+
+export type exportAdminRunsResponseSuccess = exportAdminRunsResponse200 & {
+  headers: Headers;
+};
+export type exportAdminRunsResponse = exportAdminRunsResponseSuccess;
+
+export const getExportAdminRunsUrl = (params?: ExportAdminRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/runs/export?${stringifiedParams}`
+    : `/api/v1/admin/runs/export`;
+};
+
+export const exportAdminRuns = async (
+  params?: ExportAdminRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAdminRunsResponse> => {
+  return customFetch<exportAdminRunsResponse>(getExportAdminRunsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminRolesResponse200 = {
   data: RoleResponse[];
   status: 200;
@@ -10308,6 +11388,66 @@ export const listAdminMediaJobs = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listAdminAiProvidersResponse200 = {
+  data: AiProviderOverview;
+  status: 200;
+};
+
+export type listAdminAiProvidersResponseSuccess = listAdminAiProvidersResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiProvidersResponse = listAdminAiProvidersResponseSuccess;
+
+export const getListAdminAiProvidersUrl = () => {
+  return `/api/v1/admin/ai/providers`;
+};
+
+export const listAdminAiProviders = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiProvidersResponse> => {
+  return customFetch<listAdminAiProvidersResponse>(getListAdminAiProvidersUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAiProviderModelsResponse200 = {
+  data: VendorModels;
+  status: 200;
+};
+
+export type listAdminAiProviderModelsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listAdminAiProviderModelsResponseSuccess = listAdminAiProviderModelsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiProviderModelsResponseError = listAdminAiProviderModelsResponse404 & {
+  headers: Headers;
+};
+
+export type listAdminAiProviderModelsResponse =
+  listAdminAiProviderModelsResponseSuccess | listAdminAiProviderModelsResponseError;
+
+export const getListAdminAiProviderModelsUrl = (providerKey: string) => {
+  return `/api/v1/admin/ai/providers/${providerKey}/models`;
+};
+
+export const listAdminAiProviderModels = async (
+  providerKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiProviderModelsResponse> => {
+  return customFetch<listAdminAiProviderModelsResponse>(
+    getListAdminAiProviderModelsUrl(providerKey),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type listAdminAccountsResponse200 = {
@@ -10390,6 +11530,49 @@ export const revokeWorkflowLinkGrant = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<revokeWorkflowLinkGrantResponse> => {
   return customFetch<revokeWorkflowLinkGrantResponse>(getRevokeWorkflowLinkGrantUrl(id, userId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type revokeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type revokeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type revokeResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type revokeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeResponseSuccess = revokeResponse204 & {
+  headers: Headers;
+};
+export type revokeResponseError = (revokeResponse403 | revokeResponse404 | revokeResponse503) & {
+  headers: Headers;
+};
+
+export type revokeResponse = revokeResponseSuccess | revokeResponseError;
+
+export const getRevokeUrl = (id: string) => {
+  return `/api/v1/me/api-tokens/${id}`;
+};
+
+export const revoke = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeResponse> => {
+  return customFetch<revokeResponse>(getRevokeUrl(id), {
     ...options,
     method: 'DELETE',
   });
