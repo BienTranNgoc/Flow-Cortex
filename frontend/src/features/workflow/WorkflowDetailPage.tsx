@@ -184,7 +184,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   return (
     <div>
       <PageHeading title={workflow?.name ?? t('workflow.detail.heading')} />
-      {workflow?.isShared && <p>{t('workflow.detail.shared')}</p>}
+      {workflow?.visibility === 'public' && <p>{t('workflow.detail.shared')}</p>}
       {isProductVideo && (
         <div className="pv-studio-pills">
           <span className="pv-pill pv-pill--accent">

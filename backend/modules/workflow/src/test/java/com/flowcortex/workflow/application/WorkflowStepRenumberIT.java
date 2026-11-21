@@ -84,7 +84,7 @@ class WorkflowStepRenumberIT {
     private WorkflowStepRepository workflowStepRepository;
 
     private Workflow seed(UUID ownerId) {
-        return workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Renumber", false));
+        return workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Renumber"));
     }
 
     private WorkflowStep step(Workflow workflow, int order, String name, String inputRef, String config) {

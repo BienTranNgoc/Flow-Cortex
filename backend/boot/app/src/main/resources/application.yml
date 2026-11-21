@@ -377,6 +377,9 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    share:
+      # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
+      accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
