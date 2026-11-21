@@ -536,6 +536,84 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/models/{modelKey}:
+    get:
+      tags:
+      - admin-ai-models-controller
+      operationId: getAdminAiModel
+      parameters:
+      - name: modelKey
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiModel"
+        "404":
+          description: llm-model-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-ai-models-controller
+      operationId: replaceAdminAiModel
+      parameters:
+      - name: modelKey
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiModelRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiModel"
+        "400":
+          description: "validation-failed (errors), llm-model-invalid (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: llm-model-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-ai-models-controller
+      operationId: deleteAdminAiModel
+      parameters:
+      - name: modelKey
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: llm-model-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -1878,6 +1956,54 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/step-up:
+    post:
+      tags:
+      - step-up-controller
+      operationId: stepUp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StepUpRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepUpResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/verify:
     post:
       tags:
@@ -1914,6 +2040,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/api-tokens:
+    get:
+      tags:
+      - personal-access-token-controller
+      operationId: list_1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiTokenView"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - personal-access-token-controller
+      operationId: create_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiTokenRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedApiToken"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/email-links/{token}/unsubscribe:
     post:
       tags:
@@ -2025,7 +2218,7 @@ paths:
     get:
       tags:
       - http-connector-controller
-      operationId: list_1
+      operationId: list_2
       responses:
         "200":
           description: OK
@@ -2864,6 +3057,114 @@ paths:
                 $ref: "#/components/schemas/AdminSupportKbArticle"
         "404":
           description: article-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/providers/{providerKey}/test:
+    post:
+      tags:
+      - admin-ai-providers-controller
+      operationId: testAdminAiProvider
+      parameters:
+      - name: providerKey
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbeResult"
+        "404":
+          description: ai-provider-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/models:
+    get:
+      tags:
+      - admin-ai-models-controller
+      operationId: listAdminAiModels
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewAiModel"
+    post:
+      tags:
+      - admin-ai-models-controller
+      operationId: createAdminAiModel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiModelRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiModel"
+        "400":
+          description: "validation-failed (errors), llm-model-invalid (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: llm-model-exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/models/{modelKey}/test:
+    post:
+      tags:
+      - admin-ai-models-controller
+      operationId: testAdminAiModel
+      parameters:
+      - name: modelKey
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbeResult"
+        "404":
+          description: "llm-model-not-found, ai-provider-not-found"
           content:
             application/problem+json:
               schema:
@@ -5029,6 +5330,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/ai/providers:
+    get:
+      tags:
+      - admin-ai-providers-controller
+      operationId: listAdminAiProviders
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiProviderOverview"
+  /api/v1/admin/ai/providers/{providerKey}/models:
+    get:
+      tags:
+      - admin-ai-providers-controller
+      operationId: listAdminAiProviderModels
+      parameters:
+      - name: providerKey
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorModels"
+        "404":
+          description: ai-provider-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts:
     get:
       tags:
@@ -5114,6 +5451,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevokedResponse"
+  /api/v1/me/api-tokens/{id}:
+    delete:
+      tags:
+      - personal-access-token-controller
+      operationId: revoke
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/connectors/{provider}:
     delete:
       tags:
@@ -5302,6 +5672,8 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - ai.provider.view
+            - ai.provider.update
         adminDisabled:
           type: boolean
       required:
@@ -5632,6 +6004,79 @@ components:
           format: date-time
       required:
       - enabled
+    AiModelRequest:
+      type: object
+      properties:
+        modelKey:
+          type: string
+          maxLength: 128
+          minLength: 0
+        providerKey:
+          type: string
+          maxLength: 32
+          minLength: 0
+        displayName:
+          type: string
+          maxLength: 128
+          minLength: 0
+        maxOutputTokens:
+          type: integer
+          format: int32
+          maximum: 8192
+          minimum: 1
+        supportsVision:
+          type: boolean
+        supportsAudio:
+          type: boolean
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+          format: int32
+          maximum: 32767
+          minimum: 0
+      required:
+      - displayName
+      - modelKey
+      - providerKey
+    AiModel:
+      type: object
+      properties:
+        modelKey:
+          type: string
+        providerKey:
+          type: string
+        displayName:
+          type: string
+        maxOutputTokens:
+          type: integer
+          format: int32
+        supportsVision:
+          type: boolean
+        supportsAudio:
+          type: boolean
+        active:
+          type: boolean
+        displayOrder:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - active
+      - createdAt
+      - displayName
+      - displayOrder
+      - maxOutputTokens
+      - modelKey
+      - providerKey
+      - supportsAudio
+      - supportsVision
+      - updatedAt
     CreateWorkflowRequest:
       type: object
       properties:
@@ -6583,6 +7028,31 @@ components:
           enum:
           - skipped
           - finished
+    StepUpRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          maxLength: 72
+          minLength: 0
+        purpose:
+          type: string
+          enum:
+          - PAT_CREATE
+      required:
+      - password
+      - purpose
+    StepUpResponse:
+      type: object
+      properties:
+        stepUpProof:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - stepUpProof
     VerifyCodeRequest:
       type: object
       properties:
@@ -6630,6 +7100,47 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    CreateApiTokenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 0
+        expiresInDays:
+          type: integer
+          format: int32
+          maximum: 365
+          minimum: 1
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - name
+      - stepUpProof
+    CreatedApiToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        token:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - expiresAt
+      - id
+      - name
+      - token
     EmailLinkUnsubscribed:
       type: object
       properties:
@@ -7034,6 +7545,25 @@ components:
       required:
       - body
       - status
+    ProbeResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        tested:
+          type: boolean
+        code:
+          type: string
+        latencyMs:
+          type: integer
+          format: int64
+        outputTokens:
+          type: integer
+          format: int32
+        missingSettings:
+          type: array
+          items:
+            type: string
     AdminAccountResponse:
       type: object
       properties:
@@ -8150,6 +8680,32 @@ components:
       - industry
       - track
       - usageType
+    ApiTokenView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Null until the token is first used
+        expired:
+          type: boolean
+      required:
+      - createdAt
+      - expired
+      - expiresAt
+      - id
+      - name
     HealthResponse:
       type: object
       properties:
@@ -8180,6 +8736,8 @@ components:
           type: boolean
         supportAssistant:
           type: boolean
+        personalAccessTokens:
+          type: boolean
         onboarding:
           type: boolean
         chat:
@@ -8190,6 +8748,7 @@ components:
       - emailConfirmation
       - onboarding
       - passwordReset
+      - personalAccessTokens
       - phoneVerification
       - runCancellation
       - supportAssistant
@@ -8484,6 +9043,8 @@ components:
             - system.role.view
             - system.admin_account.view
             - system.admin_account.manage
+            - ai.provider.view
+            - ai.provider.update
       required:
       - code
       - permissions
@@ -8551,6 +9112,92 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MediaJobResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    AiProviderCategory:
+      type: object
+      properties:
+        category:
+          type: string
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiProviderView"
+    AiProviderOverview:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiProviderCategory"
+    AiProviderSlot:
+      type: object
+      properties:
+        name:
+          type: string
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiProviderSlotModel"
+    AiProviderSlotModel:
+      type: object
+      properties:
+        modelKey:
+          type: string
+        status:
+          type: string
+    AiProviderView:
+      type: object
+      properties:
+        key:
+          type: string
+        configured:
+          type: boolean
+        missingSettings:
+          type: array
+          items:
+            type: string
+        liveCheckable:
+          type: boolean
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiProviderSlot"
+    VendorModel:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+    VendorModels:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorModel"
+        failure:
+          type: string
+    PageViewAiModel:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiModel"
         page:
           type: integer
           format: int32

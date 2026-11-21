@@ -115,6 +115,8 @@ export const MeResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  aiproviderview: 'ai.provider.view',
+  aiproviderupdate: 'ai.provider.update',
 } as const;
 
 export interface MeResponse {
@@ -342,6 +344,50 @@ export interface AdminChatSettings {
   enabled: boolean;
   updatedBy?: string;
   updatedAt?: string;
+}
+
+export interface AiModelRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  modelKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  providerKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  displayName: string;
+  /**
+   * @minimum 1
+   * @maximum 8192
+   */
+  maxOutputTokens?: number;
+  supportsVision?: boolean;
+  supportsAudio?: boolean;
+  active?: boolean;
+  /**
+   * @minimum 0
+   * @maximum 32767
+   */
+  displayOrder?: number;
+}
+
+export interface AiModel {
+  modelKey: string;
+  providerKey: string;
+  displayName: string;
+  maxOutputTokens: number;
+  supportsVision: boolean;
+  supportsAudio: boolean;
+  active: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateWorkflowRequest {
@@ -1024,6 +1070,26 @@ export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
 }
 
+export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof StepUpRequestPurpose];
+
+export const StepUpRequestPurpose = {
+  PAT_CREATE: 'PAT_CREATE',
+} as const;
+
+export interface StepUpRequest {
+  /**
+   * @minLength 0
+   * @maxLength 72
+   */
+  password: string;
+  purpose: StepUpRequestPurpose;
+}
+
+export interface StepUpResponse {
+  stepUpProof: string;
+  expiresAt: string;
+}
+
 export interface VerifyCodeRequest {
   /** @pattern ^\d{6}$ */
   code: string;
@@ -1046,6 +1112,32 @@ export interface SendCodeResponse {
   maskedPhone: string;
   /** Seconds before a resend is accepted */
   resendAfterSeconds: number;
+  expiresAt: string;
+}
+
+export interface CreateApiTokenRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  name: string;
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  expiresInDays?: number;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof: string;
+}
+
+export interface CreatedApiToken {
+  id: string;
+  name: string;
+  token: string;
+  createdAt: string;
   expiresAt: string;
 }
 
@@ -1344,6 +1436,15 @@ export interface AdminSupportRequestReply {
   /** @maxItems 3 */
   uploadIds?: string[];
   status: AdminSupportRequestReplyStatus;
+}
+
+export interface ProbeResult {
+  ok?: boolean;
+  tested?: boolean;
+  code?: string;
+  latencyMs?: number;
+  outputTokens?: number;
+  missingSettings?: string[];
 }
 
 export interface AdminAccountResponse {
@@ -2072,6 +2173,16 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface ApiTokenView {
+  id: string;
+  name: string;
+  createdAt: string;
+  expiresAt: string;
+  /** Null until the token is first used */
+  lastUsedAt?: string;
+  expired: boolean;
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -2088,6 +2199,7 @@ export interface FeaturesResponse {
   passwordReset: boolean;
   supportWidget: boolean;
   supportAssistant: boolean;
+  personalAccessTokens: boolean;
   onboarding: boolean;
   chat: boolean;
 }
@@ -2254,6 +2366,8 @@ export const RoleResponsePermissionsItem = {
   systemroleview: 'system.role.view',
   systemadmin_accountview: 'system.admin_account.view',
   systemadmin_accountmanage: 'system.admin_account.manage',
+  aiproviderview: 'ai.provider.view',
+  aiproviderupdate: 'ai.provider.update',
 } as const;
 
 export interface RoleResponse {
@@ -2284,6 +2398,50 @@ export interface MediaJobResponse {
 
 export interface PageViewMediaJobResponse {
   items: MediaJobResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface AiProviderSlotModel {
+  modelKey?: string;
+  status?: string;
+}
+
+export interface AiProviderSlot {
+  name?: string;
+  models?: AiProviderSlotModel[];
+}
+
+export interface AiProviderView {
+  key?: string;
+  configured?: boolean;
+  missingSettings?: string[];
+  liveCheckable?: boolean;
+  slots?: AiProviderSlot[];
+}
+
+export interface AiProviderCategory {
+  category?: string;
+  providers?: AiProviderView[];
+}
+
+export interface AiProviderOverview {
+  categories?: AiProviderCategory[];
+}
+
+export interface VendorModel {
+  id?: string;
+  displayName?: string;
+}
+
+export interface VendorModels {
+  models?: VendorModel[];
+  failure?: string;
+}
+
+export interface PageViewAiModel {
+  items: AiModel[];
   page: number;
   size: number;
   total: number;
@@ -2325,6 +2483,19 @@ export type OneClickUnsubscribeEmailLinkParams = {
 };
 
 export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
+
+export type ListAdminAiModelsParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
 
 export type GetWorkflowParams = {
   key?: string;
@@ -3497,6 +3668,136 @@ export const updateAdminChatSettings = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(adminChatSettingsUpdate),
+  });
+};
+
+export type getAdminAiModelResponse200 = {
+  data: AiModel;
+  status: 200;
+};
+
+export type getAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminAiModelResponseSuccess = getAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type getAdminAiModelResponseError = getAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminAiModelResponse = getAdminAiModelResponseSuccess | getAdminAiModelResponseError;
+
+export const getGetAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const getAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminAiModelResponse> => {
+  return customFetch<getAdminAiModelResponse>(getGetAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type replaceAdminAiModelResponse200 = {
+  data: AiModel;
+  status: 200;
+};
+
+export type replaceAdminAiModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replaceAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replaceAdminAiModelResponseSuccess = replaceAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type replaceAdminAiModelResponseError = (
+  replaceAdminAiModelResponse400 | replaceAdminAiModelResponse404
+) & {
+  headers: Headers;
+};
+
+export type replaceAdminAiModelResponse =
+  replaceAdminAiModelResponseSuccess | replaceAdminAiModelResponseError;
+
+export const getReplaceAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const replaceAdminAiModel = async (
+  modelKey: string,
+  aiModelRequest: AiModelRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replaceAdminAiModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replaceAdminAiModelResponse>(getReplaceAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(aiModelRequest),
+  });
+};
+
+export type deleteAdminAiModelResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminAiModelResponseSuccess = deleteAdminAiModelResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminAiModelResponseError = deleteAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminAiModelResponse =
+  deleteAdminAiModelResponseSuccess | deleteAdminAiModelResponseError;
+
+export const getDeleteAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}`;
+};
+
+export const deleteAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminAiModelResponse> => {
+  return customFetch<deleteAdminAiModelResponse>(getDeleteAdminAiModelUrl(modelKey), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -5620,6 +5921,82 @@ export const completeBuilderOnboarding = async (
   });
 };
 
+export type stepUpResponse200 = {
+  data: StepUpResponse;
+  status: 200;
+};
+
+export type stepUpResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type stepUpResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type stepUpResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type stepUpResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type stepUpResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type stepUpResponseSuccess = stepUpResponse200 & {
+  headers: Headers;
+};
+export type stepUpResponseError = (
+  stepUpResponse400 | stepUpResponse403 | stepUpResponse409 | stepUpResponse422 | stepUpResponse429
+) & {
+  headers: Headers;
+};
+
+export type stepUpResponse = stepUpResponseSuccess | stepUpResponseError;
+
+export const getStepUpUrl = () => {
+  return `/api/v1/me/step-up`;
+};
+
+export const stepUp = async (
+  stepUpRequest: StepUpRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<stepUpResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<stepUpResponse>(getStepUpUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(stepUpRequest),
+  });
+};
+
 export type verifyResponse200 = {
   data: PhoneResponse;
   status: 200;
@@ -5707,6 +6084,114 @@ export const sendCode = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(sendCodeRequest),
+  });
+};
+
+export type list1Response200 = {
+  data: ApiTokenView[];
+  status: 200;
+};
+
+export type list1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type list1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type list1ResponseSuccess = list1Response200 & {
+  headers: Headers;
+};
+export type list1ResponseError = (list1Response403 | list1Response503) & {
+  headers: Headers;
+};
+
+export type list1Response = list1ResponseSuccess | list1ResponseError;
+
+export const getList1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const list1 = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type create1Response201 = {
+  data: CreatedApiToken;
+  status: 201;
+};
+
+export type create1Response400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type create1Response403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type create1Response409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type create1Response503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type create1ResponseSuccess = create1Response201 & {
+  headers: Headers;
+};
+export type create1ResponseError = (
+  create1Response400 | create1Response403 | create1Response409 | create1Response503
+) & {
+  headers: Headers;
+};
+
+export type create1Response = create1ResponseSuccess | create1ResponseError;
+
+export const getCreate1Url = () => {
+  return `/api/v1/me/api-tokens`;
+};
+
+export const create1 = async (
+  createApiTokenRequest: CreateApiTokenRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<create1Response> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<create1Response>(getCreate1Url(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createApiTokenRequest),
   });
 };
 
@@ -5915,24 +6400,24 @@ export const connect = async (
   });
 };
 
-export type list1Response200 = {
+export type list2Response200 = {
   data: Summary[];
   status: 200;
 };
 
-export type list1ResponseSuccess = list1Response200 & {
+export type list2ResponseSuccess = list2Response200 & {
   headers: Headers;
 };
-export type list1Response = list1ResponseSuccess;
+export type list2Response = list2ResponseSuccess;
 
-export const getList1Url = () => {
+export const getList2Url = () => {
   return `/api/v1/connectors/http`;
 };
 
-export const list1 = async (
+export const list2 = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<list1Response> => {
-  return customFetch<list1Response>(getList1Url(), {
+): Promise<list2Response> => {
+  return customFetch<list2Response>(getList2Url(), {
     ...options,
     method: 'GET',
   });
@@ -7380,6 +7865,172 @@ export const archiveAdminSupportKbArticle = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<archiveAdminSupportKbArticleResponse> => {
   return customFetch<archiveAdminSupportKbArticleResponse>(getArchiveAdminSupportKbArticleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type testAdminAiProviderResponse200 = {
+  data: ProbeResult;
+  status: 200;
+};
+
+export type testAdminAiProviderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type testAdminAiProviderResponseSuccess = testAdminAiProviderResponse200 & {
+  headers: Headers;
+};
+export type testAdminAiProviderResponseError = testAdminAiProviderResponse404 & {
+  headers: Headers;
+};
+
+export type testAdminAiProviderResponse =
+  testAdminAiProviderResponseSuccess | testAdminAiProviderResponseError;
+
+export const getTestAdminAiProviderUrl = (providerKey: string) => {
+  return `/api/v1/admin/ai/providers/${providerKey}/test`;
+};
+
+export const testAdminAiProvider = async (
+  providerKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<testAdminAiProviderResponse> => {
+  return customFetch<testAdminAiProviderResponse>(getTestAdminAiProviderUrl(providerKey), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type listAdminAiModelsResponse200 = {
+  data: PageViewAiModel;
+  status: 200;
+};
+
+export type listAdminAiModelsResponseSuccess = listAdminAiModelsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiModelsResponse = listAdminAiModelsResponseSuccess;
+
+export const getListAdminAiModelsUrl = (params?: ListAdminAiModelsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/models?${stringifiedParams}`
+    : `/api/v1/admin/ai/models`;
+};
+
+export const listAdminAiModels = async (
+  params?: ListAdminAiModelsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiModelsResponse> => {
+  return customFetch<listAdminAiModelsResponse>(getListAdminAiModelsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createAdminAiModelResponse201 = {
+  data: AiModel;
+  status: 201;
+};
+
+export type createAdminAiModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminAiModelResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminAiModelResponseSuccess = createAdminAiModelResponse201 & {
+  headers: Headers;
+};
+export type createAdminAiModelResponseError = (
+  createAdminAiModelResponse400 | createAdminAiModelResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminAiModelResponse =
+  createAdminAiModelResponseSuccess | createAdminAiModelResponseError;
+
+export const getCreateAdminAiModelUrl = () => {
+  return `/api/v1/admin/ai/models`;
+};
+
+export const createAdminAiModel = async (
+  aiModelRequest: AiModelRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminAiModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminAiModelResponse>(getCreateAdminAiModelUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(aiModelRequest),
+  });
+};
+
+export type testAdminAiModelResponse200 = {
+  data: ProbeResult;
+  status: 200;
+};
+
+export type testAdminAiModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type testAdminAiModelResponseSuccess = testAdminAiModelResponse200 & {
+  headers: Headers;
+};
+export type testAdminAiModelResponseError = testAdminAiModelResponse404 & {
+  headers: Headers;
+};
+
+export type testAdminAiModelResponse =
+  testAdminAiModelResponseSuccess | testAdminAiModelResponseError;
+
+export const getTestAdminAiModelUrl = (modelKey: string) => {
+  return `/api/v1/admin/ai/models/${modelKey}/test`;
+};
+
+export const testAdminAiModel = async (
+  modelKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<testAdminAiModelResponse> => {
+  return customFetch<testAdminAiModelResponse>(getTestAdminAiModelUrl(modelKey), {
     ...options,
     method: 'POST',
   });
@@ -10310,6 +10961,66 @@ export const listAdminMediaJobs = async (
   });
 };
 
+export type listAdminAiProvidersResponse200 = {
+  data: AiProviderOverview;
+  status: 200;
+};
+
+export type listAdminAiProvidersResponseSuccess = listAdminAiProvidersResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiProvidersResponse = listAdminAiProvidersResponseSuccess;
+
+export const getListAdminAiProvidersUrl = () => {
+  return `/api/v1/admin/ai/providers`;
+};
+
+export const listAdminAiProviders = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiProvidersResponse> => {
+  return customFetch<listAdminAiProvidersResponse>(getListAdminAiProvidersUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAiProviderModelsResponse200 = {
+  data: VendorModels;
+  status: 200;
+};
+
+export type listAdminAiProviderModelsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listAdminAiProviderModelsResponseSuccess = listAdminAiProviderModelsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiProviderModelsResponseError = listAdminAiProviderModelsResponse404 & {
+  headers: Headers;
+};
+
+export type listAdminAiProviderModelsResponse =
+  listAdminAiProviderModelsResponseSuccess | listAdminAiProviderModelsResponseError;
+
+export const getListAdminAiProviderModelsUrl = (providerKey: string) => {
+  return `/api/v1/admin/ai/providers/${providerKey}/models`;
+};
+
+export const listAdminAiProviderModels = async (
+  providerKey: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiProviderModelsResponse> => {
+  return customFetch<listAdminAiProviderModelsResponse>(
+    getListAdminAiProviderModelsUrl(providerKey),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type listAdminAccountsResponse200 = {
   data: PageViewAdminAccountResponse;
   status: 200;
@@ -10390,6 +11101,49 @@ export const revokeWorkflowLinkGrant = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<revokeWorkflowLinkGrantResponse> => {
   return customFetch<revokeWorkflowLinkGrantResponse>(getRevokeWorkflowLinkGrantUrl(id, userId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type revokeResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type revokeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type revokeResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type revokeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeResponseSuccess = revokeResponse204 & {
+  headers: Headers;
+};
+export type revokeResponseError = (revokeResponse403 | revokeResponse404 | revokeResponse503) & {
+  headers: Headers;
+};
+
+export type revokeResponse = revokeResponseSuccess | revokeResponseError;
+
+export const getRevokeUrl = (id: string) => {
+  return `/api/v1/me/api-tokens/${id}`;
+};
+
+export const revoke = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeResponse> => {
+  return customFetch<revokeResponse>(getRevokeUrl(id), {
     ...options,
     method: 'DELETE',
   });
