@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flowcortex.dev/contracts/media-progress.schema.json",
   "title": "MediaProgress",
-  "description": "A liveness message for one delivery of a job: `started` once per delivery, then periodic heartbeats.",
+  "description": "A liveness message for one delivery of a job: `started` once per delivery, then periodic heartbeats; `vendor_task` reports a vendor job the worker submitted or judged.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "jobId", "runId", "attempt", "deliveryCount", "kind", "at"],
@@ -15,10 +15,46 @@
     "kind": {
       "title": "MediaProgressKind",
       "type": "string",
-      "enum": ["started", "heartbeat"]
+      "enum": ["started", "heartbeat", "vendor_task"]
     },
     "percent": { "type": "integer", "minimum": 0, "maximum": 100 },
     "message": { "type": "string" },
-    "at": { "type": "string", "format": "date-time" }
-  }
+    "at": { "type": "string", "format": "date-time" },
+    "vendorTask": {
+      "title": "VendorTaskReport",
+      "description": "A vendor job the worker submitted (status running, no vendorTaskId; it also needs fingerprint, requestKey, handle and vendorCreatedAt) or a verdict on a ledger row (any other status), named by vendorTaskId or by vendor and vendorJobId.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendor", "model", "vendorJobId", "status"],
+      "properties": {
+        "vendorTaskId": { "type": "string", "format": "uuid" },
+        "vendor": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "requestKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "vendorJobId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "handle": {
+          "type": "object",
+          "maxProperties": 16,
+          "description": "Vendor job identifiers only, at most 2048 bytes serialized; never a credential or signed URL."
+        },
+        "status": {
+          "title": "VendorTaskStatus",
+          "type": "string",
+          "enum": ["running", "failed", "expired", "gone"]
+        },
+        "vendorCreatedAt": { "type": "string", "format": "date-time" }
+      },
+      "if": {
+        "not": { "required": ["vendorTaskId"] },
+        "properties": { "status": { "const": "running" } }
+      },
+      "then": {
+        "required": ["fingerprint", "requestKey", "handle", "vendorCreatedAt"]
+      }
+    }
+  },
+  "if": { "properties": { "kind": { "const": "vendor_task" } }, "required": ["kind"] },
+  "then": { "required": ["vendorTask"] },
+  "else": { "not": { "required": ["vendorTask"] } }
 }

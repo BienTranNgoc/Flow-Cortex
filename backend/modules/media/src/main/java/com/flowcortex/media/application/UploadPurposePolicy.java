@@ -3,13 +3,13 @@ package com.flowcortex.media.application;
 import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 /**
  * The only arbiter of what an upload may be for each {@link UploadPurpose}: accepted extensions, per-kind
@@ -18,11 +18,13 @@ import java.util.stream.Stream;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String DRIVE_ITEM_PREFIX = "drive-item/";
+    static final String PROFILE_IMAGE_PREFIX = "profile-image/";
     static final String REVIEW_IMAGE_PREFIX = "review-image/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
-    private static final Map<String, String> IMAGE_MIME_TYPES = imageMimeTypes();
+    private static final Map<String, String> SUPPORT_MIME_TYPES = supportMimeTypes();
 
     /** What a granted upload may be: its canonical content type, kind and the byte cap of that kind. */
     record Allowed(String contentType, String kind, long maxBytes) {
@@ -34,7 +36,7 @@ final class UploadPurposePolicy {
         this.upload = upload;
     }
 
-    private static Map<String, String> imageMimeTypes() {
+    private static Map<String, String> supportMimeTypes() {
         Map<String, String> types = new LinkedHashMap<>();
         types.put("png", "image/png");
         types.put("jpg", "image/jpeg");
@@ -64,6 +66,8 @@ final class UploadPurposePolicy {
         String prefix = switch (purpose) {
             case RUN_INPUT -> "";
             case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case DRIVE_ITEM -> DRIVE_ITEM_PREFIX;
+            case PROFILE_IMAGE -> PROFILE_IMAGE_PREFIX;
             case REVIEW_IMAGE -> REVIEW_IMAGE_PREFIX;
         };
         return prefix + ownerId + "/" + uploadId;
@@ -72,8 +76,9 @@ final class UploadPurposePolicy {
     /** The size cap of {@code kind} under {@code purpose}, or 0 for a kind the purpose never accepts. */
     long maxBytes(UploadPurpose purpose, String kind) {
         return switch (purpose) {
-            case RUN_INPUT -> upload.maxBytesOf(kind);
+            case RUN_INPUT, DRIVE_ITEM -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
+            case PROFILE_IMAGE -> "image".equals(kind) ? upload.maxBytesOf(kind) : 0L;
             case REVIEW_IMAGE -> "image".equals(kind) ? UploadPurpose.REVIEW_IMAGE_MAX_BYTES : 0L;
         };
     }
@@ -85,10 +90,13 @@ final class UploadPurposePolicy {
 
     /** Extension to canonical content type, in the order formats are listed to the member. */
     Map<String, String> mimeTypes(UploadPurpose purpose) {
-        return switch (purpose) {
-            case RUN_INPUT -> upload.mimeTypes();
-            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> IMAGE_MIME_TYPES;
-        };
+        return imageOnly(purpose) ? SUPPORT_MIME_TYPES : upload.mimeTypes();
+    }
+
+    /** Purposes that take only png, jpg, jpeg and webp images. */
+    private static boolean imageOnly(UploadPurpose purpose) {
+        return purpose == UploadPurpose.SUPPORT_ATTACHMENT || purpose == UploadPurpose.PROFILE_IMAGE
+                || purpose == UploadPurpose.REVIEW_IMAGE;
     }
 
     private static String extensionOf(String fileName) {
@@ -97,11 +105,13 @@ final class UploadPurposePolicy {
     }
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
-        List<String> extensions = switch (purpose) {
-            case RUN_INPUT -> Stream.concat(upload.mediaExtensions().stream(),
-                    upload.productImageExtensions().stream()).toList();
-            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> List.copyOf(IMAGE_MIME_TYPES.keySet());
-        };
+        List<String> extensions = new ArrayList<>();
+        if (imageOnly(purpose)) {
+            extensions.addAll(SUPPORT_MIME_TYPES.keySet());
+        } else {
+            extensions.addAll(upload.mediaExtensions());
+            extensions.addAll(upload.productImageExtensions());
+        }
         List<String> dotted = extensions.stream().map(e -> "." + e).toList();
         return dotted.size() == 1
                 ? new LocalizedMessage("upload.typeOne", dotted.getFirst())
@@ -110,10 +120,9 @@ final class UploadPurposePolicy {
     }
 
     private LocalizedMessage sizeDetail(UploadPurpose purpose, String kind, long cap) {
-        List<String> extensions = switch (purpose) {
-            case RUN_INPUT -> upload.extensionsOf(kind);
-            case SUPPORT_ATTACHMENT, REVIEW_IMAGE -> List.copyOf(IMAGE_MIME_TYPES.keySet());
-        };
+        List<String> extensions = imageOnly(purpose)
+                ? List.copyOf(SUPPORT_MIME_TYPES.keySet())
+                : upload.extensionsOf(kind);
         String formats = String.join(", ", extensions.stream().map(e -> "." + e).toList());
         return cap % MEGABYTE == 0
                 ? new LocalizedMessage("upload.sizeMegabytes", cap / MEGABYTE, formats)

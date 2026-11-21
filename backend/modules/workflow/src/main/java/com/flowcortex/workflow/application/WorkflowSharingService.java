@@ -22,7 +22,6 @@ import com.flowcortex.workflow.domain.WorkflowVisibilityAuditEntry;
 import com.flowcortex.workflow.infrastructure.WorkflowAccessLogRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowLinkGrantRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
-import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowVisibilityAuditRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -54,9 +53,10 @@ public class WorkflowSharingService {
     static final int MAX_PAGE_SIZE = 100;
     static final Duration TOTAL_WINDOW = Duration.ofDays(7);
 
-    private final WorkflowServiceImpl arbiter;
+    private final WorkflowWriteAccess arbiter;
+    private final VersionWriter versionWriter;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowStepRepository workflowStepRepository;
+    private final ServedDefinitions servedDefinitions;
     private final WorkflowLinkGrantRepository grantRepository;
     private final WorkflowAccessLogRepository accessLogRepository;
     private final WorkflowVisibilityAuditRepository auditRepository;
@@ -66,14 +66,15 @@ public class WorkflowSharingService {
     private final TransactionTemplate readWrite;
     private final TransactionTemplate readOnly;
 
-    WorkflowSharingService(WorkflowServiceImpl arbiter, WorkflowRepository workflowRepository,
-            WorkflowStepRepository workflowStepRepository, WorkflowLinkGrantRepository grantRepository,
-            WorkflowAccessLogRepository accessLogRepository, WorkflowVisibilityAuditRepository auditRepository,
-            WorkflowAccessLog accessLog, UserDirectory userDirectory, Clock clock,
-            PlatformTransactionManager transactionManager) {
+    WorkflowSharingService(WorkflowWriteAccess arbiter, VersionWriter versionWriter,
+            WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
+            WorkflowLinkGrantRepository grantRepository, WorkflowAccessLogRepository accessLogRepository,
+            WorkflowVisibilityAuditRepository auditRepository, WorkflowAccessLog accessLog,
+            UserDirectory userDirectory, Clock clock, PlatformTransactionManager transactionManager) {
         this.arbiter = arbiter;
+        this.versionWriter = versionWriter;
         this.workflowRepository = workflowRepository;
-        this.workflowStepRepository = workflowStepRepository;
+        this.servedDefinitions = servedDefinitions;
         this.grantRepository = grantRepository;
         this.accessLogRepository = accessLogRepository;
         this.auditRepository = auditRepository;
@@ -118,6 +119,7 @@ public class WorkflowSharingService {
             audit(workflowId, caller.userId(), from, target,
                     caller.admin() ? VisibilityChangeTrigger.ADMIN : VisibilityChangeTrigger.OWNER, origin, now);
         }
+        versionWriter.ensurePublishedPointer(workflow, caller.userId());
         return settingsOf(workflow);
     }
 
@@ -173,16 +175,16 @@ public class WorkflowSharingService {
     }
 
     /**
-     * The narrowed view a share link opens; records the access-log entry after the read transaction has returned
-     * its connection, and writes no grant.
+     * The narrowed view a share link opens, built from the steps the caller is served (the published pointer for
+     * anyone but the owner); records the access-log entry after the read transaction has returned its connection,
+     * and writes no grant.
      */
     public SharedWorkflowView sharedView(UUID callerIdOrNull, String key, ShareOrigin origin) {
         OpenedLink opened = readOnly.execute(status -> {
             Workflow workflow = resolveKey(null, key, clock.instant());
             String authorName = userDirectory.findNamesByIds(List.of(workflow.getOwnerId()))
                     .get(workflow.getOwnerId());
-            List<SharedWorkflowView.Step> steps = workflowStepRepository
-                    .findByWorkflowIdOrderByStepOrderAsc(workflow.getId()).stream()
+            List<SharedWorkflowView.Step> steps = servedDefinitions.stepsFor(workflow, callerIdOrNull).stream()
                     .map(step -> new SharedWorkflowView.Step(step.getStepOrder(), step.getName(), step.getType()))
                     .toList();
             return new OpenedLink(workflow.getOwnerId(),

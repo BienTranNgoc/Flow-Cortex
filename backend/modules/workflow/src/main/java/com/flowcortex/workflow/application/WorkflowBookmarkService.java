@@ -61,7 +61,8 @@ public class WorkflowBookmarkService {
     @Transactional(readOnly = true)
     public BookmarkPage page(UUID callerId, int page, int size) {
         List<BookmarkedWorkflowRow> rows = bookmarks.pageVisible(callerId, PageRequest.of(page, size));
-        List<WorkflowView> mapped = views.toViews(rows.stream().map(BookmarkedWorkflowRow::workflow).toList());
+        List<WorkflowView> mapped = views.toViews(rows.stream().map(BookmarkedWorkflowRow::workflow).toList(),
+                callerId);
         List<BookmarkedWorkflow> data = new java.util.ArrayList<>(rows.size());
         for (int i = 0; i < rows.size(); i++) {
             data.add(new BookmarkedWorkflow(mapped.get(i), rows.get(i).bookmarkedAt()));

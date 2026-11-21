@@ -32,7 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class MediaAssetSpaceIT extends AbstractPostgresBootTest {
 
-    private static final String BACKFILL = "db/migration/V2026.11.10.020__media_asset_space_backfill.sql";
+    private static final String BACKFILL = "db/migration/V2026.11.10.103__media_asset_space_backfill.sql";
 
     @Autowired
     private JdbcTemplate jdbc;
