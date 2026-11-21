@@ -1165,6 +1165,10 @@ export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
 }
 
+export interface ReadAllResult {
+  marked?: number;
+}
+
 export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof StepUpRequestPurpose];
 
 export const StepUpRequestPurpose = {
@@ -1763,6 +1767,18 @@ export interface RunHistoryRowResponse {
   finishedAt?: string;
   durationSeconds?: number;
   creditsCharged?: number;
+}
+
+export interface PatchBody {
+  inApp?: boolean;
+  careEmail?: boolean;
+  marketingEmail?: boolean;
+}
+
+export interface PreferencesView {
+  inApp?: boolean;
+  careEmail?: boolean;
+  marketingEmail?: boolean;
 }
 
 export interface UpdateDriveItemRequest {
@@ -2449,6 +2465,28 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface NotificationItem {
+  id?: string;
+  type?: string;
+  title?: string;
+  body?: string;
+  link?: string;
+  read?: boolean;
+  createdAt?: string;
+}
+
+export interface NotificationPage {
+  items?: NotificationItem[];
+  page?: number;
+  size?: number;
+  hasMore?: boolean;
+  unreadCount?: number;
+}
+
+export interface UnreadCount {
+  unreadCount?: number;
+}
+
 export interface Counts {
   runs: number;
   results: number;
@@ -2647,24 +2685,6 @@ export interface DayCountResponse {
 export interface BuilderChartResponse {
   period: BuilderChartResponsePeriod;
   series: DayCountResponse[];
-}
-
-/**
- * @nullable
- */
-export type PreferencesViewLocale =
-  (typeof PreferencesViewLocale)[keyof typeof PreferencesViewLocale] | null;
-
-export const PreferencesViewLocale = {
-  vi: 'vi',
-  en: 'en',
-} as const;
-
-export interface PreferencesView {
-  /** @nullable */
-  locale?: PreferencesViewLocale;
-  ui: UiPreferences;
-  privacy: PrivacySettings;
 }
 
 export type AdminWorkflowResponseStatus =
@@ -3138,6 +3158,12 @@ export const ExportRunsStatus = {
 
 export type OpenRealtimeStreamParams = {
   topic?: string[];
+};
+
+export type ListNotificationsParams = {
+  filter?: string;
+  page?: string;
+  size?: string;
 };
 
 export type ListDriveSuggestionsParams = {
@@ -6916,6 +6942,63 @@ export const completeBuilderOnboarding = async (
   });
 };
 
+export type markNotificationReadResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type markNotificationReadResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type markNotificationReadResponseSuccess = markNotificationReadResponse204 & {
+  headers: Headers;
+};
+export type markNotificationReadResponseError = markNotificationReadResponse404 & {
+  headers: Headers;
+};
+
+export type markNotificationReadResponse =
+  markNotificationReadResponseSuccess | markNotificationReadResponseError;
+
+export const getMarkNotificationReadUrl = (id: string) => {
+  return `/api/v1/notifications/${id}/read`;
+};
+
+export const markNotificationRead = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<markNotificationReadResponse> => {
+  return customFetch<markNotificationReadResponse>(getMarkNotificationReadUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type markAllNotificationsReadResponse200 = {
+  data: ReadAllResult;
+  status: 200;
+};
+
+export type markAllNotificationsReadResponseSuccess = markAllNotificationsReadResponse200 & {
+  headers: Headers;
+};
+export type markAllNotificationsReadResponse = markAllNotificationsReadResponseSuccess;
+
+export const getMarkAllNotificationsReadUrl = () => {
+  return `/api/v1/notifications/read-all`;
+};
+
+export const markAllNotificationsRead = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<markAllNotificationsReadResponse> => {
+  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type stepUpResponse200 = {
   data: StepUpResponse;
   status: 200;
@@ -10017,6 +10100,86 @@ export const updateRun = async (
   });
 };
 
+export type getNotificationPreferencesResponse200 = {
+  data: PreferencesView;
+  status: 200;
+};
+
+export type getNotificationPreferencesResponseSuccess = getNotificationPreferencesResponse200 & {
+  headers: Headers;
+};
+export type getNotificationPreferencesResponse = getNotificationPreferencesResponseSuccess;
+
+export const getGetNotificationPreferencesUrl = () => {
+  return `/api/v1/notifications/preferences`;
+};
+
+export const getNotificationPreferences = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getNotificationPreferencesResponse> => {
+  return customFetch<getNotificationPreferencesResponse>(getGetNotificationPreferencesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateNotificationPreferencesResponse200 = {
+  data: PreferencesView;
+  status: 200;
+};
+
+export type updateNotificationPreferencesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateNotificationPreferencesResponseSuccess =
+  updateNotificationPreferencesResponse200 & {
+    headers: Headers;
+  };
+export type updateNotificationPreferencesResponseError =
+  updateNotificationPreferencesResponse400 & {
+    headers: Headers;
+  };
+
+export type updateNotificationPreferencesResponse =
+  updateNotificationPreferencesResponseSuccess | updateNotificationPreferencesResponseError;
+
+export const getUpdateNotificationPreferencesUrl = () => {
+  return `/api/v1/notifications/preferences`;
+};
+
+export const updateNotificationPreferences = async (
+  patchBody?: PatchBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateNotificationPreferencesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateNotificationPreferencesResponse>(getUpdateNotificationPreferencesUrl(), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patchBody),
+  });
+};
+
 export type getDriveItemResponse200 = {
   data: DriveItemResponse;
   status: 200;
@@ -11857,6 +12020,75 @@ export const getOnboardingResult = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getOnboardingResultResponse> => {
   return customFetch<getOnboardingResultResponse>(getGetOnboardingResultUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listNotificationsResponse200 = {
+  data: NotificationPage;
+  status: 200;
+};
+
+export type listNotificationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listNotificationsResponseSuccess = listNotificationsResponse200 & {
+  headers: Headers;
+};
+export type listNotificationsResponseError = listNotificationsResponse400 & {
+  headers: Headers;
+};
+
+export type listNotificationsResponse =
+  listNotificationsResponseSuccess | listNotificationsResponseError;
+
+export const getListNotificationsUrl = (params?: ListNotificationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications?${stringifiedParams}`
+    : `/api/v1/notifications`;
+};
+
+export const listNotifications = async (
+  params?: ListNotificationsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listNotificationsResponse> => {
+  return customFetch<listNotificationsResponse>(getListNotificationsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getUnreadNotificationCountResponse200 = {
+  data: UnreadCount;
+  status: 200;
+};
+
+export type getUnreadNotificationCountResponseSuccess = getUnreadNotificationCountResponse200 & {
+  headers: Headers;
+};
+export type getUnreadNotificationCountResponse = getUnreadNotificationCountResponseSuccess;
+
+export const getGetUnreadNotificationCountUrl = () => {
+  return `/api/v1/notifications/unread-count`;
+};
+
+export const getUnreadNotificationCount = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getUnreadNotificationCountResponse> => {
+  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(), {
     ...options,
     method: 'GET',
   });
