@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.flowcortex.app.chat.ChatIt;
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
@@ -16,7 +18,6 @@ import com.flowcortex.workflow.api.ProductVideoRuns;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowView;
 import jakarta.validation.ConstraintViolationException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.AopTestUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -59,10 +61,9 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
         return user;
     }
 
-    /** Stubbing the shared spy would race the runs earlier tests left advancing on other threads. */
     @BeforeEach
-    void mediaIsOn() {
-        assertThat(mediaJobs.isEnabled()).isTrue();
+    void enableMedia() {
+        doReturn(true).when(AopTestUtils.<MediaJobs>getUltimateTargetObject(mediaJobs)).isEnabled();
     }
 
     @Test
@@ -232,12 +233,12 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
     private UUID uploadImage(UserView owner) {
         String token = loginAs(owner);
         ResponseEntity<UploadView> grant = post("/api/v1/uploads", token,
-                new UploadRequestView("product.png", 16L), UploadView.class);
+                new UploadRequestView("product.png", (long) ImageFixtures.png().length), UploadView.class);
         assertThat(grant.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID uploadId = grant.getBody().uploadId();
         try (S3Client store = objectStore()) {
             store.putObject(request -> request.bucket(UPLOAD_BUCKET).key(owner.id() + "/" + uploadId)
-                    .contentType("image/png"), RequestBody.fromBytes("sixteen bytes!!!".getBytes(StandardCharsets.UTF_8)));
+                    .contentType("image/png"), RequestBody.fromBytes(ImageFixtures.png()));
         }
         return uploadId;
     }

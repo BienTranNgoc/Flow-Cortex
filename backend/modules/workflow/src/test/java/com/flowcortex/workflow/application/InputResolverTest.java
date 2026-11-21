@@ -99,6 +99,47 @@ class InputResolverTest {
     }
 
     @Test
+    void aNestedPathWithAnIndexReadsTheTextLeafUnquoted() {
+        Map<Integer, String> priorOutputs = Map.of(1, "{\"scenes\":[{\"text\":\"Hi\"},{\"text\":\"Bye\"}]}");
+
+        String resolved = resolver.resolve(2, "{step:1.scenes[1].text}", "the run input", priorOutputs);
+
+        assertThat(resolved).isEqualTo("Bye");
+    }
+
+    @Test
+    void anObjectLeafIsReturnedAsJsonText() {
+        Map<Integer, String> priorOutputs = Map.of(1, "{\"meta\":{\"info\":{\"lang\":\"vi\"}}}");
+
+        String resolved = resolver.resolve(2, "{step:1.meta.info}", "the run input", priorOutputs);
+
+        assertThat(resolved).isEqualTo("{\"lang\":\"vi\"}");
+    }
+
+    @Test
+    void anIndexPastTheEndOrOnANonArrayThrowsNamingTheReference() {
+        Map<Integer, String> priorOutputs = Map.of(1, "{\"scenes\":[],\"title\":\"t\"}");
+
+        assertThatThrownBy(() -> resolver.resolve(2, "{step:1.scenes[0]}", "the run input", priorOutputs))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("{step:1.scenes[0]}")
+                .hasMessageContaining("not found");
+        assertThatThrownBy(() -> resolver.resolve(2, "{step:1.title[0]}", "the run input", priorOutputs))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("{step:1.title[0]}")
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void aNamedHeadAtRunTimeThrowsAsMalformed() {
+        Map<Integer, String> priorOutputs = Map.of(1, "{\"title\":\"t\"}");
+
+        assertThatThrownBy(() -> resolver.resolve(2, "{step:draft.title}", "the run input", priorOutputs))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid input_ref format");
+    }
+
+    @Test
     void inputRefToAMissingFieldThrows() {
         Map<Integer, String> priorOutputs = new LinkedHashMap<>();
         priorOutputs.put(1, "{\"other\":\"value\"}");

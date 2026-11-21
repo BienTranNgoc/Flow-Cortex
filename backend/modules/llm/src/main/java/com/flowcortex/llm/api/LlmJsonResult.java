@@ -1,6 +1,6 @@
 package com.flowcortex.llm.api;
 
-/** What one {@link LlmClient#generateJson} call came to. */
+/** What one JSON call on {@link LlmClient} or {@link LlmSlots} came to. */
 public sealed interface LlmJsonResult permits LlmJsonResult.Answered, LlmJsonResult.Blocked, LlmJsonResult.Failed {
 
     /** {@code json} is the model's answer, already checked to parse as JSON. */
@@ -15,11 +15,17 @@ public sealed interface LlmJsonResult permits LlmJsonResult.Answered, LlmJsonRes
     }
 
     enum Kind {
-        /** No answer within the read timeout. */
+        /** No answer within the time limit. */
         TIMEOUT,
-        /** The provider answered with an error, or with nothing usable. */
+        /** The provider answered with a server error, or with a body that could not be read. */
         UPSTREAM,
         /** The provider could not be reached at all. */
-        UNREACHABLE
+        UNREACHABLE,
+        /** The provider refused the call for quota (429). */
+        QUOTA_EXCEEDED,
+        /** The provider rejected the request (a 4xx other than 429), or no key is configured. */
+        REJECTED,
+        /** The provider answered 200 without content the caller can use. */
+        UNUSABLE
     }
 }

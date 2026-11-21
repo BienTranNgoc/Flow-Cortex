@@ -1,5 +1,6 @@
 package com.flowcortex.user.application;
 
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,8 +13,9 @@ class Bucket4jRegistrationRateLimiter implements RegistrationRateLimiter {
 
     private final PerIpAndEmailBuckets buckets;
 
-    Bucket4jRegistrationRateLimiter(RegistrationProperties properties) {
-        this.buckets = new PerIpAndEmailBuckets(properties.perIp(), properties.perEmail());
+    Bucket4jRegistrationRateLimiter(RateLimiters rateLimiters) {
+        this.buckets = new PerIpAndEmailBuckets(
+                rateLimiters.named(UserRateLimits.REGISTRATION_IP), rateLimiters.named(UserRateLimits.REGISTRATION_EMAIL));
     }
 
     @Override

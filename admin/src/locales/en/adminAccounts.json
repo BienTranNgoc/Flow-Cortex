@@ -1,0 +1,68 @@
+{
+  "title": "Admin accounts",
+  "eyebrow": "Administration",
+  "description": "Staff and super admins. Change an account's role or switch its admin access off and on.",
+  "noun_one": "admin account",
+  "noun_other": "admin accounts",
+  "tableLabel": "Admin accounts table",
+  "refresh": "Refresh",
+  "retry": "Retry",
+  "loading": "Loading admin accounts…",
+  "empty": "No admin accounts yet.",
+  "noMatch": "No admin accounts match these filters.",
+  "stale": "Showing the results loaded before this error.",
+  "filters": {
+    "role": "Role",
+    "allRoles": "All roles",
+    "search": "Search",
+    "searchPlaceholder": "Name or email"
+  },
+  "columns": {
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "created": "Created",
+    "actions": "Actions"
+  },
+  "status": {
+    "deactivated": "Deactivated"
+  },
+  "actions": {
+    "changeRole": "Change role",
+    "changeRoleFor": "Change role of {{name}}",
+    "deactivate": "Deactivate",
+    "deactivateFor": "Deactivate {{name}}",
+    "activate": "Activate",
+    "activateFor": "Activate {{name}}"
+  },
+  "dialog": {
+    "cancel": "Cancel",
+    "working": "Saving…",
+    "role": {
+      "title": "Change role of {{name}}",
+      "description": "{{email}} gets the permissions of the role you choose the next time it calls the admin API.",
+      "label": "Role",
+      "confirm": "Change role"
+    },
+    "deactivate": {
+      "title": "Deactivate {{name}}?",
+      "description": "{{email}} loses access to the admin console but keeps the member app. You can activate the account again later.",
+      "confirm": "Deactivate"
+    },
+    "activate": {
+      "title": "Activate {{name}}?",
+      "description": "{{email}} regains access to the admin console with the permissions of its role.",
+      "confirm": "Activate"
+    }
+  },
+  "notice": {
+    "roleChanged": "{{name}} is now {{role}}.",
+    "deactivated": "{{name}} is deactivated.",
+    "activated": "{{name}} is active again."
+  },
+  "errors": {
+    "load": "Could not load admin accounts.",
+    "generic": "The change could not be saved. Try again."
+  }
+}

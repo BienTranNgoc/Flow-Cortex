@@ -71,6 +71,12 @@ def test_no_accepted_list_loads_every_row() -> None:
     assert set(handlers) == set(registry.HANDLER_MODULES)
 
 
+def test_the_video_analysis_capabilities_are_registered() -> None:
+    handlers = registry.load_handlers(None)
+
+    assert {"inspect", "contact_sheet", "detect_shots", "scene_frames"} <= set(handlers)
+
+
 def test_a_registered_capability_the_worker_does_not_accept_is_refused_without_a_handler() -> None:
     conn = FakeConnection()
     body = job_body(capability="probe")

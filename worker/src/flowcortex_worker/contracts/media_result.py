@@ -42,6 +42,7 @@ class MediaError(BaseModel):
             "provider_capability_unavailable",
             "provider_request_failed",
             "provider_response_invalid",
+            "provider_timeout",
             "contract_violation",
             "run_timeout",
             "duration_exceeded",

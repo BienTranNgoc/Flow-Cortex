@@ -53,7 +53,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             LOG.info("request requestId={} method={} path={} status={} durationMs={}",
-                    requestId, request.getMethod(), request.getRequestURI(), response.getStatus(),
+                    requestId, request.getMethod(), LoggedPaths.redact(request.getRequestURI()), response.getStatus(),
                     System.currentTimeMillis() - startedAtMillis);
             MDC.remove(MDC_KEY);
         }
