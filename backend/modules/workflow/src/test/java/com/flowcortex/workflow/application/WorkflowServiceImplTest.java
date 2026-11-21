@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -22,18 +23,24 @@ import com.flowcortex.workflow.api.StepEdit;
 import com.flowcortex.workflow.api.UpdateWorkflow;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.domain.WorkflowVersion;
+import com.flowcortex.workflow.domain.WorkflowVersionSource;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -45,10 +52,18 @@ class WorkflowServiceImplTest {
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final StepExecutorRegistry registry =
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
+    private final WorkflowVersionRepository versionRepository = mock(WorkflowVersionRepository.class);
+    private final WorkflowWriteAccess writeAccess = new WorkflowWriteAccess(workflowRepository, registry,
+            Validation.buildDefaultValidatorFactory().getValidator());
     private final WorkflowServiceImpl service = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
-            registry, new WorkflowWriteAccess(workflowRepository, registry,
-                    Validation.buildDefaultValidatorFactory().getValidator()),
+            registry, writeAccess,
+            new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
+            new ServedDefinitions(workflowStepRepository, versionRepository),
             mock(com.flowcortex.credit.api.CreditAccounts.class));
+
+    {
+        when(versionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void getVisibleWorkflowNotVisibleIsNotFound() {
@@ -92,14 +107,23 @@ class WorkflowServiceImplTest {
     }
 
     private static Workflow draft(UUID owner, boolean shared) {
-        return Workflow.draft(UUID.randomUUID(), owner, "W", shared);
+        Workflow workflow = Workflow.draft(UUID.randomUUID(), owner, "W");
+        if (shared) {
+            workflow.makeListedOrPrivate(WorkflowVisibility.PUBLIC);
+        }
+        return workflow;
+    }
+
+    /** Makes the visibility query answer for {@code caller}, as it does for a published public workflow. */
+    private void visibleTo(UUID caller, Workflow workflow) {
+        when(workflowRepository.findVisibleTo(workflow.getId(), caller)).thenReturn(Optional.of(workflow));
     }
 
     private static org.assertj.core.api.ThrowableAssert.ThrowingCallable[] memberWrites(WorkflowServiceImpl service,
             UUID callerId, Workflow workflow) {
         UUID stepId = UUID.randomUUID();
         return new org.assertj.core.api.ThrowableAssert.ThrowingCallable[] {
-            () -> service.updateWorkflow(callerId, workflow.getId(), new UpdateWorkflow("x", null, null)),
+            () -> service.updateWorkflow(callerId, workflow.getId(), new UpdateWorkflow("x", null)),
             () -> service.deleteWorkflow(callerId, workflow.getId()),
             () -> service.addStep(callerId, workflow.getId(), new NewStep(null, "echo", null, null)),
             () -> service.updateStep(callerId, workflow.getId(), stepId, new StepEdit("x", null, null))
@@ -115,6 +139,7 @@ class WorkflowServiceImplTest {
     void aNonOwnerWhoCanSeeTheWorkflowGetsForbidden() {
         Workflow workflow = stored(published(ANA, true));
         withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
 
         for (var write : memberWrites(service, BEN, workflow)) {
             assertThatThrownBy(write).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
@@ -122,6 +147,34 @@ class WorkflowServiceImplTest {
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void aGrantHolderOfAnUnlistedWorkflowGetsForbiddenOnEveryWriteNotNotFound() {
+        Workflow workflow = published(ANA, false);
+        workflow.makeUnlisted("K", java.time.Instant.now(), null);
+        stored(workflow);
+        withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
+        when(workflowRepository.findActiveById(workflow.getId())).thenReturn(Optional.of(workflow));
+
+        for (var write : memberWrites(service, BEN, workflow)) {
+            assertThatThrownBy(write).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        }
+        assertThatThrownBy(() -> writeAccess.loadForOwnerRead(Caller.member(BEN), workflow.getId()))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> writeAccess.loadForOwnerRead(Caller.member(CLEO), workflow.getId()))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void anOwnerOrAdminReadsTheOwnerViewWithoutTheRowLock() {
+        Workflow workflow = published(ANA, false);
+        when(workflowRepository.findActiveById(workflow.getId())).thenReturn(Optional.of(workflow));
+
+        assertThat(writeAccess.loadForOwnerRead(Caller.member(ANA), workflow.getId())).isSameAs(workflow);
+        assertThat(writeAccess.loadForOwnerRead(Caller.admin(CLEO), workflow.getId())).isSameAs(workflow);
+        verify(workflowRepository, never()).findByIdAndDeletedAtIsNull(any());
     }
 
     @Test
@@ -141,6 +194,7 @@ class WorkflowServiceImplTest {
         Workflow seeded = stored(published(NIL_OWNER, true));
 
         for (UUID member : List.of(ANA, BEN)) {
+            visibleTo(member, seeded);
             for (var write : memberWrites(service, member, seeded)) {
                 assertThatThrownBy(write).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
             }
@@ -152,7 +206,7 @@ class WorkflowServiceImplTest {
         Workflow workflow = stored(published(ANA, true));
         withSteps(workflow);
 
-        WorkflowView view = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, "published"));
+        WorkflowView view = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, "published"));
 
         assertThat(view.status()).isEqualTo("published");
         assertThat(workflow.getStatus()).isEqualTo(WorkflowStatus.PUBLISHED);
@@ -164,12 +218,115 @@ class WorkflowServiceImplTest {
         withSteps(workflow);
 
         WorkflowView unpublished = service.updateWorkflow(ANA, workflow.getId(),
-                new UpdateWorkflow(null, null, "draft"));
+                new UpdateWorkflow(null, "draft"));
         WorkflowView republished = service.updateWorkflow(ANA, workflow.getId(),
-                new UpdateWorkflow(null, null, "published"));
+                new UpdateWorkflow(null, "published"));
 
         assertThat(unpublished.status()).isEqualTo("draft");
         assertThat(republished.status()).isEqualTo("published");
+    }
+
+    @Test
+    void publishingASharedDraftPinsItsFirstVersion() {
+        Workflow workflow = stored(draft(ANA, true));
+        withSteps(workflow, "echo", "echo");
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, "published"));
+
+        ArgumentCaptor<WorkflowVersion> saved = ArgumentCaptor.forClass(WorkflowVersion.class);
+        verify(versionRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(WorkflowVersion::getVersion).containsOnly(1);
+        WorkflowVersion version = saved.getValue();
+        assertThat(version.getVersion()).isEqualTo(1);
+        assertThat(version.getSource()).isEqualTo(WorkflowVersionSource.PUBLISH);
+        assertThat(version.getPublishedBy()).isEqualTo(ANA);
+        assertThat(version.isReleased()).isTrue();
+        assertThat(workflow.getPublishedVersionId()).isEqualTo(version.getId());
+        assertThat(WorkflowSnapshots.parse(version.getSnapshot()).path("steps")).hasSize(2);
+    }
+
+    @Test
+    void publishingAnUnsharedDraftSetsNoPointer() {
+        Workflow workflow = stored(draft(ANA, false));
+        withSteps(workflow, "echo");
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, "published"));
+
+        verify(versionRepository, never()).save(any());
+        assertThat(workflow.getPublishedVersionId()).isNull();
+    }
+
+    @Test
+    void republishingKeepsTheExistingPointer() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+        UUID pointed = UUID.randomUUID();
+        workflow.pointTo(pointed);
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, "draft"));
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, "published"));
+
+        assertThat(workflow.getPublishedVersionId()).isEqualTo(pointed);
+        verify(versionRepository, never()).save(any());
+    }
+
+    @Test
+    void anAdminEditToASystemWorkflowCreatesNoVersion() {
+        Workflow seeded = stored(published(NIL_OWNER, true));
+        withSteps(seeded, "echo");
+
+        service.updateWorkflow(Caller.admin(CLEO), seeded.getId(), new UpdateWorkflow("Renamed", null));
+        service.addStep(Caller.admin(CLEO), seeded.getId(), new NewStep(null, "echo", null, null));
+
+        verify(versionRepository, never()).save(any());
+        assertThat(seeded.getPublishedVersionId()).isNull();
+    }
+
+    private WorkflowVersion versionOf(Workflow workflow, int number, WorkflowStep... steps) {
+        return new WorkflowVersion(UUID.randomUUID(), workflow.getId(), number, null, WorkflowVersionSource.PUBLISH,
+                null, WorkflowSnapshots.of(workflow, List.of(steps)).toString(), workflow.getOwnerId(),
+                Instant.now());
+    }
+
+    @Test
+    void getVisibleWorkflowServesTheNonOwnerThePointedSteps() {
+        Workflow workflow = published(ANA, true);
+        withSteps(workflow, "echo", "echo");
+        WorkflowVersion pointed = versionOf(workflow, 2,
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "old", "echo", null));
+        workflow.pointTo(pointed.getId());
+        when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
+        when(workflowRepository.findVisibleTo(workflow.getId(), BEN)).thenReturn(Optional.of(workflow));
+        when(workflowRepository.findVisibleTo(workflow.getId(), ANA)).thenReturn(Optional.of(workflow));
+
+        WorkflowView seenByBen = service.getVisibleWorkflow(BEN, workflow.getId());
+        WorkflowView seenByAna = service.getVisibleWorkflow(ANA, workflow.getId());
+
+        assertThat(seenByBen.steps()).hasSize(1);
+        assertThat(seenByBen.servedVersion()).isEqualTo(2);
+        assertThat(seenByBen.publishedVersionId()).isEqualTo(pointed.getId());
+        assertThat(seenByAna.steps()).hasSize(2);
+        assertThat(seenByAna.servedVersion()).isNull();
+    }
+
+    @Test
+    void aNonOwnersDetailCarriesNoConfigOrInputRef() {
+        Workflow workflow = published(ANA, true);
+        WorkflowStep step = new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "s", "echo",
+                "{step:0.output}", "{\"prompt\":\"secret\"}");
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(List.of(step));
+        when(workflowRepository.findVisibleTo(workflow.getId(), BEN)).thenReturn(Optional.of(workflow));
+        when(workflowRepository.findVisibleTo(workflow.getId(), ANA)).thenReturn(Optional.of(workflow));
+
+        WorkflowStepView seenByBen = service.getVisibleWorkflow(BEN, workflow.getId()).steps().getFirst();
+        WorkflowStepView seenByAna = service.getVisibleWorkflow(ANA, workflow.getId()).steps().getFirst();
+
+        assertThat(seenByBen.config()).isNull();
+        assertThat(seenByBen.inputRef()).isNull();
+        assertThat(seenByBen.type()).isEqualTo("echo");
+        assertThat(seenByBen.mode()).isEqualTo("inline");
+        assertThat(seenByAna.config()).isEqualTo("{\"prompt\":\"secret\"}");
+        assertThat(seenByAna.inputRef()).isEqualTo("{step:0.output}");
     }
 
     @Test
@@ -177,7 +334,7 @@ class WorkflowServiceImplTest {
         UUID deletedId = UUID.randomUUID();
         when(workflowRepository.findByIdAndDeletedAtIsNull(deletedId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateWorkflow(ANA, deletedId, new UpdateWorkflow("x", null, null)))
+        assertThatThrownBy(() -> service.updateWorkflow(ANA, deletedId, new UpdateWorkflow("x", null)))
                 .isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> service.deleteWorkflow(ANA, deletedId)).isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> service.deleteWorkflow(Caller.admin(CLEO), deletedId))
@@ -192,7 +349,7 @@ class WorkflowServiceImplTest {
             withSteps(workflow);
 
             WorkflowView renamed = service.updateWorkflow(admin, workflow.getId(),
-                    new UpdateWorkflow("Fixed", null, null));
+                    new UpdateWorkflow("Fixed", null));
             assertThat(renamed.name()).isEqualTo("Fixed");
             assertThat(renamed.ownerId()).isEqualTo(workflow.getOwnerId());
 
@@ -205,7 +362,7 @@ class WorkflowServiceImplTest {
         }
         UUID deletedId = UUID.randomUUID();
         when(workflowRepository.findByIdAndDeletedAtIsNull(deletedId)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.updateWorkflow(admin, deletedId, new UpdateWorkflow("x", null, null)))
+        assertThatThrownBy(() -> service.updateWorkflow(admin, deletedId, new UpdateWorkflow("x", null)))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -219,7 +376,7 @@ class WorkflowServiceImplTest {
         List<WorkflowStep> otherSteps = withSteps(other, "echo");
 
         assertThatThrownBy(() -> service.updateWorkflow(admin, productVideo.getId(),
-                new UpdateWorkflow("x", null, "draft"))).isInstanceOf(ConflictException.class)
+                new UpdateWorkflow("x", "draft"))).isInstanceOf(ConflictException.class)
                 .satisfies(e -> assertThat(((ConflictException) e).getDetail().code())
                         .isEqualTo("workflow.system.readOnly"));
         assertThatThrownBy(() -> service.deleteWorkflow(admin, productVideo.getId()))
@@ -232,7 +389,7 @@ class WorkflowServiceImplTest {
         assertThat(productVideo.getName()).isEqualTo("Product Video");
         verify(workflowStepRepository, never()).save(any());
 
-        service.updateWorkflow(admin, other.getId(), new UpdateWorkflow("renamed", null, null));
+        service.updateWorkflow(admin, other.getId(), new UpdateWorkflow("renamed", null));
         service.addStep(admin, other.getId(), new NewStep(null, "echo", null, null));
         service.updateStep(admin, other.getId(), otherSteps.get(0).getId(), new StepEdit("renamed", null, null));
         service.deleteWorkflow(admin, other.getId());
@@ -391,34 +548,8 @@ class WorkflowServiceImplTest {
                 new NewWorkflowStep("second", "echo", "{step:1.field}")));
 
         assertThat(created.ownerId()).isEqualTo(ownerId);
-        assertThat(created.shared()).isTrue();
+        assertThat(created.visibility()).isEqualTo(WorkflowVisibility.PUBLIC);
         assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
-    }
-
-    @Test
-    void createDraftWithStepsStoresAPrivateDraftWithTheStepsInOrder() {
-        UUID ownerId = UUID.randomUUID();
-        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        WorkflowView created = service.createDraft(ownerId, "From example", List.of(
-                new NewWorkflowStep("first", "echo", null),
-                new NewWorkflowStep("second", "echo", "{step:1.field}")));
-
-        assertThat(created.ownerId()).isEqualTo(ownerId);
-        assertThat(created.shared()).isFalse();
-        assertThat(created.status()).isEqualTo("draft");
-        assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
-    }
-
-    @Test
-    void createDraftWithStepsRejectsAnUnknownStepTypeAndSavesNothing() {
-        assertThatThrownBy(() -> service.createDraft(UUID.randomUUID(), "Bad", List.of(
-                new NewWorkflowStep("first", "image.gen", null))))
-                .isInstanceOf(ConstraintViolationException.class);
-
-        verify(workflowRepository, never()).save(any());
-        verify(workflowStepRepository, never()).saveAll(any());
     }
 
     @Test
@@ -621,6 +752,7 @@ class WorkflowServiceImplTest {
     void aNonOwnerCannotDeleteOrReorderSteps() {
         Workflow visible = stored(published(ANA, true));
         List<WorkflowStep> steps = withSteps(visible, "echo", "echo");
+        visibleTo(BEN, visible);
         Workflow hidden = stored(draft(ANA, true));
         withSteps(hidden, "echo");
 
@@ -758,6 +890,124 @@ class WorkflowServiceImplTest {
         verify(workflowStepRepository).setOrder(c, (short) 2);
         verify(workflowStepRepository).setOrder(b, (short) 3);
         verify(workflowStepRepository, never()).setOrder(eq(a), anyShort());
+    }
+
+    private List<WorkflowStep> echoes(Workflow workflow, String[] names, String[] refs) {
+        List<WorkflowStep> steps = withSteps(workflow, java.util.Collections.nCopies(names.length, "echo")
+                .toArray(new String[0]));
+        for (int i = 0; i < names.length; i++) {
+            steps.get(i).edit(names[i], steps.get(i).getConfig(), refs[i]);
+        }
+        return steps;
+    }
+
+    private static void assertReferenceInvalid(Throwable e) {
+        assertThat(e).isInstanceOfSatisfying(UnprocessableEntityException.class, ex -> {
+            assertThat(ex.getCode()).isEqualTo("WORKFLOW_STEP_REFERENCE_INVALID");
+            assertThat(ex.getErrors()).containsKey("inputRef");
+        });
+    }
+
+    @Test
+    void appendingAStepWithABrokenReferenceIsRefusedOnInputRefAndNothingIsSaved() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "draft"}, new String[] {null, null});
+        Workflow single = stored(draft(ANA, false));
+        echoes(single, new String[] {"draft"}, new String[] {null});
+
+        for (String ref : List.of("{step:script.text}", "{step:draft}", "{step:3}", "{step:9}", "{step: 1}")) {
+            assertThatThrownBy(() -> service.addStep(ANA, workflow.getId(), new NewStep(null, "echo", ref, null)))
+                    .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+        }
+        assertThatThrownBy(() -> service.addStep(ANA, single.getId(), new NewStep(null, "echo", "{step:2}", null)))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+        Workflow empty = stored(draft(ANA, false));
+        withSteps(empty);
+        assertThatThrownBy(() -> service.addStep(ANA, empty.getId(), new NewStep(null, "echo", "{step:1}", null)))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void editingAStepToReadALaterStepIsRefused() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice", "mix"},
+                new String[] {null, null, null});
+
+        assertThatThrownBy(() -> service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, null, "{step:mix}")))
+                .satisfies(WorkflowServiceImplTest::assertReferenceInvalid);
+
+        assertThat(steps.get(1).getInputRef()).isNull();
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void aCleanNamedReferenceIsSavedAsWritten() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "voice"}, new String[] {null, null});
+
+        WorkflowStepView added = service.addStep(ANA, workflow.getId(),
+                new NewStep(null, "echo", "{step:draft.title}", null));
+
+        assertThat(added.inputRef()).isEqualTo("{step:draft.title}");
+    }
+
+    @Test
+    void renamingOrClearingANameAnotherStepReadsIsAConflictNamingTheReaders() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice", "mix"},
+                new String[] {null, null, "{step:draft}"});
+
+        for (String renamed : List.of("outline", "")) {
+            assertThatThrownBy(() -> service.updateStep(ANA, workflow.getId(), steps.get(0).getId(),
+                    new StepEdit(renamed, null, null)))
+                    .isInstanceOfSatisfying(ConflictException.class, e -> assertThat(e.getDetail().args())
+                            .containsExactly("draft", "3"));
+        }
+        assertThat(steps.get(0).getName()).isEqualTo("draft");
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void renamingAStepNobodyReadsByNameIsAllowedAndKeepsPositionalReaders() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"draft", "voice"},
+                new String[] {null, "{step:1}"});
+
+        service.updateStep(ANA, workflow.getId(), steps.get(0).getId(), new StepEdit("outline", null, null));
+
+        assertThat(steps.get(0).getName()).isEqualTo("outline");
+        assertThat(steps.get(1).getInputRef()).isEqualTo("{step:1}");
+    }
+
+    @Test
+    void appendingAStepWithANameAnotherStepReadsIsAConflict() {
+        Workflow workflow = stored(draft(ANA, false));
+        echoes(workflow, new String[] {"draft", "voice"}, new String[] {null, "{step:draft}"});
+
+        assertThatThrownBy(() -> service.addStep(ANA, workflow.getId(), new NewStep("draft", "echo", null, null)))
+                .isInstanceOfSatisfying(ConflictException.class, e -> assertThat(e.getDetail().args())
+                        .containsExactly("draft", "2"));
+
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void aPreExistingBrokenReferenceDoesNotBlockAnUnrelatedWrite() {
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = echoes(workflow, new String[] {"a", "b"}, new String[] {null, "{step:5.output}"});
+
+        service.updateStep(ANA, workflow.getId(), steps.get(0).getId(), new StepEdit("renamed", null, null));
+        service.addStep(ANA, workflow.getId(), new NewStep(null, "echo", null, null));
+        service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"label\":\"x\"}", null));
+        service.updateStep(ANA, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"label\":\"y\"}", "{step:5.output}"));
+
+        assertThat(steps.get(1).getInputRef()).isEqualTo("{step:5.output}");
+        assertThat(steps.get(1).getConfig()).isEqualTo("{\"label\":\"y\"}");
     }
 
     private static NewWorkflowStep remote(String name, String outputInputs) {

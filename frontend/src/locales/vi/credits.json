@@ -3,5 +3,25 @@
   "runAnyway": "Vẫn chạy",
   "estimatedCost": "Chi phí ước tính: {{amount}} Credit",
   "chargedSoFarOne": "Đã tính cho lượt chạy này: {{amount}} Credit",
-  "chargedSoFarOther": "Đã tính cho lượt chạy này: {{amount}} Credit"
+  "chargedSoFarOther": "Đã tính cho lượt chạy này: {{amount}} Credit",
+  "wallet": {
+    "aria": "{{amount}} Credit, {{tier}}. Mở trang cá nhân",
+    "used": "Đã dùng {{used}} / {{granted}} Credit",
+    "tier": {
+      "ok": "số dư ổn",
+      "low": "số dư thấp",
+      "critical": "số dư rất thấp",
+      "exhausted": "đã hết Credit"
+    }
+  },
+  "banner": {
+    "title": "Credit",
+    "balance": "{{amount}} Credit",
+    "used": "Đã dùng {{used}} / {{granted}} Credit",
+    "warning": {
+      "low": "Số dư đang thấp. Hãy nạp thêm trước lần chạy tiếp theo.",
+      "critical": "Số dư rất thấp. Các lượt chạy có thể sớm bị từ chối.",
+      "exhausted": "Bạn đã hết Credit. Các lượt chạy bị từ chối cho đến khi có thêm."
+    }
+  }
 }

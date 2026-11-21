@@ -8,6 +8,7 @@
     "media_disabled": "Bộ xử lý media hiện đang tắt.",
     "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
+    "provider_timeout": "Nhà cung cấp xử lý quá lâu. Tác vụ vẫn được giữ, thử lại sau sẽ không bị tạo lại từ đầu nếu nội dung giống hệt.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
     "load_template_invalid_input": "Đầu vào của bước này phải là JSON có trường \"template\" ghi tên mẫu cần tải.",
     "load_template_not_found": "Kho dữ liệu của quy trình này không có mẫu nào mang tên đó.",
@@ -77,7 +78,43 @@
     "loading": "Đang tải lượt chạy…",
     "loadError": "Không tải được lượt chạy này."
   },
+  "runLog": {
+    "title": "Nhật ký lượt chạy",
+    "loading": "Đang tải nhật ký lượt chạy…",
+    "loadError": "Không tải được nhật ký lượt chạy.",
+    "retry": "Thử lại",
+    "empty": "Không có mục nhật ký nào ở mức này.",
+    "filter": {
+      "label": "Hiển thị",
+      "all": "Tất cả",
+      "error": "Lỗi",
+      "warn": "Cảnh báo"
+    },
+    "level": {
+      "error": "Lỗi",
+      "warn": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "started": "Bắt đầu",
+    "duration": "Thời lượng",
+    "attempt": "Lần chạy",
+    "errorCode": "Mã lỗi",
+    "traceId": "Mã theo dõi",
+    "copyTrace": "Sao chép mã theo dõi",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được. Hãy chọn mã theo dõi."
+  },
+  "waveform": {
+    "name": "Dạng sóng của {{label}}"
+  },
   "file": "Tệp: {{name}}",
+  "inputs": {
+    "heading": "Đầu vào",
+    "imageAlt": "Ảnh đầu vào {{number}}",
+    "loading": "Đang tải các tệp đầu vào…",
+    "loadError": "Không tải được các tệp đầu vào của lượt chạy này.",
+    "expired": "Tệp này không còn được lưu"
+  },
   "download": {
     "summary": "Tải bản tóm tắt (.txt)",
     "technical": "Tải chi tiết kỹ thuật (tệp JSON)",
@@ -238,5 +275,33 @@
     "sharedWorkflow": "Quy trình được chia sẻ",
     "mine": "Của tôi",
     "shared": "Được chia sẻ"
+  },
+  "builderDashboard": {
+    "heading": "Thống kê quy trình của bạn",
+    "lede": "Các quy trình của bạn đang hoạt động ra sao và được chạy bao nhiêu lần.",
+    "linkLabel": "Thống kê quy trình của bạn",
+    "loading": "Đang tải thống kê quy trình của bạn…",
+    "loadError": "Không tải được thống kê quy trình của bạn.",
+    "noWorkflows": "Bạn chưa có quy trình nào. Khi bạn sở hữu một quy trình, thống kê của nó sẽ hiện ở đây.",
+    "totals": {
+      "workflows": "Quy trình",
+      "published": "Đã xuất bản",
+      "runs": "Lượt chạy"
+    },
+    "period": {
+      "legend": "Khoảng thời gian",
+      "7d": "7 ngày",
+      "30d": "30 ngày",
+      "90d": "90 ngày"
+    },
+    "chart": {
+      "heading": "Lượt chạy mỗi ngày",
+      "label_one": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "label_other": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "tableLabel": "Lượt chạy mỗi ngày, dạng số",
+      "day": "Ngày",
+      "runs": "Lượt chạy",
+      "failed": "Thất bại"
+    }
   }
 }

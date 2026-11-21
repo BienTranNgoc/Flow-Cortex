@@ -45,43 +45,19 @@
   color: var(--primary);
 }
 
-.topbar__credits {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: var(--control-h);
-  padding-inline: 0.75rem;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-full);
-  background: var(--paper-3);
-  color: var(--ink-2);
-  font-size: 0.8rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  cursor: default;
-}
-
-.topbar__credits svg {
-  color: var(--primary);
-}
-
 @media (max-width: 480px) {
   .topbar {
-    gap: 0.5rem;
-    padding-inline: 0.5rem;
+    gap: 0.25rem;
+    padding-inline: 0.25rem;
   }
 
   .topbar__actions {
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
 
-  .topbar__credits {
-    padding-inline: 0.5rem;
-  }
-
-  .topbar__credits svg {
-    display: none;
+  .topbar__actions .language-toggle__option {
+    min-width: 2.375rem;
+    padding-inline: 0.4rem;
   }
 }
 

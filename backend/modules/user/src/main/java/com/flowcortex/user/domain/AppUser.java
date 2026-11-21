@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * An application user, scoped by {@code owner_id} rather than a tenant id: an ADMIN row is
@@ -18,6 +19,7 @@ import java.util.UUID;
  * com.flowcortex.user.api.CurrentUser}, {@link com.flowcortex.user.api.UserView}) don't carry it.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "app_user")
 public class AppUser {
 
@@ -48,6 +50,9 @@ public class AppUser {
     @Column(name = "username")
     private String username;
 
+    @Column(name = "username_changed_at")
+    private Instant usernameChangedAt;
+
     /** {@code null} only for a self-registered account that has not opened its confirmation link yet. */
     @Column(name = "email_confirmed_at")
     private Instant emailConfirmedAt;
@@ -74,6 +79,14 @@ public class AppUser {
 
     @Column(name = "oauth_provider")
     private String oauthProvider;
+
+    /** When the account's admin console access was deactivated; {@code null} while it is in force. */
+    @Column(name = "admin_disabled_at")
+    private Instant adminDisabledAt;
+
+    /** The account that deactivated the admin access; {@code null} while it is in force. */
+    @Column(name = "admin_disabled_by")
+    private UUID adminDisabledBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -179,6 +192,10 @@ public class AppUser {
         return username;
     }
 
+    public Instant getUsernameChangedAt() {
+        return usernameChangedAt;
+    }
+
     public Instant getEmailConfirmedAt() {
         return emailConfirmedAt;
     }
@@ -215,6 +232,18 @@ public class AppUser {
         return oauthProvider;
     }
 
+    public Instant getAdminDisabledAt() {
+        return adminDisabledAt;
+    }
+
+    public UUID getAdminDisabledBy() {
+        return adminDisabledBy;
+    }
+
+    public boolean isAdminDisabled() {
+        return adminDisabledAt != null;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -240,6 +269,23 @@ public class AppUser {
 
     public void changeName(String name) {
         this.name = name;
+        touch();
+    }
+
+    /** A blank first or last name arrives as {@code null} and clears the field. */
+    public void changeNames(String name, String firstName, String lastName) {
+        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        touch();
+    }
+
+    /** {@code changedAtOrNull} starts the cooldown; a {@code null} leaves the previous stamp as it was. */
+    public void changeUsername(String next, Instant changedAtOrNull) {
+        this.username = next;
+        if (changedAtOrNull != null) {
+            this.usernameChangedAt = changedAtOrNull;
+        }
         touch();
     }
 
@@ -300,8 +346,32 @@ public class AppUser {
         touch();
     }
 
+    /** A change to an end-user role clears the admin deactivation, so a later promotion starts active. */
     public void changeRole(Role role) {
         this.role = role;
+        if (!role.isStaff() && !role.isSuperAdmin()) {
+            this.adminDisabledAt = null;
+            this.adminDisabledBy = null;
+        }
+        touch();
+    }
+
+    /** Deactivates the admin access; a second call keeps the first time and the first actor. */
+    public void deactivateAdmin(UUID by, Instant at) {
+        if (this.adminDisabledAt != null) {
+            return;
+        }
+        this.adminDisabledAt = at;
+        this.adminDisabledBy = by;
+        touch();
+    }
+
+    public void activateAdmin() {
+        if (this.adminDisabledAt == null) {
+            return;
+        }
+        this.adminDisabledAt = null;
+        this.adminDisabledBy = null;
         touch();
     }
 

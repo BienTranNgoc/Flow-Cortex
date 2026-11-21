@@ -82,8 +82,8 @@ export function WorkflowsListPage() {
     if (!visible) return undefined;
     const q = query.trim().toLowerCase();
     return visible.filter((workflow) => {
-      if (scope === 'shared' && !workflow.isShared) return false;
-      if (scope === 'mine' && workflow.isShared) return false;
+      if (scope === 'shared' && workflow.visibility !== 'public') return false;
+      if (scope === 'mine' && workflow.visibility === 'public') return false;
       if (q === '') return true;
       return safeName(workflow, t).toLowerCase().includes(q);
     });
@@ -106,6 +106,11 @@ export function WorkflowsListPage() {
             values={{ name: firstName }}
             components={{ strong: <strong /> }}
           />
+        }
+        actions={
+          <Link to="/builder/dashboard" className="action-link">
+            {t('workflow.builderDashboard.linkLabel')}
+          </Link>
         }
       />
 

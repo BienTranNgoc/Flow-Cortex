@@ -13,8 +13,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
- * The one application context every chat IT and the run request-key IT share: chat, credits (priced from the
- * rate_card rows) and Product Video on, the provider and the event seam stubbed. A test that needs a different
+ * The one application context every chat IT and the run request-key IT share: chat, credits (priced in
+ * {@link ChatItSupport}) and Product Video on, the provider and the event seam stubbed. A test that needs a different
  * setting flips it at runtime through {@link ChatTestConfig}; a property of its own would build another
  * context, and the 1 GB test heap holds only a handful. {@code MediaJobs} is a spy so a test can count its calls.
  */

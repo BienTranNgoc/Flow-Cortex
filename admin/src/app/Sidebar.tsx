@@ -4,12 +4,12 @@ import { useEffect, useRef, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import { NODI_WORDMARK } from './brand';
-import { NAV, type NavGroup, type NavItem, type NavLiveCount } from './nav';
-import { can } from './permissions';
+import { isVisible, NAV, type NavGroup, type NavItem, type NavLiveCount } from './nav';
+import type { Caller } from './permissions';
 import { useIsDesktop } from './useIsDesktop';
 
 interface SidebarProps {
-  readonly role: string | undefined;
+  readonly me: Caller | undefined;
   readonly collapsed: boolean;
   readonly onToggle: () => void;
   readonly drawerOpen?: boolean;
@@ -43,12 +43,12 @@ function replaceTips(event: SyntheticEvent<HTMLElement>) {
 }
 
 /**
- * Navigation drawn from `NAV`: permitted entries link, disabled ones stay visible but inert.
+ * Navigation drawn from `NAV`: entries whose key the caller holds link, disabled ones stay visible but inert.
  * From 1024px it is an `<aside>` that is the full width or the icon-only rail (`collapsed`);
  * below that it is a modal `<dialog>` drawer driven by `drawerOpen`.
  */
 export function Sidebar({
-  role,
+  me,
   collapsed,
   onToggle,
   drawerOpen = false,
@@ -113,7 +113,7 @@ export function Sidebar({
         onScroll={replaceTips}
       >
         {nav.map((group) => {
-          const items = group.items.filter((item) => can(role, item.action));
+          const items = group.items.filter((item) => isVisible(me, item));
           if (items.length === 0) {
             return null;
           }

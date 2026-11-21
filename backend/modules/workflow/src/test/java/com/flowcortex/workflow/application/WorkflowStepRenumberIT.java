@@ -43,7 +43,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({WorkflowServiceImpl.class, WorkflowWriteAccess.class, WorkflowStepRenumberIT.Beans.class})
+@Import({WorkflowServiceImpl.class, WorkflowWriteAccess.class, VersionWriter.class, ServedDefinitions.class,
+        WorkflowStepRenumberIT.Beans.class})
 @Testcontainers
 class WorkflowStepRenumberIT {
 
@@ -83,7 +84,7 @@ class WorkflowStepRenumberIT {
     private WorkflowStepRepository workflowStepRepository;
 
     private Workflow seed(UUID ownerId) {
-        return workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Renumber", false));
+        return workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Renumber"));
     }
 
     private WorkflowStep step(Workflow workflow, int order, String name, String inputRef, String config) {

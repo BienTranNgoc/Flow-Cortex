@@ -1,0 +1,73 @@
+{
+  "eyebrow": "Administration",
+  "title": "Settings",
+  "description": "Switches and limits that take effect from the next request, without a restart.",
+  "readOnly": "You can view these settings but not change them.",
+  "empty": "There are no settings to show.",
+  "loading": "Loading…",
+  "loadFailed": "Could not load the settings.",
+  "refreshFailed": "Could not refresh the latest settings — showing the version loaded earlier.",
+  "retry": "Retry",
+  "save": "Save",
+  "saving": "Saving…",
+  "saveFailed": "Could not save. Please try again.",
+  "reset": "Reset to configured value",
+  "integerRange": "Enter a whole number from {{min}} to {{max}}.",
+  "bounds": "From {{min}} to {{max}}",
+  "changedBy": "Changed by {{email}} at {{at}}",
+  "changedAt": "Changed at {{at}}",
+  "vetoedNote": "Turned off by the server configuration; the stored value applies once it is lifted.",
+  "degradedNote": "The settings store is unavailable, so a safe fallback applies.",
+  "groups": {
+    "support": "Help Center"
+  },
+  "source": {
+    "STORED": "Set by an admin",
+    "CONFIGURED": "From server configuration",
+    "DEFAULT": "Default",
+    "VETOED": "Turned off by the server configuration",
+    "DEGRADED": "Settings store unavailable"
+  },
+  "value": {
+    "on": "On",
+    "off": "Off"
+  },
+  "history": {
+    "show": "Show history",
+    "hide": "Hide history",
+    "loadFailed": "Could not load the history.",
+    "empty": "No changes yet.",
+    "unset": "not set",
+    "unknownActor": "Deleted account",
+    "transition": "{{from}} → {{to}}",
+    "range": "{{from}}–{{to}} of {{total}}",
+    "newer": "Newer",
+    "older": "Older"
+  },
+  "keys": {
+    "support": {
+      "assistant": {
+        "enabled": {
+          "label": "AI assistant",
+          "help": "Turning it off takes effect from the next question; guide articles and requests keep working."
+        },
+        "daily_ceiling": {
+          "label": "Questions per day, all askers",
+          "help": "The assistant pauses for the day once this many questions were answered."
+        },
+        "member_daily_quota": {
+          "label": "Questions per member per day",
+          "help": "How many questions one signed-in member may ask each day."
+        },
+        "guest_daily_quota": {
+          "label": "Questions per guest per day",
+          "help": "How many questions one guest may ask each day."
+        },
+        "guest_network_daily_quota": {
+          "label": "Questions per guest network per day",
+          "help": "How many questions all guests behind one network address may ask each day."
+        }
+      }
+    }
+  }
+}

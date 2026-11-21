@@ -15,7 +15,8 @@ import java.util.UUID;
  */
 public interface WorkflowAuthoring {
 
-    WorkflowView createDraft(UUID ownerId, String name, boolean shared);
+    /** Creates an empty private draft owned by {@code ownerId}. */
+    WorkflowView createDraft(UUID ownerId, String name);
 
     /** A private draft that already holds {@code steps}, in order; the steps pass the same check as a saved workflow's. */
     WorkflowView createDraft(UUID ownerId, String name, List<NewWorkflowStep> steps);
