@@ -54,7 +54,7 @@ def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) 
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-loglevel", "error",
             "-protocol_whitelist", "file", "-i", str(video), "-map", f"0:{stream.index}",
-            "-vf", chain, "-f", "null", "-",
+            "-vf", chain, "-t", f"{duration_ms / 1000:.3f}", "-f", "null", "-",
         ]
     )  # fmt: skip
     if completed.returncode != 0:

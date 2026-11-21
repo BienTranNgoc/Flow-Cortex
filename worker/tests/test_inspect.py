@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from conftest import job_body
+from conftest import job_body, understated_duration_clip
 
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError
@@ -231,3 +231,20 @@ def test_zero_frame_rate_is_probe_failed_in_inspect(tmp_path: Path) -> None:
 
     assert error.code == "probe_failed"
     assert "avg_frame_rate" in error.message
+
+
+@needs_ffmpeg
+def test_a_container_that_understates_its_length_is_decoded_only_to_that_length(
+    tmp_path: Path,
+) -> None:
+    clip = understated_duration_clip(
+        tmp_path / "input.mkv", real_seconds=60, declared_ms=3000, rate=5
+    )
+    processes = Recording()
+
+    data = inspect.handle(job(), {"video": clip}, processes).data
+
+    [decode] = processes.decodes
+    assert decode[decode.index("-t") + 1] == "3.000"
+    assert data["durationMs"] == 3000
+    assert all(run["toMs"] > run["fromMs"] for run in [*data["black"], *data["freeze"]])

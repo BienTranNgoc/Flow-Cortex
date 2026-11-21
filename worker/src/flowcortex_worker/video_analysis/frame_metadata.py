@@ -41,7 +41,10 @@ def frame_events(text: str) -> tuple[int, list[tuple[str, float]]]:
 def runs(
     events: list[tuple[str, float]], start_key: str, end_key: str, duration_ms: int
 ) -> list[dict[str, int]]:
-    """`{fromMs, toMs}` runs between start and end marks; an open run ends at the clip end."""
+    """`{fromMs, toMs}` runs between start and end marks; an open run ends at the clip end.
+
+    Runs are clamped to the clip; one left empty by the clamp lay outside it and is dropped.
+    """
     pairs: list[tuple[int, int]] = []
     opened: float | None = None
     for key, seconds in events:
@@ -56,10 +59,8 @@ def runs(
             opened = None
     if opened is not None:
         pairs.append((ms(opened), duration_ms))
-    return [
-        {"fromMs": min(max(a, 0), duration_ms), "toMs": min(max(b, 0), duration_ms)}
-        for a, b in pairs
-    ]
+    clamped = [(min(max(a, 0), duration_ms), min(max(b, 0), duration_ms)) for a, b in pairs]
+    return [{"fromMs": a, "toMs": b} for a, b in clamped if b > a]
 
 
 def black_runs(

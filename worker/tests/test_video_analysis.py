@@ -238,6 +238,12 @@ def test_freeze_start_only_covers_the_whole_clip() -> None:
     assert frame_metadata.runs(events, *FREEZE, 3000) == [{"fromMs": 0, "toMs": 3000}]
 
 
+def test_a_run_lying_past_the_clip_end_is_dropped() -> None:
+    events = [(frame_metadata.FREEZE_START, 32.0), (frame_metadata.FREEZE_END, 40.0)]
+
+    assert frame_metadata.runs(events, *FREEZE, 3000) == []
+
+
 def test_closed_run_is_clamped_to_the_clip() -> None:
     events = [(frame_metadata.BLACK_START, -0.2), (frame_metadata.BLACK_END, 3.4)]
 
