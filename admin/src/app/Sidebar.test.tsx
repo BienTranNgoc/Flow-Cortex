@@ -48,6 +48,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Media Jobs/i })).toHaveAttribute('href', '/media-jobs');
     expect(screen.getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/users');
     expect(screen.getByRole('link', { name: /SMS Outbox/ })).toHaveAttribute('href', '/sms-outbox');
+    expect(screen.getByRole('link', { name: /Model Providers/ })).toHaveAttribute('href', '/providers');
 
     const voice = screen.getByText('Voice Quota').closest('[aria-disabled]');
     expect(voice).toHaveAttribute('aria-disabled', 'true');
@@ -63,7 +64,6 @@ describe('Sidebar', () => {
     'Workflows & Templates',
     'Approval Queue',
     'Credits & Wallets',
-    'Model Providers',
     'Feature Switches',
     'Audit Log',
     'Voice Quota',

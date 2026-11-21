@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
@@ -22,6 +23,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -52,14 +56,27 @@ public class ProductVideoService implements ProductVideoRuns {
     private final boolean enabled;
     private final boolean workflowEnabled;
     private final RunUpdates runUpdates;
+    private final Tracer tracer;
     private final ObjectMapper json = new ObjectMapper();
 
+    @Autowired
     ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
             RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards,
+            ObjectProvider<Tracer> tracer,
             @Value("${flowcortex.product-video.enabled:false}") boolean enabled,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this(workflows, workflowSteps, runs, runSteps, productInputs, mediaJobs, registry, events, runUpdates,
+                transactions, runStartGuards, tracer.getIfAvailable(() -> Tracer.NOOP), enabled, workflowEnabled);
+    }
+
+    ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
+            WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
+            MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
+            RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards, Tracer tracer,
+            boolean enabled, boolean workflowEnabled) {
+        this.tracer = tracer;
         this.runUpdates = runUpdates;
         this.workflows = workflows;
         this.workflowSteps = workflowSteps;
@@ -118,17 +135,18 @@ public class ProductVideoService implements ProductVideoRuns {
             boolean acknowledgeCost, String requestKey) {
         List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID);
         runStartGuards.check(ownerId, workflow.getId(), definitions, new StartContext(acknowledgeCost));
-        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(ownerId, uploadIds);
+        List<MediaAssetInput> assets = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds);
         String productJson = productJson(draft);
         // Copied before the run's transaction opens, so no database transaction waits on the object store.
         UUID runId = UUID.randomUUID();
         List<MediaAssetInput> copies = mediaJobs.copyRunInputs(runId, assets);
         String assetJson = json(copies.stream().map(MediaAssetInput::input).toList());
         Instant now = Instant.now();
+        String traceId = CurrentTrace.idFor(tracer);
 
         return transactions.execute(status -> {
             WorkflowRun run = runs.save(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, productJson, null,
-                    now, requestKey));
+                    now, requestKey).withTraceId(traceId));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(), now));
             mediaJobs.bindRunInputs(run.getId(), copies);

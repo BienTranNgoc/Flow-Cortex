@@ -8,6 +8,7 @@
     "media_disabled": "Bộ xử lý media hiện đang tắt.",
     "contract_violation": "Bộ xử lý media đã từ chối tác vụ này. Hãy thử lại sau.",
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
+    "provider_timeout": "Nhà cung cấp xử lý quá lâu. Tác vụ vẫn được giữ, thử lại sau sẽ không bị tạo lại từ đầu nếu nội dung giống hệt.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
@@ -71,7 +72,43 @@
     "loading": "Đang tải lượt chạy…",
     "loadError": "Không tải được lượt chạy này."
   },
+  "runLog": {
+    "title": "Nhật ký lượt chạy",
+    "loading": "Đang tải nhật ký lượt chạy…",
+    "loadError": "Không tải được nhật ký lượt chạy.",
+    "retry": "Thử lại",
+    "empty": "Không có mục nhật ký nào ở mức này.",
+    "filter": {
+      "label": "Hiển thị",
+      "all": "Tất cả",
+      "error": "Lỗi",
+      "warn": "Cảnh báo"
+    },
+    "level": {
+      "error": "Lỗi",
+      "warn": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "started": "Bắt đầu",
+    "duration": "Thời lượng",
+    "attempt": "Lần chạy",
+    "errorCode": "Mã lỗi",
+    "traceId": "Mã theo dõi",
+    "copyTrace": "Sao chép mã theo dõi",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được. Hãy chọn mã theo dõi."
+  },
+  "waveform": {
+    "name": "Dạng sóng của {{label}}"
+  },
   "file": "Tệp: {{name}}",
+  "inputs": {
+    "heading": "Đầu vào",
+    "imageAlt": "Ảnh đầu vào {{number}}",
+    "loading": "Đang tải các tệp đầu vào…",
+    "loadError": "Không tải được các tệp đầu vào của lượt chạy này.",
+    "expired": "Tệp này không còn được lưu"
+  },
   "download": {
     "summary": "Tải bản tóm tắt (.txt)",
     "technical": "Tải chi tiết kỹ thuật (tệp JSON)",

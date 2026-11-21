@@ -8,6 +8,9 @@ import {
   getReviewTasks,
   getRevisions,
   getRun,
+  getRunInputs,
+  getRunLog,
+  getStepOutputPeaks,
   getWorkflow,
   listWorkflows,
   rejectTask,
@@ -19,7 +22,9 @@ import {
 } from '@flow-cortex/api-client';
 import type {
   ApproveReviewTaskRequest,
+  GetRunLogLevel,
   ProductVideoRunRequest,
+  RunInputResponse,
   StartRunRequest,
   UploadRequest,
 } from '@flow-cortex/api-client';
@@ -43,14 +48,14 @@ export function useWorkflowsQuery() {
 export function useWorkflowQuery(id: string) {
   return useQuery({
     queryKey: ['workflows', id],
-    queryFn: () => unwrap(getWorkflow(id, authHeaders())),
+    queryFn: () => unwrap(getWorkflow(id, undefined, authHeaders())),
     enabled: Boolean(id),
   });
 }
 
 export function useStartRunMutation(workflowId: string) {
   return useMutation({
-    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, authHeaders())),
+    mutationFn: (input: StartRunRequest) => unwrap(startRun(workflowId, input, undefined, authHeaders())),
   });
 }
 
@@ -87,6 +92,37 @@ export function useRunQuery(runId: string | undefined) {
   });
   useRunEvents(runId, query.data?.status, query.refetch);
   return query;
+}
+
+const INPUT_URL_REFRESH_LEAD_MS = 60_000;
+// A stale timer longer than ~24.8 days overflows setTimeout and fires at once.
+const MAX_INPUT_STALE_MS = 24 * 60 * 60 * 1000;
+
+/** Whether a signed link is expired or about to be, so a failed load means "renew", not "gone". */
+export function inputUrlNeedsRenewal(expiresAt: string, now = Date.now()): boolean {
+  const expiry = Date.parse(expiresAt);
+  return Number.isNaN(expiry) || now >= expiry - INPUT_URL_REFRESH_LEAD_MS;
+}
+
+/** Milliseconds until the earliest link needs renewing; 0 when none is known or one already does. */
+function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
+  const expiries = (inputs ?? []).map((input) => Date.parse(input.expiresAt));
+  if (expiries.length === 0 || expiries.some(Number.isNaN)) {
+    return 0;
+  }
+  const untilRefresh = Math.min(...expiries) - INPUT_URL_REFRESH_LEAD_MS - Date.now();
+  return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
+}
+
+/** The run's uploaded files with signed links, renewed before the first expires while the tab stays open. */
+export function useRunInputsQuery(runId: string) {
+  return useQuery({
+    queryKey: ['runs', runId, 'inputs'],
+    queryFn: () => unwrap(getRunInputs(runId, authHeaders())),
+    enabled: Boolean(runId),
+    staleTime: (query) => untilInputRefresh(query.state.data),
+    refetchInterval: (query) => untilInputRefresh(query.state.data) || false,
+  });
 }
 
 /**
@@ -176,6 +212,44 @@ function approveBody(input: ApproveTaskInput): ApproveReviewTaskRequest | undefi
     };
   }
   return input.reviewedPayload === undefined ? undefined : { reviewedPayload: input.reviewedPayload };
+}
+
+/** A 404 or 503 answers the same again within the minute, so only other failures retry (twice). */
+function retryUnlessRefused(failures: number, error: unknown): boolean {
+  if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+    return false;
+  }
+  return failures < 2;
+}
+
+/** The run's log at one level filter; loaded only once the panel is open. */
+export function useRunLogQuery(runId: string, level: GetRunLogLevel, enabled: boolean) {
+  return useQuery({
+    queryKey: ['runs', runId, 'log', level],
+    queryFn: () => unwrap(getRunLog(runId, { level }, authHeaders())),
+    enabled: enabled && Boolean(runId),
+    retry: retryUnlessRefused,
+  });
+}
+
+/**
+ * The 120 peaks of one stored sound. The server keeps the answer per attempt, so once one arrives
+ * (`null` included) it is not asked for again; the key sits outside `runs` so a run refresh
+ * after a decision does not refetch it.
+ */
+export function useOutputPeaksQuery(
+  runId: string,
+  stepOrder: number,
+  name: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['run-peaks', runId, stepOrder, name],
+    queryFn: () => unwrap(getStepOutputPeaks(runId, stepOrder, name, authHeaders())),
+    enabled: enabled && Boolean(runId),
+    retry: retryUnlessRefused,
+    staleTime: Infinity,
+  });
 }
 
 export function useRejectTaskMutation(runId: string, taskId: string) {

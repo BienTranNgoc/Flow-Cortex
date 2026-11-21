@@ -14,7 +14,12 @@ include(
     ":modules:support",
     ":modules:space",
     ":modules:realtime",
+    ":modules:onboarding",
+    ":modules:mail",
+    ":modules:connector",
+    ":modules:billing",
     ":modules:chat",
     ":shared:web",
     ":shared:security",
+    ":shared:ratelimit",
 )
