@@ -9,7 +9,8 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Media",
         allowedDependencies = {
-                "shared :: web"
+                "shared :: web",
+                "space :: api"
         }
 )
 package com.flowcortex.media;

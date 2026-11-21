@@ -102,7 +102,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
     public ProblemDetail handleOptimisticLock(Exception ex, HttpServletRequest request) {
-        LOG.info("Concurrent update lost on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        LOG.info("Concurrent update lost on {} {}: {}", request.getMethod(),
+                LoggedPaths.redact(request.getRequestURI()), ex.getMessage());
         return problem(HttpStatus.CONFLICT, "conflict",
                 message("problem.conflict.concurrentUpdate", locale(request)));
     }
@@ -115,6 +116,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", message("problem.forbidden", locale(request)));
+    }
+
+    @ExceptionHandler(AdminDisabledException.class)
+    public ProblemDetail handleAdminDisabled(AdminDisabledException ex, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "admin-disabled", message("problem.adminDisabled", locale(request)));
     }
 
     @ExceptionHandler(AccountLockedException.class)
@@ -204,7 +210,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
-        LOG.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        LOG.error("Unhandled exception on {} {}", request.getMethod(),
+                LoggedPaths.redact(request.getRequestURI()), ex);
         ProblemDetail detail = problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error",
                 message("problem.unexpected", locale(request)));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(detail);

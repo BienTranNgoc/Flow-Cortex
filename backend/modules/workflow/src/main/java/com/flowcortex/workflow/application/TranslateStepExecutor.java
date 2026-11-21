@@ -4,9 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.workflow.application.provider.DubProperties;
-import com.flowcortex.workflow.application.provider.GeminiClient;
-import com.flowcortex.workflow.application.provider.GeminiException;
+import com.flowcortex.workflow.application.provider.DubSlots;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -34,11 +34,11 @@ class TranslateStepExecutor implements StepExecutor {
     private static final Duration MARGIN = Duration.ofMinutes(1);
 
     private final ObjectMapper json = new ObjectMapper();
-    private final GeminiClient gemini;
+    private final LlmSlots llm;
     private final DubProperties dub;
 
-    TranslateStepExecutor(GeminiClient gemini, DubProperties dub) {
-        this.gemini = gemini;
+    TranslateStepExecutor(LlmSlots llm, DubProperties dub) {
+        this.llm = llm;
         this.dub = dub;
     }
 
@@ -55,7 +55,7 @@ class TranslateStepExecutor implements StepExecutor {
     /** Above both asks taking every attempt on every translation model, so a provider failure keeps its own code. */
     @Override
     public Duration maxRuntime() {
-        return dub.gemini().worstCase(dub.gemini().translateModels().size()).multipliedBy(ASKS).plus(MARGIN);
+        return llm.jsonWorstCase(DubSlots.TRANSLATE).multipliedBy(ASKS).plus(MARGIN);
     }
 
     @Override
@@ -70,7 +70,7 @@ class TranslateStepExecutor implements StepExecutor {
 
     @Override
     public boolean available() {
-        return dub.available();
+        return dub.enabled() && llm.configured();
     }
 
     @Override
@@ -123,11 +123,7 @@ class TranslateStepExecutor implements StepExecutor {
     }
 
     private Map<Integer, String> ask(String prompt) {
-        try {
-            return DubSegments.lines(json, gemini.generateJson(prompt, DubSegments.LINES_SCHEMA));
-        } catch (GeminiException e) {
-            throw DubSegments.providerFailure(e);
-        }
+        return DubSegments.lines(json, llm.generateJson(DubSlots.TRANSLATE, prompt, DubSegments.LINES_SCHEMA));
     }
 
     /** Why the answer cannot be used, one entry per offending line; empty when it can. Never quotes the text. */

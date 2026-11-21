@@ -20,12 +20,22 @@ from .adapter import (
     SpeechRequest,
     StoryboardArtifact,
     StoryboardRequest,
+    VendorProbe,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
     VideoRequest,
 )
 from .contracts.provider_job import ProductAdPayload
+from .vendor_jobs import (
+    RESULT_GONE_STATUSES,
+    VendorJobEnded,
+    VendorJobTimeout,
+    VendorResultGone,
+    probe_json,
+    probe_media,
+    vendor_scope,
+)
 
 log = logging.getLogger("flowcortex_provider_worker.veo")
 
@@ -110,26 +120,58 @@ class VeoAdapter:
         if not task_id.startswith("operations/") or ".." in task_id:
             raise PermanentError("provider_response_invalid", "Veo operation name is invalid")
         deadline = time.monotonic() + self.config.poll_timeout_seconds
-        task_url = f"{self.config.base_url.rstrip('/')}/{task_id}"
+        task_url = self._task_url(task_id)
         while True:
             abort.check()
-            response = self._json_request(task_url, method="GET")
+            response = self._json_request(task_url, method="GET", task_lookup=True)
             if response.get("done") is True:
                 error = response.get("error")
                 if isinstance(error, dict):
                     code = str(error.get("code", "unknown"))[:100]
                     log.warning("Veo operation failed", extra={"providerErrorCode": code})
-                    raise PermanentError(
-                        "provider_request_failed", "Veo operation completed with an error"
-                    )
+                    raise VendorJobEnded("failed", "Veo operation completed with an error")
                 video_url = _video_uri(response)
                 return VideoArtifact(self._download_video(video_url), task_id)
             if time.monotonic() >= deadline:
-                raise TransientError("Veo operation polling timed out")
+                raise VendorJobTimeout(PROVIDER_VEO, task_id)
             remaining = max(0.0, deadline - time.monotonic())
             time.sleep(min(self.config.poll_interval_seconds, remaining))
 
-    def _json_request(self, url: str, *, method: str, body: bytes | None = None) -> dict[str, Any]:
+    def probe_video(self, task_id: str) -> VendorProbe:
+        if not task_id.startswith("operations/") or ".." in task_id:
+            return "gone"
+        headers = {"x-goog-api-key": self.config.api_key}
+        body = probe_json(
+            self._task_url(task_id), headers, self.config.request_timeout_seconds
+        )
+        if body is None:
+            return "gone"
+        if body.get("done") is not True:
+            return "running"
+        if isinstance(body.get("error"), dict):
+            return "failed"
+        try:
+            video_url = _video_uri(body)
+        except PermanentError:
+            return "gone"
+        if not _is_google_api_url(video_url):
+            return "gone"
+        return probe_media(video_url, headers, self.config.request_timeout_seconds)
+
+    def vendor_scope(self) -> dict[str, str]:
+        return vendor_scope(self.config.base_url, self.config.api_key)
+
+    def _task_url(self, task_id: str) -> str:
+        return f"{self.config.base_url.rstrip('/')}/{task_id}"
+
+    def _json_request(
+        self,
+        url: str,
+        *,
+        method: str,
+        body: bytes | None = None,
+        task_lookup: bool = False,
+    ) -> dict[str, Any]:
         request = urllib.request.Request(
             url,
             data=body,
@@ -145,7 +187,7 @@ class VeoAdapter:
             ) as response:
                 response_body = response.read()
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=frozenset({404}) if task_lookup else frozenset())
         except (urllib.error.URLError, TimeoutError) as exc:
             log.warning("Veo connection failed", extra={"errorType": type(exc).__name__})
             raise TransientError(f"Veo connection failed: {type(exc).__name__}") from exc
@@ -160,12 +202,7 @@ class VeoAdapter:
         return parsed
 
     def _download_video(self, url: str) -> bytes:
-        parsed = urllib.parse.urlparse(url)
-        if (
-            parsed.scheme != "https"
-            or not parsed.hostname
-            or not parsed.hostname.endswith(".googleapis.com")
-        ):
+        if not _is_google_api_url(url):
             raise PermanentError(
                 "provider_response_invalid", "Veo video URL is outside Google APIs"
             )
@@ -178,7 +215,7 @@ class VeoAdapter:
             ) as response:
                 body = response.read(_MAX_VIDEO_BYTES + 1)
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
         except (urllib.error.URLError, TimeoutError) as exc:
             raise TransientError(f"Veo video download failed: {type(exc).__name__}") from exc
         if len(body) > _MAX_VIDEO_BYTES:
@@ -213,10 +250,23 @@ def _image_mime(body: bytes) -> str:
     raise PermanentError("provider_response_invalid", "reference image MIME is unknown")
 
 
-def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
+def _is_google_api_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname
+        and parsed.hostname.endswith(".googleapis.com")
+    )
+
+
+def _raise_http_error(
+    exc: urllib.error.HTTPError, *, gone: frozenset[int] = frozenset()
+) -> NoReturn:
     log.warning("Veo HTTP request failed", extra={"status": exc.code})
     if exc.code in (408, 429) or 500 <= exc.code < 600:
         raise TransientError(f"Veo HTTP {exc.code}") from exc
+    if exc.code in gone:
+        raise VendorResultGone(f"Veo rejected the request with HTTP {exc.code}") from exc
     raise PermanentError(
         "provider_request_failed", f"Veo rejected the request with HTTP {exc.code}"
     ) from exc
