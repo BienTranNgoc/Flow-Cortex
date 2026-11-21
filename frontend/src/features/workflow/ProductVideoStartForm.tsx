@@ -286,6 +286,7 @@ export function ProductVideoStartForm({
   const uploadPercent = phase?.kind === 'uploading' ? phase.percent : null;
   const resend = failure?.kind === 'credits' ? failure.resend : null;
   const selectedFile = files[0];
+  const imageProblemId = imageError ? 'product-images-problem' : undefined;
 
   return (
     <div className="pv-studio-grid">
@@ -359,15 +360,17 @@ export function ProductVideoStartForm({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 required
+                tabIndex={-1}
                 onChange={onPick}
                 aria-invalid={imageError ? true : undefined}
-                aria-describedby={imageError ? 'product-images-problem' : undefined}
+                aria-describedby={imageProblemId}
               />
               {!selectedFile ? (
                 <button
                   type="button"
                   className="pv-dropzone-empty"
                   disabled={phase !== null}
+                  aria-describedby={imageProblemId}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <span className="pv-dropzone-icon" aria-hidden="true">
@@ -406,6 +409,7 @@ export function ProductVideoStartForm({
                       type="button"
                       className="pv-secondary-btn"
                       disabled={phase !== null}
+                      aria-describedby={imageProblemId}
                       onClick={() => fileInputRef.current?.click()}
                     >
                       {t('workflow.productVideo.changeImage')}

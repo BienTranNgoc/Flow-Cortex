@@ -96,6 +96,37 @@ describe('ProductVideoStartForm', () => {
     expect(picker).toBeRequired();
   });
 
+  it('keeps the hidden file input out of the tab order so only the visible picker takes focus', async () => {
+    renderForm();
+
+    expect(await screen.findByLabelText(/Product image/)).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('ties the image error to the visible picker button', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await screen.findByLabelText('Product name *');
+    await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
+    await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    await screen.findByText('Add at least one product image');
+    const picker = screen.getByRole('button', { name: /Drag & drop a photo/ });
+    expect(picker).toHaveAccessibleDescription('Add at least one product image');
+  });
+
+  it('ties the image error to the Replace photo button once a rejected file is chosen', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.upload(await screen.findByLabelText(/Product image/), [image('holiday.avi')]);
+
+    expect(await screen.findByRole('button', { name: 'Replace photo' })).toHaveAccessibleDescription(
+      'Use .jpg, .jpeg, .png or .webp.',
+    );
+  });
+
   it('asks for at least one product image when Start is pressed without one', async () => {
     const user = userEvent.setup();
     const calls = renderForm();

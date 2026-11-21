@@ -42,6 +42,15 @@ const RUN_HEADING_KEYS: Record<string, string> = {
   cancelled: 'workflow.run.heading.cancelled',
 };
 
+const RUN_BADGE_KEYS: Record<string, string> = {
+  running: 'workflow.step.state.running',
+  cancelling: 'workflow.run.heading.cancelling',
+  waiting_approval: 'workflow.step.state.needsYou',
+  completed: 'workflow.step.state.completed',
+  error: 'workflow.step.state.error',
+  cancelled: 'workflow.step.state.stopped',
+};
+
 function runHeading(status: string | undefined, t: TFunction): string {
   const key = RUN_HEADING_KEYS[status ?? ''];
   return key ? t(key) : t('workflow.run.headingOther', { status });
@@ -174,9 +183,12 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     if (stopped) headingRef.current?.focus();
   }, [stopped]);
 
+  const isProductVideo = isProductVideoRun(run, steps);
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
-    selected && selectedState ? `${stepLabel(selected, t)}, ${stateWord(selectedState, t)}` : '';
+    selected && selectedState
+      ? `${stepLabel(selected, t, steps, isProductVideo)}, ${stateWord(selectedState, t)}`
+      : '';
 
   const selectedKey = selected && stepKey(selected);
   const [announced, setAnnounced] = useState('');
@@ -195,7 +207,6 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     run.status === 'error' && !steps.some((step) => step.status === 'error');
   const backTo = workflowId ?? run.workflowId;
   const brief = parseProductBrief(run.input);
-  const isProductVideo = isProductVideoRun(run, steps);
   const finalVideo =
     isProductVideo && run.status === 'completed' ? findFinalVideoArtifact(steps) : null;
 
@@ -220,16 +231,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     />
   ) : null;
 
-  const statusPillLabel =
-    run.status === 'running' || run.status === 'cancelling'
-      ? t('workflow.step.state.running')
-      : run.status === 'waiting_approval'
-        ? t('workflow.step.state.needsYou')
-        : run.status === 'completed'
-          ? t('workflow.step.state.completed')
-          : run.status === 'error' || run.status === 'cancelled'
-            ? t('workflow.step.state.error')
-            : t('workflow.step.state.pending');
+  const statusPillLabel = t(RUN_BADGE_KEYS[run.status ?? ''] ?? 'workflow.step.state.pending');
 
   return (
     <div className={isProductVideo ? 'pv-run-shell' : undefined}>

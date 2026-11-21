@@ -22,6 +22,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   provider_timeout: 'workflow.stepError.provider_timeout',
   provider_quota_exceeded: 'workflow.stepError.provider_quota_exceeded',
   provider_unavailable: 'workflow.stepError.provider_unavailable',
+  provider_busy: 'workflow.stepError.provider_busy',
   sibling_failed: 'workflow.stepError.sibling_failed',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
   INSUFFICIENT_CREDITS: 'workflow.stepError.INSUFFICIENT_CREDITS',

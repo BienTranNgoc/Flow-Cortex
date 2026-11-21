@@ -64,7 +64,12 @@ export function ScriptEditor({
       <RevisionHistory
         revisions={revisions}
         approvedRevisionId={task.approvedRevisionId}
-        onSelectRevision={setDraft}
+        onSelectRevision={(content) => {
+          if (dirty && !window.confirm(t('workflow.script.replaceConfirm'))) {
+            return;
+          }
+          setDraft(content);
+        }}
       />
       <div className="field">
         <label htmlFor="script-draft">{t('workflow.script.label')}</label>

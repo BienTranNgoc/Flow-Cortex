@@ -63,6 +63,50 @@ describe('stepErrorSentence', () => {
     }
   });
 
+  it('covers every errorCode the backend writes on a step', () => {
+    const backendCodes = [
+      'input_rejected',
+      'probe_failed',
+      'audio_extraction_failed',
+      'audio_alignment_failed',
+      'audio_alignment_out_of_range',
+      'provider_capability_unavailable',
+      'provider_request_failed',
+      'provider_response_invalid',
+      'provider_timeout',
+      'contract_violation',
+      'run_timeout',
+      'duration_exceeded',
+      'no_audio_stream',
+      'sibling_failed',
+      'queue_timeout',
+      'lease_expired',
+      'media_disabled',
+      'store_unavailable',
+      'translation_invalid',
+      'dub_disabled',
+      'speech_too_long',
+      'provider_quota_exceeded',
+      'provider_unavailable',
+      'provider_busy',
+      'INSUFFICIENT_CREDITS',
+      'APPROVAL_REJECTED',
+    ];
+
+    expect(backendCodes.filter((code) => !KNOWN_STEP_ERROR_CODES.includes(code))).toEqual([]);
+  });
+
+  it('tells the member a busy provider pool is temporary, in both languages', () => {
+    const fromServer = 'Too many videos are being processed right now. Try again in a few minutes.';
+
+    expect(stepErrorSentence('provider_busy', fromServer, false, en, 'en')).toBe(
+      enWorkflow.stepError.provider_busy,
+    );
+    expect(stepErrorSentence('provider_busy', fromServer, false, vi, 'vi')).toBe(
+      viWorkflow.stepError.provider_busy,
+    );
+  });
+
   it('uses AI-step context copy instead of file/media-engine copy for AI and Product Video steps', () => {
     const aiSteps = [
       'generate_script',

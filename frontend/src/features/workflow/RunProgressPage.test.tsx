@@ -1125,6 +1125,56 @@ describe('RunProgressPage', () => {
       expect(confirm).toHaveBeenCalledOnce();
       expect(screen.getByLabelText('Script to approve')).toBeInTheDocument();
     });
+
+    describe('loading an earlier revision over an unsaved edit', () => {
+      const SECOND = {
+        ...REVISION,
+        id: 'rev2',
+        revisionNumber: 2,
+        content: 'Newer saved line.',
+      };
+
+      it('keeps the unsaved edit when the reviewer declines to replace it', async () => {
+        const user = userEvent.setup();
+        const confirm = vi.fn(() => false);
+        vi.stubGlobal('confirm', confirm);
+        renderScript([REVISION, SECOND]);
+
+        const editor = await screen.findByLabelText('Script to approve');
+        await user.type(editor, ' extra');
+        await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
+
+        expect(confirm).toHaveBeenCalledOnce();
+        expect(editor).toHaveValue('Newer saved line. extra');
+      });
+
+      it('replaces the unsaved edit once the reviewer confirms', async () => {
+        const user = userEvent.setup();
+        const confirm = vi.fn(() => true);
+        vi.stubGlobal('confirm', confirm);
+        renderScript([REVISION, SECOND]);
+
+        const editor = await screen.findByLabelText('Script to approve');
+        await user.type(editor, ' extra');
+        await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
+
+        expect(confirm).toHaveBeenCalledOnce();
+        expect(editor).toHaveValue('Draft caption');
+      });
+
+      it('loads a revision without asking when nothing is unsaved', async () => {
+        const user = userEvent.setup();
+        const confirm = vi.fn(() => false);
+        vi.stubGlobal('confirm', confirm);
+        renderScript([REVISION, SECOND]);
+
+        const editor = await screen.findByLabelText('Script to approve');
+        await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
+
+        expect(confirm).not.toHaveBeenCalled();
+        expect(editor).toHaveValue('Draft caption');
+      });
+    });
   });
 
   describe('a running run followed by push', () => {
@@ -2401,6 +2451,82 @@ describe('RunProgressPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'Load revision 1 into editor' }));
       expect(editor).toHaveValue('First crisp ad line.');
+    });
+
+    it.each([
+      ['cancelled', 'Run cancelled', 'Stopped', 'stopped'],
+      ['cancelling', 'Stopping…', 'Stopping…', 'running'],
+    ])(
+      'labels a %s product video run as "%s" instead of Error',
+      async (status, heading, badgeLabel, badgeState) => {
+        stubApi({
+          'GET /api/v1/features': { status: 200, body: { runCancellation: true } },
+          'GET /api/v1/runs/r1': {
+            status: 200,
+            body: run(
+              [
+                step({
+                  id: 's1',
+                  stepOrder: 1,
+                  type: 'generate_script',
+                  mode: 'remote',
+                  status: 'completed',
+                  output: 'First crisp ad line.',
+                }),
+              ],
+              {
+                status,
+                input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+              },
+            ),
+          },
+        });
+
+        renderRoute(
+          '/workflows/:workflowId/runs/:runId',
+          '/workflows/w1/runs/r1',
+          <RunProgressPage />,
+        );
+
+        expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+        const badge = document.querySelector('.pv-run-badge');
+        expect(badge).toHaveTextContent(badgeLabel);
+        expect(badge).not.toHaveTextContent('Error');
+        expect(badge).toHaveAttribute('data-state', badgeState);
+      },
+    );
+
+    it('announces the numbered clip the reviewer picked in a product video run', async () => {
+      const user = userEvent.setup();
+      const clip = (order: 5 | 6) =>
+        step({
+          id: `s${order}`,
+          stepOrder: order,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'running',
+          pickedUpAt: '2026-11-18T10:00:01Z',
+          outputs: [],
+        });
+      stubApi({
+        'GET /api/v1/runs/r1': {
+          status: 200,
+          body: run([clip(5), clip(6)], {
+            status: 'running',
+            input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+          }),
+        },
+      });
+
+      renderRoute(
+        '/workflows/:workflowId/runs/:runId',
+        '/workflows/w1/runs/r1',
+        <RunProgressPage />,
+      );
+
+      await user.click(await screen.findByRole('button', { name: /Video clip 2/ }));
+
+      expect(screen.getByRole('status')).toHaveTextContent('Video clip 2, Running');
     });
 
     it('renders two running video clips together and keeps polling after error until sibling settles as Stopped', async () => {
