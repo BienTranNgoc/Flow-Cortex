@@ -2,6 +2,7 @@ package com.flowcortex.support.assistant;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.support.config.AssistantSwitch;
 import com.flowcortex.support.web.SupportCaller;
 import com.flowcortex.user.api.CurrentUser;
@@ -77,6 +78,7 @@ class AdminSupportSettingsController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
+    @AdminAudit(value = "support_setting.update", capture = "assistantEnabled")
     @PutMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     AdminSettings update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SettingsUpdate body) {
         CurrentUser admin = caller.require(jwt);

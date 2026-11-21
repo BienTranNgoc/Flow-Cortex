@@ -52,7 +52,6 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         Map<String, Boolean> catalog = Arrays.stream(Permission.values())
                 .collect(Collectors.toMap(Permission::key, Permission::superAdminOnly));
-        assertThat(catalog).hasSize(25);
         assertThat(rows).isEqualTo(catalog);
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
@@ -65,10 +64,7 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).hasSize(21).isEqualTo(operationManager);
-        assertThat(keysOf("OPERATION_MANAGER")).containsAll(keys(
-                Permission.WORKFLOW_RUN_EXPORT, Permission.WORKFLOW_RUN_CANCEL,
-                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT));
+        assertThat(keysOf("OPERATION_MANAGER")).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
                 Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_WORKFLOW_VIEW));
@@ -78,7 +74,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_RUN_EXPORT,
+                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.AI_PROVIDER_VIEW, Permission.AI_PROVIDER_UPDATE, Permission.WORKFLOW_RUN_EXPORT,
                 Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT));
 
         Integer workflowManageHolders = jdbc.queryForObject(

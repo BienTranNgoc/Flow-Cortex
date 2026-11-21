@@ -1,5 +1,6 @@
 import { withClientId } from './clientId';
 import { withLocale } from './locale';
+import { emitNetworkSignal, rateLimitWaitSeconds } from './networkSignals';
 import { getToken } from './tokenStore';
 import { REFRESH_PATH, refreshAccessToken } from './session';
 
@@ -32,9 +33,21 @@ export async function sessionFetch(url: string, options: RequestInit = {}): Prom
   return response;
 }
 
-/** Fetch used by every generated operation (orval `override.mutator`). */
+/** Fetch used by every generated operation (orval `override.mutator`); a 429 also raises the rate-limit signal. */
 export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
-  return toResult<T>(await sessionFetch(url, options));
+  const response = await sessionFetch(url, options);
+  const result = await toResult<{ data: unknown }>(response);
+  if (response.status === 429) {
+    emitNetworkSignal({
+      type: 'rate-limited',
+      waitSeconds: rateLimitWaitSeconds(
+        result.data,
+        response.headers.get('Retry-After'),
+        Date.now(),
+      ),
+    });
+  }
+  return result as T;
 }
 
 function bearerOf(headers: HeadersInit | undefined): string | null {

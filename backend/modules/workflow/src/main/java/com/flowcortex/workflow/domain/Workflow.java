@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.domain;
 
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -8,14 +9,16 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A workflow definition. {@code isShared} is the ONLY sharing dimension: a
- * shared definition is listed to every authenticated user, but that never
- * implies shared RUNS — {@link WorkflowRun#ownerId} always scopes reads to
- * the user who started it.
+ * A workflow definition. {@link WorkflowVisibility} is the sharing dimension: a public definition
+ * is listed to every authenticated user and an unlisted one is readable through its key, but
+ * neither implies shared RUNS — {@link WorkflowRun#ownerId} always scopes reads to the user who
+ * started it. {@code is_shared} mirrors {@code visibility == PUBLIC} so a rollback keeps working.
  */
 @Entity
 @Table(name = "workflow")
 public class Workflow {
+
+    public static final UUID SYSTEM_OWNER_ID = new UUID(0, 0);
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -30,6 +33,18 @@ public class Workflow {
     @Column(name = "is_shared", nullable = false)
     private boolean shared;
 
+    @Column(name = "visibility", nullable = false)
+    private WorkflowVisibility visibility;
+
+    @Column(name = "unlisted_key", length = 32)
+    private String unlistedKey;
+
+    @Column(name = "unlisted_key_generated_at")
+    private Instant unlistedKeyGeneratedAt;
+
+    @Column(name = "unlisted_key_expires_at")
+    private Instant unlistedKeyExpiresAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -42,6 +57,9 @@ public class Workflow {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "published_version_id")
+    private UUID publishedVersionId;
+
     /** Required by JPA. */
     protected Workflow() {
     }
@@ -51,8 +69,9 @@ public class Workflow {
         this(id, ownerId, name, shared, WorkflowStatus.PUBLISHED);
     }
 
-    public static Workflow draft(UUID id, UUID ownerId, String name, boolean shared) {
-        return new Workflow(id, ownerId, name, shared, WorkflowStatus.DRAFT);
+    /** Creates a private draft. */
+    public static Workflow draft(UUID id, UUID ownerId, String name) {
+        return new Workflow(id, ownerId, name, false, WorkflowStatus.DRAFT);
     }
 
     private Workflow(UUID id, UUID ownerId, String name, boolean shared, WorkflowStatus status) {
@@ -60,6 +79,7 @@ public class Workflow {
         this.ownerId = ownerId;
         this.name = name;
         this.shared = shared;
+        this.visibility = shared ? WorkflowVisibility.PUBLIC : WorkflowVisibility.PRIVATE;
         this.status = status;
         Instant now = Instant.now();
         this.createdAt = now;
@@ -71,13 +91,53 @@ public class Workflow {
         touch();
     }
 
-    public void setShared(boolean shared) {
-        this.shared = shared;
+    /** Makes the workflow unlisted with a fresh key; a prior key is replaced. */
+    public void makeUnlisted(String key, Instant generatedAt, Instant expiresAt) {
+        this.visibility = WorkflowVisibility.UNLISTED;
+        this.unlistedKey = key;
+        this.unlistedKeyGeneratedAt = generatedAt;
+        this.unlistedKeyExpiresAt = expiresAt;
+        syncSharedAndTouch();
+    }
+
+    /** Keeps the current key of an unlisted workflow and sets its expiry. */
+    public void keepKey(Instant expiresAt) {
+        this.unlistedKeyExpiresAt = expiresAt;
+        touch();
+    }
+
+    /** Moves to {@code PRIVATE} or {@code PUBLIC}, which hold no key. */
+    public void makeListedOrPrivate(WorkflowVisibility visibility) {
+        if (visibility == WorkflowVisibility.UNLISTED) {
+            throw new IllegalArgumentException("unlisted needs a key; use makeUnlisted");
+        }
+        this.visibility = visibility;
+        this.unlistedKey = null;
+        this.unlistedKeyGeneratedAt = null;
+        this.unlistedKeyExpiresAt = null;
+        syncSharedAndTouch();
+    }
+
+    /** Replaces the key of an unlisted workflow; the expiry stays. */
+    public void rotateKey(String key, Instant at) {
+        this.unlistedKey = key;
+        this.unlistedKeyGeneratedAt = at;
+        syncSharedAndTouch();
+    }
+
+    private void syncSharedAndTouch() {
+        this.shared = visibility == WorkflowVisibility.PUBLIC;
         touch();
     }
 
     public void changeStatus(WorkflowStatus status) {
         this.status = status;
+        touch();
+    }
+
+    /** Moves the version non-owners are served; the caller guarantees it belongs to this workflow. */
+    public void pointTo(UUID versionId) {
+        this.publishedVersionId = versionId;
         touch();
     }
 
@@ -102,8 +162,20 @@ public class Workflow {
         return name;
     }
 
-    public boolean isShared() {
-        return shared;
+    public WorkflowVisibility getVisibility() {
+        return visibility;
+    }
+
+    public String getUnlistedKey() {
+        return unlistedKey;
+    }
+
+    public Instant getUnlistedKeyGeneratedAt() {
+        return unlistedKeyGeneratedAt;
+    }
+
+    public Instant getUnlistedKeyExpiresAt() {
+        return unlistedKeyExpiresAt;
     }
 
     public Instant getCreatedAt() {
@@ -120,5 +192,14 @@ public class Workflow {
 
     public Instant getDeletedAt() {
         return deletedAt;
+    }
+
+    public UUID getPublishedVersionId() {
+        return publishedVersionId;
+    }
+
+    /** True for the migration-maintained seed workflows, which are served live and never versioned. */
+    public boolean isSystemOwned() {
+        return SYSTEM_OWNER_ID.equals(ownerId);
     }
 }

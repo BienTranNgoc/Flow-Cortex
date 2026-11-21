@@ -12,11 +12,11 @@ import { HomePage } from './app/HomePage';
 import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
-import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
+import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
@@ -27,6 +27,7 @@ import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -42,6 +43,7 @@ function ContainedOutlet() {
         title: t('common.errorView.title'),
         message: t('common.errorView.message'),
         reload: t('common.errorView.reload'),
+        retry: t('common.errorView.retry'),
       }}
     >
       <Outlet />
@@ -56,8 +58,26 @@ const SupportWidget = lazy(() =>
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
   return supportWidget ? (
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <SupportWidget />
+      </Suspense>
+    </ErrorBoundary>
+  ) : null;
+}
+
+// A failed chunk renders nothing: the route element sits outside ContainedOutlet's ErrorBoundary.
+const OnboardingFlow = lazy(() =>
+  import('./features/onboarding/OnboardingFlow')
+    .then((module) => ({ default: module.OnboardingFlow }))
+    .catch(() => ({ default: () => null })),
+);
+
+function OnboardingFlowWhenOn() {
+  const { onboarding } = useFeatures();
+  return onboarding ? (
     <Suspense fallback={null}>
-      <SupportWidget />
+      <OnboardingFlow />
     </Suspense>
   ) : null;
 }
@@ -82,12 +102,14 @@ export function App() {
             <Route path="/set-password" element={<SetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
           </Route>
           <Route
             element={
               <RequireAuth>
                 <PasswordSetupGate>
                   <Layout />
+                  <OnboardingFlowWhenOn />
                 </PasswordSetupGate>
               </RequireAuth>
             }
@@ -99,7 +121,7 @@ export function App() {
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
-              {demoPagesEnabled() && <Route path="runs" element={<RunsPage />} />}
+              <Route path="runs" element={<RunHistoryPage />} />
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />

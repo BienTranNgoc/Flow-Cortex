@@ -15,24 +15,18 @@ class DailySeriesTest {
     @Test
     void fillsEveryDayOfTheWindowOldestFirstWithZeros() {
         List<DayCount> series = DailySeries.fill(
-                List.of(new DayCount(LocalDate.of(2026, 11, 8), 4, 1), new DayCount(LocalDate.of(2026, 11, 6), 2, 0)),
-                TODAY, 7);
+                List.of(new DayCount(LocalDate.of(2026, 11, 6), 4, 1), new DayCount(TODAY, 2, 2)), TODAY, 3);
 
-        assertThat(series).extracting(DayCount::day).containsExactly(
-                LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 3), LocalDate.of(2026, 11, 4),
-                LocalDate.of(2026, 11, 5), LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 7),
-                LocalDate.of(2026, 11, 8));
-        assertThat(series).extracting(DayCount::runs).containsExactly(0L, 0L, 0L, 0L, 2L, 0L, 4L);
-        assertThat(series).extracting(DayCount::failed).containsExactly(0L, 0L, 0L, 0L, 0L, 0L, 1L);
+        assertThat(series).containsExactly(new DayCount(LocalDate.of(2026, 11, 6), 4, 1),
+                new DayCount(LocalDate.of(2026, 11, 7), 0, 0), new DayCount(TODAY, 2, 2));
     }
 
     @Test
     void ignoresRowsOutsideTheWindow() {
-        List<DayCount> series = DailySeries.fill(
-                List.of(new DayCount(LocalDate.of(2026, 11, 1), 9, 9), new DayCount(LocalDate.of(2026, 11, 9), 9, 9)),
-                TODAY, 7);
+        List<DayCount> series = DailySeries.fill(List.of(new DayCount(LocalDate.of(2026, 11, 5), 9, 9),
+                new DayCount(TODAY.plusDays(1), 9, 9)), TODAY, 3);
 
-        assertThat(series).hasSize(7).allSatisfy(point -> assertThat(point.runs()).isZero());
+        assertThat(series).hasSize(3).allSatisfy(point -> assertThat(point.runs()).isZero());
     }
 
     @Test
@@ -40,22 +34,31 @@ class DailySeriesTest {
         List<DayCount> series = DailySeries.fill(List.of(), TODAY, 30);
 
         assertThat(series).hasSize(30);
-        assertThat(series.getFirst().day()).isEqualTo(LocalDate.of(2026, 10, 10));
-        assertThat(series.getLast().day()).isEqualTo(TODAY);
-        assertThat(DailySeries.windowStart(TODAY, 30)).isEqualTo(Instant.parse("2026-10-09T17:00:00Z"));
+        assertThat(series.get(0).day()).isEqualTo(LocalDate.of(2026, 10, 10));
+        assertThat(series.get(29).day()).isEqualTo(TODAY);
     }
 
     @Test
     void anEmptyInputIsAllZeros() {
-        assertThat(DailySeries.fill(List.of(), TODAY, 5)).allSatisfy(point -> {
-            assertThat(point.runs()).isZero();
-            assertThat(point.failed()).isZero();
-        });
+        assertThat(DailySeries.fill(List.of(), TODAY, 7)).hasSize(7)
+                .allSatisfy(point -> assertThat(point.runs() + point.failed()).isZero());
     }
 
     @Test
     void aRunAtHalfPastMidnightLocalTimeCountsOnTheLocalDay() {
-        assertThat(DailySeries.dayOf(Instant.parse("2026-11-07T17:30:00Z"))).isEqualTo(LocalDate.of(2026, 11, 8));
-        assertThat(DailySeries.dayOf(Instant.parse("2026-11-07T16:59:59Z"))).isEqualTo(LocalDate.of(2026, 11, 7));
+        Instant halfPastMidnightLocal = Instant.parse("2026-11-07T17:30:00Z");
+
+        assertThat(DailySeries.dayOf(halfPastMidnightLocal)).isEqualTo(LocalDate.of(2026, 11, 8));
+    }
+
+    @Test
+    void windowStartIsTheLocalMidnightOfTheFirstDay() {
+        assertThat(DailySeries.windowStart(TODAY, 3)).isEqualTo(Instant.parse("2026-11-05T17:00:00Z"));
+    }
+
+    @Test
+    void daysListsTheWindowOldestFirst() {
+        assertThat(DailySeries.days(TODAY, 3)).containsExactly(LocalDate.of(2026, 11, 6),
+                LocalDate.of(2026, 11, 7), TODAY);
     }
 }

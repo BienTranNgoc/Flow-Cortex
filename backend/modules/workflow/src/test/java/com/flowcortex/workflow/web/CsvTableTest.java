@@ -11,48 +11,50 @@ class CsvTableTest {
 
     private static final String BOM = "﻿";
 
-    private static String oneCell(Object cell) {
-        String csv = CsvTable.render(List.of("h"), List.of(Arrays.asList(cell)));
-        return csv.substring(BOM.length() + "\"h\"\r\n".length());
-    }
-
     @Test
     void quotesEveryCellAndDoublesInnerQuotes() {
-        String csv = CsvTable.render(List.of("Name", "Note"), List.of(List.of("a", "say \"hi\"")));
+        String csv = CsvTable.render(List.of("Name", "Note"), List.of(List.of("Ann", "say \"hi\"")));
 
-        assertThat(csv).isEqualTo(BOM + "\"Name\",\"Note\"\r\n\"a\",\"say \"\"hi\"\"\"\r\n");
+        assertThat(csv).isEqualTo(BOM + "\"Name\",\"Note\"\r\n\"Ann\",\"say \"\"hi\"\"\"\r\n");
     }
 
     @Test
     void keepsCommasAndLineBreaksInsideOneCell() {
-        assertThat(oneCell("a,b\nc\r\nd")).isEqualTo("\"a,b\nc\r\nd\"\r\n");
+        String csv = CsvTable.render(List.of("A"), List.of(List.of("x,y\nz")));
+
+        assertThat(csv).isEqualTo(BOM + "\"A\"\r\n\"x,y\nz\"\r\n");
     }
 
     @Test
     void prefixesATextCellStartingWithAFormulaCharacter() {
-        for (String start : List.of("=", "+", "-", "@", "\t", "\r")) {
-            assertThat(oneCell(start + "SUM(A1)")).isEqualTo("\"'" + start + "SUM(A1)\"\r\n");
+        for (String lead : new String[] {"=", "+", "-", "@", "\t", "\r"}) {
+            String csv = CsvTable.render(List.of("A"), List.of(List.of(lead + "SUM(1)")));
+
+            assertThat(csv).as("lead %s", lead.replace("\t", "TAB").replace("\r", "CR"))
+                    .isEqualTo(BOM + "\"A\"\r\n\"'" + lead + "SUM(1)\"\r\n");
         }
     }
 
     @Test
     void leavesANegativeNumberCellUnprefixed() {
-        assertThat(oneCell(-5L)).isEqualTo("\"-5\"\r\n");
-        assertThat(oneCell(-1.5)).isEqualTo("\"-1.5\"\r\n");
+        String csv = CsvTable.render(List.of("A", "B"), List.of(List.of(-5L, -2.5)));
+
+        assertThat(csv).isEqualTo(BOM + "\"A\",\"B\"\r\n\"-5\",\"-2.5\"\r\n");
     }
 
     @Test
     void rendersNullAsEmptyAndInstantsAsIsoUtc() {
-        assertThat(oneCell(null)).isEqualTo("\"\"\r\n");
-        assertThat(oneCell(Instant.parse("2026-11-08T05:00:00Z"))).isEqualTo("\"2026-11-08T05:00:00Z\"\r\n");
+        String csv = CsvTable.render(List.of("A", "B"),
+                List.of(Arrays.asList(null, Instant.parse("2026-11-01T03:04:05Z"))));
+
+        assertThat(csv).isEqualTo(BOM + "\"A\",\"B\"\r\n\"\",\"2026-11-01T03:04:05Z\"\r\n");
     }
 
     @Test
     void startsWithAByteOrderMarkAndEndsRowsWithCrlf() {
-        String csv = CsvTable.render(List.of("a"), List.of(List.of("x"), List.of("y")));
+        String csv = CsvTable.render(List.of("A"), List.of(List.of("1"), List.of("2")));
 
-        assertThat(csv).startsWith(BOM);
-        assertThat(csv.substring(BOM.length()).split("(?<=\r\n)"))
-                .containsExactly("\"a\"\r\n", "\"x\"\r\n", "\"y\"\r\n");
+        assertThat(csv).startsWith(BOM).endsWith("\r\n");
+        assertThat(csv.substring(1).split("\r\n")).containsExactly("\"A\"", "\"1\"", "\"2\"");
     }
 }

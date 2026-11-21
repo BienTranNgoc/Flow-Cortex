@@ -13,7 +13,8 @@
                 "media :: api",
                 "realtime :: api",
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.chat;
