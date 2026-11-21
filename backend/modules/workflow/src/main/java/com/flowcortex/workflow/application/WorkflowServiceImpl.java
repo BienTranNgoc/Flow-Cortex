@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.credit.api.CreditAccounts;
+import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
@@ -23,10 +24,14 @@ import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +41,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
 
     /** Longest serialized step config accepted, in characters. */
     static final int MAX_CONFIG_CHARS = 50_000;
+
+    private static final String ORDER_INVALID = "WORKFLOW_STEP_ORDER_INVALID";
 
     private static final ObjectMapper CONFIG_READER =
             new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -130,8 +137,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
 
     @Override
     @Transactional
-    public WorkflowView createDraft(UUID ownerId, String name, boolean shared) {
-        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name, shared));
+    public WorkflowView createDraft(UUID ownerId, String name) {
+        Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name));
         return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable);
     }
 
@@ -167,9 +174,6 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         if (update.name() != null && !update.name().equals(workflow.getName())) {
             workflow.rename(update.name());
         }
-        if (update.shared() != null && update.shared() != workflow.isShared()) {
-            workflow.setShared(update.shared());
-        }
         if (update.status() != null) {
             WorkflowStatus status = WorkflowStatus.valueOf(update.status().toUpperCase(Locale.ROOT));
             if (status != workflow.getStatus()) {
@@ -203,8 +207,13 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         List<NewWorkflowStep> definition = new ArrayList<>(WorkflowWriteAccess.definitionOf(stepsOf(workflow)));
         definition.add(new NewWorkflowStep(step.name(), step.type(), step.inputRef(), step.config()));
         writeAccess.validateDefinition(definition);
+        UUID newId = UUID.randomUUID();
+        List<StepReferences.Step> before = referenceStepsOf(stepsOf(workflow));
+        List<StepReferences.Step> after = new ArrayList<>(before);
+        after.add(new StepReferences.Step(newId, last + 1, step.name(), step.inputRef()));
+        requireReferencesIntact(before, after, newId);
 
-        WorkflowStep saved = workflowStepRepository.save(new WorkflowStep(UUID.randomUUID(), workflow.getId(),
+        WorkflowStep saved = workflowStepRepository.save(new WorkflowStep(newId, workflow.getId(),
                 (short) (last + 1), step.name(), step.type(), step.inputRef(), step.config()));
         return WorkflowMapper.toStepView(saved, registry::isRemote);
     }
@@ -229,9 +238,175 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                                 other.getConfig()))
                 .toList();
         writeAccess.validateDefinition(definition);
+        List<StepReferences.Step> before = referenceStepsOf(stepsOf(workflow));
+        List<StepReferences.Step> after = before.stream()
+                .map(other -> other.id().equals(stepId)
+                        ? new StepReferences.Step(stepId, other.order(), name, inputRef)
+                        : other)
+                .toList();
+        boolean changesReference = !Objects.equals(inputRef, step.getInputRef());
+        requireReferencesIntact(before, after, changesReference ? stepId : null);
 
         step.edit(name, config, inputRef);
         return WorkflowMapper.toStepView(workflowStepRepository.save(step), registry::isRemote);
+    }
+
+    @Override
+    @Transactional
+    public void deleteStep(UUID callerId, UUID workflowId, UUID stepId) {
+        deleteStep(Caller.member(callerId), workflowId, stepId);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowView reorderSteps(UUID callerId, UUID workflowId, List<UUID> stepIds) {
+        return reorderSteps(Caller.member(callerId), workflowId, stepIds);
+    }
+
+    @Override
+    @Transactional
+    public void deleteStep(Caller caller, UUID workflowId, UUID stepId) {
+        Workflow workflow = writeAccess.lockForWrite(caller, workflowId);
+        List<WorkflowStep> steps = stepsOf(workflow);
+        if (steps.stream().noneMatch(step -> step.getId().equals(stepId))) {
+            throw new NotFoundException(new LocalizedMessage("workflow.definitionStep.notFound", stepId));
+        }
+        StepRenumbering.Outcome outcome = StepRenumbering.forDelete(rowsOf(steps), stepId);
+        if (outcome instanceof StepRenumbering.Referenced referenced) {
+            String readers = referenced.readers().stream().map(String::valueOf).collect(Collectors.joining(", "));
+            throw new ConflictException(
+                    new LocalizedMessage("workflow.definitionStep.referenced", referenced.deletedOrder(), readers));
+        }
+        List<StepRenumbering.Planned> planned = ((StepRenumbering.Plan) outcome).rows();
+        writeAccess.validateDefinition(definitionOfPlan(planned));
+
+        workflowStepRepository.deleteById(stepId);
+        for (StepRenumbering.Planned step : planned) {
+            if (step.orderChanged()) {
+                workflowStepRepository.setOrder(step.row().id(), (short) step.row().order());
+            }
+        }
+        applyReferenceRewrites(workflow, planned);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowView reorderSteps(Caller caller, UUID workflowId, List<UUID> stepIds) {
+        Workflow workflow = writeAccess.lockForWrite(caller, workflowId);
+        List<WorkflowStep> steps = stepsOf(workflow);
+        StepRenumbering.Outcome outcome = StepRenumbering.forOrder(rowsOf(steps), stepIds);
+        switch (outcome) {
+            case StepRenumbering.Unchanged unchanged -> {
+                return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable);
+            }
+            case StepRenumbering.Stale stale ->
+                throw new ConflictException(new LocalizedMessage("workflow.definitionStep.orderStale"));
+            case StepRenumbering.Duplicate duplicate -> {
+                LocalizedMessage reason = new LocalizedMessage("workflow.definitionStep.orderDuplicate");
+                throw new UnprocessableEntityException(reason, ORDER_INVALID, Map.of("stepIds", reason));
+            }
+            case StepRenumbering.ForwardReference forward -> {
+                LocalizedMessage reason = new LocalizedMessage("workflow.definitionStep.orderForward");
+                Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
+                forward.newIndexes().forEach(index -> errors.put("steps[" + index + "].inputRef", reason));
+                throw new UnprocessableEntityException(reason, ORDER_INVALID, errors);
+            }
+            case StepRenumbering.Referenced referenced ->
+                throw new IllegalStateException("A reorder cannot refuse a step as referenced");
+            case StepRenumbering.Plan plan -> {
+                writeAccess.validateDefinition(definitionOfPlan(plan.rows()));
+                List<UUID> moved = plan.rows().stream()
+                        .filter(StepRenumbering.Planned::orderChanged)
+                        .map(step -> step.row().id())
+                        .toList();
+                workflowStepRepository.parkOrders(workflow.getId(), moved);
+                for (StepRenumbering.Planned step : plan.rows()) {
+                    if (step.orderChanged()) {
+                        workflowStepRepository.setOrder(step.row().id(), (short) step.row().order());
+                    }
+                }
+                List<WorkflowStep> reloaded = applyReferenceRewrites(workflow, plan.rows());
+                return WorkflowMapper.toWorkflowView(workflow, reloaded, registry::isRemote, registry::isAvailable);
+            }
+        }
+    }
+
+    /**
+     * Reloads the steps after the native order writes (they clear the persistence context) and gives each step
+     * whose references the planner rewrote its new {@code inputRef} and {@code config}; dirty checking saves them.
+     */
+    private List<WorkflowStep> applyReferenceRewrites(Workflow workflow, List<StepRenumbering.Planned> planned) {
+        List<WorkflowStep> reloaded = stepsOf(workflow);
+        for (StepRenumbering.Planned step : planned) {
+            if (!step.referencesChanged()) {
+                continue;
+            }
+            reloaded.stream()
+                    .filter(stored -> stored.getId().equals(step.row().id()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Step vanished during renumbering: "
+                            + step.row().id()))
+                    .edit(step.row().name(), step.row().config(), step.row().inputRef());
+        }
+        return reloaded;
+    }
+
+    private static List<StepRenumbering.Row> rowsOf(List<WorkflowStep> steps) {
+        return steps.stream()
+                .map(step -> new StepRenumbering.Row(step.getId(), step.getStepOrder(), step.getType(),
+                        step.getName(), step.getInputRef(), step.getConfig()))
+                .toList();
+    }
+
+    private static List<NewWorkflowStep> definitionOfPlan(List<StepRenumbering.Planned> planned) {
+        return planned.stream()
+                .map(step -> new NewWorkflowStep(step.row().name(), step.row().type(), step.row().inputRef(),
+                        step.row().config()))
+                .toList();
+    }
+
+    private static List<StepReferences.Step> referenceStepsOf(List<WorkflowStep> steps) {
+        return steps.stream()
+                .map(step -> new StepReferences.Step(step.getId(), step.getStepOrder(), step.getName(),
+                        step.getInputRef()))
+                .toList();
+    }
+
+    /**
+     * Refuses a write whose touched step reads a broken reference, or that turns another step's clean
+     * reference broken. A reference that was already broken and is left as is never blocks the write.
+     */
+    private static void requireReferencesIntact(List<StepReferences.Step> before, List<StepReferences.Step> after,
+            UUID touchedId) {
+        Map<UUID, StepReferences.Problem> problemsBefore = StepReferences.analyze(before);
+        Map<UUID, StepReferences.Problem> problemsAfter = StepReferences.analyze(after);
+        if (touchedId != null && problemsAfter.containsKey(touchedId)) {
+            throw new UnprocessableEntityException(new LocalizedMessage("workflow.definitionStep.referenceInvalid"),
+                    "WORKFLOW_STEP_REFERENCE_INVALID", Map.of("inputRef", referenceReason(problemsAfter.get(touchedId))));
+        }
+        List<StepReferences.Step> broken = after.stream()
+                .filter(reader -> problemsAfter.containsKey(reader.id()) && !problemsBefore.containsKey(reader.id())
+                        && before.stream().anyMatch(old -> old.id().equals(reader.id())))
+                .sorted(Comparator.comparingInt(StepReferences.Step::order))
+                .toList();
+        if (!broken.isEmpty()) {
+            String name = problemsAfter.get(broken.get(0).id()).detail();
+            String readers = broken.stream().map(reader -> String.valueOf(reader.order()))
+                    .collect(Collectors.joining(", "));
+            throw new ConflictException(new LocalizedMessage("workflow.definitionStep.nameReferenced", name, readers));
+        }
+    }
+
+    private static LocalizedMessage referenceReason(StepReferences.Problem problem) {
+        boolean positional = !problem.detail().isEmpty() && problem.detail().chars().allMatch(Character::isDigit);
+        return switch (problem.kind()) {
+            case MALFORMED -> new LocalizedMessage("workflow.reference.malformed");
+            case UNKNOWN_STEP -> positional
+                    ? new LocalizedMessage("workflow.reference.unknownOrder", problem.detail())
+                    : new LocalizedMessage("workflow.reference.unknownName", problem.detail());
+            case AMBIGUOUS_NAME -> new LocalizedMessage("workflow.reference.ambiguousName", problem.detail());
+            case NOT_EARLIER -> new LocalizedMessage("workflow.reference.notEarlier", problem.detail());
+        };
     }
 
     /** Runs before the step-list validation, so a config that is not an object is always a 422 on {@code config}. */

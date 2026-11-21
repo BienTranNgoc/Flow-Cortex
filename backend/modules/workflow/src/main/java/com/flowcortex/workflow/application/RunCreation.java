@@ -8,6 +8,7 @@ import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,10 +53,11 @@ class RunCreation {
     private final ObjectProvider<StepExecutorRegistry> registry;
     private final MediaJobs mediaJobs;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectProvider<Tracer> tracer;
 
     RunCreation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, RunUpdates runUpdates, ObjectProvider<StepExecutorRegistry> registry,
-            MediaJobs mediaJobs, TransactionTemplate transactionTemplate) {
+            MediaJobs mediaJobs, TransactionTemplate transactionTemplate, ObjectProvider<Tracer> tracer) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.events = events;
@@ -63,16 +65,22 @@ class RunCreation {
         this.registry = registry;
         this.mediaJobs = mediaJobs;
         this.transactionTemplate = transactionTemplate;
+        this.tracer = tracer;
     }
 
     RunView create(NewRun newRun) {
         StepExecutorRegistry steps = registry.getObject();
+        String traceId = CurrentTrace.idFor(tracer.getIfAvailable(() -> Tracer.NOOP));
         return transactionTemplate.execute(status -> {
-            WorkflowRun run = workflowRunRepository.save(toRun(newRun));
+            WorkflowRun run = workflowRunRepository.save(toRun(newRun).withTraceId(traceId));
             if (!newRun.copies().isEmpty()) {
                 mediaJobs.bindRunInputs(run.getId(), newRun.copies());
             }
             List<RunStep> runSteps = new ArrayList<>();
+            List<StepReferences.Step> referenceSteps = newRun.steps().stream()
+                    .map(def -> new StepReferences.Step(def.getId(), def.getStepOrder(), def.getName(),
+                            def.getInputRef()))
+                    .toList();
             for (WorkflowStep stepDef : newRun.steps()) {
                 String stepInput = steps.isRemote(stepDef.getType()) ? newRun.stepInputJson() : null;
                 runSteps.add(new RunStep(
@@ -82,7 +90,7 @@ class RunCreation {
                         stepDef.getType(),
                         stepInput,
                         stepDef.getConfig(),
-                        stepDef.getInputRef()));
+                        StepReferences.canonicalize(stepDef.getInputRef(), referenceSteps)));
             }
             runSteps = runStepRepository.saveAll(runSteps);
             runUpdates.touched(run.getId());

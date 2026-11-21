@@ -3,21 +3,26 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.workflow.api.AdminRunDetailView;
+import com.flowcortex.workflow.api.AdminRunFilter;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
+import com.flowcortex.workflow.api.RunInputView;
 import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
@@ -32,6 +37,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.RunWithWorkflowName;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +47,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -68,6 +76,10 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private static final Pattern UNSAFE_IN_FILE_NAME = Pattern.compile("[\\p{Cc}\\p{Cf}/\\\\]");
     private static final int MAX_FILE_NAME_LENGTH = 255;
 
+    /** Open ends of the admin start-time filter: outside any real run, inside what PostgreSQL stores. */
+    private static final Instant EARLIEST_START = Instant.EPOCH;
+    private static final Instant LATEST_START = Instant.parse("9999-12-31T00:00:00Z");
+
     private static final ObjectMapper OUTPUTS_READER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -81,13 +93,16 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final UserDirectory userDirectory;
     private final RunStartGuards runStartGuards;
     private final RunCreation runCreation;
+    private final CreditAccounts creditAccounts;
     private final boolean workflowEnabled;
 
+    @Autowired
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, UserDirectory userDirectory,
-            RunStartGuards runStartGuards, RunCreation runCreation,
+            RunStartGuards runStartGuards, RunCreation runCreation, CreditAccounts creditAccounts,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.creditAccounts = creditAccounts;
         this.workflowRepository = workflowRepository;
         this.servedDefinitions = servedDefinitions;
         this.workflowRunRepository = workflowRunRepository;
@@ -179,7 +194,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         List<MediaAssetInput> assetInputs = List.of();
         if (mediaWorkflow) {
             if (uploadIds != null && !uploadIds.isEmpty()) {
-                assetInputs = mediaJobs.resolveImageUploads(currentUserId, uploadIds);
+                assetInputs = mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, currentUserId, uploadIds);
             } else if (uploadId != null) {
                 assetInputs = List.of(mediaJobs.resolveUpload(currentUserId, uploadId));
                 singleUpload = true;
@@ -232,7 +247,28 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<RunInputView> getRunInputs(UUID currentUserId, UUID runId) {
+        workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        return mediaJobs.runInputs(runId).stream()
+                .map(input -> new RunInputView(input.bindingKey(), input.kind(), input.mimeType(), input.url(),
+                        input.expiresAt()))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public RunOutputUrlView getOutputUrl(UUID currentUserId, UUID runId, int stepOrder, String name) {
+        DownloadableOutput output = downloadableOutput(currentUserId, runId, stepOrder, name);
+        MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());
+        return new RunOutputUrlView(download.url(), download.expiresAt());
+    }
+
+    /**
+     * The stored output of the caller's run that lies under its step and sits in a downloadable bucket.
+     * @throws NotFoundException if the run is not the caller's, or the step or output is absent or not downloadable
+     */
+    DownloadableOutput downloadableOutput(UUID currentUserId, UUID runId, int stepOrder, String name) {
         workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         RunStep step = runStepRepository.findByRunIdOrderByStepOrderAsc(runId).stream()
@@ -254,22 +290,40 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                     runId, stepOrder, name, output.bucket());
             throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
         }
-        MediaDownload download = mediaJobs.presignedGet(output.bucket(), output.objectKey(), output.name());
-        return new RunOutputUrlView(download.url(), download.expiresAt());
+        return new DownloadableOutput(step.getId(), step.getAttempt(), output.name(), output.bucket(),
+                output.objectKey(), output.mime());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageView<AdminRunView> listAllRuns(int page, int size, String status) {
+    public PageView<AdminRunView> listAllRuns(AdminRunFilter filter, int page, int size) {
+        String status = filter.status();
         Page<RunWithWorkflowName> runs = workflowRunRepository.findAllNewestFirst(
-                status == null ? null : RunStatus.valueOf(status.toUpperCase(Locale.ROOT)), PageRequest.of(page, size));
+                status == null ? null : RunStatus.valueOf(status.toUpperCase(Locale.ROOT)), filter.workflowId(),
+                filter.from() == null ? EARLIEST_START : filter.from(), filter.to() == null ? LATEST_START : filter.to(),
+                PageRequest.of(page, size));
         // One lookup for the whole page, not one per row.
         Map<UUID, String> emails = userDirectory.findEmailsByIds(
                 runs.stream().map(row -> row.run().getOwnerId()).collect(Collectors.toSet()));
+        Map<UUID, Long> charged = creditAccounts.enabled() && runs.hasContent()
+                ? creditAccounts.chargedForRuns(runs.stream().map(row -> row.run().getId()).toList()) : null;
         return new PageView<>(runs.stream()
                 .map(row -> WorkflowMapper.toAdminRunView(row.run(), row.workflowName(),
-                        emails.get(row.run().getOwnerId())))
+                        emails.get(row.run().getOwnerId()),
+                        charged == null ? null : charged.getOrDefault(row.run().getId(), 0L)))
                 .toList(), page, size, runs.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminRunDetailView getAdminRun(UUID runId) {
+        WorkflowRun run = workflowRunRepository.findById(runId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        String workflowName = workflowRepository.findById(run.getWorkflowId()).map(Workflow::getName).orElse(null);
+        String ownerEmail = userDirectory.findEmailsByIds(List.of(run.getOwnerId())).get(run.getOwnerId());
+        Long charged = creditAccounts.enabled() ? creditAccounts.chargedForRun(runId) : null;
+        return WorkflowMapper.toAdminRunDetailView(run, workflowName, ownerEmail, charged,
+                runStepRepository.findByRunIdOrderByStepOrderAsc(runId), registry::isRemote);
     }
 
     @Override
@@ -294,6 +348,11 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     }
 
     /** Where a step's output is stored; this never leaves the server. */
-    private record StoredOutput(String name, String bucket, String objectKey) {
+    private record StoredOutput(String name, String bucket, String objectKey, String mime) {
+    }
+
+    /** A step attempt's output that may be read from the media bucket; {@code mime} is as the worker reported it. */
+    record DownloadableOutput(UUID runStepId, short attempt, String name, String bucket, String objectKey,
+            String mime) {
     }
 }

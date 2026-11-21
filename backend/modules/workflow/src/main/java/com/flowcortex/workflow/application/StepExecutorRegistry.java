@@ -2,6 +2,8 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,12 +28,13 @@ class StepExecutorRegistry {
 
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
-            WorkflowCallStepExecutor workflowCall) {
-        this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts), workflowCall));
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall) {
+        this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
+                tts), workflowCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
-        this(executors(mediaJobs, clock));
+        this(executors(mediaJobs, clock, null, null));
     }
 
     StepExecutorRegistry(List<StepExecutor> executors) {
@@ -42,13 +45,15 @@ class StepExecutorRegistry {
         }
     }
 
-    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock) {
+    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock, VendorJobLedger vendorLedger,
+            VendorJobsProperties vendorJobs) {
         List<StepExecutor> executors = new ArrayList<>(List.of(new EchoStepExecutor(), new FailStepExecutor()));
         executors.add(new ProviderStepExecutor("generate_script", "product_ad_v1", mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_storyboard", "product_ad_storyboard_v1",
                 mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
-        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock));
+        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock,
+                vendorLedger, vendorJobs));
         Arrays.stream(MediaCapability.values())
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);
@@ -78,6 +83,11 @@ class StepExecutorRegistry {
 
     boolean isRemote(String type) {
         return find(type).map(executor -> executor.mode() == StepExecutor.Mode.REMOTE).orElse(false);
+    }
+
+    /** How the engine feeds a step of this type with this config; an unknown type reads a resolved input. */
+    StepExecutor.InputPolicy inputPolicy(String type, String config) {
+        return find(type).map(executor -> executor.inputPolicy(config)).orElse(StepExecutor.InputPolicy.RESOLVED);
     }
 
     /** Whether the step type reads an uploaded file, so a workflow using it must start with a media step. */

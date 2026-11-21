@@ -142,7 +142,7 @@ class WorkflowVersionWriteConcurrencyIT {
     @Test
     void eightConcurrentSavesOfOneDefinitionWriteOneRow() throws Exception {
         UUID ownerId = UUID.randomUUID();
-        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race", false));
+        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race"));
         seedSteps(workflow, 2);
 
         List<VersionSavedView> saved = raceAll(() -> versionService.save(ownerId, workflow.getId(), null));
@@ -156,7 +156,7 @@ class WorkflowVersionWriteConcurrencyIT {
     @Test
     void concurrentSavesAfterDistinctEditsGetConsecutiveNumbers() throws Exception {
         UUID ownerId = UUID.randomUUID();
-        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race", false));
+        Workflow workflow = workflowRepository.saveAndFlush(Workflow.draft(UUID.randomUUID(), ownerId, "Race"));
         List<WorkflowStep> steps = seedSteps(workflow, THREADS);
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         AtomicInteger next = new AtomicInteger();

@@ -11,9 +11,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
@@ -32,6 +34,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -72,13 +76,13 @@ class WorkflowRunServiceImplTest {
         ObjectProvider<StepExecutorRegistry> provider = mock(ObjectProvider.class);
         when(provider.getObject()).thenReturn(executors);
         return new RunCreation(workflowRunRepository, runStepRepository, events, runUpdates, provider, mediaJobs,
-                new TransactionTemplate(transactions));
+                new TransactionTemplate(transactions), new StaticListableBeanFactory().getBeanProvider(Tracer.class));
     }
 
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
                 runStepRepository, registry, mediaJobs, mock(UserDirectory.class), new RunStartGuards(List.of()),
-                runCreation(registry), workflowEnabled);
+                runCreation(registry), mock(CreditAccounts.class), workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -125,7 +129,7 @@ class WorkflowRunServiceImplTest {
         StepExecutorRegistry dubRegistry = new StepExecutorRegistry(List.of(translate));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, dubRegistry, mediaJobs, mock(UserDirectory.class),
-                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), true);
+                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class), true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "translate");
 
@@ -263,7 +267,8 @@ class WorkflowRunServiceImplTest {
         when(versionRepository.findByIdIn(any())).thenReturn(List.of(pointed));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, registry, mediaJobs, mock(UserDirectory.class),
-                new RunStartGuards(List.of(new WorkflowReadinessGuard())), runCreation(registry), true);
+                new RunStartGuards(List.of(new WorkflowReadinessGuard())), runCreation(registry),
+                mock(CreditAccounts.class), true);
 
         assertThatThrownBy(() -> service.startRun(binh, workflow.getId(), "hi"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,
@@ -356,7 +361,7 @@ class WorkflowRunServiceImplTest {
                 new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "uploads", "a")),
                 new MediaAssetInput(uploadIds.get(1), new MediaJobInput("image_2", "uploads", "b")));
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(mediaJobs.resolveImageUploads(ownerId, uploadIds)).thenReturn(assets);
+        when(mediaJobs.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, uploadIds)).thenReturn(assets);
         UUID runId = UUID.randomUUID();
         List<MediaAssetInput> copied = List.of(
                 new MediaAssetInput(uploadIds.get(0), new MediaJobInput("image_1", "media",
@@ -461,6 +466,26 @@ class WorkflowRunServiceImplTest {
                     .toList();
         });
         return upload;
+    }
+
+    @Test
+    void aNamedReferenceIsStoredAsTheOrderOfTheNamedStepWhenTheRunStarts() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "draft", "echo", null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "voice", "echo", "{step:1}"),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 3, "mix", "echo", "{step:draft.title}"));
+        when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowRunRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.startRun(ownerId, workflow.getId(), "hello");
+
+        assertThat(savedSteps()).extracting(RunStep::getInputRef)
+                .containsExactly(null, "{step:1}", "{step:1.title}");
     }
 
     @SuppressWarnings("unchecked")
