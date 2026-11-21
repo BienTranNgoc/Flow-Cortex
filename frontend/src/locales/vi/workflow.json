@@ -72,6 +72,35 @@
     "loading": "Đang tải lượt chạy…",
     "loadError": "Không tải được lượt chạy này."
   },
+  "runLog": {
+    "title": "Nhật ký lượt chạy",
+    "loading": "Đang tải nhật ký lượt chạy…",
+    "loadError": "Không tải được nhật ký lượt chạy.",
+    "retry": "Thử lại",
+    "empty": "Không có mục nhật ký nào ở mức này.",
+    "filter": {
+      "label": "Hiển thị",
+      "all": "Tất cả",
+      "error": "Lỗi",
+      "warn": "Cảnh báo"
+    },
+    "level": {
+      "error": "Lỗi",
+      "warn": "Cảnh báo",
+      "info": "Thông tin"
+    },
+    "started": "Bắt đầu",
+    "duration": "Thời lượng",
+    "attempt": "Lần chạy",
+    "errorCode": "Mã lỗi",
+    "traceId": "Mã theo dõi",
+    "copyTrace": "Sao chép mã theo dõi",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được. Hãy chọn mã theo dõi."
+  },
+  "waveform": {
+    "name": "Dạng sóng của {{label}}"
+  },
   "file": "Tệp: {{name}}",
   "inputs": {
     "heading": "Đầu vào",
@@ -226,5 +255,33 @@
     "sharedWorkflow": "Quy trình được chia sẻ",
     "mine": "Của tôi",
     "shared": "Được chia sẻ"
+  },
+  "builderDashboard": {
+    "heading": "Thống kê quy trình của bạn",
+    "lede": "Các quy trình của bạn đang hoạt động ra sao và được chạy bao nhiêu lần.",
+    "linkLabel": "Thống kê quy trình của bạn",
+    "loading": "Đang tải thống kê quy trình của bạn…",
+    "loadError": "Không tải được thống kê quy trình của bạn.",
+    "noWorkflows": "Bạn chưa có quy trình nào. Khi bạn sở hữu một quy trình, thống kê của nó sẽ hiện ở đây.",
+    "totals": {
+      "workflows": "Quy trình",
+      "published": "Đã xuất bản",
+      "runs": "Lượt chạy"
+    },
+    "period": {
+      "legend": "Khoảng thời gian",
+      "7d": "7 ngày",
+      "30d": "30 ngày",
+      "90d": "90 ngày"
+    },
+    "chart": {
+      "heading": "Lượt chạy mỗi ngày",
+      "label_one": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "label_other": "{{count}} lượt chạy trong {{days}} ngày qua",
+      "tableLabel": "Lượt chạy mỗi ngày, dạng số",
+      "day": "Ngày",
+      "runs": "Lượt chạy",
+      "failed": "Thất bại"
+    }
   }
 }

@@ -47,14 +47,18 @@
 
 @media (max-width: 480px) {
   .topbar {
-    gap: 0.5rem;
-    padding-inline: 0.5rem;
+    gap: 0.25rem;
+    padding-inline: 0.25rem;
   }
 
   .topbar__actions {
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
 
+  .topbar__actions .language-toggle__option {
+    min-width: 2.375rem;
+    padding-inline: 0.4rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

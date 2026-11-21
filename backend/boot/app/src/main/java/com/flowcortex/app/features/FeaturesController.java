@@ -29,10 +29,12 @@ public class FeaturesController {
             @Value("${flowcortex.auth.password-reset.enabled:false}") boolean passwordReset,
             @Value("${flowcortex.support.enabled:false}") boolean supportWidget,
             @Value("${flowcortex.support.assistant.enabled:false}") boolean supportAssistant,
+            @Value("${flowcortex.auth.personal-access-tokens.enabled:false}") boolean personalAccessTokens,
             @Value("${flowcortex.onboarding.enabled:false}") boolean onboarding,
             @Value("${flowcortex.chat.enabled:false}") boolean chat) {
         this.features = new FeaturesResponse(emailConfirmation, phoneVerification, uploadContentCheck,
-                runCancellation, credits, passwordReset, supportWidget, supportAssistant, onboarding, chat);
+                runCancellation, credits, passwordReset, supportWidget, supportAssistant, personalAccessTokens,
+                onboarding, chat);
     }
 
     @SecurityRequirements
@@ -50,6 +52,7 @@ public class FeaturesController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean passwordReset,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean supportWidget,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean supportAssistant,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean personalAccessTokens,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean onboarding,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean chat) {
     }

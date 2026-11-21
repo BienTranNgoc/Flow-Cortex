@@ -120,7 +120,7 @@ class RateCardPricingIT extends AbstractPostgresBootTest {
         UUID runId = UUID.randomUUID();
         jdbc.update("INSERT INTO credit_wallet (user_id, balance) VALUES (?, 30)", userId);
 
-        assertThat(creditAccounts.debitForStep(userId, runId, UUID.randomUUID(), "probe")).isTrue();
+        assertThat(creditAccounts.debitForStep(userId, runId, UUID.randomUUID(), (short) 1, "probe")).isTrue();
 
         assertThat(jdbc.queryForList("SELECT amount FROM credit_ledger WHERE run_id = ? AND kind = 'debit'",
                 Long.class, runId)).containsExactly(10L);
@@ -133,7 +133,7 @@ class RateCardPricingIT extends AbstractPostgresBootTest {
         UUID runId = UUID.randomUUID();
         jdbc.update("INSERT INTO credit_wallet (user_id, balance) VALUES (?, 30)", userId);
 
-        assertThat(creditAccounts.debitForStep(userId, runId, UUID.randomUUID(), "APPROVAL_CHECKPOINT")).isTrue();
+        assertThat(creditAccounts.debitForStep(userId, runId, UUID.randomUUID(), (short) 1, "APPROVAL_CHECKPOINT")).isTrue();
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_ledger WHERE run_id = ?", Long.class, runId))
                 .isZero();

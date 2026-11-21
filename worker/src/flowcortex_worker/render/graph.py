@@ -1,4 +1,4 @@
-"""ffmpeg argument lists for a project render: one filter graph per chunk, the join and the mux.
+"""ffmpeg argument lists for a project render: one filter graph per chunk and the join.
 
 Pure: nothing runs here. Every value that reaches a filter graph was checked by `document`
 (closed lists, ranges, `#RRGGBB` fills) and every file name is built from an index, never from a
@@ -10,8 +10,15 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 
-from .document import SAMPLE_RATE
-from .timeline import PROFILES, Chunk, PlannedScene, TimelinePlan, is_hdr
+from .overlays import image_overlay_filters, image_windows
+from .timeline import (
+    PROFILES,
+    Chunk,
+    PlannedScene,
+    PlannedTextOverlay,
+    TimelinePlan,
+    is_hdr,
+)
 
 CONTAIN_BLUR_SIGMA = 24
 _ASSET_INPUT = ("-protocol_whitelist", "file")
@@ -105,10 +112,15 @@ def _scene_audio_on(scene: PlannedScene) -> bool:
     return has_audio
 
 
-def prints_captions(plan: TimelinePlan, chunk: Chunk) -> bool:
-    """True when a planned cue overlaps the chunk's window, so libass will draw something."""
+def prints_text(plan: TimelinePlan, chunk: Chunk) -> bool:
+    """True when libass draws anything in the chunk: a cue or a text overlay overlaps its window."""
     end = chunk.start_ms + chunk.dur_ms
-    return any(cue.start_ms < end and cue.end_ms > chunk.start_ms for cue in plan.cues)
+    return any(cue.start_ms < end and cue.end_ms > chunk.start_ms for cue in plan.cues) or any(
+        isinstance(overlay, PlannedTextOverlay)
+        and overlay.start_ms < end
+        and overlay.end_ms > chunk.start_ms
+        for overlay in plan.overlays
+    )
 
 
 def _escape_filter_path(path: str) -> str:
@@ -167,7 +179,7 @@ def chunk_command(
         transition = scene.transition_out
         position += dur - (transition.dur_ms if transition is not None and not last else 0.0)
 
-    verbose = prints_captions(plan, chunk)
+    verbose = prints_text(plan, chunk)
     cmd = [
         "ffmpeg", "-y", "-hide_banner",
         "-loglevel", "verbose" if verbose else "error",
@@ -269,6 +281,11 @@ def chunk_command(
         parts.append(f"{audio_cur}{audio_labels[k]}acrossfade=d={d:.4f}:c1=tri:c2=tri[ax{k}]")
         video_cur, audio_cur = f"[vx{k}]", f"[ax{k}]"
         cur_len = cur_len + seg_dur[k] - transition.dur_ms
+    # Image overlays go after the scene chain and before the ASS pass, so text always sits on top.
+    for j, (overlay, window) in enumerate(image_windows(plan, chunk)):
+        src = add_input(*_ASSET_INPUT, "-i", files[overlay.asset_id])
+        filters, video_cur = image_overlay_filters(overlay, window, src, video_cur, j, width, fps)
+        parts += filters
     parts.append(f"{video_cur}ass='{_escape_filter_path(ass_path)}'[vout]")
     parts.append(f"{audio_cur}anull[aout]")
 
@@ -298,26 +315,4 @@ def join_command(chunk_paths: list[str], list_path: str, out_path: str) -> list[
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
         "-f", "concat", "-safe", "0", "-i", list_path,
         "-c", "copy", "-movflags", "+faststart", out_path,
-    ]  # fmt: skip
-
-
-def mux_command(
-    base_path: str, out_path: str, duration_ms: float, video_start_s: float = 0.0
-) -> list[str]:
-    """The one audio re-encode: pad or trim the joined audio to the timeline length and copy the
-    picture. Stream-copied AAC chunks keep their encoder priming at every join, so without this
-    the audio drifts about a frame per join. `aresample=async=1` first lays the joined audio on
-    its timestamps: without it the join gaps survive `atrim` and the decoded audio runs long.
-    The copied picture keeps the B-frame start offset of the first chunk, so `video_start_s`
-    (the base's measured video start) is shifted out on the picture input alone."""
-    t = f"{duration_ms / 1000.0:.4f}"
-    return [
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-itsoffset", f"{-video_start_s:.6f}", "-i", base_path, "-i", base_path,
-        "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
-        "-af",
-        "aresample=async=1:first_pts=0,"
-        f"aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur={t},atrim=duration={t}",
-        "-c:a", "aac", "-b:a", "160k", "-ar", str(SAMPLE_RATE),
-        "-t", t, "-movflags", "+faststart", out_path,
     ]  # fmt: skip

@@ -12,6 +12,7 @@ import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -70,16 +71,30 @@ final class GeminiAttempts {
     }
 
     static Attempt send(RestClient http, String apiKey, byte[] body, String uriTemplate, Object... uriVariables) {
+        return attempt(() -> http.post()
+                .uri(uriTemplate, uriVariables)
+                .header(KEY_HEADER, apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(body)
+                .exchange((request, response) -> new Raw(response.getStatusCode().value(),
+                        response.getBody().readAllBytes())));
+    }
+
+    /** A GET with the key in the header only; the outcome is classified exactly as for {@link #send}. */
+    static Attempt get(RestClient http, String apiKey, String uriTemplate, Object... uriVariables) {
+        return attempt(() -> http.get()
+                .uri(uriTemplate, uriVariables)
+                .header(KEY_HEADER, apiKey)
+                .accept(MediaType.APPLICATION_JSON)
+                .exchange((request, response) -> new Raw(response.getStatusCode().value(),
+                        response.getBody().readAllBytes())));
+    }
+
+    private static Attempt attempt(Supplier<Raw> exchange) {
         Raw raw;
         try {
-            raw = http.post()
-                    .uri(uriTemplate, uriVariables)
-                    .header(KEY_HEADER, apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .exchange((request, response) -> new Raw(response.getStatusCode().value(),
-                            response.getBody().readAllBytes()));
+            raw = exchange.get();
         } catch (RestClientException ex) {
             // Only the cause's type is kept: its text may carry the URL.
             Throwable cause = ex.getCause() == null ? ex : ex.getCause();

@@ -10,6 +10,7 @@ import pytest
 
 from flowcortex_worker.render.document import (
     TRANSITION_KINDS,
+    TextOverlay,
     parse_document,
     parse_job,
 )
@@ -46,10 +47,13 @@ def project() -> Doc:
             "a1": {"kind": "video"},
             "a2": {"kind": "image"},
             "aud": {"kind": "audio"},
+            "v1": {"kind": "audio", "role": "dub"},
+            "m1": {"kind": "audio", "role": "music"},
         },
         "output": {
             "captionTrackId": "ct_main",
             "voiceTrackId": None,
+            "overlayLang": "vi",
             "lanes": {"captions": True, "voice": False, "music": False, "overlays": False},
         },
         "timeline": {
@@ -239,23 +243,6 @@ def test_style_scale_error_names_the_range() -> None:
     refuses(lambda d: d["timeline"]["captions"]["style"].update(scale=0.2), "0.3 to 3", "scale")
 
 
-def test_music_lane_on_with_a_clip_is_refused() -> None:
-    def music_on(doc: Doc) -> None:
-        doc["output"]["lanes"]["music"] = True
-        doc["timeline"]["music"]["clips"] = [{"id": "mu1", "assetId": "aud"}]
-
-    refuses(music_on, "output.lanes.music", "not support")
-
-
-def test_voice_lane_on_with_a_clip_is_refused() -> None:
-    def voice_on(doc: Doc) -> None:
-        doc["output"]["lanes"]["voice"] = True
-        doc["output"]["voiceTrackId"] = "vt_one"
-        doc["timeline"]["voice"]["tracks"]["vt_one"] = {"clips": [{"id": "vc1"}]}
-
-    refuses(voice_on, "output.lanes.voice")
-
-
 def test_unknown_voice_track_is_refused() -> None:
     refuses(lambda d: d["output"].update(voiceTrackId="vt_gone"), "output.voiceTrackId")
 
@@ -264,14 +251,6 @@ def test_overlays_off_with_content_is_accepted() -> None:
     doc = project()
     doc["timeline"]["overlays"] = [{"id": "ov1"}, {"id": "ov2", "kind": "image"}]
     parse_document(doc)
-
-
-def test_overlays_on_with_content_is_refused() -> None:
-    doc = project()
-    doc["output"]["lanes"]["overlays"] = True
-    doc["timeline"]["overlays"] = [{"id": "ov1"}]
-    with pytest.raises(ValueError, match=r"output\.lanes\.overlays"):
-        parse_document(doc)
 
 
 def test_voice_on_without_a_track_is_accepted() -> None:
@@ -289,18 +268,6 @@ def test_voice_on_with_every_clip_on_a_muted_row_is_accepted() -> None:
         "clips": [{"id": "vc1", "row": "rw1"}, {"id": "vc2", "row": "rw1"}],
     }
     parse_document(doc)
-
-
-def test_voice_row_that_is_not_muted_still_refuses() -> None:
-    doc = project()
-    doc["output"]["lanes"]["voice"] = True
-    doc["output"]["voiceTrackId"] = "vt_one"
-    doc["timeline"]["voice"]["tracks"]["vt_one"] = {
-        "rows": [{"id": "rw1", "muted": True}, {"id": "rw2"}],
-        "clips": [{"id": "vc1", "row": "rw1"}, {"id": "vc2", "row": "rw2"}],
-    }
-    with pytest.raises(ValueError, match=r"output\.lanes\.voice"):
-        parse_document(doc)
 
 
 def test_overlays_on_with_every_overlay_on_a_hidden_row_is_accepted() -> None:
@@ -347,7 +314,9 @@ def test_repeated_clip_is_one_asset() -> None:
 @pytest.mark.parametrize(
     ("params", "needle"),
     [
-        ({"profile": "draft", "mode": "plan"}, "plan mode is not supported"),
+        ({"profile": "draft", "mode": "render", "renderDefaults": {}}, "params.renderDefaults"),
+        ({"profile": "draft", "mode": "render", "lang": "vi"}, "params.lang"),
+        ({"profile": "draft", "mode": "dry"}, "params.mode"),
         ({"profile": "draft"}, "params.mode"),
         ({"mode": "render"}, "params.profile"),
         ({"profile": "draft", "mode": "render", "threads": 8}, "params.threads"),
@@ -381,3 +350,412 @@ def test_fill_scene_needs_no_asset_input() -> None:
     doc = project()
     doc["timeline"]["scenes"] = [scene(0, clipId=None, fill="#112233")]
     assert parse_job(good_params(), ["project"], parse_document(doc)).asset_ids == ()
+
+
+def text_overlay(**over: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "id": "ov1",
+        "text": {"vi": "Xin chào", "en": "Hello"},
+        "x": 0.5,
+        "y": 0.5,
+        "sizePct": 5,
+        "color": "#FFFFFF",
+        "bg": "none",
+        "anim": "none",
+        "startMs": 0,
+        "endMs": 2000,
+    }
+    base.update(over)
+    return base
+
+
+def image_overlay(**over: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "id": "ov2",
+        "kind": "image",
+        "assetId": "a2",
+        "x": 0.5,
+        "y": 0.5,
+        "widthPct": 20,
+        "opacity": 1,
+        "anim": "none",
+        "startMs": 0,
+        "endMs": 2000,
+    }
+    base.update(over)
+    return base
+
+
+def voice_clip(**over: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "id": "vc1",
+        "cueId": None,
+        "assetId": "v1",
+        "srcInMs": 0,
+        "srcOutMs": 3000,
+        "atMs": 0,
+        "durMs": 3000,
+        "gainDb": 0,
+        "fadeInMs": 0,
+        "fadeOutMs": 0,
+        "fitPolicy": "ripple",
+        "rate": 1,
+    }
+    base.update(over)
+    return base
+
+
+def music_clip(**over: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "id": "mu1",
+        "assetId": "m1",
+        "srcInMs": 0,
+        "srcOutMs": 3000,
+        "atMs": 0,
+        "durMs": 3000,
+        "gainDb": -6,
+        "fadeInMs": 0,
+        "fadeOutMs": 0,
+        "loop": False,
+    }
+    base.update(over)
+    return base
+
+
+def with_overlays(doc: Doc, *items: dict[str, Any], lane: bool = True) -> Doc:
+    doc["output"]["lanes"]["overlays"] = lane
+    doc["timeline"]["overlays"] = list(items)
+    return doc
+
+
+def with_voice(
+    doc: Doc, *clips: dict[str, Any], lane: bool = True, chosen: bool = True, **track: Any
+) -> Doc:
+    doc["output"]["lanes"]["voice"] = lane
+    if chosen:
+        doc["output"]["voiceTrackId"] = "vt_one"
+    doc["timeline"]["voice"]["tracks"]["vt_one"] = {
+        "captionTrackId": "ct_main",
+        "clips": list(clips),
+        **track,
+    }
+    return doc
+
+
+def with_music(doc: Doc, *clips: dict[str, Any], lane: bool = True, **box: Any) -> Doc:
+    doc["output"]["lanes"]["music"] = lane
+    doc["timeline"]["music"] = {"clips": list(clips), "duck": {"enabled": True}, **box}
+    return doc
+
+
+def refuses_doc(doc: Doc, *needles: str) -> None:
+    with pytest.raises(ValueError) as caught:
+        parse_document(doc)
+    for needle in needles:
+        assert needle in str(caught.value)
+
+
+GLOW = {"color": "#FFFFFF", "blurPct": 10, "spreadPct": 2, "strength": 2}
+
+
+@pytest.mark.parametrize(
+    ("over", "needle"),
+    [
+        ({"sizePct": 0}, "timeline.overlays[0].sizePct"),
+        ({"sizePct": 51}, "timeline.overlays[0].sizePct"),
+        ({"color": "red"}, "timeline.overlays[0].color"),
+        ({"bg": "neon"}, "timeline.overlays[0].bg"),
+        ({"anim": "spin"}, "timeline.overlays[0].anim"),
+        ({"font": "Lora"}, "timeline.overlays[0].font"),
+        ({"outline": {"color": "#000000", "widthPct": 26}}, "overlays[0].outline.widthPct"),
+        ({"shadow": {"color": "#000000", "angle": 181}}, "overlays[0].shadow.angle"),
+        ({"glow": {**GLOW, "strength": 4}}, "overlays[0].glow.strength"),
+        ({"glow": {**GLOW, "blurPct": 0.5}}, "overlays[0].glow.blurPct"),
+        ({"lines": [{"sizeScale": 1}] * 5}, "timeline.overlays[0].lines"),
+        ({"lines": [{"sizeScale": 3}]}, "overlays[0].lines[0].sizeScale"),
+        ({"letterSpacingPct": -21}, "timeline.overlays[0].letterSpacingPct"),
+        ({"rotate": 181}, "timeline.overlays[0].rotate"),
+        ({"opacity": 1.5}, "timeline.overlays[0].opacity"),
+        ({"x": 1.2}, "timeline.overlays[0].x"),
+        ({"text": {"vietnamese": "x"}}, "timeline.overlays[0].text.vietnamese"),
+        ({"startMs": -1}, "timeline.overlays[0].startMs"),
+        ({"kind": "banner"}, "timeline.overlays[0].kind"),
+    ],
+)
+def test_text_overlay_leaves_are_refused_even_with_the_lane_off(
+    over: dict[str, Any], needle: str
+) -> None:
+    refuses_doc(with_overlays(project(), text_overlay(**over), lane=False), needle)
+
+
+@pytest.mark.parametrize(
+    ("over", "needle"),
+    [
+        ({"widthPct": 1}, "timeline.overlays[0].widthPct"),
+        ({"anim": "slide_up"}, "timeline.overlays[0].anim"),
+        ({"opacity": -0.1}, "timeline.overlays[0].opacity"),
+        ({"assetId": ""}, "timeline.overlays[0].assetId"),
+    ],
+)
+def test_image_overlay_leaves_are_refused_even_with_the_lane_off(
+    over: dict[str, Any], needle: str
+) -> None:
+    refuses_doc(with_overlays(project(), image_overlay(**over), lane=False), needle)
+
+
+def test_overlay_row_hidden_must_be_true_and_overlay_lang_must_be_a_tag() -> None:
+    doc = project()
+    doc["timeline"]["overlayRows"] = {"text": [{"id": "rw1", "hidden": False}], "image": []}
+    refuses_doc(doc, "timeline.overlayRows.text[0].hidden")
+    refuses(lambda d: d["output"].update(overlayLang="Vietnamese"), "output.overlayLang")
+
+
+@pytest.mark.parametrize(
+    ("over", "needle"),
+    [
+        ({"rate": 3}, "timeline.voice.tracks.vt_one.clips[0].rate"),
+        ({"fitPolicy": "cut"}, "clips[0].fitPolicy"),
+        ({"gainDb": 13}, "clips[0].gainDb"),
+        ({"fadeInMs": -1}, "clips[0].fadeInMs"),
+        ({"durMs": 0}, "clips[0].durMs"),
+        ({"cueId": 4}, "clips[0].cueId"),
+    ],
+)
+def test_voice_clip_leaves_are_refused_on_a_track_that_is_not_chosen(
+    over: dict[str, Any], needle: str
+) -> None:
+    refuses_doc(with_voice(project(), voice_clip(**over), lane=False, chosen=False), needle)
+
+
+def test_voice_track_caption_link_is_checked() -> None:
+    refuses_doc(
+        with_voice(project(), lane=False, chosen=False, captionTrackId=5),
+        "timeline.voice.tracks.vt_one.captionTrackId",
+    )
+
+
+@pytest.mark.parametrize(
+    ("over", "needle"),
+    [
+        ({"gainDb": 20}, "timeline.music.clips[0].gainDb"),
+        ({"loop": "yes"}, "timeline.music.clips[0].loop"),
+        ({"fadeOutMs": -5}, "timeline.music.clips[0].fadeOutMs"),
+    ],
+)
+def test_music_clip_leaves_are_refused_with_the_lane_off(
+    over: dict[str, Any], needle: str
+) -> None:
+    refuses_doc(with_music(project(), music_clip(**over), lane=False), needle)
+
+
+def test_music_duck_flag_must_be_boolean() -> None:
+    refuses_doc(
+        with_music(project(), lane=False, duck={"enabled": 1}), "timeline.music.duck.enabled"
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "needle"),
+    [
+        (lambda d: d["assets"]["a1"].update(role="narrator"), "assets.a1.role"),
+        (
+            lambda d: d["assets"]["a2"].update(
+                animation={"frameCount": 601, "cols": 1, "frameW": 8, "frameH": 8, "frameMs": 40}
+            ),
+            "assets.a2.animation.frameCount",
+        ),
+        (
+            lambda d: d["assets"]["a2"].update(
+                animation={"frameCount": 4, "cols": 0, "frameW": 8, "frameH": 8, "frameMs": 40}
+            ),
+            "assets.a2.animation.cols",
+        ),
+        (
+            lambda d: d["assets"]["a2"].update(animation={"frameCount": 4}),
+            "assets.a2.animation.cols",
+        ),
+        (
+            lambda d: d["assets"]["a1"].update(probe={"durationMs": -1}),
+            "assets.a1.probe.durationMs",
+        ),
+        (lambda d: d["assets"]["a1"].update(probe={"hasAudio": "no"}), "assets.a1.probe.hasAudio"),
+        (lambda d: d["assets"]["a1"].update(probe={"sha256": "xyz"}), "assets.a1.probe.sha256"),
+        (lambda d: d["assets"]["a1"].update(probe={"width": 0}), "assets.a1.probe.width"),
+        (lambda d: d["assets"]["a1"].update(probe={"fps": 0}), "assets.a1.probe.fps"),
+        (lambda d: d["assets"]["a1"].update(probe={"pixFmt": 3}), "assets.a1.probe.pixFmt"),
+    ],
+)
+def test_asset_role_animation_and_probe_leaves_are_refused(
+    mutate: Callable[[Doc], None], needle: str
+) -> None:
+    refuses(mutate, needle)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "needle"),
+    [
+        (
+            lambda d: d["timeline"]["captions"]["style"].update(fontFamily="Lora"),
+            "style.fontFamily",
+        ),
+        (lambda d: d["timeline"]["captions"]["style"].update(preset="neon"), "style.preset"),
+        (
+            lambda d: d["timeline"]["captions"]["styles"]["loud"].update(shadow={"color": "red"}),
+            "styles.loud.shadow.color",
+        ),
+        (lambda d: d["timeline"]["captions"]["style"].update(shadow="black"), "style.shadow"),
+    ],
+)
+def test_caption_style_font_preset_and_shadow_are_refused(
+    mutate: Callable[[Doc], None], needle: str
+) -> None:
+    refuses(mutate, needle)
+
+
+def test_caption_style_accepts_a_listed_font_a_preset_and_a_shadow() -> None:
+    doc = project()
+    doc["timeline"]["captions"]["style"].update(
+        fontFamily="Montserrat", preset="tiktok_bold", shadow={"color": "#112233"}
+    )
+    doc["timeline"]["captions"]["styles"]["loud"].update(shadow=None)
+    parse_document(doc)
+
+
+def test_leaves_are_read_with_the_lane_on() -> None:
+    doc = project()
+    with_overlays(
+        doc,
+        text_overlay(font="Anton", glow=GLOW, lines=[{"sizeScale": 1.5, "color": "#FF0000"}]),
+        image_overlay(),
+    )
+    with_voice(doc, voice_clip())
+    with_music(doc, music_clip())
+    parsed = parse_document(doc)
+    assert [o.id for o in parsed.overlays] == ["ov1", "ov2"]
+    first = parsed.overlays[0]
+    assert isinstance(first, TextOverlay)
+    assert first.style["font"] == "Anton"
+    assert parsed.overlay_lang == "vi"
+    assert [c.id for c in parsed.voice_clips] == ["vc1"]
+    assert [c.id for c in parsed.music_clips] == ["mu1"]
+    assert parsed.duck_enabled is True
+    assert parsed.voice_track_id == "vt_one"
+    assert parsed.lanes == {"captions": True, "voice": True, "music": True, "overlays": True}
+
+
+def test_a_lane_that_is_off_keeps_none_of_its_content() -> None:
+    doc = project()
+    with_overlays(doc, text_overlay(), image_overlay(), lane=False)
+    with_voice(doc, voice_clip(), lane=False)
+    with_music(doc, music_clip(), lane=False)
+    parsed = parse_document(doc)
+    assert (parsed.overlays, parsed.voice_clips, parsed.music_clips) == ((), (), ())
+
+
+def test_rows_drop_hidden_overlays_and_muted_clips() -> None:
+    doc = project()
+    with_overlays(doc, text_overlay(row="rw1"), image_overlay(row="rw1"))
+    doc["timeline"]["overlayRows"] = {
+        "text": [{"id": "rw1"}],
+        "image": [{"id": "rw1", "hidden": True}],
+    }
+    with_voice(
+        doc,
+        voice_clip(row="rw1"),
+        voice_clip(id="vc2", row="rw2"),
+        rows=[{"id": "rw1", "muted": True}, {"id": "rw2"}],
+    )
+    with_music(
+        doc,
+        music_clip(row="rw9"),
+        music_clip(id="mu2", row="rw8"),
+        rows=[{"id": "rw9", "muted": True}, {"id": "rw8"}],
+    )
+    parsed = parse_document(doc)
+    assert [o.id for o in parsed.overlays] == ["ov1"]
+    assert parsed.overlays[0].row_index == 0
+    assert [(c.id, c.index) for c in parsed.voice_clips] == [("vc2", 1)]
+    assert [c.id for c in parsed.music_clips] == ["mu2"]
+
+
+def test_a_kept_item_needs_its_required_leaves() -> None:
+    doc = with_voice(project(), {k: v for k, v in voice_clip().items() if k != "rate"})
+    refuses_doc(doc, "timeline.voice.tracks.vt_one.clips[0].rate", "required")
+    doc = with_music(project(), {k: v for k, v in music_clip().items() if k != "loop"})
+    refuses_doc(doc, "timeline.music.clips[0].loop", "required")
+    doc = with_overlays(project(), {k: v for k, v in text_overlay().items() if k != "x"})
+    refuses_doc(doc, "timeline.overlays[0].x", "required")
+
+
+def test_a_kept_item_must_point_at_a_listed_asset() -> None:
+    refuses_doc(
+        with_music(project(), music_clip(assetId="ghost")),
+        "timeline.music.clips[0].assetId",
+        "ghost",
+    )
+    refuses_doc(
+        with_voice(project(), voice_clip(assetId="ghost")),
+        "timeline.voice.tracks.vt_one.clips[0].assetId",
+    )
+    refuses_doc(
+        with_overlays(project(), image_overlay(assetId="ghost")),
+        "timeline.overlays[0].assetId",
+    )
+    parse_document(with_music(project(), music_clip(assetId="ghost"), lane=False))
+
+
+def test_plan_job_reads_only_the_project() -> None:
+    doc = parse_document(project())
+    spec = parse_job({"profile": "draft", "mode": "plan"}, ["project"], doc)
+    assert (spec.mode, spec.asset_ids) == ("plan", ())
+    with pytest.raises(ValueError, match="plan job reads only the project"):
+        parse_job({"profile": "draft", "mode": "plan"}, ["project", "asset:a1"], doc)
+    with pytest.raises(ValueError, match="missing input 'project'"):
+        parse_job({"profile": "draft", "mode": "plan"}, [], doc)
+
+
+def test_render_inputs_follow_scenes_overlays_voice_and_music() -> None:
+    doc = project()
+    with_overlays(doc, image_overlay(assetId="a1"))
+    with_voice(doc, voice_clip())
+    with_music(doc, music_clip())
+    spec = parse_job(
+        good_params(),
+        ["project", "asset:a1", "asset:a2", "asset:v1", "asset:m1"],
+        parse_document(doc),
+    )
+    assert spec.asset_ids == ("a1", "a2", "v1", "m1")
+    assert spec.mode == "render"
+
+
+def test_music_clip_without_its_asset_input_is_refused() -> None:
+    doc = with_music(project(), music_clip())
+    with pytest.raises(ValueError, match="missing input 'asset:m1'"):
+        parse_job(good_params(), KEYS, parse_document(doc))
+
+
+def test_overlay_asset_input_is_extra_when_the_overlay_lane_is_off() -> None:
+    doc = with_overlays(project(), image_overlay(assetId="ghost"), lane=False)
+    doc["assets"]["ghost"] = {"kind": "image"}
+    with pytest.raises(ValueError, match="extra input 'asset:ghost'"):
+        parse_job(good_params(), [*KEYS, "asset:ghost"], parse_document(doc))
+    assert parse_job(good_params(), KEYS, parse_document(doc)).asset_ids == ("a1", "a2")
+
+
+def test_a_voice_clip_that_trim_tail_will_drop_still_needs_its_asset() -> None:
+    doc = with_voice(
+        project(), voice_clip(cueId="cu1", atMs=5000, fitPolicy="trim_tail", durMs=3000)
+    )
+    with pytest.raises(ValueError, match="missing input 'asset:v1'"):
+        parse_job(good_params(), KEYS, parse_document(doc))
+    spec = parse_job(good_params(), [*KEYS, "asset:v1"], parse_document(doc))
+    assert spec.asset_ids == ("a1", "a2", "v1")
+
+
+def test_an_image_overlay_shorter_than_a_frame_still_needs_its_asset() -> None:
+    doc = with_overlays(project(), image_overlay(assetId="a3", startMs=1000, endMs=1010))
+    doc["assets"]["a3"] = {"kind": "image"}
+    with pytest.raises(ValueError, match="missing input 'asset:a3'"):
+        parse_job(good_params(), KEYS, parse_document(doc))
+    spec = parse_job(good_params(), [*KEYS, "asset:a3"], parse_document(doc))
+    assert spec.asset_ids == ("a1", "a2", "a3")
