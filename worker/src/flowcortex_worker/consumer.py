@@ -29,7 +29,7 @@ from pydantic import BaseModel, ValidationError
 
 from . import telemetry
 from .contracts.media_job import MediaJob, MediaJobInput
-from .contracts.media_progress import MediaProgress
+from .contracts.media_progress import MediaProgress, VendorTaskReport
 from .contracts.media_result import CompletedResult, ErrorResult, MediaError, MediaOutput
 from .errors import MAX_BACKOFF_SECONDS, ErrorCode, PermanentError, TransientError, backoff_seconds
 from .handlers import Handler
@@ -103,7 +103,8 @@ class Consumer:
         queue: str = JOBS_QUEUE,
         exchange: str = EXCHANGE,
         parse_job: Callable[[bytes], Any] | None = None,
-        execute_job: Callable[[Any, ProcessRunner], Any] | None = None,
+        execute_job: Callable[[Any, ProcessRunner, Callable[[VendorTaskReport], None]], Any]
+        | None = None,
         wait: Callable[[float], Any] | None = None,
         max_transient_redeliveries: int | None = None,
         transient_exhausted_code: ErrorCode = "provider_request_failed",
@@ -329,13 +330,8 @@ class Consumer:
                 and delivery.count >= self._max_transient_redeliveries
             ):
                 heartbeat.stop(join=True)
-                result = self._error(
-                    job.jobId,
-                    job.runId,
-                    job.attempt,
-                    delivery.count,
-                    self._transient_exhausted_code,
-                    "transient retry budget exhausted",
+                result = self._exhausted_error(
+                    job, delivery, exc, "transient retry budget exhausted"
                 )
                 self._publish(
                     run_id, RESULT_KEY, result, message_id=f"{result.jobId}:{result.attempt}:result"
@@ -398,7 +394,9 @@ class Consumer:
                 }
                 outcome = handler(job, inputs, runner)
             else:
-                outcome = self._execute_job(job, runner)
+                outcome = self._execute_job(
+                    job, runner, lambda report: self._report_vendor_task(job, delivery, report)
+                )
             if runner.killed is not None:
                 raise ProcessKilled(runner.killed)
             outputs = []
@@ -464,13 +462,39 @@ class Consumer:
         # The job scope already stamps deliveryCount on every record; logging it again here
         # would make the logger raise KeyError.
         log.warning("transient retry budget exhausted", extra={"error": type(exc).__name__})
+        return self._exhausted_error(
+            job,
+            delivery,
+            exc,
+            f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+        )
+
+    def _exhausted_error(
+        self, job: Any, delivery: Delivery, exc: TransientError, message: str
+    ) -> ErrorResult:
+        """A failure that names its own terminal code (a vendor timeout) is answered with it.
+
+        Only for a job that carries the ledger block: a backend that predates the ledger does not
+        know the code, and would reject the result.
+        """
+        code: ErrorCode | None = getattr(exc, "exhausted_code", None)
+        if code is None or getattr(job, "vendorLedger", None) is None:
+            return self._error(
+                job.jobId,
+                job.runId,
+                job.attempt,
+                delivery.count,
+                self._transient_exhausted_code,
+                message,
+            )
         return self._error(
             job.jobId,
             job.runId,
             job.attempt,
             delivery.count,
-            self._transient_exhausted_code,
-            f"transient retry budget exhausted after {delivery.count} redeliveries: {exc}",
+            code,
+            str(exc),
+            retryable=bool(getattr(exc, "exhausted_retryable", False)),
         )
 
     def _publish_result(self, run_id: UUID, result: Result) -> None:
@@ -491,7 +515,15 @@ class Consumer:
         )
 
     def _error(
-        self, job_id: UUID, run_id: UUID, attempt: int, count: int, code: ErrorCode, message: str
+        self,
+        job_id: UUID,
+        run_id: UUID,
+        attempt: int,
+        count: int,
+        code: ErrorCode,
+        message: str,
+        *,
+        retryable: bool = False,
     ) -> ErrorResult:
         return ErrorResult(
             schemaVersion="1",
@@ -500,7 +532,7 @@ class Consumer:
             attempt=attempt,
             deliveryCount=count,
             status="error",
-            error=MediaError(code=code, message=message, retryable=False),
+            error=MediaError(code=code, message=message, retryable=retryable),
             finishedAt=datetime.now(UTC),
             workerId=self._worker_id,
         )
@@ -517,6 +549,32 @@ class Consumer:
             kind=kind,
             at=datetime.now(UTC),
         )
+
+    def _report_vendor_task(
+        self, job: Any, delivery: Delivery, report: VendorTaskReport
+    ) -> None:
+        """Publishes a vendor-task report from the job thread. A lost report only costs a later
+        attach (the completed result still consumes the job), so a publish failure is logged;
+        a closed connection still abandons the delivery."""
+        message = MediaProgress(
+            schemaVersion="1",
+            jobId=job.jobId,
+            runId=job.runId,
+            attempt=job.attempt,
+            deliveryCount=delivery.count,
+            kind="vendor_task",
+            at=datetime.now(UTC),
+            vendorTask=report,
+        )
+        try:
+            self._publish(job.runId, PROGRESS_KEY, message)
+        except Abandoned:
+            raise
+        except Exception as exc:
+            error, reason = _describe(exc)
+            log.warning(
+                "vendor task report not published", extra={"error": error, "reason": reason}
+            )
 
     def _beat(self, job: MediaJob, delivery: Delivery, job_context: Any) -> None:
         try:

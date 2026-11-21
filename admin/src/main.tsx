@@ -1,3 +1,4 @@
+import { configureClientErrorReporting } from '@flow-cortex/ui-kit';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/google-sans-flex';
@@ -7,6 +8,7 @@ import { configureAdminClient } from './app/configureClient';
 import { initTheme } from './app/useTheme';
 
 configureAdminClient();
+configureClientErrorReporting({ app: 'admin' });
 initTheme();
 
 const rootEl = document.getElementById('root');

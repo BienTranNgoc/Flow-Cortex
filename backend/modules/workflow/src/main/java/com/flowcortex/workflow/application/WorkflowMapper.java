@@ -3,6 +3,8 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.api.AdminRunDetailView;
+import com.flowcortex.workflow.api.AdminRunStepView;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.RunStepOutputView;
@@ -17,6 +19,7 @@ import com.flowcortex.workflow.domain.WorkflowStep;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 /** Entity -> {@code api} view mapping, mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
@@ -31,11 +34,27 @@ final class WorkflowMapper {
 
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
             Predicate<String> isAvailableType) {
-        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
+        return toWorkflowView(workflow, steps, isRemoteType, isAvailableType, null, null);
+    }
+
+    static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
+            Predicate<String> isAvailableType, UUID publishedVersionId, Integer servedVersion) {
+        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.getVisibility(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
-                wire(workflow.getStatus().name()));
+                wire(workflow.getStatus().name()), publishedVersionId, servedVersion);
+    }
+
+    /** The same view with every step reduced to what a reader who does not own the workflow may see. */
+    static WorkflowView withoutStepContent(WorkflowView view) {
+        return new WorkflowView(view.id(), view.ownerId(), view.name(), view.visibility(), view.createdAt(),
+                view.updatedAt(),
+                view.steps().stream()
+                        .map(step -> new WorkflowStepView(step.id(), step.stepOrder(), step.name(), step.type(),
+                                step.mode(), null, null))
+                        .toList(),
+                view.available(), view.status(), view.publishedVersionId(), view.servedVersion());
     }
 
     static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {
@@ -43,7 +62,7 @@ final class WorkflowMapper {
                 mode(step.getType(), isRemoteType), step.getInputRef(), step.getConfig());
     }
 
-    private static String mode(String type, Predicate<String> isRemoteType) {
+    static String mode(String type, Predicate<String> isRemoteType) {
         return isRemoteType.test(type) ? "remote" : "inline";
     }
 
@@ -71,9 +90,26 @@ final class WorkflowMapper {
                 outputs(step, isDownloadable), mode(step.getType(), isRemoteType));
     }
 
-    static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail) {
-        return new AdminRunView(run.getId(), workflowName, ownerEmail, wire(run.getStatus().name()),
-                run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt());
+    static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail,
+            Long creditsCharged) {
+        return new AdminRunView(run.getId(), run.getWorkflowId(), workflowName, run.getOwnerId(), ownerEmail,
+                wire(run.getStatus().name()), run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt(),
+                creditsCharged);
+    }
+
+    static AdminRunDetailView toAdminRunDetailView(WorkflowRun run, String workflowName, String ownerEmail,
+            Long creditsCharged, List<RunStep> steps, Predicate<String> isRemoteType) {
+        return new AdminRunDetailView(run.getId(), run.getWorkflowId(), workflowName, run.getOwnerId(), ownerEmail,
+                wire(run.getStatus().name()), run.getErrorMessage(), run.getStartedAt(), run.getFinishedAt(),
+                creditsCharged, steps.stream().map(step -> toAdminRunStepView(step, isRemoteType)).toList());
+    }
+
+    private static AdminRunStepView toAdminRunStepView(RunStep step, Predicate<String> isRemoteType) {
+        Short percent = step.getProgressPercent();
+        return new AdminRunStepView(step.getStepOrder(), step.getType(), mode(step.getType(), isRemoteType),
+                wire(step.getStatus().name()), step.getAttempt(), step.getDeliveryCount(),
+                percent == null ? null : percent.intValue(), step.getErrorCode(), step.getErrorMessage(),
+                step.getPickedUpAt(), step.getStartedAt(), step.getFinishedAt());
     }
 
     static MediaJobView toMediaJobView(RunStep step) {

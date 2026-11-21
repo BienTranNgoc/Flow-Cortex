@@ -148,6 +148,21 @@ class S3MediaStoreTest {
     }
 
     @Test
+    void anObjectWrittenWithARetentionCarriesOnlyThatTag() throws IOException {
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        HttpServer server = fakeStore(200, "", headers);
+        try (S3MediaStore local = storeAt(server)) {
+            local.put("flowcortex-media", "runs/r/inputs/image_1", "image/png", new byte[] {1, 2, 3},
+                    S3MediaStore.RUN_INPUT_RETENTION);
+        } finally {
+            server.stop(0);
+        }
+
+        assertThat(headers).containsEntry("x-amz-tagging", "flowcortex-retention=run-input")
+                .containsEntry("content-type", "image/png");
+    }
+
+    @Test
     void retaggingReplacesTheObjectsTagSetWithTheNamedRetention() throws IOException {
         List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -191,8 +206,13 @@ class S3MediaStoreTest {
         try (S3MediaStore local = storeAt(denied)) {
             assertThatThrownBy(() -> local.copy("flowcortex-uploads", "owner/upload", "flowcortex-media",
                     "runs/r/inputs/image_1"))
-                    .isInstanceOf(S3Exception.class)
-                    .isNotInstanceOf(UploadRejectedException.class);
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("backend store policy")
+                    .hasCauseInstanceOf(S3Exception.class);
+            assertThatThrownBy(() -> local.copyWithoutTags("flowcortex-media", "runs/a/steps/1/x", "flowcortex-media",
+                    "runs/b/steps/1/attempts/1/x"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasCauseInstanceOf(S3Exception.class);
         } finally {
             denied.stop(0);
         }

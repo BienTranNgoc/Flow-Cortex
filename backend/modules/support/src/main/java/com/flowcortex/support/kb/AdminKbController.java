@@ -6,6 +6,7 @@ import com.flowcortex.support.kb.KnowledgeBaseService.AdminGroup;
 import com.flowcortex.support.kb.KnowledgeBaseService.ArticleDraft;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -87,6 +88,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
+    @AdminAudit("support_kb_group.create")
     @PostMapping(value = "/groups", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminGroup> createGroup(@Valid @RequestBody GroupRequest body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(knowledgeBase.createGroup(body.name().strip()));
@@ -104,6 +106,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
+    @AdminAudit("support_kb_group.rename")
     @PutMapping(value = "/groups/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     AdminGroup renameGroup(@PathVariable UUID id, @Valid @RequestBody GroupRequest body) {
         return knowledgeBase.renameGroup(id, body.name().strip());
@@ -115,6 +118,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
+    @AdminAudit(value = "support_kb_group.reorder", capture = "ids")
     @PutMapping(value = "/groups/order", produces = MediaType.APPLICATION_JSON_VALUE)
     List<AdminGroup> reorderGroups(@Valid @RequestBody GroupOrderRequest body) {
         return knowledgeBase.reorderGroups(body.ids());
@@ -130,6 +134,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_TOPIC_MANAGE)
+    @AdminAudit("support_kb_group.delete")
     @DeleteMapping("/groups/{id}")
     ResponseEntity<Void> deleteGroup(@PathVariable UUID id) {
         knowledgeBase.deleteGroup(id);
@@ -167,6 +172,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
+    @AdminAudit("support_kb_article.create")
     @PostMapping(value = "/articles", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminArticle> createArticle(@Valid @RequestBody ArticleRequest body) {
         return ResponseEntity.status(HttpStatus.CREATED).body(knowledgeBase.createArticle(body.draft()));
@@ -184,6 +190,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
+    @AdminAudit("support_kb_article.update")
     @PutMapping(value = "/articles/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     AdminArticle updateArticle(@PathVariable UUID id, @Valid @RequestBody ArticleRequest body) {
         return knowledgeBase.updateArticle(id, body.draft());
@@ -195,6 +202,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
+    @AdminAudit("support_kb_article.publish")
     @PostMapping(value = "/articles/{id}/publish", produces = MediaType.APPLICATION_JSON_VALUE)
     AdminArticle publish(@PathVariable UUID id) {
         return knowledgeBase.publish(id);
@@ -206,6 +214,7 @@ class AdminKbController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.CONTENT_HELP_ARTICLE_MANAGE)
+    @AdminAudit("support_kb_article.archive")
     @PostMapping(value = "/articles/{id}/archive", produces = MediaType.APPLICATION_JSON_VALUE)
     AdminArticle archive(@PathVariable UUID id) {
         return knowledgeBase.archive(id);
