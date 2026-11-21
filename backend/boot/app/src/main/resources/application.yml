@@ -380,6 +380,12 @@ flowcortex:
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
+      # GET /api/v1/workflows/by-key/{key} without a token: each client address gets `capacity`
+      # reads per `period`, refilled gradually; over it answers 429 with Retry-After. A signed-in
+      # reader is not counted. Budgets are shared by every backend instance. Env var + restart.
+      rate-limit:
+        capacity: ${FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_CAPACITY:30}
+        period: ${FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_PERIOD:1m}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
