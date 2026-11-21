@@ -67,7 +67,7 @@ class WorkflowVersionEndpointsIT extends AbstractWorkflowHttpIT {
         String ownerToken = loginAs(owner);
         String memberToken = loginAs(member);
         String base = "/api/v1/workflows/" + workflow.id();
-        call(HttpMethod.PATCH, base, ownerToken, Map.of("shared", true, "status", "published"), null);
+        call(HttpMethod.PATCH, base + "/visibility", ownerToken, Map.of("visibility", "public"), null);
 
         ResponseEntity<Map> detail = call(HttpMethod.GET, base + "/versions/1", memberToken, null, null);
         ResponseEntity<Map> saveByMember = call(HttpMethod.POST, base + "/versions", memberToken, null, null);
@@ -118,7 +118,7 @@ class WorkflowVersionEndpointsIT extends AbstractWorkflowHttpIT {
         WorkflowView workflow = newWorkflow(owner.id(), false, new NewWorkflowStep("only", "echo", null));
         String token = loginAs(owner);
         String base = "/api/v1/workflows/" + workflow.id();
-        call(HttpMethod.PATCH, base, token, Map.of("shared", true, "status", "published"), null);
+        call(HttpMethod.PATCH, base + "/visibility", token, Map.of("visibility", "public"), null);
 
         ResponseEntity<Map> english = call(HttpMethod.PATCH, base + "/versions/1", token,
                 Map.of("changelog", "renamed"), null);

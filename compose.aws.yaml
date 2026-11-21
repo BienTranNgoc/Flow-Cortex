@@ -70,6 +70,9 @@ services:
       # No dev fallback: with the assistant on, a blank secret stops startup instead of keying
       # guest hashes with the key published in docker-compose.yml.
       FLOWCORTEX_SUPPORT_HASH_SECRET: ${FLOWCORTEX_SUPPORT_HASH_SECRET:-}
+      # Same rule for the share access-log hashes: a blank value stops startup instead of
+      # falling back to the dev key published in docker-compose.yml.
+      FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:-}
 
   # Seedance and Wan read the product photo through a presigned URL on this host.
   provider-video-worker:
