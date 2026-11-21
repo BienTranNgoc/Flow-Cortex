@@ -119,7 +119,40 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
+  const streamId = (nextStreamId += 1);
+  let down = false;
+
+  function markDown(): void {
+    if (!down) {
+      down = true;
+      emitNetworkSignal({ type: 'stream-down', streamId });
+    }
+  }
+
+  function markUp(): void {
+    if (down) {
+      down = false;
+      emitNetworkSignal({ type: 'stream-up', streamId });
+    }
+  }
+
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const streamId = (nextStreamId += 1);
+  let down = false;
+
+  function markDown(): void {
+    if (!down) {
+      down = true;
+      emitNetworkSignal({ type: 'stream-down', streamId });
+    }
+  }
+
+  function markUp(): void {
+    if (down) {
+      down = false;
+      emitNetworkSignal({ type: 'stream-up', streamId });
+    }
+  }
 
   const clearIdle = () => {
     if (idleTimer !== null) {

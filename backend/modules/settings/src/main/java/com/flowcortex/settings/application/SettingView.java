@@ -2,6 +2,7 @@ package com.flowcortex.settings.application;
 
 import com.flowcortex.settings.api.SettingChange;
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingDescription;
 import com.flowcortex.settings.api.SettingRead;
 
 /**
@@ -11,4 +12,11 @@ import com.flowcortex.settings.api.SettingRead;
  */
 public record SettingView(SettingDefinition<?> definition, SettingRead<?> read, Object storedValue,
         SettingChange change) {
+
+    /** The key as every admin surface describes it; the change stamp stays on this view. */
+    public SettingDescription description() {
+        return new SettingDescription(definition.name(), definition.type(), definition.options(),
+                definition.min(), definition.max(), read.effective(), read.decided(), read.source(), storedValue,
+                definition.configuredValue(), definition.codeDefault());
+    }
 }

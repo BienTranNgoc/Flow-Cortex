@@ -2,6 +2,8 @@ package com.flowcortex.user.application;
 
 import com.flowcortex.jobs.api.ClusterJob;
 import com.flowcortex.user.infrastructure.RefreshTokenRepository;
+import com.flowcortex.user.pat.PersonalAccessTokenRepository;
+import com.flowcortex.user.stepup.StepUpProofRepository;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -17,8 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Keeps the ever-growing auth tables bounded: audit rows (which hold IPs and user agents) older
- * than the configured retention, reset-link rows that were used or expired, and refresh-token rows
- * that expired or were revoked. A live, rotated-out refresh-token row stays until its session
+ * than the configured retention, reset-link rows that were used or expired, refresh-token rows
+ * that expired or were revoked, spent or expired step-up proofs, and access tokens that were revoked
+ * or expired longer ago than the audit retention. A live, rotated-out refresh-token row stays until its session
  * expires, because presenting it again is how a stolen token is detected. Runs on one instance at a time through
  * the cluster runner; the deletes stay idempotent.
  */
@@ -29,24 +32,31 @@ public class AuthRetentionJob implements ClusterJob {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final StepUpProofRepository stepUpProofRepository;
+    private final PersonalAccessTokenRepository accessTokenRepository;
     private final AuthRetentionProperties properties;
     private final Clock clock;
     private final Duration interval;
 
     @Autowired
     AuthRetentionJob(NamedParameterJdbcTemplate jdbc, RefreshTokenRepository refreshTokenRepository,
+            StepUpProofRepository stepUpProofRepository, PersonalAccessTokenRepository accessTokenRepository,
             AuthRetentionProperties properties, Clock clock,
             @Value("${flowcortex.auth.retention.interval}") Duration interval) {
         this.jdbc = jdbc;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.stepUpProofRepository = stepUpProofRepository;
+        this.accessTokenRepository = accessTokenRepository;
         this.properties = properties;
         this.clock = clock;
         this.interval = interval;
     }
 
     AuthRetentionJob(NamedParameterJdbcTemplate jdbc, RefreshTokenRepository refreshTokenRepository,
+            StepUpProofRepository stepUpProofRepository, PersonalAccessTokenRepository accessTokenRepository,
             AuthRetentionProperties properties, Clock clock) {
-        this(jdbc, refreshTokenRepository, properties, clock, Duration.ofHours(1));
+        this(jdbc, refreshTokenRepository, stepUpProofRepository, accessTokenRepository, properties, clock,
+                Duration.ofHours(1));
     }
 
     @Override
@@ -74,7 +84,9 @@ public class AuthRetentionJob implements ClusterJob {
         int tokens = refreshTokenRepository.deleteExpiredAndRevokedBefore(now);
         int resetLinks = jdbc.update("DELETE FROM email_confirmation_token WHERE purpose = 'PASSWORD_RESET'"
                 + " AND (used_at < :now OR expires_at < :now)", new MapSqlParameterSource("now", Timestamp.from(now)));
-        LOG.info("Auth retention: deleted {} audit events, {} refresh tokens and {} reset links", events, tokens,
-                resetLinks);
+        int proofs = stepUpProofRepository.deleteSpentBefore(now);
+        int accessTokens = accessTokenRepository.deleteDead(now.minus(properties.auditEvents()));
+        LOG.info("Auth retention: deleted {} audit events, {} refresh tokens, {} reset links, {} step-up proofs and"
+                + " {} access tokens", events, tokens, resetLinks, proofs, accessTokens);
     }
 }

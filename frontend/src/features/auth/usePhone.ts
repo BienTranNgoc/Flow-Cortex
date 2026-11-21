@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   authHeaders,
-  current,
+  current1 as current,
   sendCode,
   unwrap,
   verify,

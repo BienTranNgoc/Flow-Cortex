@@ -3,12 +3,17 @@ package com.flowcortex.support.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.support.web.SupportProblemException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AskerLimitsTest {
@@ -18,7 +23,7 @@ class AskerLimitsTest {
     @Test
     void theEleventhQuestionInAMinuteIsRefusedWithTheNextAllowedTime() {
         Instant now = Instant.parse("2026-10-19T08:20:00Z");
-        MinuteLimiter limiter = new MinuteLimiter(Clock.fixed(now, ZoneOffset.UTC));
+        MinuteLimiter limiter = minuteLimiter(Clock.fixed(now, ZoneOffset.UTC));
         for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
             limiter.acquire("member:a");
         }
@@ -35,7 +40,7 @@ class AskerLimitsTest {
     @Test
     void networkAndSessionBucketsAreSeparateAndTheNetworkOneRefusesTheEleventhQuestion() {
         Instant now = Instant.parse("2026-10-19T08:20:00Z");
-        MinuteLimiter limiter = new MinuteLimiter(Clock.fixed(now, ZoneOffset.UTC));
+        MinuteLimiter limiter = minuteLimiter(Clock.fixed(now, ZoneOffset.UTC));
         for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
             limiter.acquireNetwork("guest-ip:a");
         }
@@ -49,7 +54,7 @@ class AskerLimitsTest {
 
     @Test
     void aFloodOfSessionKeysDoesNotResetANetworkBucket() {
-        MinuteLimiter limiter = new MinuteLimiter(Clock.fixed(Instant.parse("2026-10-19T08:20:00Z"), ZoneOffset.UTC));
+        MinuteLimiter limiter = minuteLimiter(Clock.fixed(Instant.parse("2026-10-19T08:20:00Z"), ZoneOffset.UTC));
         for (int i = 0; i < MinuteLimiter.PER_MINUTE; i++) {
             limiter.acquireNetwork("guest-ip:a");
         }
@@ -109,6 +114,14 @@ class AskerLimitsTest {
                     .hasMessageContaining("FLOWCORTEX_SUPPORT_HASH_SECRET");
         }
         assertThat(new GuestKeys(properties(false), "").configured()).isFalse();
+    }
+
+    static MinuteLimiter minuteLimiter(Clock clock) {
+        AssistantRateLimits limits = new AssistantRateLimits();
+        RateLimiters limiters = new RateLimiters(
+                List.of(limits.assistantAskerLimit(), limits.assistantNetworkLimit()),
+                new InMemoryRateLimitStore(clock), new RateLimitTelemetry(new SimpleMeterRegistry(), clock));
+        return new MinuteLimiter(limiters, clock);
     }
 
     private static SupportProperties properties(boolean assistantEnabled) {

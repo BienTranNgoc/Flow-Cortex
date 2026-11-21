@@ -1,6 +1,7 @@
 package com.flowcortex.support.web;
 
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedProblem;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -12,7 +13,7 @@ import org.springframework.http.HttpStatus;
  * field error are message bundle keys, put into the request's language by {@link SupportProblemHandler};
  * clients still map the code to their own copy.
  */
-public class SupportProblemException extends RuntimeException {
+public class SupportProblemException extends RuntimeException implements LocalizedProblem {
 
     private final HttpStatus status;
     private final String code;
@@ -46,6 +47,11 @@ public class SupportProblemException extends RuntimeException {
     }
 
     public LocalizedMessage detail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
         return detail;
     }
 

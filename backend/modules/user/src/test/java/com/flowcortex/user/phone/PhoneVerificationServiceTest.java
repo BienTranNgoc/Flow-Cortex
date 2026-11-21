@@ -11,11 +11,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocaleConfig;
 import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.phone.PhoneVerificationService.SentCode;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -271,8 +275,10 @@ class PhoneVerificationServiceTest {
         ObjectProvider<SmsSender> senders = mock(ObjectProvider.class);
         when(senders.getIfAvailable()).thenReturn(sender);
         return new PhoneVerificationService(challenges, phones, senders, enabled, attempts, HASHER,
-                new PhoneSendIpLimiter(LIMITS), LIMITS, encoder, jdbc, mock(PlatformTransactionManager.class),
-                Clock.fixed(now, ZoneOffset.UTC), LOCALE, LOCALE.getBean(RequestLocale.class));
+                new PhoneSendIpLimiter(new RateLimiters(List.of(new PhoneRateLimits().phoneSendIp(LIMITS)),
+                        new InMemoryRateLimitStore(),
+                        new RateLimitTelemetry(new SimpleMeterRegistry(), Clock.systemUTC()))), LIMITS, encoder, jdbc,
+                mock(PlatformTransactionManager.class), Clock.fixed(now, ZoneOffset.UTC), LOCALE, LOCALE.getBean(RequestLocale.class));
     }
 
     private static String english(MessageSourceResolvable message) {

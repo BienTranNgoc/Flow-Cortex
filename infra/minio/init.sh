@@ -44,13 +44,25 @@ mc ilm import ROOT/flowcortex-uploads < "$DIR/uploads-lifecycle.json"
 # rule is built inline because its age comes from the environment. Like the
 # uploads import above, this replaces every lifecycle rule on the media bucket:
 # add rules here, not by hand, or the next init run drops them.
-# A support attachment stays support-pending until its content check passes.
+# A support attachment stays support-pending until its content check passes;
+# a review image stays review-pending likewise; a Drive file stays drive-pending
+# until its item row commits; a profile image stays profile-released until its
+# record commits, and again once it leaves the member's history.
 printf '%s\n' \
     '{"Rules":[{"ID":"expire-run-inputs","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"run-input"}},' \
     "\"Expiration\":{\"Days\":$RUN_INPUT_RETENTION_DAYS}}," \
     '{"ID":"expire-support-pending","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"support-pending"}},' \
+    '"Expiration":{"Days":1}},' \
+    '{"ID":"expire-drive-pending","Status":"Enabled",' \
+    '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"drive-pending"}},' \
+    '"Expiration":{"Days":1}},' \
+    '{"ID":"expire-profile-released","Status":"Enabled",' \
+    '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"profile-released"}},' \
+    '"Expiration":{"Days":1}},' \
+    '{"ID":"expire-review-pending","Status":"Enabled",' \
+    '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"review-pending"}},' \
     '"Expiration":{"Days":1}}]}' \
     | mc ilm import ROOT/flowcortex-media
 

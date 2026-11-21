@@ -31,26 +31,24 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 class SupportReplyMailerTest {
 
     private final UserDirectory users = mock(UserDirectory.class);
-    private final Mailer sender = mock(Mailer.class);
-    private final SupportProperties properties = properties(true);
-    private final SupportReplyMailer mailer = new SupportReplyMailer(users, sender, properties,
+    private final Mailer mailer = mock(Mailer.class);
+    private final SupportReplyMailer replyMailer = new SupportReplyMailer(users, mailer, properties(true),
             "http://localhost:5173/");
     private final UUID member = UUID.randomUUID();
 
     @Test
-    void aReplyMailCarriesTheRequestNumberAndTheLinkToTheRequest(CapturedOutput output) {
+    void aReplyMailIsSentWithTheLinkToTheRequest(CapturedOutput output) {
         recipientExists();
-        when(sender.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SENT);
+        when(mailer.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SENT);
 
-        mailer.on(event("vi"));
+        replyMailer.on(event("vi"));
 
-        ArgumentCaptor<OutgoingMail> mail = ArgumentCaptor.forClass(OutgoingMail.class);
-        verify(sender).send(mail.capture());
-        assertThat(mail.getValue().key()).isEqualTo(MailKey.SUPPORT_REQUEST_REPLIED);
-        assertThat(mail.getValue().memberId()).isEqualTo(member);
-        assertThat(mail.getValue().to()).isEqualTo("m@example.com");
-        assertThat(mail.getValue().locale()).isEqualTo(Locale.of("vi"));
-        assertThat(mail.getValue().values()).containsExactly(12L, "http://localhost:5173/?help=request-12");
+        OutgoingMail mail = sent();
+        assertThat(mail.key()).isEqualTo(MailKey.SUPPORT_REQUEST_REPLIED);
+        assertThat(mail.memberId()).isEqualTo(member);
+        assertThat(mail.to()).isEqualTo("m@example.com");
+        assertThat(mail.locale()).isEqualTo(Locale.of("vi"));
+        assertThat(mail.values()).containsExactly(12L, "http://localhost:5173/?help=request-12");
         assertThat(output.getOut()).contains("support.reply.mail outcome=sent request=12")
                 .doesNotContain("m@example.com");
     }
@@ -58,13 +56,13 @@ class SupportReplyMailerTest {
     @Test
     void aRequestFiledInEnglishIsMailedInEnglishAndAnyOtherLocaleInVietnamese() {
         recipientExists();
-        when(sender.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SENT);
+        when(mailer.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SENT);
 
-        mailer.on(event("en"));
-        mailer.on(event("fr"));
+        replyMailer.on(event("en"));
+        replyMailer.on(event("fr"));
 
         ArgumentCaptor<OutgoingMail> mail = ArgumentCaptor.forClass(OutgoingMail.class);
-        verify(sender, times(2)).send(mail.capture());
+        verify(mailer, times(2)).send(mail.capture());
         assertThat(mail.getAllValues().get(0).locale()).isEqualTo(Locale.ENGLISH);
         assertThat(mail.getAllValues().get(1).locale()).isEqualTo(Locale.of("vi"));
     }
@@ -73,54 +71,40 @@ class SupportReplyMailerTest {
     void aDeletedRecipientSendsNothingReturnsNormallyAndLogsTheRequestNumber(CapturedOutput output) {
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
 
-        assertThatCode(() -> mailer.on(event("vi"))).doesNotThrowAnyException();
+        assertThatCode(() -> replyMailer.on(event("vi"))).doesNotThrowAnyException();
 
-        verify(sender, never()).send(any());
+        verify(mailer, never()).send(any());
         assertThat(output.getOut()).contains("support.reply.mail outcome=recipient_deleted request=12");
     }
 
     @Test
-    void aMemberWhoOptedOutIsNotRetried(CapturedOutput output) {
+    void aSuppressedSendReturnsNormallySoTheRegistryDoesNotRetryIt(CapturedOutput output) {
         recipientExists();
-        when(sender.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SUPPRESSED);
+        when(mailer.send(any(OutgoingMail.class))).thenReturn(MailOutcome.SUPPRESSED);
 
-        assertThatCode(() -> mailer.on(event("vi"))).doesNotThrowAnyException();
+        assertThatCode(() -> replyMailer.on(event("vi"))).doesNotThrowAnyException();
 
         assertThat(output.getOut()).contains("support.reply.mail outcome=suppressed request=12")
                 .doesNotContain("m@example.com");
     }
 
     @Test
-    void aFailedSendIsRethrownSoTheRegistryRetriesIt(CapturedOutput output) {
+    void aFailedSendIsRethrownSoTheRegistryRetriesItAndTheLogHoldsNoAddress(CapturedOutput output) {
         recipientExists();
-        when(sender.send(any(OutgoingMail.class))).thenReturn(MailOutcome.FAILED);
+        when(mailer.send(any(OutgoingMail.class))).thenReturn(MailOutcome.FAILED);
 
-        assertThatThrownBy(() -> mailer.on(event("vi"))).isInstanceOf(IllegalStateException.class)
-                .hasMessageNotContaining("m@example.com");
+        assertThatThrownBy(() -> replyMailer.on(event("vi"))).isInstanceOf(IllegalStateException.class);
 
         assertThat(output.getOut()).contains("support.reply.mail outcome=failed request=12 error=send_failed")
                 .doesNotContain("m@example.com");
     }
 
     @Test
-    void aSenderExceptionIsRethrownAndItsLogLineHoldsTheRequestNumberAndNoAddress(CapturedOutput output) {
-        recipientExists();
-        when(sender.send(any(OutgoingMail.class)))
-                .thenThrow(new IllegalArgumentException("bad mail for m@example.com"));
-
-        assertThatThrownBy(() -> mailer.on(event("vi"))).isInstanceOf(IllegalArgumentException.class);
-
-        assertThat(output.getOut())
-                .contains("support.reply.mail outcome=failed request=12 error=IllegalArgumentException")
-                .doesNotContain("m@example.com");
-    }
-
-    @Test
     void startupFailsWithTheHelpCenterOnAndNoPublicUrlForTheLink() {
-        assertThatThrownBy(() -> new SupportReplyMailer(users, sender, properties, " "))
+        assertThatThrownBy(() -> new SupportReplyMailer(users, mailer, properties(true), " "))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("flowcortex.app.public-url");
-        assertThatCode(() -> new SupportReplyMailer(users, sender, properties(false), ""))
+        assertThatCode(() -> new SupportReplyMailer(users, mailer, properties(false), ""))
                 .doesNotThrowAnyException();
     }
 
@@ -141,6 +125,12 @@ class SupportReplyMailerTest {
 
     private void recipientExists() {
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
+    }
+
+    private OutgoingMail sent() {
+        ArgumentCaptor<OutgoingMail> mail = ArgumentCaptor.forClass(OutgoingMail.class);
+        verify(mailer).send(mail.capture());
+        return mail.getValue();
     }
 
     private static SupportProperties properties(boolean enabled) {

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/workflow-artifact.schema.json",
+  "title": "WorkflowArtifact",
+  "description": "A workflow definition moved between environments: its name and its ordered steps, nothing environment-bound (no id, owner, status, sharing or fork data). Every key is always written (null, never omitted). Rules a schema cannot state, enforced by the importer: stepOrder equals the step's 1-based position; each step's config, serialized, is at most 50000 characters; duplicate keys are refused. String lengths count code points.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "exportedAt", "workflow", "steps"],
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 255, "pattern": "\\S" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "maxItems": 32767,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "step": {
+      "title": "WorkflowArtifactStep",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stepOrder", "name", "type", "inputRef", "config"],
+      "properties": {
+        "stepOrder": { "type": "integer", "minimum": 1, "maximum": 32767 },
+        "name": { "type": ["string", "null"], "maxLength": 255 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "inputRef": { "type": ["string", "null"], "maxLength": 255 },
+        "config": { "type": ["object", "null"] }
+      }
+    }
+  }
+}

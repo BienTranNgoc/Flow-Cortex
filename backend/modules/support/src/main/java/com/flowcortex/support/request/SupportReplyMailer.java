@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Mails the member a link to each admin reply once the reply is committed. A failed send is rethrown so the
- * event registry keeps the publication as failed and retries it by {@link SupportReplyMailRetryPolicy}; a mail
- * the member opted out of is not retried. The reply itself is already saved. Logs carry the request number,
- * never the address.
+ * event registry keeps the publication as failed and retries it by {@link SupportReplyMailRetryPolicy}; the
+ * reply itself is already saved. A member who opted out is not retried. Logs carry the request number, never
+ * the address.
  */
 @Component
 class SupportReplyMailer {
@@ -59,12 +59,16 @@ class SupportReplyMailer {
                     e.getClass().getSimpleName());
             throw e;
         }
-        if (outcome == MailOutcome.FAILED) {
-            LOG.warn("support.reply.mail outcome=failed request={} error=send_failed", event.requestNumber());
-            throw new IllegalStateException("The reply mail for request " + event.requestNumber() + " was not sent");
+        switch (outcome) {
+            case SENT -> LOG.info("support.reply.mail outcome=sent request={}", event.requestNumber());
+            case SUPPRESSED -> LOG.info("support.reply.mail outcome=suppressed request={}", event.requestNumber());
+            // FAILED, and any outcome added later, counts as not sent so the listener retries.
+            default -> {
+                LOG.warn("support.reply.mail outcome=failed request={} error=send_failed", event.requestNumber());
+                throw new IllegalStateException("Support reply mail for request " + event.requestNumber()
+                        + " was not sent");
+            }
         }
-        LOG.info("support.reply.mail outcome={} request={}", outcome == MailOutcome.SENT ? "sent" : "suppressed",
-                event.requestNumber());
     }
 
     private OutgoingMail mail(String email, SupportReplyMailRequested event) {

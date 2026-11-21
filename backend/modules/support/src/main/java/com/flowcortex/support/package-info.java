@@ -15,7 +15,8 @@
                 "mail :: api",
                 "notification :: api",
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.support;

@@ -28,6 +28,7 @@ from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
 from flowcortex_worker.provider.adapter import (
     FixtureProviderAdapter,
+    VendorProbe,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
@@ -36,6 +37,11 @@ from flowcortex_worker.provider.adapter import (
 from flowcortex_worker.provider.capabilities import ExecutionContext, execute
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.provider.contracts.provider_video_result import ProviderVideoData
+from flowcortex_worker.provider.vendor_jobs import (
+    VendorJobEnded,
+    VendorJobTimeout,
+    VendorResultGone,
+)
 
 REVISION_ID = UUID("a71ea3ba-d72a-4c2c-985c-3a7fd98853c4")
 RUN_ID = "0b7e1d2c-3a4b-4c5d-8e6f-7a8b9c0d1e2f"
@@ -124,6 +130,16 @@ class _Abort:
 
 def _fast_config(config: Any, **overrides: Any) -> Any:
     return dataclasses.replace(config, poll_interval_seconds=0.0, **overrides)
+
+
+class _NoLedgerAdapter:
+    """The vendor-job half of VideoAdapter for fakes whose jobs never carry a ledger."""
+
+    def probe_video(self, task_id: str) -> VendorProbe:
+        raise AssertionError("a job without a ledger is never probed")
+
+    def vendor_scope(self) -> dict[str, str]:
+        raise AssertionError("a job without a ledger has no fingerprint")
 
 
 # ---------------------------------------------------------------------------
@@ -428,7 +444,7 @@ def _empty_context() -> ExecutionContext:
 def test_video_capability_normalises_clip_to_five_seconds() -> None:
     """End-to-end: submit a clip and normalize it to the configured vertical output."""
 
-    class _Adapter:
+    class _Adapter(_NoLedgerAdapter):
         def video_identity(self) -> VideoIdentity:
             return VideoIdentity(
                 "seedance", "ByteDance-Seedance-1.5-pro", 5, "9:16", "480p", False
@@ -477,7 +493,7 @@ def test_video_capability_uses_existing_checkpoint_without_resubmit(
 
     submitted: list[VideoRequest] = []
 
-    class _Adapter:
+    class _Adapter(_NoLedgerAdapter):
         def video_identity(self) -> VideoIdentity:
             return VideoIdentity(
                 "seedance", "ByteDance-Seedance-1.5-pro", 5, "9:16", "720p", False
@@ -629,7 +645,7 @@ def test_video_job_with_a_product_image_sends_bytes_to_veo_and_wan_and_a_url_to_
     storage.head_object.return_value = None
     submitted: list[VideoRequest] = []
 
-    class _Adapter:
+    class _Adapter(_NoLedgerAdapter):
         def video_identity(self) -> VideoIdentity:
             return VideoIdentity(provider, "model", 5, "9:16", "480p", False)
 
@@ -794,6 +810,367 @@ def test_wan_failed_prediction_keeps_the_provider_error_out_of_logs_and_message(
     for record in caplog.records:
         assert raw_error not in record.getMessage()
         assert all(raw_error not in str(value) for value in vars(record).values())
+
+
+# ---------------------------------------------------------------------------
+# Vendor job probes and the wait's typed failures
+# ---------------------------------------------------------------------------
+
+Route = int | dict[str, Any] | bytes
+
+
+def _route_urlopen(
+    monkeypatch: pytest.MonkeyPatch, routes: dict[tuple[str, str], Route]
+) -> list[tuple[str, str, dict[str, str]]]:
+    """Answers each (method, url) with a status (an int), a JSON object or raw bytes."""
+    calls: list[tuple[str, str, dict[str, str]]] = []
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        key = (request.get_method(), request.full_url)
+        calls.append((*key, dict(request.header_items())))
+        answer = routes[key]
+        if isinstance(answer, int):
+            raise urllib.error.HTTPError(
+                request.full_url, answer, "x", cast(Any, {}), io.BytesIO(b"{}")
+            )
+        response = _http_response(answer)
+        response.status = 200 if request.get_method() != "GET" or "Range" not in dict(
+            request.header_items()
+        ) else 206
+        return response
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    return calls
+
+
+DASH_TASK = "https://dashscope.aliyuncs.com/api/v1/tasks/t-1"
+DASH_VIDEO = "https://cdn.aliyuncs.com/seedance/clip.mp4"
+BYTEPLUS_BASE = "https://ark.ap-southeast.bytepluses.com/api/v3"
+BYTEPLUS_TASK = f"{BYTEPLUS_BASE}/contents/generations/tasks/t-1"
+BYTEPLUS_VIDEO = "https://cdn.bytepluses.com/clip.mp4"
+VEO_TASK = "https://generativelanguage.googleapis.com/v1beta/operations/op-1"
+VEO_VIDEO = "https://storage.googleapis.com/veo/clip.mp4"
+WAN_TASK = "https://api.replicate.com/v1/predictions/w-1"
+WAN_VIDEO = "https://replicate.delivery/out.mp4"
+
+
+def _byteplus() -> seedance_adapter.SeedanceAdapter:
+    return seedance_adapter.SeedanceAdapter(
+        seedance_adapter.SeedanceConfig(api_key="sk-bp", base_url=BYTEPLUS_BASE)
+    )
+
+
+def _wan() -> Any:
+    from flowcortex_worker.provider import wan_adapter
+
+    return wan_adapter.WanAdapter(wan_adapter.WanConfig(api_key="wan-key"))
+
+
+def _veo_done(uri: str = VEO_VIDEO) -> dict[str, Any]:
+    return {
+        "done": True,
+        "response": {"generateVideoResponse": {"generatedSamples": [{"video": {"uri": uri}}]}},
+    }
+
+
+@pytest.mark.parametrize(
+    ("task_status", "expected"),
+    [
+        ("PENDING", "running"),
+        ("RUNNING", "running"),
+        ("FAILED", "failed"),
+        ("CANCELED", "failed"),
+        ("UNKNOWN", "failed"),
+    ],
+)
+def test_seedance_dashscope_probe_maps_status(
+    monkeypatch: pytest.MonkeyPatch, task_status: str, expected: str
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", DASH_TASK): {"output": {"task_status": task_status}}})
+
+    assert _seedance().probe_video("t-1") == expected
+
+
+def test_seedance_dashscope_probe_succeeds_when_the_clip_answers_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _route_urlopen(
+        monkeypatch,
+        {
+            ("GET", DASH_TASK): {"output": {"task_status": "SUCCEEDED", "video_url": DASH_VIDEO}},
+            ("HEAD", DASH_VIDEO): b"",
+        },
+    )
+
+    assert _seedance().probe_video("t-1") == "succeeded"
+    assert [call[0] for call in calls] == ["GET", "HEAD"]
+
+
+@pytest.mark.parametrize("head", [403, 404, 410])
+def test_seedance_probe_reads_gone_when_the_clip_is_refused(
+    monkeypatch: pytest.MonkeyPatch, head: int
+) -> None:
+    _route_urlopen(
+        monkeypatch,
+        {
+            ("GET", DASH_TASK): {"output": {"task_status": "SUCCEEDED", "video_url": DASH_VIDEO}},
+            ("HEAD", DASH_VIDEO): head,
+            ("GET", DASH_VIDEO): head,
+        },
+    )
+
+    assert _seedance().probe_video("t-1") == "gone"
+
+
+def test_a_head_refused_as_a_method_falls_back_to_a_ranged_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _route_urlopen(
+        monkeypatch,
+        {
+            ("GET", DASH_TASK): {"output": {"task_status": "SUCCEEDED", "video_url": DASH_VIDEO}},
+            ("HEAD", DASH_VIDEO): 405,
+            ("GET", DASH_VIDEO): b"x",
+        },
+    )
+
+    assert _seedance().probe_video("t-1") == "succeeded"
+    assert calls[-1][2]["Range"] == "bytes=0-0"
+
+
+def test_a_clip_url_outside_the_vendor_cdn_reads_gone_without_a_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _route_urlopen(
+        monkeypatch,
+        {("GET", DASH_TASK): {"output": {"task_status": "SUCCEEDED", "video_url": "https://x.io/a"}}},
+    )
+
+    assert _seedance().probe_video("t-1") == "gone"
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("task_status", "expected"),
+    [
+        ("queued", "running"),
+        ("running", "running"),
+        ("expired", "expired"),
+        ("failed", "failed"),
+        ("cancelled", "failed"),
+    ],
+)
+def test_seedance_byteplus_probe_maps_status(
+    monkeypatch: pytest.MonkeyPatch, task_status: str, expected: str
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", BYTEPLUS_TASK): {"status": task_status}})
+
+    assert _byteplus().probe_video("t-1") == expected
+
+
+def test_seedance_byteplus_probe_succeeds_on_a_live_clip(monkeypatch: pytest.MonkeyPatch) -> None:
+    _route_urlopen(
+        monkeypatch,
+        {
+            ("GET", BYTEPLUS_TASK): {
+                "status": "succeeded",
+                "content": {"video_url": BYTEPLUS_VIDEO},
+            },
+            ("HEAD", BYTEPLUS_VIDEO): b"",
+        },
+    )
+
+    assert _byteplus().probe_video("t-1") == "succeeded"
+
+
+def test_veo_probe_maps_the_operation(monkeypatch: pytest.MonkeyPatch) -> None:
+    _route_urlopen(monkeypatch, {("GET", VEO_TASK): {"done": False}})
+    assert _veo().probe_video("operations/op-1") == "running"
+
+    _route_urlopen(monkeypatch, {("GET", VEO_TASK): {"done": True, "error": {"code": 3}}})
+    assert _veo().probe_video("operations/op-1") == "failed"
+
+    calls = _route_urlopen(
+        monkeypatch, {("GET", VEO_TASK): _veo_done(), ("HEAD", VEO_VIDEO): b""}
+    )
+    assert _veo().probe_video("operations/op-1") == "succeeded"
+    assert calls[-1][2]["X-goog-api-key"] == "veo-test-key"
+
+    _route_urlopen(monkeypatch, {("GET", VEO_TASK): 404})
+    assert _veo().probe_video("operations/op-1") == "gone"
+
+
+def test_veo_probe_reads_a_malformed_operation_name_as_gone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _route_urlopen(monkeypatch, {})
+
+    assert _veo().probe_video("../evil") == "gone"
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("task_status", "expected"),
+    [
+        ("starting", "running"),
+        ("processing", "running"),
+        ("failed", "failed"),
+        ("canceled", "failed"),
+    ],
+)
+def test_wan_probe_maps_status(
+    monkeypatch: pytest.MonkeyPatch, task_status: str, expected: str
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", WAN_TASK): {"status": task_status}})
+
+    assert _wan().probe_video("w-1") == expected
+
+
+def test_wan_probe_succeeds_on_a_live_clip_and_reads_a_404_as_gone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _route_urlopen(
+        monkeypatch,
+        {("GET", WAN_TASK): {"status": "succeeded", "output": WAN_VIDEO}, ("HEAD", WAN_VIDEO): b""},
+    )
+    assert _wan().probe_video("w-1") == "succeeded"
+
+    _route_urlopen(monkeypatch, {("GET", WAN_TASK): 404})
+    assert _wan().probe_video("w-1") == "gone"
+
+
+def _probes() -> list[tuple[Any, str, str]]:
+    return [
+        (_seedance(), "t-1", DASH_TASK),
+        (_byteplus(), "t-1", BYTEPLUS_TASK),
+        (_veo(), "operations/op-1", VEO_TASK),
+        (_wan(), "w-1", WAN_TASK),
+    ]
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 410])
+def test_every_probe_reads_a_refusing_vendor_as_gone(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    for adapter, task_id, url in _probes():
+        _route_urlopen(monkeypatch, {("GET", url): status})
+
+        assert adapter.probe_video(task_id) == "gone"
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 503])
+def test_every_probe_raises_when_the_vendor_cannot_answer(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    for adapter, task_id, url in _probes():
+        _route_urlopen(monkeypatch, {("GET", url): status})
+
+        with pytest.raises(TransientError):
+            adapter.probe_video(task_id)
+
+
+def test_a_probe_network_error_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(request: Any, timeout: float = 0) -> MagicMock:
+        raise urllib.error.URLError("down")
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+
+    with pytest.raises(TransientError):
+        _seedance().probe_video("t-1")
+
+
+def test_a_vendor_scope_names_the_host_and_hides_the_key() -> None:
+    scope = _seedance().vendor_scope()
+
+    assert scope["endpoint"] == "dashscope.aliyuncs.com"
+    assert "sk-seedance-test" not in json.dumps(scope)
+    assert scope != _byteplus().vendor_scope()
+
+
+@pytest.mark.parametrize(
+    ("adapter", "url", "task_id", "task_status", "expected"),
+    [
+        (_seedance(), DASH_TASK, "t-1", {"output": {"task_status": "FAILED"}}, "failed"),
+        (_byteplus(), BYTEPLUS_TASK, "t-1", {"status": "expired"}, "expired"),
+        (_byteplus(), BYTEPLUS_TASK, "t-1", {"status": "failed"}, "failed"),
+        (_veo(), VEO_TASK, "operations/op-1", {"done": True, "error": {"code": 3}}, "failed"),
+        (_wan(), WAN_TASK, "w-1", {"status": "failed"}, "failed"),
+    ],
+)
+def test_a_vendor_ended_task_raises_with_its_status(
+    monkeypatch: pytest.MonkeyPatch,
+    adapter: Any,
+    url: str,
+    task_id: str,
+    task_status: dict[str, Any],
+    expected: str,
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", url): task_status})
+    adapter = dataclasses.replace(adapter, config=_fast_config(adapter.config))
+
+    with pytest.raises(VendorJobEnded) as ended:
+        adapter.await_video(task_id, _Abort())
+
+    assert ended.value.status == expected
+    assert ended.value.code == "provider_request_failed"
+
+
+@pytest.mark.parametrize("status", [403, 404, 410])
+def test_a_clip_download_the_vendor_refuses_raises_result_gone(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", DASH_VIDEO): status, ("GET", VEO_VIDEO): status})
+
+    with pytest.raises(VendorResultGone):
+        _seedance()._download_video(DASH_VIDEO)
+    with pytest.raises(VendorResultGone):
+        _veo()._download_video(VEO_VIDEO)
+
+
+def test_a_wan_clip_download_the_vendor_refuses_raises_result_gone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", WAN_VIDEO): 404})
+
+    with pytest.raises(VendorResultGone):
+        _wan()._download_video(WAN_VIDEO)
+
+
+def test_a_task_the_vendor_has_forgotten_raises_result_gone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for adapter, task_id, url in _probes():
+        _route_urlopen(monkeypatch, {("GET", url): 404})
+
+        with pytest.raises(VendorResultGone):
+            adapter.await_video(task_id, _Abort())
+
+
+def test_a_submit_the_vendor_refuses_stays_a_plain_permanent_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submit = "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis"
+    _route_urlopen(monkeypatch, {("POST", submit): 404})
+
+    with pytest.raises(PermanentError) as refused:
+        _seedance().submit_video(VideoRequest("prompt", REVISION_ID))
+
+    assert not isinstance(refused.value, VendorResultGone)
+
+
+def test_the_poll_deadline_raises_a_retryable_vendor_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _route_urlopen(monkeypatch, {("GET", DASH_TASK): {"output": {"task_status": "RUNNING"}}})
+    adapter = seedance_adapter.SeedanceAdapter(
+        _fast_config(_seedance().config, poll_timeout_seconds=0.0)
+    )
+
+    with pytest.raises(VendorJobTimeout) as timeout:
+        adapter.await_video("t-1", _Abort())
+
+    assert timeout.value.vendor == "seedance"
+    assert timeout.value.exhausted_code == "provider_timeout"
 
 
 # ---------------------------------------------------------------------------

@@ -52,7 +52,6 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         Map<String, Boolean> catalog = Arrays.stream(Permission.values())
                 .collect(Collectors.toMap(Permission::key, Permission::superAdminOnly));
-        assertThat(catalog).hasSize(22);
         assertThat(rows).isEqualTo(catalog);
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
@@ -64,27 +63,33 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         Set<String> operationManager = new TreeSet<>(keys(Permission.values()));
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
+        operationManager.remove(Permission.PAYMENT_SETTING_UPDATE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).hasSize(18).isEqualTo(operationManager);
+        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key())
+                .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW));
-
-        assertThat(Permission.SUPPORT_TICKET_ASSIGN.superAdminOnly()).isFalse();
-        assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(Permission.SUPPORT_TICKET_ASSIGN.key());
-        assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(Permission.SUPPORT_TICKET_ASSIGN.key());
+                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.AI_PROVIDER_VIEW, Permission.AI_PROVIDER_UPDATE, Permission.WORKFLOW_RUN_EXPORT,
+                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT));
 
         Integer workflowManageHolders = jdbc.queryForObject(
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
                 Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         assertThat(workflowManageHolders).isZero();
+
+        Integer paymentUpdateHolders = jdbc.queryForObject(
+                "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
+                Permission.PAYMENT_SETTING_UPDATE.key());
+        assertThat(paymentUpdateHolders).isZero();
     }
 
     @Test

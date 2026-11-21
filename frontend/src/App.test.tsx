@@ -57,6 +57,17 @@ const FEATURES_OFF = {
   },
 };
 
+const SHELL_ACCOUNT = {
+  'GET /api/v1/auth/profile/preferences': {
+    status: 200,
+    body: {
+      ui: {},
+      privacy: { profile: 'everyone', activity: 'everyone', message: 'everyone', stats: 'show' },
+    },
+  },
+  'GET /api/v1/profile/images': { status: 200, body: {} },
+};
+
 vi.mock('./features/auth/LoginPage', async (importOriginal) => {
   const actual = await importOriginal<typeof LoginPageModule>();
   return {
@@ -191,7 +202,12 @@ describe('App', () => {
 
   it('contains a page that throws inside the layout, with Try again and one structured event', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    stubApi({ ...MEMBER_ME, ...FEATURES_OFF });
+    stubApi({
+      ...MEMBER_ME,
+      ...FEATURES_OFF,
+      ...SHELL_ACCOUNT,
+      'GET /api/v1/runs/tray': { status: 200, body: { active: [], recent: [] } },
+    });
     setToken('t', true);
     window.history.pushState({}, '', '/');
 
@@ -202,7 +218,7 @@ describe('App', () => {
     expect(nav).toHaveTextContent('Home');
     expect(nav).toHaveTextContent('Workflows');
     expect(nav).toHaveTextContent('Docs');
-    expect(nav).not.toHaveTextContent('Runs');
+    expect(nav).toHaveTextContent('Runs');
     expect(nav).not.toHaveTextContent('Integrations');
     expect(consoleError.mock.calls.filter(([first]) => first === 'client_error')).toEqual([
       ['client_error', { route: '/', name: 'TypeError' }],
@@ -285,7 +301,7 @@ describe('App', () => {
     consoleError.mockRestore();
   });
 
-  it.each(['/runs', '/integrations'])(
+  it.each(['/integrations'])(
     'sends %s to / while the demo pages are off',
     async (path) => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -314,7 +330,7 @@ describe('App', () => {
     try {
       render(<App />);
 
-      expect(await screen.findByRole('heading', { name: 'Recent runs' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Runs', level: 1 })).toBeInTheDocument();
       const nav = screen.getByRole('navigation', { name: 'Main navigation' });
       expect(within(nav).getByRole('link', { name: 'Runs' })).toBeInTheDocument();
       expect(within(nav).getByRole('link', { name: 'Integrations' })).toBeInTheDocument();

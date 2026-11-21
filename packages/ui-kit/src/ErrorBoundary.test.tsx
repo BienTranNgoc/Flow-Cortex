@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { MockInstance } from 'vitest';
 import { ErrorBoundary } from './ErrorBoundary';
-import { reportClientError } from './reportClientError';
+import {
+  configureClientErrorReporting,
+  reportClientError,
+  resetClientErrorReportingForTests,
+} from './reportClientError';
 
 function Explodes(): never {
   throw new TypeError('Cannot read properties of undefined (reading "durationMs")');
@@ -131,14 +135,33 @@ describe('ErrorBoundary', () => {
 });
 
 describe('reportClientError', () => {
+  let consoleError: ConsoleSpy;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    resetClientErrorReportingForTests();
+    document.documentElement.lang = 'en';
+  });
+  afterEach(() => {
+    consoleError.mockRestore();
+    vi.unstubAllGlobals();
+    document.documentElement.lang = '';
+  });
+
   it('reports a thrown value that is not an Error without its content', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    configureClientErrorReporting({ app: 'member' });
     window.history.pushState({}, '', '/profile');
 
     reportClientError({ password: 'hunter2' });
 
     expect(consoleError).toHaveBeenCalledWith('client_error', { route: '/profile', name: 'NonError' });
-    consoleError.mockRestore();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = String(fetchMock.mock.calls[0]?.[1]?.body);
+    expect(JSON.parse(body)).toMatchObject({ name: 'NonError', route: '/profile' });
+    expect(body).not.toContain('hunter2');
   });
 
   it('reports an API error by its status and never its message, which can carry personal data', () => {
@@ -146,7 +169,7 @@ describe('reportClientError', () => {
       readonly status = 404;
       override readonly name = 'ApiError';
     }
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    configureClientErrorReporting({ app: 'member' });
     window.history.pushState({}, '', '/users');
 
     reportClientError(new ApiError('User not found: member1@flowcortex.dev'));
@@ -155,6 +178,101 @@ describe('reportClientError', () => {
       ['client_error', { route: '/users', name: 'ApiError', status: 404 }],
     ]);
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('@');
-    consoleError.mockRestore();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('posts a render failure to the intake without its message, cookies or referrer', () => {
+    configureClientErrorReporting({ app: 'member' });
+    window.history.pushState({}, '', '/workflows/42?x=1');
+
+    reportClientError(new TypeError('cannot read user an@example.com'), 'render');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/client-errors');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'Content-Type': 'text/plain;charset=UTF-8' });
+    expect(init.credentials).toBe('omit');
+    expect(init.keepalive).toBe(true);
+    expect(init.referrerPolicy).toBe('no-referrer');
+    expect(init.body).toBe(
+      '{"v":1,"kind":"render","app":"member","name":"TypeError","route":"/workflows/42","lang":"en"}',
+    );
+    expect(String(init.body)).not.toContain('an@example.com');
+  });
+
+  it('omits the language when the page declares none and caps name and route', () => {
+    configureClientErrorReporting({ app: 'admin' });
+    document.documentElement.lang = '';
+    window.history.pushState({}, '', `/${'a'.repeat(200)}`);
+    class Long extends Error {
+      override readonly name = 'N'.repeat(100);
+    }
+
+    reportClientError(new Long('x'));
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(['v', 'kind', 'app', 'name', 'route']);
+    expect(body.app).toBe('admin');
+    expect(String(body.name)).toHaveLength(80);
+    expect(String(body.route)).toHaveLength(120);
+  });
+
+  it('reports a query failure without a status as kind query', () => {
+    configureClientErrorReporting({ app: 'member' });
+
+    reportClientError(new TypeError('Failed to fetch'));
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ kind: 'query' });
+  });
+
+  it('sends nothing before the app is configured', () => {
+    reportClientError(new TypeError('boom'), 'render');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith('client_error', expect.objectContaining({ name: 'TypeError' }));
+  });
+
+  it('sends one report for a failure that repeats on one route', () => {
+    configureClientErrorReporting({ app: 'member' });
+    window.history.pushState({}, '', '/loop');
+
+    for (let i = 0; i < 50; i += 1) {
+      reportClientError(new TypeError('again'), 'render');
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends at most ten reports in one page load', () => {
+    configureClientErrorReporting({ app: 'member' });
+    window.history.pushState({}, '', '/many');
+
+    for (let i = 0; i < 15; i += 1) {
+      const error = new Error('x');
+      error.name = `Failure${i}`;
+      reportClientError(error);
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
+
+  it('never throws and never retries when delivery fails', async () => {
+    configureClientErrorReporting({ app: 'member' });
+    window.history.pushState({}, '', '/down');
+    const first = new TypeError('a');
+    const second = new RangeError('b');
+
+    fetchMock.mockImplementationOnce(() => {
+      throw new TypeError('sync failure');
+    });
+    expect(() => reportClientError(first)).not.toThrow();
+    fetchMock.mockRejectedValueOnce(new TypeError('network down'));
+    expect(() => reportClientError(second)).not.toThrow();
+    await Promise.resolve();
+
+    reportClientError(first);
+    reportClientError(second);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

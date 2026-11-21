@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.app.MailParts;
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
 import com.flowcortex.notification.api.NotificationRequested;
 import com.flowcortex.settings.api.Settings;
@@ -78,8 +79,7 @@ class SupportRequestIT extends AbstractPostgresBootTest {
     private static final String REPLY_MAIL = "support.reply-mail";
 
     private static final URI PROBLEMS = URI.create("https://flow-cortex.dev/problems/");
-    private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D,
-        'I', 'H', 'D', 'R', 0, 0, 0, 1};
+    private static final byte[] PNG = ImageFixtures.png();
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -884,7 +884,8 @@ class SupportRequestIT extends AbstractPostgresBootTest {
         assertThat(grant.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID uploadId = grant.getBody().uploadId();
         try (S3Client store = objectStore()) {
-            store.putObject(o -> o.bucket(UPLOAD_BUCKET).key(user.id() + "/" + uploadId).contentType(contentType),
+            store.putObject(o -> o.bucket(UPLOAD_BUCKET).key("support-attachment/" + user.id() + "/" + uploadId)
+                            .contentType(contentType),
                     RequestBody.fromBytes(body));
         }
         return uploadId;

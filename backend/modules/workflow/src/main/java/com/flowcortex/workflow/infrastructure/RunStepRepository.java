@@ -59,6 +59,22 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
     int claimPending(@Param("id") UUID id, @Param("now") Instant now, @Param("queueDeadline") Instant queueDeadline,
             @Param("input") String input);
 
+    /**
+     * {@code error -> pending} as the next attempt of the step: every trace of the failed attempt is
+     * cleared and the stored input is set back to {@code input}, because a claim overwrites it with the
+     * resolved one. The attempt guard decides between two callers re-arming the same failure.
+     */
+    @Modifying
+    @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.PENDING, "
+            + "r.attempt = r.attempt + 1, r.output = NULL, r.outputs = NULL, r.errorCode = NULL, "
+            + "r.errorMessage = NULL, r.startedAt = NULL, r.finishedAt = NULL, r.pickedUpAt = NULL, "
+            + "r.leaseUntil = NULL, r.queueDeadline = NULL, r.runDeadline = NULL, r.progressPercent = NULL, "
+            + "r.deliveryCount = 0, r.input = :input "
+            + "WHERE r.id = :id AND r.runId = :runId AND r.attempt = :attempt AND r.attempt < 32767 "
+            + "AND r.status = com.flowcortex.workflow.domain.RunStepStatus.ERROR")
+    int reArm(@Param("id") UUID id, @Param("runId") UUID runId, @Param("attempt") short attempt,
+            @Param("input") String input);
+
     /** Every step of the run that has not started becomes {@code skipped}; returns how many. */
     @Modifying
     @Query("UPDATE RunStep r SET r.status = com.flowcortex.workflow.domain.RunStepStatus.SKIPPED "
