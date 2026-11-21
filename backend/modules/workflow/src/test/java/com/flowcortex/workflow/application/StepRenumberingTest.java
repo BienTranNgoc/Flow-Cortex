@@ -187,4 +187,73 @@ class StepRenumberingTest {
                 .isEqualTo(new Stale());
         assertThat(StepRenumbering.forDelete(rows, UUID.randomUUID())).isEqualTo(new Stale());
     }
+
+    private static Row named(int order, String name, String inputRef) {
+        return new Row(UUID.randomUUID(), order, "echo", name, inputRef, null);
+    }
+
+    @Test
+    void deletingAStepReadByNameIsRefusedNamingTheReader() {
+        List<Row> rows = List.of(named(1, "draft", null), named(2, "voice", null), named(3, "mix", "{step:draft.title}"));
+
+        assertThat(StepRenumbering.forDelete(rows, rows.get(0).id())).isEqualTo(new Referenced(1, List.of(3)));
+    }
+
+    @Test
+    void aReorderLeavesNamedReferencesAsWrittenAndRewritesPositionalOnes() {
+        List<Row> rows = List.of(named(1, "draft", null), named(2, "voice", null),
+                named(3, "mix", "{step:draft.title}"), named(4, "cut", "{step:2}"));
+
+        Plan plan = plan(StepRenumbering.forOrder(rows, ids(rows, 2, 1, 3, 4)));
+
+        assertThat(plan.rows().get(2).row().inputRef()).isEqualTo("{step:draft.title}");
+        assertThat(plan.rows().get(2).referencesChanged()).isFalse();
+        assertThat(plan.rows().get(3).row().inputRef()).isEqualTo("{step:1}");
+    }
+
+    @Test
+    void aReorderThatPutsANamedReaderBeforeItsSourceIsAForwardReference() {
+        List<Row> rows = List.of(named(1, "draft", null), named(2, "mix", "{step:draft}"));
+
+        assertThat(StepRenumbering.forOrder(rows, ids(rows, 2, 1))).isEqualTo(new ForwardReference(List.of(0)));
+
+        List<Row> three = List.of(named(1, "draft", null), named(2, "mix", "{step:draft}"), named(3, "cut", null));
+        assertThat(StepRenumbering.forOrder(three, ids(three, 1, 3, 2))).isInstanceOf(Plan.class);
+    }
+
+    @Test
+    void aNamedReferenceToAnUnknownOrSharedNameIsNeitherReaderNorForward() {
+        List<Row> rows = List.of(named(1, "dup", null), named(2, "dup", null), named(3, "a", "{step:dup}"),
+                named(4, "b", "{step:ghost}"));
+
+        Plan afterDelete = plan(StepRenumbering.forDelete(rows, rows.get(0).id()));
+        assertThat(afterDelete.rows()).extracting(p -> p.row().inputRef())
+                .containsExactly(null, "{step:dup}", "{step:ghost}");
+
+        Plan afterReorder = plan(StepRenumbering.forOrder(rows, ids(rows, 4, 3, 2, 1)));
+        assertThat(afterReorder.rows()).extracting(p -> p.row().id()).containsExactlyElementsOf(ids(rows, 4, 3, 2, 1));
+    }
+
+    @Test
+    void aDeleteRewritesADeepPositionalPathKeepingIt() {
+        List<Row> rows = List.of(row(1), row(2), row(3), row(4, "{step:3.a.b}", null),
+                row(5, "{step:3.items[0].text}", null));
+
+        Plan plan = plan(StepRenumbering.forDelete(rows, rows.get(1).id()));
+
+        assertThat(plan.rows().get(2).row().inputRef()).isEqualTo("{step:2.a.b}");
+        assertThat(plan.rows().get(3).row().inputRef()).isEqualTo("{step:2.items[0].text}");
+    }
+
+    @Test
+    void aDeleteNeverRewritesANamedReference() {
+        List<Row> rows = List.of(named(1, "draft", null), named(2, "gone", null),
+                named(3, "mix", "{step:draft.title}"), named(4, "cut", "{step:mix}"));
+
+        Plan plan = plan(StepRenumbering.forDelete(rows, rows.get(1).id()));
+
+        assertThat(plan.rows().get(1).row().inputRef()).isEqualTo("{step:draft.title}");
+        assertThat(plan.rows().get(2).row().inputRef()).isEqualTo("{step:mix}");
+        assertThat(plan.rows()).noneMatch(Planned::referencesChanged);
+    }
 }

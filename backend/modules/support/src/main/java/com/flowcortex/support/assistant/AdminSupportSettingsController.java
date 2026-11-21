@@ -1,5 +1,7 @@
 package com.flowcortex.support.assistant;
 
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.support.config.AssistantSwitch;
 import com.flowcortex.support.web.SupportCaller;
 import com.flowcortex.user.api.CurrentUser;
@@ -63,9 +65,9 @@ class AdminSupportSettingsController {
     }
 
     @Operation(operationId = "getAdminSupportSettings")
+    @RequirePermission(Permission.PLATFORM_SETTING_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    AdminSettings settings(@AuthenticationPrincipal Jwt jwt) {
-        caller.requireAdmin(jwt);
+    AdminSettings settings() {
         return view();
     }
 
@@ -74,9 +76,10 @@ class AdminSupportSettingsController {
     @ApiResponse(responseCode = "400", description = "validation-failed (errors.assistantEnabled)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
     @PutMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     AdminSettings update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SettingsUpdate body) {
-        CurrentUser admin = caller.requireAdmin(jwt);
+        CurrentUser admin = caller.require(jwt);
         assistantSwitch.setConsole(body.assistantEnabled(), admin.id(), clock.instant());
         return view();
     }

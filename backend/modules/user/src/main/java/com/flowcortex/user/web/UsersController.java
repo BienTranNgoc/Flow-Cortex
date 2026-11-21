@@ -1,5 +1,7 @@
 package com.flowcortex.user.web;
 
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import jakarta.validation.Valid;
@@ -13,7 +15,6 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,7 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/users} — ADMIN-only CRUD scoped to the caller's own owner scope. A record
+ * {@code /api/v1/users} — CRUD guarded per handler by {@code user.account.*} keys, scoped to the caller's own owner scope. A record
  * outside that scope is a 404, not a 403 — {@link UserService} enforces that; this controller
  * just relays what it throws.
  *
@@ -36,7 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/users")
-@PreAuthorize("hasRole('ADMIN')")
 class UsersController {
 
     private final UserService userService;
@@ -45,9 +45,10 @@ class UsersController {
         this.userService = userService;
     }
 
+    @RequirePermission(Permission.USER_ACCOUNT_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<List<UserResponse>> list(@AuthenticationPrincipal Jwt jwt) {
-        List<UserResponse> users = userService.listUsers(ownerId(jwt)).stream()
+        List<UserResponse> users = userService.listUsers(callerId(jwt)).stream()
                 .map(UserResponse::from)
                 .toList();
         return ResponseEntity.ok(users);
@@ -56,38 +57,45 @@ class UsersController {
     // @ResponseStatus documents 201 for springdoc/orval — Spring MVC ignores it for a
     // ResponseEntity-returning method (actual 201 comes from ResponseEntity.status() below).
     @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission(Permission.USER_ACCOUNT_CREATE)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> create(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateUserRequest request) {
-        UserView created = userService.createUser(ownerId(jwt), request.email(), request.password(),
+        UserView created = userService.createUser(callerId(jwt), request.email(), request.password(),
                 request.name(), request.role());
         return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(created));
     }
 
+    @RequirePermission(Permission.USER_ACCOUNT_VIEW)
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return ResponseEntity.ok(UserResponse.from(userService.getUser(ownerId(jwt), id)));
+        return ResponseEntity.ok(UserResponse.from(userService.getUser(callerId(jwt), id)));
     }
 
+    @RequirePermission(Permission.USER_ACCOUNT_UPDATE)
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRequest request) {
-        UserView updated = userService.updateUser(ownerId(jwt), id, request.email(), request.name(),
+        UserView updated = userService.updateUser(callerId(jwt), id, request.email(), request.name(),
                 request.role(), request.status());
         return ResponseEntity.ok(UserResponse.from(updated));
     }
 
+    @RequirePermission(Permission.USER_ACCOUNT_DELETE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        userService.deleteUser(ownerId(jwt), id);
+        userService.deleteUser(callerId(jwt), id);
         return ResponseEntity.noContent().build();
     }
 
-    private static UUID ownerId(Jwt jwt) {
+    private static UUID callerId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }
+
+    private static final String ROLE_CODES =
+            "ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR";
 
     record CreateUserRequest(
             @NotBlank @Email String email,
@@ -95,14 +103,14 @@ class UsersController {
             // real limit is bytes, enforced by @MaxUtf8Bytes.
             @NotBlank @Size(min = 8, max = 72) @MaxUtf8Bytes(72) String password,
             @NotBlank String name,
-            @NotBlank @Pattern(regexp = "ADMIN|MEMBER|CREATOR") String role) {
+            @NotBlank @Pattern(regexp = ROLE_CODES) String role) {
     }
 
     /** Partial update — a {@code null} field is left unchanged. */
     record UpdateUserRequest(
             @Email String email,
             String name,
-            @Pattern(regexp = "ADMIN|MEMBER|CREATOR") String role,
+            @Pattern(regexp = ROLE_CODES) String role,
             @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {
     }
 

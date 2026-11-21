@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -136,6 +137,15 @@ class RunsController {
         Integer from = request == null ? null : request.fromStepOrder();
         boolean acknowledged = request != null && Boolean.TRUE.equals(request.acknowledgeCost());
         return ResponseEntity.ok(RunResponse.from(runResumption.retryRun(currentUserId, id, from, acknowledged), creditAccounts));
+    }
+
+    /** The run's inputs in start order, each with a time-limited URL; 404 if the run is not the caller's. */
+    @GetMapping(value = "/{id}/inputs", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<List<RunInputResponse>> getRunInputs(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        UUID currentUserId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(workflowRunService.getRunInputs(currentUserId, id).stream()
+                .map(RunInputResponse::from)
+                .toList());
     }
 
     @GetMapping(value = "/{id}/steps/{order}/outputs/{name}/url", produces = MediaType.APPLICATION_JSON_VALUE)

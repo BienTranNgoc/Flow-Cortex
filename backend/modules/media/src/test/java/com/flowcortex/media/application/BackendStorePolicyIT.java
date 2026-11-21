@@ -8,6 +8,7 @@ import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
 import com.flowcortex.media.infrastructure.S3MediaStore;
+import com.flowcortex.space.api.PersonalSpaces;
 import jakarta.validation.Validator;
 import java.net.URI;
 import java.time.Duration;
@@ -64,7 +65,8 @@ class BackendStorePolicyIT {
         MediaProperties properties = properties(STORE.getS3URL());
         backendStore = new S3MediaStore(properties);
         jobs = new MediaJobsImpl(mock(ApplicationEventPublisher.class), mock(Validator.class), properties,
-                backendStore, mock(MediaAssetRepository.class), mock(MediaAssetBindingRepository.class));
+                backendStore, mock(MediaAssetRepository.class), mock(MediaAssetBindingRepository.class),
+                mock(PersonalSpaces.class));
     }
 
     @AfterAll
