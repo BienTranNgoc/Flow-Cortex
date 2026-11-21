@@ -470,7 +470,7 @@ class MediaJobsImpl implements MediaJobs {
                 .orElseThrow(() -> new IllegalStateException("Profile image is not registered: " + uploadId));
         MediaJobInput source = resolved.input();
         long maxBytes = purposes.maxBytes(UploadPurpose.PROFILE_IMAGE, "image");
-        HardenedImage image = hardenedImage(source, asset.getMimeType(), maxBytes, reason -> {
+        HardenedImage image = hardenedImage(source, asset.getMimeType(), maxBytes, "uploadIds", reason -> {
             LOG.info("Profile image refused: bucket={} key={} reason={}", source.bucket(), source.objectKey(), reason);
             return new UploadRejectedException("uploadIds", new LocalizedMessage("upload.attachmentNotImage"));
         });
