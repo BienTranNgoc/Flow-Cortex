@@ -92,7 +92,7 @@ final class UploadPurposePolicy {
 
     /** Purposes that take only png, jpg, jpeg and webp images. */
     private static boolean imageOnly(UploadPurpose purpose) {
-        return purpose != UploadPurpose.RUN_INPUT;
+        return purpose == UploadPurpose.SUPPORT_ATTACHMENT || purpose == UploadPurpose.PROFILE_IMAGE;
     }
 
     private static String extensionOf(String fileName) {
