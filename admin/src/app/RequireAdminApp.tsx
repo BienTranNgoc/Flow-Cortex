@@ -2,13 +2,15 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthToken, useMeQuery, useSessionReady } from '../features/auth/useAuth';
+import { AdminDisabledPage } from './AdminDisabledPage';
 import { NoAccessPage } from './NoAccessPage';
-import { can } from './permissions';
+import { canEnterConsole } from './permissions';
 import { SessionStatus } from './SessionStatus';
 
 /**
- * Entry guard of the whole console: no token → `/login` (remembering the page), a role without
- * `console.enter` → "No access". Nothing under it mounts, so a refused user triggers no admin call.
+ * Entry guard of the whole console: no token → `/login` (remembering the page), a deactivated admin
+ * → "deactivated", an account holding no key → "No access". Nothing under it mounts, so a refused
+ * user triggers no admin call.
  */
 export function RequireAdminApp({ children }: Readonly<{ children: ReactNode }>) {
   const token = useAuthToken();
@@ -36,7 +38,10 @@ export function RequireAdminApp({ children }: Readonly<{ children: ReactNode }>)
       </main>
     );
   }
-  if (!can(meQuery.data.role, 'console.enter')) {
+  if (meQuery.data.adminDisabled) {
+    return <AdminDisabledPage email={meQuery.data.email} />;
+  }
+  if (!canEnterConsole(meQuery.data)) {
     return <NoAccessPage email={meQuery.data.email} />;
   }
   return <>{children}</>;

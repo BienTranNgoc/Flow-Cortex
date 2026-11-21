@@ -257,6 +257,42 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         assertForbiddenOnBothEndpoints(token);
     }
 
+    record CreateUserBody(String email, String password, String name, String role) {
+    }
+
+    @Test
+    void aCustomerSupportReadsRunsButCannotWriteWorkflows() {
+        UserView owner = newUser("admin-support-keys");
+        UserView support = userService.createUser(owner.id(), uniqueEmail("support"), "password123", "Support",
+                "CUSTOMER_SUPPORT");
+        UserView operations = userService.createUser(owner.id(), uniqueEmail("operations"), "password123",
+                "Operations", "OPERATION_MANAGER");
+        String supportToken = loginAs(support);
+        String operationsToken = loginAs(operations);
+        String newcomer = uniqueEmail("newcomer");
+
+        for (String path : List.of("/api/v1/admin/runs", "/api/v1/admin/media/jobs")) {
+            assertThat(getPage(path, supportToken, ANY_PAGE).getStatusCode()).as("support " + path)
+                    .isEqualTo(HttpStatus.OK);
+            assertThat(getPage(path, operationsToken, ANY_PAGE).getStatusCode()).as("operations " + path)
+                    .isEqualTo(HttpStatus.OK);
+        }
+        ResponseEntity<ProblemView> write = restTemplate.exchange("/api/v1/users", HttpMethod.POST,
+                new HttpEntity<>(new CreateUserBody(newcomer, "password123", "Newcomer", "MEMBER"),
+                        bearer(supportToken)), problem());
+
+        assertThat(write.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(write.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE email = ?", Integer.class, newcomer))
+                .isZero();
+    }
+
+    private static HttpHeaders bearer(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        return headers;
+    }
+
     private void assertForbiddenOnBothEndpoints(String token) {
         for (String path : List.of("/api/v1/admin/runs", "/api/v1/admin/media/jobs")) {
             ResponseEntity<ProblemView> response = getPage(path, token, problem());

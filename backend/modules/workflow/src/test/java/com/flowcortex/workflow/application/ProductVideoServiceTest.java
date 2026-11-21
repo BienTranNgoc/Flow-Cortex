@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard;
@@ -63,7 +64,7 @@ class ProductVideoServiceTest {
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
                         .isEqualTo(503));
 
-        verify(media, never()).resolveImageUploads(any(), any());
+        verify(media, never()).resolveImageUploads(any(), any(), any());
         verify(runs, never()).save(any());
     }
 
@@ -87,7 +88,7 @@ class ProductVideoServiceTest {
                 .hasMessage("refused");
 
         assertThat(acknowledged).containsExactly(true);
-        verify(media, never()).resolveImageUploads(any(), any());
+        verify(media, never()).resolveImageUploads(any(), any(), any());
         verify(runs, never()).save(any());
     }
 
@@ -111,7 +112,7 @@ class ProductVideoServiceTest {
         when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
                 .thenReturn(definitions);
-        when(media.resolveImageUploads(ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
+        when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
         List<MediaAssetInput> copies = List.of(
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "media", "runs/x/inputs/image_1")),
                 new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "media", "runs/x/inputs/image_2")));

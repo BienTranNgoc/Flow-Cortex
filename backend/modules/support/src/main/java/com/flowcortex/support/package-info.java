@@ -7,11 +7,14 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Support",
         allowedDependencies = {
+                "jobs :: api",
                 "user :: api",
                 "media :: api",
                 "llm :: api",
+                "mail :: api",
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.support;

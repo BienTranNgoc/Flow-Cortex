@@ -1,4 +1,4 @@
-import { GetRunLogLevel, type Entry, type RunStepResponse } from '@flow-cortex/api-client';
+import { GetRunLogLevel, type RunLogEntry, type RunStepResponse } from '@flow-cortex/api-client';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { activeLocale } from '../../lib/i18n';
@@ -11,7 +11,7 @@ const FILTERS = [
   { level: GetRunLogLevel.warn, key: 'workflow.runLog.filter.warn' },
 ] as const;
 
-const LEVEL_KEYS: Record<Entry['level'], string> = {
+const LEVEL_KEYS: Record<RunLogEntry['level'], string> = {
   error: 'workflow.runLog.level.error',
   warn: 'workflow.runLog.level.warn',
   info: 'workflow.runLog.level.info',
@@ -20,7 +20,7 @@ const LEVEL_KEYS: Record<Entry['level'], string> = {
 type CopyState = 'idle' | 'copied' | 'failed';
 
 /** The step view the shared step helpers read, rebuilt from a log entry. */
-function asStep(entry: Entry): RunStepResponse {
+function asStep(entry: RunLogEntry): RunStepResponse {
   return {
     stepOrder: entry.stepOrder,
     type: entry.type,
@@ -33,7 +33,7 @@ function asStep(entry: Entry): RunStepResponse {
   };
 }
 
-function LogEntry({ entry }: Readonly<{ entry: Entry }>) {
+function LogEntry({ entry }: Readonly<{ entry: RunLogEntry }>) {
   const { t } = useTranslation();
   const locale = activeLocale();
   const step = asStep(entry);

@@ -188,7 +188,7 @@ describe('App', () => {
     });
   });
 
-  it('contains a page that throws inside the layout, with Reload and one structured event', async () => {
+  it('contains a page that throws inside the layout, with Try again and one structured event', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     stubApi({
       ...MEMBER_ME,
@@ -200,7 +200,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(nav).toHaveTextContent('Home');
     expect(nav).toHaveTextContent('Workflows');
@@ -225,14 +225,14 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     pages.homeThrows = false;
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     await user.click(within(nav).getByRole('link', { name: 'Home' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Home page' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
 
     setToken(null);
@@ -273,7 +273,7 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(nav).toHaveTextContent('Home');
@@ -298,7 +298,7 @@ describe('App', () => {
 
       render(<App />);
 
-      expect(await screen.findByRole('button', { name: 'Reload' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(window.location.pathname).toBe('/');
 
       setToken(null);

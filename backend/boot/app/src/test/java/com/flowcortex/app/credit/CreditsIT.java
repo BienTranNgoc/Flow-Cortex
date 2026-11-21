@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.BooleanSupplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -36,14 +38,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Run credits with the switch on. {@code echo} costs 10 and {@code fail} 50 here, so the scenarios
- * read as the spec's: a workflow of echo then fail is estimated at 60. Balances are set with SQL
- * once the signup grant has created the wallet; the sweep is pushed out to an hour so it never
- * advances a seeded run.
+ * read as the spec's: a workflow of echo then fail is estimated at 60. The prices are the seeded
+ * {@code rate_card} rows, set to those values by SQL before each test and put back after. Balances
+ * are set with SQL once the signup grant has created the wallet; the sweep is pushed out to an hour
+ * so it never advances a seeded run.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.credits.enabled=true",
-        "flowcortex.credits.step-costs.echo=10",
-        "flowcortex.credits.step-costs.fail=50",
         "flowcortex.workflow.cancel.enabled=true",
         "flowcortex.workflow.reaper-interval-ms=3600000"})
 @AutoConfigureTestRestTemplate
@@ -63,13 +64,31 @@ class CreditsIT extends AbstractWorkflowHttpIT {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @BeforeEach
+    void priceEchoAndFailForTheScenarios() {
+        setSeededPrice("echo", 10);
+        setSeededPrice("fail", 50);
+    }
+
+    @AfterEach
+    void restoreTheSeededPrices() {
+        setSeededPrice("echo", 1);
+        setSeededPrice("fail", 20);
+    }
+
+    private void setSeededPrice(String ref, int credits) {
+        int updated = jdbcTemplate.update("UPDATE rate_card SET credits_per_unit = ? WHERE rate_card_ref = ? "
+                + "AND effective_to IS NULL", credits, ref);
+        assertThat(updated).as("seeded open rate_card row of %s", ref).isEqualTo(1);
+    }
+
     record StartRequest(String input, Boolean acknowledgeCost) {
     }
 
     record CreditsProblem(int status, String detail, String code, Long balance, Long required, Long shortfall) {
     }
 
-    record BalanceView(long balance) {
+    record BalanceView(long balance, long granted) {
     }
 
     record PricedWorkflowView(UUID id, String name, Long estimatedCredits) {
@@ -154,7 +173,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(get("/api/v1/runs/" + runId, token, ChargedRunView.class).getBody().chargedCredits())
                 .isEqualTo(10);
 
-        creditAccounts.refundStep(runId, failed.id(), failed.errorCode());
+        creditAccounts.refundStep(runId, failed.id(), (short) 1, failed.errorCode());
 
         assertThat(ledger(runId, "refund")).containsExactly(50L);
         assertThat(balance(member)).isEqualTo(90);
@@ -167,7 +186,7 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         UUID stepId = stepIds(runId).get(1);
         chargeBySql(member, runId, stepId, 50);
 
-        creditAccounts.refundStep(runId, stepId, "APPROVAL_REJECTED");
+        creditAccounts.refundStep(runId, stepId, (short) 1, "APPROVAL_REJECTED");
 
         assertThat(ledger(runId, "refund")).isEmpty();
         assertThat(balance(member)).isEqualTo(50);
@@ -242,6 +261,28 @@ class CreditsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void theBalanceReportsWhatWasGrantedBesideWhatIsLeft() {
+        UserView member = memberWithBalance("granted", 940);
+        jdbcTemplate.update("UPDATE credit_ledger SET amount = 1000 WHERE user_id = ? AND kind = 'grant'",
+                member.id());
+        String token = loginAs(member);
+
+        BalanceView beforeCharge = get("/api/v1/credits/balance", token, BalanceView.class).getBody();
+        assertThat(beforeCharge.balance()).isEqualTo(940);
+        assertThat(beforeCharge.granted()).isEqualTo(1000);
+
+        UUID runId = seedRun(member, "running", "running");
+        UUID stepId = stepIds(runId).get(0);
+        chargeBySql(member, runId, stepId, 100);
+        creditAccounts.refundStep(runId, stepId, (short) 1, null);
+
+        BalanceView afterRefund = get("/api/v1/credits/balance", token, BalanceView.class).getBody();
+        assertThat(ledger(runId, "refund")).containsExactly(100L);
+        assertThat(afterRefund.balance()).isEqualTo(940);
+        assertThat(afterRefund.granted()).isEqualTo(1000);
+    }
+
+    @Test
     void aNewAccountIsGrantedOneThousandCreditsOnceEvenWhenTheEventIsHandledAgain() {
         UserView member = newUser("signup");
         awaitWallet(member.id());
@@ -265,11 +306,11 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         List<Callable<Boolean>> debits = List.of(
                 () -> {
                     go.await();
-                    return creditAccounts.debitForStep(member.id(), runA, UUID.randomUUID(), "fail");
+                    return creditAccounts.debitForStep(member.id(), runA, UUID.randomUUID(), (short) 1, "fail");
                 },
                 () -> {
                     go.await();
-                    return creditAccounts.debitForStep(member.id(), runB, UUID.randomUUID(), "fail");
+                    return creditAccounts.debitForStep(member.id(), runB, UUID.randomUUID(), (short) 1, "fail");
                 });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
@@ -291,6 +332,23 @@ class CreditsIT extends AbstractWorkflowHttpIT {
         assertThat(balance(member)).isEqualTo(10);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_ledger WHERE user_id = ? AND kind = 'debit'",
                 Long.class, member.id())).isEqualTo(1);
+    }
+
+    @Test
+    void eachAttemptOfAStepIsChargedAndRefundedOnItsOwn() {
+        UserView member = memberWithBalance("attempts", 100);
+        UUID runId = seedRun(member, "error", "error");
+        UUID stepId = stepIds(runId).get(0);
+
+        for (short attempt = 1; attempt <= 2; attempt++) {
+            assertThat(creditAccounts.debitForStep(member.id(), runId, stepId, attempt, "fail")).isTrue();
+            creditAccounts.refundStep(runId, stepId, attempt, "lease_expired");
+            creditAccounts.refundStep(runId, stepId, attempt, "lease_expired");
+        }
+
+        assertThat(ledger(runId, "debit")).containsExactly(50L, 50L);
+        assertThat(ledger(runId, "refund")).containsExactly(50L, 50L);
+        assertThat(balance(member)).isEqualTo(100);
     }
 
     private WorkflowView echoThenFail(UserView owner) {

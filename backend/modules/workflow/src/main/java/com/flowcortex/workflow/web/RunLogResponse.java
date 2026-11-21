@@ -25,6 +25,7 @@ record RunLogResponse(
     }
 
     /** One step as a log line; {@code message} is set only for an {@code error}. */
+    @Schema(name = "RunLogEntry")
     record Entry(
             @Schema(requiredMode = RequiredMode.REQUIRED) int stepOrder,
             @Schema(requiredMode = RequiredMode.REQUIRED) String type,
@@ -46,6 +47,7 @@ record RunLogResponse(
     }
 
     /** Counts over every step of the run, whatever level or limit the log was read with. */
+    @Schema(name = "RunLogSummary")
     record Summary(
             @Schema(requiredMode = RequiredMode.REQUIRED) int errorCount,
             @Schema(requiredMode = RequiredMode.REQUIRED) int warningCount,

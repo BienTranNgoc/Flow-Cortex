@@ -86,7 +86,7 @@ class RunStepTransactions {
             return ClaimOutcome.LOST;
         }
         runUpdates.touched(runId);
-        if (!charge(runId, stepId)) {
+        if (!charge(runId, stepId, attempt)) {
             failRunning(runId, stepId, attempt, InsufficientCreditsException.CODE, NOT_ENOUGH_CREDITS, now);
             return ClaimOutcome.FAILED;
         }
@@ -172,7 +172,7 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
-        creditAccounts.refundStep(runId, stepId, code);
+        creditAccounts.refundStep(runId, stepId, attempt, code);
         if (settleIfCancelling(runId, now)) {
             return true;
         }
@@ -213,13 +213,13 @@ class RunStepTransactions {
     }
 
     /** Charges the run's owner for a step just claimed; {@code false} when they cannot pay for it. */
-    private boolean charge(UUID runId, UUID stepId) {
+    private boolean charge(UUID runId, UUID stepId, short attempt) {
         if (!creditAccounts.enabled()) {
             return true;
         }
         String type = runStepRepository.findById(stepId).map(RunStep::getType)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.runStep.notFound", stepId)));
-        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, type);
+        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, attempt, type);
     }
 
     private WorkflowRun requireRun(UUID runId) {

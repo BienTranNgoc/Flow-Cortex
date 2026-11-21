@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.Tag;
 import software.amazon.awssdk.services.s3.model.Tagging;
 import software.amazon.awssdk.services.s3.model.TaggingDirective;
@@ -48,7 +50,9 @@ public class S3MediaStore implements AutoCloseable {
     /** Signed, but set by the browser itself; a script may not set them. */
     private static final Set<String> SET_BY_THE_BROWSER = Set.of("host", "content-length");
     private static final String RETENTION_TAG_KEY = "flowcortex-retention";
-    static final String RUN_INPUT_TAG = RETENTION_TAG_KEY + "=run-input";
+    /** Retention value of a run input's copy; the media bucket's lifecycle rule keys on it. */
+    public static final String RUN_INPUT_RETENTION = "run-input";
+    static final String RUN_INPUT_TAG = RETENTION_TAG_KEY + "=" + RUN_INPUT_RETENTION;
 
     private final S3Client client;
     private final S3Presigner presigner;
@@ -125,6 +129,39 @@ public class S3MediaStore implements AutoCloseable {
         return new AbortingOnEarlyClose(client.getObject(request -> request.bucket(bucket).key(key)));
     }
 
+    /**
+     * As {@link #put(String, String, String, byte[])}, but the object carries only
+     * {@code flowcortex-retention=<retention>}. Bounded by the copy timeout like {@link #copy}: moving
+     * an image of several megabytes outlasts the client's default per-attempt timeout.
+     * @throws software.amazon.awssdk.core.exception.SdkException if the store does not take the write
+     */
+    public void put(String bucket, String key, String contentType, byte[] bytes, String retention) {
+        client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType)
+                        .tagging(RETENTION_TAG_KEY + "=" + retention)
+                        .overrideConfiguration(timeouts -> timeouts
+                                .apiCallTimeout(copyTimeout)
+                                .apiCallAttemptTimeout(copyTimeout)),
+                RequestBody.fromBytes(bytes));
+    }
+
+    /**
+     * At most the first {@code maxBytes + 1} bytes of the object, so a caller can tell an object over its
+     * cap from one at it without reading the rest. Bounded by the copy timeout like {@link #copy}.
+     * @throws UploadRejectedException on field {@code uploadIds} if there is no object at {@code key}
+     */
+    public byte[] read(String bucket, String key, int maxBytes) {
+        try {
+            return client.getObjectAsBytes(request -> request.bucket(bucket).key(key)
+                    .range("bytes=0-" + maxBytes)
+                    .overrideConfiguration(timeouts -> timeouts
+                            .apiCallTimeout(copyTimeout)
+                            .apiCallAttemptTimeout(copyTimeout))).asByteArray();
+        } catch (NoSuchKeyException e) {
+            LOG.info("Upload refused at run start: bucket={} key={} reason=gone before read", bucket, key);
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        }
+    }
+
     /** @throws software.amazon.awssdk.core.exception.SdkException if the bucket cannot be reached or does not exist */
     public void headBucket(String bucket) {
         client.headBucket(request -> request.bucket(bucket));
@@ -166,6 +203,31 @@ public class S3MediaStore implements AutoCloseable {
         copyTagged(sourceBucket, sourceKey, targetBucket, targetKey, RETENTION_TAG_KEY + "=" + retention);
     }
 
+    /**
+     * A server-side copy that carries no tags, so a worker output copied into another run does not pick up
+     * the run-input expiry tag. Worker outputs have no tags to keep, and copying tags would need tagging
+     * grants the backend does not hold. Bounded by the copy timeout like {@link #copy(String, String, String, String)}.
+     * @throws UploadRejectedException on field {@code uploadIds} if the source object is gone
+     * @throws IllegalStateException if the store denies the copy, which means the backend policy lacks a grant
+     */
+    public void copyWithoutTags(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        try {
+            client.copyObject(request -> request
+                    .sourceBucket(sourceBucket).sourceKey(sourceKey)
+                    .destinationBucket(targetBucket).destinationKey(targetKey)
+                    .tagging(Tagging.builder().tagSet(List.of()).build())
+                    .taggingDirective(TaggingDirective.REPLACE)
+                    .overrideConfiguration(timeouts -> timeouts
+                            .apiCallTimeout(copyTimeout)
+                            .apiCallAttemptTimeout(copyTimeout)));
+        } catch (NoSuchKeyException e) {
+            LOG.info("Copy refused: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
+            throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        } catch (S3Exception e) {
+            throw deniedCopy(e, sourceBucket, sourceKey, targetBucket, targetKey);
+        }
+    }
+
     /** Replaces every tag of the object with {@code flowcortex-retention=<retention>}. */
     public void retag(String bucket, String key, String retention) {
         client.putObjectTagging(request -> request.bucket(bucket).key(key)
@@ -188,7 +250,21 @@ public class S3MediaStore implements AutoCloseable {
         } catch (NoSuchKeyException e) {
             LOG.info("Upload refused at run start: bucket={} key={} reason=gone before copy", sourceBucket, sourceKey);
             throw new UploadRejectedException("uploadIds", new LocalizedMessage("upload.again"));
+        } catch (S3Exception e) {
+            throw deniedCopy(e, sourceBucket, sourceKey, targetBucket, targetKey);
         }
+    }
+
+    /** A 403 is a policy gap, not a transient fault: log it as configuration; any other status is rethrown as is. */
+    private static RuntimeException deniedCopy(S3Exception e, String sourceBucket, String sourceKey,
+            String targetBucket, String targetKey) {
+        if (e.statusCode() != 403) {
+            return e;
+        }
+        LOG.error("Object store denied a copy, so the backend's store policy is missing a grant: from={}/{} to={}/{}",
+                sourceBucket, sourceKey, targetBucket, targetKey, e);
+        return new IllegalStateException("The object store denied copying " + sourceBucket + "/" + sourceKey
+                + " to " + targetBucket + "/" + targetKey + "; check the backend store policy", e);
     }
 
     @Override
