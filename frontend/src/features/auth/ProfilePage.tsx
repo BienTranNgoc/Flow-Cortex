@@ -8,6 +8,7 @@ import { useFeatures } from '../../app/useFeatures';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useBalance } from '../credits/useBalance';
+import { ApiTokensSection } from './ApiTokensSection';
 import { AvatarPickerDialog } from '../profile/AvatarPickerDialog';
 import { CoverPickerDialog } from '../profile/CoverPickerDialog';
 import { useImageFailure } from '../profile/useImageFailure';
@@ -61,7 +62,7 @@ export function ProfilePage() {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
   const ownProfile = useOwnProfileQuery();
-  const { phoneVerification } = useFeatures();
+  const { phoneVerification, personalAccessTokens } = useFeatures();
   const credits = useBalance();
   const images = useProfileImagesQuery();
   const avatar = useImageFailure(images.data?.avatar?.url);
@@ -302,6 +303,13 @@ export function ProfilePage() {
             <>
               <hr className="profile-card__divider" />
               <PhoneVerification />
+            </>
+          )}
+
+          {personalAccessTokens && me.role === 'ADMIN' && (
+            <>
+              <hr className="profile-card__divider" />
+              <ApiTokensSection />
             </>
           )}
 

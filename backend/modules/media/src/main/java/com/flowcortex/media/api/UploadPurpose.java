@@ -6,6 +6,8 @@ public enum UploadPurpose {
     RUN_INPUT,
     /** An image attached to a support request or message. */
     SUPPORT_ATTACHMENT,
+    /** A video, audio or image file a member keeps in the Drive library; same formats and caps as a run input. */
+    DRIVE_ITEM,
     /** A member's avatar or cover picture; only the owner ever sees it. */
     PROFILE_IMAGE;
 

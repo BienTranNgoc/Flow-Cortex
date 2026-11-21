@@ -18,6 +18,7 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String DRIVE_ITEM_PREFIX = "drive-item/";
     static final String PROFILE_IMAGE_PREFIX = "profile-image/";
 
     private static final long MEGABYTE = 1024L * 1024;
@@ -64,6 +65,7 @@ final class UploadPurposePolicy {
         String prefix = switch (purpose) {
             case RUN_INPUT -> "";
             case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case DRIVE_ITEM -> DRIVE_ITEM_PREFIX;
             case PROFILE_IMAGE -> PROFILE_IMAGE_PREFIX;
         };
         return prefix + ownerId + "/" + uploadId;
@@ -72,7 +74,7 @@ final class UploadPurposePolicy {
     /** The size cap of {@code kind} under {@code purpose}, or 0 for a kind the purpose never accepts. */
     long maxBytes(UploadPurpose purpose, String kind) {
         return switch (purpose) {
-            case RUN_INPUT -> upload.maxBytesOf(kind);
+            case RUN_INPUT, DRIVE_ITEM -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
             case PROFILE_IMAGE -> "image".equals(kind) ? upload.maxBytesOf(kind) : 0L;
         };

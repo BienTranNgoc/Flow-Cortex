@@ -12,6 +12,8 @@ reader cannot infer from the name.
 erDiagram
   app_user ||--o{ workflow : "owner_id (no FK)"
   app_user ||--o{ workflow_run : "owner_id (no FK)"
+  app_user ||--o{ step_up_proof : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ personal_access_token : "user_id, ON DELETE CASCADE"
   workflow ||--|{ workflow_step : "workflow_id"
   workflow ||--o{ workflow_run : "workflow_id"
   workflow_run ||--|{ run_step : "run_id"
@@ -142,6 +144,25 @@ erDiagram
     uuid created_by "NULL for revision 1, which the provider wrote"
     timestamptz created_at
   }
+  step_up_proof {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar purpose "closed list in code (StepUpPurpose), no CHECK"
+    varchar token_hash UK "SHA-256 hex of the proof; the proof itself is never stored"
+    timestamptz created_at
+    timestamptz expires_at "index — retention scan"
+    timestamptz consumed_at "set once by a conditional UPDATE; NULL = unspent"
+  }
+  personal_access_token {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar name "1-128 characters, chosen by the owner"
+    varchar token_hash UK "SHA-256 hex of the fc_pat_ token; the token itself is never stored"
+    timestamptz created_at
+    timestamptz expires_at "1-365 days after creation"
+    timestamptz last_used_at "NULL until first use; written at most once a minute"
+    timestamptz revoked_at "NULL = not revoked; soft, the retention job deletes the row"
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -153,13 +174,64 @@ erDiagram
     integer completion_attempts
     timestamptz last_resubmission_date
   }
+  drive_item {
+    uuid id PK
+    uuid space_id "personal space of the owner, no FK; INDEX (space_id, created_at DESC, id DESC)"
+    uuid owner_id "no FK"
+    varchar name "1-160 chars, sent by the client"
+    varchar content_type "text | image | video | audio"
+    varchar semantic_role "role vocabulary checked by the application"
+    text text_value "text items only"
+    varchar source "text | upload | run_output — CHECK ck_drive_item_payload ties source to the columns that must be set or empty"
+    varchar bucket "media items"
+    varchar object_key "upload: drive/{spaceId}/{itemId}; run_output: the run's own output key"
+    varchar file_name
+    varchar mime_type
+    bigint size_bytes
+    uuid run_id "run_output only, no FK"
+    smallint step_order "run_output only"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  memory_result {
+    uuid id PK
+    uuid space_id "UNIQUE (space_id, result_key)"
+    uuid owner_id "no FK"
+    uuid run_id "INDEX; no FK"
+    uuid run_step_id "no FK"
+    smallint step_order
+    varchar result_key "run_step_id for text, run_step_id/outputName for media — stable across attempts"
+    varchar kind "text | image | video | audio"
+    varchar title
+    varchar preview_text "text results, first 500 chars"
+    varchar bucket "media results"
+    varchar object_key "media results"
+    varchar file_name
+    varchar mime_type
+    bigint size_bytes "text: UTF-8 byte length"
+    timestamptz result_at "run finished_at"
+    boolean pinned "member-owned, survives re-population"
+    boolean hidden "member-owned, survives re-population"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  drive_backfill {
+    uuid space_id PK
+    uuid owner_id
+    timestamptz migrated_at "NULL until an apply inserted an entry for the space"
+    jsonb counts "{runs, results} inserted by applies"
+    timestamptz reconciled_at
+    boolean ok
+    timestamptz updated_at
+  }
 ```
 
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
 the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
-`idx_event_publication_serialized_event` (hash), `idx_event_publication_completion_date`.
+`idx_step_up_proof_expires_at`, `idx_pat_user_live` (partial, `WHERE revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
+`idx_event_publication_completion_date`.
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is

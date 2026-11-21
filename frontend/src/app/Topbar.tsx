@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useBalance } from '../features/credits/useBalance';
 import { WalletBadge } from '../features/credits/WalletBadge';
+import { RunTray } from '../features/runHistory/RunTray';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
 import { useSaveLocale } from '../features/auth/useAccountPreferences';
 import type { Theme } from './useTheme';
@@ -48,6 +49,7 @@ export function Topbar({
       )}
       <div className="topbar__actions">
         {credits !== undefined && <WalletBadge wallet={credits} />}
+        <RunTray />
         <AppLanguageToggle onSwitch={saveLocale.mutate} />
         <ThemeToggle
           theme={theme}

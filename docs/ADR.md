@@ -510,3 +510,313 @@ Format per entry: **Context → Decision → Consequences**.
     the forwarded client address.
   - **Operator docs:** `LOCAL_SETUP.md` describes which services have no
     internet route and how to add a host.
+
+## ADR-0011 — GPU workers: external APIs first, self-host later
+
+- **Context:** Xood is the functional target (ADR-0007, `docs/ADR.md:252`), and
+  part of its media work is GPU-class: face swap, upscaling, FLUX.2 image
+  generation, SAM 2.1 role tracking, RT-DETR role suggestion, LaMa overlay
+  clean-up, demucs stem separation, Depth Anything / clay render and Blender
+  preview. Every change that ports one of them needs to know whether it is a
+  provider adapter, a CPU handler or a self-host item; without this entry each
+  re-decides it. Vendor calls already leave from a provider worker today
+  (Seedance on BytePlus, WAN on Replicate), and the backend calls Google OAuth
+  and Gemini, while OpenAI calls leave from a provider worker; ADR-0010 lists
+  both tiers. No fal integration exists, and
+  `infra/egress-proxy/acl.yaml` has no fal host. Production is described as an
+  Oracle A1 VM (`docs/ADR.md:203`); whether it offers a GPU was not verified.
+- **Decision — policy:** GPU-class capabilities are served by external APIs
+  (fal, Replicate, BytePlus) called per use first, and self-hosted on a GPU
+  later, once the threshold below is met. The per-call price of an API is a
+  `rateCardRef` row of the rate-card contract owned by the
+  `step-pricing-contract` change, not a new price table here;
+  `step-pricing-contract` is a dependency that is not on `origin/development`
+  yet (`CreditAccounts.estimate(List<String>)` is the only pricing surface
+  there).
+- **Decision — boundaries kept:** a vendor API is called by the backend or by a
+  provider worker (the two tiers ADR-0010 lists). The media worker stays
+  keyless with no internet egress (ADR-0007, `docs/ADR.md:185`). Vendor calls
+  leave through ADR-0010's "Egress isolation: one forward proxy with a domain
+  allowlist": the adapter change that first calls a new vendor host adds it to
+  `infra/egress-proxy/acl.yaml` and to the adapter's in-code result-download
+  host list. ADR-0007 is not edited here; reconciling its "HTTP-provider steps
+  stay in the API, where the keys live" (`docs/ADR.md:258`) with the
+  provider-worker tier is left open.
+- **Decision — classes:** *API-available* means Xood's code calls a vendor API
+  for that capability. *CPU-first* means no API is confirmed, so the capability
+  runs on CPU first. *Self-host-later* means the capability is, or would be, a
+  GPU item once the threshold is met. Each row separates what Xood's code
+  proves (a cited `file:line`) from what a provider catalogue claims; a
+  catalogue claim reads `verified @ <URL, date>` or `unverified` with what
+  would settle it. No catalogue was read for this entry (no web access in the
+  authoring session), so every catalogue cell is `unverified`: reading the
+  fal, Replicate and BytePlus catalogues for the capability settles it, and a
+  row that turns out API-available is an edit of that one row.
+
+  | Capability | Class | Xood evidence | Catalogue status | Next change |
+  |---|---|---|---|---|
+  | Upscale: clarity, seedvr2, flux video, SUPIR | API-available | fal queue API: `clarity-upscale.provider.ts:78,120`; `seedvr2-upscale.provider.ts:89,128`; `flux-video-upscale.provider.ts:186-188`; `supir-upscale.provider.ts:11-15`, registered at `providers.module.ts:434` | unverified: fal model pages not read | `provider-upscalers` |
+  | Face swap video, whole person (`video.person_swap`) | API-available | fal `fal-ai/pixverse/swap`: `fal-pixverse-swap.provider.ts:75,129` | unverified: the "Endpoint verified 2026-09-07" note is Xood's own claim; the fal page would settle it | `provider-face-swap-detect` |
+  | Face swap image and video, face only | no commercial path verified | InsightFace inswapper, "free/non-commercial, internal use": `face-swap.provider.ts:28,72` (CPU sidecar), `video-swap.provider.ts:35,110`, `Dockerfile.gpu:2-4` | n/a: the model licence restricts commercial use, so a licensed model or API would settle it | none (a later licence decision) |
+  | FLUX.2 image generation | API-available for image generation in general; FLUX.2-klein itself self-host-later | `flux2-klein-selfhost.provider.ts:22-26` (self-hosted on Xood's GPU), `providers.module.ts:318`; `byteplus-seedream.provider.ts` and `gemini-pro-image.provider.ts` exist | unverified: a FLUX.2-klein listing on fal or Replicate would settle it | `worker-gpu-self-host` for FLUX.2-klein |
+  | demucs (`audio.separate`) | CPU-first | `tasks/demucs.py:295` (`device="cpu"`), `Dockerfile.local-demucs`; `demucs-separate.provider.ts:28-36` (self-hosted on a separate media box over HTTP, not a vendor) | unverified: no API found; a fal or Replicate demucs model would settle it | `worker-audio-separate-speakers-beats`; GPU in `worker-gpu-self-host` |
+  | SAM 2.1 (`video.track_roles`) | CPU-first, feasibility unmeasured, expected to promote | `tasks/track_roles.py:33-35` (GPU figure only: T4 on g4dn.xlarge, SAM 2.1 tiny) | unverified | `worker-track-roles`; GPU in `worker-gpu-self-host` |
+  | RT-DETR (`video.role_suggest`) | CPU-first | `tasks/role_suggest.py:3`; `video-role-suggest.provider.ts:11` ("GPU worker") | unverified | `worker-trend-role-suggest`; GPU in `worker-gpu-self-host` |
+  | LaMa (`image.clean_overlay`) | CPU-first | `image-clean-overlay.provider.ts:35` ("FREE (self-host)"); `tasks/image_clean_overlay.py:76` (`lama_inpaint`); `requirements.txt:39` | unverified | `worker-image-clean-overlay` |
+  | Depth Anything / clay render | CPU-first; GPU self-host-later | `xood-clay-render/depth.py:37-39` (CPU fallback, "roughly 10x slower"); `ark.py` calls BytePlus for generation | unverified | `worker-gpu-self-host` (clay pipeline is a separate follow-up) |
+  | Blender preview (`video.preview`) | CPU-first | consumer `video-project/preview/preview-job.ts:18` names a "worker blender"; its source is not in the available Xood copies | unverified: no per-call API known | `worker-blender-preview`; GPU render in `worker-gpu-self-host` |
+
+  Paths are relative to the Xood repositories `xood-backend/src/providers/providers/`
+  (`*.provider.ts`), `xood-media-worker/` (`tasks/`, `Dockerfile*`,
+  `requirements.txt`) and `xood-clay-render/`, at the origin/main commits read:
+  `xood-backend` f1aaea107, `xood-media-worker` 1b8f15c63, `xood-clay-render`
+  d89eaf235. The
+  face-only rows are not ported: product parity for face swap is the fal
+  whole-person swap.
+- **Decision — threshold:** a capability moves from an API to self-hosting
+  when, for that capability, `S` (trailing-30-day API spend, calls times the
+  `rateCardRef` price) is at least `H` (all-in monthly cost of the smallest GPU
+  host that meets the capability's latency), and the measured call volume would
+  keep that host busy for at least a fraction `U` (utilisation) of its hours.
+  The constants `U`, the review period, `H` and the call volume are not set
+  here; the `worker-gpu-self-host` proposal fills them once rate-card rows and a
+  checked GPU price exist. No capability moves before they are filled, and this
+  entry carries no figure for them.
+- **Decision — promotion of CPU-first capabilities:** a CPU-first capability is
+  promoted, to an API or to self-hosting, when its measured P95 CPU wall time
+  exceeds the capability's `flowcortex.media.max-runtime` value. The handler
+  change measures it: `worker-track-roles` for `video.track_roles` (expected
+  to promote: Xood's only figure is for a GPU), `worker-trend-role-suggest` for
+  `video.role_suggest`, `worker-audio-separate-speakers-beats` for
+  `audio.separate`, `worker-image-clean-overlay` for `image.clean_overlay` and
+  `worker-blender-preview` for `video.preview`. Clay render has no measuring
+  change yet: `worker-gpu-self-host` or the clay-pipeline follow-up must name
+  its owner before it can cross the threshold.
+- **Consequences:**
+  - API-available rows go to the provider-adapter changes
+    `provider-face-swap-detect` (whole-person swap) and `provider-upscalers`
+    (all four upscalers, though the roadmap row names three). Both add the fal
+    queue and result hosts (Xood evidence `queue.fal.run`, `*.fal.media`; a
+    `*.` glob does not match the bare domain) to `infra/egress-proxy/acl.yaml`
+    and to the adapter's result-download host list.
+  - CPU-first rows go to `worker-track-roles`, `worker-trend-role-suggest`,
+    `worker-audio-separate-speakers-beats`, `worker-image-clean-overlay` and
+    `worker-blender-preview`; each owns the measurement that promotes it.
+  - Self-host-later items (GPU image, GPU autoscale, FLUX.2-klein, and the GPU
+    leg of demucs, SAM 2.1, RT-DETR, Depth Anything and Blender) belong to
+    `worker-gpu-self-host`, a follow-up that also chooses the host and vendor;
+    this entry chooses neither.
+  - The face-only face-swap rows have no owner until a licensed model is
+    chosen. Whole-person swap compliance (deepfake audit logging, AI-content
+    labelling) is not gated by this entry.
+
+## ADR-0012 — Connector credential key custody
+
+- **Context:** a member's connector secrets (a Telegram bot token, an HTTP
+  connector's API key) are stored in `connector_auth` and read back by the
+  server to call the third party. A database dump or backup alone must not
+  yield a usable secret, keys must be rotatable without a data migration, and
+  a ciphertext copied from one member's row to another must not decrypt.
+  The stack is a single-host Compose deployment (`compose.aws.yaml`) with no
+  cloud key service wired in. The choice was made when the store
+  landed and recorded in
+  `openspec/changes/archive/2026-11-08-connector-auths-encrypted-credentials/proposal.md:90`;
+  this entry is its permanent home.
+- **Decision:** an environment keyring, with the key id inside the stored
+  value and the row identity bound into the ciphertext.
+  - **Cipher:** AES-256-GCM through the JDK's `javax.crypto` (12-byte random
+    nonce, 128-bit tag, 32-byte key from base64); no new dependency.
+  - **Stored value:** one `text` string, `kid.iv.tag.ct` (each part but the
+    key id base64). The key id matches `[a-z0-9]{1,16}`; decryption uses the key
+    the value names, encryption uses the current one.
+  - **Associated data:** `userId|provider`, so a value moved to another
+    member's row or another provider's row fails authentication.
+  - **Keyring:** `FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT` names the current
+    key id and `FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_<ID>` holds each key
+    (`openssl rand -base64 32`). Rotating is: add a key, switch the current id;
+    values under the old key stay readable until it is retired.
+- **Alternatives rejected:**
+  - One unversioned env key: no rotation path, and a wrong key shows up only
+    when a secret is read.
+  - A cloud KMS envelope: a cloud SDK, a network call on every read, an egress
+    allowlist entry, and no KMS wiring in the single-host stack.
+- **Consequences:**
+  - **Losing a key makes the secrets stored under it unreadable;** the
+    member is asked to connect again (`connector.credentialUnreadable`). Keys
+    live in the host's environment, outside the repository and the database.
+  - **The key and the data are in the same trust zone** (the host running
+    the backend): this protects against a leaked database or backup, not
+    against a compromised backend host.
+  - **No re-encrypt job yet:** old values keep their old key id until a
+    follow-up re-encrypts them, so a key cannot be retired while rows use it.
+  - **No key custody beyond the host:** backing up the keyring is the
+    operator's job and is documented in `.env.example`.
+
+---
+
+## ADR-0013 — Payment gateway
+
+- **Context:** Nodi will take payments through third-party providers that
+  charge the payer on their own page and report the result later. Nothing in
+  the stack touches a payment yet. A provider's result reaches us twice: the
+  payer's browser comes back to a return URL, and the provider calls us. Only
+  the second is something the provider vouches for. Callbacks are retried and
+  can arrive out of order, so a "last write wins" handler can double-credit or
+  move a settled payment backwards. ADR-0007 sends our own worker's results
+  over the broker instead of an HMAC callback; a third-party provider cannot
+  publish to our broker, so that rule does not carry over. Payments open only
+  in Vietnam (the region gate), so the only currency is VND.
+- **Decision:** one gateway shape for every provider.
+  - **Where adapters live:** in the backend, in `:modules:billing`, behind one
+    provider port. No provider type crosses the port. Money state and the
+    credit ledger change in one database transaction, which a separate process
+    cannot join.
+  - **Opening a payment:** the backend mints the order reference and the
+    request reference and records the operation before it calls the provider
+    through the port. A retry of the same operation reuses the same request
+    reference, so the provider deduplicates it. The browser receives only the
+    provider's pay URL. The return URL carries only our order reference and is
+    observation-only: it feeds a journey event, never a state change.
+  - **Outbound calls:** through `egress-proxy` and its allowlist (ADR-0010).
+    Each adapter's change adds its provider host to `infra/egress-proxy/acl.yaml`.
+  - **Inbound results:** a provider's asynchronous result arrives as an HTTPS
+    callback on a backend route. The signature is verified over the raw request
+    bytes before any JSON binding, because a binding step that drops unknown
+    fields removes fields the provider signed. The verified payload is then
+    normalised into the provider event of
+    `contracts/payment-provider-event.schema.json`.
+  - **Callback for an order that is not ours:** a verified callback whose order
+    reference is not of our shape, or was never minted, is refused before
+    normalisation, answered as the provider's protocol requires (so it stops
+    retrying), logged without its payload and counted. Examples are a
+    misconfigured merchant, a sandbox, or a replay from another environment.
+  - **State authority:** only a verified provider callback or a
+    server-initiated status query changes a payment's state. A journey event or
+    a return URL never does. A verified callback is applied idempotently on
+    (provider, request reference) or (provider, provider transaction id),
+    changes state only when its amount equals the amount recorded at opening,
+    and events are ordered by the provider's timestamp, not by the time we
+    received them.
+  - **Journey events:** the payer's page reports what the browser saw through
+    `contracts/payment-journey-event.schema.json`. They are observations: not
+    trusted, not tied to a member in the log, and no caller-chosen string
+    reaches the log stream.
+  - **Shapes:** the order reference is `fc_` plus 32 lowercase hex digits (35
+    characters, within the 64-byte order-id ceiling providers set); the request
+    reference is a UUID; amounts are integers in đồng.
+  - **Off until contracted:** every adapter has its own enable property,
+    default false, and the backend starts with every adapter off. The merchant
+    contract and fees are signed by the operator before an adapter is turned on.
+- **Alternatives:**
+  - **A separate payment-gateway process that receives callbacks and relays
+    them over the broker:** rejected. It adds a second public ingress and a
+    second place for provider keys, and the state change still has to land in
+    the backend's transaction.
+  - **Polling-only settlement:** rejected. The payer usually returns before the
+    provider has settled, and polling every open payment grows with traffic.
+    A status query stays as the server-initiated way to settle a payment whose
+    callback never arrived.
+- **Consequences:**
+  - **ADR-0007 is scoped, not reversed:** "results over the broker instead of
+    an HMAC callback" governs our own worker, which can publish to our broker.
+    A third-party provider cannot, so provider results come in as a signed
+    callback.
+  - **A new public route per provider:** each adapter exposes a callback route
+    that must be reachable by the provider and must read raw bytes; its change
+    owns the signature scheme and any source-address check.
+  - **Foreign references are dropped, not stored:** the ledger can join on the
+    order reference because every event carries one of our shape.
+  - **A two-way door for now:** the two schemas have no consumer yet. Once an
+    adapter, the checkout pages and the transaction ledger use them, an edit
+    goes through the changes that consume them.
+
+---
+
+## ADR-0022 — Personal access tokens: decoder dispatch, role-less principal, route allowlist
+
+Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
+
+- **Context:** Admin accounts need to call the API from scripts without a
+  browser session. Every bearer chain is a resource server over one `JwtDecoder`
+  bean and every controller reads the caller as a `Jwt`, so a second credential
+  type must arrive as a `Jwt` or each chain and controller changes.
+- **Decision:**
+  - **Resolved inside the shared JWT decoder.** `PatAwareJwtDecoder` sends a
+    bearer starting with `fc_pat_` to the user module's authenticator and
+    everything else to the HS256 decoder unchanged. The authenticator builds a
+    `Jwt` with the owner's id as `sub`, the claim `fc_auth = "pat"` and **no
+    `role` claim**, so a token carries no authority of its own; an unknown,
+    expired, revoked or ineligible token is a `BadJwtException` (401) and no
+    other credential is tried. No chain configuration and no controller changed.
+  - **The route allowlist decides where a token may act**, independent of how
+    admin routes authorize. `PatRouteInterceptor` matches the route pattern
+    Spring resolved against `PatRoutePolicy` (workflows, runs, review tasks,
+    uploads, product videos, credits, and `GET /api/v1/auth/me`) and answers
+    403 `PAT_NOT_ALLOWED` for anything else, whatever the owner's role. A token
+    cannot mint a step-up proof or another token. A role-guarded route that
+    denies the role-less principal first is answered with the same code.
+  - **The throttle runs before authentication.** `PatRateLimitFilter` counts
+    every `fc_pat_` bearer, valid or not, against registry limiters keyed on
+    the SHA-256 of the token (60 per minute, 1000 per day), so a replayed
+    revoked or mistyped token is limited and nothing raw reaches the store.
+  - **A switch.** `flowcortex.auth.personal-access-tokens.enabled` defaults to
+    off: the token routes answer 503, every `fc_pat_` bearer answers 401, rows
+    are kept and work again when it is turned back on.
+  - **Stored form.** The token is `fc_pat_` plus 32 random bytes in base64url;
+    only its SHA-256 hex is stored (`personal_access_token.token_hash`), and the
+    raw value is shown once in the create response. Creating needs a single-use
+    step-up proof minted by re-entering the password.
+- **Consequences:**
+  - **A database read per token request:** the decoder looks the token up and
+    reads the owner row, so a demoted or suspended admin's tokens stop on the
+    next request. The per-token budget bounds this per value, not across many
+    distinct unknown values; a per-IP failed-token limiter is a follow-up.
+  - **A login lockout does not stop issued tokens**, because anyone who knows an
+    admin's email can cause one; revoke, suspension, demotion and the switch do.
+  - **A route added under an allowlisted prefix is reachable by tokens
+    automatically**, so a reviewer adding one checks it against this table.
+  - **Changing the prefix or the hash** means revoking every issued token.
+
+---
+
+## ADR-0016 — Runtime settings registry
+
+- **Context:** Operator-tunable values (the Help Center assistant switch and
+  its four daily limits) were bound once from environment variables at
+  startup, with one ad-hoc table per feature for the switch. Changing a limit
+  meant a restart, there was no common history, and a console page would have
+  needed per-feature code. Every later runtime switch would have repeated the
+  pattern.
+- **Decision:** One registry of typed keys, decided at read time.
+  - **Declaration:** each module declares its own keys as `SettingDefinition`
+    beans (key, type, bounds, code default, a supplier of the configured
+    value); the settings module collects them at startup and refuses a
+    duplicate, a malformed name, bounds with min above max, a configured value
+    outside its bounds, and any key whose segment looks like a secret
+    (`key`, `token`, `secret`, `password`). No secret is ever a setting.
+  - **Composition:** one pure function decides every read. The environment is
+    the configured layer. A switch is tri-state there: configured off vetoes
+    whatever is stored, configured on turns the switch on when nothing is
+    stored, unset defers to stored-else-code-default. An integer is stored,
+    else configured. A stored value beats the configured one except for the
+    veto.
+  - **Reads never throw:** one primary-key query outside the caller's
+    transaction, no cache. A failed read or unparseable stored text degrades
+    by type (a switch to off, an integer to its configured value), increments
+    `settings.read.degraded{key}` and logs the key, never the text.
+  - **Writes:** one transaction per key under a per-key advisory lock; the
+    value and its history row commit together, an unchanged value records
+    nothing, and a reset deletes the stored value and records one row.
+  - **Surface:** an admin API gated by `platform.setting.view|update` lists
+    keys with their source, edits, resets and pages the history; the console
+    Settings page renders any declared key from that API.
+- **Consequences:**
+  - A later key adds a declaration and copy, no store or page code.
+  - A switch fails closed on a database fault, intended for cost-bearing
+    switches; a key whose safe position is "on" needs a hold-last policy
+    first.
+  - Every read is one indexed query; a cache would need cross-instance
+    invalidation and is deferred until there is more than one instance.
+  - `support_settings` stays unread after the switch is copied, so rolling the
+    release back still serves the pre-upgrade switch; a cleanup change drops
+    it.

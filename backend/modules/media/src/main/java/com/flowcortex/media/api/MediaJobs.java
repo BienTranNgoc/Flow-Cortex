@@ -1,6 +1,7 @@
 package com.flowcortex.media.api;
 
 import com.flowcortex.media.api.provider.ProviderJob;
+import java.io.InputStream;
 import java.util.UUID;
 import java.util.List;
 
@@ -84,6 +85,31 @@ public interface MediaJobs {
     void bindRunInputs(UUID runId, List<MediaAssetInput> copies);
 
     /**
+     * The inputs {@code runId} was bound to, in binding order, each pointing at its copy under
+     * {@code runs/<runId>/inputs/} of the media bucket; empty when the run bound none. Feed them to
+     * {@link #copyRunInputs} to give another run its own copies.
+     */
+    List<MediaAssetInput> boundRunInputs(UUID runId);
+
+    /**
+     * Copies stored step outputs of run {@code fromRunId}, step {@code stepOrder}, server-side and keeping the
+     * source tags, to {@code runs/<toRunId>/steps/<stepOrder>/attempts/1/<name>} of the same bucket; a source's
+     * {@code attempts/<n>/} segment is dropped from the name. Call it outside any transaction: a copy can take minutes.
+     * @return the outputs as stored under the new run, name, type, size and meta unchanged
+     * @throws IllegalArgumentException if an output is not an object below {@code runs/<fromRunId>/steps/<stepOrder>/};
+     *         nothing is copied
+     * @throws UploadRejectedException if a source object is gone
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    List<MediaOutput> copyStepOutputs(UUID fromRunId, UUID toRunId, int stepOrder, List<MediaOutput> outputs);
+
+    /**
+     * Whether every input {@code runId} was bound to is still in the media bucket (its lifecycle rule expires
+     * run inputs); true when the run bound none. Stops at the first missing copy.
+     */
+    boolean runInputsStored(UUID runId);
+
+    /**
      * Keeps owner-verified image uploads as attachments at {@code <keyPrefix>/1..N} of the media bucket. Each
      * image is read, checked (format, pixel cap) and written without its metadata, tagged pending; all are
      * re-tagged kept only once every copy passed, and a refused copy expires by the media bucket's lifecycle
@@ -103,6 +129,33 @@ public interface MediaJobs {
      * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
      */
     void releaseAttachments(List<StoredAttachment> attachments);
+
+    /**
+     * Keeps the owner's {@link UploadPurpose#DRIVE_ITEM} upload {@code uploadId} at
+     * {@code drive/<spaceId>/<itemId>} of the media bucket, tagged pending: an image is read, checked (format,
+     * pixel cap) and written without its metadata, any other kind is copied server-side, and with the content
+     * check on the copy must match its kind. Call {@link #confirmDriveFile} once the item row is saved and
+     * {@link #releaseDriveFile} if saving fails. Call it outside any transaction.
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of another purpose or
+     *         owner, too large, not the type it was declared as or over the pixel cap; on field
+     *         {@code contentType} if its kind differs from {@code contentType}, before anything is copied
+     * @throws MediaStoreUnavailableException if media is switched off or the object store does not answer
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    StoredDriveFile keepDriveFile(UUID ownerId, UUID uploadId, String contentType, UUID spaceId, UUID itemId);
+
+    /**
+     * Keeps a pending Drive file for good, so the media bucket's lifecycle rule no longer expires it.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void confirmDriveFile(StoredDriveFile file);
+
+    /**
+     * Marks a Drive file pending again, so the media bucket's lifecycle rule expires it: for a copy whose item
+     * was never saved or has been deleted.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void releaseDriveFile(StoredDriveFile file);
 
     /**
      * Keeps a member's profile-image upload (granted under {@link UploadPurpose#PROFILE_IMAGE}) at
@@ -153,6 +206,14 @@ public interface MediaJobs {
      *         plain server-chosen file name
      */
     MediaDownload presignedGet(String bucket, String key, String fileName);
+
+    /**
+     * The bytes of the stored output {@code bucket}/{@code key} as a stream the caller must close. Only objects in
+     * the media bucket are ever read.
+     * @throws IllegalArgumentException if {@code bucket} is not the media bucket
+     * @throws MediaStoreUnavailableException if the store does not open the object
+     */
+    InputStream openDownloadable(String bucket, String key);
 
     /**
      * Stores {@code bytes} as object {@code name} of step {@code stepOrder} of run {@code runId}, at

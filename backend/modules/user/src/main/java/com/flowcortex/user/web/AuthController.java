@@ -1,5 +1,6 @@
 package com.flowcortex.user.web;
 
+import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AccessTokenResponse;
@@ -9,6 +10,8 @@ import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OwnProfiles;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.user.authz.CallerFacts;
+import com.flowcortex.user.authz.CallerFactsLoader;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -19,6 +22,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -55,13 +60,15 @@ class AuthController {
     private final UserDirectory userDirectory;
     private final OwnProfiles ownProfiles;
     private final RefreshCookieSupport cookieSupport;
+    private final CallerFactsLoader callerFacts;
 
     AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
-            RefreshCookieSupport cookieSupport) {
+            RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts) {
         this.authService = authService;
         this.userDirectory = userDirectory;
         this.ownProfiles = ownProfiles;
         this.cookieSupport = cookieSupport;
+        this.callerFacts = callerFacts;
     }
 
     @SecurityRequirements
@@ -209,7 +216,7 @@ class AuthController {
         UUID id = subjectId(jwt);
         CurrentUser user = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-        return ResponseEntity.ok(MeResponse.from(user));
+        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id)));
     }
 
     @PutMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -220,7 +227,7 @@ class AuthController {
         ownProfiles.updateNames(id, request.name(), request.firstName(), request.lastName());
         CurrentUser user = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-        return ResponseEntity.ok(MeResponse.from(user));
+        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id)));
     }
 
     private static UUID subjectId(Jwt jwt) {
@@ -292,12 +299,18 @@ class AuthController {
     /**
      * {@code passwordSetupRequired}: the account has no password and no Google sign-in, so once this
      * session ends nothing gets it back in; the app sends the member to set a password first.
+     * {@code permissions}: the caller's effective admin keys sorted by key (empty for an end user and
+     * once deactivated); {@code adminDisabled}: the admin console access is deactivated.
      */
     record MeResponse(UUID id, String email, String name, String role, String status, boolean hasPassword,
-            boolean passwordSetupRequired) {
-        static MeResponse from(CurrentUser user) {
+            boolean passwordSetupRequired,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Permission> permissions,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled) {
+        static MeResponse from(CurrentUser user, CallerFacts facts) {
+            List<Permission> keys = facts.effectiveKeys().stream()
+                    .sorted(Comparator.comparing(Permission::key)).toList();
             return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status(),
-                    user.hasPassword(), user.passwordSetupRequired());
+                    user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled());
         }
     }
 }
