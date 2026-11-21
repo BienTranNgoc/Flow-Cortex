@@ -62,7 +62,8 @@ class SupportReplyMailer {
         switch (outcome) {
             case SENT -> LOG.info("support.reply.mail outcome=sent request={}", event.requestNumber());
             case SUPPRESSED -> LOG.info("support.reply.mail outcome=suppressed request={}", event.requestNumber());
-            case FAILED -> {
+            // FAILED, and any outcome added later, counts as not sent so the listener retries.
+            default -> {
                 LOG.warn("support.reply.mail outcome=failed request={} error=send_failed", event.requestNumber());
                 throw new IllegalStateException("Support reply mail for request " + event.requestNumber()
                         + " was not sent");
