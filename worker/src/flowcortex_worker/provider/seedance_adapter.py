@@ -19,12 +19,22 @@ from .adapter import (
     SpeechRequest,
     StoryboardArtifact,
     StoryboardRequest,
+    VendorProbe,
     VideoAbort,
     VideoArtifact,
     VideoIdentity,
     VideoRequest,
 )
 from .contracts.provider_job import ProductAdPayload
+from .vendor_jobs import (
+    RESULT_GONE_STATUSES,
+    VendorJobEnded,
+    VendorJobTimeout,
+    VendorResultGone,
+    probe_json,
+    probe_media,
+    vendor_scope,
+)
 
 log = logging.getLogger("flowcortex_provider_worker.seedance")
 
@@ -127,10 +137,10 @@ class SeedanceAdapter:
         if self._uses_byteplus():
             return self._await_byteplus(task_id, abort)
         deadline = time.monotonic() + self.config.poll_timeout_seconds
-        task_url = f"{self.config.base_url.rstrip('/')}/tasks/{urllib.parse.quote(task_id)}"
+        task_url = self._task_url(task_id)
         while True:
             abort.check()
-            response = self._json_request(task_url, method="GET")
+            response = self._json_request(task_url, method="GET", task_lookup=True)
             status = _nested_string(response, "output", "task_status")
             if status == "SUCCEEDED":
                 video_url = _nested_string(response, "output", "video_url")
@@ -146,15 +156,13 @@ class SeedanceAdapter:
                     "Seedance task failed",
                     extra={"taskStatus": status, "providerErrorCode": code[:100]},
                 )
-                raise PermanentError(
-                    "provider_request_failed", f"Seedance task ended with status {status}"
-                )
+                raise VendorJobEnded("failed", f"Seedance task ended with status {status}")
             if status not in {"PENDING", "RUNNING"}:
                 raise PermanentError(
                     "provider_response_invalid", "Seedance returned an unknown task status"
                 )
             if time.monotonic() >= deadline:
-                raise TransientError("Seedance task polling timed out")
+                raise VendorJobTimeout(PROVIDER_SEEDANCE, task_id)
             remaining = max(0.0, deadline - time.monotonic())
             time.sleep(min(self.config.poll_interval_seconds, remaining))
 
@@ -187,13 +195,10 @@ class SeedanceAdapter:
 
     def _await_byteplus(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         deadline = time.monotonic() + self.config.poll_timeout_seconds
-        task_url = (
-            f"{self.config.base_url.rstrip('/')}/contents/generations/tasks/"
-            f"{urllib.parse.quote(task_id)}"
-        )
+        task_url = self._task_url(task_id)
         while True:
             abort.check()
-            response = self._json_request(task_url, method="GET")
+            response = self._json_request(task_url, method="GET", task_lookup=True)
             status = (_string(response, "status") or "").lower()
             if status == "succeeded":
                 video_url = _nested_string(response, "content", "video_url")
@@ -209,17 +214,58 @@ class SeedanceAdapter:
                     "Seedance task failed",
                     extra={"taskStatus": status, "providerErrorCode": code[:100]},
                 )
-                raise PermanentError(
-                    "provider_request_failed", f"Seedance task ended with status {status}"
+                raise VendorJobEnded(
+                    "expired" if status == "expired" else "failed",
+                    f"Seedance task ended with status {status}",
                 )
             if status not in {"queued", "pending", "running"}:
                 raise PermanentError(
                     "provider_response_invalid", "Seedance returned an unknown task status"
                 )
             if time.monotonic() >= deadline:
-                raise TransientError("Seedance task polling timed out")
+                raise VendorJobTimeout(PROVIDER_SEEDANCE, task_id)
             remaining = max(0.0, deadline - time.monotonic())
             time.sleep(min(self.config.poll_interval_seconds, remaining))
+
+    def probe_video(self, task_id: str) -> VendorProbe:
+        body = probe_json(
+            self._task_url(task_id),
+            {"Authorization": f"Bearer {self.config.api_key}"},
+            self.config.request_timeout_seconds,
+        )
+        if body is None:
+            return "gone"
+        if self._uses_byteplus():
+            status = (_string(body, "status") or "").lower()
+            video_url = _nested_string(body, "content", "video_url")
+            if status in {"queued", "pending", "running"}:
+                return "running"
+            if status == "expired":
+                return "expired"
+            if status in _BYTEPLUS_TERMINAL_FAILURES:
+                return "failed"
+        else:
+            status = _nested_string(body, "output", "task_status") or ""
+            video_url = _nested_string(body, "output", "video_url")
+            if status in {"PENDING", "RUNNING"}:
+                return "running"
+            if status in _TERMINAL_FAILURES:
+                return "failed"
+        if status in {"succeeded", "SUCCEEDED"}:
+            if not video_url or not _is_allowed_video_url(video_url):
+                return "gone"
+            return probe_media(video_url, {}, self.config.request_timeout_seconds)
+        raise TransientError("Seedance probe read an unknown task status")
+
+    def vendor_scope(self) -> dict[str, str]:
+        return vendor_scope(self.config.base_url, self.config.api_key)
+
+    def _task_url(self, task_id: str) -> str:
+        base = self.config.base_url.rstrip("/")
+        quoted = urllib.parse.quote(task_id)
+        if self._uses_byteplus():
+            return f"{base}/contents/generations/tasks/{quoted}"
+        return f"{base}/tasks/{quoted}"
 
     def _uses_byteplus(self) -> bool:
         hostname = urllib.parse.urlparse(self.config.base_url).hostname or ""
@@ -232,6 +278,7 @@ class SeedanceAdapter:
         method: str,
         body: bytes | None = None,
         asynchronous: bool = False,
+        task_lookup: bool = False,
     ) -> dict[str, Any]:
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -250,7 +297,7 @@ class SeedanceAdapter:
                 response_content_type = response.headers.get_content_type()
                 response_body = response.read()
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=frozenset({404}) if task_lookup else frozenset())
         except (urllib.error.URLError, TimeoutError) as exc:
             log.warning("Seedance connection failed", extra={"errorType": type(exc).__name__})
             raise TransientError(f"Seedance connection failed: {type(exc).__name__}") from exc
@@ -274,11 +321,7 @@ class SeedanceAdapter:
         return parsed
 
     def _download_video(self, url: str) -> bytes:
-        parsed = urllib.parse.urlparse(url)
-        allowed_hosts = (".aliyuncs.com", ".volces.com", ".bytepluses.com")
-        if parsed.scheme != "https" or not parsed.hostname or not any(
-            parsed.hostname.endswith(suffix) for suffix in allowed_hosts
-        ):
+        if not _is_allowed_video_url(url):
             raise PermanentError(
                 "provider_response_invalid", "Seedance video URL is outside Alibaba Cloud"
             )
@@ -289,7 +332,7 @@ class SeedanceAdapter:
             ) as response:
                 body = response.read(_MAX_VIDEO_BYTES + 1)
         except urllib.error.HTTPError as exc:
-            _raise_http_error(exc)
+            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
         except (urllib.error.URLError, TimeoutError) as exc:
             raise TransientError(f"Seedance video download failed: {type(exc).__name__}") from exc
         if len(body) > _MAX_VIDEO_BYTES:
@@ -312,7 +355,19 @@ def _string(value: dict[str, Any], field: str) -> str | None:
     return result if isinstance(result, str) and result else None
 
 
-def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
+def _is_allowed_video_url(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    allowed_hosts = (".aliyuncs.com", ".volces.com", ".bytepluses.com")
+    return bool(
+        parsed.scheme == "https"
+        and parsed.hostname
+        and any(parsed.hostname.endswith(suffix) for suffix in allowed_hosts)
+    )
+
+
+def _raise_http_error(
+    exc: urllib.error.HTTPError, *, gone: frozenset[int] = frozenset()
+) -> NoReturn:
     code = _provider_error_code(exc)
     log.warning(
         "Seedance HTTP request failed",
@@ -320,6 +375,8 @@ def _raise_http_error(exc: urllib.error.HTTPError) -> NoReturn:
     )
     if exc.code in (408, 429) or 500 <= exc.code < 600:
         raise TransientError(f"Seedance HTTP {exc.code}") from exc
+    if exc.code in gone:
+        raise VendorResultGone(f"Seedance rejected the request with HTTP {exc.code}") from exc
     raise PermanentError(
         "provider_request_failed", f"Seedance rejected the request with HTTP {exc.code}"
     ) from exc

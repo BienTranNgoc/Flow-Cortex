@@ -11,45 +11,61 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses a run of a workflow with a step that cannot work as configured: a configuration that is
- * not a JSON object, an empty {@code profile}, or an input reference to a step that does not run
- * before it. Every failing step is reported as {@code errors["step<order>"] = reason}.
+ * Refuses a run of a workflow with no steps, or with a step that cannot work as configured: a configuration that is
+ * not a JSON object, an empty {@code profile}, or an input reference that is malformed or does not
+ * name an earlier step (by order or by unique name). Every failing step is reported as {@code errors["step<order>"] = reason}.
  */
 @Component
 @Order(1)
 class WorkflowReadinessGuard implements RunStartGuard {
 
     static final String CODE = "WORKFLOW_INCOMPLETE";
-    private static final Pattern STEP_REFERENCE = Pattern.compile("^\\{step:(\\d+)\\.(\\w+)}$");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
+        Map<Integer, LocalizedMessage> faults = faults(steps);
+        if (faults.isEmpty()) {
+            return;
+        }
+        if (steps.isEmpty()) {
+            throw new UnprocessableEntityException(faults.get(0), CODE);
+        }
         Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
-        Integer firstFailing = null;
-        for (StepDef step : steps) {
-            Optional<LocalizedMessage> reason = reason(step);
-            if (reason.isPresent()) {
-                failures.put("step" + step.order(), reason.get());
-                if (firstFailing == null) {
-                    firstFailing = step.order();
-                }
-            }
-        }
-        if (firstFailing != null) {
-            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
-                    failures);
-        }
+        faults.forEach((order, reason) -> failures.put("step" + order, reason));
+        int firstFailing = faults.keySet().iterator().next();
+        throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
+                failures);
     }
 
-    private Optional<LocalizedMessage> reason(StepDef step) {
+    /**
+     * Every reason this workflow cannot start, keyed by step order in step order; a workflow without steps is one
+     * fault under key {@code 0}. Empty when the workflow can start.
+     */
+    Map<Integer, LocalizedMessage> faults(List<StepDef> steps) {
+        if (steps.isEmpty()) {
+            return Map.of(0, new LocalizedMessage("workflow.incomplete.noSteps"));
+        }
+        List<StepReferences.Step> referenceSteps = steps.stream()
+                .map(step -> new StepReferences.Step(UUID.randomUUID(), step.order(), step.name(), step.inputRef()))
+                .toList();
+        Map<UUID, StepReferences.Problem> problems = StepReferences.analyze(referenceSteps);
+        Map<Integer, LocalizedMessage> faults = new LinkedHashMap<>();
+        for (int i = 0; i < steps.size(); i++) {
+            StepDef step = steps.get(i);
+            StepReferences.Problem problem = problems.get(referenceSteps.get(i).id());
+            configReason(step).or(() -> referenceReason(step, problem))
+                    .ifPresent(reason -> faults.put(step.order(), reason));
+        }
+        return faults;
+    }
+
+    private Optional<LocalizedMessage> configReason(StepDef step) {
         if (step.config() != null && !step.config().isBlank()) {
             JsonNode config;
             try {
@@ -65,18 +81,26 @@ class WorkflowReadinessGuard implements RunStartGuard {
                 return Optional.of(new LocalizedMessage("workflow.incomplete.profileEmpty"));
             }
         }
-        if (step.inputRef() != null) {
-            Matcher reference = STEP_REFERENCE.matcher(step.inputRef());
-            if (reference.matches()) {
-                String digits = reference.group(1);
-                // More digits than any step order can have: parsing would overflow, and it is never earlier.
-                long referenced = digits.length() > 9 ? Long.MAX_VALUE : Long.parseLong(digits);
-                if (referenced < 1 || referenced >= step.order()) {
-                    String named = referenced == Long.MAX_VALUE ? digits : Long.toString(referenced);
-                    return Optional.of(new LocalizedMessage("workflow.incomplete.notEarlierStep", named));
-                }
-            }
-        }
         return Optional.empty();
+    }
+
+    private static Optional<LocalizedMessage> referenceReason(StepDef step, StepReferences.Problem problem) {
+        if (problem == null) {
+            return Optional.empty();
+        }
+        boolean byName = StepReferences.parse(step.inputRef())
+                .filter(reference -> reference.head() instanceof StepReferences.Name)
+                .isPresent();
+        String detail = problem.detail();
+        return Optional.of(switch (problem.kind()) {
+            case MALFORMED -> new LocalizedMessage("workflow.incomplete.referenceMalformed");
+            case AMBIGUOUS_NAME -> new LocalizedMessage("workflow.incomplete.ambiguousStepName", detail);
+            case UNKNOWN_STEP -> byName
+                    ? new LocalizedMessage("workflow.incomplete.unknownStepName", detail)
+                    : new LocalizedMessage("workflow.incomplete.notEarlierStep", detail);
+            case NOT_EARLIER -> byName
+                    ? new LocalizedMessage("workflow.incomplete.notEarlierNamedStep", detail)
+                    : new LocalizedMessage("workflow.incomplete.notEarlierStep", detail);
+        });
     }
 }
