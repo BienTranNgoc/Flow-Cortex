@@ -1,6 +1,7 @@
 package com.flowcortex.user.phone;
 
-import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -12,54 +13,39 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * {@code /api/v1/admin/sms-outbox} — the development SMS outbox, newest first, for an ADMIN. The
- * admin filter chain and the admin kill switch both cover this path; the role is checked again
- * against the user's row, so an admin demoted since the token was issued is refused at once.
- * Mapped only with {@code flowcortex.sms.sender=outbox}, like the sender that fills the table.
+ * {@code /api/v1/admin/sms-outbox} — the development SMS outbox, newest first, for a caller
+ * holding {@code platform.sms_outbox.view}. The admin filter chain and the admin kill switch both
+ * cover this path; the key is read from the database on each request. Mapped only with
+ * {@code flowcortex.sms.sender=outbox}, like the sender that fills the table.
  */
 @RestController
 @ConditionalOnProperty(name = "flowcortex.sms.sender", havingValue = "outbox")
 @RequestMapping("/api/v1/admin/sms-outbox")
-@PreAuthorize("hasRole('ADMIN')")
 class AdminSmsOutboxController {
 
     private static final int MAX_LIMIT = 200;
 
     private final SmsOutboxRepository outbox;
-    private final UserDirectory userDirectory;
 
-    AdminSmsOutboxController(SmsOutboxRepository outbox, UserDirectory userDirectory) {
+    AdminSmsOutboxController(SmsOutboxRepository outbox) {
         this.outbox = outbox;
-        this.userDirectory = userDirectory;
     }
 
     @Operation(operationId = "listAdminSmsOutbox")
+    @RequirePermission(Permission.PLATFORM_SMS_OUTBOX_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<List<SmsOutboxEntryResponse>> list(@AuthenticationPrincipal Jwt jwt,
+    ResponseEntity<List<SmsOutboxEntryResponse>> list(
             @RequestParam(defaultValue = "50") @Min(1) @Max(MAX_LIMIT) int limit) {
-        requireAdmin(jwt);
         List<SmsOutboxEntryResponse> entries = outbox.findAllByOrderByCreatedAtDesc(PageRequest.of(0, limit)).stream()
                 .map(SmsOutboxEntryResponse::from)
                 .toList();
         return ResponseEntity.ok(entries);
-    }
-
-    private void requireAdmin(Jwt jwt) {
-        UUID id = UUID.fromString(jwt.getSubject());
-        boolean admin = userDirectory.findById(id).map(user -> "ADMIN".equals(user.role())).orElse(false);
-        if (!admin) {
-            throw new AccessDeniedException("User " + id + " is not an ADMIN");
-        }
     }
 
     record SmsOutboxEntryResponse(

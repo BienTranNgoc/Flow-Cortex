@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard;
@@ -25,6 +26,7 @@ import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +54,7 @@ class ProductVideoServiceTest {
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                runUpdates, transactions, new RunStartGuards(List.of()), enabled, true);
+                runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP, enabled, true);
     }
 
     @Test
@@ -62,7 +64,7 @@ class ProductVideoServiceTest {
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
                         .isEqualTo(503));
 
-        verify(media, never()).resolveImageUploads(any(), any());
+        verify(media, never()).resolveImageUploads(any(), any(), any());
         verify(runs, never()).save(any());
     }
 
@@ -80,13 +82,13 @@ class ProductVideoServiceTest {
             throw new IllegalStateException("refused");
         };
         ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
-                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), true, true);
+                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), Tracer.NOOP, true, true);
 
         assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
                 .hasMessage("refused");
 
         assertThat(acknowledged).containsExactly(true);
-        verify(media, never()).resolveImageUploads(any(), any());
+        verify(media, never()).resolveImageUploads(any(), any(), any());
         verify(runs, never()).save(any());
     }
 
@@ -110,7 +112,7 @@ class ProductVideoServiceTest {
         when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
                 .thenReturn(definitions);
-        when(media.resolveImageUploads(ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
+        when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(firstUpload, secondUpload))).thenReturn(assets);
         List<MediaAssetInput> copies = List.of(
                 new MediaAssetInput(firstUpload, new MediaJobInput("image_1", "media", "runs/x/inputs/image_1")),
                 new MediaAssetInput(secondUpload, new MediaJobInput("image_2", "media", "runs/x/inputs/image_2")));

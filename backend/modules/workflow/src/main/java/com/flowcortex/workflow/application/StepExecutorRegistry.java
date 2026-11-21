@@ -2,6 +2,8 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.workflow.application.vendor.VendorJobLedger;
+import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,8 +18,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types, the dub and connector steps, and one remote executor per media capability. Workflow creation rejects
- * any other type.
+ * types, the dub steps, the template loader, the connector call, and one remote executor per media capability.
+ * Workflow creation rejects any other type.
  */
 @Component
 class StepExecutorRegistry {
@@ -26,12 +28,14 @@ class StepExecutorRegistry {
 
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
-            ConnectorCallStepExecutor connectorCall) {
-        this(withSpringSteps(executors(mediaJobs, Clock.systemUTC()), translate, tts, connectorCall));
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall,
+            LoadTemplateStepExecutor loadTemplate, ConnectorCallStepExecutor connectorCall) {
+        this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
+                tts, loadTemplate), workflowCall, connectorCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
-        this(executors(mediaJobs, clock));
+        this(executors(mediaJobs, clock, null, null));
     }
 
     StepExecutorRegistry(List<StepExecutor> executors) {
@@ -42,23 +46,32 @@ class StepExecutorRegistry {
         }
     }
 
-    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock) {
+    private static List<StepExecutor> executors(MediaJobs mediaJobs, Clock clock, VendorJobLedger vendorLedger,
+            VendorJobsProperties vendorJobs) {
         List<StepExecutor> executors = new ArrayList<>(List.of(new EchoStepExecutor(), new FailStepExecutor()));
         executors.add(new ProviderStepExecutor("generate_script", "product_ad_v1", mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_storyboard", "product_ad_storyboard_v1",
                 mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
-        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock));
+        executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock,
+                vendorLedger, vendorJobs));
         Arrays.stream(MediaCapability.values())
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);
         return executors;
     }
 
-    private static List<StepExecutor> withSpringSteps(List<StepExecutor> executors, StepExecutor translate,
-            StepExecutor tts, StepExecutor connectorCall) {
+    private static List<StepExecutor> withDubSteps(List<StepExecutor> executors, StepExecutor translate,
+            StepExecutor tts, StepExecutor loadTemplate) {
         executors.add(translate);
         executors.add(tts);
+        executors.add(loadTemplate);
+        return executors;
+    }
+
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall,
+            StepExecutor connectorCall) {
+        executors.add(workflowCall);
         executors.add(connectorCall);
         return executors;
     }
@@ -74,6 +87,11 @@ class StepExecutorRegistry {
 
     boolean isRemote(String type) {
         return find(type).map(executor -> executor.mode() == StepExecutor.Mode.REMOTE).orElse(false);
+    }
+
+    /** How the engine feeds a step of this type with this config; an unknown type reads a resolved input. */
+    StepExecutor.InputPolicy inputPolicy(String type, String config) {
+        return find(type).map(executor -> executor.inputPolicy(config)).orElse(StepExecutor.InputPolicy.RESOLVED);
     }
 
     /** Whether the step type reads an uploaded file, so a workflow using it must start with a media step. */

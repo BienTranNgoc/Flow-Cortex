@@ -7,9 +7,11 @@ import { MetricCard } from '../../app/MetricCard';
 import { PageHeading } from '../../app/PageHeading';
 import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
+import { can } from '../../app/permissions';
 import { usePageTitle } from '../../app/usePageTitle';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { useMeQuery } from '../auth/useAuth';
 import { useAdminRuns } from '../runs/useAdminRuns';
 import { useUsersQuery } from '../users/useUsers';
 
@@ -37,11 +39,11 @@ export function DashboardPage() {
   const { t } = useTranslation();
   const locale = activeLocale();
   usePageTitle(t('dashboard.title'));
-  const usersQuery = useUsersQuery();
-  const allRuns = useAdminRuns(0, undefined);
-  const runningRuns = useAdminRuns(0, ListAdminRunsStatus.running);
-  const completedRuns = useAdminRuns(0, ListAdminRunsStatus.completed);
-  const failedRuns = useAdminRuns(0, ListAdminRunsStatus.error);
+  const usersQuery = useUsersQuery(can(useMeQuery().data, 'user.account.view'));
+  const allRuns = useAdminRuns(0, {});
+  const runningRuns = useAdminRuns(0, { status: ListAdminRunsStatus.running });
+  const completedRuns = useAdminRuns(0, { status: ListAdminRunsStatus.completed });
+  const failedRuns = useAdminRuns(0, { status: ListAdminRunsStatus.error });
   const users = usersQuery.data ?? [];
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const newUsers = users.filter(

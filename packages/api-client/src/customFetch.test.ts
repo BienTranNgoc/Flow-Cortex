@@ -2,6 +2,7 @@ import { authHeaders, unwrap } from './client';
 import { setClientId } from './clientId';
 import { ensureSession } from './session';
 import { login, logout, me } from './generated/flowCortexApi';
+import { subscribeNetworkSignals, type NetworkSignal } from './networkSignals';
 import { getToken, setToken } from './tokenStore';
 import { setLocaleProvider } from './locale';
 
@@ -205,6 +206,18 @@ describe('customFetch', () => {
 
       expect(calls.map((c) => c.language)).toEqual([null]);
     });
+  });
+
+  it('reports a 429 as rate-limited with the wait the problem names, and returns it unchanged', async () => {
+    stubFetch(() => json(429, { status: 429, retryAfterSeconds: 20 }));
+    const signals: NetworkSignal[] = [];
+    const unsubscribe = subscribeNetworkSignals((signal) => signals.push(signal));
+
+    const response = await me();
+    unsubscribe();
+
+    expect(response.status).toBe(429);
+    expect(signals).toEqual([{ type: 'rate-limited', waitSeconds: 20 }]);
   });
 
   it('answers a 204 with no data', async () => {

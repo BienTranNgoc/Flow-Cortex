@@ -27,6 +27,22 @@ class StepConfigRulesTest {
     }
 
     @Test
+    void aWorkflowCallStepWithoutAWorkflowIdHasItsFault() {
+        assertThat(StepConfigRules.fault("workflow.call", "{}")).isNotNull()
+                .isEqualTo(WorkflowCallConfig.fault("{}"));
+    }
+
+    @Test
+    void theValidatorReportsAWorkflowCallFaultAtTheStepsConfig() {
+        Set<ConstraintViolation<KnownStepTypes.Definition>> violations = validator.validate(definition(
+                new NewWorkflowStep("a", "echo", null),
+                new NewWorkflowStep("b", "workflow.call", null, "{\"workflowId\":\"abc\"}")));
+
+        assertThat(violations).hasSize(1);
+        assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("steps[1].config");
+    }
+
+    @Test
     void connectorCallConfigIsChecked() {
         assertThat(StepConfigRules.fault("connector.call", GOOD)).isNull();
         assertThat(StepConfigRules.fault("connector.call", BAD)).isEqualTo(ConnectorCallConfig.fault(BAD)).isNotNull();
@@ -63,6 +79,7 @@ class StepConfigRulesTest {
     }
 
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
-        return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call"), Set.of(), Set.of());
+        return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call", "workflow.call"),
+                Set.of(), Set.of());
     }
 }

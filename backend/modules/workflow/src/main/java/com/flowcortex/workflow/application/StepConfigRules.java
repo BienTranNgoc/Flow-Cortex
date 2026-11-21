@@ -1,12 +1,13 @@
 package com.flowcortex.workflow.application;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Save-time config rules, one per step type: a pure function from the config text to the fault that
- * refuses it, or {@code null}. A type with no entry accepts any config.
+ * Per-type config rules checked when a workflow is saved: a step type with an entry has its config
+ * judged by that rule, a type without one is unconstrained.
  */
 final class StepConfigRules {
 
@@ -15,15 +16,16 @@ final class StepConfigRules {
     private StepConfigRules() {
     }
 
-    private static Map<String, Function<String, String>> rules() {
-        Map<String, Function<String, String>> rules = new LinkedHashMap<>();
-        rules.put("connector.call", ConnectorCallConfig::fault);
-        return Map.copyOf(rules);
-    }
-
-    /** What is wrong with {@code config} for a step of {@code type}, or {@code null}. */
+    /** The fault the rule for {@code type} finds in {@code config}, or {@code null}. */
     static String fault(String type, String config) {
         Function<String, String> rule = type == null ? null : RULES.get(type);
         return rule == null ? null : rule.apply(config);
+    }
+
+    private static Map<String, Function<String, String>> rules() {
+        Map<String, Function<String, String>> rules = new LinkedHashMap<>();
+        rules.put("workflow.call", WorkflowCallConfig::fault);
+        rules.put("connector.call", ConnectorCallConfig::fault);
+        return Collections.unmodifiableMap(rules);
     }
 }

@@ -4,11 +4,12 @@ import type { CreateUserRequest, UpdateUserRequest, UserResponse } from '@flow-c
 
 const USERS_QUERY_KEY = ['users'] as const;
 
-/** ADMIN-only user list, owner-scoped server-side. */
-export function useUsersQuery() {
+/** The user list, owner-scoped server-side; `enabled` is false for a caller without `user.account.view`. */
+export function useUsersQuery(enabled = true) {
   return useQuery({
     queryKey: USERS_QUERY_KEY,
     queryFn: () => unwrap(list(authHeaders())),
+    enabled,
   });
 }
 

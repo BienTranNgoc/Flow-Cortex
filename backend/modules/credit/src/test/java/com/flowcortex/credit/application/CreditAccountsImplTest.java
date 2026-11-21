@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.Test;
 class CreditAccountsImplTest {
 
     private static final Instant NOW = Instant.parse("2026-10-18T09:00:00Z");
+    private static final short ATTEMPT = 2;
     private static final Instant SINCE = Instant.parse("2026-10-18T00:00:00Z");
 
     private final RateBookRepository rates = mock(RateBookRepository.class);
@@ -173,69 +175,71 @@ class CreditAccountsImplTest {
 
     @Test
     void aStepIsChargedOnlyWhenTheLedgerAcceptsTheDebit() {
-        when(ledger.debit(any(), eq(userId), eq(runId), eq(stepId), eq(10L), eq(NOW))).thenReturn(1);
+        when(ledger.debit(any(), eq(userId), eq(runId), eq(stepId), eq(ATTEMPT), eq(10L), eq(NOW))).thenReturn(1);
 
-        assertThat(accounts(true).debitForStep(userId, runId, stepId, "probe")).isTrue();
+        assertThat(accounts(true).debitForStep(userId, runId, stepId, ATTEMPT, "probe")).isTrue();
     }
 
     @Test
     void aStepTheBalanceCannotCoverIsRefusedWithoutWriting() {
-        when(ledger.debit(any(), eq(userId), eq(runId), eq(stepId), eq(20L), eq(NOW))).thenReturn(0);
+        when(ledger.debit(any(), eq(userId), eq(runId), eq(stepId), eq(ATTEMPT), eq(20L), eq(NOW))).thenReturn(0);
 
-        assertThat(accounts(true).debitForStep(userId, runId, stepId, "extract_audio")).isFalse();
+        assertThat(accounts(true).debitForStep(userId, runId, stepId, ATTEMPT, "extract_audio")).isFalse();
     }
 
     @Test
     void aFreeStepAndADisabledSwitchAllowTheStepWithoutALedgerRow() {
-        assertThat(accounts(true).debitForStep(userId, runId, stepId, "echo")).isTrue();
-        assertThat(accounts(false).debitForStep(userId, runId, stepId, "probe")).isTrue();
+        assertThat(accounts(true).debitForStep(userId, runId, stepId, ATTEMPT, "echo")).isTrue();
+        assertThat(accounts(false).debitForStep(userId, runId, stepId, ATTEMPT, "probe")).isTrue();
 
-        verify(ledger, never()).debit(any(), any(), any(), any(), anyLong(), any());
+        verify(ledger, never()).debit(any(), any(), any(), any(), anyShort(), anyLong(), any());
     }
 
     @Test
     void aStepWithNoPriceIsNeitherChargedNorAllowed() {
-        assertThatThrownBy(() -> accounts(true).debitForStep(userId, runId, stepId, "render_video"))
+        assertThatThrownBy(() -> accounts(true).debitForStep(userId, runId, stepId, ATTEMPT, "render_video"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("render_video");
 
-        verify(ledger, never()).debit(any(), any(), any(), any(), anyLong(), any());
+        verify(ledger, never()).debit(any(), any(), any(), any(), anyShort(), anyLong(), any());
     }
 
     @Test
     void aSystemFailureAsksTheLedgerToRefundTheStepsDebitAndTheLedgerKeepsItToOnce() {
         givenDebit(20L);
-        when(ledger.refund(any(), eq(stepId), eq(NOW))).thenReturn(1).thenReturn(0);
+        when(ledger.refund(any(), eq(stepId), eq(ATTEMPT), eq(NOW))).thenReturn(1).thenReturn(0);
 
-        accounts(true).refundStep(runId, stepId, "lease_expired");
-        accounts(true).refundStep(runId, stepId, "lease_expired");
+        accounts(true).refundStep(runId, stepId, ATTEMPT, "lease_expired");
+        accounts(true).refundStep(runId, stepId, ATTEMPT, "lease_expired");
 
-        verify(ledger, times(2)).refund(any(), eq(stepId), eq(NOW));
+        verify(ledger, times(2)).refund(any(), eq(stepId), eq(ATTEMPT), eq(NOW));
     }
 
     @Test
     void aFailureTheMemberCausedIsNotRefunded() {
         givenDebit(20L);
 
-        accounts(true).refundStep(runId, stepId, "INSUFFICIENT_CREDITS");
+        accounts(true).refundStep(runId, stepId, ATTEMPT, "INSUFFICIENT_CREDITS");
 
-        verify(ledger, never()).refund(any(), any(), any());
+        verify(ledger, never()).refund(any(), any(), anyShort(), any());
     }
 
     @Test
     void aStepThatWasNeverChargedAndADisabledSwitchRefundNothing() {
-        when(ledger.findByRunStepIdAndKind(stepId, CreditLedgerEntry.DEBIT)).thenReturn(Optional.empty());
+        when(ledger.findByRunStepIdAndAttemptAndKind(stepId, ATTEMPT, CreditLedgerEntry.DEBIT))
+                .thenReturn(Optional.empty());
 
-        accounts(true).refundStep(runId, stepId, "run_timeout");
-        accounts(false).refundStep(runId, stepId, "run_timeout");
+        accounts(true).refundStep(runId, stepId, ATTEMPT, "run_timeout");
+        accounts(false).refundStep(runId, stepId, ATTEMPT, "run_timeout");
 
-        verify(ledger, never()).refund(any(), any(), any());
+        verify(ledger, never()).refund(any(), any(), anyShort(), any());
     }
 
     private void givenDebit(long amount) {
         CreditLedgerEntry debit = mock(CreditLedgerEntry.class);
         when(debit.getUserId()).thenReturn(userId);
         when(debit.getAmount()).thenReturn(amount);
-        when(ledger.findByRunStepIdAndKind(stepId, CreditLedgerEntry.DEBIT)).thenReturn(Optional.of(debit));
+        when(ledger.findByRunStepIdAndAttemptAndKind(stepId, ATTEMPT, CreditLedgerEntry.DEBIT))
+                .thenReturn(Optional.of(debit));
     }
 }
