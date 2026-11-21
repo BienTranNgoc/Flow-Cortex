@@ -64,6 +64,47 @@ x-provider-worker-env: &provider-worker-env
   OTEL_LOGS_EXPORTER: none
   OTEL_METRICS_EXPORTER: none
 
+# What worker and render-worker share: one image, one broker and store identity, the same
+# health and shutdown handling. Each service adds the queue it consumes and its identity.
+x-media-worker: &media-worker
+  build:
+    context: ./worker
+    target: media-runtime
+  image: flow-cortex-worker:local
+  networks: [internal]
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    minio-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+  # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
+  stop_grace_period: 40s
+  restart: unless-stopped
+
+x-media-worker-env: &media-worker-env
+  # The credentials must be URL-safe; they are placed in the URL as is.
+  AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_PATH_STYLE: 'true'
+  S3_UPLOAD_BUCKET: flowcortex-uploads
+  S3_BUCKET: flowcortex-media
+  S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
+  S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  # Spans and trace ids still exist without a collector; the observability
+  # overlay turns the exporters on.
+  OTEL_TRACES_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+
 services:
   # The only route out for the backend and the provider workers: refuses every
   # host not in the ACL file and every private, loopback, link-local or CGNAT
@@ -247,6 +288,9 @@ services:
       SPRING_DATASOURCE_USERNAME: flowcortex
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (see .env.example)}
+      FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT: ${FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT:?Set FLOWCORTEX_CONNECTORS_ENCRYPTION_CURRENT (see .env.example)}
+      FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1: ${FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1:?Set FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1 (see .env.example)}
+      FLOWCORTEX_CONNECTORS_TELEGRAM_ENABLED: ${FLOWCORTEX_CONNECTORS_TELEGRAM_ENABLED:-false}
       # Workflow-execution kill switch: defaults on. Flip it off and restart the
       # backend to refuse new runs (503) without a rebuild:
       #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
@@ -271,7 +315,7 @@ services:
       FLOWCORTEX_MEDIA_ENABLED: ${FLOWCORTEX_MEDIA_ENABLED:-true}
       # Vietnamese dubbing: off by default, and available only with a Gemini key as well.
       FLOWCORTEX_DUB_ENABLED: ${FLOWCORTEX_DUB_ENABLED:-false}
-      # One Gemini key serves dubbing and the Help Center assistant; empty fails both.
+      # One Gemini client and key serve dubbing and the Help Center assistant; empty fails both.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Admin-console kill switch: off answers /api/v1/admin/** with 503; the member API is unaffected.
       FLOWCORTEX_ADMIN_ENABLED: ${FLOWCORTEX_ADMIN_ENABLED:-true}
@@ -288,6 +332,8 @@ services:
       FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_CAPACITY:-20}
       FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD: ${FLOWCORTEX_LOGIN_FAILURES_PER_IP_PERIOD:-15m}
       FLOWCORTEX_AUTH_AUDIT_RETENTION: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:-90d}
+      FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:-365d}
+      FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:-1h}
       # Browser error intake (POST /api/v1/client-errors) and its per-IP limit.
       FLOWCORTEX_CLIENT_ERRORS_ENABLED: ${FLOWCORTEX_CLIENT_ERRORS_ENABLED:-true}
       FLOWCORTEX_CLIENT_ERRORS_PER_IP_CAPACITY: ${FLOWCORTEX_CLIENT_ERRORS_PER_IP_CAPACITY:-10}
@@ -297,6 +343,7 @@ services:
       FLOWCORTEX_RATE_LIMIT_STORE_MAX_POOL_SIZE: ${FLOWCORTEX_RATE_LIMIT_STORE_MAX_POOL_SIZE:-8}
       FLOWCORTEX_RATE_LIMIT_STORE_CONNECTION_TIMEOUT: ${FLOWCORTEX_RATE_LIMIT_STORE_CONNECTION_TIMEOUT:-250ms}
       FLOWCORTEX_RATE_LIMIT_STORE_LOCK_TIMEOUT: ${FLOWCORTEX_RATE_LIMIT_STORE_LOCK_TIMEOUT:-200ms}
+      FLOWCORTEX_RATE_LIMIT_STORE_STATEMENT_TIMEOUT: ${FLOWCORTEX_RATE_LIMIT_STORE_STATEMENT_TIMEOUT:-500ms}
       # Sign in with Google; an empty client id switches it off.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -307,11 +354,16 @@ services:
       FLOWCORTEX_SUPPORT_CONTACT_EMAIL: ${FLOWCORTEX_SUPPORT_CONTACT_EMAIL:-}
       FLOWCORTEX_SUPPORT_ASSISTANT_MODEL: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:-gemini-3.5-flash-lite}
       FLOWCORTEX_SUPPORT_HASH_SECRET: ${FLOWCORTEX_SUPPORT_HASH_SECRET:-dev-only-support-hash-secret-change-me-0123456789}
+      FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:-dev-only-workflow-share-hash-secret-change-me-0123456789}
       FLOWCORTEX_SUPPORT_ASSISTANT_DAILY_CEILING: ${FLOWCORTEX_SUPPORT_ASSISTANT_DAILY_CEILING:-2000}
       FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:-50}
       FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:-10}
       FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:-100}
-      FLOWCORTEX_SUPPORT_MAIL_FROM: ${FLOWCORTEX_SUPPORT_MAIL_FROM:-no-reply@flow-cortex.dev}
+      FLOWCORTEX_MAIL_FROM: ${FLOWCORTEX_MAIL_FROM:-no-reply@flow-cortex.dev}
+      FLOWCORTEX_MAIL_FROM_NAME: ${FLOWCORTEX_MAIL_FROM_NAME:-Nodi}
+      FLOWCORTEX_MAIL_LINK_SECRET: ${FLOWCORTEX_MAIL_LINK_SECRET:-}
+      FLOWCORTEX_MAIL_LINK_RATE_LIMIT: ${FLOWCORTEX_MAIL_LINK_RATE_LIMIT:-10}
+      FLOWCORTEX_MAIL_LINK_RATE_WINDOW: ${FLOWCORTEX_MAIL_LINK_RATE_WINDOW:-60s}
       # Main chat switch and limits (see .env.example); the language model key is GEMINI_API_KEY above.
       FLOWCORTEX_CHAT_ENABLED: ${FLOWCORTEX_CHAT_ENABLED:-false}
       FLOWCORTEX_CHAT_MODEL: ${FLOWCORTEX_CHAT_MODEL:-gemini-3.5-flash}
@@ -390,6 +442,8 @@ services:
       FLOWCORTEX_SMS_OUTBOX_RETENTION: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:-7d}
       # Personal spaces: off makes the session space answer 503; spaces are still provisioned.
       FLOWCORTEX_SPACES_ENABLED: ${FLOWCORTEX_SPACES_ENABLED:-true}
+      # Member onboarding journey: off hides it and makes progress writes answer 409.
+      FLOWCORTEX_ONBOARDING_ENABLED: ${FLOWCORTEX_ONBOARDING_ENABLED:-true}
       # Confirmation mail goes to the Mailpit sink unless .env names a relay; links in it point
       # at the member app.
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
@@ -433,44 +487,27 @@ services:
   # the internet; it makes no outbound call, so it has no proxy settings. No
   # published ports.
   worker:
-    build:
-      context: ./worker
-      target: media-runtime
-    image: flow-cortex-worker:local
+    <<: *media-worker
     environment:
-      # The credentials must be URL-safe; they are placed in the URL as is.
-      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@rabbitmq:5672/%2F
-      S3_ENDPOINT: http://minio:9000
-      S3_REGION: us-east-1
-      S3_PATH_STYLE: 'true'
-      S3_UPLOAD_BUCKET: flowcortex-uploads
-      S3_BUCKET: flowcortex-media
-      S3_ACCESS_KEY: ${WORKER_S3_ACCESS_KEY:?Set WORKER_S3_ACCESS_KEY (see .env.example)}
-      S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
+      <<: *media-worker-env
       WORKER_ID: ${WORKER_ID:-flow-worker-1}
       OTEL_SERVICE_NAME: flow-worker
-      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      # Spans and trace ids still exist without a collector; the observability
-      # overlay turns the exporters on.
-      OTEL_TRACES_EXPORTER: none
-      OTEL_LOGS_EXPORTER: none
-      OTEL_METRICS_EXPORTER: none
-    networks: [internal]
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ['CMD', 'python', '-m', 'flowcortex_worker.healthcheck']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    # Covers the worker's own 30 s shutdown grace plus the telemetry flush.
-    stop_grace_period: 40s
-    restart: unless-stopped
+
+  # Render pool: consumes media.render.jobs (render_video), so an encode never waits
+  # behind probe or audio jobs and the pool is sized on its own. One job per
+  # container: the broker connection is not thread-safe, so the pool size is the
+  # replica count. A capability added to the backend's render lane is added to
+  # WORKER_CAPABILITIES in the same change. No WORKER_ID: each replica reports its
+  # own container hostname.
+  render-worker:
+    <<: *media-worker
+    environment:
+      <<: *media-worker-env
+      MEDIA_QUEUE: media.render.jobs
+      WORKER_CAPABILITIES: render_video
+      OTEL_SERVICE_NAME: render-worker
+    deploy:
+      replicas: ${MEDIA_RENDER_WORKERS:-1}
 
   # Provider worker: consumes provider.jobs (script, storyboard and speech).
   provider-worker:

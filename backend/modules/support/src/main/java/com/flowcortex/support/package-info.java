@@ -7,9 +7,12 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Support",
         allowedDependencies = {
+                "jobs :: api",
                 "user :: api",
                 "media :: api",
                 "llm :: api",
+                "settings :: api",
+                "mail :: api",
                 "shared :: web",
                 "shared :: security",
                 "shared :: ratelimit"

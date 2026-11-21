@@ -2,7 +2,8 @@
   "errorView": {
     "title": "Something went wrong",
     "message": "This page could not be shown. Reload it to try again.",
-    "reload": "Reload"
+    "reload": "Reload",
+    "retry": "Try again"
   },
   "errors": {
     "requestFailed": "Something went wrong. Try again."
@@ -65,6 +66,11 @@
     "empty": "There are no workflows yet.",
     "noMatch": "No workflow matches your search.",
     "clearFilters": "Clear filters"
+  },
+  "networkStatus": {
+    "offline": "You are offline. Changes will not load until you reconnect.",
+    "rateLimited": "Too many requests. Please wait a moment.",
+    "reconnecting": "Reconnecting to live updates…"
   },
   "shell": {
     "skipToContent": "Skip to content",
@@ -147,38 +153,6 @@
       "approveOnRun": "<strong>Approve a step.</strong> When a run hits an approval checkpoint, it stays <em>Waiting for review</em> on the run page until you act.",
       "byoProvider": "<strong>Bring your own AI provider.</strong> Add a key on the <integrationsLink>Integrations</integrationsLink> page; any workflow that needs that model will pick it up automatically."
     }
-  },
-  "runs": {
-    "title": "Recent runs",
-    "subtitle": "Track every pipeline you started: what is running, what needs your review, and what failed.",
-    "searchPlaceholder": "Search by workflow name…",
-    "searchLabel": "Search runs",
-    "filterLegend": "Filter by status",
-    "status": {
-      "all": "All",
-      "success": "Succeeded",
-      "failure": "Failed",
-      "waiting": "Waiting for review",
-      "running": "Running"
-    },
-    "trigger": {
-      "label": "Trigger",
-      "manual": "Manual",
-      "webhook": "Webhook",
-      "schedule": "Scheduled"
-    },
-    "empty": "No runs match the current filter.",
-    "runId": "Run ID",
-    "copy": "Copy {{value}}",
-    "started": "Started",
-    "ago": "{{time}} ago",
-    "justNow": "just now",
-    "duration": "Duration",
-    "durationRunning": "{{duration}} · running",
-    "retry": "Retry",
-    "retryNamed": "Retry {{name}}",
-    "viewDetail": "View run detail →",
-    "demoFailure": "Step \"throw\" failed: deliberate failure for testing."
   },
   "integrations": {
     "title": "Integrations",

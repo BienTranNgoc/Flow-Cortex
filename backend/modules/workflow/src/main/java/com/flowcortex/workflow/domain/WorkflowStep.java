@@ -60,6 +60,13 @@ public class WorkflowStep {
         this.config = config;
     }
 
+    /** Replaces the three editable fields; the type and position of a step never change. */
+    public void edit(String name, String config, String inputRef) {
+        this.name = name;
+        this.config = config;
+        this.inputRef = inputRef;
+    }
+
     public UUID getId() {
         return id;
     }
