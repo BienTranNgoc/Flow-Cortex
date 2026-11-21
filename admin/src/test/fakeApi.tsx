@@ -1,3 +1,4 @@
+import { MeResponsePermissionsItem } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
@@ -70,5 +71,34 @@ export async function settled(queryClient: QueryClient) {
   await waitFor(() => expect(queryClient.isFetching()).toBe(0));
 }
 
-export const ADMIN_ME = { id: 'a1', email: 'admin@flowcortex.dev', name: 'Admin', role: 'ADMIN' };
-export const MEMBER_ME = { id: 'm1', email: 'member1@flowcortex.dev', name: 'Member One', role: 'MEMBER' };
+/** Every catalog key, in the order the API lists them for a super admin. */
+const ALL_PERMISSIONS: MeResponsePermissionsItem[] = Object.values(MeResponsePermissionsItem);
+
+export const ADMIN_ME = {
+  id: 'a1',
+  email: 'admin@flowcortex.dev',
+  name: 'Admin',
+  role: 'ADMIN',
+  permissions: ALL_PERMISSIONS,
+  adminDisabled: false,
+};
+export const MEMBER_ME = {
+  id: 'm1',
+  email: 'member1@flowcortex.dev',
+  name: 'Member One',
+  role: 'MEMBER',
+  permissions: [] as MeResponsePermissionsItem[],
+  adminDisabled: false,
+};
+
+/** A staff caller holding only `keys`. */
+export function staffMe(role: string, keys: MeResponsePermissionsItem[]) {
+  return {
+    id: 's1',
+    email: `${role.toLowerCase()}@flowcortex.dev`,
+    name: 'Staff',
+    role,
+    permissions: keys,
+    adminDisabled: false,
+  };
+}

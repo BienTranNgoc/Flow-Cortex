@@ -2,7 +2,8 @@
   "errorView": {
     "title": "Something went wrong",
     "message": "This page could not be shown. Reload it to try again.",
-    "reload": "Reload"
+    "reload": "Reload",
+    "retry": "Try again"
   },
   "errors": {
     "requestFailed": "Something went wrong. Try again."
@@ -65,6 +66,11 @@
     "empty": "There are no workflows yet.",
     "noMatch": "No workflow matches your search.",
     "clearFilters": "Clear filters"
+  },
+  "networkStatus": {
+    "offline": "You are offline. Changes will not load until you reconnect.",
+    "rateLimited": "Too many requests. Please wait a moment.",
+    "reconnecting": "Reconnecting to live updates…"
   },
   "shell": {
     "skipToContent": "Skip to content",
