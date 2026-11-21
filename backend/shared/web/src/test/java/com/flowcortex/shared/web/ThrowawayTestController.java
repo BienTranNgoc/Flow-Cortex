@@ -78,6 +78,11 @@ class ThrowawayTestController {
         throw new AccessDeniedException("not an admin");
     }
 
+    @GetMapping("/test/admin-disabled")
+    String triggerAdminDisabled() {
+        throw new AdminDisabledException();
+    }
+
     @GetMapping("/test/locked")
     String triggerLocked() {
         throw new AccountLockedException(new LocalizedMessage("auth.accountLocked", LOCKED_UNTIL), LOCKED_UNTIL);
