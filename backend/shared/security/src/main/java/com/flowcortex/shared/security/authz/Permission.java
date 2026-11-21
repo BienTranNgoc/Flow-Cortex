@@ -34,6 +34,12 @@ public enum Permission {
     SYSTEM_ROLE_VIEW("system.role.view", true),
     SYSTEM_ADMIN_ACCOUNT_VIEW("system.admin_account.view", true),
     SYSTEM_ADMIN_ACCOUNT_MANAGE("system.admin_account.manage", true),
+    AI_PROVIDER_VIEW("ai.provider.view", false),
+    AI_PROVIDER_UPDATE("ai.provider.update", false),
+    WORKFLOW_RUN_EXPORT("workflow.run.export", false),
+    WORKFLOW_RUN_CANCEL("workflow.run.cancel", false),
+    WORKFLOW_WORKFLOW_VIEW("workflow.workflow.view", false),
+    WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
     PAYMENT_SETTING_VIEW("payment.setting.view", false),
     PAYMENT_SETTING_UPDATE("payment.setting.update", false);
 

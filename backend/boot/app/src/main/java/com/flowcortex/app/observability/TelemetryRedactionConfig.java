@@ -1,5 +1,6 @@
 package com.flowcortex.app.observability;
 
+import com.flowcortex.shared.web.LoggedPaths;
 import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationFilter;
@@ -10,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Strips the query from every URL an observation records, then replaces any signing value still
  * left anywhere in a value (a URL inside an error message, say), so neither spans nor metric tags
- * carry the credential and signature of a presigned object-store URL.
+ * carry the credential and signature of a presigned object-store URL. A request path that carries a
+ * bearer credential (a share key, an email-link token) is redacted the same way as in log lines.
  */
 @Configuration(proxyBeanMethods = false)
 class TelemetryRedactionConfig {
@@ -49,6 +51,7 @@ class TelemetryRedactionConfig {
         if (URL_WITH_QUERY.matcher(value).matches()) {
             value = value.substring(0, value.indexOf('?'));
         }
+        value = LoggedPaths.redact(value);
         value = SIGNING_VALUE.matcher(value).replaceAll("X-Amz-$1=REDACTED");
         return value.equals(keyValue.getValue()) ? keyValue : KeyValue.of(keyValue.getKey(), value);
     }

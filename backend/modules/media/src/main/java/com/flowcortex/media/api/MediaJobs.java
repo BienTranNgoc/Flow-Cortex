@@ -1,6 +1,7 @@
 package com.flowcortex.media.api;
 
 import com.flowcortex.media.api.provider.ProviderJob;
+import java.io.InputStream;
 import java.util.UUID;
 import java.util.List;
 
@@ -32,11 +33,13 @@ public interface MediaJobs {
     MediaLimits providerLimits(String capability);
 
     /**
-     * Signs an upload of {@code size} bytes to a key derived from {@code ownerId} and a new upload id.
-     * The type comes from the extension of {@code fileName}, which is not stored anywhere.
-     * @throws UploadRejectedException for {@code fileName} outside the allowlist or {@code size} out of range
+     * Signs an upload of {@code size} bytes to a key derived from {@code purpose}, {@code ownerId} and a new
+     * upload id. The type comes from the extension of {@code fileName}, which is not stored anywhere, and must
+     * be one the purpose accepts.
+     * @throws UploadRejectedException on field {@code fileName} outside the purpose's allowlist, on field
+     *         {@code size} out of range
      */
-    UploadGrant prepareUpload(UUID ownerId, String fileName, long size);
+    UploadGrant prepareUpload(UploadPurpose purpose, UUID ownerId, String fileName, long size);
 
     /**
      * The stored object of {@code ownerId}'s upload {@code uploadId}, re-checked and registered as an asset.
@@ -51,8 +54,11 @@ public interface MediaJobs {
     /** Whether an output stored in {@code bucket} can be signed for download: only the media bucket's can. */
     boolean isDownloadable(String bucket);
 
-    /** Resolves and registers 1-10 uploads, preserving their order as {@code image_1..image_N}. */
-    List<MediaAssetInput> resolveImageUploads(UUID ownerId, List<UUID> uploadIds);
+    /**
+     * Resolves and registers 1-10 uploads granted for {@code purpose}, preserving their order as
+     * {@code image_1..image_N}. An upload granted for another purpose is not found.
+     */
+    List<MediaAssetInput> resolveImageUploads(UploadPurpose purpose, UUID ownerId, List<UUID> uploadIds);
 
     /**
      * Copies already owner-verified assets into {@code runs/<runId>/inputs/<bindingKey>} of the media bucket,
@@ -60,11 +66,13 @@ public interface MediaJobs {
      * video copy can take minutes. The uploads bucket expires objects after a day while an approval may wait far
      * longer, and an upload URL can rewrite its object, so the worker reads only the copy. With the content check
      * on, the first bytes of each copy must match its kind. Copies of a start that fails later are not deleted;
-     * the media bucket's run-input lifecycle rule expires them.
+     * the media bucket's run-input lifecycle rule expires them. An image is not copied server-side: it is
+     * read, checked (format, pixel cap) and written back without its metadata, whatever the content check says.
      * @return the inputs, each pointing at its copy in the media bucket
      * @throws UploadRejectedException on field {@code uploadId} for the single media upload, {@code uploadIds}
      *         otherwise, if an upload vanished before it was copied; on field {@code uploadId} if a copy's
-     *         content is not its kind
+     *         content is not its kind; on field {@code uploadIds} if an image is not the image it was declared
+     *         as or has more than 25 million pixels
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs);
@@ -77,12 +85,41 @@ public interface MediaJobs {
     void bindRunInputs(UUID runId, List<MediaAssetInput> copies);
 
     /**
+     * The inputs {@code runId} was bound to, in binding order, each pointing at its copy under
+     * {@code runs/<runId>/inputs/} of the media bucket; empty when the run bound none. Feed them to
+     * {@link #copyRunInputs} to give another run its own copies.
+     */
+    List<MediaAssetInput> boundRunInputs(UUID runId);
+
+    /**
+     * Copies stored step outputs of run {@code fromRunId}, step {@code stepOrder}, server-side and keeping the
+     * source tags, to {@code runs/<toRunId>/steps/<stepOrder>/attempts/1/<name>} of the same bucket; a source's
+     * {@code attempts/<n>/} segment is dropped from the name. Call it outside any transaction: a copy can take minutes.
+     * @return the outputs as stored under the new run, name, type, size and meta unchanged
+     * @throws IllegalArgumentException if an output is not an object below {@code runs/<fromRunId>/steps/<stepOrder>/};
+     *         nothing is copied
+     * @throws UploadRejectedException if a source object is gone
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    List<MediaOutput> copyStepOutputs(UUID fromRunId, UUID toRunId, int stepOrder, List<MediaOutput> outputs);
+
+    /**
+     * Whether every input {@code runId} was bound to is still in the media bucket (its lifecycle rule expires
+     * run inputs); true when the run bound none. Stops at the first missing copy.
+     */
+    boolean runInputsStored(UUID runId);
+
+    /**
      * Keeps owner-verified image uploads as attachments at {@code <keyPrefix>/1..N} of the media bucket. Each
-     * copy is tagged pending and sniffed (content check on); all are re-tagged kept only once every copy passed,
-     * and a refused copy expires by the media bucket's lifecycle rule. Call it outside any transaction.
+     * image is read, checked (format, pixel cap) and written without its metadata, tagged pending; all are
+     * re-tagged kept only once every copy passed, and a refused copy expires by the media bucket's lifecycle
+     * rule. Call it outside any transaction.
+     * @return the kept copies, each with the size of the stored (stripped) bytes
      * @throws UploadRejectedException on field {@code uploadIds} if an upload is not an image, is larger than
-     *         {@code maxBytes} (checked before any copy), vanished, or its copy's content is not an image
-     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/}, or there are not 1-10 inputs
+     *         {@code maxBytes} (checked before any read), vanished, is not the image it was declared as, or has
+     *         more than 25 million pixels
+     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/} or
+     *         {@code workflow-review/}, or there are not 1-10 inputs
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes);
@@ -90,9 +127,72 @@ public interface MediaJobs {
     /**
      * Re-tags kept attachments pending again, so the media bucket's lifecycle rule expires them: for copies whose
      * request or message was never saved. Tries every object, then rethrows the first failure.
-     * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
+     * @throws IllegalArgumentException if an attachment is not under {@code support/} or
+     *         {@code workflow-review/} of the media bucket
      */
     void releaseAttachments(List<StoredAttachment> attachments);
+
+    /**
+     * Keeps the owner's {@link UploadPurpose#DRIVE_ITEM} upload {@code uploadId} at
+     * {@code drive/<spaceId>/<itemId>} of the media bucket, tagged pending: an image is read, checked (format,
+     * pixel cap) and written without its metadata, any other kind is copied server-side, and with the content
+     * check on the copy must match its kind. Call {@link #confirmDriveFile} once the item row is saved and
+     * {@link #releaseDriveFile} if saving fails. Call it outside any transaction.
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of another purpose or
+     *         owner, too large, not the type it was declared as or over the pixel cap; on field
+     *         {@code contentType} if its kind differs from {@code contentType}, before anything is copied
+     * @throws MediaStoreUnavailableException if media is switched off or the object store does not answer
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    StoredDriveFile keepDriveFile(UUID ownerId, UUID uploadId, String contentType, UUID spaceId, UUID itemId);
+
+    /**
+     * Keeps a pending Drive file for good, so the media bucket's lifecycle rule no longer expires it.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void confirmDriveFile(StoredDriveFile file);
+
+    /**
+     * Marks a Drive file pending again, so the media bucket's lifecycle rule expires it: for a copy whose item
+     * was never saved or has been deleted.
+     * @throws IllegalArgumentException if {@code file} is not under {@code drive/} of the media bucket
+     */
+    void releaseDriveFile(StoredDriveFile file);
+
+    /**
+     * Keeps a member's profile-image upload (granted under {@link UploadPurpose#PROFILE_IMAGE}) at
+     * {@code targetKey} of the media bucket. The image is read, checked (format, pixel cap) and written without
+     * its metadata, tagged to expire; it stays so until {@link #confirmProfileImages} retags it, so a copy whose
+     * caller never saved it vanishes by the bucket's lifecycle rule. Call it outside any transaction.
+     * @return the kept copy with the pixel size read from its header and the size of the stored (stripped) bytes
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, not the owner's, or not
+     *         a png, jpg or webp within the size cap; on field {@code uploadIds} if the bytes are not the image
+     *         they were declared as, exceed the cap since the grant, or have more than 25 million pixels
+     * @throws IllegalArgumentException if {@code targetKey} is not an object name under {@code profile/}
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    KeptImage keepProfileImage(UUID ownerId, UUID uploadId, String targetKey);
+
+    /**
+     * Retags kept profile images as permanent. Call it only after the database write that records them has
+     * committed. Tries every object, then rethrows the first failure.
+     * @throws IllegalArgumentException if a key is not an object name under {@code profile/}; nothing is retagged
+     */
+    void confirmProfileImages(List<String> objectKeys);
+
+    /**
+     * Retags profile images so the media bucket's lifecycle rule expires them: for copies whose record was never
+     * saved, or whose history entry was dropped. Tries every object, then rethrows the first failure.
+     * @throws IllegalArgumentException if a key is not an object name under {@code profile/}; nothing is retagged
+     */
+    void releaseProfileImages(List<String> objectKeys);
+
+    /**
+     * The inputs bound to {@code runId} in start order, each with a signed URL to the run's own copy under
+     * {@code runs/<runId>/inputs/}. The caller must have verified that the run belongs to the reader. A run
+     * with no bound input yields an empty list.
+     */
+    List<RunInput> runInputs(UUID runId);
 
     /**
      * Registers worker outputs accepted for the current step attempt. The caller must invoke this only after
@@ -108,6 +208,14 @@ public interface MediaJobs {
      *         plain server-chosen file name
      */
     MediaDownload presignedGet(String bucket, String key, String fileName);
+
+    /**
+     * The bytes of the stored output {@code bucket}/{@code key} as a stream the caller must close. Only objects in
+     * the media bucket are ever read.
+     * @throws IllegalArgumentException if {@code bucket} is not the media bucket
+     * @throws MediaStoreUnavailableException if the store does not open the object
+     */
+    InputStream openDownloadable(String bucket, String key);
 
     /**
      * Stores {@code bytes} as object {@code name} of step {@code stepOrder} of run {@code runId}, at

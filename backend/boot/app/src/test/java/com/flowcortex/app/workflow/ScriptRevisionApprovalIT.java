@@ -1,7 +1,9 @@
 package com.flowcortex.app.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
 
+import com.flowcortex.app.media.ImageFixtures;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.user.api.UserView;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -59,7 +62,7 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
 
     @BeforeEach
     void enableMediaEngineAndDrainProviderQueues() {
-        org.mockito.Mockito.when(mediaJobs.isEnabled()).thenReturn(true);
+        doReturn(true).when(AopTestUtils.<MediaJobs>getUltimateTargetObject(mediaJobs)).isEnabled();
         amqpAdmin.purgeQueue("provider.jobs", false);
     }
 
@@ -294,12 +297,12 @@ class ScriptRevisionApprovalIT extends AbstractWorkflowHttpIT {
 
     private UUID uploadProductImage(UserView owner) {
         ResponseEntity<UploadResponseView> grant = post("/api/v1/uploads", loginAs(owner),
-                new UploadRequestView("product.png", 16L), UploadResponseView.class);
+                new UploadRequestView("product.png", (long) ImageFixtures.png().length), UploadResponseView.class);
         assertThat(grant.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UploadResponseView body = grant.getBody();
         try (S3Client store = objectStore()) {
             store.putObject(o -> o.bucket(UPLOAD_BUCKET).key(owner.id() + "/" + body.uploadId())
-                    .contentType("image/png"), RequestBody.fromBytes("sixteen bytes!!!".getBytes()));
+                    .contentType("image/png"), RequestBody.fromBytes(ImageFixtures.png()));
         } catch (RuntimeException e) {
             throw new IllegalStateException("could not stage the product image", e);
         }

@@ -1,0 +1,292 @@
+.providers-page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.providers-tab,
+.providers-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.providers-tab .cortex-admin-toolbar {
+  justify-content: flex-end;
+  margin-bottom: 0.25rem;
+}
+
+/* Wide screens: the page itself stays put and the table region (or the cards) is the one vertical scroller. */
+@media (min-width: 1024px) {
+  .providers-page {
+    height: calc(100svh - 3.5rem - 2 * clamp(1rem, 2.4vw, 2rem));
+  }
+
+  .providers-page .cortex-admin-page-heading {
+    margin-bottom: 0.75rem;
+  }
+
+  .providers-page .cortex-admin-table-wrapper {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .providers-panel > .providers-tab:has(.providers-category) {
+    overflow-y: auto;
+  }
+}
+
+.providers-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--admin-card-edge);
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+
+.providers-tab-button {
+  min-height: var(--admin-hit-min);
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-ink-3);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--dur-quick) var(--ease-standard),
+    background var(--dur-quick) var(--ease-standard);
+}
+
+.providers-tab-button[aria-selected='true'] {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+.providers-tab-button:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+  .providers-tab-button:not([aria-selected='true']):hover {
+    background: var(--admin-chrome-hover);
+    color: var(--admin-ink);
+  }
+}
+
+.providers-tab-button:active {
+  transform: scale(0.98);
+}
+
+/* Below 1024px the table keeps the id, active and actions columns; the rest is in the edit dialog. */
+@media (max-width: 1023px) {
+  .cortex-admin-table .providers-col-extra {
+    display: none;
+  }
+
+  .providers-table td:last-child .cortex-admin-row-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.providers-table .cortex-admin-table-job-id {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.providers-switch {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+}
+
+.providers-switch input,
+.providers-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--admin-primary);
+  cursor: pointer;
+}
+
+.providers-switch input:focus-visible,
+.providers-check input:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.providers-switch input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.providers-probe {
+  margin: 0.4rem 0 0;
+}
+
+.providers-probe .cortex-admin-pill {
+  white-space: normal;
+  text-align: left;
+}
+
+.providers-note,
+.providers-hint {
+  margin: 0.25rem 0 0;
+  color: var(--admin-ink-4);
+  font-size: 0.85rem;
+}
+
+.providers-note[role='alert'] {
+  color: var(--admin-warning);
+}
+
+/* ===== PROVIDER CARDS ================================================== */
+
+.providers-category h2 {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+  color: var(--admin-ink);
+}
+
+.providers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.providers-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--admin-card-surface);
+  color: var(--admin-ink);
+}
+
+.providers-card h3,
+.providers-card h4 {
+  margin: 0;
+}
+
+.providers-card h4 {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--admin-ink-3);
+}
+
+.providers-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.providers-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.providers-card__actions {
+  margin-top: 0.25rem;
+}
+
+.providers-slot__name {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.providers-slot__models {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.providers-slot__models li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.providers-slot__models code {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+/* ===== DIALOGS ========================================================== */
+
+.providers-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem 1.4rem;
+  overflow-y: auto;
+}
+
+.providers-dialog__body h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.providers-dialog .cortex-admin-field {
+  max-width: none;
+}
+
+.providers-dialog__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0 0.75rem;
+}
+
+.providers-dialog__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.providers-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--target-min);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.providers-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .providers-tab-button {
+    transition: none;
+  }
+}
