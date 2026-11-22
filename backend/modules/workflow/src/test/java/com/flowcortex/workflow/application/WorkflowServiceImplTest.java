@@ -198,6 +198,7 @@ class WorkflowServiceImplTest {
     void aNonOwnerCannotSetAllowFork() {
         Workflow workflow = stored(published(ANA, true));
         withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
 
         assertThatThrownBy(() -> service.updateWorkflow(BEN, workflow.getId(),
                 new UpdateWorkflow(null, null, true))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
