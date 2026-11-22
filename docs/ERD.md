@@ -395,6 +395,34 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
