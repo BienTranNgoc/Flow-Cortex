@@ -218,6 +218,53 @@ class RunStepTest {
     }
 
     @Test
+    void aChildIsPendingAtAttemptOneWithItsParentColumnsAndNoConfig() {
+        UUID runId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+
+        RunStep child = RunStep.child(runId, (short) 3, "echo", parentId, (short) 2, (short) 4, "item");
+
+        assertThat(child.getStatus()).isEqualTo(RunStepStatus.PENDING);
+        assertThat(child.getAttempt()).isEqualTo((short) 1);
+        assertThat(child.getRunId()).isEqualTo(runId);
+        assertThat(child.getStepOrder()).isEqualTo((short) 3);
+        assertThat(child.getParentStepId()).isEqualTo(parentId);
+        assertThat(child.getParentAttempt()).isEqualTo((short) 2);
+        assertThat(child.getItemIndex()).isEqualTo((short) 4);
+        assertThat(child.getInput()).isEqualTo("item");
+        assertThat(child.getConfig()).isNull();
+        assertThat(child.getInputRef()).isNull();
+        assertThat(newPendingStep().getParentStepId()).as("a top-level step has no parent").isNull();
+    }
+
+    @Test
+    void aCompletedCopyCarriesTheEarlierResultIntoTheNextParentAttempt() {
+        RunStep earlier = RunStep.child(UUID.randomUUID(), (short) 3, "echo", UUID.randomUUID(), (short) 1, (short) 4,
+                "item");
+        Instant started = Instant.parse("2026-11-20T10:00:00Z");
+        Instant finished = Instant.parse("2026-11-20T10:00:05Z");
+        earlier.markRunning(started);
+        earlier.markCompleted("item", "out", finished, "[{\"name\":\"a.wav\"}]");
+
+        RunStep copy = RunStep.completedCopy(earlier, (short) 2);
+
+        assertThat(copy.getId()).isNotEqualTo(earlier.getId());
+        assertThat(copy.getStatus()).isEqualTo(RunStepStatus.COMPLETED);
+        assertThat(copy.getAttempt()).isEqualTo((short) 1);
+        assertThat(copy.getRunId()).isEqualTo(earlier.getRunId());
+        assertThat(copy.getStepOrder()).isEqualTo(earlier.getStepOrder());
+        assertThat(copy.getType()).isEqualTo("echo");
+        assertThat(copy.getParentStepId()).isEqualTo(earlier.getParentStepId());
+        assertThat(copy.getParentAttempt()).isEqualTo((short) 2);
+        assertThat(copy.getItemIndex()).isEqualTo((short) 4);
+        assertThat(copy.getInput()).isEqualTo("item");
+        assertThat(copy.getOutput()).isEqualTo("out");
+        assertThat(copy.getOutputs()).isEqualTo("[{\"name\":\"a.wav\"}]");
+        assertThat(copy.getStartedAt()).isEqualTo(started);
+        assertThat(copy.getFinishedAt()).isEqualTo(finished);
+    }
+
+    @Test
     void aHeartbeatOnAFinishedStepIsIllegal() {
         RunStep step = newPendingStep();
         Instant at = Instant.now();
