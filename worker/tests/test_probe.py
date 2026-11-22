@@ -191,9 +191,9 @@ class RecordingRunner(ProcessRunner):
         super().__init__()
         self.argv: list[str] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.argv = argv
-        return super().run(argv)
+        return super().run(argv, cwd)
 
 
 def test_ffprobe_may_open_local_files_only(clip: Path) -> None:

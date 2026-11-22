@@ -42,6 +42,7 @@ export const HUMAN_STEP_TYPES: ReadonlySet<string> = new Set([CHECKPOINT, QA_REV
 const LABEL_KEYS: Record<string, string> = {
   probe: 'workflow.step.label.probe',
   extract_audio: 'workflow.step.label.extract_audio',
+  load_template: 'workflow.step.label.load_template',
   [CHECKPOINT]: 'workflow.step.label.review',
   [QA_REVIEW]: 'workflow.step.label.qaReview',
 };

@@ -14,6 +14,7 @@ import {
   getRunLog,
   getStepOutputPeaks,
   getWorkflow,
+  listWorkflowExamples,
   listWorkflows,
   rejectTask,
   requestUpload,
@@ -21,6 +22,7 @@ import {
   startProductVideoRun,
   startRun,
   unwrap,
+  useWorkflowExample as createDraftFromExample,
 } from '@flow-cortex/api-client';
 import type {
   ApproveReviewTaskRequest,
@@ -30,6 +32,7 @@ import type {
   StartRunRequest,
   UploadRequest,
 } from '@flow-cortex/api-client';
+import { activeLocale } from '../../lib/i18n';
 import { newUuidV4 } from '../support/uuid';
 import { useRunEvents } from './useRunEvents';
 
@@ -62,6 +65,35 @@ export function useWorkflowsQuery() {
   return useQuery({
     queryKey: ['workflows'],
     queryFn: () => unwrap(listWorkflows(authHeaders())),
+  });
+}
+
+type SuccessData<T> = Extract<T, { status: 200 | 201 }> extends { data: infer D } ? D : never;
+
+/** `unwrap` narrowed to the success body: it throws for every status >= 400. */
+async function unwrapSuccess<T extends { status: number; data: unknown }>(
+  request: Promise<T>,
+): Promise<SuccessData<T>> {
+  return (await unwrap(request)) as SuccessData<T>;
+}
+
+/** The starter examples, listed in the interface language. */
+export function useWorkflowExamplesQuery() {
+  const locale = activeLocale();
+  return useQuery({
+    queryKey: ['workflow-examples', locale],
+    queryFn: () => unwrapSuccess(listWorkflowExamples(authHeaders())),
+    // The catalog ships with the server build, so it cannot change under an open page.
+    staleTime: Infinity,
+  });
+}
+
+/** Creates a draft from an example; the member's workflow list refreshes on success. */
+export function useUseWorkflowExampleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (exampleId: string) => unwrapSuccess(createDraftFromExample(exampleId, authHeaders())),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workflows'] }),
   });
 }
 
@@ -134,10 +166,14 @@ function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
   return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
 }
 
-/** The run's uploaded files with signed links, renewed before the first expires while the tab stays open. */
+/**
+ * The run's uploaded files with signed links, renewed before the first expires while the tab stays
+ * open. The key sits outside `runs`, so a run refresh after a decision does not hand every input
+ * element a fresh link and remount it.
+ */
 export function useRunInputsQuery(runId: string) {
   return useQuery({
-    queryKey: ['runs', runId, 'inputs'],
+    queryKey: ['run-inputs', runId],
     queryFn: () => unwrap(getRunInputs(runId, authHeaders())),
     enabled: Boolean(runId),
     staleTime: (query) => untilInputRefresh(query.state.data),

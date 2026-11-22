@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types, the dub steps, and one remote executor per media capability. Workflow creation rejects
- * any other type.
+ * types, the dub steps, the template loader, the connector call, and one remote executor per media capability.
+ * Workflow creation rejects any other type.
  */
 @Component
 class StepExecutorRegistry {
@@ -28,9 +28,10 @@ class StepExecutorRegistry {
 
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
-            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall) {
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall,
+            LoadTemplateStepExecutor loadTemplate, ConnectorCallStepExecutor connectorCall) {
         this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
-                tts), workflowCall));
+                tts, loadTemplate), workflowCall, connectorCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -61,14 +62,17 @@ class StepExecutorRegistry {
     }
 
     private static List<StepExecutor> withDubSteps(List<StepExecutor> executors, StepExecutor translate,
-            StepExecutor tts) {
+            StepExecutor tts, StepExecutor loadTemplate) {
         executors.add(translate);
         executors.add(tts);
+        executors.add(loadTemplate);
         return executors;
     }
 
-    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall) {
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall,
+            StepExecutor connectorCall) {
         executors.add(workflowCall);
+        executors.add(connectorCall);
         return executors;
     }
 

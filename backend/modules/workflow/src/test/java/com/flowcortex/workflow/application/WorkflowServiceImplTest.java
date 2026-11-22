@@ -178,6 +178,61 @@ class WorkflowServiceImplTest {
     }
 
     @Test
+    void updateSetsAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+
+        WorkflowView on = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, true));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(on.allowFork()).isTrue();
+
+        WorkflowView untouched = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow("W2", null, null));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(untouched.allowFork()).isTrue();
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, false));
+        assertThat(workflow.isAllowFork()).isFalse();
+    }
+
+    @Test
+    void aNonOwnerCannotSetAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
+
+        assertThatThrownBy(() -> service.updateWorkflow(BEN, workflow.getId(),
+                new UpdateWorkflow(null, null, true))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+
+        assertThat(workflow.isAllowFork()).isFalse();
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void anAdminSetsAllowForkOnAnyWorkflow() {
+        Workflow seeded = stored(published(NIL_OWNER, true));
+        withSteps(seeded, "echo");
+        Workflow members = stored(published(ANA, false));
+        withSteps(members, "echo");
+
+        service.updateWorkflow(Caller.admin(CLEO), seeded.getId(), new UpdateWorkflow(null, null, true));
+        service.updateWorkflow(Caller.admin(CLEO), members.getId(), new UpdateWorkflow(null, null, true));
+
+        assertThat(seeded.isAllowFork()).isTrue();
+        assertThat(members.isAllowFork()).isTrue();
+    }
+
+    @Test
+    void createdDraftsHaveForkingOff() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView view = service.createDraft(ANA, "Fresh");
+
+        assertThat(view.allowFork()).isFalse();
+        assertThat(view.forkCount()).isZero();
+        assertThat(view.forkedFromId()).isNull();
+    }
+
+    @Test
     void aNonOwnerWhoCannotSeeTheDraftGetsNotFound() {
         Workflow sharedDraft = stored(draft(ANA, true));
         Workflow privatePublished = stored(published(ANA, false));
@@ -396,6 +451,100 @@ class WorkflowServiceImplTest {
         assertThat(other.getDeletedAt()).isNotNull();
     }
 
+    private static final String CONNECTOR_CONFIG =
+            "{\"connector\":\"notion-main\",\"url\":\"https://api.notion.com/v1/users\"}";
+
+    @SuppressWarnings("unchecked")
+    private WorkflowServiceImpl serviceKnowingConnectorCalls() {
+        org.springframework.beans.factory.ObjectProvider<StepExecutor> others =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(
+                mock(com.flowcortex.connector.api.HttpConnector.class),
+                mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others);
+        StepExecutorRegistry connectorRegistry = new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall));
+        return new WorkflowServiceImpl(workflowRepository, workflowStepRepository, connectorRegistry,
+                new WorkflowWriteAccess(workflowRepository, connectorRegistry,
+                        Validation.buildDefaultValidatorFactory().getValidator()),
+                new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
+                new ServedDefinitions(workflowStepRepository, versionRepository),
+                mock(com.flowcortex.credit.api.CreditAccounts.class));
+    }
+
+    private List<WorkflowStep> withEchoThenConnectorStep(Workflow workflow) {
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Say", "echo", null, null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Call", "connector.call", null,
+                        CONNECTOR_CONFIG));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowStepRepository.findMaxStepOrder(workflow.getId())).thenReturn(2);
+        steps.forEach(step -> when(workflowStepRepository.findById(step.getId())).thenReturn(Optional.of(step)));
+        return steps;
+    }
+
+    @Test
+    void anAdminCannotAddOrEditAConnectorCallStepOnAnotherMembersWorkflow() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(admin, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getDetailMessageCode())
+                        .isEqualTo("workflow.notOwner"));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"connector\":\"notion-main\",\"method\":\"DELETE\","
+                        + "\"url\":\"https://api.notion.com/v1/blocks/b1\"}", null)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit("renamed", null, null))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        verify(workflowStepRepository, never()).save(any());
+        assertThat(steps.get(1).getConfig()).isEqualTo(CONNECTOR_CONFIG);
+    }
+
+    @Test
+    void anAdminStillEditsOtherStepsAndDeletesOrReordersAConnectorCallStepOfAnotherMember() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        connectorService.addStep(admin, workflow.getId(), new NewStep("Say", "echo", null, null));
+        connectorService.updateStep(admin, workflow.getId(), steps.get(0).getId(), new StepEdit("renamed", null, null));
+        connectorService.reorderSteps(admin, workflow.getId(), List.of(steps.get(1).getId(), steps.get(0).getId()));
+        connectorService.deleteStep(admin, workflow.getId(), steps.get(1).getId());
+
+        verify(workflowStepRepository).deleteById(steps.get(1).getId());
+    }
+
+    @Test
+    void theOwnerAddsAndEditsAConnectorCallStepWhetherOrNotAnAdmin() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        for (Caller owner : List.of(Caller.member(ANA), Caller.admin(ANA))) {
+            WorkflowStepView added = connectorService.addStep(owner, workflow.getId(),
+                    new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG));
+            assertThat(added.type()).isEqualTo("connector.call");
+            connectorService.updateStep(owner, workflow.getId(), steps.get(1).getId(), new StepEdit("renamed", null, null));
+        }
+        assertThat(steps.get(1).getName()).isEqualTo("renamed");
+    }
+
+    @Test
+    void aMemberWhoIsNotTheOwnerKeepsTheirExistingRefusal() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(published(ANA, true));
+        withEchoThenConnectorStep(workflow);
+        visibleTo(BEN, workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+    }
+
     @Test
     void appendingTakesTheNextStepOrder() {
         Workflow workflow = stored(draft(ANA, false));
@@ -538,6 +687,32 @@ class WorkflowServiceImplTest {
     }
 
     @Test
+    void createDraftWithStepsStoresAPrivateDraftWithTheStepsInOrder() {
+        UUID ownerId = UUID.randomUUID();
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createDraft(ownerId, "From example", List.of(
+                new NewWorkflowStep("first", "echo", null),
+                new NewWorkflowStep("second", "echo", "{step:1.field}")));
+
+        assertThat(created.ownerId()).isEqualTo(ownerId);
+        assertThat(created.visibility()).isEqualTo(WorkflowVisibility.PRIVATE);
+        assertThat(created.status()).isEqualTo("draft");
+        assertThat(created.steps()).extracting(step -> step.stepOrder()).containsExactly(1, 2);
+    }
+
+    @Test
+    void createDraftWithStepsRejectsAnUnknownStepTypeAndSavesNothing() {
+        assertThatThrownBy(() -> service.createDraft(UUID.randomUUID(), "Bad", List.of(
+                new NewWorkflowStep("first", "image.gen", null))))
+                .isInstanceOf(ConstraintViolationException.class);
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
+    }
+
+    @Test
     void createWorkflowAssignsStepOrderByListPosition() {
         UUID ownerId = UUID.randomUUID();
         when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -567,11 +742,12 @@ class WorkflowServiceImplTest {
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
                                         + "echo, extract_audio, fail, generate_script, generate_speech, "
-                                        + "generate_storyboard, generate_video, probe, qa.review, render_video",
+                                        + "generate_storyboard, generate_video, probe, qa.review, "
+                                        + "render_video, separate_audio",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
                                         + "align_audio, echo, extract_audio, fail, generate_script, "
                                         + "generate_speech, generate_storyboard, generate_video, probe, "
-                                        + "qa.review, render_video"));
+                                        + "qa.review, render_video, separate_audio"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
