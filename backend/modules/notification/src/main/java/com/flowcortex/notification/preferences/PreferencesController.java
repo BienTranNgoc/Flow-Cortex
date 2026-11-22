@@ -88,6 +88,7 @@ class PreferencesController {
         return new PreferencesView(preferences.inApp(), preferences.careEmail(), preferences.marketingEmail());
     }
 
+    @Schema(name = "NotificationPreferencesView")
     record PreferencesView(boolean inApp, boolean careEmail, boolean marketingEmail) {
     }
 
