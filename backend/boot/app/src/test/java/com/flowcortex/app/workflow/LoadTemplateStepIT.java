@@ -9,6 +9,7 @@ import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.application.WorkflowForkService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +39,9 @@ class LoadTemplateStepIT extends AbstractWorkflowModuleIT {
 
     @Autowired
     private CreditAccounts creditAccounts;
+
+    @Autowired
+    private WorkflowForkService forkService;
 
     @Test
     void theFirstStepReadsTheRunInput() {
@@ -117,6 +121,28 @@ class LoadTemplateStepIT extends AbstractWorkflowModuleIT {
         assertThat(step.output()).isNull();
         assertThat(String.valueOf(step.errorMessage())).doesNotContain("token-123");
         assertThat(String.valueOf(run)).doesNotContain("token-123");
+    }
+
+    @Test
+    void aForkRunsLoadTemplateAgainstItsOwnCopyOfTheTemplateAndHasNoPrivateRow() {
+        UserView ana = memberWithBalance("fork-src", 10);
+        UserView ben = memberWithBalance("fork-ben", 10);
+        WorkflowView source = newWorkflow(ana.id(), true, new NewWorkflowStep("load", "load_template", null),
+                new NewWorkflowStep("show", "echo", "{step:1.brief}"));
+        putEntry(source.id(), "promo", "template", PROMO);
+        putEntry(source.id(), "apiNotes", "json", "{\"secret\":\"token-123\"}");
+        jdbc.update("UPDATE workflow SET allow_fork = true, status = 'published', visibility = 'public' "
+                + "WHERE id = ?", source.id());
+
+        WorkflowView fork = forkService.fork(ben.id(), source.id());
+
+        assertThat(jdbc.queryForList("SELECT key FROM workflow_data_store WHERE workflow_id = ?", String.class,
+                fork.id())).containsExactly("promo");
+        RunView run = runToEnd(ben, fork, "{\"template\":\"promo\"}");
+        assertThat(run.status()).isEqualTo("completed");
+        assertThat(run.steps().get(1).output()).isEqualTo("Spring sale");
+        jdbc.update("DELETE FROM workflow_data_store WHERE workflow_id = ?", source.id());
+        assertThat(runToEnd(ben, fork, "{\"template\":\"promo\"}").status()).isEqualTo("completed");
     }
 
     @Test

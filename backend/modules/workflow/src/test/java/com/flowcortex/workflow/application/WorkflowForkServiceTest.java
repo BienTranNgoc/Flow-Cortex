@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,10 +18,12 @@ import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.WorkflowView;
 import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
+import com.flowcortex.workflow.domain.WorkflowDataEntry;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.domain.WorkflowVersion;
 import com.flowcortex.workflow.domain.WorkflowVersionSource;
+import com.flowcortex.workflow.infrastructure.WorkflowDataEntryRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowVersionRepository;
@@ -45,8 +48,10 @@ class WorkflowForkServiceTest {
     private final WorkflowStepRepository stepRepository = mock(WorkflowStepRepository.class);
     private final WorkflowVersionRepository versionRepository = mock(WorkflowVersionRepository.class);
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+    private final WorkflowDataEntryRepository dataEntryRepository = mock(WorkflowDataEntryRepository.class);
+    private final WorkflowDataStore dataStore = mock(WorkflowDataStore.class);
     private final WorkflowForkService service = new WorkflowForkService(workflowRepository, stepRepository,
-            new ServedDefinitions(stepRepository, versionRepository), registry);
+            new ServedDefinitions(stepRepository, versionRepository), registry, dataEntryRepository, dataStore);
 
     {
         when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -199,6 +204,78 @@ class WorkflowForkServiceTest {
         verify(workflowRepository, never()).save(any());
         verify(workflowRepository, never()).incrementForkCount(any());
         verify(stepRepository, never()).saveAll(any());
+    }
+
+    private static WorkflowDataEntry row(UUID workflowId, String key, String dataType, String value) {
+        return new WorkflowDataEntry(UUID.randomUUID(), workflowId, key, dataType, value, value.length(),
+                Instant.now());
+    }
+
+    @Test
+    void theForkReceivesTheSourcesTemplateRowsThroughTheStoreAndNotItsOtherRows() {
+        Workflow source = visible(forkable("Dub"));
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId())).thenReturn(List.of());
+        when(dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(source.getId())).thenReturn(List.of(
+                row(source.getId(), "promo", "template", "{\"data\":{\"brief\":\"Spring sale\"}}"),
+                row(source.getId(), "apiNotes", "json", "{\"secret\":\"token-123\"}")));
+
+        WorkflowView view = service.fork(BINH, source.getId());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<WorkflowDataStore.Seed>> seeded = ArgumentCaptor.forClass(List.class);
+        verify(dataStore).seed(eq(view.id()), seeded.capture());
+        assertThat(seeded.getValue()).extracting(WorkflowDataStore.Seed::key).containsExactly("promo");
+        assertThat(seeded.getValue().get(0).dataType()).isEqualTo("template");
+        assertThat(seeded.getValue().get(0).value().toString()).isEqualTo("{\"data\":{\"brief\":\"Spring sale\"}}");
+    }
+
+    private WorkflowStep callStep(Workflow source, int order, UUID callee) {
+        return step(source, order, "call", "workflow.call", null, "{\"workflowId\":\"" + callee + "\"}");
+    }
+
+    @Test
+    void aSourceCallingAWorkflowTheCallerCannotSeeIsRefusedAndWritesNothing() {
+        Workflow source = visible(forkable("Parent"));
+        UUID hidden = UUID.randomUUID();
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId())).thenReturn(List.of(
+                step(source, 1, "first", "echo", null, null), callStep(source, 2, hidden)));
+        when(workflowRepository.findVisibleIds(any(), eq(BINH))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.fork(BINH, source.getId()))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("FORK_REFERENCE_UNRESOLVED");
+                    assertThat(e.getErrors()).containsOnlyKeys("step2.config");
+                });
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowRepository, never()).incrementForkCount(any());
+        verify(stepRepository, never()).saveAll(any());
+        verifyNoInteractions(dataStore);
+    }
+
+    @Test
+    void aSourceCallingAWorkflowTheCallerCanSeeForksWithTheCallStepKept() {
+        Workflow source = visible(forkable("Parent"));
+        UUID callee = UUID.randomUUID();
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId()))
+                .thenReturn(List.of(callStep(source, 1, callee)));
+        when(workflowRepository.findVisibleIds(any(), eq(BINH))).thenReturn(List.of(callee));
+
+        service.fork(BINH, source.getId());
+
+        assertThat(savedSteps()).extracting(WorkflowStep::getType).containsExactly("workflow.call");
+        verify(workflowRepository).incrementForkCount(source.getId());
+    }
+
+    @Test
+    void aMalformedCallStepNamesNothingToResolve() {
+        Workflow source = visible(forkable("Parent"));
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId())).thenReturn(List.of(
+                step(source, 1, "call", "workflow.call", null, "{\"workflowId\":\"not-an-id\"}")));
+
+        service.fork(BINH, source.getId());
+
+        verify(workflowRepository, never()).findVisibleIds(any(), any());
     }
 
     @Test

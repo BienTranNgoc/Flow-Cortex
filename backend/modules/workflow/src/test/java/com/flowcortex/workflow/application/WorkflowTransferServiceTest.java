@@ -23,9 +23,11 @@ import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.application.WorkflowTransferService.ImportResult;
 import com.flowcortex.workflow.application.WorkflowTransferService.ReviewView;
 import com.flowcortex.workflow.domain.Workflow;
+import com.flowcortex.workflow.domain.WorkflowDataEntry;
 import com.flowcortex.workflow.domain.WorkflowImportReview;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.infrastructure.WorkflowDataEntryRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowImportReviewRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
@@ -38,6 +40,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,13 +61,44 @@ class WorkflowTransferServiceTest {
     private final WorkflowStepRepository stepRepository = mock(WorkflowStepRepository.class);
     private final WorkflowImportReviewRepository reviewRepository = mock(WorkflowImportReviewRepository.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final WorkflowDataEntryRepository dataEntryRepository = mock(WorkflowDataEntryRepository.class);
+    private final WorkflowDataStore dataStore = mock(WorkflowDataStore.class);
     private final StepExecutorRegistry registry = new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
     private final WorkflowTransferService service = new WorkflowTransferService(workflowRepository, stepRepository,
-            reviewRepository,
+            reviewRepository, dataEntryRepository, dataStore,
             new WorkflowWriteAccess(workflowRepository, registry,
                     Validation.buildDefaultValidatorFactory().getValidator()),
             new WorkflowReadinessGuard(), registry, jdbc, Clock.fixed(NOW, ZoneOffset.UTC),
             Map.of("echo", List.of("url")));
+
+    /** A registry that knows {@code workflow.call}, so a review does not also refuse the step's type. */
+    private final StepExecutorRegistry registryWithCall = new StepExecutorRegistry(List.of(new EchoStepExecutor(),
+            new StepExecutor() {
+                @Override
+                public String type() {
+                    return WorkflowCallStepExecutor.TYPE;
+                }
+
+                @Override
+                public Mode mode() {
+                    return Mode.NESTED;
+                }
+
+                @Override
+                public Duration maxRuntime() {
+                    return Duration.ofMinutes(5);
+                }
+
+                @Override
+                public String execute(StepContext context) {
+                    throw new UnsupportedOperationException();
+                }
+            }));
+    private final WorkflowTransferService serviceWithCall = new WorkflowTransferService(workflowRepository,
+            stepRepository, reviewRepository, dataEntryRepository, dataStore,
+            new WorkflowWriteAccess(workflowRepository, registryWithCall,
+                    Validation.buildDefaultValidatorFactory().getValidator()),
+            new WorkflowReadinessGuard(), registryWithCall, jdbc, Clock.fixed(NOW, ZoneOffset.UTC), Map.of());
 
     {
         when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -437,6 +471,214 @@ class WorkflowTransferServiceTest {
 
     private static JsonNode configTree(String config) throws Exception {
         return config == null ? null : JSON.readTree(config);
+    }
+
+    // Data store
+
+    private static WorkflowDataEntry row(UUID workflowId, String key, String dataType, String value) {
+        return new WorkflowDataEntry(UUID.randomUUID(), workflowId, key, dataType, value, value.length(), NOW);
+    }
+
+    private static WorkflowDataStore.Seed seed(String key, String dataType, String json) throws Exception {
+        return new WorkflowDataStore.Seed(key, dataType, DataStoreJson.mapper().readTree(json));
+    }
+
+    private static byte[] artifactBytesWithStore(List<WorkflowDataStore.Seed> entries, StepDefinition... steps) {
+        return WorkflowArtifacts.write("Dub", List.of(steps), entries, NOW).toString()
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private Workflow exportable() {
+        Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Dub", true);
+        when(workflowRepository.findActiveById(workflow.getId())).thenReturn(Optional.of(workflow));
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId()))
+                .thenReturn(List.of(entity(workflow.getId(), step(1, "echo", null, null))));
+        return workflow;
+    }
+
+    @Test
+    void exportCarriesTheWorkflowsDataStoreRowsSortedByKey() {
+        Workflow workflow = exportable();
+        when(dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(workflow.getId())).thenReturn(List.of(
+                row(workflow.getId(), "promo", "template", "{\"data\":{\"brief\":\"Spring sale\"}}"),
+                row(workflow.getId(), "notes", "json", "[1,2]")));
+
+        JsonNode entries = service.export(ADMIN, workflow.getId()).artifact().get("dataStore");
+
+        assertThat(entries).hasSize(2);
+        assertThat(entries.get(0).get("key").asText()).isEqualTo("notes");
+        assertThat(entries.get(0).get("dataType").asText()).isEqualTo("json");
+        assertThat(entries.get(1).get("key").asText()).isEqualTo("promo");
+        assertThat(entries.get(1).get("value").toString()).isEqualTo("{\"data\":{\"brief\":\"Spring sale\"}}");
+    }
+
+    @Test
+    void anExportOfAWorkflowWithoutRowsHasNoDataStoreSection() {
+        Workflow workflow = exportable();
+
+        assertThat(service.export(ADMIN, workflow.getId()).artifact().has("dataStore")).isFalse();
+    }
+
+    @Test
+    void anExportWhoseValueNestsPastTheReadLimitIsRefusedAsNotPortable() {
+        Workflow workflow = exportable();
+        String deep = "[".repeat(WorkflowArtifacts.MAX_NESTING_DEPTH) + "]".repeat(WorkflowArtifacts.MAX_NESTING_DEPTH);
+        when(dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(workflow.getId()))
+                .thenReturn(List.of(row(workflow.getId(), "deep", "json", deep)));
+
+        assertRefusedWith(() -> service.export(ADMIN, workflow.getId()), "ARTIFACT_NOT_PORTABLE");
+    }
+
+    @Test
+    void aReviewKeepsTheDataStoreInTheStoredFileAndIsNotBlockedByRowsTheStoreAccepts() throws Exception {
+        byte[] body = artifactBytesWithStore(List.of(seed("promo", "template", "{\"data\":{\"a\":2.50}}")),
+                step(1, "echo", null, null));
+
+        ReviewView view = service.review(ADMIN, body);
+
+        ArgumentCaptor<WorkflowImportReview> stored = ArgumentCaptor.forClass(WorkflowImportReview.class);
+        verify(reviewRepository).saveAndFlush(stored.capture());
+        assertThat(view.blocked()).isFalse();
+        assertThat(WorkflowArtifacts.read(stored.getValue().getArtifact().getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOfSatisfying(WorkflowArtifacts.Parsed.class, parsed -> {
+                    assertThat(parsed.artifact().dataStore()).hasSize(1);
+                    assertThat(parsed.artifact().dataStore().get(0).value().toString()).contains("2.50");
+                });
+    }
+
+    @Test
+    void aRowTheStoreRefusesBlocksTheReviewAtItsFieldWithTheStoresMessage() throws Exception {
+        byte[] body = artifactBytesWithStore(List.of(seed("ok", "json", "1"), seed("bad key", "json", "1")),
+                step(1, "echo", null, null));
+
+        ReviewView view = service.review(ADMIN, body);
+
+        assertThat(view.blocked()).isTrue();
+        assertThat(view.issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.code()).isEqualTo("data_store_entry_invalid");
+            assertThat(issue.severity()).isEqualTo("blocking");
+            assertThat(issue.field()).isEqualTo("dataStore[0].key");
+            assertThat(issue.message().code()).isEqualTo("workflow.dataStore.keyInvalid");
+        });
+    }
+
+    @Test
+    void importSeedsTheNewWorkflowsStoreWithTheFilesRows() throws Exception {
+        WorkflowImportReview row = openReview(ADMIN, artifactBytesWithStore(
+                List.of(seed("promo", "template", "{\"data\":{\"brief\":\"Spring sale\"}}"), seed("n", "json", "[1]")),
+                step(1, "echo", null, null)), false);
+
+        ImportResult result = service.importReviewed(ADMIN, row.getToken().toString(), null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<WorkflowDataStore.Seed>> seeded = ArgumentCaptor.forClass(List.class);
+        verify(dataStore).seed(eq(result.view().id()), seeded.capture());
+        assertThat(seeded.getValue()).extracting(WorkflowDataStore.Seed::key).containsExactly("n", "promo");
+        assertThat(seeded.getValue()).extracting(WorkflowDataStore.Seed::dataType).containsExactly("json", "template");
+    }
+
+    @Test
+    void anArtifactWithoutDataStoreStillImportsAndSeedsNothing() {
+        WorkflowImportReview row = openReview(ADMIN, artifactBytes("A", step(1, "echo", null, null)), false);
+
+        ImportResult result = service.importReviewed(ADMIN, row.getToken().toString(), null);
+
+        assertThat(result.created()).isTrue();
+        verify(dataStore).seed(result.view().id(), List.of());
+    }
+
+    @Test
+    void aRowTheStoreRefusesBlocksTheImportAndCreatesNothing() throws Exception {
+        WorkflowImportReview row = openReview(ADMIN, artifactBytesWithStore(List.of(seed("bad key", "json", "1")),
+                step(1, "echo", null, null)), false);
+
+        assertThatThrownBy(() -> service.importReviewed(ADMIN, row.getToken().toString(), null))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("IMPORT_BLOCKED");
+                    assertThat(e.getErrors()).containsOnlyKeys("workflow.dataStore[0].key");
+                });
+        verify(workflowRepository, never()).save(any());
+        verifyNoInteractions(dataStore);
+        assertThat(row.getWorkflowId()).isNull();
+    }
+
+    @Test
+    void anExportedWorkflowWithRowsReviewsAndImportsItsRows() {
+        Workflow workflow = exportable();
+        when(dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(workflow.getId())).thenReturn(List.of(
+                row(workflow.getId(), "promo", "template", "{\"data\":{\"price\":2.50}}")));
+        byte[] file = service.export(ADMIN, workflow.getId()).artifact().toString().getBytes(StandardCharsets.UTF_8);
+
+        ReviewView review = service.review(ADMIN, file);
+        ArgumentCaptor<WorkflowImportReview> stored = ArgumentCaptor.forClass(WorkflowImportReview.class);
+        verify(reviewRepository).saveAndFlush(stored.capture());
+        when(reviewRepository.findLockedByToken(review.token())).thenReturn(Optional.of(stored.getValue()));
+        ImportResult result = service.importReviewed(ADMIN, review.token().toString(), null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<WorkflowDataStore.Seed>> seeded = ArgumentCaptor.forClass(List.class);
+        verify(dataStore).seed(eq(result.view().id()), seeded.capture());
+        assertThat(seeded.getValue()).singleElement().satisfies(entry -> {
+            assertThat(entry.key()).isEqualTo("promo");
+            assertThat(entry.dataType()).isEqualTo("template");
+            assertThat(entry.value().toString()).isEqualTo("{\"data\":{\"price\":2.50}}");
+        });
+    }
+
+    // workflow.call references
+
+    private static StepDefinition callStep(int order, UUID target) {
+        return step(order, WorkflowCallStepExecutor.TYPE, "{\"workflowId\":\"" + target + "\"}", null);
+    }
+
+    @Test
+    void aCallToAWorkflowTheAdminCannotSeeBlocksTheReviewOnThatStepsConfig() {
+        UUID elsewhere = UUID.randomUUID();
+        when(workflowRepository.findVisibleIds(any(), eq(ADMIN))).thenReturn(List.of());
+
+        ReviewView view = serviceWithCall.review(ADMIN, artifactBytes("Parent", step(1, "echo", null, null),
+                callStep(2, elsewhere)));
+
+        assertThat(view.blocked()).isTrue();
+        assertThat(view.issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.code()).isEqualTo("reference_unresolved");
+            assertThat(issue.severity()).isEqualTo("blocking");
+            assertThat(issue.stepOrder()).isEqualTo(2);
+            assertThat(issue.field()).isEqualTo("config");
+        });
+        verify(workflowRepository).findVisibleIds(Set.of(elsewhere), ADMIN);
+    }
+
+    @Test
+    void aCallToAWorkflowTheAdminCanSeeDoesNotBlock() {
+        UUID here = UUID.randomUUID();
+        when(workflowRepository.findVisibleIds(any(), eq(ADMIN))).thenReturn(List.of(here));
+
+        ReviewView view = serviceWithCall.review(ADMIN, artifactBytes("Parent", callStep(1, here)));
+
+        assertThat(view.blocked()).isFalse();
+        assertThat(view.issues()).isEmpty();
+    }
+
+    @Test
+    void aCalledWorkflowDeletedSinceTheReviewBlocksTheImport() {
+        UUID target = UUID.randomUUID();
+        WorkflowImportReview row = openReview(ADMIN, artifactBytes("Parent", callStep(1, target)), false);
+        when(workflowRepository.findVisibleIds(any(), eq(ADMIN))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> serviceWithCall.importReviewed(ADMIN, row.getToken().toString(), null))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("IMPORT_BLOCKED");
+                    assertThat(e.getErrors()).containsOnlyKeys("step1.config");
+                });
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void aFileWithNoCallStepNeverAsksWhichWorkflowsAreVisible() {
+        service.review(ADMIN, artifactBytes("A", step(1, "echo", null, null)));
+
+        verify(workflowRepository, never()).findVisibleIds(any(), any());
     }
 
     @Test
