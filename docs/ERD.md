@@ -49,7 +49,7 @@ erDiagram
     uuid workflow_id FK
     smallint step_order "UNIQUE (workflow_id, step_order), contiguous from 1"
     varchar name
-    varchar type "inline, provider remote, media remote, or APPROVAL_CHECKPOINT"
+    varchar type "inline, provider remote, media remote, APPROVAL_CHECKPOINT or qa.review"
     jsonb config
     varchar input_ref "{step:K.field}; NULL = previous step's output"
   }
@@ -124,8 +124,8 @@ erDiagram
     uuid id PK
     uuid run_id FK "ON DELETE CASCADE"
     uuid run_step_id FK,UK "ON DELETE CASCADE — a step pauses at most once"
-    varchar review_type "APPROVAL_CHECKPOINT"
-    varchar status "pending | approved | rejected"
+    varchar review_type "APPROVAL_CHECKPOINT | QA_REVIEW"
+    varchar status "pending | approved | rejected | expired"
     text original_payload "the checkpoint's input, unwrapped from the provider result"
     text reviewed_payload "plain checkpoints only; a script task approves a revision instead"
     uuid reviewed_by
@@ -134,6 +134,11 @@ erDiagram
     bigint version "JPA @Version — the decision's optimistic lock"
     uuid current_revision_id FK "the revision on screen; NULL = task keeps no revisions"
     uuid approved_revision_id FK "the revision that was approved; NULL until a decision"
+    timestamptz expires_at "time limit; a pending task past it is ended expired by the sweep"
+    jsonb questions "QA_REVIEW only: the questions shown"
+    text questions_state "generating | ready; NOT NULL exactly when review_type = QA_REVIEW"
+    jsonb answers "QA_REVIEW only: the answers given"
+    text decision_key "Idempotency-Key of the decision that ended the task, 1-80 chars"
   }
   script_revision {
     uuid id PK
@@ -229,7 +234,8 @@ erDiagram
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
-the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
+the reaper scan), `idx_review_task_run_id`, `idx_review_task_pending_expiry` (partial, `WHERE status = 'pending'` — the
+expiry sweep), `idx_script_revision_run`,
 `idx_step_up_proof_expires_at`, `idx_pat_user_live` (partial, `WHERE revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
 `idx_event_publication_completion_date`.
 

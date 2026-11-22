@@ -13,6 +13,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   speech_too_long: 'workflow.stepError.speech_too_long',
   provider_timeout: 'workflow.stepError.provider_timeout',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
+  REVIEW_EXPIRED: 'workflow.stepError.REVIEW_EXPIRED',
 };
 
 /** The reaper closes inline steps with these codes too, and those never reached the media engine. */

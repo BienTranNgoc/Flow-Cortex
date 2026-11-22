@@ -10,6 +10,7 @@
     "speech_too_long": "Kịch bản đã duyệt quá dài so với video 10 giây. Hãy bắt đầu một lượt chạy mới với kịch bản ngắn hơn.",
     "provider_timeout": "Nhà cung cấp xử lý quá lâu. Tác vụ vẫn được giữ, thử lại sau sẽ không bị tạo lại từ đầu nếu nội dung giống hệt.",
     "APPROVAL_REJECTED": "Bạn đã từ chối nội dung này nên lượt chạy đã dừng.",
+    "REVIEW_EXPIRED": "Không ai quyết định kịp thời nên lượt chạy đã dừng.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
     "noMessage": "Bước này đã dừng do gặp lỗi."
   },
@@ -26,7 +27,8 @@
     "label": {
       "probe": "Kiểm tra tệp",
       "extract_audio": "Tách âm thanh gốc",
-      "review": "Bước duyệt"
+      "review": "Bước duyệt",
+      "qaReview": "Duyệt bằng hỏi đáp"
     },
     "fallback": "Bước {{order}}",
     "progress": "Tiến độ bước {{order}}",
@@ -137,7 +139,24 @@
     "loadingScript": "Đang tải kịch bản…",
     "scriptLoadError": "Không tải được các bản sửa của kịch bản.",
     "loadingTask": "Đang tải bước cần duyệt…",
-    "taskLoadError": "Không tải được bước cần duyệt."
+    "taskLoadError": "Không tải được bước cần duyệt.",
+    "decideBy": "Quyết định trước {{when}}",
+    "expired": "Lượt duyệt này đã hết hạn nên lượt chạy đã dừng.",
+    "pick": {
+      "region": "Chọn một phương án",
+      "option": "Phương án {{number}}",
+      "own": "Hướng đi của riêng tôi",
+      "details": "Chi tiết"
+    }
+  },
+  "qa": {
+    "region": "Trả lời các câu hỏi duyệt",
+    "preparing": "Đang chuẩn bị câu hỏi…",
+    "send": "Gửi câu trả lời",
+    "sending": "Đang gửi…",
+    "approveAsIs": "Duyệt nguyên trạng",
+    "notReady": "Câu hỏi chưa sẵn sàng. Hãy thử lại sau giây lát.",
+    "sendFailed": "Không gửi được câu trả lời của bạn"
   },
   "script": {
     "label": "Kịch bản cần duyệt",

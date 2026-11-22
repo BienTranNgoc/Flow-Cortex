@@ -45,7 +45,7 @@ final class WorkflowCallRules {
             new Row(CallFacts::firstStepRemote,
                     new Refusal("workflow_call_needs_upload",
                             "The called workflow starts with a step that needs an upload")),
-            new Row(f -> f.stepTypes().contains(KnownStepTypes.APPROVAL_CHECKPOINT),
+            new Row(f -> f.stepTypes().stream().anyMatch(HumanSteps.TYPES::contains),
                     new Refusal("workflow_call_has_checkpoint", "The called workflow has a review checkpoint step")),
             new Row(f -> !f.workflowsEnabled() || (f.anyStepRemote() && !f.mediaEnabled()) || f.anyTypeUnavailable(),
                     new Refusal("workflow_call_unavailable", "The called workflow cannot run right now")));
