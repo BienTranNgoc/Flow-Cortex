@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -45,6 +46,7 @@ class DriveUploadsController {
 
     @Operation(operationId = "requestDriveUpload")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<DriveUploadResponse> requestUpload(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody DriveUploadRequest request) {
         Caller caller = driveCaller.require(jwt);
