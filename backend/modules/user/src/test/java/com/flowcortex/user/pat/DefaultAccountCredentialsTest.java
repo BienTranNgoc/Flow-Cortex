@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.user.application.AuditEventWriter;
 import com.flowcortex.user.application.AuthEventType;
 import com.flowcortex.user.application.RefreshTokenService;
+import com.flowcortex.user.stepup.StepUpProofRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,8 +32,9 @@ class DefaultAccountCredentialsTest {
     private final RefreshTokenService refreshTokens = mock(RefreshTokenService.class);
     private final PersonalAccessTokenRepository tokens = mock(PersonalAccessTokenRepository.class);
     private final AuditEventWriter audit = mock(AuditEventWriter.class);
-    private final DefaultAccountCredentials credentials = new DefaultAccountCredentials(refreshTokens, tokens, audit,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    private final StepUpProofRepository stepUpProofs = mock(StepUpProofRepository.class);
+    private final DefaultAccountCredentials credentials = new DefaultAccountCredentials(refreshTokens, tokens,
+            stepUpProofs, audit, Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID userId = UUID.randomUUID();
 
     private PersonalAccessToken live(String name) {
@@ -61,6 +63,31 @@ class DefaultAccountCredentialsTest {
             assertThat(m.get("reason")).isEqualTo("credentials_reset");
             assertThat(m).doesNotContainKey("token");
         });
+    }
+
+    @Test
+    void revokingEverythingAlsoDropsTheUnspentStepUpProofs() {
+        when(tokens.findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(userId)).thenReturn(List.of());
+
+        credentials.revokeAllFor(userId);
+
+        verify(stepUpProofs).deleteUnspentByUserId(userId);
+    }
+
+    @Test
+    void aDemotionRevokesAndAuditsTheTokensWithItsOwnReasonAndLeavesSessionsAndProofs() {
+        PersonalAccessToken token = live("ci");
+        when(tokens.findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(userId)).thenReturn(List.of(token));
+
+        credentials.revokePersonalAccessTokensOnDemotion(userId);
+
+        verify(tokens).revokeAllByUserId(userId, NOW);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.forClass(Map.class);
+        verify(audit).write(eq(AuthEventType.PAT_REVOKED), eq(userId), any(), any(), metadata.capture());
+        assertThat(metadata.getValue()).containsEntry("reason", "role_demoted")
+                .containsEntry("tokenId", token.getId().toString());
+        verifyNoInteractions(refreshTokens, stepUpProofs);
     }
 
     @Test
