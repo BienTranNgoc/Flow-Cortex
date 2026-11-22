@@ -26,13 +26,20 @@ function canKeep(candidate: SuggestionResponse): boolean {
     : candidate.runOutput !== undefined;
 }
 
-/** Recent run outputs and inputs worth keeping; a kept one reads "Kept" until the page is left. */
-export function SuggestionsSection() {
+/**
+ * Recent run outputs and inputs worth keeping; a kept one reads "Kept" until the page is left.
+ * The API returns an already-kept candidate again, so the owner of the page remembers `kept` for the visit.
+ */
+export function SuggestionsSection({
+  kept,
+  onKept,
+}: {
+  kept: ReadonlySet<string>;
+  onKept: (suggestionId: string) => void;
+}) {
   const { t } = useTranslation();
   const headingId = useId();
   const suggestions = useDriveSuggestionsQuery();
-  // The API returns an already-kept candidate again, so keeping is remembered here for the visit.
-  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   const [keeping, setKeeping] = useState<SuggestionResponse | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const locale = activeLocale();
@@ -127,7 +134,7 @@ export function SuggestionsSection() {
         candidate={keeping}
         onClose={() => setKeeping(null)}
         onKept={(candidate, name) => {
-          setKept((current) => new Set(current).add(candidate.id));
+          onKept(candidate.id);
           setAnnouncement(t('driveItems.suggestions.keptAnnouncement', { name }));
           setKeeping(null);
         }}

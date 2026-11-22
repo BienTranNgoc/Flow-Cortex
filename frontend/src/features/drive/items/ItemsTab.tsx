@@ -22,7 +22,7 @@ import '../shared/DriveShared.css';
 import './DriveItems.css';
 
 /** The member's saved items, one content type at a time, with the suggestions from recent runs below. */
-export function ItemsTab() {
+export function ItemsTab({ kept, onKept }: { kept: ReadonlySet<string>; onKept: (suggestionId: string) => void }) {
   const { t } = useTranslation();
   const ids = useId();
   const locale = activeLocale();
@@ -200,7 +200,7 @@ export function ItemsTab() {
         {body}
       </div>
 
-      <SuggestionsSection />
+      <SuggestionsSection kept={kept} onKept={onKept} />
 
       <TextItemForm open={adding && type === 'text'} onClose={() => setAdding(false)} onSaved={saved} />
       {type !== 'text' && (

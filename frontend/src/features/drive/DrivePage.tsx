@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeading } from '../../app/PageHeading';
@@ -22,6 +22,12 @@ export function DrivePage() {
   const [params, setParams] = useSearchParams();
   const tab = tabOf(params.get('tab'));
   const tabRefs = useRef<Partial<Record<DriveTab, HTMLButtonElement | null>>>({});
+  // Only the selected tab is mounted, so what was kept lives here to survive a switch to Memory and back.
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+
+  function markKept(id: string) {
+    setKept((current) => new Set(current).add(id));
+  }
 
   function select(next: DriveTab) {
     setParams(
@@ -77,7 +83,7 @@ export function DrivePage() {
         ))}
       </div>
       <div id={`${ids}-panel`} role="tabpanel" aria-labelledby={`${ids}-tab-${tab}`} className="drive-page__panel">
-        {tab === 'memory' ? <MemoryTab /> : <ItemsTab />}
+        {tab === 'memory' ? <MemoryTab /> : <ItemsTab kept={kept} onKept={markKept} />}
       </div>
     </div>
   );
