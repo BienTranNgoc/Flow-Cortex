@@ -43,14 +43,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountCredentials accountCredentials = mock(AccountCredentials.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks,
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
                     adminPermissions, superAdminInvariant, registrationOwnerGuard);
 
     @Test
@@ -130,7 +130,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, null, null, "SUSPENDED");
 
-        verify(refreshTokenService).revokeAllFor(id);
+        verify(accountCredentials).revokeAllFor(id);
     }
 
     @Test
@@ -145,7 +145,39 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
-        verify(refreshTokenService, never()).revokeAllFor(any());
+        verify(accountCredentials, never()).revokeAllFor(any());
+    }
+
+    @Test
+    void demotingAnAdminRevokesItsTokensButKeepsItsSessions() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser admin = ownedUser(ownerId, Role.ADMIN);
+
+        service.updateUser(ownerId, admin.getId(), null, null, "MEMBER", null);
+
+        verify(accountCredentials).revokePersonalAccessTokensOnDemotion(admin.getId());
+        verify(accountCredentials, never()).revokeAllFor(any());
+    }
+
+    @Test
+    void demotingAndSuspendingTogetherRevokesEverythingOnce() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser admin = ownedUser(ownerId, Role.ADMIN);
+
+        service.updateUser(ownerId, admin.getId(), null, null, "MEMBER", "SUSPENDED");
+
+        verify(accountCredentials).revokeAllFor(admin.getId());
+        verify(accountCredentials, never()).revokePersonalAccessTokensOnDemotion(any());
+    }
+
+    @Test
+    void changingAMembersRoleLeavesTheTokensAlone() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser member = ownedUser(ownerId, Role.MEMBER);
+
+        service.updateUser(ownerId, member.getId(), null, null, "CREATOR", null);
+
+        verify(accountCredentials, never()).revokePersonalAccessTokensOnDemotion(any());
     }
 
     @Test
@@ -196,8 +228,16 @@ class UserServiceImplTest {
     }
 
     private AppUser ownedMember(UUID ownerId, UserStatus status) {
+        return ownedUser(ownerId, Role.MEMBER, status);
+    }
+
+    private AppUser ownedUser(UUID ownerId, Role role) {
+        return ownedUser(ownerId, role, UserStatus.ACTIVE);
+    }
+
+    private AppUser ownedUser(UUID ownerId, Role role, UserStatus status) {
         AppUser member = new AppUser(UUID.randomUUID(), ownerId, "person@example.com", "$2a$hash", "Person",
-                Role.MEMBER, status);
+                role, status);
         when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
         when(repository.findByOwnerIdAndId(ownerId, member.getId())).thenReturn(Optional.of(member));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));

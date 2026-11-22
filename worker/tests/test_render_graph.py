@@ -1,4 +1,4 @@
-"""Picture graph and ffmpeg argument lists: fit, scene sources, handles, join and mux."""
+"""Picture graph and ffmpeg argument lists: fit, scene sources, handles and join."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 import pytest
-from test_render_document import scene
+from test_render_document import image_overlay, scene, text_overlay, with_overlays
 from test_render_timeline import PROBES, doc_of, plan
 
 from flowcortex_worker.render.graph import (
@@ -14,8 +14,10 @@ from flowcortex_worker.render.graph import (
     concat_list,
     fit_chain,
     join_command,
-    mux_command,
+    prints_text,
 )
+from flowcortex_worker.render.overlays import image_windows
+from flowcortex_worker.render.subtitles import ass_document, caption_styles
 from flowcortex_worker.render.timeline import TimelinePlan, plan_timeline
 
 FILES = {"a1": "/in/a1", "a2": "/in/a2"}
@@ -144,6 +146,46 @@ def test_lead_image_renders_its_whole_zoom_and_drops_what_the_cut_chunk_showed()
     assert "trim=start=2.6000:duration=0.4000" in graph
     at = after.index("-loop")
     assert after[at : at + 6] == ["-loop", "1", "-framerate", "30", "-t", "3.0000"]
+
+
+def test_overlays_across_a_split_chunk_keep_one_frame_clock() -> None:
+    probes = {**PROBES, "a1": {**PROBES["a1"], "durationMs": 20000}}
+    scenes = [
+        scene(0, transitionOut=transition("extend")),
+        scene(1, srcInMs=1000, srcOutMs=4000, transitionOut=transition("extend")),
+        scene(2, srcInMs=1000, srcOutMs=4000),
+    ]
+
+    def overlays(raw: dict[str, Any]) -> None:
+        with_overlays(
+            raw,
+            text_overlay(startMs=4000, endMs=7000),
+            image_overlay(assetId="a2", startMs=4000, endMs=7000),
+        )
+        raw["output"]["lanes"]["captions"] = False
+
+    split = plan_timeline(doc_of(scenes, overlays), probes, "final", max_chunk_scenes=2)
+    first, second = split.chunks
+    assert (first.cut_after, second.lead_scene) == (True, 1)
+    assert second.start_ms == first.start_ms + first.dur_ms
+
+    def no_table() -> Any:
+        raise AssertionError("the glyph table must not be loaded")
+
+    styles = caption_styles(split, split.canvas.width, split.canvas.height, no_table)
+    shown = []
+    for index, chunk in enumerate(split.chunks):
+        ((_, window),) = image_windows(split, chunk)
+        shown.append((window.k0, window.k1, window.j0))
+        assert f"between(t,{(window.k0 - 0.5) / 30:.4f}" in graph_of(command(split, index))
+        assert prints_text(split, chunk)
+    # 4000..5800 ms is frames 120..174 of the first chunk; the rest starts the second at 0
+    assert shown == [(120, 174, 0), (0, 36, 54)]
+    lines = []
+    for c in split.chunks:
+        script = ass_document(split, styles, c.start_ms, c.dur_ms)
+        lines.append([r.split(",")[1:3] for r in script.splitlines() if r.startswith("Dialogue:")])
+    assert lines == [[["0:00:04.00", "0:00:05.80"]], [["0:00:00.00", "0:00:01.20"]]]
 
 
 def test_overlap_adds_no_handle() -> None:
@@ -281,20 +323,70 @@ def test_join_of_one_chunk_is_refused() -> None:
         join_command(["/work/chunk_0.mp4"], "/work/chunks.txt", "/work/base.mp4")
 
 
-def test_mux_re_encodes_the_audio_to_the_timeline_length() -> None:
-    cmd = mux_command("/work/base.mp4", "/work/video.mp4", 5033.3333, 0.021)
-    assert cmd[cmd.index("-itsoffset") + 1] == "-0.021000"
-    assert cmd.count("-i") == 2
-    assert cmd[cmd.index("-map") + 1] == "0:v:0"
-    assert cmd.count("-map") == 2 and "1:a:0" in cmd
-    assert cmd[cmd.index("-c:v") + 1] == "copy"
-    assert cmd[cmd.index("-af") + 1] == (
-        "aresample=async=1:first_pts=0,"
-        "aformat=sample_fmts=fltp:channel_layouts=stereo,"
-        "apad=whole_dur=5.0333,atrim=duration=5.0333"
+SHEET = {"frameCount": 4, "cols": 2, "frameW": 64, "frameH": 64, "frameMs": 100}
+
+
+def with_images(*overlays: dict[str, Any]) -> Any:
+    def apply(raw: dict[str, Any]) -> None:
+        with_overlays(raw, *overlays)
+        raw["assets"]["a3"] = {"kind": "image", "animation": SHEET}
+
+    return apply
+
+
+def overlay_command(*overlays: dict[str, Any]) -> list[str]:
+    planned = plan([scene(0)], mutate=with_images(*overlays))
+    files = {**FILES, "a3": "/in/a3"}
+    return chunk_command(planned, 0, files, "/work", "/work/chunk_0.ass")
+
+
+def test_image_overlays_are_inputs_between_the_scene_chain_and_the_ass_pass() -> None:
+    cmd = overlay_command(
+        image_overlay(id="ovA", assetId="a2"), image_overlay(id="ovB", assetId="a3")
     )
-    tail = cmd[cmd.index("-c:a") :]
-    assert tail[:6] == ["-c:a", "aac", "-b:a", "160k", "-ar", "48000"]
-    assert tail[6:8] == ["-t", "5.0333"]
-    assert "+faststart" in tail
-    assert cmd[-1] == "/work/video.mp4"
+    graph = graph_of(cmd)
+    for path in ("/in/a2", "/in/a3"):
+        i = cmd.index(path)
+        assert cmd[i - 3 : i] == ["-protocol_whitelist", "file", "-i"]
+    assert graph.index("overlay=x=0.500000") < graph.index("ass=")
+    assert "[vim0][im1]overlay" in graph
+    assert "[vim1]ass='/work/chunk_0.ass'[vout]" in graph
+    assert "crop=64:64" in graph
+
+
+def test_image_overlay_outside_the_chunk_adds_no_input() -> None:
+    cmd = overlay_command(image_overlay(startMs=5000, endMs=6000))
+    assert "/in/a2" not in cmd
+    assert "overlay=x=" not in graph_of(cmd)
+
+
+def test_image_overlay_shorter_than_a_frame_adds_no_input() -> None:
+    assert "/in/a2" not in overlay_command(image_overlay(startMs=1000, endMs=1010))
+
+
+def test_short_fade_overlay_ramps_over_half_its_life() -> None:
+    graph = graph_of(overlay_command(image_overlay(anim="fade", startMs=1000, endMs=1300)))
+    assert "fade=t=in:st=0:d=0.150000:alpha=1" in graph
+    assert "colorchannelmixer=aa=0.7500" in graph
+
+
+def test_chunk_whose_only_text_is_an_overlay_logs_verbosely() -> None:
+    def only_overlay(raw: dict[str, Any]) -> None:
+        with_overlays(raw, text_overlay())
+        raw["output"]["lanes"]["captions"] = False
+
+    planned = plan([scene(0)], mutate=only_overlay)
+    chunk = planned.chunks[0]
+    assert not planned.cues
+    assert prints_text(planned, chunk)
+    cmd = command(planned)
+    assert cmd[cmd.index("-loglevel") + 1] == "verbose"
+
+
+def test_image_overlay_alone_does_not_print_text() -> None:
+    def only_image(raw: dict[str, Any]) -> None:
+        with_overlays(raw, image_overlay())
+        raw["output"]["lanes"]["captions"] = False
+
+    planned = plan([scene(0)], mutate=only_image)
+    assert not prints_text(planned, planned.chunks[0])

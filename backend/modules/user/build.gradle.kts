@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":modules:jobs"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":modules:settings"))
     implementation(project(":modules:mail"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,

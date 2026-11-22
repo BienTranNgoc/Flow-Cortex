@@ -1,0 +1,694 @@
+.run-history {
+  max-width: var(--content-max, 1440px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.run-history__body,
+.run-history__main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+/* Below 1024px the usage card leads the page, as it did before the columns. */
+.run-history__body > .usage-card {
+  order: -1;
+}
+
+.run-history .page-heading {
+  margin-bottom: 0;
+}
+
+.run-history__notice {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.run-history__notice--error {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* ===== Filters ========================================================== */
+
+.run-history__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.run-history__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.run-history__field select,
+.run-history__field input {
+  min-height: var(--control-h);
+  min-width: 0;
+  padding: 0 0.6rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.9rem;
+}
+
+.run-history__field select:hover,
+.run-history__field input:hover {
+  border-color: var(--input-border-hover);
+}
+
+.run-history__field select:focus-visible,
+.run-history__field input:focus-visible,
+.run-history__toggle:focus-visible,
+.run-history__pager button:focus-visible,
+.run-row__star:focus-visible,
+.run-menu__button:focus-visible,
+.run-menu__list button:focus-visible,
+.usage-card__range-button:focus-visible,
+.run-dialog button:focus-visible,
+.run-dialog__input:focus-visible,
+.run-row__name:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.run-history__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  min-height: var(--control-h);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+}
+
+.run-history__toggle[aria-pressed='true'] {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  border-color: var(--primary);
+}
+
+/* ===== List ============================================================= */
+
+.run-history__list-section {
+  min-width: 0;
+}
+
+.run-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.run-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'main actions'
+    'pill actions'
+    'meta meta';
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.run-row:hover {
+  border-color: var(--primary);
+}
+
+.run-row__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.run-row__name {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.run-row__name:hover {
+  color: var(--teal);
+  text-decoration: underline;
+}
+
+.run-row__workflow {
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.run-row__meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-row__actions {
+  grid-area: actions;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.run-pill {
+  grid-area: pill;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.run-pill--running {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.run-pill--done {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.run-pill--failed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.run-pill--attention {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.run-pill--muted {
+  background: var(--paper-3);
+  color: var(--ink-3);
+}
+
+.run-row__star,
+.run-menu__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.run-row__star:hover,
+.run-menu__button:hover {
+  background: var(--chrome-hover);
+  color: var(--ink);
+}
+
+.run-row__star[aria-pressed='true'] {
+  color: var(--warning);
+}
+
+.run-menu {
+  position: relative;
+}
+
+.run-menu__button[aria-expanded='true'] {
+  background: var(--chrome-active);
+  color: var(--primary);
+}
+
+.run-menu__list {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+  box-shadow: var(--shadow);
+}
+
+.run-menu__list button {
+  margin: 0;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  text-align: start;
+}
+
+.run-menu__list button:hover {
+  background: var(--chrome-hover);
+}
+
+.run-menu__list .run-menu__danger {
+  color: var(--red);
+}
+
+/* ===== Pager ============================================================ */
+
+.run-history__pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+
+.run-history__total {
+  margin-inline-end: auto;
+}
+
+.run-history__pager button {
+  margin: 0;
+}
+
+/* ===== Usage card ======================================================= */
+
+.usage-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.usage-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.usage-card__title,
+.usage-card__subtitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.usage-card__subtitle {
+  font-size: 0.88rem;
+  color: var(--ink-3);
+}
+
+.usage-card__range {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.usage-card__range-button {
+  margin: 0;
+  min-height: var(--control-h);
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+}
+
+.usage-card__range-button[aria-pressed='true'] {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-fg);
+  border-color: var(--primary);
+}
+
+.usage-card__skeleton {
+  height: 8rem;
+}
+
+.usage-card__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--red);
+}
+
+.usage-card__error p {
+  margin: 0;
+}
+
+.usage-card__error button {
+  margin: 0;
+}
+
+.usage-card__totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.usage-card__totals dt {
+  color: var(--ink-3);
+  font-size: 0.8rem;
+}
+
+.usage-card__totals dd {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-card__rate {
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.usage-bars__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.usage-bars__chart {
+  display: block;
+}
+
+.usage-bars__track {
+  fill: var(--paper-3);
+}
+
+.usage-bars__runs {
+  fill: var(--primary);
+}
+
+.usage-bars__failed {
+  fill: var(--red);
+}
+
+.usage-card__top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  padding-inline-start: 1.25rem;
+}
+
+.usage-card__top-name {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.usage-card__muted {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+}
+
+/* ===== Dialogs ========================================================== */
+
+.run-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.run-dialog[open] {
+  animation: run-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.run-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.run-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.run-dialog p {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.run-dialog__label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.run-dialog__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0 0.6rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 0.95rem;
+}
+
+.run-dialog__hint {
+  margin-top: 0.4rem;
+  color: var(--ink-3);
+  font-size: 0.8rem;
+}
+
+.run-dialog__error {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.run-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.run-dialog__actions button {
+  margin-right: 0;
+}
+
+.run-dialog__primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
+.run-dialog__danger {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.run-dialog__actions button[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.run-dialog__actions button[aria-busy='true'] {
+  cursor: progress;
+}
+
+@keyframes run-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+/* ===== Wider screens: one-line rows ===================================== */
+
+@media (min-width: 768px) {
+  .run-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'main pill actions'
+      'meta meta actions';
+  }
+}
+
+@media (min-width: 1024px) {
+  .run-row {
+    grid-template-columns: minmax(0, 2fr) 9rem minmax(0, 3fr) auto;
+    grid-template-areas: 'main pill meta actions';
+  }
+
+  /* 56px top bar, the canvas padding above and below and the footer (control height, 1rem padding, 1px border); the filters and list sit in the left column, the usage card in a right column, and each scrolls inside its own box. */
+  .run-history {
+    height: calc(100svh - 56px - 4rem - var(--control-h) - 1rem - 1px);
+  }
+
+  .run-history__body {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .run-history__main {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  /* The usage card is a short strip above the filters: totals, chart and top workflows side by side. */
+  .usage-card {
+    flex: none;
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr) 15rem;
+    grid-template-areas:
+      'head head head'
+      'totals chart top';
+    align-items: start;
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .usage-card__head {
+    grid-area: head;
+  }
+
+  .usage-card__totals {
+    grid-area: totals;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 0.75rem;
+  }
+
+  .usage-card__totals dd {
+    font-size: 1.1rem;
+  }
+
+  .usage-bars {
+    grid-area: chart;
+    min-width: 0;
+  }
+
+  .usage-bars__chart {
+    width: 100%;
+    height: 6rem;
+  }
+
+  .usage-card__top {
+    grid-area: top;
+    max-height: 6.5rem;
+    overflow-y: auto;
+  }
+
+  .usage-card__skeleton,
+  .usage-card__error {
+    grid-column: 1 / -1;
+  }
+
+  .run-history__filters,
+  .run-history__pager {
+    flex: none;
+  }
+
+  .run-history__field {
+    flex-basis: 7.5rem;
+  }
+
+  .run-history__list-section {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+/* With the rail pinned the canvas is wide enough for the usage card to stand beside the list. */
+@media (min-width: 1280px) {
+  .run-history__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .run-history__body > .usage-card {
+    order: 0;
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .usage-card__top {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .usage-card__totals {
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+
+  .usage-card__totals dd {
+    font-size: 1.35rem;
+  }
+
+  .usage-bars__chart {
+    height: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .run-history__field {
+    flex-basis: 100%;
+  }
+
+  .usage-card__totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-dialog[open] {
+    animation: none;
+  }
+}

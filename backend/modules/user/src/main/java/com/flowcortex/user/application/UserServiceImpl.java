@@ -35,7 +35,7 @@ class UserServiceImpl implements UserService {
 
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RefreshTokenService refreshTokenService;
+    private final AccountCredentials accountCredentials;
     private final ApplicationEventPublisher events;
     private final EmailConfirmationService emailLinks;
     private final AdminPermissions adminPermissions;
@@ -43,12 +43,12 @@ class UserServiceImpl implements UserService {
     private final RegistrationOwnerGuard registrationOwnerGuard;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService, ApplicationEventPublisher events,
+            AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
             SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.refreshTokenService = refreshTokenService;
+        this.accountCredentials = accountCredentials;
         this.events = events;
         this.emailLinks = emailLinks;
         this.adminPermissions = adminPermissions;
@@ -130,13 +130,18 @@ class UserServiceImpl implements UserService {
         if (newRole != null) {
             user.changeRole(newRole);
         }
+        if (leavesAdminRole && !suspends) {
+            // Suspension revokes every credential below; a plain demotion must still drop the tokens,
+            // or promoting the account again would revive ones its owner could not see or revoke.
+            accountCredentials.revokePersonalAccessTokensOnDemotion(id);
+        }
         if (newStatus != null) {
             boolean reactivated = user.getStatus() != UserStatus.ACTIVE && newStatus == UserStatus.ACTIVE;
             user.changeStatus(newStatus);
             if (newStatus == UserStatus.SUSPENDED) {
                 // Refresh tokens would otherwise keep minting access tokens for a suspended account,
                 // and its emailed links would work again once it is reactivated.
-                refreshTokenService.revokeAllFor(id);
+                accountCredentials.revokeAllFor(id);
                 emailLinks.retireOpenLinks(id);
             }
             // An account confirmed while suspended was never activated; listeners tolerate a repeat.

@@ -3,6 +3,7 @@ package com.flowcortex.support.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -70,7 +71,7 @@ class AssistantServiceTest {
                 llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         when(assistantSwitch.available()).thenReturn(true);
         when(retriever.retrieve(anyString())).thenReturn(List.of(NAP, GOI));
-        when(quotas.charge(MEMBER)).thenReturn(charge);
+        when(quotas.charge(eq(MEMBER), anyInt())).thenReturn(charge);
         when(conversations.append(eq(MEMBER), any(), any(), any())).thenReturn(conversationId);
     }
 
@@ -143,7 +144,7 @@ class AssistantServiceTest {
 
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.quota().remaining()).isEqualTo(50);
-        verify(quotas, never()).charge(any());
+        verify(quotas, never()).charge(any(), anyInt());
         verifyNoInteractions(llm);
     }
 
@@ -184,7 +185,7 @@ class AssistantServiceTest {
 
     @Test
     void aRefusedChargeIsCountedByItsKind() {
-        when(quotas.charge(MEMBER)).thenThrow(QuotaService.exhausted(NOW));
+        when(quotas.charge(eq(MEMBER), anyInt())).thenThrow(QuotaService.exhausted(NOW));
 
         assertThatThrownBy(() -> service.ask(MEMBER, null, QUESTION, Locale.ENGLISH)).isInstanceOf(SupportProblemException.class);
 
@@ -253,7 +254,7 @@ class AssistantServiceTest {
         assertThat(reply.message().outcome()).isEqualTo("no_answer");
         assertThat(reply.quota().remaining()).isEqualTo(9);
         verify(quotas).chargeAskerOnly(GUEST);
-        verify(quotas, never()).charge(any());
+        verify(quotas, never()).charge(any(), anyInt());
         verifyNoInteractions(llm);
     }
 
@@ -307,6 +308,16 @@ class AssistantServiceTest {
                     assertThat(e.code()).isEqualTo("assistant-quota");
                 });
         verify(retriever, times(MinuteLimiter.PER_MINUTE)).retrieve(anyString());
+    }
+
+    @Test
+    void theChargeUsesTheCeilingTheQuestionWasCheckedAgainst() {
+        when(quotas.refuseWhenPaused()).thenReturn(1234);
+        answer("{\"answered\":true,\"answer\":\"Vào Hồ sơ.\",\"citedSlugs\":[\"goi-credit\"]}");
+
+        service.ask(MEMBER, null, QUESTION, Locale.ENGLISH);
+
+        verify(quotas).charge(MEMBER, 1234);
     }
 
     @Test

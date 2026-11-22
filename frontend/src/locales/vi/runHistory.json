@@ -1,0 +1,109 @@
+{
+  "page": {
+    "title": "Lượt chạy",
+    "lede": "Mọi lượt chạy bạn đã bắt đầu, cùng kết quả và chi phí của chúng.",
+    "loadError": "Không tải được các lượt chạy của bạn.",
+    "retry": "Thử lại",
+    "emptyNone": "Bạn chưa có lượt chạy nào. Hãy bắt đầu một lượt từ một quy trình.",
+    "emptyNoneAction": "Đến trang Quy trình",
+    "emptyNoMatch": "Không có lượt chạy nào khớp với bộ lọc này.",
+    "emptyNoMatchAction": "Xóa bộ lọc",
+    "total": "Tổng cộng {{n}}",
+    "listLabel": "Lịch sử lượt chạy"
+  },
+  "filters": {
+    "legend": "Lọc lượt chạy",
+    "status": "Trạng thái",
+    "statusAll": "Mọi trạng thái",
+    "workflow": "Quy trình",
+    "workflowAll": "Mọi quy trình",
+    "from": "Từ ngày",
+    "to": "Đến ngày",
+    "favorites": "Chỉ lượt đã gắn sao",
+    "clear": "Xóa bộ lọc"
+  },
+  "status": {
+    "running": "Đang chạy",
+    "waiting_approval": "Chờ duyệt",
+    "completed": "Hoàn tất",
+    "error": "Thất bại",
+    "cancelling": "Đang dừng",
+    "cancelled": "Đã hủy"
+  },
+  "row": {
+    "started": "Bắt đầu {{time}}",
+    "duration": "Mất {{duration}}",
+    "credits": "{{amount}} tín dụng",
+    "star": "Gắn sao {{name}}",
+    "unstar": "Bỏ sao của {{name}}",
+    "starFailed": "Không đổi được dấu sao. Hãy thử lại.",
+    "actions": "Thao tác cho {{name}}",
+    "open": "Mở lượt chạy {{name}}",
+    "rename": "Đổi tên",
+    "delete": "Xóa"
+  },
+  "rename": {
+    "title": "Đổi tên lượt chạy",
+    "label": "Tên lượt chạy",
+    "hint": "Tối đa {{max}} ký tự. Để trống để hiện lại tên quy trình.",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Hủy",
+    "failed": "Không đổi được tên lượt chạy. Hãy thử lại."
+  },
+  "delete": {
+    "title": "Xóa lượt chạy này?",
+    "text": "“{{name}}” sẽ rời khỏi lịch sử lượt chạy của bạn. Không thể hoàn tác.",
+    "keep": "Giữ lượt chạy",
+    "confirm": "Xóa lượt chạy",
+    "deleting": "Đang xóa…",
+    "failed": "Không xóa được lượt chạy. Hãy thử lại.",
+    "stillActive": "Lượt chạy này vẫn đang diễn ra nên chưa thể xóa."
+  },
+  "pager": {
+    "label": "Các trang lượt chạy",
+    "previous": "Trước",
+    "next": "Sau",
+    "position": "Trang {{page}} trên {{pages}}"
+  },
+  "export": {
+    "button": "Xuất CSV",
+    "busy": "Đang xuất…",
+    "failed": "Không xuất được các lượt chạy. Hãy thử lại.",
+    "capped": "Tệp chứa {{cap}} lượt đầu tiên trong tổng số {{total}}. Hãy thu hẹp bộ lọc để xuất phần còn lại."
+  },
+  "usage": {
+    "title": "Mức sử dụng",
+    "range": "Khoảng thời gian",
+    "days7": "7 ngày",
+    "days30": "30 ngày",
+    "days90": "90 ngày",
+    "runs": "Lượt chạy",
+    "failed": "Thất bại",
+    "failureRate": "{{rate}}% thất bại",
+    "creditsSpent": "Tín dụng đã dùng",
+    "balance": "Số dư",
+    "loadError": "Không tải được số liệu sử dụng.",
+    "chartLabel": "Số lượt chạy mỗi ngày",
+    "chartTable": "Số lượt chạy mỗi ngày, dạng số",
+    "day": "Ngày",
+    "failedRuns": "Lượt thất bại",
+    "credits": "Tín dụng",
+    "topWorkflows": "Quy trình dùng nhiều nhất",
+    "topNone": "Không có lượt chạy nào trong khoảng này.",
+    "topLine": "{{runs}} lượt chạy",
+    "topAverage": "{{amount}} tín dụng mỗi lượt"
+  },
+  "tray": {
+    "button": "Lượt chạy",
+    "buttonWithCount": "Lượt chạy, {{n}} đang chạy",
+    "panelLabel": "Lượt chạy",
+    "running": "Đang chạy",
+    "finished": "Kết thúc trong 24 giờ qua",
+    "emptyRunning": "Không có lượt nào đang chạy.",
+    "emptyFinished": "Chưa có lượt nào kết thúc gần đây.",
+    "viewAll": "Xem tất cả lượt chạy",
+    "loadError": "Không tải được các lượt chạy của bạn.",
+    "retry": "Thử lại"
+  }
+}

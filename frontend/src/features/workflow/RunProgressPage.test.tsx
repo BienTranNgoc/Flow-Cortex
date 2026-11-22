@@ -19,6 +19,7 @@ import {
   type FakeReply,
   type Handler,
 } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { openInCurrentTab } from './browser';
 import { RunProgressPage } from './RunProgressPage';
 
@@ -985,6 +986,25 @@ describe('RunProgressPage', () => {
       );
     });
 
+    it('refreshes the run after a revision save without refetching the uploaded files', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION], {
+        [`POST ${REVISIONS}`]: {
+          status: 200,
+          body: { ...REVISION, id: 'rev2', revisionNumber: 2, content: 'Edited', reviewTaskVersion: 4 },
+        },
+      });
+      const reads = (path: string) => calls.filter((call) => call.path === path).length;
+
+      await user.clear(await screen.findByLabelText('Script to approve'));
+      await waitFor(() => expect(reads('/api/v1/runs/r1/inputs')).toBe(1));
+      await user.type(screen.getByLabelText('Script to approve'), 'Edited');
+      await user.click(screen.getByRole('button', { name: 'Save revision' }));
+
+      await waitFor(() => expect(reads('/api/v1/runs/r1')).toBeGreaterThan(1));
+      expect(reads('/api/v1/runs/r1/inputs')).toBe(1);
+    });
+
     it('approves the revision it is showing, not the text in the box', async () => {
       const user = userEvent.setup();
       const calls = renderScript([REVISION], {
@@ -1792,39 +1812,6 @@ describe('RunProgressPage', () => {
     const stopButton = () => screen.findByRole('button', { name: 'Stop workflow' });
     const cancelCalls = (calls: { method: string; path: string }[]) =>
       calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/runs/r1/cancel');
-
-    /** jsdom has no `showModal`/`close`; Escape fires `cancel` the way a browser does. */
-    function stubModalDialog() {
-      const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-      Object.defineProperties(proto, {
-        showModal: {
-          configurable: true,
-          value(this: HTMLDialogElement) {
-            this.setAttribute('open', '');
-          },
-        },
-        close: {
-          configurable: true,
-          value(this: HTMLDialogElement) {
-            if (!this.hasAttribute('open')) return;
-            this.removeAttribute('open');
-            this.dispatchEvent(new Event('close'));
-          },
-        },
-      });
-      const onEscape = (event: KeyboardEvent) => {
-        const open = document.querySelector('dialog[open]');
-        if (event.key === 'Escape' && open instanceof HTMLDialogElement) {
-          if (open.dispatchEvent(new Event('cancel', { cancelable: true }))) open.close();
-        }
-      };
-      document.addEventListener('keydown', onEscape);
-      return () => {
-        document.removeEventListener('keydown', onEscape);
-        delete proto.showModal;
-        delete proto.close;
-      };
-    }
 
     function threeSteps(first: Partial<RunStepResponse>, later: string): RunStepResponse[] {
       return [

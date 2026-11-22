@@ -106,6 +106,11 @@ export function WorkflowsListPage() {
             components={{ strong: <strong /> }}
           />
         }
+        actions={
+          <Link to="/builder/dashboard" className="action-link">
+            {t('workflow.builderDashboard.linkLabel')}
+          </Link>
+        }
       />
 
       <div className="wf-list__toolbar">

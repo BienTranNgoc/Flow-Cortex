@@ -1,5 +1,7 @@
 import { setToken } from '@flow-cortex/api-client';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import i18n from '../lib/i18n';
 import { renderRoute, settled, stubApi, type FakeReply } from '../test/fakeApi';
 import { Topbar } from './Topbar';
 
@@ -20,11 +22,27 @@ function stubWithMe(routes: Parameters<typeof stubApi>[0]) {
   return stubApi({ 'GET /api/v1/auth/me': ME, ...routes });
 }
 
-function renderTopbar() {
+interface RenderOptions {
+  showMenuButton?: boolean;
+  drawerOpen?: boolean;
+  onOpenMenu?: () => void;
+}
+
+function renderTopbar({
+  showMenuButton = false,
+  drawerOpen = false,
+  onOpenMenu = () => {},
+}: RenderOptions = {}) {
   return renderRoute(
     '/',
     '/',
-    <Topbar showMenuButton={false} drawerOpen={false} onOpenMenu={() => {}} />,
+    <Topbar
+      showMenuButton={showMenuButton}
+      drawerOpen={drawerOpen}
+      onOpenMenu={onOpenMenu}
+      theme="light"
+      onToggleTheme={() => {}}
+    />,
   );
 }
 
@@ -32,12 +50,119 @@ function balanceCalls(calls: { path: string }[]) {
   return calls.filter((call) => call.path === '/api/v1/credits/balance');
 }
 
+describe('Topbar', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('holds the language toggle beside the theme toggle in the banner', () => {
+    stubApi({});
+
+    renderTopbar();
+
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('group', { name: 'Language' })).toBeInTheDocument();
+    expect(
+      within(banner).getByRole('button', { name: /^Switch to (dark|light) theme$/ }),
+    ).toBeInTheDocument();
+    expect(within(banner).getByRole('button', { name: /open account menu/i })).toBeInTheDocument();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('labels the theme switch, the language group and the account menu', () => {
+      stubApi({});
+
+      renderTopbar();
+
+      expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Chuyển sang giao diện (tối|sáng)$/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mở menu tài khoản' })).toBeInTheDocument();
+    });
+
+    it('names the menu button in Vietnamese', () => {
+      stubApi({});
+
+      renderTopbar({ showMenuButton: true });
+
+      expect(screen.getByRole('button', { name: 'Mở menu' })).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Topbar menu button', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is absent while the sidebar is pinned or a rail', () => {
+    stubApi({});
+
+    renderTopbar({ showMenuButton: false });
+
+    expect(screen.queryByRole('button', { name: 'Open menu' })).not.toBeInTheDocument();
+  });
+
+  it('is named, hides its icon from assistive technology and opens the drawer', async () => {
+    stubApi({});
+    const onOpenMenu = vi.fn();
+    const user = userEvent.setup();
+
+    renderTopbar({ showMenuButton: true, onOpenMenu });
+
+    const button = screen.getByRole('button', { name: 'Open menu' });
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    await user.click(button);
+    expect(onOpenMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the open drawer through aria-expanded', () => {
+    stubApi({});
+
+    renderTopbar({ showMenuButton: true, drawerOpen: true });
+
+    expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+});
+
 describe('Topbar credits', () => {
   beforeEach(() => setToken('t', true));
   afterEach(() => {
     setToken(null);
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  describe('in Vietnamese', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('groups the balance the vi-VN way', async () => {
+      stubWithMe({
+        'GET /api/v1/features': { status: 200, body: FEATURES },
+        'GET /api/v1/credits/balance': { status: 200, body: { balance: 1000, granted: 1000 } },
+      });
+
+      renderTopbar();
+
+      expect(await screen.findByText('1.000 Credit')).toBeInTheDocument();
+    });
   });
 
   it('shows no credits and never asks for the balance when credits are off', async () => {
