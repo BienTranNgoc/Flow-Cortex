@@ -26,6 +26,7 @@ final class StepConfigRules {
         Map<String, Function<String, String>> rules = new LinkedHashMap<>();
         rules.put("workflow.call", WorkflowCallConfig::fault);
         rules.put("connector.call", ConnectorCallConfig::fault);
+        rules.put("drive.read", DriveReadConfig::fault);
         return Collections.unmodifiableMap(rules);
     }
 }

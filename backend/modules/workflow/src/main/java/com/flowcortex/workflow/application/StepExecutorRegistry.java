@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types, the dub steps, the template loader, the connector call, and one remote executor per media capability.
+ * types, the dub steps, the template loader, the connector call, the drive read, and one remote executor per media
+ * capability.
  * Workflow creation rejects any other type.
  */
 @Component
@@ -29,9 +30,10 @@ class StepExecutorRegistry {
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
             VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall,
-            LoadTemplateStepExecutor loadTemplate, ConnectorCallStepExecutor connectorCall) {
+            LoadTemplateStepExecutor loadTemplate, ConnectorCallStepExecutor connectorCall,
+            DriveReadStepExecutor driveRead) {
         this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
-                tts, loadTemplate), workflowCall, connectorCall));
+                tts, loadTemplate), workflowCall, connectorCall, driveRead));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -70,9 +72,10 @@ class StepExecutorRegistry {
     }
 
     private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall,
-            StepExecutor connectorCall) {
+            StepExecutor connectorCall, StepExecutor driveRead) {
         executors.add(workflowCall);
         executors.add(connectorCall);
+        executors.add(driveRead);
         return executors;
     }
 
@@ -83,6 +86,12 @@ class StepExecutorRegistry {
     /** An unknown type counts as available: it fails at dispatch with its own message. */
     boolean isAvailable(String type) {
         return find(type).map(StepExecutor::available).orElse(true);
+    }
+
+    /** The executor of the first of {@code types} that may not run now, in the order given. */
+    Optional<StepExecutor> firstUnavailable(List<String> types) {
+        return types.stream().map(this::find).flatMap(Optional::stream)
+                .filter(executor -> !executor.available()).findFirst();
     }
 
     boolean isRemote(String type) {

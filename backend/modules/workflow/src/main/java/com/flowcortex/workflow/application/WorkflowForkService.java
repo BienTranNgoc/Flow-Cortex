@@ -42,7 +42,7 @@ public class WorkflowForkService {
      * @throws UnprocessableEntityException the caller owns the workflow ({@code CANNOT_FORK_OWN})
      * @throws ConflictException the workflow is the fixed Product Video workflow
      * @throws LocalizedStatusException 403: the owner has not allowed forking
-     * @throws UnprocessableEntityException the served steps hold a connector call
+     * @throws UnprocessableEntityException the served steps hold a step that reads a member connector
      *         ({@code CANNOT_FORK_CONNECTOR_STEP})
      */
     @Transactional
@@ -51,7 +51,7 @@ public class WorkflowForkService {
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", sourceId)));
         List<StepDefinition> served = WorkflowCarry.of(servedDefinitions.stepsFor(source, callerId));
         boolean holdsConnectorCall = served.stream()
-                .anyMatch(step -> ConnectorStepOwnerGuard.isConnectorCall(step.type()));
+                .anyMatch(step -> ConnectorStepOwnerGuard.readsMemberConnector(step.type()));
         ForkEligibility.refusal(source.getId(), source.getOwnerId(), source.isAllowFork(), holdsConnectorCall,
                 callerId).ifPresent(WorkflowForkService::refuse);
 

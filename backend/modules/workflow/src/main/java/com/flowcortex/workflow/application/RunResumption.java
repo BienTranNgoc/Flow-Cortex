@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -326,8 +327,10 @@ public class RunResumption {
         if (remaining.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
-            throw new DubDisabledException();
+        Optional<StepExecutor> unavailable = registry.firstUnavailable(
+                remaining.stream().map(RunStep::getType).toList());
+        if (unavailable.isPresent()) {
+            throw unavailable.get().unavailableRefusal();
         }
     }
 

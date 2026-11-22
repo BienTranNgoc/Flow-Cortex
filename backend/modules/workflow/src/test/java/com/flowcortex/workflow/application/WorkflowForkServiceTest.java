@@ -194,6 +194,21 @@ class WorkflowForkServiceTest {
     }
 
     @Test
+    void aWorkflowHoldingADriveReadStepIsRefusedWith422AndWritesNothing() {
+        Workflow source = visible(forkable("CV intake"));
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId())).thenReturn(List.of(
+                step(source, 1, "read", "drive.read", null, "{\"folderId\":\"1AbCdEfGhIjKlMnOpQrStUvWxYz012345\"}")));
+
+        assertThatThrownBy(() -> service.fork(BINH, source.getId()))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("CANNOT_FORK_CONNECTOR_STEP"));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowRepository, never()).incrementForkCount(any());
+        verify(stepRepository, never()).saveAll(any());
+    }
+
+    @Test
     void productVideoIsRefusedWith409() {
         Workflow fixed = new Workflow(ProductVideoWorkflow.ID, Workflow.SYSTEM_OWNER_ID, "Product Video", true);
         fixed.setAllowFork(true);

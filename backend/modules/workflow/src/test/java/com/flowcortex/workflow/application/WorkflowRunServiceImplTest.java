@@ -123,6 +123,7 @@ class WorkflowRunServiceImplTest {
         when(translate.type()).thenReturn("translate");
         when(translate.mode()).thenReturn(StepExecutor.Mode.INLINE);
         when(translate.available()).thenReturn(false);
+        when(translate.unavailableRefusal()).thenCallRealMethod();
         RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
             throw new IllegalStateException("the credit guard must not be consulted");
         };
@@ -144,6 +145,69 @@ class WorkflowRunServiceImplTest {
 
         verify(workflowRunRepository, never()).save(any());
         verify(events, never()).publishEvent(any());
+    }
+
+    private WorkflowRunServiceImpl serviceWithUnavailable(StepExecutor... unavailable) {
+        RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
+            throw new IllegalStateException("the credit guard must not be consulted");
+        };
+        StepExecutorRegistry unavailableRegistry = new StepExecutorRegistry(List.of(unavailable));
+        return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
+                runStepRepository, unavailableRegistry, mediaJobs, mock(UserDirectory.class),
+                new RunStartGuards(List.of(creditGuard)), runCreation(unavailableRegistry), mock(CreditAccounts.class),
+                true);
+    }
+
+    private static StepExecutor unavailableExecutor(String type) {
+        StepExecutor executor = mock(StepExecutor.class);
+        when(executor.type()).thenReturn(type);
+        when(executor.mode()).thenReturn(StepExecutor.Mode.INLINE);
+        when(executor.available()).thenReturn(false);
+        when(executor.unavailableRefusal()).thenCallRealMethod();
+        return executor;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static DriveReadStepExecutor driveReadWhileGoogleIsOff() {
+        ObjectProvider<StepExecutor> others = mock(ObjectProvider.class);
+        return new DriveReadStepExecutor(mock(com.flowcortex.connector.api.GoogleDrive.class),
+                mock(WorkflowRunRepository.class), DubFixtures.dub(), others, Clock.systemUTC());
+    }
+
+    @Test
+    void aDriveReadStepWhileTheGoogleConnectorIsOffIsRefusedWith503ConnectorTurnedOffAndCreatesNothing() {
+        WorkflowRunServiceImpl service = serviceWithUnavailable(driveReadWhileGoogleIsOff());
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = givenWorkflow(ownerId, "drive.read");
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), "hi"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> {
+                    ResponseStatusException status = (ResponseStatusException) e;
+                    assertThat(status.getStatusCode().value()).isEqualTo(503);
+                    assertThat(status.getBody().getProperties()).containsEntry("code", "connector_turned_off");
+                    assertThat(status.getDetailMessageCode()).isEqualTo("workflow.connectorTurnedOff");
+                });
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
+    }
+
+    @Test
+    void theRefusalIsThatOfTheFirstUnavailableStepWhateverTheOthersAre() {
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRunServiceImpl service =
+                serviceWithUnavailable(unavailableExecutor("translate"), driveReadWhileGoogleIsOff());
+
+        Workflow dubFirst = givenWorkflow(ownerId, "translate", "drive.read");
+        assertThatThrownBy(() -> service.startRun(ownerId, dubFirst.getId(), "hi"))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getBody().getProperties())
+                        .containsEntry("code", "dub_disabled"));
+
+        Workflow driveFirst = givenWorkflow(ownerId, "drive.read", "translate");
+        assertThatThrownBy(() -> service.startRun(ownerId, driveFirst.getId(), "hi"))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getBody().getProperties())
+                        .containsEntry("code", "connector_turned_off"));
     }
 
     @Test

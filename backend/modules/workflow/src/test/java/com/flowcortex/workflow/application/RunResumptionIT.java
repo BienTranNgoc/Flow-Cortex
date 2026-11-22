@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -187,7 +189,6 @@ class RunResumptionIT {
                             i.input().bucket(), "runs/" + to + "/inputs/" + i.input().key())))
                     .toList();
         });
-        when(registry.isAvailable(anyString())).thenReturn(true);
         when(registry.isRemote(anyString())).thenAnswer(call -> REMOTE.equals(call.getArgument(0)));
         when(mediaJobs.isEnabled()).thenReturn(true);
         when(mediaJobs.boundRunInputs(any())).thenReturn(List.of());
@@ -453,11 +454,41 @@ class RunResumptionIT {
         assertThat(snapshot(seed)).isEqualTo(afterReset);
 
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(registry.isAvailable(REMOTE)).thenReturn(false);
+        StepExecutor dubbing = unavailableExecutor();
+        when(registry.firstUnavailable(List.of(REMOTE))).thenReturn(Optional.of(dubbing));
         assertThatThrownBy(() -> resumption.executeStep(seed.ownerId(), seed.runId(), stepId))
                 .isInstanceOf(DubDisabledException.class);
         assertThat(snapshot(seed)).isEqualTo(afterReset);
         assertThat(recorder.resumed).isEmpty();
+    }
+
+    @Test
+    void aStepWhoseConnectorIsSwitchedOffIsRefusedWithItsOwnRefusalOnEveryResumePath() {
+        Seed seed = failedRun("boom_code", 0, LOCAL);
+        UUID stepId = seed.stepIds().getFirst();
+        LocalizedStatusException turnedOff = new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                new LocalizedMessage("workflow.connectorTurnedOff"));
+        turnedOff.getBody().setProperty("code", "connector_turned_off");
+        StepExecutor connectorStep = unavailableExecutor();
+        when(connectorStep.unavailableRefusal()).thenReturn(turnedOff);
+        when(registry.firstUnavailable(List.of(LOCAL))).thenReturn(Optional.of(connectorStep));
+        String before = snapshot(seed);
+
+        assertThatThrownBy(() -> resumption.retryStep(seed.ownerId(), seed.runId(), stepId)).isSameAs(turnedOff);
+        assertThatThrownBy(() -> resumption.retryRun(seed.ownerId(), seed.runId(), null, true)).isSameAs(turnedOff);
+        assertThat(snapshot(seed)).isEqualTo(before);
+
+        resumption.resetStep(seed.ownerId(), seed.runId(), stepId);
+        String afterReset = snapshot(seed);
+        assertThatThrownBy(() -> resumption.executeStep(seed.ownerId(), seed.runId(), stepId)).isSameAs(turnedOff);
+        assertThat(snapshot(seed)).isEqualTo(afterReset);
+        assertThat(recorder.resumed).isEmpty();
+    }
+
+    private static StepExecutor unavailableExecutor() {
+        StepExecutor executor = mock(StepExecutor.class);
+        when(executor.unavailableRefusal()).thenCallRealMethod();
+        return executor;
     }
 
     @Test
