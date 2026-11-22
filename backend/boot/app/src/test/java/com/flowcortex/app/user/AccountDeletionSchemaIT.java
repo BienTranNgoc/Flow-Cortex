@@ -64,8 +64,10 @@ class AccountDeletionSchemaIT extends AbstractPostgresBootTest {
 
     @Test
     void theTwoConditionsAreSeeded() {
+        // Conditions added by later modules are seeded at runtime from their defaults, not by this migration.
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT key, enabled, sort_order, message_vi, message_en FROM deletion_block_condition ORDER BY sort_order");
+                "SELECT key, enabled, sort_order, message_vi, message_en FROM deletion_block_condition "
+                        + "WHERE key IN ('workflow.active_run', 'support.open_request') ORDER BY sort_order");
 
         assertThat(rows).hasSize(2);
         assertThat(rows.get(0)).containsEntry("key", "workflow.active_run").containsEntry("enabled", true)
