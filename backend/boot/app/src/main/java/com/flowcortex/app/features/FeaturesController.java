@@ -1,46 +1,47 @@
 package com.flowcortex.app.features;
 
+import com.flowcortex.app.features.FeatureSwitchCatalog.Reading;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The feature switches the member app adapts to, read once at startup (a change needs a restart).
- * Public, since the sign-in and registration pages need them before there is a session. Lives in
- * {@code :boot:app} because the switches belong to several modules.
+ * The feature switches the member app adapts to. {@code passwordReset}, {@code runCancellation},
+ * {@code supportWidget} and {@code supportAssistant} are runtime switches read on every request; the
+ * rest are server configuration read at startup (a change needs a restart). Public, since the sign-in
+ * and registration pages need them before there is a session. Lives in {@code :boot:app} because the
+ * switches belong to several modules.
  */
 @RestController
 @RequestMapping("/api/v1")
 public class FeaturesController {
 
-    private final FeaturesResponse features;
+    private final FeatureSwitchCatalog catalog;
 
-    public FeaturesController(
-            @Value("${flowcortex.auth.email-confirmation.enabled:false}") boolean emailConfirmation,
-            @Value("${flowcortex.phone-verification.enabled:false}") boolean phoneVerification,
-            @Value("${flowcortex.media.upload.content-check.enabled:true}") boolean uploadContentCheck,
-            @Value("${flowcortex.workflow.cancel.enabled:false}") boolean runCancellation,
-            @Value("${flowcortex.credits.enabled:false}") boolean credits,
-            @Value("${flowcortex.auth.password-reset.enabled:false}") boolean passwordReset,
-            @Value("${flowcortex.support.enabled:false}") boolean supportWidget,
-            @Value("${flowcortex.support.assistant.enabled:false}") boolean supportAssistant,
-            @Value("${flowcortex.auth.personal-access-tokens.enabled:false}") boolean personalAccessTokens,
-            @Value("${flowcortex.onboarding.enabled:false}") boolean onboarding,
-            @Value("${flowcortex.chat.enabled:false}") boolean chat) {
-        this.features = new FeaturesResponse(emailConfirmation, phoneVerification, uploadContentCheck,
-                runCancellation, credits, passwordReset, supportWidget, supportAssistant, personalAccessTokens,
-                onboarding, chat);
+    FeaturesController(FeatureSwitchCatalog catalog) {
+        this.catalog = catalog;
     }
 
     @SecurityRequirements
     @GetMapping(value = "/features", produces = MediaType.APPLICATION_JSON_VALUE)
     public FeaturesResponse features() {
-        return features;
+        return response(catalog.read());
+    }
+
+    private static FeaturesResponse response(List<Reading> readings) {
+        Map<String, Boolean> byName = new HashMap<>();
+        readings.forEach(reading -> byName.put(reading.name(), reading.value()));
+        return new FeaturesResponse(byName.get("emailConfirmation"), byName.get("phoneVerification"),
+                byName.get("uploadContentCheck"), byName.get("runCancellation"), byName.get("credits"),
+                byName.get("passwordReset"), byName.get("supportWidget"), byName.get("supportAssistant"),
+                byName.get("personalAccessTokens"), byName.get("onboarding"), byName.get("chat"));
     }
 
     public record FeaturesResponse(

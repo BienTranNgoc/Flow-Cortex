@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -8,7 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
@@ -20,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 class RunCancellationTest {
 
@@ -32,10 +38,10 @@ class RunCancellationTest {
     private final ChildRuns childRuns = mock(ChildRuns.class);
     private final RunCancellation cancellation = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, true);
+            runUpdates, childRuns, switchReading(true));
     private final RunCancellation switchedOff = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, false);
+            runUpdates, childRuns, switchReading(false));
     private final UUID adminId = UUID.randomUUID();
 
     private final UUID ownerId = UUID.randomUUID();
@@ -51,6 +57,15 @@ class RunCancellationTest {
         cancellation.cancelRun(ownerId, runId);
 
         verify(runUpdates).touched(runId);
+    }
+
+    @Test
+    void aMemberStopIsRefusedWith503WhileTheSwitchIsOffAndChangesNothing() {
+        assertThatThrownBy(() -> switchedOff.cancelRun(ownerId, runId))
+                .isInstanceOfSatisfying(LocalizedStatusException.class,
+                        refusal -> assertThat(refusal.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+        verify(runs, never()).requestCancel(any(), any());
+        verify(runUpdates, never()).touched(any());
     }
 
     @Test
@@ -162,5 +177,12 @@ class RunCancellationTest {
         cancellation.cancelRun(ownerId, runId);
 
         verify(runUpdates, never()).touched(any());
+    }
+
+    private static Settings switchReading(boolean on) {
+        Settings settings = mock(Settings.class);
+        when(settings.get(WorkflowSettingKeys.RUN_CANCELLATION_ENABLED))
+                .thenReturn(new SettingRead<>(on, on, SettingSource.STORED));
+        return settings;
     }
 }
