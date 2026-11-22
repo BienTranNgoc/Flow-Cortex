@@ -19,7 +19,9 @@
   "vetoedNote": "Turned off by the server configuration; the stored value applies once it is lifted.",
   "degradedNote": "The settings store is unavailable, so a safe fallback applies.",
   "groups": {
-    "support": "Help Center"
+    "support": "Help Center",
+    "user": "Accounts",
+    "workflow": "Workflows"
   },
   "source": {
     "STORED": "Set by an admin",
@@ -45,7 +47,29 @@
     "older": "Older"
   },
   "keys": {
+    "user": {
+      "pw_reset": {
+        "enabled": {
+          "label": "Password reset",
+          "help": "Turning it off hides the reset link for members and refuses reset requests from the next request."
+        }
+      }
+    },
+    "workflow": {
+      "run_cancellation": {
+        "enabled": {
+          "label": "Run cancellation",
+          "help": "Turning it off hides the Stop button for members and refuses cancel requests from the next request."
+        }
+      }
+    },
     "support": {
+      "help_center": {
+        "enabled": {
+          "label": "Help Center",
+          "help": "Turning it off hides the Help Center for members and refuses every Help Center request from the next request."
+        }
+      },
       "assistant": {
         "enabled": {
           "label": "AI assistant",

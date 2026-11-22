@@ -1,0 +1,41 @@
+{
+  "eyebrow": "Quản trị",
+  "title": "Công tắc tính năng",
+  "description": "Mọi công tắc tính năng dành cho thành viên. Công tắc thời gian chạy có hiệu lực từ yêu cầu kế tiếp; các công tắc còn lại theo cấu hình máy chủ.",
+  "envOnly": "Thay đổi cần khởi động lại máy chủ",
+  "loading": "Đang tải…",
+  "loadFailed": "Không tải được các công tắc tính năng.",
+  "refreshFailed": "Không làm mới được các công tắc mới nhất — đang hiển thị bản đã tải trước đó.",
+  "retry": "Thử lại",
+  "empty": "Chưa có công tắc tính năng nào để hiển thị.",
+  "items": {
+    "emailConfirmation": {
+      "label": "Xác nhận email",
+      "help": "Tài khoản mới phải xác nhận địa chỉ email trước khi đăng nhập."
+    },
+    "phoneVerification": {
+      "label": "Xác minh số điện thoại",
+      "help": "Thành viên xác minh số điện thoại bằng mã dùng một lần."
+    },
+    "uploadContentCheck": {
+      "label": "Kiểm tra nội dung tải lên",
+      "help": "Tệp tải lên có phần đầu không khớp với loại đã khai báo sẽ bị từ chối."
+    },
+    "credits": {
+      "label": "Credit",
+      "help": "Số dư, mức sử dụng và nạp credit của thành viên."
+    },
+    "personalAccessTokens": {
+      "label": "Mã truy cập API",
+      "help": "Thành viên có thể tạo mã truy cập cá nhân cho API."
+    },
+    "onboarding": {
+      "label": "Hướng dẫn bắt đầu",
+      "help": "Thành viên mới được hướng dẫn qua quy trình đầu tiên."
+    },
+    "chat": {
+      "label": "Trò chuyện",
+      "help": "Thành viên có thể dùng trang Trò chuyện."
+    }
+  }
+}
