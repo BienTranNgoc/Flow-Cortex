@@ -93,6 +93,27 @@ class DocumentTextTest {
         }
     }
 
+    /** One page whose content stream holds {@code shows} text-showing operators of {@code glyphs} characters each. */
+    private static byte[] onePageOfShows(int shows, int glyphs) throws IOException {
+        String text = "x".repeat(glyphs);
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
+                content.newLineAtOffset(25, 760);
+                for (int i = 0; i < shows; i++) {
+                    content.showText(text);
+                    content.newLineAtOffset(0, -12);
+                }
+                content.endText();
+            }
+            document.save(out);
+            return out.toByteArray();
+        }
+    }
+
     private static byte[] pdfOfPages(int pages) throws IOException {
         return pdf(pages, page -> List.of("page-" + page));
     }
@@ -197,6 +218,30 @@ class DocumentTextTest {
         assertThat(result.warning()).isEqualTo("unreadable");
         assertThat(result.needsVision()).isFalse();
         assertThat(clock.calls()).isEqualTo(8);
+    }
+
+    @Test
+    void aSinglePageOfTwoHundredThousandOperatorsIsAbandonedInsideThePagePastTwentySeconds() throws IOException {
+        SteppingClock clock = new SteppingClock(Duration.ofSeconds(3));
+
+        DriveFileText result = new DocumentText(clock).fromBytes(onePageOfShows(200_000, 1), PDF);
+
+        assertThat(result.text()).isEmpty();
+        assertThat(result.warning()).isEqualTo("unreadable");
+        assertThat(result.needsVision()).isFalse();
+        assertThat(clock.calls()).isEqualTo(8);
+    }
+
+    @Test
+    void aSinglePageOfTwoHundredThousandGlyphsEndsTruncatedAtTheCapAndStopsBeingParsed() throws IOException {
+        SteppingClock clock = new SteppingClock(Duration.ZERO);
+
+        DriveFileText result = new DocumentText(clock).fromBytes(onePageOfShows(2_000, 100), PDF);
+
+        assertThat(result.text()).hasSize(CAP);
+        assertThat(result.truncated()).isTrue();
+        assertThat(result.warning()).isNull();
+        assertThat(clock.calls()).isEqualTo(4);
     }
 
     @Test

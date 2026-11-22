@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -22,19 +23,22 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
  * Turns the bytes of an untrusted Drive file into text within fixed bounds: 50,000 characters, PDF pages 1-200, a
- * 64 MB PDF memory budget, 20 MB of expanded DOCX XML, and 20 seconds of extraction checked between PDF pages and
- * DOCX paragraphs. A bound or an unreadable file is a warning on the result, never an exception, and nothing of the
+ * 64 MB PDF memory budget, 20 MB of expanded DOCX XML, and 20 seconds of extraction checked between PDF pages, every
+ * 1,000 operators inside a page, and between DOCX paragraphs. A bound or an unreadable file is a warning on the result, never an exception, and nothing of the
  * file's content reaches a log line.
  */
 @Component
@@ -55,6 +59,8 @@ public class DocumentText {
     static final long PDF_MEMORY_BYTES = 64L * 1024 * 1024;
     static final long DOCX_EXPANSION_CAP = 20L * 1024 * 1024;
     static final Duration EXTRACTION_DEADLINE = Duration.ofSeconds(20);
+    static final int MAX_PAGE_GLYPHS = 2 * MAX_CHARS;
+    static final int OPERATORS_PER_CLOCK_READ = 1_000;
 
     private static final String DOCX_MAIN_PART = "word/document.xml";
     private static final String WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -171,7 +177,7 @@ public class DocumentText {
                 // the writer already holds the text up to the cap
             }
             String text = out.text().strip();
-            return new DriveFileText(text, "pdf", out.truncated(), text.isEmpty(), null);
+            return new DriveFileText(text, "pdf", out.truncated() || stripper.glyphLimited(), text.isEmpty(), null);
         } catch (InvalidPasswordException ex) {
             return new DriveFileText("", "pdf", false, false, WARNING_ENCRYPTED);
         } catch (IOException | RuntimeException ex) {
@@ -304,15 +310,55 @@ public class DocumentText {
         }
     }
 
-    /** Reads pages 1-{@link #MAX_PDF_PAGES} and checks the clock before each page. */
+    /** Thrown inside the PDF engine when one page has produced more glyphs than {@link #MAX_PAGE_GLYPHS}. */
+    private static final class PageGlyphLimit extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        PageGlyphLimit() {
+            super("page glyph limit reached", null, false, false);
+        }
+    }
+
+    /**
+     * Reads pages 1-{@link #MAX_PDF_PAGES}. The clock is read before each page and every
+     * {@link #OPERATORS_PER_CLOCK_READ} content-stream operators inside it, and a page that yields more than
+     * {@link #MAX_PAGE_GLYPHS} glyphs is cut there, so one page cannot hold the thread or the heap past the bounds.
+     */
     private final class DeadlineStripper extends PDFTextStripper {
 
         private final Instant deadline;
+        private IOException stop;
+        private int operators;
+        private int glyphs;
+        private boolean glyphLimited;
 
         DeadlineStripper(Instant deadline) throws IOException {
             this.deadline = deadline;
             setEndPage(MAX_PDF_PAGES);
             setLineSeparator("\n");
+        }
+
+        /** Whether a page was cut at the glyph limit, so its text is incomplete. */
+        boolean glyphLimited() {
+            return glyphLimited;
+        }
+
+        @Override
+        public void processPage(PDPage page) throws IOException {
+            stop = null;
+            operators = 0;
+            glyphs = 0;
+            try {
+                super.processPage(page);
+            } catch (PageGlyphLimit ex) {
+                glyphLimited = true;
+                writePage();
+                throw new CapReached();
+            }
+            if (stop != null) {
+                // an operator that PDFBox swallows (a form XObject) hid the stop from the page loop
+                throw stop;
+            }
         }
 
         @Override
@@ -321,6 +367,26 @@ public class DocumentText {
                 throw new DeadlineReached();
             }
             super.startPage(page);
+        }
+
+        @Override
+        protected void processOperator(Operator operator, List<COSBase> operands) throws IOException {
+            if (stop != null) {
+                throw stop;
+            }
+            if (++operators % OPERATORS_PER_CLOCK_READ == 0 && clock.instant().isAfter(deadline)) {
+                stop = new DeadlineReached();
+                throw stop;
+            }
+            super.processOperator(operator, operands);
+        }
+
+        @Override
+        protected void processTextPosition(TextPosition text) {
+            if (++glyphs > MAX_PAGE_GLYPHS) {
+                throw new PageGlyphLimit();
+            }
+            super.processTextPosition(text);
         }
     }
 
