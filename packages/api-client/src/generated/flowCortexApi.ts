@@ -1176,6 +1176,87 @@ export interface HotfixRequest {
   note?: string;
 }
 
+export type CreateBatchRequestFormat =
+  (typeof CreateBatchRequestFormat)[keyof typeof CreateBatchRequestFormat];
+
+export const CreateBatchRequestFormat = {
+  csv: 'csv',
+  json: 'json',
+  jsonl: 'jsonl',
+} as const;
+
+export interface CreateBatchRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  name?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2000000
+   */
+  content?: string;
+  /**
+   * @minItems 0
+   * @maxItems 500
+   * @items.minLength 0
+   * @items.maxLength 10000
+   */
+  rows?: string[];
+  format?: CreateBatchRequestFormat;
+  skipFirstLine?: boolean;
+  concurrency?: number;
+  acknowledgeCost?: boolean;
+}
+
+export type BatchResponseStatus = (typeof BatchResponseStatus)[keyof typeof BatchResponseStatus];
+
+export const BatchResponseStatus = {
+  running: 'running',
+  paused: 'paused',
+  completed: 'completed',
+  completed_with_errors: 'completed_with_errors',
+  cancelled: 'cancelled',
+} as const;
+
+export type BatchResponsePauseReason =
+  (typeof BatchResponsePauseReason)[keyof typeof BatchResponsePauseReason];
+
+export const BatchResponsePauseReason = {
+  member: 'member',
+  insufficientCredits: 'insufficientCredits',
+  unavailable: 'unavailable',
+} as const;
+
+export type BatchResponseCancelReason =
+  (typeof BatchResponseCancelReason)[keyof typeof BatchResponseCancelReason];
+
+export const BatchResponseCancelReason = {
+  member: 'member',
+  workflowUnavailable: 'workflowUnavailable',
+  ownerInactive: 'ownerInactive',
+} as const;
+
+export interface BatchResponse {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  name?: string;
+  status: BatchResponseStatus;
+  concurrency: number;
+  totalRows: number;
+  pendingRows: number;
+  runningRows: number;
+  completedRows: number;
+  failedRows: number;
+  cancelledRows: number;
+  pauseReason?: BatchResponsePauseReason;
+  cancelReason?: BatchResponseCancelReason;
+  parentBatchId?: string;
+  createdAt: string;
+  finishedAt?: string;
+}
+
 export interface CreateUserRequest {
   /** @minLength 1 */
   email: string;
@@ -3520,6 +3601,13 @@ export interface BuilderChartResponse {
   series: DayCountResponse[];
 }
 
+export interface PageViewBatchResponse {
+  items: BatchResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 /**
  * @nullable
  */
@@ -4271,6 +4359,43 @@ export const GetBuilderRunsChartPeriod = {
   '7d': '7d',
   '30d': '30d',
   '90d': '90d',
+} as const;
+
+export type ListBatchesParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
+export type ListBatchRowsParams = {
+  status?: ListBatchRowsStatus;
+  /**
+   * @minimum 0
+   * @maximum 10737418
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  size?: number;
+};
+
+export type ListBatchRowsStatus = (typeof ListBatchRowsStatus)[keyof typeof ListBatchRowsStatus];
+
+export const ListBatchRowsStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
 } as const;
 
 export type CallbackParams = {
@@ -7702,6 +7827,99 @@ export const forkWorkflow = async (
   });
 };
 
+export type createBatchResponse201 = {
+  data: BatchResponse;
+  status: 201;
+};
+
+export type createBatchResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createBatchResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type createBatchResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type createBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createBatchResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createBatchResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type createBatchResponseSuccess = createBatchResponse201 & {
+  headers: Headers;
+};
+export type createBatchResponseError = (
+  | createBatchResponse400
+  | createBatchResponse401
+  | createBatchResponse402
+  | createBatchResponse404
+  | createBatchResponse409
+  | createBatchResponse422
+  | createBatchResponse503
+) & {
+  headers: Headers;
+};
+
+export type createBatchResponse = createBatchResponseSuccess | createBatchResponseError;
+
+export const getCreateBatchUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/batches`;
+};
+
+export const createBatch = async (
+  id: string,
+  createBatchRequest: CreateBatchRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createBatchResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createBatchResponse>(getCreateBatchUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createBatchRequest),
+  });
+};
+
 export type useWorkflowExampleResponse201 = {
   data: WorkflowResponse;
   status: 201;
@@ -10939,6 +11157,185 @@ export const recordPaymentJourneyEvent = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(recordPaymentJourneyEventBody),
+  });
+};
+
+export type retryBatchResponse201 = {
+  data: BatchResponse;
+  status: 201;
+};
+
+export type retryBatchResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryBatchResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type retryBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryBatchResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryBatchResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryBatchResponseSuccess = retryBatchResponse201 & {
+  headers: Headers;
+};
+export type retryBatchResponseError = (
+  | retryBatchResponse401
+  | retryBatchResponse402
+  | retryBatchResponse404
+  | retryBatchResponse409
+  | retryBatchResponse422
+  | retryBatchResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryBatchResponse = retryBatchResponseSuccess | retryBatchResponseError;
+
+export const getRetryBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/retry`;
+};
+
+export const retryBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryBatchResponse> => {
+  return customFetch<retryBatchResponse>(getRetryBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resumeBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type resumeBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resumeBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type resumeBatchResponseSuccess = resumeBatchResponse200 & {
+  headers: Headers;
+};
+export type resumeBatchResponseError = (resumeBatchResponse404 | resumeBatchResponse409) & {
+  headers: Headers;
+};
+
+export type resumeBatchResponse = resumeBatchResponseSuccess | resumeBatchResponseError;
+
+export const getResumeBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/resume`;
+};
+
+export const resumeBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resumeBatchResponse> => {
+  return customFetch<resumeBatchResponse>(getResumeBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type pauseBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type pauseBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pauseBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type pauseBatchResponseSuccess = pauseBatchResponse200 & {
+  headers: Headers;
+};
+export type pauseBatchResponseError = (pauseBatchResponse404 | pauseBatchResponse409) & {
+  headers: Headers;
+};
+
+export type pauseBatchResponse = pauseBatchResponseSuccess | pauseBatchResponseError;
+
+export const getPauseBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/pause`;
+};
+
+export const pauseBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pauseBatchResponse> => {
+  return customFetch<pauseBatchResponse>(getPauseBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type cancelBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type cancelBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type cancelBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelBatchResponseSuccess = cancelBatchResponse200 & {
+  headers: Headers;
+};
+export type cancelBatchResponseError = (cancelBatchResponse404 | cancelBatchResponse409) & {
+  headers: Headers;
+};
+
+export type cancelBatchResponse = cancelBatchResponseSuccess | cancelBatchResponseError;
+
+export const getCancelBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/cancel`;
+};
+
+export const cancelBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelBatchResponse> => {
+  return customFetch<cancelBatchResponse>(getCancelBatchUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -16162,6 +16559,108 @@ export const getBuilderRunsChart = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getBuilderRunsChartResponse> => {
   return customFetch<getBuilderRunsChartResponse>(getGetBuilderRunsChartUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listBatchesResponse200 = {
+  data: PageViewBatchResponse;
+  status: 200;
+};
+
+export type listBatchesResponseSuccess = listBatchesResponse200 & {
+  headers: Headers;
+};
+export type listBatchesResponse = listBatchesResponseSuccess;
+
+export const getListBatchesUrl = (params?: ListBatchesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/batches?${stringifiedParams}` : `/api/v1/batches`;
+};
+
+export const listBatches = async (
+  params?: ListBatchesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBatchesResponse> => {
+  return customFetch<listBatchesResponse>(getListBatchesUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBatchResponseError = getBatchResponse404 & {
+  headers: Headers;
+};
+
+export type getBatchResponse = getBatchResponseError;
+
+export const getGetBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}`;
+};
+
+export const getBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBatchResponse> => {
+  return customFetch<getBatchResponse>(getGetBatchUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listBatchRowsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listBatchRowsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listBatchRowsResponseError = (listBatchRowsResponse400 | listBatchRowsResponse404) & {
+  headers: Headers;
+};
+
+export type listBatchRowsResponse = listBatchRowsResponseError;
+
+export const getListBatchRowsUrl = (id: string, params?: ListBatchRowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/batches/${id}/rows?${stringifiedParams}`
+    : `/api/v1/batches/${id}/rows`;
+};
+
+export const listBatchRows = async (
+  id: string,
+  params?: ListBatchRowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBatchRowsResponse> => {
+  return customFetch<listBatchRowsResponse>(getListBatchRowsUrl(id, params), {
     ...options,
     method: 'GET',
   });
