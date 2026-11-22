@@ -224,6 +224,8 @@ export const MeResponsePermissionsItem = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface MeResponse {
@@ -260,6 +262,41 @@ export interface LocaleRequest {
 
 export interface LocaleResponse {
   locale: string;
+}
+
+export interface AdminTrendTagOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   */
+  ids: string[];
+}
+
+export interface AdminTrendTag {
+  id: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
+}
+
+export interface AdminTrendCategoryOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   * @items.minLength 1
+   */
+  keys: string[];
+}
+
+export interface AdminTrendCategory {
+  key: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -575,6 +612,8 @@ export const RoleResponsePermissionsItem = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface RoleResponse {
@@ -2088,6 +2127,32 @@ export interface ImportReviewResponse {
   outboundTargets: OutboundTargetResponse[];
 }
 
+export interface AdminTrendTagCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn: string;
+}
+
+export interface AdminTrendCategoryCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn: string;
+}
+
 export type AdminSupportRequestReplyStatus =
   (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
 
@@ -2458,6 +2523,34 @@ export interface PrivacySettings {
   activity?: PrivacySettingsActivity;
   message?: PrivacySettingsMessage;
   stats?: PrivacySettingsStats;
+}
+
+export interface AdminTrendTagUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn?: string;
+  visible?: boolean;
+}
+
+export interface AdminTrendCategoryUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn?: string;
+  visible?: boolean;
 }
 
 export interface UpdateRoleRequest {
@@ -3461,6 +3554,11 @@ export interface WorkflowReportResponse {
   series: DayCountResponse[];
 }
 
+export interface AdminTrendTaxonomy {
+  categories: AdminTrendCategory[];
+  tags: AdminTrendTag[];
+}
+
 export type AdminSupportRequestSummaryType =
   (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
 
@@ -3654,6 +3752,8 @@ export const PermissionCatalogEntryKey = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -5422,6 +5522,130 @@ export const reorderAdminWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type reorderAdminTrendTagsResponse200 = {
+  data: AdminTrendTag[];
+  status: 200;
+};
+
+export type reorderAdminTrendTagsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendTagsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendTagsResponseSuccess = reorderAdminTrendTagsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendTagsResponseError = (
+  reorderAdminTrendTagsResponse400 | reorderAdminTrendTagsResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendTagsResponse =
+  reorderAdminTrendTagsResponseSuccess | reorderAdminTrendTagsResponseError;
+
+export const getReorderAdminTrendTagsUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags/order`;
+};
+
+export const reorderAdminTrendTags = async (
+  adminTrendTagOrderRequest: AdminTrendTagOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendTagsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendTagsResponse>(getReorderAdminTrendTagsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagOrderRequest),
+  });
+};
+
+export type reorderAdminTrendCategoriesResponse200 = {
+  data: AdminTrendCategory[];
+  status: 200;
+};
+
+export type reorderAdminTrendCategoriesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendCategoriesResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendCategoriesResponseSuccess = reorderAdminTrendCategoriesResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendCategoriesResponseError = (
+  reorderAdminTrendCategoriesResponse400 | reorderAdminTrendCategoriesResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendCategoriesResponse =
+  reorderAdminTrendCategoriesResponseSuccess | reorderAdminTrendCategoriesResponseError;
+
+export const getReorderAdminTrendCategoriesUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories/order`;
+};
+
+export const reorderAdminTrendCategories = async (
+  adminTrendCategoryOrderRequest: AdminTrendCategoryOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendCategoriesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendCategoriesResponse>(getReorderAdminTrendCategoriesUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryOrderRequest),
   });
 };
 
@@ -11393,6 +11617,137 @@ export const reviewAdminWorkflowImport = async (
   });
 };
 
+export type createAdminTrendTagResponse201 = {
+  data: AdminTrendTag;
+  status: 201;
+};
+
+export type createAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendTagResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendTagResponseSuccess = createAdminTrendTagResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendTagResponseError = (
+  createAdminTrendTagResponse400 | createAdminTrendTagResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendTagResponse =
+  createAdminTrendTagResponseSuccess | createAdminTrendTagResponseError;
+
+export const getCreateAdminTrendTagUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags`;
+};
+
+export const createAdminTrendTag = async (
+  adminTrendTagCreateRequest: AdminTrendTagCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendTagResponse>(getCreateAdminTrendTagUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagCreateRequest),
+  });
+};
+
+export type createAdminTrendCategoryResponse201 = {
+  data: AdminTrendCategory;
+  status: 201;
+};
+
+export type createAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendCategoryResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminTrendCategoryResponseSuccess = createAdminTrendCategoryResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendCategoryResponseError = (
+  | createAdminTrendCategoryResponse400
+  | createAdminTrendCategoryResponse409
+  | createAdminTrendCategoryResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendCategoryResponse =
+  createAdminTrendCategoryResponseSuccess | createAdminTrendCategoryResponseError;
+
+export const getCreateAdminTrendCategoryUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories`;
+};
+
+export const createAdminTrendCategory = async (
+  adminTrendCategoryCreateRequest: AdminTrendCategoryCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendCategoryResponse>(getCreateAdminTrendCategoryUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryCreateRequest),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -13673,6 +14028,207 @@ export const updateAdminWorkflowStep = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(updateStepRequest),
+  });
+};
+
+export type deleteAdminTrendTagResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendTagResponseSuccess = deleteAdminTrendTagResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendTagResponseError = deleteAdminTrendTagResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendTagResponse =
+  deleteAdminTrendTagResponseSuccess | deleteAdminTrendTagResponseError;
+
+export const getDeleteAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const deleteAdminTrendTag = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendTagResponse> => {
+  return customFetch<deleteAdminTrendTagResponse>(getDeleteAdminTrendTagUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendTagResponse200 = {
+  data: AdminTrendTag;
+  status: 200;
+};
+
+export type updateAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendTagResponseSuccess = updateAdminTrendTagResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendTagResponseError = (
+  updateAdminTrendTagResponse400 | updateAdminTrendTagResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendTagResponse =
+  updateAdminTrendTagResponseSuccess | updateAdminTrendTagResponseError;
+
+export const getUpdateAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const updateAdminTrendTag = async (
+  id: string,
+  adminTrendTagUpdateRequest: AdminTrendTagUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendTagResponse>(getUpdateAdminTrendTagUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagUpdateRequest),
+  });
+};
+
+export type deleteAdminTrendCategoryResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminTrendCategoryResponseSuccess = deleteAdminTrendCategoryResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendCategoryResponseError = (
+  deleteAdminTrendCategoryResponse404 | deleteAdminTrendCategoryResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendCategoryResponse =
+  deleteAdminTrendCategoryResponseSuccess | deleteAdminTrendCategoryResponseError;
+
+export const getDeleteAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const deleteAdminTrendCategory = async (
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendCategoryResponse> => {
+  return customFetch<deleteAdminTrendCategoryResponse>(getDeleteAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendCategoryResponse200 = {
+  data: AdminTrendCategory;
+  status: 200;
+};
+
+export type updateAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendCategoryResponseSuccess = updateAdminTrendCategoryResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendCategoryResponseError = (
+  updateAdminTrendCategoryResponse400 | updateAdminTrendCategoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendCategoryResponse =
+  updateAdminTrendCategoryResponseSuccess | updateAdminTrendCategoryResponseError;
+
+export const getUpdateAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const updateAdminTrendCategory = async (
+  key: string,
+  adminTrendCategoryUpdateRequest: AdminTrendCategoryUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendCategoryResponse>(getUpdateAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryUpdateRequest),
   });
 };
 
@@ -16124,6 +16680,29 @@ export const exportAdminWorkflows = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportAdminWorkflowsResponse> => {
   return customFetch<exportAdminWorkflowsResponse>(getExportAdminWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminTrendTaxonomyResponse200 = {
+  data: AdminTrendTaxonomy;
+  status: 200;
+};
+
+export type listAdminTrendTaxonomyResponseSuccess = listAdminTrendTaxonomyResponse200 & {
+  headers: Headers;
+};
+export type listAdminTrendTaxonomyResponse = listAdminTrendTaxonomyResponseSuccess;
+
+export const getListAdminTrendTaxonomyUrl = () => {
+  return `/api/v1/admin/trend/taxonomy`;
+};
+
+export const listAdminTrendTaxonomy = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminTrendTaxonomyResponse> => {
+  return customFetch<listAdminTrendTaxonomyResponse>(getListAdminTrendTaxonomyUrl(), {
     ...options,
     method: 'GET',
   });
