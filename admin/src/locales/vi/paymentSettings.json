@@ -1,0 +1,92 @@
+{
+  "eyebrow": "Tín dụng & Thanh toán",
+  "title": "Cài đặt thanh toán",
+  "description": "Cách thanh toán vận hành lúc chạy. Thay đổi có hiệu lực từ yêu cầu kế tiếp, không cần khởi động lại.",
+  "tabs": {
+    "label": "Các mục cài đặt thanh toán",
+    "settings": "Cài đặt",
+    "history": "Lịch sử"
+  },
+  "loading": "Đang tải…",
+  "loadFailed": "Không tải được cài đặt thanh toán.",
+  "retry": "Thử lại",
+  "empty": {
+    "title": "Chưa có cài đặt thanh toán",
+    "description": "Máy chủ này chưa khai báo cài đặt thanh toán nào."
+  },
+  "groups": {
+    "region": "Khu vực"
+  },
+  "settings": {
+    "payment_region_gate_mode": {
+      "label": "Chế độ chặn theo khu vực",
+      "description": "Cách cổng khu vực thanh toán xử lý yêu cầu từ ngoài Việt Nam: Tắt không áp dụng gì, Giám sát chỉ đo lường, Chặn từ chối thanh toán.",
+      "options": {
+        "off": "Tắt",
+        "shadow": "Giám sát",
+        "enforce": "Chặn"
+      }
+    }
+  },
+  "source": {
+    "STORED": "Do quản trị viên đặt",
+    "CONFIGURED": "Từ cấu hình máy chủ",
+    "DEFAULT": "Mặc định",
+    "VETOED": "Bị tắt bởi cấu hình máy chủ",
+    "DEGRADED": "Kho cài đặt không khả dụng"
+  },
+  "readOnly": "Muốn thay đổi cài đặt này cần quyền cập nhật cài đặt thanh toán.",
+  "allowedValues": "Giá trị cho phép: {{values}}",
+  "bounds": "Từ {{min}} đến {{max}}",
+  "dangerous": "Ảnh hưởng đến thanh toán của khách hàng thật",
+  "switch": {
+    "on": "Bật",
+    "off": "Tắt"
+  },
+  "save": "Lưu",
+  "saving": "Đang lưu…",
+  "draftError": {
+    "options": "Hãy chọn một trong các giá trị cho phép.",
+    "range": "Nhập một số nguyên từ {{min}} đến {{max}}.",
+    "blank": "Hãy nhập một giá trị."
+  },
+  "errors": {
+    "save": "Không lưu được. Vui lòng thử lại."
+  },
+  "dialog": {
+    "title": "Lý do thay đổi",
+    "description": "{{setting}} sẽ đổi từ {{from}} sang {{to}}. Lý do được lưu trong lịch sử thay đổi.",
+    "reasonLabel": "Lý do",
+    "counter": "{{count}} / {{max}}",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu…"
+  },
+  "history": {
+    "loading": "Đang tải lịch sử…",
+    "loadFailed": "Không tải được lịch sử thay đổi.",
+    "retry": "Thử lại",
+    "tableLabel": "Các thay đổi cài đặt thanh toán",
+    "filterLabel": "Cài đặt",
+    "filterAll": "Tất cả cài đặt",
+    "columns": {
+      "time": "Thời gian",
+      "setting": "Cài đặt",
+      "change": "Thay đổi",
+      "actor": "Người thay đổi",
+      "reason": "Lý do"
+    },
+    "transition": "{{from}} → {{to}}",
+    "unset": "chưa đặt",
+    "deletedAccount": "tài khoản đã xóa",
+    "noReason": "—",
+    "emptyTitle": "Chưa có thay đổi nào",
+    "emptyDescription": "Chưa có cài đặt thanh toán nào được thay đổi.",
+    "emptyFilteredDescription": "Cài đặt này chưa được thay đổi.",
+    "pageOf": "Trang {{page}} / {{pages}}",
+    "previous": "Trước",
+    "next": "Sau",
+    "previousLabel": "Trang thay đổi trước",
+    "nextLabel": "Trang thay đổi sau"
+  }
+}

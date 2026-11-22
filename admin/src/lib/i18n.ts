@@ -6,6 +6,7 @@ import enCommon from '../locales/en/common.json';
 import enDashboard from '../locales/en/dashboard.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
 import enProviders from '../locales/en/providers.json';
+import enPaymentSettings from '../locales/en/paymentSettings.json';
 import enRuns from '../locales/en/runs.json';
 import enSettings from '../locales/en/settings.json';
 import enSmsOutbox from '../locales/en/smsOutbox.json';
@@ -19,6 +20,7 @@ import viCommon from '../locales/vi/common.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
 import viProviders from '../locales/vi/providers.json';
+import viPaymentSettings from '../locales/vi/paymentSettings.json';
 import viRuns from '../locales/vi/runs.json';
 import viSettings from '../locales/vi/settings.json';
 import viSmsOutbox from '../locales/vi/smsOutbox.json';
@@ -41,6 +43,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: viDashboard,
     smsOutbox: viSmsOutbox,
     settings: viSettings,
+    paymentSettings: viPaymentSettings,
     support: viSupport,
     chat: viChat,
   },
@@ -56,6 +59,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     dashboard: enDashboard,
     smsOutbox: enSmsOutbox,
     settings: enSettings,
+    paymentSettings: enPaymentSettings,
     support: enSupport,
     chat: enChat,
   },

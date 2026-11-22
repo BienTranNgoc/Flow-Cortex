@@ -39,7 +39,9 @@ public enum Permission {
     WORKFLOW_RUN_EXPORT("workflow.run.export", false),
     WORKFLOW_RUN_CANCEL("workflow.run.cancel", false),
     WORKFLOW_WORKFLOW_VIEW("workflow.workflow.view", false),
-    WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false);
+    WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
+    PAYMENT_SETTING_VIEW("payment.setting.view", false),
+    PAYMENT_SETTING_UPDATE("payment.setting.update", false);
 
     private static final Map<String, Permission> BY_KEY =
             Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(Permission::key, Function.identity()));
