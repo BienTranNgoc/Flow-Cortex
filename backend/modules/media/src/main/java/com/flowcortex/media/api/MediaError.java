@@ -21,7 +21,11 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         RUN_TIMEOUT("run_timeout"),
         DURATION_EXCEEDED("duration_exceeded"),
         NO_AUDIO_STREAM("no_audio_stream"),
-        SIBLING_FAILED("sibling_failed");
+        SIBLING_FAILED("sibling_failed"),
+        SEPARATION_FAILED("separation_failed"),
+        DIARIZATION_FAILED("diarization_failed"),
+        BEAT_DETECTION_FAILED("beat_detection_failed"),
+        NO_BEATS_DETECTED("no_beats_detected");
 
         private final String value;
 

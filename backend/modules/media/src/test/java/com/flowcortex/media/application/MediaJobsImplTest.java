@@ -102,6 +102,7 @@ class MediaJobsImplTest {
         "flowcortex.media.max-runtime.extract_audio=10m",
         "flowcortex.media.max-runtime.align_audio=10m",
         "flowcortex.media.max-runtime.render_video=10m",
+        "flowcortex.media.max-runtime.separate_audio=15m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
         "flowcortex.media.provider-queue-timeout=5m",
@@ -869,6 +870,11 @@ class MediaJobsImplTest {
                     new StoredAttachment("flowcortex-media", "support/r/m/2", "image/png", 40L))))
                     .hasMessage("store down");
             verify(store).retag("flowcortex-media", "support/r/m/2", "support-pending");
+            jobs.releaseAttachments(List.of(
+                    new StoredAttachment("flowcortex-media", "workflow-review/w/u/b/1", "image/png", 40L),
+                    new StoredAttachment("flowcortex-media", "support/r/m/3", "image/png", 40L)));
+            verify(store).retag("flowcortex-media", "workflow-review/w/u/b/1", "review-pending");
+            verify(store).retag("flowcortex-media", "support/r/m/3", "support-pending");
             assertThatThrownBy(() -> jobs.releaseAttachments(List.of(
                     new StoredAttachment("flowcortex-media", "runs/r/inputs/a", "image/png", 40L))))
                     .isInstanceOf(IllegalArgumentException.class);
@@ -1252,6 +1258,26 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void reviewImagesAreKeptUnderTheWorkflowReviewRootWithTheirOwnTags() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID image = UUID.randomUUID();
+            givenImage(context, image, "image/png", 100L);
+            givenUploadBytes(context, "o/" + image, png(40, 30));
+            String prefix = "workflow-review/" + UUID.randomUUID() + "/" + UUID.randomUUID() + "/" + UUID.randomUUID();
+            when(store.readPrefix("flowcortex-media", prefix + "/1", 16)).thenReturn(Optional.of(PNG_PREFIX));
+
+            jobs.keepAttachments(prefix, List.of(upload(image, "image_1")), 5L * 1024 * 1024);
+
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).put("flowcortex-media", prefix + "/1", "image/png", png(40, 30), "review-pending");
+            order.verify(store).retag("flowcortex-media", prefix + "/1", "review-image");
+            verify(store, never()).retag(eq("flowcortex-media"), anyString(), eq("support-attachment"));
+        });
+    }
+
+    @Test
     void keepingAttachmentsRefusesToJoinATransaction() {
         runner.run(context -> {
             MediaJobs jobs = context.getBean(MediaJobs.class);
@@ -1438,6 +1464,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.provider-max-runtime=10m",
                 "flowcortex.media.consumer-timeout=12m")
         .run(context -> {
@@ -1498,6 +1525,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
             assertThat(context).hasFailed();
@@ -1511,6 +1539,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
                 .run(context -> assertThat(context).hasNotFailed());

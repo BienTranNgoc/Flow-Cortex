@@ -2,13 +2,13 @@ groups:
   - name: worker-queues
     rules:
       - alert: WorkerQueueBacklog
-        expr: rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue=~"media\\.jobs|media\\.render\\.jobs|provider\\.jobs|provider\\.video\\.jobs"} > 0
+        expr: rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue=~"media\\.jobs|media\\.render\\.jobs|media\\.audio\\.jobs|provider\\.jobs|provider\\.video\\.jobs"} > 0
         for: 15m
         labels:
           severity: warning
         annotations:
           summary: "Queue {{ $labels.queue }} has had ready messages for 15 minutes"
-          description: '{{ $labels.queue }} has not emptied for 15 minutes (consumers busy or absent). {{ if eq $labels.queue "media.render.jobs" }}Raise MEDIA_RENDER_WORKERS{{ else if eq $labels.queue "provider.video.jobs" }}Raise PROVIDER_VIDEO_WORKERS{{ else }}This lane has a single container; check its logs and whether a job is stuck{{ end }}.'
+          description: '{{ $labels.queue }} has not emptied for 15 minutes (consumers busy or absent). {{ if eq $labels.queue "media.render.jobs" }}Raise MEDIA_RENDER_WORKERS{{ else if eq $labels.queue "media.audio.jobs" }}Raise MEDIA_AUDIO_WORKERS{{ else if eq $labels.queue "provider.video.jobs" }}Raise PROVIDER_VIDEO_WORKERS{{ else }}This lane has a single container; check its logs and whether a job is stuck{{ end }}.'
 
       - alert: WorkerDeadLetters
         expr: rabbitmq_queue_messages{job="rabbitmq-per-object",queue=~"(media|provider)\\..+\\.dlq"} > 0

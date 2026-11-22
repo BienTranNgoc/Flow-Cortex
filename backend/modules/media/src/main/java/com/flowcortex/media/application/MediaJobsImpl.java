@@ -59,10 +59,6 @@ class MediaJobsImpl implements MediaJobs {
     private static final Pattern ATTEMPT_SEGMENT = Pattern.compile("^attempts/[1-9][0-9]*/(?=.)");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
-    private static final String ATTACHMENT_PREFIX = "support/";
-    /** Retention tag values the media bucket's lifecycle rules key on: pending expires, attachment is kept. */
-    private static final String SUPPORT_PENDING = "support-pending";
-    private static final String SUPPORT_ATTACHMENT = "support-attachment";
     private static final String DRIVE_PREFIX = "drive/";
     /** Same retention-tag contract as support: pending expires by lifecycle, a kept Drive file does not. */
     private static final String DRIVE_PENDING = "drive-pending";
@@ -72,6 +68,22 @@ class MediaJobsImpl implements MediaJobs {
     /** Profile images: pending expires like a released one, a confirmed one is kept. */
     private static final String PROFILE_IMAGE_TAG = "profile-image";
     private static final String PROFILE_RELEASED = "profile-released";
+
+    /** Retention tag values the media bucket's lifecycle rules key on: pending expires, kept stays. */
+    private record RetentionTags(String pending, String kept) {
+    }
+
+    /** The key roots attachments may be kept under, each with its own retention tags. */
+    private static final Map<String, RetentionTags> ATTACHMENT_ROOTS = Map.of(
+            "support/", new RetentionTags("support-pending", "support-attachment"),
+            "workflow-review/", new RetentionTags("review-pending", "review-image"));
+
+    private static Optional<RetentionTags> rootTagsOf(String key) {
+        return ATTACHMENT_ROOTS.entrySet().stream()
+                .filter(root -> key.startsWith(root.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst();
+    }
 
     private final ApplicationEventPublisher events;
     private final Validator validator;
@@ -305,8 +317,9 @@ class MediaJobsImpl implements MediaJobs {
     @Override
     @Transactional(propagation = Propagation.NEVER)
     public List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes) {
-        if (keyPrefix == null || !keyPrefix.startsWith(ATTACHMENT_PREFIX) || keyPrefix.endsWith("/")) {
-            throw new IllegalArgumentException("Attachments are kept only under " + ATTACHMENT_PREFIX + ": "
+        RetentionTags tags = keyPrefix == null || keyPrefix.endsWith("/") ? null : rootTagsOf(keyPrefix).orElse(null);
+        if (tags == null) {
+            throw new IllegalArgumentException("Attachments are kept only under " + ATTACHMENT_ROOTS.keySet() + ": "
                     + keyPrefix);
         }
         if (inputs == null || inputs.isEmpty() || inputs.size() > 10) {
@@ -331,7 +344,7 @@ class MediaJobsImpl implements MediaJobs {
             String targetKey = keyPrefix + "/" + (index + 1);
             HardenedImage image = hardenedImage(source, sources.get(index).getMimeType(), maxBytes,
                     "uploadIds", reason -> refusedAttachment(source.bucket(), source.objectKey(), reason));
-            store.put(bucket, targetKey, image.contentType(), image.bytes(), SUPPORT_PENDING);
+            store.put(bucket, targetKey, image.contentType(), image.bytes(), tags.pending());
             if (properties.upload().contentCheck().enabled()) {
                 byte[] prefix = store.readPrefix(bucket, targetKey, ContentSniffer.PREFIX_LENGTH)
                         .orElseThrow(() -> refusedAttachment(bucket, targetKey, "gone before the content check"));
@@ -348,7 +361,7 @@ class MediaJobsImpl implements MediaJobs {
         List<StoredAttachment> retagged = new java.util.ArrayList<>();
         try {
             for (StoredAttachment attachment : kept) {
-                store.retag(bucket, attachment.objectKey(), SUPPORT_ATTACHMENT);
+                store.retag(bucket, attachment.objectKey(), tags.kept());
                 retagged.add(attachment);
             }
         } catch (RuntimeException e) {
@@ -366,7 +379,7 @@ class MediaJobsImpl implements MediaJobs {
     public void releaseAttachments(List<StoredAttachment> attachments) {
         String bucket = properties.s3().bucket();
         for (StoredAttachment attachment : attachments) {
-            if (!bucket.equals(attachment.bucket()) || !attachment.objectKey().startsWith(ATTACHMENT_PREFIX)) {
+            if (!bucket.equals(attachment.bucket()) || rootTagsOf(attachment.objectKey()).isEmpty()) {
                 throw new IllegalArgumentException("Not a kept attachment: " + attachment.bucket() + "/"
                         + attachment.objectKey());
             }
@@ -374,7 +387,7 @@ class MediaJobsImpl implements MediaJobs {
         RuntimeException first = null;
         for (StoredAttachment attachment : attachments) {
             try {
-                store.retag(bucket, attachment.objectKey(), SUPPORT_PENDING);
+                store.retag(bucket, attachment.objectKey(), rootTagsOf(attachment.objectKey()).orElseThrow().pending());
                 LOG.info("Attachment released: bucket={} key={}", bucket, attachment.objectKey());
             } catch (RuntimeException e) {
                 LOG.warn("Attachment release failed: bucket={} key={} error={}", bucket, attachment.objectKey(),

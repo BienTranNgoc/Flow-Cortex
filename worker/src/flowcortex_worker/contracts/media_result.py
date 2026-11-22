@@ -48,6 +48,10 @@ class MediaError(BaseModel):
             "duration_exceeded",
             "no_audio_stream",
             "sibling_failed",
+            "separation_failed",
+            "diarization_failed",
+            "beat_detection_failed",
+            "no_beats_detected",
         ],
         Field(title="MediaErrorCode"),
     ]
