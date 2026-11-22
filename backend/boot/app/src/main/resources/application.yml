@@ -438,6 +438,13 @@ flowcortex:
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
+    call:
+      # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
+      # child is stopped. Covers a child of four media steps at their queue and run bounds.
+      max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
+    # How often reviews of an uploaded workflow file that were never imported are deleted.
+    import-review:
+      purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
@@ -448,13 +455,6 @@ flowcortex:
       enabled: ${FLOWCORTEX_VENDOR_JOBS_CLEANUP_ENABLED:true}
       interval: ${FLOWCORTEX_VENDOR_JOBS_CLEANUP_INTERVAL:1h}
     retention: ${FLOWCORTEX_VENDOR_JOBS_RETENTION:7d}
-    call:
-      # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
-      # child is stopped. Covers a child of four media steps at their queue and run bounds.
-      max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
-    # How often reviews of an uploaded workflow file that were never imported are deleted.
-    import-review:
-      purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
   # Vietnamese dubbing: the translate and tts steps call Gemini. Off by default; the steps count as
   # available only with the switch on AND a key — otherwise a dub run is refused (503 dub_disabled)
   # and a run already past its start fails dub_disabled at its next dub step. Env var + restart,
