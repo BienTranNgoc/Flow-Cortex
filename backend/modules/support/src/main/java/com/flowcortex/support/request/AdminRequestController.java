@@ -218,6 +218,7 @@ class AdminRequestController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_ASSIGN)
+    @AdminAudit(value = "support_request.assign", resourceParam = "number", capture = "assigneeId")
     @PutMapping(value = "/{number}/assignee", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     AdminDetail assign(@AuthenticationPrincipal Jwt jwt, @PathVariable long number,
@@ -231,6 +232,7 @@ class AdminRequestController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_ASSIGN)
+    @AdminAudit(value = "support_request.bulk_assign", resourceParam = "", capture = {"numbers", "assigneeId"})
     @PostMapping(value = "/bulk-assign", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     BulkAssignResult bulkAssign(@AuthenticationPrincipal Jwt jwt, @RequestBody BulkAssignRequest body) {
