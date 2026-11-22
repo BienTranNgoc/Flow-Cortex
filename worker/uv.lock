@@ -699,12 +699,6 @@ overlay = [
     { name = "opencv-python-headless" },
 ]
 
-[package.optional-dependencies]
-overlay = [
-    { name = "numpy" },
-    { name = "opencv-python-headless" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "datamodel-code-generator" },
