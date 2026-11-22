@@ -412,6 +412,7 @@ flowcortex:
   # hub-threads are the module's own, not Boot's pools.
   realtime:
     heartbeat: 15s
+    recheck-interval: 60s
     replay:
       max-events: 1000
       max-age: 120s

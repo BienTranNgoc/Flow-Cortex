@@ -89,7 +89,8 @@ class RealtimeStreamController {
             throw new InvalidBearerTokenException("The access token has no expiry");
         }
         SseEmitter emitter = new SseEmitter(Math.max(1, Duration.between(Instant.now(), expiresAt).toMillis()));
-        Admission admission = hub.register(userId, outcome.topics(), expiresAt, lastEventId, new SseEmitterSink(emitter));
+        Admission admission = hub.register(userId, outcome.topics(), outcome.rechecks(), expiresAt, lastEventId,
+                new SseEmitterSink(emitter));
         if (admission == Admission.LIMIT_REACHED) {
             throw new LocalizedStatusException(HttpStatus.TOO_MANY_REQUESTS, new LocalizedMessage("realtime.stream.limit"));
         }
