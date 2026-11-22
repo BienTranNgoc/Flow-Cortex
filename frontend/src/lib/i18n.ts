@@ -4,6 +4,7 @@ import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enCredits from '../locales/en/credits.json';
 import enDashboard from '../locales/en/dashboard.json';
+import enLegal from '../locales/en/legal.json';
 import enOnboarding from '../locales/en/onboarding.json';
 import enRunHistory from '../locales/en/runHistory.json';
 import enNotifications from '../locales/en/notifications.json';
@@ -14,6 +15,7 @@ import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viCredits from '../locales/vi/credits.json';
 import viDashboard from '../locales/vi/dashboard.json';
+import viLegal from '../locales/vi/legal.json';
 import viOnboarding from '../locales/vi/onboarding.json';
 import viRunHistory from '../locales/vi/runHistory.json';
 import viNotifications from '../locales/vi/notifications.json';
@@ -34,6 +36,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: viOnboarding,
     chat: viChat,
     notifications: viNotifications,
+    legal: viLegal,
   },
   en: {
     common: enCommon,
@@ -46,6 +49,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: enOnboarding,
     chat: enChat,
     notifications: enNotifications,
+    legal: enLegal,
   },
 });
 
