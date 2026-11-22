@@ -56,6 +56,100 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/schedule:
+    get:
+      tags:
+      - schedules-controller
+      summary: The caller's schedule for the workflow
+      operationId: getWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - schedules-controller
+      summary: Create or replace the caller's schedule
+      operationId: setWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetScheduleRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - schedules-controller
+      summary: Delete the caller's schedule; its fires stay
+      operationId: deleteWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
     put:
       tags:
@@ -1617,6 +1711,103 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/workflows/{id}/schedule/run-now:
+    post:
+      tags:
+      - schedules-controller
+      summary: "Start one run with the schedule's input now, without changing the\
+        \ schedule"
+      operationId: runWorkflowScheduleNow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/schedule/resume:
+    post:
+      tags:
+      - schedules-controller
+      summary: Resume the caller's schedule
+      operationId: resumeWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/schedule/pause:
+    post:
+      tags:
+      - schedules-controller
+      summary: Pause the caller's schedule
+      operationId: pauseWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -5865,6 +6056,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+  /api/v1/workflows/{id}/schedule/runs:
+    get:
+      tags:
+      - schedules-controller
+      summary: "The caller's fires of the workflow, newest first"
+      operationId: listWorkflowScheduleRuns
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/reviews:
     get:
       tags:
@@ -8421,6 +8656,54 @@ components:
         properties:
           type: object
           additionalProperties: {}
+    SetScheduleRequest:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum:
+          - daily
+          - weekly
+          - monthly
+          pattern: daily|weekly|monthly
+        dayOfWeek:
+          type: string
+          enum:
+          - monday
+          - tuesday
+          - wednesday
+          - thursday
+          - friday
+          - saturday
+          - sunday
+          pattern: monday|tuesday|wednesday|thursday|friday|saturday|sunday
+        dayOfMonth:
+          type: integer
+          format: int32
+          maximum: 28
+          minimum: 1
+        time:
+          type: string
+          description: "HH:mm on the quarter hour, in the schedule's time zone"
+          example: 08:00
+          pattern: "([01]\\d|2[0-3]):(00|15|30|45)"
+        timezone:
+          type: string
+          default: Asia/Ho_Chi_Minh
+          description: "A region id such as Asia/Ho_Chi_Minh, or UTC"
+        active:
+          type: boolean
+          default: true
+        input:
+          type: string
+          maxLength: 10000
+          minLength: 0
+        acknowledgeCost:
+          type: boolean
+          default: false
+      required:
+      - frequency
+      - time
     HelpfulRequest:
       type: object
       properties:

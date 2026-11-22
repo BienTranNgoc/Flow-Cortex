@@ -24,6 +24,60 @@ export interface ProblemDetail {
   properties?: ProblemDetailProperties;
 }
 
+/**
+ * @pattern daily|weekly|monthly
+ */
+export type SetScheduleRequestFrequency =
+  (typeof SetScheduleRequestFrequency)[keyof typeof SetScheduleRequestFrequency];
+
+export const SetScheduleRequestFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  monthly: 'monthly',
+} as const;
+
+/**
+ * @pattern monday|tuesday|wednesday|thursday|friday|saturday|sunday
+ */
+export type SetScheduleRequestDayOfWeek =
+  (typeof SetScheduleRequestDayOfWeek)[keyof typeof SetScheduleRequestDayOfWeek];
+
+export const SetScheduleRequestDayOfWeek = {
+  monday: 'monday',
+  tuesday: 'tuesday',
+  wednesday: 'wednesday',
+  thursday: 'thursday',
+  friday: 'friday',
+  saturday: 'saturday',
+  sunday: 'sunday',
+} as const;
+
+export interface SetScheduleRequest {
+  /** @pattern daily|weekly|monthly */
+  frequency: SetScheduleRequestFrequency;
+  /** @pattern monday|tuesday|wednesday|thursday|friday|saturday|sunday */
+  dayOfWeek?: SetScheduleRequestDayOfWeek;
+  /**
+   * @minimum 1
+   * @maximum 28
+   */
+  dayOfMonth?: number;
+  /**
+   * HH:mm on the quarter hour, in the schedule's time zone
+   * @pattern ([01]\d|2[0-3]):(00|15|30|45)
+   */
+  time: string;
+  /** A region id such as Asia/Ho_Chi_Minh, or UTC */
+  timezone?: string;
+  active?: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 10000
+   */
+  input?: string;
+  acknowledgeCost?: boolean;
+}
+
 export interface HelpfulRequest {
   helpful: boolean;
 }
@@ -4063,6 +4117,19 @@ export type GetWorkflowVisibilityAuditParams = {
   cursor?: string;
 };
 
+export type ListWorkflowScheduleRunsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
 export type ListWorkflowReviewsParams = {
   /**
    * @pattern newest|helpful
@@ -4635,6 +4702,146 @@ export const reorderWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type getWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getWorkflowScheduleResponseError = (
+  getWorkflowScheduleResponse404 | getWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowScheduleResponse = getWorkflowScheduleResponseError;
+
+export const getGetWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary The caller's schedule for the workflow
+ */
+export const getWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowScheduleResponse> => {
+  return customFetch<getWorkflowScheduleResponse>(getGetWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type setWorkflowScheduleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type setWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type setWorkflowScheduleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type setWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type setWorkflowScheduleResponseError = (
+  | setWorkflowScheduleResponse400
+  | setWorkflowScheduleResponse404
+  | setWorkflowScheduleResponse422
+  | setWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type setWorkflowScheduleResponse = setWorkflowScheduleResponseError;
+
+export const getSetWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary Create or replace the caller's schedule
+ */
+export const setWorkflowSchedule = async (
+  id: string,
+  setScheduleRequest: SetScheduleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setWorkflowScheduleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setWorkflowScheduleResponse>(getSetWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setScheduleRequest),
+  });
+};
+
+export type deleteWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type deleteWorkflowScheduleResponseError = (
+  deleteWorkflowScheduleResponse404 | deleteWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowScheduleResponse = deleteWorkflowScheduleResponseError;
+
+export const getDeleteWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary Delete the caller's schedule; its fires stay
+ */
+export const deleteWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowScheduleResponse> => {
+  return customFetch<deleteWorkflowScheduleResponse>(getDeleteWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -7227,6 +7434,131 @@ export const addStep = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createStepRequest),
+  });
+};
+
+export type runWorkflowScheduleNowResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type runWorkflowScheduleNowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type runWorkflowScheduleNowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type runWorkflowScheduleNowResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type runWorkflowScheduleNowResponseError = (
+  | runWorkflowScheduleNowResponse402
+  | runWorkflowScheduleNowResponse404
+  | runWorkflowScheduleNowResponse422
+  | runWorkflowScheduleNowResponse503
+) & {
+  headers: Headers;
+};
+
+export type runWorkflowScheduleNowResponse = runWorkflowScheduleNowResponseError;
+
+export const getRunWorkflowScheduleNowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/run-now`;
+};
+
+/**
+ * @summary Start one run with the schedule's input now, without changing the schedule
+ */
+export const runWorkflowScheduleNow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<runWorkflowScheduleNowResponse> => {
+  return customFetch<runWorkflowScheduleNowResponse>(getRunWorkflowScheduleNowUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resumeWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resumeWorkflowScheduleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type resumeWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type resumeWorkflowScheduleResponseError = (
+  | resumeWorkflowScheduleResponse404
+  | resumeWorkflowScheduleResponse422
+  | resumeWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type resumeWorkflowScheduleResponse = resumeWorkflowScheduleResponseError;
+
+export const getResumeWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/resume`;
+};
+
+/**
+ * @summary Resume the caller's schedule
+ */
+export const resumeWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resumeWorkflowScheduleResponse> => {
+  return customFetch<resumeWorkflowScheduleResponse>(getResumeWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type pauseWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pauseWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type pauseWorkflowScheduleResponseError = (
+  pauseWorkflowScheduleResponse404 | pauseWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type pauseWorkflowScheduleResponse = pauseWorkflowScheduleResponseError;
+
+export const getPauseWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/pause`;
+};
+
+/**
+ * @summary Pause the caller's schedule
+ */
+export const pauseWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pauseWorkflowScheduleResponse> => {
+  return customFetch<pauseWorkflowScheduleResponse>(getPauseWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -14195,6 +14527,57 @@ export const getWorkflowSharing = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getWorkflowSharingResponse> => {
   return customFetch<getWorkflowSharingResponse>(getGetWorkflowSharingUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listWorkflowScheduleRunsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listWorkflowScheduleRunsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listWorkflowScheduleRunsResponseError = (
+  listWorkflowScheduleRunsResponse400 | listWorkflowScheduleRunsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowScheduleRunsResponse = listWorkflowScheduleRunsResponseError;
+
+export const getListWorkflowScheduleRunsUrl = (
+  id: string,
+  params?: ListWorkflowScheduleRunsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/schedule/runs?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/schedule/runs`;
+};
+
+/**
+ * @summary The caller's fires of the workflow, newest first
+ */
+export const listWorkflowScheduleRuns = async (
+  id: string,
+  params?: ListWorkflowScheduleRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowScheduleRunsResponse> => {
+  return customFetch<listWorkflowScheduleRunsResponse>(getListWorkflowScheduleRunsUrl(id, params), {
     ...options,
     method: 'GET',
   });
