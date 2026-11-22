@@ -120,6 +120,8 @@ The member app has two themes. Light is the default (`:root` in `tokens.css`); d
 
 The public auth screens (sign in, register, confirm email, set password) are a fixed light brand surface: a frosted light card on an ocean banner. Their shell root sets `color-scheme: light` and ignores both the operating-system preference and the member's chosen theme; nothing outside that root changes, so signed-in screens keep the chosen theme. The VI | EN toggle sits in the shell's top bar, restyled with the auth tokens, with 44px controls.
 
+The verify-phone page, which a signed-in member the server holds for an unverified number sees before any product page, uses the same card. It reuses the profile phone form, so its root remaps that form's app tokens (`ink`, `input-bg`, `primary`, `red`, `green` and the like) to the auth palette instead of adding colours; the form's own heading stays for screen readers only, and its title is 28px so the card fits a 1366×650 window.
+
 | token               | value     | use                                                                |
 | ------------------- | --------- | ------------------------------------------------------------------ |
 | `auth-ocean`        | `#0b57a6` | banner base; `auth-on-ocean` text 7.17:1                           |

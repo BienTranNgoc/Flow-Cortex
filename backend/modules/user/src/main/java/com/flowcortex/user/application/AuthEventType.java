@@ -38,6 +38,9 @@ public enum AuthEventType {
     /** A redeemed authorization code was presented again; the token its first redemption produced is revoked. */
     OAUTH_CODE_REPLAYED,
 
+    PHONE_CHANGED,
+    PHONE_CHANGE_REVERTED,
+
     LOGOUT;
 
     public static Map<String, Object> metadata(Object... keyValuePairs) {

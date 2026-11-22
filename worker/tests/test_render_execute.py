@@ -40,7 +40,7 @@ class Recording(ProcessRunner):
         self.fail_encode = fail_encode
         self.kill_encode = kill_encode
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.calls.append(Path(argv[0]).name)
         if argv[0] == "ffmpeg" and any(a.startswith("-filter_complex") for a in argv):
             self.encodes += 1
@@ -48,11 +48,11 @@ class Recording(ProcessRunner):
                 raise ProcessKilled("watchdog")
             if self.fail_encode == self.encodes:
                 return subprocess.CompletedProcess(argv, 1, b"", b"boom")
-        return super().run(argv)
+        return super().run(argv, cwd)
 
 
 class NeverRuns(ProcessRunner):
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         raise AssertionError(f"no process may start, got {argv[0]}")
 
 
@@ -384,8 +384,8 @@ def test_overlay_image_at_the_pixel_cap_passes_the_probe_stage(tmp_path: Path) -
 class FakeLibassLog(Recording):
     """Real ffmpeg, but every chunk reports libass missing a Vietnamese glyph."""
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
-        done = super().run(argv)
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
+        done = super().run(argv, cwd)
         if argv[0] == "ffmpeg" and any(a.startswith("-filter_complex") for a in argv):
             return subprocess.CompletedProcess(argv, 0, done.stdout, b"Glyph 0x1EA1 not found\n")
         return done
