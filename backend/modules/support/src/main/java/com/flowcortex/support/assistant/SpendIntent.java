@@ -31,7 +31,9 @@ final class SpendIntent {
             "gi");
 
     /** Folded single words that collide with another word; in an accented message only the accented spelling counts. */
-    private static final Map<String, String> ACCENTED_ONLY = Map.of("anh", "ảnh", "dung", "dựng");
+    private static final Map<String, String> ACCENTED_ONLY = Map.of(
+            "anh", "ảnh", "dung", "dựng", "ve", "vẽ", "lam", "làm", "tao", "tạo", "chay", "chạy",
+            "nhac", "nhạc", "song", "song");
 
     private SpendIntent() {
     }

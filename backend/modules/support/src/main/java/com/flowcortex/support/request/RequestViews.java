@@ -81,7 +81,7 @@ final class RequestViews {
     record ConversationMessage(
             @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"user", "assistant"}) String role,
             @Schema(requiredMode = RequiredMode.REQUIRED) String text,
-            @Schema(allowableValues = {"answered", "no_answer", "blocked"}) String outcome,
+            @Schema(allowableValues = {"answered", "no_answer", "blocked", "handoff", "sign_in"}) String outcome,
             @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt) {
     }
 

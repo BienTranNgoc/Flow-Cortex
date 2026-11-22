@@ -8906,6 +8906,8 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         createdAt:
           type: string
           format: date-time

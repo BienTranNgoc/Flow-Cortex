@@ -380,6 +380,8 @@ export const SupportConversationMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportConversationMessage {

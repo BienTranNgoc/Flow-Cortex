@@ -31,6 +31,7 @@ import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
 import com.flowcortex.support.request.RequestViews.BulkAssignResult;
+import com.flowcortex.support.request.RequestViews.ConversationMessage;
 import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.web.SupportProblemException;
 import com.flowcortex.shared.security.authz.Permission;
@@ -436,6 +437,22 @@ class RequestServiceTest {
         assertThat(detail.conversation()).singleElement().satisfies(m -> assertThat(m.text()).isEqualTo("Mất credit"));
         assertThat(detail.conversationExpired()).isFalse();
         assertThat(detail.allowedStatuses()).containsExactly("in_progress", "resolved", "closed");
+    }
+
+    @Test
+    void anAdminSeesTheHandoffOutcomeOfAnAssistantTurnUnchanged() {
+        UUID id = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(id, 12, member, "credit",
+                "Bị trừ tiền", RequestStatus.NEW, conversation, true, false, NOW, null, null, null, NOW, null, "vi")));
+        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
+        when(requests.conversation(conversation)).thenReturn(List.of(
+                new ConversationMessageRow("user", "Tôi bị trừ tiền 2 lần", null, NOW),
+                new ConversationMessageRow("assistant", "Câu hỏi này cần đội ngũ hỗ trợ xử lý", "handoff", NOW)));
+
+        AdminDetail detail = service.adminDetail(12);
+
+        assertThat(detail.conversation()).extracting(ConversationMessage::outcome).containsExactly(null, "handoff");
     }
 
     @Test

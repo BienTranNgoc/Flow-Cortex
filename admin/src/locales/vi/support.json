@@ -236,7 +236,9 @@
     "assistant": "Trợ lý",
     "outcome": {
       "no_answer": "Trợ lý chưa trả lời được",
-      "blocked": "Câu hỏi bị từ chối"
+      "blocked": "Câu hỏi bị từ chối",
+      "handoff": "Câu hỏi được chuyển cho đội ngũ hỗ trợ",
+      "sign_in": "Khách được yêu cầu đăng nhập"
     },
     "attachmentAlt": "Ảnh đính kèm {{position}}",
     "saveStatus": "Lưu trạng thái",

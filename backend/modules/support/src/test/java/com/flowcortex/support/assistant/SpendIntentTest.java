@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -30,7 +31,7 @@ class SpendIntentTest {
     void everyGoldenSpendMessageIsASpendRequest() throws IOException {
         List<String> messages = golden("spend");
 
-        assertThat(messages).hasSize(23);
+        assertThat(messages).hasSize(25);
         assertThat(messages).allSatisfy(message -> assertThat(SpendIntent.isSpendRequest(message))
                 .as(message).isTrue());
     }
@@ -39,7 +40,7 @@ class SpendIntentTest {
     void everyGoldenNotSpendMessageIsNot() throws IOException {
         List<String> messages = golden("notSpend");
 
-        assertThat(messages).hasSize(24);
+        assertThat(messages).hasSize(26);
         assertThat(messages).allSatisfy(message -> assertThat(SpendIntent.isSpendRequest(message))
                 .as(message).isFalse());
     }
@@ -60,6 +61,17 @@ class SpendIntentTest {
     void dungIsTheVerbOnlyAsDung() {
         assertThat(SpendIntent.isSpendRequest("sử dụng workflow mới")).isFalse();
         assertThat(SpendIntent.isSpendRequest("dựng video ra mắt")).isTrue();
+    }
+
+    @ParameterizedTest(name = "\"{0}\" is not a spend request")
+    @ValueSource(strings = {
+            "Mình thích lắm video này",
+            "Quả táo trong video này",
+            "Cháy hàng workflow mới",
+            "Tạo giúp mình nhắc nhở hàng ngày",
+            "Tạo môi trường sống"})
+    void aFoldedWordThatIsAnotherWordWhenAccentedIsNotAVerbOrNoun(String message) {
+        assertThat(SpendIntent.isSpendRequest(message)).isFalse();
     }
 
     @ParameterizedTest(name = "help cue \"{0}\" in \"{1}\"")

@@ -236,7 +236,9 @@
     "assistant": "Assistant",
     "outcome": {
       "no_answer": "The assistant could not answer",
-      "blocked": "The question was refused"
+      "blocked": "The question was refused",
+      "handoff": "The question was sent to the support team",
+      "sign_in": "The guest was asked to sign in"
     },
     "attachmentAlt": "Attached image {{position}}",
     "saveStatus": "Save status",
