@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * A workflow definition. {@link WorkflowVisibility} is the sharing dimension: a public definition
@@ -60,6 +61,17 @@ public class Workflow {
     @Column(name = "published_version_id")
     private UUID publishedVersionId;
 
+    @Column(name = "allow_fork", nullable = false)
+    private boolean allowFork;
+
+    /** Written only by the atomic increment in the repository, never through the entity. */
+    @Column(name = "fork_count", nullable = false, insertable = false, updatable = false)
+    @ColumnDefault("0")
+    private int forkCount;
+
+    @Column(name = "forked_from_id", updatable = false)
+    private UUID forkedFromId;
+
     /** Required by JPA. */
     protected Workflow() {
     }
@@ -72,6 +84,13 @@ public class Workflow {
     /** Creates a private draft. */
     public static Workflow draft(UUID id, UUID ownerId, String name) {
         return new Workflow(id, ownerId, name, false, WorkflowStatus.DRAFT);
+    }
+
+    /** An unshared draft copy of {@code sourceId}; forking is off until its owner turns it on. */
+    public static Workflow forkOf(UUID id, UUID ownerId, String name, UUID sourceId) {
+        Workflow fork = new Workflow(id, ownerId, name, false, WorkflowStatus.DRAFT);
+        fork.forkedFromId = sourceId;
+        return fork;
     }
 
     private Workflow(UUID id, UUID ownerId, String name, boolean shared, WorkflowStatus status) {
@@ -127,6 +146,11 @@ public class Workflow {
 
     private void syncSharedAndTouch() {
         this.shared = visibility == WorkflowVisibility.PUBLIC;
+        touch();
+    }
+
+    public void setAllowFork(boolean allowFork) {
+        this.allowFork = allowFork;
         touch();
     }
 
@@ -196,6 +220,18 @@ public class Workflow {
 
     public UUID getPublishedVersionId() {
         return publishedVersionId;
+    }
+
+    public boolean isAllowFork() {
+        return allowFork;
+    }
+
+    public int getForkCount() {
+        return forkCount;
+    }
+
+    public UUID getForkedFromId() {
+        return forkedFromId;
     }
 
     /** True for the migration-maintained seed workflows, which are served live and never versioned. */

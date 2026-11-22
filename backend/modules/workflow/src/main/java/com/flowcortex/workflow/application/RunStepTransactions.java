@@ -4,6 +4,7 @@ import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.credit.api.InsufficientCreditsException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.workflow.api.WorkflowRunCompleted;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,13 +50,18 @@ class RunStepTransactions {
     private final WorkflowRunRepository workflowRunRepository;
     private final CreditAccounts creditAccounts;
     private final RunUpdates runUpdates;
+    private final ApplicationEventPublisher events;
+    private final ChildRuns childRuns;
 
     RunStepTransactions(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            CreditAccounts creditAccounts, RunUpdates runUpdates) {
+            CreditAccounts creditAccounts, RunUpdates runUpdates, ApplicationEventPublisher events,
+            ChildRuns childRuns) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.creditAccounts = creditAccounts;
         this.runUpdates = runUpdates;
+        this.events = events;
+        this.childRuns = childRuns;
     }
 
     /**
@@ -86,7 +93,7 @@ class RunStepTransactions {
             return ClaimOutcome.LOST;
         }
         runUpdates.touched(runId);
-        if (!charge(runId, stepId)) {
+        if (!charge(runId, stepId, attempt)) {
             failRunning(runId, stepId, attempt, InsufficientCreditsException.CODE, NOT_ENOUGH_CREDITS, now);
             return ClaimOutcome.FAILED;
         }
@@ -172,7 +179,8 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
-        creditAccounts.refundStep(runId, stepId, code);
+        creditAccounts.refundStep(runId, stepId, attempt, code);
+        childRuns.stopChildOfStep(stepId);
         if (settleIfCancelling(runId, now)) {
             return true;
         }
@@ -180,6 +188,7 @@ class RunStepTransactions {
         if (run.markError(message, now)) {
             workflowRunRepository.save(run);
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
         }
         return true;
@@ -197,7 +206,9 @@ class RunStepTransactions {
         if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
+            events.publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
     }
@@ -208,18 +219,19 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
+        childRuns.finished(runId);
         LOG.info("Workflow run finished: runId={} status=cancelled", runId);
         return true;
     }
 
     /** Charges the run's owner for a step just claimed; {@code false} when they cannot pay for it. */
-    private boolean charge(UUID runId, UUID stepId) {
+    private boolean charge(UUID runId, UUID stepId, short attempt) {
         if (!creditAccounts.enabled()) {
             return true;
         }
         String type = runStepRepository.findById(stepId).map(RunStep::getType)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.runStep.notFound", stepId)));
-        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, type);
+        return creditAccounts.debitForStep(requireRun(runId).getOwnerId(), runId, stepId, attempt, type);
     }
 
     private WorkflowRun requireRun(UUID runId) {

@@ -81,6 +81,7 @@ export const ADMIN_ME = {
   role: 'ADMIN',
   permissions: ALL_PERMISSIONS,
   adminDisabled: false,
+  phoneVerificationRequired: false,
 };
 export const MEMBER_ME = {
   id: 'm1',
@@ -89,6 +90,7 @@ export const MEMBER_ME = {
   role: 'MEMBER',
   permissions: [] as MeResponsePermissionsItem[],
   adminDisabled: false,
+  phoneVerificationRequired: false,
 };
 
 /** A staff caller holding only `keys`. */
@@ -100,5 +102,6 @@ export function staffMe(role: string, keys: MeResponsePermissionsItem[]) {
     role,
     permissions: keys,
     adminDisabled: false,
+    phoneVerificationRequired: false,
   };
 }

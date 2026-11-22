@@ -49,8 +49,10 @@ async function stage<T>(name: StartStage, work: () => Promise<T>): Promise<T> {
  * so no run is ever started with an upload id whose object is missing. A call made while one is
  * in flight sends nothing and resolves `null`; a call after a failure starts again from `/uploads`.
  * `resend` repeats only the run start of a refused press, sharing the same in-flight guard.
+ * An `image` upload is started as `uploadIds` (the server resolves it as an image), a `media`
+ * one as `uploadId` with the file's name.
  */
-export function createStartWithUpload(deps: StartWithUploadDeps) {
+export function createStartWithUpload(deps: StartWithUploadDeps, kind: 'media' | 'image' = 'media') {
   let inFlight = false;
 
   async function startRun(request: StartRunRequest): Promise<string> {
@@ -98,7 +100,11 @@ export function createStartWithUpload(deps: StartWithUploadDeps) {
         ),
       );
       onPhase({ kind: 'starting' });
-      return await startRun({ uploadId: grant.uploadId, originalName: file.name });
+      return await startRun(
+        kind === 'image'
+          ? { uploadIds: [grant.uploadId] }
+          : { uploadId: grant.uploadId, originalName: file.name },
+      );
     } finally {
       inFlight = false;
     }

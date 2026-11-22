@@ -26,10 +26,44 @@
     "ACTIVE": "Đang hoạt động",
     "SUSPENDED": "Đã tạm ngưng"
   },
+  "state": {
+    "active": "Đang hoạt động",
+    "pending_confirmation": "Chờ xác nhận",
+    "locked": "Đang bị khóa",
+    "suspended": "Đã tạm ngưng"
+  },
+  "signInMethod": {
+    "PASSWORD": "Mật khẩu",
+    "GOOGLE": "Google"
+  },
+  "sort": {
+    "label": "Sắp xếp theo",
+    "newest": "Mới nhất trước",
+    "oldest": "Cũ nhất trước",
+    "email": "Email A–Z",
+    "name": "Tên A–Z"
+  },
+  "pagination": {
+    "label": "Phân trang",
+    "previous": "Trang trước",
+    "next": "Trang sau",
+    "summary_one": "Trang {{page}} / {{pages}} · {{total}} tài khoản",
+    "summary_other": "Trang {{page}} / {{pages}} · {{total}} tài khoản"
+  },
+  "export": {
+    "button": "Xuất CSV",
+    "busy": "Đang xuất…",
+    "error": "Không xuất được danh sách người dùng.",
+    "retry": "Thử xuất lại",
+    "tooManyRows": "Hãy thu hẹp tìm kiếm hoặc bộ lọc rồi xuất lại."
+  },
+  "readOnlyAdminAccount": "Chỉ siêu quản trị viên mới thay đổi được tài khoản quản trị.",
   "stats": {
     "label": "Thống kê người dùng",
     "total": "Tổng số người dùng",
     "active": "Đang hoạt động",
+    "pendingConfirmation": "Chờ xác nhận",
+    "locked": "Đang bị khóa",
     "suspended": "Đã tạm ngưng",
     "newThisWeek": "Mới trong 7 ngày"
   },
@@ -48,14 +82,12 @@
     "label": "Danh sách người dùng",
     "tableLabel": "Bảng người dùng",
     "title": "Tất cả người dùng",
-    "count_one": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
-    "count_other": "Đang hiển thị {{visible}} trên {{total}} tài khoản",
     "refresh": "Làm mới",
     "refreshing": "Đang làm mới…",
     "search": "Tìm kiếm",
-    "searchPlaceholder": "Tên hoặc email",
-    "status": "Trạng thái",
-    "allStatuses": "Tất cả trạng thái",
+    "searchPlaceholder": "Tên, email hoặc tên đăng nhập",
+    "state": "Tình trạng",
+    "allStates": "Tất cả tình trạng",
     "role": "Vai trò",
     "allRoles": "Tất cả vai trò",
     "loading": "Đang tải người dùng…",
@@ -63,7 +95,9 @@
     "retry": "Thử lại",
     "empty": "Chưa có người dùng nào.",
     "emptyHint": "Hãy thêm quản trị viên hoặc thành viên đầu tiên ở phía trên.",
-    "noMatch": "Không có người dùng nào khớp với bộ lọc này.",
+    "noMatch": "Không có tài khoản nào khớp với bộ lọc này.",
+    "emptyPage": "Trang này không có tài khoản nào.",
+    "backToFirstPage": "Về trang đầu",
     "clearFilters": "Xóa bộ lọc"
   },
   "columns": {
@@ -71,6 +105,7 @@
     "email": "Email",
     "role": "Vai trò",
     "status": "Trạng thái",
+    "state": "Tình trạng",
     "joined": "Ngày tham gia",
     "actions": "Thao tác"
   },
@@ -103,6 +138,12 @@
     "email": "Email",
     "role": "Vai trò",
     "status": "Trạng thái",
+    "username": "Tên đăng nhập",
+    "emailConfirmed": "Email đã xác nhận lúc",
+    "signInMethods": "Cách đăng nhập",
+    "lockedUntil": "Bị khóa đến",
+    "adminDisabled": "Quyền truy cập quản trị đã bị vô hiệu hóa",
+    "yes": "Có",
     "registered": "Ngày đăng ký",
     "lastUpdated": "Cập nhật lần cuối",
     "access": "Quản lý quyền truy cập",

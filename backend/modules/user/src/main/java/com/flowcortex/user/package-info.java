@@ -14,7 +14,8 @@
                 "shared :: web",
                 "shared :: security",
                 "shared :: ratelimit",
-                "mail :: api"
+                "mail :: api",
+                "settings :: api"
         }
 )
 package com.flowcortex.user;

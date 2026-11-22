@@ -1,6 +1,10 @@
-import type { OnboardingProgressBody, OnboardingStatusResponse } from '@flow-cortex/api-client';
+import type {
+  OnboardingProgressBody,
+  OnboardingSampleWorkflow,
+  OnboardingStatusResponse,
+} from '@flow-cortex/api-client';
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAccountLeft } from '../../app/AccountCacheReset';
 import { useIsDesktop } from '../../app/sidebarMode';
 import { useFeatures } from '../../app/useFeatures';
@@ -24,7 +28,14 @@ import {
 import { QuizDialog } from './QuizDialog';
 import { SurveyIntroDialog } from './SurveyIntroDialog';
 import { SIDEBAR_NAV_SELECTOR, TourTip } from './TourTip';
-import { quizBody, useOnboardingActions, useOnboardingStatus, type Answers } from './useOnboarding';
+import { resetFirstResultClaim, useFirstResultClaim } from './useFirstResultClaim';
+import {
+  quizBody,
+  useOnboardingActions,
+  useOnboardingStatus,
+  type Answers,
+  type ProgressOutcome,
+} from './useOnboarding';
 import { WelcomeDialog } from './WelcomeDialog';
 
 const USER_MENU_TRIGGER_SELECTOR = '.cortex-user-menu__trigger';
@@ -72,11 +83,14 @@ function sameProgress(a: FlowState, b: FlowState): boolean {
  */
 export function OnboardingFlow() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const status = useOnboardingStatus();
   const session = useOnboardingSession();
   const actions = useOnboardingActions();
   const [flow, setFlow] = useState<FlowState>(CLOSED);
+  const [trying, setTrying] = useState(false);
+  useFirstResultClaim(status.data?.firstResult);
 
   const flowRef = useRef<FlowState>(CLOSED);
   const modeRef = useRef<OnboardingMode>('first');
@@ -84,6 +98,14 @@ export function OnboardingFlow() {
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const generationRef = useRef(0);
   const writesRef = useRef<Promise<unknown>>(Promise.resolve());
+  const tryingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const answers = answersOf(status.data);
   const replaySurvey = hasMissingCoreAnswer(answers);
@@ -169,9 +191,38 @@ export function OnboardingFlow() {
 
   useAccountLeft(() => {
     resetOnboardingSession();
+    resetFirstResultClaim();
     generationRef.current += 1;
+    setTrying(false);
     show(CLOSED);
   });
+
+  const trySample = async (sample: OnboardingSampleWorkflow) => {
+    const current = flowRef.current;
+    if (current.screen !== 'done' || tryingRef.current) return;
+    tryingRef.current = true;
+    setTrying(true);
+    const generation = generationRef.current;
+    let outcome: ProgressOutcome | 'none' = 'none';
+    if (modeRef.current === 'first') {
+      const body: OnboardingProgressBody = {
+        step: 'done',
+        finished: true,
+        ...(current.surveyDeferred ? { surveyDeferred: true } : {}),
+      };
+      outcome = await write(body);
+      if (outcome !== 'failed') void actions.refreshStatus();
+    }
+    tryingRef.current = false;
+    // A 409 already closed the journey through `write`, which bumps the generation once.
+    const ours =
+      generationRef.current === generation ||
+      (outcome === 'closed' && generationRef.current === generation + 1);
+    if (!mountedRef.current || !ours) return;
+    setTrying(false);
+    if (flowRef.current.screen !== 'closed') leave();
+    navigate(`/workflows/${sample.id}`, { state: { sampleInput: sample.input } });
+  };
 
   const entry = status.data?.entry;
   const progress = status.data?.progress;
@@ -280,7 +331,10 @@ export function OnboardingFlow() {
       return (
         <DoneDialog
           steps={doneSteps(context(), flow.surveyDeferred)}
+          sample={status.data?.sampleWorkflow ?? null}
+          trying={trying}
           onFinish={() => send('next')}
+          onTrySample={(sample) => void trySample(sample)}
           onBack={() => send('back')}
           onClose={() => send('close')}
         />

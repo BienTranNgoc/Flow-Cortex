@@ -1,6 +1,7 @@
 package com.flowcortex.user.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -50,11 +51,14 @@ public class AppUser {
     @Column(name = "username")
     private String username;
 
+    @Column(name = "username_changed_at")
+    private Instant usernameChangedAt;
+
     /** {@code null} only for a self-registered account that has not opened its confirmation link yet. */
     @Column(name = "email_confirmed_at")
     private Instant emailConfirmedAt;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RoleConverter.class)
     @Column(name = "role", nullable = false)
     private Role role;
 
@@ -189,6 +193,10 @@ public class AppUser {
         return username;
     }
 
+    public Instant getUsernameChangedAt() {
+        return usernameChangedAt;
+    }
+
     public Instant getEmailConfirmedAt() {
         return emailConfirmedAt;
     }
@@ -265,6 +273,23 @@ public class AppUser {
         touch();
     }
 
+    /** A blank first or last name arrives as {@code null} and clears the field. */
+    public void changeNames(String name, String firstName, String lastName) {
+        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        touch();
+    }
+
+    /** {@code changedAtOrNull} starts the cooldown; a {@code null} leaves the previous stamp as it was. */
+    public void changeUsername(String next, Instant changedAtOrNull) {
+        this.username = next;
+        if (changedAtOrNull != null) {
+            this.usernameChangedAt = changedAtOrNull;
+        }
+        touch();
+    }
+
     /**
      * Confirms the email and drops everything chosen before anyone proved they own the address: the
      * password (with the failed-login count and lockout that guarded it), the username and the names.
@@ -322,10 +347,14 @@ public class AppUser {
         touch();
     }
 
-    /** A change to an end-user role clears the admin deactivation, so a later promotion starts active. */
-    public void changeRole(Role role) {
+    /**
+     * A change to an end-user role clears the admin deactivation, so a later promotion starts active.
+     *
+     * @param adminAccount whether the new role is a staff or super-admin role, from the role table
+     */
+    public void changeRole(Role role, boolean adminAccount) {
         this.role = role;
-        if (!role.isStaff() && !role.isSuperAdmin()) {
+        if (!adminAccount) {
             this.adminDisabledAt = null;
             this.adminDisabledBy = null;
         }

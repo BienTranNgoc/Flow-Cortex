@@ -48,6 +48,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: /Media Jobs/i })).toHaveAttribute('href', '/media-jobs');
     expect(screen.getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/users');
     expect(screen.getByRole('link', { name: /SMS Outbox/ })).toHaveAttribute('href', '/sms-outbox');
+    expect(screen.getByRole('link', { name: /Model Providers/ })).toHaveAttribute('href', '/providers');
 
     const voice = screen.getByText('Voice Quota').closest('[aria-disabled]');
     expect(voice).toHaveAttribute('aria-disabled', 'true');
@@ -59,11 +60,25 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('link', { name: /Voice Quota/ })).not.toBeInTheDocument();
   });
 
+  it('links Workflows to /workflows with no coming-soon tag for a holder of its key, and hides it otherwise', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+
+    const link = screen.getByRole('link', { name: /Workflows & Templates/ });
+    expect(link).toHaveAttribute('href', '/workflows');
+    expect(link).not.toHaveTextContent('Coming soon');
+    unmount();
+
+    renderSidebar({
+      permissions: ADMIN_ME.permissions.filter((key) => key !== 'workflow.workflow.view'),
+      adminDisabled: false,
+    });
+    expect(screen.queryByText('Workflows & Templates')).not.toBeInTheDocument();
+  });
+
   it.each([
-    'Workflows & Templates',
     'Approval Queue',
     'Credits & Wallets',
-    'Model Providers',
     'Feature Switches',
     'Audit Log',
     'Voice Quota',
@@ -138,7 +153,7 @@ describe('Sidebar', () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
-      'GET /api/v1/users': { status: 200, body: [] },
+      'GET /api/v1/users/stats': { status: 200, body: {} },
       [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } },
     });
     setToken('admin-token-voice', true);
@@ -152,7 +167,9 @@ describe('Sidebar', () => {
   it('switches between expanded and icon-only mode', async () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
     const { container } = renderSidebar(ADMIN_ME);
-    expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass('cortex-admin-nav--collapsed');
+    expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass(
+      'cortex-admin-nav--collapsed',
+    );
     expect(screen.getByText('Dashboard')).toBeVisible();
 
     renderSidebar(ADMIN_ME, true);
@@ -309,7 +326,13 @@ describe('Sidebar', () => {
         id: 'support',
         label: 'common.shell.nav.groups.overview',
         items: [
-          { label: 'Support', path: '/support', icon: Lifebuoy, key: 'workflow.run.view', badge: 3 },
+          {
+            label: 'Support',
+            path: '/support',
+            icon: Lifebuoy,
+            key: 'workflow.run.view',
+            badge: 3,
+          },
           { label: 'Empty', path: '/empty', icon: Lifebuoy, key: 'workflow.run.view', badge: 0 },
           { label: 'Plain', path: '/plain', icon: Lifebuoy, key: 'workflow.run.view' },
         ],
@@ -393,7 +416,13 @@ describe('Sidebar', () => {
       stubMatchMedia(false);
       render(
         <MemoryRouter>
-          <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} drawerOpen onDrawerClose={() => {}} />
+          <Sidebar
+            me={ADMIN_ME}
+            collapsed
+            onToggle={() => {}}
+            drawerOpen
+            onDrawerClose={() => {}}
+          />
         </MemoryRouter>,
       );
       const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });

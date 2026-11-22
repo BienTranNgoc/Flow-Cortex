@@ -1,6 +1,6 @@
 package com.flowcortex.user.api;
 
-import java.util.List;
+import com.flowcortex.shared.web.PageView;
 import java.util.UUID;
 
 /**
@@ -27,11 +27,18 @@ public interface UserService {
     /** @throws NotFoundException if {@code id} does not exist within the caller's owner scope */
     UserView getUser(UUID callerId, UUID id);
 
-    List<UserView> listUsers(UUID callerId);
+    /**
+     * One page of the caller's scope, filtered and ordered by {@code query}; {@code page} is zero-based.
+     * @throws UnknownRoleException if the query names a role code no {@code role} row holds
+     */
+    PageView<UserView> searchUsers(UUID callerId, UserQuery query, int page, int size);
+
+    /** Account counts of the caller's scope, by account state. */
+    UserStats userStats(UUID callerId);
 
     /**
-     * Partial update: a {@code null} argument leaves that field unchanged. Unlike {@link AuthService#updateOwnProfile}
-     * (self-service, name only), this admin op can also edit {@code email}/{@code role}/{@code status}.
+     * Partial update: a {@code null} argument leaves that field unchanged. Unlike {@link OwnProfiles}
+     * (self-service, names and username), this admin op can also edit {@code email}/{@code role}/{@code status}.
      * @throws NotFoundException if {@code id} does not exist within the caller's owner scope
      * @throws ConflictException if {@code email} is supplied and already taken, or the change would remove the
      *         last active super admin or the registration owner

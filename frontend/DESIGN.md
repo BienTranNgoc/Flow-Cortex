@@ -120,6 +120,8 @@ The member app has two themes. Light is the default (`:root` in `tokens.css`); d
 
 The public auth screens (sign in, register, confirm email, set password) are a fixed light brand surface: a frosted light card on an ocean banner. Their shell root sets `color-scheme: light` and ignores both the operating-system preference and the member's chosen theme; nothing outside that root changes, so signed-in screens keep the chosen theme. The VI | EN toggle sits in the shell's top bar, restyled with the auth tokens, with 44px controls.
 
+The verify-phone page, which a signed-in member the server holds for an unverified number sees before any product page, uses the same card. It reuses the profile phone form, so its root remaps that form's app tokens (`ink`, `input-bg`, `primary`, `red`, `green` and the like) to the auth palette instead of adding colours; the form's own heading stays for screen readers only, and its title is 28px so the card fits a 1366×650 window.
+
 | token               | value     | use                                                                |
 | ------------------- | --------- | ------------------------------------------------------------------ |
 | `auth-ocean`        | `#0b57a6` | banner base; `auth-on-ocean` text 7.17:1                           |
@@ -176,6 +178,12 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Pipeline: a `paper-2` frame holding `paper-3` nodes joined by connectors; a node has a 4px left bar in its status colour, and the selected node is outlined in `primary`. Connectors are `green` when done, `primary` when active, `edge` (dashed when broken) otherwise.
 - Card: `paper-2` fill, `card-edge` edge, `shadow-sm`.
 - Icons: Phosphor, one weight family. `ThemeToggle` keeps its own sun and moon glyphs as the one exception.
+
+### Password re-check and API tokens
+
+- Step-up dialog: a native modal `dialog`, `min(26rem, 100vw − 2rem)` wide, `paper-3` fill, `line` edge, `md` radius, `shadow`, over a `shadow-color` backdrop; it enters with `opacity` and an 8px rise over `dur-standard`. Focus starts on the password field, Escape or Cancel closes it and focus returns to the opener. A wrong password shows a `red` message, clears the field and refocuses it. Below 480px the buttons stack full width.
+- API tokens section (profile, admins only): a title and `ink-3` hint, a create form (name field, lifetime select 30/90/180/365 days), then rows separated by `line-soft` rules. A row wraps a long name, shows `ink-3` dates beneath it and a `red` on `red-soft` expired badge when expired. Revoke opens an inline confirmation naming the token, with focus on "Keep token".
+- Reveal: a `paper-3` panel with a read-only token field, a copy button announced by a polite `green` status line, and the one-time warning in `ink-2`; closing it drops the token from the page.
 
 ### Help Center
 

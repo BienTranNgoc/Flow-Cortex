@@ -14,6 +14,9 @@ const workflow = (name: string, types: readonly string[]): WorkflowResponse => (
   name,
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: types.map((type, index) => step(type, index + 1)),
 });
 

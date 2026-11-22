@@ -2,13 +2,14 @@ package com.flowcortex.user.accounts;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.shared.web.PageView;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -31,8 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/accounts")
 class AdminAccountsController {
 
-    private static final String ROLE_CODES =
-            "ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR";
+    private static final int ROLE_CODE_MAX = 20;
     private static final int MAX_PAGE_SIZE = 100;
     /** Keeps {@code page * size} within an {@code int}, the offset type Spring Data pages with. */
     private static final int MAX_PAGE = Integer.MAX_VALUE / MAX_PAGE_SIZE;
@@ -47,7 +47,7 @@ class AdminAccountsController {
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<PageView<AdminAccountResponse>> list(
-            @RequestParam(required = false) @Pattern(regexp = ROLE_CODES) String role,
+            @RequestParam(required = false) @Size(max = ROLE_CODE_MAX) String role,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) int size) {
@@ -55,6 +55,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "changeAdminAccountRole")
+    @AdminAudit(value = "admin_account.change_role", capture = "role")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PatchMapping(value = "/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -64,6 +65,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "deactivateAdminAccount")
+    @AdminAudit("admin_account.deactivate")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PostMapping(value = "/{id}/deactivate", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminAccountResponse> deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
@@ -71,6 +73,7 @@ class AdminAccountsController {
     }
 
     @Operation(operationId = "activateAdminAccount")
+    @AdminAudit("admin_account.activate")
     @RequirePermission(Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE)
     @PostMapping(value = "/{id}/activate", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminAccountResponse> activate(@PathVariable UUID id) {
@@ -81,6 +84,6 @@ class AdminAccountsController {
         return UUID.fromString(jwt.getSubject());
     }
 
-    record ChangeRoleRequest(@NotBlank @Pattern(regexp = ROLE_CODES) String role) {
+    record ChangeRoleRequest(@NotBlank @Size(min = 1, max = ROLE_CODE_MAX) String role) {
     }
 }

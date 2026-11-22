@@ -3,6 +3,7 @@ package com.flowcortex.workflow.web;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.workflow.application.Caller;
 import com.flowcortex.workflow.application.WorkflowAuthoring;
 import com.flowcortex.workflow.application.WorkflowSharingService;
@@ -59,6 +60,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "setAdminWorkflowVisibility")
+    @AdminAudit(value = "workflow.set_visibility", capture = "visibility")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.OK)
     @PatchMapping(value = "/{id}/visibility", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -79,6 +81,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "createAdminWorkflow")
+    @AdminAudit("workflow.create")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -98,6 +101,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "updateAdminWorkflow")
+    @AdminAudit(value = "workflow.update", capture = "status")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.OK)
     @PatchMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -119,6 +123,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "deleteAdminWorkflow")
+    @AdminAudit("workflow.delete")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
@@ -136,6 +141,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "addAdminWorkflowStep")
+    @AdminAudit(value = "workflow_step.create", resourceParam = "", capture = "type", params = "id")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(value = "/{id}/steps", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -156,6 +162,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "updateAdminWorkflowStep")
+    @AdminAudit(value = "workflow_step.update", resourceParam = "stepId", params = "id")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.OK)
     @PatchMapping(value = "/{id}/steps/{stepId}", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -176,6 +183,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "deleteAdminWorkflowStep")
+    @AdminAudit(value = "workflow_step.delete", resourceParam = "stepId", params = "id")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}/steps/{stepId}")
@@ -194,6 +202,7 @@ class AdminWorkflowsController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "reorderAdminWorkflowSteps")
+    @AdminAudit("workflow.reorder_steps")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @PutMapping(value = "/{id}/steps/order", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)

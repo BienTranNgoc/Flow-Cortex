@@ -1,0 +1,61 @@
+{
+  "eyebrow": "Onboarding",
+  "title": "Onboarding sample",
+  "description": "The workflow new members are offered at the end of onboarding, and the input it starts with.",
+  "common": {
+    "loading": "Loading…",
+    "loadFailed": "Could not load the onboarding sample.",
+    "retry": "Retry",
+    "saveFailed": "Could not save. Please try again."
+  },
+  "status": {
+    "heading": "Current status",
+    "workflow": "Workflow",
+    "none": "Nothing configured",
+    "shown": "Offered",
+    "notShown": "Not offered",
+    "changedBy": "Last changed by {{email}} at {{at}}"
+  },
+  "reason": {
+    "not_found": "The workflow no longer exists.",
+    "deleted": "The workflow was deleted.",
+    "unpublished": "The workflow is not published.",
+    "private": "The workflow is private, so members cannot open it.",
+    "no_steps": "The workflow has no steps.",
+    "unavailable": "A step of the workflow is switched off.",
+    "needs_upload": "The workflow starts from a file upload, which cannot be pre-filled.",
+    "needs_link": "The workflow starts from a link, which cannot be pre-filled.",
+    "manual_step": "The workflow waits for an approval, so it is not a one-click first result.",
+    "onboarding_off": "The workflow is valid, but onboarding is switched off for members."
+  },
+  "form": {
+    "heading": "Sample workflow",
+    "workflowId": "Workflow ID",
+    "workflowIdHint": "Paste the ID of a published, shared workflow.",
+    "workflowRequired": "Enter a workflow ID, or use Clear to remove the sample.",
+    "sampleInput": "Sample input",
+    "sampleInputHint": "One line. It fills the start form for members.",
+    "counter": "{{used}} / {{max}}",
+    "sourceLocale": "Language of the input",
+    "save": "Save",
+    "saving": "Saving…",
+    "clear": "Clear",
+    "clearing": "Clearing…"
+  },
+  "locale": {
+    "vi": "Vietnamese",
+    "en": "English"
+  },
+  "translations": {
+    "heading": "Translations",
+    "description": "Members who read the app in another language get this input instead of the source one.",
+    "empty": "Save a sample first to translate its input.",
+    "field": "Input in {{language}}",
+    "fieldHint": "Leave empty to fall back to the source input.",
+    "save": "Save translation",
+    "saving": "Saving…",
+    "saved": "Translation saved.",
+    "stale": "The sample changed since this page loaded. Reload to see the current one; your text is kept.",
+    "reload": "Reload"
+  }
+}

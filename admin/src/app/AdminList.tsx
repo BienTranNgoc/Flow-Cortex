@@ -27,6 +27,11 @@ interface AdminListProps<T> {
   filtered?: boolean;
   onStatusChange: (status: string) => void;
   onPageChange: (page: number) => void;
+  /**
+   * Page-owned filters placed ahead of the status filter in the same toolbar row. `label` names
+   * the row as a search landmark; `className` lets the page size its fields.
+   */
+  toolbar?: { label: string; className?: string; lead: ReactNode };
   children: (items: T[]) => ReactNode;
 }
 
@@ -44,6 +49,7 @@ export function AdminList<T>({
   filtered = false,
   onStatusChange,
   onPageChange,
+  toolbar,
   children,
 }: Readonly<AdminListProps<T>>) {
   const { t } = useTranslation();
@@ -79,7 +85,14 @@ export function AdminList<T>({
 
   return (
     <>
-      <div className="cortex-admin-toolbar">
+      <div
+        className={
+          toolbar?.className ? `cortex-admin-toolbar ${toolbar.className}` : 'cortex-admin-toolbar'
+        }
+        role={toolbar ? 'search' : undefined}
+        aria-label={toolbar?.label}
+      >
+        {toolbar?.lead}
         <div className="cortex-admin-field">
           <label htmlFor={filterId}>{t('common.shell.list.status')}</label>
           <select id={filterId} value={status} onChange={(event) => onStatusChange(event.target.value)}>

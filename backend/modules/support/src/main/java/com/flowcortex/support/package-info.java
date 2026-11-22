@@ -11,7 +11,9 @@
                 "user :: api",
                 "media :: api",
                 "llm :: api",
+                "settings :: api",
                 "mail :: api",
+                "notification :: api",
                 "shared :: web",
                 "shared :: security",
                 "shared :: ratelimit"

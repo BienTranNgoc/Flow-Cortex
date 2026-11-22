@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { stubApi, type Handler, type RecordedCall } from '../../test/fakeApi';
 import { OnboardingFlow } from './OnboardingFlow';
 import { requestReplay, resetOnboardingSession } from './onboardingSession';
+import { resetFirstResultClaim } from './useFirstResultClaim';
 
 const FEATURES = {
   emailConfirmation: false,
@@ -113,6 +114,7 @@ describe('OnboardingFlow', () => {
     cleanup();
     setToken(null);
     act(() => resetOnboardingSession());
+    resetFirstResultClaim();
     vi.unstubAllGlobals();
   });
 
@@ -293,6 +295,41 @@ describe('OnboardingFlow', () => {
     await waitFor(() =>
       expect(progressWrites(calls)).toEqual([{ step: 'done' }, { step: 'done', finished: true }]),
     );
+  });
+
+  it('claims a pending first result once and refreshes the status on 200', async () => {
+    let reads = 0;
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': () => ({
+        status: 200,
+        body: status({
+          entry: null,
+          open: false,
+          firstResult: ++reads === 1 ? 'pending' : 'reported',
+        }),
+      }),
+      'POST /api/v1/me/first-result/claim': { status: 200, body: { runId: 'r', workflowId: 'w' } },
+    });
+    await waitFor(() => expect(reads).toBe(2));
+    expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1);
+  });
+
+  it('drops a failed claim without a message or a retry', async () => {
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': {
+        status: 200,
+        body: status({ entry: null, open: false, firstResult: 'pending' }),
+      },
+      'POST /api/v1/me/first-result/claim': { status: 500, body: { status: 500 } },
+    });
+    await waitFor(() =>
+      expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1);
   });
 
   it('sends nothing while the feature is off', async () => {

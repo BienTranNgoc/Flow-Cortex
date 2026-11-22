@@ -12,6 +12,9 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -20,6 +23,9 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   name: 'Product Video',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -28,6 +34,9 @@ const DOUYIN: WorkflowResponse = {
   name: 'Douyin Video Repurpose',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -39,6 +48,9 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo (all steps succeed)',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -47,6 +59,9 @@ const FAIL: WorkflowResponse = {
   name: 'Failing Demo (deliberate)',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
 
@@ -278,6 +293,7 @@ describe('WorkflowsListPage', () => {
           ? { status: 503, body: { status: 503 } }
           : { status: 200, body: [DOUYIN, ECHO, FAIL] };
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
@@ -300,6 +316,7 @@ describe('WorkflowsListPage', () => {
         status: 503,
         body: { status: 503, detail: 'Workflows are paused for maintenance.' },
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);

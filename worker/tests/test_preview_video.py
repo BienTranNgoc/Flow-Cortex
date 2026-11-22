@@ -316,8 +316,8 @@ def test_an_unreadable_report_is_a_contract_violation(
     tmp_path: Path, blender_log: Path, damage: Any
 ) -> None:
     class Damaging(ProcessRunner):
-        def run(self, argv: list[str]) -> Any:
-            completed = super().run(argv)
+        def run(self, argv: list[str], cwd: Path | None = None) -> Any:
+            completed = super().run(argv, cwd)
             report = Path(argv[-2] + ".report.json")
             report.write_text(damage if isinstance(damage, str) else json.dumps(damage))
             return completed

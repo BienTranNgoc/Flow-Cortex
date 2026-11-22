@@ -29,30 +29,40 @@ class WorkflowReadinessGuard implements RunStartGuard {
 
     @Override
     public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
+        Map<Integer, LocalizedMessage> faults = faults(steps);
+        if (faults.isEmpty()) {
+            return;
+        }
         if (steps.isEmpty()) {
-            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete.noSteps"), CODE);
+            throw new UnprocessableEntityException(faults.get(0), CODE);
+        }
+        Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
+        faults.forEach((order, reason) -> failures.put("step" + order, reason));
+        int firstFailing = faults.keySet().iterator().next();
+        throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
+                failures);
+    }
+
+    /**
+     * Every reason this workflow cannot start, keyed by step order in step order; a workflow without steps is one
+     * fault under key {@code 0}. Empty when the workflow can start.
+     */
+    Map<Integer, LocalizedMessage> faults(List<StepDef> steps) {
+        if (steps.isEmpty()) {
+            return Map.of(0, new LocalizedMessage("workflow.incomplete.noSteps"));
         }
         List<StepReferences.Step> referenceSteps = steps.stream()
                 .map(step -> new StepReferences.Step(UUID.randomUUID(), step.order(), step.name(), step.inputRef()))
                 .toList();
         Map<UUID, StepReferences.Problem> problems = StepReferences.analyze(referenceSteps);
-        Map<String, LocalizedMessage> failures = new LinkedHashMap<>();
-        Integer firstFailing = null;
+        Map<Integer, LocalizedMessage> faults = new LinkedHashMap<>();
         for (int i = 0; i < steps.size(); i++) {
             StepDef step = steps.get(i);
             StepReferences.Problem problem = problems.get(referenceSteps.get(i).id());
-            Optional<LocalizedMessage> reason = configReason(step).or(() -> referenceReason(step, problem));
-            if (reason.isPresent()) {
-                failures.put("step" + step.order(), reason.get());
-                if (firstFailing == null) {
-                    firstFailing = step.order();
-                }
-            }
+            configReason(step).or(() -> referenceReason(step, problem))
+                    .ifPresent(reason -> faults.put(step.order(), reason));
         }
-        if (firstFailing != null) {
-            throw new UnprocessableEntityException(new LocalizedMessage("workflow.incomplete", firstFailing), CODE,
-                    failures);
-        }
+        return faults;
     }
 
     private Optional<LocalizedMessage> configReason(StepDef step) {

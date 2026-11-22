@@ -26,10 +26,44 @@
     "ACTIVE": "Active",
     "SUSPENDED": "Suspended"
   },
+  "state": {
+    "active": "Active",
+    "pending_confirmation": "Pending confirmation",
+    "locked": "Locked",
+    "suspended": "Suspended"
+  },
+  "signInMethod": {
+    "PASSWORD": "Password",
+    "GOOGLE": "Google"
+  },
+  "sort": {
+    "label": "Sort by",
+    "newest": "Newest first",
+    "oldest": "Oldest first",
+    "email": "Email A–Z",
+    "name": "Name A–Z"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previous": "Previous page",
+    "next": "Next page",
+    "summary_one": "Page {{page}} of {{pages}} · {{total}} account",
+    "summary_other": "Page {{page}} of {{pages}} · {{total}} accounts"
+  },
+  "export": {
+    "button": "Export CSV",
+    "busy": "Exporting…",
+    "error": "Could not export the users.",
+    "retry": "Retry export",
+    "tooManyRows": "Narrow the search or filters, then export again."
+  },
+  "readOnlyAdminAccount": "Only a super admin changes admin accounts.",
   "stats": {
     "label": "User statistics",
     "total": "Total users",
     "active": "Active",
+    "pendingConfirmation": "Pending confirmation",
+    "locked": "Locked",
     "suspended": "Suspended",
     "newThisWeek": "New in 7 days"
   },
@@ -48,14 +82,12 @@
     "label": "User directory",
     "tableLabel": "Users table",
     "title": "All users",
-    "count_one": "Showing {{visible}} of {{total}} account",
-    "count_other": "Showing {{visible}} of {{total}} accounts",
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "search": "Search",
-    "searchPlaceholder": "Name or email",
-    "status": "Status",
-    "allStatuses": "All statuses",
+    "searchPlaceholder": "Name, email or username",
+    "state": "State",
+    "allStates": "All states",
     "role": "Role",
     "allRoles": "All roles",
     "loading": "Loading users…",
@@ -63,7 +95,9 @@
     "retry": "Retry",
     "empty": "No users yet.",
     "emptyHint": "Add the first admin or member above.",
-    "noMatch": "No users match these filters.",
+    "noMatch": "No account matches these filters.",
+    "emptyPage": "There are no accounts on this page.",
+    "backToFirstPage": "Back to the first page",
     "clearFilters": "Clear filters"
   },
   "columns": {
@@ -71,6 +105,7 @@
     "email": "Email",
     "role": "Role",
     "status": "Status",
+    "state": "State",
     "joined": "Joined",
     "actions": "Actions"
   },
@@ -103,6 +138,12 @@
     "email": "Email",
     "role": "Role",
     "status": "Status",
+    "username": "Username",
+    "emailConfirmed": "Email confirmed",
+    "signInMethods": "Sign-in methods",
+    "lockedUntil": "Locked until",
+    "adminDisabled": "Admin access deactivated",
+    "yes": "Yes",
     "registered": "Registered",
     "lastUpdated": "Last updated",
     "access": "Access management",

@@ -26,6 +26,15 @@ HANDLER_MODULES: dict[str, str] = {
     "render_video": "flowcortex_worker.handlers.render_video",
     "caption_burn": "flowcortex_worker.handlers.caption_burn",
     "preview_video": "flowcortex_worker.handlers.preview_video",
+    "fetch_video": "flowcortex_worker.handlers.fetch_video",
+    "clean_overlay": "flowcortex_worker.handlers.clean_overlay",
+    "inspect": "flowcortex_worker.handlers.inspect",
+    "contact_sheet": "flowcortex_worker.handlers.contact_sheet",
+    "detect_shots": "flowcortex_worker.handlers.detect_shots",
+    "scene_frames": "flowcortex_worker.handlers.scene_frames",
+    "separate_audio": "flowcortex_worker.handlers.separate_audio",
+    "speakers": "flowcortex_worker.handlers.speakers",
+    "beats": "flowcortex_worker.handlers.beats",
 }
 
 

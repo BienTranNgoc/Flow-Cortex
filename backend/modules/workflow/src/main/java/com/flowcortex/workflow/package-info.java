@@ -9,7 +9,8 @@
  * realtime module only through its {@code api} port (to publish run updates and authorize the
  * run topic), on the jobs module only through its {@code api} port (the lease reaper runs on the
  * cluster runner), on the llm module only through its {@code api} port (to ask the model by
- * purpose for the dub steps), plus the shared libraries.
+ * purpose for the dub steps), on the connector module only through its {@code api} port (to call a
+ * member's saved HTTP connector), plus the shared libraries.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Workflow",
@@ -20,6 +21,7 @@
                 "realtime :: api",
                 "jobs :: api",
                 "llm :: api",
+                "connector :: api",
                 "shared :: web",
                 "shared :: security"
         }

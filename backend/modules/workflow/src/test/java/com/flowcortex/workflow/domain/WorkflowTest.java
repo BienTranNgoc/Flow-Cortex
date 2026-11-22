@@ -74,4 +74,29 @@ class WorkflowTest {
         assertThatThrownBy(() -> workflow.makeListedOrPrivate(WorkflowVisibility.UNLISTED))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aNewDraftAndAForkStartWithForkingOff() {
+        assertThat(new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Demo", true).isAllowFork()).isFalse();
+        Workflow draft = Workflow.draft(UUID.randomUUID(), UUID.randomUUID(), "Demo");
+        assertThat(draft.isAllowFork()).isFalse();
+        assertThat(draft.getForkCount()).isZero();
+        assertThat(draft.getForkedFromId()).isNull();
+    }
+
+    @Test
+    void forkOfRecordsTheSourceAndIsAnUnsharedDraft() {
+        UUID source = UUID.randomUUID();
+        UUID owner = UUID.randomUUID();
+
+        Workflow fork = Workflow.forkOf(UUID.randomUUID(), owner, "Copy", source);
+
+        assertThat(fork.getForkedFromId()).isEqualTo(source);
+        assertThat(fork.getOwnerId()).isEqualTo(owner);
+        assertThat(fork.getName()).isEqualTo("Copy");
+        assertThat(fork.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
+        assertThat(fork.getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
+        assertThat(fork.isAllowFork()).isFalse();
+        assertThat(fork.getForkCount()).isZero();
+    }
 }

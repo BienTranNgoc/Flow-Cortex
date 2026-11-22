@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import queue
+import struct
 import subprocess
 import tempfile
 import threading
@@ -91,6 +92,27 @@ def job_body(**change: Any) -> dict[str, Any]:
         "issuedAt": datetime.now(UTC).isoformat(),
     }
     return body | change
+
+
+def understated_duration_clip(
+    path: Path, *, real_seconds: int, declared_ms: int, size: str = "64x64", rate: int = 5
+) -> Path:
+    """A matroska file whose Segment Duration header claims `declared_ms` but holds more."""
+    subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-y",
+            "-f", "lavfi", "-i", f"testsrc=duration={real_seconds}:size={size}:rate={rate}",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-f", "matroska", str(path),
+        ],
+        check=True,
+    )  # fmt: skip
+    data = path.read_bytes()
+    marker = b"\x44\x89\x88"  # Duration element, 8-byte float, in milliseconds
+    at = data.find(marker)
+    assert at != -1, "the muxer wrote no 8-byte Duration element"
+    patched = data[: at + 3] + struct.pack(">d", float(declared_ms)) + data[at + 11 :]
+    path.write_bytes(patched)
+    return path
 
 
 # --- fake pika ------------------------------------------------------------------
