@@ -437,7 +437,7 @@ Format per entry: **Context → Decision → Consequences**.
     the two proxies is on `egress`, when a proxy publishes a port, when
     `fetch` is not internal or has a member besides `egress-fetch` and
     `fetch-worker`, when `fetch-worker` leaves `internal` and `fetch`, or when
-    its object-store key equals another service's. CI runs it.
+    its object-store key or broker user equals another service's. CI runs it.
   - **Allowlist per environment:** the committed list is
     `infra/egress-proxy/acl.yaml`, seeded with the hosts the code calls:
     `*.googleapis.com`, `api.openai.com`, `api.replicate.com`,

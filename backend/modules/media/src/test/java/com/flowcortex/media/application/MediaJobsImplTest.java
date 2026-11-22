@@ -1895,20 +1895,21 @@ class MediaJobsImplTest {
     }
 
     @Test
-    void aRunObjectIsCopiedServerSideIntoTheStepPrefixTaggedStepOutputAndDescribedFromTheCopy() {
+    void aRunObjectIsCopiedServerSideIntoTheStepsFirstAttemptUntaggedAndDescribedFromTheCopy() {
         runner.run(context -> {
             UUID runId = UUID.randomUUID();
             S3MediaStore store = context.getBean(S3MediaStore.class);
-            String target = "runs/" + runId + "/steps/1/video";
+            String target = "runs/" + runId + "/steps/1/attempts/1/video";
             when(store.head("flowcortex-media", target))
                     .thenReturn(Optional.of(new S3MediaStore.StoredObject(4_096L, "video/mp4")));
 
             MediaOutput copied = context.getBean(MediaJobs.class).copyRunObject(runId, 1,
                     new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media"), "video");
 
-            verify(store).copy("flowcortex-media", "runs/" + runId + "/inputs/media", "flowcortex-media", target,
-                    "step-output");
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + runId + "/inputs/media", "flowcortex-media",
+                    target);
             verify(store, never()).copy(anyString(), anyString(), anyString(), anyString());
+            verify(store, never()).copy(any(), any(), any(), any(), any());
             assertThat(copied).isEqualTo(new MediaOutput("video", "flowcortex-media", target, "video/mp4", 4_096L,
                     null));
         });
@@ -1930,7 +1931,7 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.copyRunObject(runId, 1,
                     new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media"), "../video"))
                     .isInstanceOf(IllegalArgumentException.class);
-            verify(context.getBean(S3MediaStore.class), never()).copy(any(), any(), any(), any(), any());
+            verify(context.getBean(S3MediaStore.class), never()).copyWithoutTags(any(), any(), any(), any());
         });
     }
 
@@ -1944,17 +1945,25 @@ class MediaJobsImplTest {
             MediaJobInput source = new MediaJobInput("media", "flowcortex-media",
                     "runs/" + runId + "/inputs/media");
             org.mockito.Mockito.doThrow(SdkException.builder().message("connection refused").build())
-                    .when(store).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+                    .when(store).copyWithoutTags(anyString(), anyString(), anyString(), anyString());
 
             assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
                     .isInstanceOf(MediaStoreUnavailableException.class)
                     .hasCauseInstanceOf(SdkException.class)
                     .satisfies(e -> assertThat(e.getMessage()).doesNotContain("flowcortex-media", "runs/"));
-            assertThat(output.getAll()).contains("WARN").contains("runs/" + runId + "/steps/1/video",
+            assertThat(output.getAll()).contains("WARN").contains("runs/" + runId + "/steps/1/attempts/1/video",
                     "connection refused");
 
+            org.mockito.Mockito.doThrow(new IllegalStateException(
+                    "The object store denied copying flowcortex-media/runs/x to flowcortex-media/runs/y"))
+                    .when(store).copyWithoutTags(anyString(), anyString(), anyString(), anyString());
+            assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("flowcortex-media", "runs/"));
+
             org.mockito.Mockito.doNothing().when(store)
-                    .copy(anyString(), anyString(), anyString(), anyString(), anyString());
+                    .copyWithoutTags(anyString(), anyString(), anyString(), anyString());
             when(store.head(anyString(), anyString())).thenReturn(Optional.empty());
             assertThatThrownBy(() -> jobs.copyRunObject(runId, 1, source, "video"))
                     .isInstanceOf(MediaStoreUnavailableException.class);

@@ -61,8 +61,6 @@ class MediaJobsImpl implements MediaJobs {
     private static final Pattern ATTEMPT_SEGMENT = Pattern.compile("^attempts/[1-9][0-9]*/(?=.)");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
-    /** A retention value no lifecycle rule of the media bucket matches: the copy lives as long as worker outputs. */
-    private static final String STEP_OUTPUT = "step-output";
     private static final String CONTENT_PREFIX = "content/";
     /** Content copies follow the same lifecycle: pending expires, kept stays. */
     private static final String CONTENT_PENDING = "content-pending";
@@ -870,12 +868,14 @@ class MediaJobsImpl implements MediaJobs {
             throw new IllegalArgumentException("Only an object of the run in the media bucket can be copied: "
                     + source.key());
         }
-        String key = MediaJob.outputPrefix(runId, stepOrder) + name;
+        // The backend's store policy lets it write a step's first attempt only, and holds no tagging grant
+        // there; the untagged copy matches no lifecycle rule, so it lives as long as a worker output.
+        String key = MediaJob.outputPrefix(runId, stepOrder, 1) + name;
         Optional<S3MediaStore.StoredObject> copy;
         try {
-            store.copy(bucket, source.objectKey(), bucket, key, STEP_OUTPUT);
+            store.copyWithoutTags(bucket, source.objectKey(), bucket, key);
             copy = store.head(bucket, key);
-        } catch (SdkException e) {
+        } catch (SdkException | IllegalStateException e) {
             // The message may reach a step's error message; where the object was going stays in the log.
             LOG.warn("Run object not copied: bucket={} key={} source={}", bucket, key, source.objectKey(), e);
             throw new MediaStoreUnavailableException("The object store did not take the step's file", e);

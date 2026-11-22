@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Downloads the video behind a link on the fetch worker. The link is the config's {@code url}, else the
@@ -69,14 +70,15 @@ class FetchVideoStepExecutor implements StepExecutor {
         if (configFault != null) {
             throw new StepFailedException("contract_violation", "The step config is not valid: " + configFault);
         }
-        String link = FetchVideoConfig.configUrl(context.config())
-                .orElseGet(() -> context.input() == null ? null : context.input().trim());
+        Optional<String> configured = FetchVideoConfig.configUrl(context.config());
+        String link = configured.orElseGet(() -> context.input() == null ? null : context.input().trim());
         if (FetchVideoConfig.linkFault(link) != null) {
             throw new StepFailedException("input_rejected", "The step needs a link that starts with http:// or https://");
         }
         MediaLimits limits = mediaJobs.limitsFor(FetchVideoConfig.TYPE);
         MediaJob job = new MediaJob("1", context.stepId(), context.runId(), context.runId(), context.stepOrder(),
-                MediaCapability.FETCH_VIDEO, List.of(), params(link, context.config()),
+                MediaCapability.FETCH_VIDEO, List.of(),
+                params(link, configured.isEmpty(), context.config()),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()), (int) context.attempt(),
                 Math.toIntExact(limits.maxRuntime().toSeconds()), limits.maxInputBytes(), clock.instant());
         try {
@@ -88,10 +90,17 @@ class FetchVideoStepExecutor implements StepExecutor {
         return null;
     }
 
-    private Map<String, Object> params(String link, String config) {
+    /**
+     * {@code echoSource} lets the worker record the link in the step's data; it is set only for a link the
+     * member gave, because a link from the config is the owner's and the member may not read it.
+     */
+    private Map<String, Object> params(String link, boolean givenByMember, String config) {
         JsonNode settings = readConfig(config);
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("url", link);
+        if (givenByMember) {
+            params.put("echoSource", true);
+        }
         params.put("quality", settings.hasNonNull("quality") ? settings.get("quality").textValue() : "best");
         params.put("extractAudio", !settings.hasNonNull("extractAudio") || settings.get("extractAudio").booleanValue());
         return params;

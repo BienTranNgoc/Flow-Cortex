@@ -157,19 +157,7 @@ export function UsersPage() {
       );
     }
   }
-  const pageItems = page?.items;
-  const { filterRoles, filterNames } = useMemo(() => {
-    const customNames: Record<string, string> = {};
-    for (const user of pageItems ?? []) {
-      if (user.role && !(ROLE_CODES as readonly string[]).includes(user.role)) {
-        customNames[user.role] = user.roleName;
-      }
-    }
-    return {
-      filterRoles: [...ROLE_CODES, ...Object.keys(customNames)],
-      filterNames: customNames,
-    };
-  }, [pageItems]);
+  const filterRoles = [...ROLE_CODES, ...Object.keys(names)];
 
   return (
     <div className="cortex-admin-users">
@@ -237,6 +225,20 @@ export function UsersPage() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {statsQuery.isError && (
+        <div className="cortex-admin-error" role="alert">
+          <p>{t('users.stats.loadError')}</p>
+          <button
+            type="button"
+            className="cortex-admin-btn"
+            onClick={() => statsQuery.refetch()}
+            disabled={statsQuery.isFetching}
+          >
+            {t('users.stats.retry')}
+          </button>
         </div>
       )}
 
@@ -376,7 +378,7 @@ export function UsersPage() {
               <RoleOptions
                 roles={filterRoles}
                 current={params.role || undefined}
-                names={{ ...filterNames, ...names }}
+                names={names}
               />
             </select>
           </div>
