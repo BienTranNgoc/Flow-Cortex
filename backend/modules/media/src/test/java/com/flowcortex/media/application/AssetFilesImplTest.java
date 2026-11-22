@@ -50,6 +50,13 @@ class AssetFilesImplTest {
     }
 
     @Test
+    void onlyTheMediaBucketIsServed() {
+        assertThat(files.serves(BUCKET)).isTrue();
+        assertThat(files.serves("flowcortex-uploads")).isFalse();
+        assertThat(files.serves(null)).isFalse();
+    }
+
+    @Test
     void probeOfAnotherBucketIsRefused() {
         assertThatThrownBy(() -> files.probe("flowcortex-uploads", KEY)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> files.sign("flowcortex-uploads", KEY, AssetFiles.Disposition.INLINE, "a.mp4",

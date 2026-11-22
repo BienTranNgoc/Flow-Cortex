@@ -43,7 +43,8 @@ public class AssetLinks {
      * @throws com.flowcortex.shared.web.NotFoundException 404 {@code asset.notFound} for a malformed id, an unknown
      *         one and another space's
      * @throws LocalizedStatusException 410 {@code asset.fileGone} when the object is gone, 503
-     *         {@code asset.storeUnavailable} when the store does not answer
+     *         {@code asset.storeUnavailable} when the store does not answer or the asset's bucket is not the one
+     *         it serves (nothing is marked missing)
      */
     public AssetFileLink downloadUrl(UUID spaceId, String idText) {
         return link(spaceId, idText, Disposition.ATTACHMENT, "download");
@@ -68,13 +69,18 @@ public class AssetLinks {
             return SpaceAssetLibrary.notFound();
         });
 
+        if (!files.serves(row.bucket())) {
+            // An operator or configuration fault, not proof the member's file is gone: nothing is marked missing.
+            log.warn("asset.link.{} space={} asset={} outcome=outside_media_bucket", operation, spaceId, id);
+            throw storeUnavailable();
+        }
+
         OptionalLong size;
         try {
             size = files.probe(row.bucket(), row.objectKey());
         } catch (MediaStoreUnavailableException e) {
             log.warn("asset.link.{} space={} asset={} outcome=store_unavailable", operation, spaceId, id);
-            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    new LocalizedMessage("asset.storeUnavailable"));
+            throw storeUnavailable();
         }
         if (size.isEmpty()) {
             marks.markGone(id, spaceId);
@@ -89,5 +95,10 @@ public class AssetLinks {
                 AssetFileNames.fileName(id, row.title(), row.mimeType()), row.mimeType());
         log.info("asset.link.{} space={} asset={} outcome=issued", operation, spaceId, id);
         return link;
+    }
+
+    private static LocalizedStatusException storeUnavailable() {
+        return new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                new LocalizedMessage("asset.storeUnavailable"));
     }
 }

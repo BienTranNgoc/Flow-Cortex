@@ -183,6 +183,63 @@ describe('RunHistoryPage', () => {
       }
     });
 
+    it("polls only the pending run and keeps a done row's thumbnail URL across polls", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const second = { ...COMPLETED, id: 'a2', title: 'Second cut' };
+        const requested: string[][] = [];
+        let signatures = 0;
+        let registered = false;
+        stubHistory([COMPLETED, second], {
+          [RESULTS]: () => {
+            const url = String(vi.mocked(fetch).mock.calls.at(-1)?.[0]);
+            const ids = new URLSearchParams(url.split('?')[1]).getAll('runId');
+            requested.push(ids);
+            // Each request signs afresh, as the object store does: a run asked about again gets a new URL.
+            signatures += 1;
+            return {
+              status: 200,
+              body: {
+                results: ids.map((runId) =>
+                  runId === 'a2' && !registered
+                    ? { runId, count: 0, kinds: [], thumbnails: [], registration: 'pending' }
+                    : {
+                        runId,
+                        count: 1,
+                        kinds: ['image'],
+                        thumbnails: [{ url: `https://files/${runId}.png?sig=${signatures}` }],
+                        registration: 'done',
+                      },
+                ),
+              },
+            };
+          },
+        });
+        const { container } = renderPage();
+        await screen.findByText('Saving files…');
+        const sources = () =>
+          Array.from(container.querySelectorAll('.run-row img')).map((image) =>
+            image.getAttribute('src'),
+          );
+        expect(sources()).toEqual(['https://files/a1.png?sig=1']);
+
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        expect(requested).toEqual([['a1', 'a2'], ['a2']]);
+        expect(sources()).toEqual(['https://files/a1.png?sig=1']);
+
+        registered = true;
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        await waitFor(() => expect(screen.queryByText('Saving files…')).not.toBeInTheDocument());
+        expect(requested).toEqual([['a1', 'a2'], ['a2'], ['a2']]);
+        expect(sources()).toEqual(['https://files/a1.png?sig=1', 'https://files/a2.png?sig=3']);
+
+        await act(() => vi.advanceTimersByTimeAsync(15_000));
+        expect(requested).toHaveLength(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('leaves every row as it was when the summary request fails', async () => {
       stubHistory([COMPLETED], { [RESULTS]: { status: 503, body: { status: 503 } } });
       const { queryClient, container } = renderPage();

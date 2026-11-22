@@ -22,6 +22,13 @@ public interface AssetFiles {
     }
 
     /**
+     * Whether this store can probe and sign objects of {@code bucket}. False for any bucket other than the
+     * media bucket, which {@link #probe} and {@link #sign} refuse; callers ask first when the bucket comes
+     * from a stored row.
+     */
+    boolean serves(String bucket);
+
+    /**
      * The stored object's size in bytes, or empty when there is no object at {@code key}.
      * @throws MediaStoreUnavailableException when the object store fails in any other way, a 403 included
      * @throws IllegalArgumentException when {@code bucket} is not the media bucket

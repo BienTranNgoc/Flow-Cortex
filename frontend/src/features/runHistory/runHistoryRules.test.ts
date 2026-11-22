@@ -1,7 +1,9 @@
 import type { RunResultResponse } from '@flow-cortex/api-client';
 import {
   canDeleteRun,
+  overrideResults,
   parse,
+  pendingRunIds,
   resultSummaryView,
   resultsRefetchInterval,
   serialize,
@@ -133,6 +135,25 @@ describe('resultSummaryView', () => {
       count: 5,
       thumbnails: ['a', 'b', 'c'],
     });
+  });
+});
+
+describe('pendingRunIds and overrideResults', () => {
+  const settled = result({ runId: 'a', count: 1, registration: 'done' });
+  const saving = result({ runId: 'b', registration: 'pending' });
+
+  it('lists only the runs whose registration is pending', () => {
+    expect(pendingRunIds([settled, saving, result({ runId: 'c' })])).toEqual(['b']);
+    expect(pendingRunIds([])).toEqual([]);
+    expect(pendingRunIds(undefined)).toEqual([]);
+  });
+
+  it('replaces only the runs it was given and keeps the rest untouched, in order', () => {
+    const fresh = result({ runId: 'b', count: 2, registration: 'done' });
+    const merged = overrideResults([settled, saving], [fresh, result({ runId: 'zz' })]);
+
+    expect(merged).toEqual([settled, fresh]);
+    expect(merged[0]).toBe(settled);
   });
 });
 

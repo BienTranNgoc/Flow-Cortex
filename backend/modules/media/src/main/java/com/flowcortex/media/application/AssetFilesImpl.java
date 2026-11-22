@@ -29,6 +29,11 @@ class AssetFilesImpl implements AssetFiles {
     }
 
     @Override
+    public boolean serves(String bucket) {
+        return properties.s3().bucket().equals(bucket);
+    }
+
+    @Override
     public OptionalLong probe(String bucket, String key) {
         requireMediaBucket(bucket);
         try {
@@ -57,7 +62,7 @@ class AssetFilesImpl implements AssetFiles {
     }
 
     private void requireMediaBucket(String bucket) {
-        if (!properties.s3().bucket().equals(bucket)) {
+        if (!serves(bucket)) {
             throw new IllegalArgumentException("Only objects in the media bucket are asset files, not " + bucket);
         }
     }

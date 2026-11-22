@@ -26,6 +26,7 @@ import {
   RUN_HISTORY_PAGE_SIZE,
   useDeleteRunMutation,
   useRunHistoryQuery,
+  usePendingRunResults,
   useRunResultsQuery,
   useRunWorkflowsQuery,
   useUpdateRunMutation,
@@ -193,6 +194,7 @@ export function RunHistoryPage() {
   const page = listQuery.data;
   const runIds = useMemo(() => page?.items.map((run) => run.id) ?? [], [page]);
   const resultsQuery = useRunResultsQuery(runIds);
+  usePendingRunResults(runIds, resultsQuery);
   const resultsByRun = useMemo(
     () => new Map(resultsQuery.data?.map((result) => [result.runId, result])),
     [resultsQuery.data],

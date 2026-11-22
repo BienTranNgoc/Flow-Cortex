@@ -1,4 +1,11 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import { useMemo } from 'react';
 import {
   authHeaders,
   deleteRun,
@@ -11,8 +18,11 @@ import {
   updateRun,
   useAuthToken,
 } from '@flow-cortex/api-client';
-import type { UpdateRunRequest } from '@flow-cortex/api-client';
+import type { RunResultResponse, UpdateRunRequest } from '@flow-cortex/api-client';
 import {
+  RESULTS_POLL_INTERVAL_MS,
+  overrideResults,
+  pendingRunIds,
   resultsRefetchInterval,
   toListParams,
   trayRefetchInterval,
@@ -62,17 +72,53 @@ export function useRunTrayQuery() {
   });
 }
 
+function runResultsKey(runIds: readonly string[]) {
+  return ['run-results', runIds] as const;
+}
+
+async function fetchRunResults(runIds: readonly string[]): Promise<RunResultResponse[]> {
+  return (await unwrap(listRunResults({ runId: [...runIds] }, authHeaders()))).results;
+}
+
 /**
- * What each run on the page produced. Kept outside {@link ROOT_KEY} so starring or renaming a run
- * does not refetch it and re-sign every thumbnail; a failed request leaves `data` empty and the rows unchanged.
+ * What each run on the page produced, never polled. Kept outside {@link ROOT_KEY} so starring or renaming
+ * a run does not refetch it and re-sign every thumbnail; a failed request leaves `data` empty.
  */
 export function useRunResultsQuery(runIds: readonly string[]) {
   return useQuery({
-    queryKey: ['run-results', runIds],
-    queryFn: async () => (await unwrap(listRunResults({ runId: [...runIds] }, authHeaders()))).results,
+    queryKey: runResultsKey(runIds),
+    queryFn: () => fetchRunResults(runIds),
     enabled: runIds.length > 0,
     retry: 1,
     staleTime: RESULTS_STALE_MS,
+  });
+}
+
+/**
+ * Polls only the runs of `base` still pending and writes each answer into `base`'s cache for those runs alone,
+ * so every other run keeps its signed thumbnail URLs. The first poll waits one interval: `base` just answered.
+ */
+export function usePendingRunResults(
+  runIds: readonly string[],
+  base: Pick<UseQueryResult<RunResultResponse[]>, 'data' | 'dataUpdatedAt'>,
+): void {
+  const queryClient = useQueryClient();
+  const pendingIds = useMemo(() => pendingRunIds(base.data), [base.data]);
+  useQuery({
+    queryKey: ['run-results', 'pending', pendingIds],
+    queryFn: async () => {
+      const fresh = await fetchRunResults(pendingIds);
+      queryClient.setQueryData<RunResultResponse[]>(
+        runResultsKey(runIds),
+        (current) => current && overrideResults(current, fresh),
+      );
+      return fresh;
+    },
+    enabled: pendingIds.length > 0,
+    retry: 1,
+    initialData: () => base.data?.filter((result) => pendingIds.includes(result.runId)),
+    initialDataUpdatedAt: base.dataUpdatedAt,
+    staleTime: RESULTS_POLL_INTERVAL_MS,
     refetchInterval: (query) =>
       resultsRefetchInterval(query.state.data, query.state.dataUpdateCount),
   });

@@ -131,6 +131,20 @@ export function resultSummaryView(result: RunResultResponse | undefined): Result
   };
 }
 
+/** The runs whose last known registration is still pending: the only ones worth asking about again. */
+export function pendingRunIds(results: readonly RunResultResponse[] | undefined): string[] {
+  return results?.filter((result) => result.registration === 'pending').map((result) => result.runId) ?? [];
+}
+
+/** `current` with each run's entry replaced by its fresher one in `fresh`; runs absent from `current` are not added. */
+export function overrideResults(
+  current: readonly RunResultResponse[],
+  fresh: readonly RunResultResponse[],
+): RunResultResponse[] {
+  const byRun = new Map(fresh.map((result) => [result.runId, result]));
+  return current.map((result) => byRun.get(result.runId) ?? result);
+}
+
 /** Asks again every 5 seconds while a registration is pending, for at most 24 fetches (about 2 minutes). */
 export function resultsRefetchInterval(
   results: readonly RunResultResponse[] | undefined,

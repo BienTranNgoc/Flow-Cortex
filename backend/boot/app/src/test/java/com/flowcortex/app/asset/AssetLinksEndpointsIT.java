@@ -138,6 +138,21 @@ class AssetLinksEndpointsIT extends AbstractAssetHttpIT {
     }
 
     @Test
+    void assetOutsideTheMediaBucketIs503AndMarksNothing(CapturedOutput output) {
+        Member member = member("link-foreign-bucket");
+        UUID asset = member.storedAsset("video", "Moved bucket", "video/mp4", CLIP, Instant.now());
+        jdbc.update("UPDATE space_asset SET bucket = 'flowcortex-renamed' WHERE id = ?", asset);
+
+        ResponseEntity<ProblemView> download = member.get("/" + asset + "/download-url", ProblemView.class);
+        ResponseEntity<ProblemView> view = member.get("/" + asset + "/view-url", ProblemView.class);
+
+        assertThat(download.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(view.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(member.missingAt(asset)).isNull();
+        assertThat(output.getAll()).contains("outcome=outside_media_bucket").contains("asset=" + asset);
+    }
+
+    @Test
     void anotherMembersAssetLinkIs404() {
         Member owner = member("link-owner");
         Member intruder = member("link-intruder");
