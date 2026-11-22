@@ -261,6 +261,13 @@ What to know about the media path:
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
     host to it, plus the five registry hosts the payments region gate downloads from:
     `ftp.apnic.net`, `ftp.arin.net`, `ftp.ripe.net`, `ftp.lacnic.net`, `ftp.afrinic.net`.
+  - The VietGuys SMS sender (`FLOWCORTEX_SMS_SENDER=vietguys`) reaches `api-v2.vietguys.biz` and
+    `cloudsms4.vietguys.biz` (port 4438) through this proxy. Both hosts are in the committed file
+    (a host-side `EGRESS_ACL_FILE` copy must list them too); another account's hosts are added by
+    the same file edit. To rotate the key that seals the carrier tokens, add
+    `FLOWCORTEX_SMS_CREDENTIAL_KEYS_K2` (`openssl rand -base64 32`), set
+    `FLOWCORTEX_SMS_CREDENTIAL_CURRENT_KEY_ID=k2`, and keep `..._KEYS_K1` until the next token
+    renewal has re-sealed both tokens under `k2`; only then drop `k1`.
   - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
     connecting directly. Why and what else was weighed: `docs/ADR.md`, ADR-0010.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
