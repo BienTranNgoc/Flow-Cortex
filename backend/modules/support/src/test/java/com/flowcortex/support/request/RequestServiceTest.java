@@ -2,6 +2,7 @@ package com.flowcortex.support.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -14,6 +15,11 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.notification.api.NotificationRequested;
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
+import com.flowcortex.support.config.SupportLifecycleSettings;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.ConversationMessageRow;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
@@ -21,18 +27,27 @@ import com.flowcortex.support.request.RequestRepository.RequestRow;
 import com.flowcortex.support.request.RequestService.NewRequest;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
+import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
+import com.flowcortex.support.request.RequestViews.BulkAssignResult;
 import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.web.SupportProblemException;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.LongStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,13 +58,21 @@ class RequestServiceTest {
 
     private final RequestRepository requests = mock(RequestRepository.class);
     private final IdempotencyGuard idempotency = mock(IdempotencyGuard.class);
-    private final MailOutboxRepository outbox = mock(MailOutboxRepository.class);
+    private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final AttachmentService attachments = mock(AttachmentService.class);
     private final UserDirectory users = mock(UserDirectory.class);
-    private final RequestService service = new RequestService(requests, idempotency, outbox, attachments, users,
-            mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
+    private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
+    private final Settings settings = mock(Settings.class);
+    private final RequestService service = new RequestService(requests, idempotency, publisher, attachments, users,
+            adminPermissions, settings, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
+
+    @BeforeEach
+    void replyMailWindowIsFifteenMinutes() {
+        when(settings.get(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES))
+                .thenReturn(new SettingRead<>(15, 15, SettingSource.STORED));
+    }
 
     @Test
     void aNewRequestIsTrimmedStoredWithItsFirstMessageAndShownNew() {
@@ -186,7 +209,7 @@ class RequestServiceTest {
         service.adminReply(admin, 12, "Đã xử lý", List.of(upload), "resolved", Optional.of("key"));
 
         verify(attachments).release(kept);
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -264,7 +287,7 @@ class RequestServiceTest {
     }
 
     @Test
-    void anAdminReplyMarksUnreadAndQueuesOneMail() {
+    void anAdminReplyMarksUnreadDuesTheMailAfterTheWindowAndRingsTheBellOnce() {
         UUID id = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.NEW)));
         when(requests.findById(id)).thenReturn(Optional.of(row(id, 12, RequestStatus.RESOLVED)));
@@ -275,8 +298,84 @@ class RequestServiceTest {
 
         assertThat(detail.status()).isEqualTo("resolved");
         assertThat(detail.requester().deleted()).isFalse();
-        verify(outbox).insert(eq(id), any(), eq(member), eq(NOW));
-        verify(requests).insertMessage(any(), eq(id), eq("admin"), eq(admin), eq("Đã xử lý"), eq(NOW));
+        ArgumentCaptor<UUID> message = ArgumentCaptor.forClass(UUID.class);
+        verify(requests).insertMessage(message.capture(), eq(id), eq("admin"), eq(admin), eq("Đã xử lý"), eq(NOW));
+        verify(requests).markReplyMailDue(id, message.getValue(), NOW.plusSeconds(15 * 60));
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue()).satisfies(event -> {
+            assertThat(event.id()).isEqualTo(MemberNotices.idFor(id, message.getValue(), RequestStatus.RESOLVED, NOW));
+            assertThat(event.memberId()).isEqualTo(member);
+            assertThat(event.type()).isEqualTo("support_reply");
+            assertThat(event.titleCode()).isEqualTo("notification.support.reply.title");
+            assertThat(event.args()).containsExactly(12L);
+            assertThat(event.link()).isEqualTo("/?help=request-12");
+        });
+    }
+
+    @Test
+    void anAdminStatusChangeRingsItsNoticeAndAMemberChangeRingsNothing() {
+        UUID id = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.findById(id)).thenReturn(Optional.of(row(id, 12, RequestStatus.RESOLVED)));
+        when(requests.move(id, RequestStatus.IN_PROGRESS, RequestStatus.RESOLVED, null, null, NOW)).thenReturn(true);
+        when(requests.move(id, RequestStatus.IN_PROGRESS, RequestStatus.CLOSED, "cancelled", null, NOW))
+                .thenReturn(true);
+
+        service.setStatus(12, "resolved");
+        service.cancel(member, 12);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.resolved.title");
+        assertThat(bell.getValue().id()).isEqualTo(MemberNotices.idFor(id, null, RequestStatus.RESOLVED, NOW));
+    }
+
+    @Test
+    void aChangeThatLostTheRaceRingsNothing() {
+        UUID id = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(id, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(false);
+
+        assertProblem(() -> service.setStatus(12, "resolved"), HttpStatus.CONFLICT, "request-state-changed");
+
+        verify(publisher, never()).publishEvent(any(NotificationRequested.class));
+    }
+
+    @Test
+    void aPickUpRingsTheInProgressNoticeAndAnAssignmentThatKeepsTheStatusRingsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID fresh = UUID.randomUUID();
+        UUID open = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(row(fresh, 30, RequestStatus.NEW)));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS)));
+        when(requests.findById(any())).thenAnswer(call -> Optional.of(row(call.getArgument(0), 30,
+                RequestStatus.IN_PROGRESS, member, linh)));
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(true);
+
+        service.assign(admin, 30, linh);
+        service.assign(admin, 31, linh);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.inProgress.title");
+        assertThat(bell.getValue().id()).isEqualTo(MemberNotices.idFor(fresh, null, RequestStatus.IN_PROGRESS, NOW));
+    }
+
+    @Test
+    void anAutoCloseRingsTheClosedNoticeOnlyWhenItWon() {
+        RequestRow resolved = row(UUID.randomUUID(), 12, RequestStatus.RESOLVED);
+        Instant cutoff = NOW.minusSeconds(7 * 24 * 3600);
+        when(requests.closeSeenResolution(resolved.id(), "auto", cutoff, NOW)).thenReturn(true, false);
+
+        service.autoClose(resolved, cutoff);
+        service.autoClose(resolved, cutoff);
+
+        ArgumentCaptor<NotificationRequested> bell = ArgumentCaptor.forClass(NotificationRequested.class);
+        verify(publisher).publishEvent(bell.capture());
+        assertThat(bell.getValue().titleCode()).isEqualTo("notification.support.closed.title");
     }
 
     @Test
@@ -289,7 +388,7 @@ class RequestServiceTest {
                 HttpStatus.CONFLICT, "requester-deleted");
         assertProblem(() -> service.adminReply(admin, 5, "Xin chào", List.of(), "closed", Optional.empty()),
                 HttpStatus.BAD_REQUEST, "validation-failed");
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -303,7 +402,7 @@ class RequestServiceTest {
                     assertThat(e.code()).isEqualTo("validation-failed");
                     assertThat(e.fieldErrors()).containsOnlyKeys("status");
                 });
-        verify(outbox, never()).insert(any(), any(), any(), any());
+        verify(publisher, never()).publishEvent(any(SupportReplyMailRequested.class));
     }
 
     @Test
@@ -311,7 +410,7 @@ class RequestServiceTest {
         UUID id = UUID.randomUUID();
         UUID conversation = UUID.randomUUID();
         RequestRow linked = new RequestRow(id, 12, member, "credit", "Không thấy credit", RequestStatus.NEW,
-                conversation, true, false, NOW, null, null, null, NOW);
+                conversation, true, false, NOW, null, null, null, NOW, null, "vi");
         when(requests.findByNumber(12)).thenReturn(Optional.of(linked));
         when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
         when(requests.conversation(conversation)).thenReturn(List.of(
@@ -329,7 +428,7 @@ class RequestServiceTest {
     void aLinkedConversationTheRetentionDeletedShowsAsExpiredWhileNoLinkDoesNot() {
         UUID expiredId = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(expiredId, 12, member, "credit",
-                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW)));
+                "Không thấy credit", RequestStatus.NEW, null, true, false, NOW, null, null, null, NOW, null, "vi")));
         when(requests.findByNumber(13)).thenReturn(Optional.of(row(UUID.randomUUID(), 13, RequestStatus.NEW)));
 
         AdminDetail expired = service.adminDetail(12);
@@ -343,10 +442,11 @@ class RequestServiceTest {
 
     @Test
     void anInboxPageBeyondTenThousandIsRefusedInsteadOfOverflowing() {
-        assertProblem(() -> service.page(null, null, Integer.MAX_VALUE), HttpStatus.BAD_REQUEST,
+        assertProblem(() -> service.page(null, null, null, null, null, null, Integer.MAX_VALUE, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+        assertProblem(() -> service.page(null, null, null, null, null, null, 10_001, admin), HttpStatus.BAD_REQUEST,
                 "validation-failed");
-        assertProblem(() -> service.page(null, null, 10_001), HttpStatus.BAD_REQUEST, "validation-failed");
-        verify(requests, never()).page(any(), any(), anyInt(), anyInt());
+        verify(requests, never()).page(any(), anyInt(), anyInt());
     }
 
     @Test
@@ -361,27 +461,85 @@ class RequestServiceTest {
     @Test
     void theInboxPagesByTwentyAndRefusesUnknownFilters() {
         UUID id = UUID.randomUUID();
-        when(requests.page("new", "credit", 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW)));
-        when(requests.count("new", "credit")).thenReturn(21L);
-        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
+        UUID linh = UUID.randomUUID();
+        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, 1, admin, NOW)
+                .filter();
+        when(requests.page(filter, 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
+        when(requests.count(filter)).thenReturn(21L);
+        when(users.findEmailsByIds(List.of(member, linh))).thenReturn(Map.of(member, "m@example.com"));
 
-        AdminPage page = service.page("new", "credit", 1);
+        AdminPage page = service.page("new", "credit", "me", null, null, null, 1, admin);
 
-        assertThat(page.items()).singleElement().satisfies(item -> assertThat(item.requester().email())
-                .isEqualTo("m@example.com"));
+        assertThat(page.items()).singleElement().satisfies(item -> {
+            assertThat(item.requester().email()).isEqualTo("m@example.com");
+            assertThat(item.assignee().id()).isEqualTo(linh);
+            assertThat(item.assignee().deleted()).isTrue();
+        });
         assertThat(page.total()).isEqualTo(21);
-        assertProblem(() -> service.page("open", "billing", -1), HttpStatus.BAD_REQUEST, "validation-failed");
+        assertProblem(() -> service.page("open", "billing", null, null, null, null, -1, admin), HttpStatus.BAD_REQUEST,
+                "validation-failed");
     }
 
     @Test
-    void theCountsAndTheListComeFromTheRepository() {
-        when(requests.countUnread(member)).thenReturn(2L);
-        when(requests.countOpen()).thenReturn(3L);
-        when(requests.listOfRequester(member)).thenReturn(List.of(row(UUID.randomUUID(), 4, RequestStatus.NEW)));
+    void bulkAssignClassifiesEachNumber() {
+        UUID linh = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        RequestRow fresh = row(UUID.randomUUID(), 30, RequestStatus.NEW);
+        RequestRow already = row(UUID.randomUUID(), 31, RequestStatus.IN_PROGRESS, member, linh);
+        RequestRow closed = row(UUID.randomUUID(), 9, RequestStatus.CLOSED);
+        RequestRow racing = row(UUID.randomUUID(), 32, RequestStatus.IN_PROGRESS, member, other);
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(fresh));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(already));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(closed));
+        when(requests.findByNumber(32)).thenReturn(Optional.of(racing));
+        when(requests.findByNumber(999)).thenReturn(Optional.empty());
+        when(requests.assign(fresh.id(), RequestStatus.NEW, RequestStatus.IN_PROGRESS, linh, NOW)).thenReturn(true);
+        when(requests.assign(racing.id(), RequestStatus.IN_PROGRESS, RequestStatus.IN_PROGRESS, linh, NOW))
+                .thenReturn(false);
 
-        assertThat(service.unreadCount(member)).isEqualTo(2);
-        assertThat(service.openCount()).isEqualTo(3);
-        assertThat(service.list(member)).singleElement().satisfies(s -> assertThat(s.number()).isEqualTo(4));
+        BulkAssignResult result = service.bulkAssign(admin, List.of(30L, 31L, 9L, 999L, 32L), linh);
+
+        assertThat(result.assigned()).containsExactly(30L);
+        assertThat(result.unchanged()).containsExactly(31L);
+        assertThat(result.failed()).extracting(BulkAssignFailure::number, BulkAssignFailure::reason)
+                .containsExactly(tuple(9L, "closed"), tuple(999L, "not_found"), tuple(32L, "changed"));
+        verify(requests, never()).assign(eq(already.id()), any(), any(), any(), any());
+        verify(requests, never()).assign(eq(closed.id()), any(), any(), any(), any());
+    }
+
+    @Test
+    void bulkAssignRefusesEmptyOversizedOrRepeatedListsBeforeAnyWrite() {
+        UUID linh = UUID.randomUUID();
+        List<Long> oversized = LongStream.rangeClosed(1, 101).boxed().toList();
+
+        for (List<Long> numbers : Arrays.asList(List.<Long>of(), oversized, List.of(1L, 1L), null,
+                Arrays.asList(1L, null), List.of(0L))) {
+            assertThatThrownBy(() -> service.bulkAssign(admin, numbers, linh))
+                    .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                        assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                        assertThat(e.fieldErrors()).containsOnlyKeys("numbers");
+                    });
+        }
+        verifyNoInteractions(adminPermissions);
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anIneligibleAssigneeFailsTheWholeBatch() {
+        UUID editor = UUID.randomUUID();
+        when(adminPermissions.holds(editor, Permission.SUPPORT_TICKET_REPLY)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.bulkAssign(admin, List.of(30L, 31L), editor))
+                .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(e.fieldErrors()).containsOnlyKeys("assigneeId");
+                });
+        assertThatThrownBy(() -> service.bulkAssign(admin, List.of(30L), null))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.fieldErrors()).containsOnlyKeys("assigneeId"));
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+        verify(requests, never()).findByNumber(30);
     }
 
     @Test
@@ -401,9 +559,13 @@ class RequestServiceTest {
     }
 
     private static RequestRow row(UUID id, long number, RequestStatus status, UUID requester) {
+        return row(id, number, status, requester, null);
+    }
+
+    private static RequestRow row(UUID id, long number, RequestStatus status, UUID requester, UUID assignee) {
         return new RequestRow(id, number, requester, "credit", "Không thấy credit", status, null, false, false, NOW,
                 status == RequestStatus.RESOLVED ? NOW : null, null,
-                status == RequestStatus.CLOSED ? "cancelled" : null, NOW);
+                status == RequestStatus.CLOSED ? "cancelled" : null, NOW, assignee, "en");
     }
 
     private static void assertProblem(Runnable call, HttpStatus status, String code) {

@@ -102,6 +102,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void unprocessableCarriesTheMachineReasonOfEachFieldBesideItsMessage() throws Exception {
+        mockMvc.perform(get("/test/unprocessable-reasons"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.errors['steps[1].config']").value("is missing"))
+                .andExpect(jsonPath("$.reasons['steps[1].config']").value("missing_key"));
+        mockMvc.perform(get("/test/unprocessable"))
+                .andExpect(jsonPath("$.reasons").doesNotExist());
+    }
+
+    @Test
     void aLostOptimisticLockReturns409() throws Exception {
         mockMvc.perform(get("/test/optimistic-lock"))
                 .andExpect(status().isConflict())
@@ -134,6 +144,26 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
                 .andExpect(jsonPath("$.errors.size").exists());
+    }
+
+    @Test
+    void aMismatchedFieldTypeNamesTheField() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarked\":\"yes\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.errors.bookmarked").value("has the wrong type"));
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"images\":[\"x\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.images").value("has the wrong type"));
+    }
+
+    @Test
+    void anotherUnreadableBodyKeepsTheBare400() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON).content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors").doesNotExist());
     }
 
     @Test

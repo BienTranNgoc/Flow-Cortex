@@ -3,15 +3,18 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import tempfile
 import wave
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 from pydantic import ValidationError
 
+from ..contracts.media_progress import VendorTaskReport
 from ..errors import PermanentError
 from .adapter import (
     ScriptAdapter,
@@ -29,12 +32,24 @@ from .contracts.provider_job import (
     GenerateStoryboardJob,
     GenerateVideoJob,
     ProviderJob,
+    VendorCandidate,
+    VendorLedger,
 )
 from .contracts.provider_speech_result import ProviderSpeechData
 from .seedance_adapter import PROVIDER_SEEDANCE
+from .vendor_jobs import (
+    ProbeRegistry,
+    VendorJobEnded,
+    VendorJobTimeout,
+    VendorResultGone,
+    select_attach,
+    vendor_fingerprint,
+)
 
 # Providers that fetch the reference image themselves from a URL instead of taking its bytes.
 _URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE})
+
+log = logging.getLogger("flowcortex_provider_worker.vendor_jobs")
 
 
 class UnsupportedCapability(ValueError):
@@ -65,12 +80,18 @@ class ObjectStore(Protocol):
     def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = ...) -> str: ...
 
 
+def _discard_report(report: VendorTaskReport) -> None:
+    return None
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     storage: ObjectStore
     bucket: str
     output_prefix: str
     abort: Any
+    report: Callable[[VendorTaskReport], None] = _discard_report
+    probes: ProbeRegistry = field(default_factory=dict)
 
 
 Handler = Callable[
@@ -193,11 +214,52 @@ def _generate_video(
         reference_image_bytes=image_bytes,
     )
     idempotency_key = _video_idempotency_key(request, identity)
+    ledger = job.vendorLedger
+    fingerprint = (
+        vendor_fingerprint(identity, adapter.vendor_scope(), request) if ledger else None
+    )
     task_id = _load_video_task(context, idempotency_key, identity)
+    attached: VendorCandidate | None = None
     if task_id is None:
-        task_id = adapter.submit_video(request)
+        if ledger is not None and fingerprint is not None:
+            attached = select_attach(
+                ledger.candidates,
+                fingerprint,
+                context.probes,
+                lambda candidate, status: _report_verdict(context, candidate, status),
+            )
+        task_id = (
+            attached.vendorJobId
+            if attached is not None
+            else _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+        )
         _store_video_task(context, task_id, idempotency_key, identity)
-    video = adapter.await_video(task_id, context.abort)
+    try:
+        video = adapter.await_video(task_id, context.abort)
+    except VendorJobEnded as exc:
+        if attached is not None:
+            _report_verdict(context, attached, exc.status)
+        elif ledger is not None:
+            context.report(
+                VendorTaskReport(
+                    vendor=identity.provider,
+                    model=identity.model,
+                    vendorJobId=task_id,
+                    status=exc.status,
+                )
+            )
+        raise
+    except VendorJobTimeout as exc:
+        if attached is not None:
+            raise exc.with_ledger(str(attached.vendorTaskId)) from exc
+        raise
+    except VendorResultGone:
+        if attached is None:
+            raise
+        _report_verdict(context, attached, "gone")
+        task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+        _store_video_task(context, task_id, idempotency_key, identity)
+        video = adapter.await_video(task_id, context.abort)
     if video.provider_task_id != task_id:
         raise PermanentError(
             "provider_response_invalid",
@@ -215,6 +277,9 @@ def _generate_video(
         "providerTaskId": task_id,
         "format": "mp4",
     }
+    if ledger is not None and fingerprint is not None:
+        data["fingerprint"] = fingerprint
+        data["requestKey"] = ledger.requestKey
     normalized = _normalize_video(video.body, context)
     manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
     return ProviderOutcome(
@@ -223,6 +288,54 @@ def _generate_video(
             ProviderFile("clip.mp4", video.mime, normalized),
             ProviderFile("manifest.json", "application/json", manifest),
         ),
+    )
+
+
+def _submit_recorded(
+    adapter: VideoAdapter,
+    request: VideoRequest,
+    identity: VideoIdentity,
+    ledger: VendorLedger | None,
+    fingerprint: str | None,
+    context: ExecutionContext,
+) -> str:
+    """Submits a new vendor job and, when the backend runs a ledger, records it before any wait."""
+    task_id = adapter.submit_video(request)
+    if ledger is not None and fingerprint is not None:
+        context.report(
+            VendorTaskReport(
+                vendor=identity.provider,
+                model=identity.model,
+                fingerprint=fingerprint,
+                requestKey=ledger.requestKey,
+                vendorJobId=task_id,
+                handle={},
+                status="running",
+                vendorCreatedAt=datetime.now(UTC),
+            )
+        )
+        log.info(
+            "vendor_job outcome=submit ledger=- vendor=%s job=%s candidates=%d",
+            identity.provider,
+            task_id,
+            len(ledger.candidates),
+        )
+    return task_id
+
+
+def _report_verdict(
+    context: ExecutionContext,
+    candidate: VendorCandidate,
+    status: Literal["failed", "expired", "gone"],
+) -> None:
+    context.report(
+        VendorTaskReport(
+            vendorTaskId=candidate.vendorTaskId,
+            vendor=candidate.vendor,
+            model=candidate.model,
+            vendorJobId=candidate.vendorJobId,
+            status=status,
+        )
     )
 
 

@@ -1,0 +1,62 @@
+.notifications-page {
+  max-width: 48rem;
+}
+
+.notifications-page__tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.notifications-page__tab {
+  min-width: 0;
+  margin: 0 0 -1px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.notifications-page__tab:hover {
+  background: var(--chrome-hover);
+  color: var(--ink);
+  transform: none;
+}
+
+.notifications-page__tab:active {
+  background: var(--chrome-active);
+  transform: none;
+}
+
+.notifications-page__tab[aria-selected='true'] {
+  border-bottom-color: var(--primary);
+  color: var(--ink);
+}
+
+.notifications-page__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.notifications-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.notifications-page__more {
+  align-self: center;
+  margin: 0.75rem 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notifications-page__tab {
+    transition: none;
+  }
+}

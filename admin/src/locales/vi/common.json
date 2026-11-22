@@ -70,8 +70,10 @@
         "approvals": "Hàng chờ duyệt",
         "credits": "Credit & ví",
         "providers": "Nhà cung cấp mô hình",
+        "paymentSettings": "Cài đặt thanh toán",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
+        "settings": "Cài đặt",
         "features": "Công tắc tính năng",
         "auditLog": "Nhật ký kiểm toán",
         "mediaJobs": "Tác vụ media",
@@ -122,6 +124,15 @@
       "previousPage": "Trang trước",
       "pager": "Trang {{page}}/{{pages}} · {{total}} {{noun}}",
       "nextPage": "Trang sau"
+    },
+    "export": {
+      "button": "Xuất CSV",
+      "working": "Đang chuẩn bị tệp…",
+      "done": "Đã lưu {{fileName}}.",
+      "capped": "Tệp chứa {{shown}} {{noun}} mới nhất trong tổng số {{total}}.",
+      "forbidden": "Bạn không có quyền xuất dữ liệu.",
+      "disabled": "Trang quản trị đang tạm tắt",
+      "failed": "Không xuất được. Hãy thử lại."
     }
   }
 }

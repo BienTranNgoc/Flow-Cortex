@@ -16,6 +16,7 @@ import { WorkflowIcon } from '../dashboard/WorkflowIcon';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useWorkflowsQuery } from './useWorkflows';
 import { OwnerCell } from './OwnerCell';
+import { WorkflowExamples } from './WorkflowExamples';
 import './WorkflowsListPage.css';
 
 type PillTone = 'active' | 'failed' | 'attention';
@@ -81,8 +82,8 @@ export function WorkflowsListPage() {
     if (!visible) return undefined;
     const q = query.trim().toLowerCase();
     return visible.filter((workflow) => {
-      if (scope === 'shared' && !workflow.isShared) return false;
-      if (scope === 'mine' && workflow.isShared) return false;
+      if (scope === 'shared' && workflow.visibility !== 'public') return false;
+      if (scope === 'mine' && workflow.visibility === 'public') return false;
       if (q === '') return true;
       return safeName(workflow, t).toLowerCase().includes(q);
     });
@@ -106,7 +107,14 @@ export function WorkflowsListPage() {
             components={{ strong: <strong /> }}
           />
         }
+        actions={
+          <Link to="/builder/dashboard" className="action-link">
+            {t('workflow.builderDashboard.linkLabel')}
+          </Link>
+        }
       />
+
+      <WorkflowExamples />
 
       <div className="wf-list__toolbar">
         <label className="wf-list__search" aria-label={t('workflow.list.searchLabel')}>

@@ -1,0 +1,109 @@
+{
+  "close": "Close",
+  "welcome": {
+    "title": "Welcome to FlowCortex",
+    "text": "Take a two-minute guide: a quick look around, then six short questions so we can tailor FlowCortex to how you work.",
+    "start": "Start",
+    "skip": "Skip"
+  },
+  "tour": {
+    "title": "Find your way around",
+    "text": "The sidebar takes you to your workflows, runs and docs. Everything you build lives here.",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip"
+  },
+  "survey": {
+    "title": "Tell us about your work",
+    "text": "Six quick questions. Every one is optional and you can skip any of them.",
+    "start": "Start survey",
+    "later": "Later",
+    "back": "Back"
+  },
+  "quiz": {
+    "counter": "Question {{n}} of {{total}}",
+    "next": "Next",
+    "finish": "Finish",
+    "back": "Back",
+    "skip": "Skip",
+    "retry": "Retry",
+    "saving": "Saving…",
+    "saveFailed": "We couldn't save your answer. Your choice is kept, please try again.",
+    "multiHint": "Pick as many as you like.",
+    "singleHint": "Pick one.",
+    "q1": {
+      "title": "What do you want to use FlowCortex for?",
+      "options": {
+        "marketing_content": "Marketing content",
+        "automation": "Automating tasks",
+        "documents_reports": "Documents and reports",
+        "customer_care": "Customer care",
+        "research": "Research",
+        "other": "Something else"
+      }
+    },
+    "q2": {
+      "title": "How did you hear about us?",
+      "options": {
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "linkedin": "LinkedIn",
+        "google": "Google search",
+        "referral": "A friend or colleague",
+        "other": "Somewhere else"
+      }
+    },
+    "q3": {
+      "title": "How familiar are you with AI tools?",
+      "options": {
+        "beginner": "I'm just starting out",
+        "tried": "I've tried a few tools",
+        "automation": "I automate tasks with AI",
+        "builder": "I build AI products"
+      }
+    },
+    "q4": {
+      "title": "Which field do you work in?",
+      "options": {
+        "marketing": "Marketing",
+        "sales": "Sales",
+        "finance": "Finance",
+        "hr": "Human resources",
+        "tech": "Technology",
+        "other": "Something else"
+      }
+    },
+    "q5": {
+      "title": "What kind of content do you work with?",
+      "options": {
+        "text": "Text",
+        "image": "Images",
+        "audio": "Audio",
+        "video": "Video",
+        "spreadsheet": "Spreadsheets",
+        "document": "Documents",
+        "slide": "Slides"
+      }
+    },
+    "q6": {
+      "title": "Who will use FlowCortex?",
+      "options": {
+        "personal": "Just me",
+        "team": "My team"
+      }
+    }
+  },
+  "done": {
+    "title": "You're all set",
+    "text": "Here is what we covered. You can replay this guide any time from the account menu.",
+    "stepsLabel": "Guide steps",
+    "steps": {
+      "interface": "Looked around the interface",
+      "survey": "Answered the survey"
+    },
+    "action": "Start using FlowCortex"
+  },
+  "menu": {
+    "replay": "Replay guide"
+  }
+}

@@ -18,6 +18,9 @@ import java.util.UUID;
 final class UploadPurposePolicy {
 
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
+    static final String DRIVE_ITEM_PREFIX = "drive-item/";
+    static final String PROFILE_IMAGE_PREFIX = "profile-image/";
+    static final String REVIEW_IMAGE_PREFIX = "review-image/";
     static final String CONTENT_MEDIA_PREFIX = "content-media/";
 
     private static final long MEGABYTE = 1024L * 1024;
@@ -64,6 +67,9 @@ final class UploadPurposePolicy {
         String prefix = switch (purpose) {
             case RUN_INPUT -> "";
             case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
+            case DRIVE_ITEM -> DRIVE_ITEM_PREFIX;
+            case PROFILE_IMAGE -> PROFILE_IMAGE_PREFIX;
+            case REVIEW_IMAGE -> REVIEW_IMAGE_PREFIX;
             case CONTENT_MEDIA -> CONTENT_MEDIA_PREFIX;
         };
         return prefix + ownerId + "/" + uploadId;
@@ -72,8 +78,10 @@ final class UploadPurposePolicy {
     /** The size cap of {@code kind} under {@code purpose}, or 0 for a kind the purpose never accepts. */
     long maxBytes(UploadPurpose purpose, String kind) {
         return switch (purpose) {
-            case RUN_INPUT -> upload.maxBytesOf(kind);
+            case RUN_INPUT, DRIVE_ITEM -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
+            case PROFILE_IMAGE -> "image".equals(kind) ? upload.maxBytesOf(kind) : 0L;
+            case REVIEW_IMAGE -> "image".equals(kind) ? UploadPurpose.REVIEW_IMAGE_MAX_BYTES : 0L;
             case CONTENT_MEDIA -> switch (kind) {
                 case "image" -> upload.maxImageBytes();
                 case "video" -> upload.maxVideoBytes();
@@ -90,8 +98,8 @@ final class UploadPurposePolicy {
     /** Extension to canonical content type, in the order formats are listed to the member. */
     Map<String, String> mimeTypes(UploadPurpose purpose) {
         return switch (purpose) {
-            case RUN_INPUT -> upload.mimeTypes();
-            case SUPPORT_ATTACHMENT -> SUPPORT_MIME_TYPES;
+            case RUN_INPUT, DRIVE_ITEM -> upload.mimeTypes();
+            case SUPPORT_ATTACHMENT, PROFILE_IMAGE, REVIEW_IMAGE -> SUPPORT_MIME_TYPES;
             case CONTENT_MEDIA -> contentMediaMimeTypes();
         };
     }
@@ -113,7 +121,7 @@ final class UploadPurposePolicy {
 
     private LocalizedMessage typeDetail(UploadPurpose purpose) {
         List<String> extensions = new ArrayList<>();
-        if (purpose == UploadPurpose.RUN_INPUT) {
+        if (purpose == UploadPurpose.RUN_INPUT || purpose == UploadPurpose.DRIVE_ITEM) {
             extensions.addAll(upload.mediaExtensions());
             extensions.addAll(upload.productImageExtensions());
         } else {
@@ -129,8 +137,8 @@ final class UploadPurposePolicy {
     /** The extensions {@code purpose} accepts for {@code kind}, as the member is told them: {@code .mp4, .webm}. */
     String formats(UploadPurpose purpose, String kind) {
         List<String> extensions = switch (purpose) {
-            case RUN_INPUT -> upload.extensionsOf(kind);
-            case SUPPORT_ATTACHMENT -> List.copyOf(SUPPORT_MIME_TYPES.keySet());
+            case RUN_INPUT, DRIVE_ITEM -> upload.extensionsOf(kind);
+            case SUPPORT_ATTACHMENT, PROFILE_IMAGE, REVIEW_IMAGE -> List.copyOf(SUPPORT_MIME_TYPES.keySet());
             case CONTENT_MEDIA -> contentMediaMimeTypes().entrySet().stream()
                     .filter(entry -> MediaProperties.Upload.kindOf(entry.getValue()).equals(kind))
                     .map(Map.Entry::getKey)

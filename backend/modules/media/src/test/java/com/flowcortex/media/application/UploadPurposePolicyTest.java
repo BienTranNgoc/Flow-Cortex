@@ -157,6 +157,49 @@ class UploadPurposePolicyTest {
     }
 
     @Test
+    void driveItemAcceptsEveryRunInputKindAtItsCapUnderTheDriveItemPrefix() {
+        record Row(String file, String type, String kind, long cap) {
+        }
+
+        List<Row> rows = List.of(
+                new Row("a.mp4", "video/mp4", "video", VIDEO_CAP),
+                new Row("a.mkv", "video/x-matroska", "video", VIDEO_CAP),
+                new Row("a.m4a", "audio/mp4", "audio", AUDIO_CAP),
+                new Row("a.wav", "audio/wav", "audio", AUDIO_CAP),
+                new Row("a.JPG", "image/jpeg", "image", IMAGE_CAP),
+                new Row("a.png", "image/png", "image", IMAGE_CAP),
+                new Row("a.webp", "image/webp", "image", IMAGE_CAP));
+
+        for (Row row : rows) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.DRIVE_ITEM, row.file(), row.cap());
+            assertThat(allowed.contentType()).as(row.file()).isEqualTo(row.type());
+            assertThat(allowed.kind()).as(row.file()).isEqualTo(row.kind());
+            assertThat(allowed.maxBytes()).as(row.file()).isEqualTo(row.cap());
+            assertThat(policy.maxBytes(UploadPurpose.DRIVE_ITEM, row.kind())).isEqualTo(row.cap());
+        }
+        assertThat(policy.mimeTypes(UploadPurpose.DRIVE_ITEM)).isEqualTo(policy.mimeTypes(UploadPurpose.RUN_INPUT));
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+        assertThat(policy.objectKey(UploadPurpose.DRIVE_ITEM, owner, upload))
+                .isEqualTo("drive-item/" + owner + "/" + upload);
+    }
+
+    @Test
+    void driveItemRefusesOneByteOverTheKindCap() {
+        for (String[] row : new String[][] {{"clip.mp4", "video"}, {"voice.mp3", "audio"}, {"logo.png", "image"}}) {
+            long cap = policy.maxBytes(UploadPurpose.DRIVE_ITEM, row[1]);
+            assertThatThrownBy(() -> policy.grant(UploadPurpose.DRIVE_ITEM, row[0], cap + 1))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).as(row[0]).isEqualTo("size");
+                        assertThat(e.detail().code()).isEqualTo("upload.sizeMegabytes");
+                    });
+        }
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.DRIVE_ITEM, "notes.pdf", 16L))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(e.field()).isEqualTo("fileName"));
+    }
+
+    @Test
     void runInputKeyIsOwnerSlashUploadAndSupportKeyCarriesItsPrefix() {
         UUID owner = UUID.randomUUID();
         UUID upload = UUID.randomUUID();
@@ -164,6 +207,77 @@ class UploadPurposePolicyTest {
         assertThat(policy.objectKey(UploadPurpose.RUN_INPUT, owner, upload)).isEqualTo(owner + "/" + upload);
         assertThat(policy.objectKey(UploadPurpose.SUPPORT_ATTACHMENT, owner, upload))
                 .isEqualTo("support-attachment/" + owner + "/" + upload);
+    }
+
+    @Test
+    void profileImageAcceptsPngJpgJpegWebpUpToTenMegabytesAndRefusesGifAndOneByteMore() {
+        for (String fileName : List.of("a.png", "a.JPG", "a.jpeg", "a.webp")) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.PROFILE_IMAGE, fileName, IMAGE_CAP);
+            assertThat(allowed.kind()).as(fileName).isEqualTo("image");
+            assertThat(allowed.maxBytes()).isEqualTo(IMAGE_CAP);
+        }
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.PROFILE_IMAGE, "a.gif", 1L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("fileName");
+                    assertThat(e.detail().args()).containsExactly(".png, .jpg, .jpeg", ".webp");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.PROFILE_IMAGE, "a.png", IMAGE_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().args()[0]).isEqualTo(10L);
+                });
+        assertThat(policy.maxBytes(UploadPurpose.PROFILE_IMAGE, "video")).isZero();
+    }
+
+    @Test
+    void profileImageKeyCarriesItsPrefix() {
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+
+        assertThat(policy.objectKey(UploadPurpose.PROFILE_IMAGE, owner, upload))
+                .isEqualTo("profile-image/" + owner + "/" + upload);
+    }
+
+    @Test
+    void reviewImageAcceptsPngJpgJpegWebpExactlyAtFiveMegabytesUnderItsOwnPrefix() {
+        for (String fileName : List.of("a.png", "a.JPG", "a.jpeg", "a.webp")) {
+            UploadPurposePolicy.Allowed allowed = policy.grant(UploadPurpose.REVIEW_IMAGE, fileName, SUPPORT_CAP);
+            assertThat(allowed.kind()).as(fileName).isEqualTo("image");
+            assertThat(allowed.maxBytes()).isEqualTo(SUPPORT_CAP);
+        }
+        assertThat(policy.maxBytes(UploadPurpose.REVIEW_IMAGE, "image")).isEqualTo(SUPPORT_CAP);
+        assertThat(policy.maxBytes(UploadPurpose.REVIEW_IMAGE, "video")).isZero();
+        UUID owner = UUID.randomUUID();
+        UUID upload = UUID.randomUUID();
+        assertThat(policy.objectKey(UploadPurpose.REVIEW_IMAGE, owner, upload))
+                .isEqualTo("review-image/" + owner + "/" + upload);
+    }
+
+    @Test
+    void reviewImageRefusesAVideoOnFileNameAndOneByteOverOnSize() {
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "clip.mp4", 2_097_152L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("fileName");
+                    assertThat(e.detail().code()).isEqualTo("upload.typeMany");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "anh.jpg", SUPPORT_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.field()).isEqualTo("size");
+                    assertThat(e.detail().code()).isEqualTo("upload.sizeMegabytes");
+                    assertThat(e.detail().args()[0]).isEqualTo(5L);
+                });
+    }
+
+    @Test
+    void reviewImageTypeSentenceListsOnlyPngJpgJpegWebp() {
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "clip.mp4", 10L))
+                .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                    assertThat(e.detail().args()[0]).isEqualTo(".png, .jpg, .jpeg");
+                    assertThat(e.detail().args()[1]).isEqualTo(".webp");
+                });
+        assertThatThrownBy(() -> policy.grant(UploadPurpose.REVIEW_IMAGE, "a.png", SUPPORT_CAP + 1))
+                .isInstanceOfSatisfying(UploadRejectedException.class,
+                        e -> assertThat(e.detail().args()[1]).isEqualTo(".png, .jpg, .jpeg, .webp"));
     }
 
     @Test

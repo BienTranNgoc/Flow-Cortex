@@ -70,8 +70,10 @@
         "approvals": "Approval Queue",
         "credits": "Credits & Wallets",
         "providers": "Model Providers",
+        "paymentSettings": "Payment settings",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "settings": "Settings",
         "features": "Feature Switches",
         "auditLog": "Audit Log",
         "mediaJobs": "Media Jobs",
@@ -122,6 +124,15 @@
       "previousPage": "Previous page",
       "pager": "Page {{page}} of {{pages}} · {{total}} {{noun}}",
       "nextPage": "Next page"
+    },
+    "export": {
+      "button": "Export CSV",
+      "working": "Preparing file…",
+      "done": "Saved {{fileName}}.",
+      "capped": "The file holds the newest {{shown}} of {{total}} {{noun}}.",
+      "forbidden": "You do not have permission to export.",
+      "disabled": "Admin console is disabled",
+      "failed": "Could not export. Try again."
     }
   }
 }
