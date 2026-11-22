@@ -68,10 +68,10 @@ ENTRYPOINT ["python", "-m", "flowcortex_worker.provider"]
 # before, without build isolation, so no build backend is fetched unpinned.
 FROM build AS audio-build
 COPY engines/ ./engines/
-RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
       --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
       --index-strategy unsafe-best-match -r engines/requirements-torch-cpu.txt \
- && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+ && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
       --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
       --index-strategy unsafe-best-match -r engines/requirements-audio-build.txt \
  && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
@@ -93,9 +93,9 @@ RUN /app/.venv/bin/python -c "from demucs.pretrained import get_model; get_model
     | sha256sum -c - \
  && test "$(ls | wc -l)" = 1
 RUN mkdir -p /models/speakers && cd /models/speakers \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o silero_vad.onnx \
+ && curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors -o silero_vad.onnx \
       https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+ && curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors \
       -o 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
       https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
  && printf '%s  %s\n' \
@@ -104,7 +104,7 @@ RUN mkdir -p /models/speakers && cd /models/speakers \
       3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
     | sha256sum -c -
 RUN mkdir -p /models/beat_this && cd /models/beat_this \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o final0.ckpt \
+ && curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors -o final0.ckpt \
       https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt \
  && printf '%s  %s\n' 8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331 final0.ckpt \
     | sha256sum -c -
