@@ -12,6 +12,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
 import com.flowcortex.shared.web.UnprocessableEntityException;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -167,6 +168,7 @@ class PaymentSettingsAdminController {
             description = "paymentSetting.reasonRequired (errors.reason) or setting.invalidValue (errors.value)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "payment_setting.update", resourceParam = "key", capture = "value")
     @RequirePermission(Permission.PAYMENT_SETTING_UPDATE)
     @PutMapping(value = "/{key:.+}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
