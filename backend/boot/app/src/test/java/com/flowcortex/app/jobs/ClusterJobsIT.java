@@ -324,7 +324,8 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     "user.phone-retention", 3_600_000L,
                     "user.admin-audit-origin-retention", 3_600_000L,
                     "support.assistant-retention", 3_600_000L,
-                    "support.request-auto-close", 3_600_000L);
+                    "support.request-auto-close", 3_600_000L,
+                    "asset.registration-sweep", 120_000L);
 
             await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
                 Map<String, Long> stored = rows.queryForList(
