@@ -24,6 +24,41 @@ const names = (nav: HTMLElement) =>
 describe('SidebarNav', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    features.chat = false;
+    features.drive = false;
+  });
+
+  it('lists Chat after Runs while the chat switch is on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
+    features.chat = true;
+
+    renderNav('/');
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Chat']);
+    expect(within(nav).getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/chat');
+  });
+
+  it('lists Drive after Runs while the drive switch is on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
+    features.drive = true;
+
+    renderNav('/');
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Drive']);
+    expect(within(nav).getByRole('link', { name: 'Drive' })).toHaveAttribute('href', '/drive');
+  });
+
+  it('lists Drive after Chat while both switches are on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
+    features.chat = true;
+    features.drive = true;
+
+    renderNav('/');
+
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Chat', 'Drive']);
   });
 
   it('lists Home, Workflows, Runs and the Docs group while the demo pages flag is off', () => {

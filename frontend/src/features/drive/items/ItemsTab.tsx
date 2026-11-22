@@ -41,12 +41,13 @@ export function ItemsTab({ kept, onKept }: { kept: ReadonlySet<string>; onKept: 
   const remove = useDeleteDriveItem();
 
   // A delete or hide that emptied the last page leaves the page index past the end.
+  const data = query.data;
+  const pageEmptied = data !== undefined && data.items.length === 0 && data.total > 0;
+  const shrinkTo =
+    pageEmptied && !query.isPlaceholderData ? pageAfterShrink(page, data.total, ITEMS_PAGE_SIZE) : page;
   useEffect(() => {
-    const data = query.data;
-    if (query.isPlaceholderData || !data || data.items.length > 0 || data.total === 0) return;
-    const next = pageAfterShrink(page, data.total, ITEMS_PAGE_SIZE);
-    if (next !== page) setPage(next);
-  }, [query.data, query.isPlaceholderData, page]);
+    if (shrinkTo !== page) setPage(shrinkTo);
+  }, [shrinkTo, page]);
 
   // Runs after the confirm dialog has handed focus back to a button the reload may have removed.
   useEffect(() => {
@@ -128,6 +129,9 @@ export function ItemsTab({ kept, onKept }: { kept: ReadonlySet<string>; onKept: 
         onRetry={() => void query.refetch()}
       />
     );
+  } else if (shrinkTo !== page || (pageEmptied && query.isPlaceholderData)) {
+    // Earlier pages still hold items: this page is being left, not empty.
+    body = <DriveLoading />;
   } else if (items.length === 0) {
     body = <StatusBlock kind="empty" message={t('driveItems.empty.title')} action={{ label: addLabel, onClick: openAdd }} />;
   } else {
