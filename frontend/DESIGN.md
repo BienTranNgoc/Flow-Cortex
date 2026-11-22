@@ -183,6 +183,12 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - API tokens section (profile, admins only): a title and `ink-3` hint, a create form (name field, lifetime select 30/90/180/365 days), then rows separated by `line-soft` rules. A row wraps a long name, shows `ink-3` dates beneath it and a `red` on `red-soft` expired badge when expired. Revoke opens an inline confirmation naming the token, with focus on "Keep token".
 - Reveal: a `paper-3` panel with a read-only token field, a copy button announced by a polite `green` status line, and the one-time warning in `ink-2`; closing it drops the token from the page.
 
+### App consent (`/oauth/authorize`)
+
+- Sits in the auth card with the auth palette: title, an `auth-ink-3` intro, a facts block on `auth-field` with an `auth-line` edge (App, Sends you back to, Signed in as; `auth-ink-3` labels, `auth-ink` values that wrap anywhere), then two `auth-ink-3` notes: the app chose its own name, and what Allow grants. The app name and host come from the server's check, never from the link.
+- Buttons are 44px (`target-min`): Deny is the secondary button, Allow the call-to-action. Below 768px they stack full width with Allow on top; from 768px they sit side by side at equal width. A secondary button's hover colours its edge and text `auth-accent`.
+- States: checking is an `auth-status` line; an invalid link, an unavailable service and a failed check are `auth-alert` messages (a failed check adds "Try again"), with no button that leaves; an account that may not consent sees the message and Deny only; a refused grant shows its `auth-alert` above the buttons with Allow enabled again; a faulty request or Deny sends the browser back to the client with an `auth-status` line. Allow opens the step-up dialog and stays disabled while the grant runs.
+
 ### Help Center
 
 - Launcher: a 56px button fixed bottom-right (20px from the edges, safe-area aware), `paper-3` fill, `line-2` outline, fully rounded, `shadow`. It holds the headset mascot, painted only from the `nodi-*` tokens (`nodi-headset` and `nodi-earcup` belong to the launcher alone); from 640px up the label "Trợ giúp" shows beside it in `ink`. Its accessible name is "Trợ giúp" at every width, and it reports `aria-expanded`.

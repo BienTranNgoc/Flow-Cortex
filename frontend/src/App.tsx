@@ -21,6 +21,7 @@ import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
@@ -105,6 +106,8 @@ export function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
+            {/* Signs in through RequireAuth, yet stays outside PasswordSetupGate and the app Layout. */}
+            <Route path="/oauth/authorize" element={<OAuthConsentRoute />} />
           </Route>
           <Route
             element={

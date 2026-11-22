@@ -1165,6 +1165,102 @@ export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
 }
 
+export interface TokenForm {
+  grant_type: string;
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+export interface RevokeForm {
+  token: string;
+  token_type_hint?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export interface RegistrationRequest {
+  client_name?: string;
+  redirect_uris?: string[];
+  grant_types?: string[];
+  response_types?: string[];
+  token_endpoint_auth_method?: string;
+}
+
+export interface Registration {
+  client_id: string;
+  /** Absent for a client that authenticates with none */
+  client_secret?: string;
+  client_id_issued_at: number;
+  client_secret_expires_at: number;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  token_endpoint_auth_method: string;
+}
+
+export interface GrantRequest {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof?: string;
+}
+
+export interface GrantResponse {
+  redirectTo: string;
+}
+
 export interface ReadAllResult {
   marked?: number;
 }
@@ -2465,6 +2561,19 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface CheckResponse {
+  clientId: string;
+  clientName: string;
+  redirectUri: string;
+  scope: string;
+  eligible: boolean;
+  /**
+   * The OAuth error the page sends to the redirect URI; null when the request is valid
+   * @nullable
+   */
+  error?: string | null;
+}
+
 export interface NotificationItem {
   id?: string;
   type?: string;
@@ -2975,9 +3084,48 @@ export interface PageViewAdminAccountResponse {
   total: number;
 }
 
+export interface Metadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint: string;
+  revocation_endpoint: string;
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  scopes_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+  revocation_endpoint_auth_methods_supported: string[];
+}
+
 export interface RevokedResponse {
   revoked?: number;
 }
+
+/**
+ * The Idempotency-Key header is blank or longer than 80 characters, or the keyed request body cannot be fingerprinted (multipart or over 1 MiB).
+ */
+export type IdempotencyKeyInvalidResponse = ProblemDetail;
+
+/**
+ * A request with the same key is still running.
+ */
+export type IdempotencyInProgressResponse = ProblemDetail;
+
+/**
+ * The key was used with a different method, path, query or body.
+ */
+export type IdempotencyKeyReusedResponse = ProblemDetail;
+
+/**
+ * The token owner's daily write limit is reached (code API_TOKEN_DAILY_LIMIT); retry after the UTC day ends.
+ */
+export type ApiTokenDailyLimitResponse = ProblemDetail;
+
+/**
+ * Optional on POST and PATCH made with a personal access token. A repeat of the same request within 24 hours returns the stored answer with Idempotent-Replayed: true.
+ */
+export type IdempotencyKeyParameter = string;
 
 export type ListWorkflowVersionsParams = {
   /**
@@ -2994,6 +3142,14 @@ export type ListWorkflowVersionsParams = {
 export type StartRunParams = {
   key?: string;
 };
+
+export type RevokeOAuthToken200 = { [key: string]: unknown };
+
+export type RevokeOAuthToken400 = { [key: string]: unknown };
+
+export type RevokeOAuthToken401 = { [key: string]: unknown };
+
+export type RevokeOAuthToken429 = { [key: string]: unknown };
 
 export type UnsubscribeEmailLinkParams = {
   src?: string;
@@ -3176,6 +3332,49 @@ export const ExportRunsStatus = {
 
 export type OpenRealtimeStreamParams = {
   topic?: string[];
+};
+
+export type CheckOAuthAuthorizationParams = {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
 };
 
 export type ListNotificationsParams = {
@@ -6957,6 +7156,324 @@ export const completeBuilderOnboarding = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(builderCompleteBody),
+  });
+};
+
+export type oauthTokenResponse200 = {
+  data: TokenResponse;
+  status: 200;
+};
+
+export type oauthTokenResponse400 = {
+  data: TokenResponse;
+  status: 400;
+};
+
+export type oauthTokenResponse401 = {
+  data: TokenResponse;
+  status: 401;
+};
+
+export type oauthTokenResponse429 = {
+  data: TokenResponse;
+  status: 429;
+};
+
+export type oauthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthTokenResponseSuccess = oauthTokenResponse200 & {
+  headers: Headers;
+};
+export type oauthTokenResponseError = (
+  oauthTokenResponse400 | oauthTokenResponse401 | oauthTokenResponse429 | oauthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type oauthTokenResponse = oauthTokenResponseSuccess | oauthTokenResponseError;
+
+export const getOauthTokenUrl = () => {
+  return `/api/v1/oauth/token`;
+};
+
+export const oauthToken = async (
+  tokenForm: TokenForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`grant_type`, tokenForm.grant_type);
+  formUrlEncoded.append(`code`, tokenForm.code);
+  formUrlEncoded.append(`code_verifier`, tokenForm.code_verifier);
+  formUrlEncoded.append(`redirect_uri`, tokenForm.redirect_uri);
+  if (tokenForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, tokenForm.client_id);
+  }
+  if (tokenForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, tokenForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<oauthTokenResponse>(getOauthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type revokeOAuthTokenResponse200 = {
+  data: RevokeOAuthToken200;
+  status: 200;
+};
+
+export type revokeOAuthTokenResponse400 = {
+  data: RevokeOAuthToken400;
+  status: 400;
+};
+
+export type revokeOAuthTokenResponse401 = {
+  data: RevokeOAuthToken401;
+  status: 401;
+};
+
+export type revokeOAuthTokenResponse429 = {
+  data: RevokeOAuthToken429;
+  status: 429;
+};
+
+export type revokeOAuthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeOAuthTokenResponseSuccess = revokeOAuthTokenResponse200 & {
+  headers: Headers;
+};
+export type revokeOAuthTokenResponseError = (
+  | revokeOAuthTokenResponse400
+  | revokeOAuthTokenResponse401
+  | revokeOAuthTokenResponse429
+  | revokeOAuthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type revokeOAuthTokenResponse =
+  revokeOAuthTokenResponseSuccess | revokeOAuthTokenResponseError;
+
+export const getRevokeOAuthTokenUrl = () => {
+  return `/api/v1/oauth/revoke`;
+};
+
+export const revokeOAuthToken = async (
+  revokeForm: RevokeForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeOAuthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`token`, revokeForm.token);
+  if (revokeForm.token_type_hint !== undefined) {
+    formUrlEncoded.append(`token_type_hint`, revokeForm.token_type_hint);
+  }
+  if (revokeForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, revokeForm.client_id);
+  }
+  if (revokeForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, revokeForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<revokeOAuthTokenResponse>(getRevokeOAuthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type registerOAuthClientResponse201 = {
+  data: Registration;
+  status: 201;
+};
+
+export type registerOAuthClientResponse400 = {
+  data: Registration;
+  status: 400;
+};
+
+export type registerOAuthClientResponse429 = {
+  data: Registration;
+  status: 429;
+};
+
+export type registerOAuthClientResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type registerOAuthClientResponseSuccess = registerOAuthClientResponse201 & {
+  headers: Headers;
+};
+export type registerOAuthClientResponseError = (
+  registerOAuthClientResponse400 | registerOAuthClientResponse429 | registerOAuthClientResponse503
+) & {
+  headers: Headers;
+};
+
+export type registerOAuthClientResponse =
+  registerOAuthClientResponseSuccess | registerOAuthClientResponseError;
+
+export const getRegisterOAuthClientUrl = () => {
+  return `/api/v1/oauth/register`;
+};
+
+export const registerOAuthClient = async (
+  registrationRequest: RegistrationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<registerOAuthClientResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<registerOAuthClientResponse>(getRegisterOAuthClientUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registrationRequest),
+  });
+};
+
+export type grantOAuthAuthorizationResponse200 = {
+  data: GrantResponse;
+  status: 200;
+};
+
+export type grantOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type grantOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type grantOAuthAuthorizationResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type grantOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type grantOAuthAuthorizationResponseSuccess = grantOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type grantOAuthAuthorizationResponseError = (
+  | grantOAuthAuthorizationResponse400
+  | grantOAuthAuthorizationResponse403
+  | grantOAuthAuthorizationResponse409
+  | grantOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type grantOAuthAuthorizationResponse =
+  grantOAuthAuthorizationResponseSuccess | grantOAuthAuthorizationResponseError;
+
+export const getGrantOAuthAuthorizationUrl = () => {
+  return `/api/v1/oauth/authorize`;
+};
+
+export const grantOAuthAuthorization = async (
+  grantRequest: GrantRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<grantOAuthAuthorizationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<grantOAuthAuthorizationResponse>(getGrantOAuthAuthorizationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(grantRequest),
   });
 };
 
@@ -12050,6 +12567,66 @@ export const getOnboardingResult = async (
   });
 };
 
+export type checkOAuthAuthorizationResponse200 = {
+  data: CheckResponse;
+  status: 200;
+};
+
+export type checkOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type checkOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type checkOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type checkOAuthAuthorizationResponseSuccess = checkOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type checkOAuthAuthorizationResponseError = (
+  | checkOAuthAuthorizationResponse400
+  | checkOAuthAuthorizationResponse403
+  | checkOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type checkOAuthAuthorizationResponse =
+  checkOAuthAuthorizationResponseSuccess | checkOAuthAuthorizationResponseError;
+
+export const getCheckOAuthAuthorizationUrl = (params?: CheckOAuthAuthorizationParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/oauth/authorize/request?${stringifiedParams}`
+    : `/api/v1/oauth/authorize/request`;
+};
+
+export const checkOAuthAuthorization = async (
+  params?: CheckOAuthAuthorizationParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<checkOAuthAuthorizationResponse> => {
+  return customFetch<checkOAuthAuthorizationResponse>(getCheckOAuthAuthorizationUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listNotificationsResponse200 = {
   data: NotificationPage;
   status: 200;
@@ -13176,6 +13753,38 @@ export const listAdminAccounts = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminAccountsResponse> => {
   return customFetch<listAdminAccountsResponse>(getListAdminAccountsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type oauthMetadataResponse200 = {
+  data: Metadata;
+  status: 200;
+};
+
+export type oauthMetadataResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthMetadataResponseSuccess = oauthMetadataResponse200 & {
+  headers: Headers;
+};
+export type oauthMetadataResponseError = oauthMetadataResponse503 & {
+  headers: Headers;
+};
+
+export type oauthMetadataResponse = oauthMetadataResponseSuccess | oauthMetadataResponseError;
+
+export const getOauthMetadataUrl = () => {
+  return `/.well-known/oauth-authorization-server`;
+};
+
+export const oauthMetadata = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthMetadataResponse> => {
+  return customFetch<oauthMetadataResponse>(getOauthMetadataUrl(), {
     ...options,
     method: 'GET',
   });
