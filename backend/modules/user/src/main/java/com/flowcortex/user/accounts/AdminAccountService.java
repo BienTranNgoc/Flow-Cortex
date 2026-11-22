@@ -4,6 +4,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.application.RegistrationOwnerGuard;
 import com.flowcortex.user.application.SuperAdminInvariant;
 import com.flowcortex.user.domain.AppUser;
@@ -36,11 +37,14 @@ class AdminAccountService {
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
 
+    private final AccountCredentials accountCredentials;
+
     AdminAccountService(AppUserRepository users, SuperAdminInvariant superAdminInvariant,
-            RegistrationOwnerGuard registrationOwnerGuard) {
+            RegistrationOwnerGuard registrationOwnerGuard, AccountCredentials accountCredentials) {
         this.users = users;
         this.superAdminInvariant = superAdminInvariant;
         this.registrationOwnerGuard = registrationOwnerGuard;
+        this.accountCredentials = accountCredentials;
     }
 
     /**
@@ -72,6 +76,8 @@ class AdminAccountService {
         if (target.getRole().isSuperAdmin() && !newRole.isSuperAdmin()) {
             registrationOwnerGuard.assertNotRegistrationOwner(target);
             superAdminInvariant.assertNotLastActive(target);
+            // Tokens issued as an admin must not come back to life when the account is promoted again.
+            accountCredentials.revokePersonalAccessTokensOnDemotion(id);
         }
         target.changeRole(newRole);
         return AdminAccountResponse.from(users.saveAndFlush(target));

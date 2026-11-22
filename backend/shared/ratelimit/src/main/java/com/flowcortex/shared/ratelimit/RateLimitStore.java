@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * Token-bucket storage keyed by an opaque string. An empty result means admitted; otherwise it
- * is the time until one unit is available. Implementations may throw; {@link RateLimiter} fails open.
+ * is the time until one unit is available. Implementations may throw; {@link RateLimiter} then fails open or closed per its definition.
  */
 public interface RateLimitStore {
 
