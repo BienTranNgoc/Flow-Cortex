@@ -947,3 +947,61 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
   - The executor and `RunCreation` need the step registry, which takes the
     executor; they resolve it, and the start guards, when they run rather than
     at construction.
+
+---
+
+## ADR-0043 — MCP authorization server: personal access tokens for consenting admins
+
+Number provisional until merge; see `openspec/changes/mcp-oauth-runtime/`.
+
+- **Context:** An MCP client (Claude Desktop, Claude Code, claude.ai) needs a
+  credential for the Nodi API without handling an admin's password. ADR-0022
+  made the personal access token the one scripted credential of an admin
+  account, with its own cap, route allowlist and revocation. The client must get
+  one through an OAuth 2.1 authorization-code flow with PKCE, with the admin's
+  consent in the member app.
+- **Decision:**
+  - **The access token is a personal access token.** The token endpoint answers
+    with a new `fc_pat_` token named `MCP: <client name>`, minted through the
+    one port `OAuthTokenIssuer` of the token service, so the cap of live tokens,
+    the eligibility rule (an active, unlocked super admin whose admin access is
+    not disabled), the route allowlist, the profile page and credential-reset
+    revocation all apply unchanged. No refresh token and no second credential
+    store.
+  - **Consent needs a signed-in session and a fresh step-up proof.** The grant
+    spends a `PAT_CREATE` proof after the request, eligibility and cap checks
+    pass, so a refusal for any other reason leaves the proof usable; a token
+    cannot reach the consent routes (`PAT_NOT_ALLOWED`). The page shows the
+    client name and redirect host the server holds, never values from the link.
+  - **Clients and codes are stored durably.** Registrations (`oauth_client`, the
+    SHA-256 of the secret only), codes (`oauth_authorization_code`, the SHA-256
+    of the code, 5 minutes) and the link from a token to its client
+    (`oauth_issued_token`) live in the database, so every instance and every
+    restart agrees. A code is redeemed by one conditional `UPDATE`; a replay
+    revokes the token its first redemption produced.
+  - **Redirect URI policy.** Registration takes 1-5 absolute URIs without
+    fragment or user information: `https` anywhere, `http` only on `localhost`,
+    `127.0.0.1` or `[::1]`. Matching is exact, except that the port of a
+    registered loopback `http` URI is ignored (RFC 8252). An unregistered
+    redirect URI is refused before anything is redirected.
+  - **Revocation is scoped to the issuing client.** `POST /api/v1/oauth/revoke`
+    authenticates the client and revokes a token only when this flow issued it
+    to that client; every other authenticated request answers 200 and changes
+    nothing.
+  - **A switch, off by default.** `flowcortex.auth.mcp-oauth.enabled` answers
+    503 on every route and the metadata document while off; turning it on
+    without personal access tokens or `flowcortex.app.public-url` stops startup.
+    Registration, and token and revocation requests, are limited per client IP
+    on the shared registry.
+- **Consequences:**
+  - **Open dynamic registration** lets anyone create client rows; the per-IP
+    limit and the purge of unused clients after 30 days bound it, and a client
+    name shown on the consent page is the registered one, not a link value.
+  - **A wrong verifier burns the code**, so a client that sends one restarts the
+    consent; this stops verifier guessing.
+  - **An admin credential reaches an outside client** after one consent: the
+    step-up proof, the auth events (`OAUTH_CONSENT_GRANTED`, `PAT_CREATED`,
+    `OAUTH_CODE_REPLAYED`, `PAT_REVOKED`) and revocation on the profile page are
+    the controls.
+  - **Resource indicators are accepted and ignored**; the token is valid on the
+    whole Nodi API within the allowlist, not bound to an MCP server.

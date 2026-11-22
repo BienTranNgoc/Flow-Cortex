@@ -291,6 +291,73 @@ and slot, which also makes concurrent saves exactly-once), `idx_profile_image_hi
 cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
 rows behind.
 
+## MCP authorization server and token call guards (`V2026.11.15.170` – `V2026.11.15.171`)
+
+```mermaid
+erDiagram
+  oauth_client ||--o{ oauth_authorization_code : "client_id, ON DELETE CASCADE"
+  oauth_client ||--o{ oauth_issued_token : "client_id, ON DELETE CASCADE"
+  app_user ||--o{ oauth_authorization_code : "user_id, ON DELETE CASCADE"
+  personal_access_token ||--o| oauth_issued_token : "token_id, ON DELETE CASCADE"
+
+  oauth_client {
+    varchar client_id PK "mcp_ + 24 hex"
+    varchar client_secret_hash "SHA-256 hex; NULL for a public client (auth_method none)"
+    varchar client_name "1-128 characters, shown on the consent page"
+    jsonb redirect_uris "1-5 URIs validated in Java"
+    varchar auth_method "client_secret_post | client_secret_basic | none"
+    timestamptz created_at "index — unused-client purge"
+  }
+  oauth_authorization_code {
+    varchar code_hash PK "SHA-256 hex of the code; the code itself is never stored"
+    varchar client_id FK "ON DELETE CASCADE"
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar redirect_uri "the exact URI the consent accepted"
+    varchar code_challenge "PKCE S256"
+    varchar scope
+    timestamptz created_at
+    timestamptz expires_at "5 minutes after consent; index — retention scan"
+    timestamptz redeemed_at "set once by a conditional UPDATE; NULL = unspent"
+    uuid issued_token_id "no FK: the token row may be purged before the code row"
+  }
+  oauth_issued_token {
+    uuid token_id PK, FK "personal_access_token, ON DELETE CASCADE"
+    varchar client_id FK "ON DELETE CASCADE; a client with a row here is never purged"
+    timestamptz issued_at
+  }
+  api_token_call {
+    uuid id PK
+    uuid user_id "no FK: rows outlive tokens and accounts until retention"
+    uuid token_id
+    varchar method
+    varchar route "normalized pattern, never the query or body"
+    varchar outcome "ok | error | blocked | replayed"
+    smallint http_status
+    varchar error_code
+    integer duration_ms
+    timestamptz occurred_at "index — daily cap count and 90-day purge"
+  }
+  api_token_idempotency {
+    uuid user_id PK "no FK"
+    varchar idem_key PK "1-80 characters from the Idempotency-Key header"
+    varchar fingerprint "SHA-256 hex of method, path, query and body"
+    varchar state "running | done"
+    timestamptz reserved_at "a running reservation older than 5 minutes is taken over"
+    smallint http_status
+    varchar content_type
+    bytea response_body "the stored answer, at most 256 KiB"
+    timestamptz expires_at "24 hours after the reservation; index — retention scan"
+  }
+```
+
+Indexes: `idx_oauth_client_created_at`, `idx_oauth_code_expires_at`, `idx_oauth_issued_token_client`,
+`idx_api_token_call_user_time` (`user_id, occurred_at`), `idx_api_token_call_occurred_at`,
+`idx_api_token_idempotency_expires_at`.
+
+`api_token_call` and `api_token_idempotency` carry no foreign key on purpose: the audit trail and the
+stored answers outlive the token and the account until the retention job deletes them.
+`user.mcp-oauth-retention` deletes spent codes, unused clients, old call rows and ended reservations.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
