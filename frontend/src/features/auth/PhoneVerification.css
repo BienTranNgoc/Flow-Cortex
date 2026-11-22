@@ -41,6 +41,15 @@
   letter-spacing: 0.04em;
 }
 
+.phone-verification__undo-until {
+  margin: 0 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+.phone-verification__undo-failure {
+  margin: 0 0 1rem;
+}
+
 .phone-verification__resend {
   display: flex;
   flex-wrap: wrap;

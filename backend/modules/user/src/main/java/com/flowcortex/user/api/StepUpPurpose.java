@@ -9,7 +9,8 @@ import java.time.Duration;
  */
 public enum StepUpPurpose {
 
-    PAT_CREATE(Duration.ofSeconds(300));
+    PAT_CREATE(Duration.ofSeconds(300)),
+    PHONE_CHANGE(Duration.ofSeconds(300));
 
     private final Duration ttl;
 

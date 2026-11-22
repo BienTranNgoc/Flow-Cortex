@@ -89,6 +89,8 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
             aria-describedby={message ? messageId : undefined}
             onChange={(event) => toggle(event.target.checked)}
           />
+        ) : setting.type === 'ENUM' ? (
+          <output id={controlId}>{String(decided)}</output>
         ) : (
           <form className="settings-number" onSubmit={submitNumber} noValidate>
             <input

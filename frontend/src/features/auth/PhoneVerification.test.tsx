@@ -1,8 +1,9 @@
 import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { formatDateTime } from '../../lib/format';
 import i18n from '../../lib/i18n';
-import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
+import { renderRoute, settled, stubApi, type FakeReply, type RecordedCall } from '../../test/fakeApi';
 import { PhoneVerification } from './PhoneVerification';
 import { ProfilePage } from './ProfilePage';
 
@@ -196,17 +197,253 @@ describe('PhoneVerification', () => {
     expect(screen.queryByLabelText('6-digit code')).not.toBeInTheDocument();
   });
 
-  it('shows an already verified number with its badge and offers to change it', async () => {
-    stubApi({ [PHONE]: { status: 200, body: VERIFIED_BODY } });
-    const user = userEvent.setup();
-    renderSection();
+  describe('changing a verified number', () => {
+    const CHANGE_START = 'POST /api/v1/me/phone/change/start';
+    const CHANGE_VERIFY = 'POST /api/v1/me/phone/change/verify';
+    const CHANGE_CANCEL = 'POST /api/v1/me/phone/change/cancel';
+    const STEP_UP = 'POST /api/v1/me/step-up';
+    const GRANTED: FakeReply = {
+      status: 200,
+      body: { stepUpProof: 'proof-1', expiresAt: '2026-10-16T10:05:00Z' },
+    };
+    const NEW_SENT: FakeReply = {
+      status: 200,
+      body: { maskedPhone: '+84 9•• ••• 321', resendAfterSeconds: 60, expiresAt: '2026-10-16T10:05:00Z' },
+    };
+    const DEADLINE = new Date(Date.now() + 3 * 3_600_000).toISOString();
+    const CHANGED_BODY = {
+      phone: '+84987654321',
+      verified: true,
+      maskedPhone: '+84 9•• ••• 321',
+      cancelAvailableUntil: DEADLINE,
+    };
 
-    expect(await screen.findByText('+84912345678')).toBeInTheDocument();
-    expect(screen.getByText('Verified')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Mobile number')).not.toBeInTheDocument();
+    beforeEach(() => {
+      HTMLDialogElement.prototype.showModal = function showModal() {
+        this.setAttribute('open', '');
+      };
+      HTMLDialogElement.prototype.close = function close() {
+        this.removeAttribute('open');
+      };
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+      Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    });
 
-    await user.click(screen.getByRole('button', { name: 'Change number' }));
-    expect(screen.getByLabelText('Mobile number')).toBeInTheDocument();
+    const dialogOpen = () => document.querySelector('dialog[open]') !== null;
+    const callsTo = (calls: RecordedCall[], path: string) => calls.filter((call) => call.path === path);
+
+    async function continueWithNumber(user: ReturnType<typeof userEvent.setup>, number = '0987654321') {
+      await user.click(await screen.findByRole('button', { name: 'Change number' }));
+      await user.type(screen.getByLabelText('New mobile number'), number);
+      await user.click(screen.getByRole('button', { name: 'Continue' }));
+    }
+
+    async function confirmPassword(user: ReturnType<typeof userEvent.setup>) {
+      await user.type(await screen.findByLabelText('Password'), 'Secret123!');
+      await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    }
+
+    it('opens the change form with the new number field from a verified number', async () => {
+      const calls = stubApi({ [PHONE]: { status: 200, body: VERIFIED_BODY } });
+      const user = userEvent.setup();
+      renderSection();
+
+      expect(await screen.findByText('+84912345678')).toBeInTheDocument();
+      expect(screen.getByText('Verified')).toBeInTheDocument();
+      expect(screen.queryByLabelText('New mobile number')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Undo change' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Change number' }));
+      expect(screen.getByLabelText('New mobile number')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+      expect(calls.some((call) => call.method === 'POST')).toBe(false);
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByText('+84912345678')).toBeInTheDocument();
+    });
+
+    it('opens the step-up dialog with purpose PHONE_CHANGE on continue and sends its proof to change start', async () => {
+      const calls = stubApi({
+        [PHONE]: { status: 200, body: VERIFIED_BODY },
+        [STEP_UP]: GRANTED,
+        [CHANGE_START]: NEW_SENT,
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      await continueWithNumber(user);
+      expect(dialogOpen()).toBe(true);
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')).toHaveLength(0);
+
+      await confirmPassword(user);
+
+      expect(await screen.findByText('We sent a 6-digit code to +84 9•• ••• 321')).toBeInTheDocument();
+      expect(callsTo(calls, '/api/v1/me/step-up')[0]).toMatchObject({
+        body: { password: 'Secret123!', purpose: 'PHONE_CHANGE' },
+      });
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')[0]).toMatchObject({
+        body: { phone: '0987654321', stepUpProof: 'proof-1' },
+      });
+      expect(dialogOpen()).toBe(false);
+    });
+
+    it('reopens the step-up dialog on STEP_UP_REQUIRED and on resend', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      onTestFinished(() => {
+        vi.useRealTimers();
+      });
+      let startReply: FakeReply = problem(403, 'Confirm your password again.', { code: 'STEP_UP_REQUIRED' });
+      let proof = 'proof-1';
+      const calls = stubApi({
+        [PHONE]: { status: 200, body: VERIFIED_BODY },
+        [STEP_UP]: () => ({ status: 200, body: { stepUpProof: proof, expiresAt: '2026-10-16T10:05:00Z' } }),
+        [CHANGE_START]: () => startReply,
+      });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderSection();
+
+      await continueWithNumber(user);
+      await confirmPassword(user);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your password confirmation expired or was already used. Continue to confirm it again.',
+      );
+      expect(screen.getByLabelText('New mobile number')).toBeInTheDocument();
+
+      startReply = NEW_SENT;
+      proof = 'proof-2';
+      await user.click(screen.getByRole('button', { name: 'Continue' }));
+      expect(dialogOpen()).toBe(true);
+      await confirmPassword(user);
+      expect(await screen.findByText('Resend in 1:00')).toBeInTheDocument();
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')[1]).toMatchObject({
+        body: { phone: '0987654321', stepUpProof: 'proof-2' },
+      });
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      proof = 'proof-3';
+      await user.click(screen.getByRole('button', { name: 'Resend code' }));
+      expect(dialogOpen()).toBe(true);
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')).toHaveLength(2);
+      await confirmPassword(user);
+
+      await waitFor(() => expect(callsTo(calls, '/api/v1/me/phone/change/start')).toHaveLength(3));
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')[2]).toMatchObject({
+        body: { phone: '0987654321', stepUpProof: 'proof-3' },
+      });
+    });
+
+    it('stays on the number step when the dialog refuses the password', async () => {
+      const calls = stubApi({
+        [PHONE]: { status: 200, body: VERIFIED_BODY },
+        [STEP_UP]: problem(422, 'wrong', { code: 'STEP_UP_INVALID_PASSWORD' }),
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      await continueWithNumber(user);
+      await confirmPassword(user);
+
+      expect(await screen.findByText('That password is not correct. Try again.')).toBeInTheDocument();
+      expect(dialogOpen()).toBe(true);
+      expect(callsTo(calls, '/api/v1/me/phone/change/start')).toHaveLength(0);
+    });
+
+    it('walks the change code step and then shows the new number with Undo change and its deadline', async () => {
+      const calls = stubApi({
+        [PHONE]: { status: 200, body: VERIFIED_BODY },
+        [STEP_UP]: GRANTED,
+        [CHANGE_START]: NEW_SENT,
+        [CHANGE_VERIFY]: { status: 200, body: CHANGED_BODY },
+      });
+      const user = userEvent.setup();
+      renderSection();
+      await continueWithNumber(user);
+      await confirmPassword(user);
+
+      await enterCode(user, '123456');
+
+      expect(await screen.findByText('+84987654321')).toBeInTheDocument();
+      expect(screen.getByText('Verified')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Phone number changed');
+      expect(screen.getByRole('button', { name: 'Undo change' })).toBeInTheDocument();
+      const deadline = formatDateTime(DEADLINE, 'en', { dateStyle: 'medium', timeStyle: 'short' });
+      expect(screen.getByText(`You can undo this change until ${deadline}.`)).toBeInTheDocument();
+      expect(callsTo(calls, '/api/v1/me/phone/change/verify')[0]).toMatchObject({ body: { code: '123456' } });
+      expect(callsTo(calls, '/api/v1/me/phone/verify')).toHaveLength(0);
+    });
+
+    it('undo restores the previous number and hides the undo action', async () => {
+      const calls = stubApi({
+        [PHONE]: { status: 200, body: CHANGED_BODY },
+        [CHANGE_CANCEL]: { status: 200, body: VERIFIED_BODY },
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      await user.click(await screen.findByRole('button', { name: 'Undo change' }));
+
+      expect(await screen.findByText('+84912345678')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Previous phone number restored');
+      expect(screen.queryByRole('button', { name: 'Undo change' })).not.toBeInTheDocument();
+      expect(callsTo(calls, '/api/v1/me/phone/change/cancel')).toHaveLength(1);
+    });
+
+    it('shows the PHONE_REVERT_TAKEN detail as an alert', async () => {
+      stubApi({
+        [PHONE]: { status: 200, body: CHANGED_BODY },
+        [CHANGE_CANCEL]: problem(
+          409,
+          'Your previous number is now verified on another account, so this change cannot be undone.',
+          { code: 'PHONE_REVERT_TAKEN' },
+        ),
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      await user.click(await screen.findByRole('button', { name: 'Undo change' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your previous number is now verified on another account, so this change cannot be undone.',
+      );
+      expect(screen.getByText('+84987654321')).toBeInTheDocument();
+    });
+
+    it('reloads the phone status when the undo window turned out to be closed', async () => {
+      let closed = false;
+      const calls = stubApi({
+        [PHONE]: () => ({
+          status: 200,
+          body: closed ? { ...CHANGED_BODY, cancelAvailableUntil: undefined } : CHANGED_BODY,
+        }),
+        [CHANGE_CANCEL]: () => {
+          closed = true;
+          return problem(409, 'There is no number change to undo right now.', { code: 'PHONE_NO_UNDO_WINDOW' });
+        },
+      });
+      const user = userEvent.setup();
+      renderSection();
+
+      await user.click(await screen.findByRole('button', { name: 'Undo change' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('There is no number change to undo right now.');
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Undo change' })).not.toBeInTheDocument());
+      expect(callsTo(calls, '/api/v1/me/phone').filter((call) => call.method === 'GET')).toHaveLength(2);
+    });
+
+    it('hides the undo action once the deadline has passed', async () => {
+      stubApi({
+        [PHONE]: {
+          status: 200,
+          body: { ...CHANGED_BODY, cancelAvailableUntil: new Date(Date.now() - 1000).toISOString() },
+        },
+      });
+      renderSection();
+
+      expect(await screen.findByText('+84987654321')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Undo change' })).not.toBeInTheDocument();
+    });
   });
 
   it('shows an alert with a retry action when the phone status cannot be loaded', async () => {

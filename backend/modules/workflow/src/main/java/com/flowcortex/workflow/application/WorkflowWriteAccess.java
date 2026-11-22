@@ -57,6 +57,21 @@ class WorkflowWriteAccess {
         return workflow;
     }
 
+    /**
+     * The same 404/403 rule as {@link #lockForWrite} for a read: no row lock, and the fixed Product Video workflow
+     * stays readable.
+     */
+    Workflow requireOwned(Caller caller, UUID workflowId) {
+        Workflow workflow = (caller.admin()
+                ? workflowRepository.findById(workflowId).filter(found -> found.getDeletedAt() == null)
+                : workflowRepository.findVisibleTo(workflowId, caller.userId()))
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        if (!caller.admin() && !workflow.getOwnerId().equals(caller.userId())) {
+            throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
+        }
+        return workflow;
+    }
+
     /** 404 for a caller who cannot see the workflow, 403 for one who can but does not own it. */
     private void requireOwnerOrAdmin(Caller caller, Workflow workflow) {
         if (caller.admin() || workflow.getOwnerId().equals(caller.userId())) {

@@ -37,6 +37,13 @@ class PhoneSendAttemptStore {
                 userId, Timestamp.from(since));
     }
 
+    /** How many codes were sent after {@code since}, from every member, through the partial index on sent attempts. */
+    long sentSince(Instant since) {
+        Long count = jdbc.queryForObject("SELECT count(*) FROM phone_send_attempt WHERE outcome = '" + SENT + "' "
+                + "AND created_at > ?", Long.class, Timestamp.from(since));
+        return count == null ? 0 : count;
+    }
+
     /**
      * The {@code n}-th newest send after {@code since}, from every member; empty while fewer were sent.
      * One row is read, through the partial index on sent attempts.

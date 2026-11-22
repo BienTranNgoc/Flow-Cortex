@@ -12,14 +12,18 @@ import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
+import { can } from '../../../app/permissions';
 import { usePageTitle } from '../../../app/usePageTitle';
+import { useMeQuery } from '../../auth/useAuth';
 import { supportProblemCode } from '../unwrapSupport';
 import '../markdown.css';
 import { ATTACHMENT_ACCEPT, UploadFailedError, addAttachments } from './attachments';
 import './requests.css';
 import { RequestTime } from './RequestTime';
-import { RequesterLabel, StatusBadge } from './StatusBadge';
+import { AssigneeLabel, RequesterLabel, StatusBadge } from './StatusBadge';
+import { useAssignees } from './useAssignees';
 import {
+  useAssignRequest,
   useReply,
   useRequestDetail,
   useSetStatus,
@@ -139,6 +143,13 @@ function RequestView({
             <dt>{t('support.requests.columns.requester')}</dt>
             <dd>
               <RequesterLabel requester={request.requester} />
+            </dd>
+          </div>
+          <div className="request-fact-assignee">
+            <dt>{t('support.requests.columns.assignee')}</dt>
+            <dd>
+              <AssigneeLabel assignee={request.assignee} />
+              <AssigneePicker request={request} refresh={refresh} />
             </dd>
           </div>
           <div>
@@ -261,6 +272,105 @@ function ConversationMessage({ message }: Readonly<{ message: SupportConversatio
         <p className="request-message-body">{message.text}</p>
       )}
     </li>
+  );
+}
+
+/** Eligible staff only, from the server's list; a refusal shows where it happened and a lost race reads the request again. */
+function AssigneePicker({
+  request,
+  refresh,
+}: Readonly<{ request: AdminSupportRequestDetail; refresh: Refresh }>) {
+  const { t } = useTranslation();
+  const editable = can(useMeQuery().data, 'support.ticket.assign') && request.status !== 'closed';
+  const assignees = useAssignees(editable);
+  const assign = useAssignRequest(request.number);
+  const id = useId();
+  const errorId = `${id}-error`;
+  const current = request.assignee?.id ?? '';
+  const [picked, setPicked] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const value = picked ?? current;
+  const people = assignees.data ?? [];
+  const holder = request.assignee;
+  const holderListed = people.some((person) => person.id === current);
+
+  if (!editable) return null;
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (assign.isPending || value === current) return;
+    setError(null);
+    setAnnouncement('');
+    assign.mutate(value || undefined, {
+      onSuccess: (result) => {
+        setPicked(null);
+        setAnnouncement(
+          result.assignee?.email
+            ? t('support.requests.assigneeChanged', { email: result.assignee.email })
+            : t('support.requests.assigneeCleared'),
+        );
+      },
+      onError: (failure) => {
+        const status = failure instanceof ApiError ? failure.status : undefined;
+        const problem = failure instanceof ApiError ? failure.problem : undefined;
+        if (status === 400) {
+          setError(problem?.errors?.assigneeId ?? t('support.requests.assigneeFailed'));
+        } else if (status === 409) {
+          setError(
+            supportProblemCode(failure) === 'request-closed'
+              ? t('support.requests.closedRequest', { number: request.number })
+              : t('support.requests.stateChanged'),
+          );
+          setPicked(null);
+          void refresh();
+        } else {
+          setError(t('support.requests.assigneeFailed'));
+        }
+      },
+    });
+  };
+
+  return (
+    <form className="request-assignee-form" onSubmit={onSubmit}>
+      <div className="cortex-admin-field">
+        <label htmlFor={`${id}-select`}>{t('support.requests.assigneePicker')}</label>
+        <select
+          id={`${id}-select`}
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(event) => {
+            setPicked(event.target.value);
+            setError(null);
+          }}
+        >
+          <option value="">{t('support.requests.unassigned')}</option>
+          {current && !holderListed && (
+            <option value={current}>
+              {holder?.email && !holder.deleted ? holder.email : t('support.requests.assigneeDeleted')}
+            </option>
+          )}
+          {people.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.email}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button type="submit" className="cortex-admin-btn" aria-disabled={assign.isPending || value === current}>
+        {assign.isPending ? t('support.common.saving') : t('support.requests.saveAssignee')}
+      </button>
+      {assignees.isError && <p className="cortex-admin-form-error">{t('support.requests.assigneesFailed')}</p>}
+      {error && (
+        <p id={errorId} className="cortex-admin-form-error request-assignee-error" role="alert">
+          {error}
+        </p>
+      )}
+      <p role="status" className="request-announcement">
+        {announcement}
+      </p>
+    </form>
   );
 }
 

@@ -117,7 +117,7 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         ResponseEntity<String> rawMe = get("/api/v1/auth/me", token, String.class);
         assertThat(rawMe.getBody()).doesNotContain("\"password\"").doesNotContain("passwordHash")
                 .doesNotContain("$2a$").contains("\"hasPassword\":true")
-                .contains("\"passwordSetupRequired\":false");
+                .contains("\"passwordSetupRequired\":false").contains("\"phoneVerificationRequired\":false");
     }
 
     @Test

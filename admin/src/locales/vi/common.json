@@ -60,6 +60,7 @@
         "administration": "Quản trị",
         "system": "Hệ thống",
         "support": "Hỗ trợ",
+        "content": "Nội dung",
         "chat": "Trò chuyện"
       },
       "items": {
@@ -69,8 +70,10 @@
         "approvals": "Hàng chờ duyệt",
         "credits": "Credit & ví",
         "providers": "Nhà cung cấp mô hình",
+        "paymentSettings": "Cài đặt thanh toán",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
+        "phoneVerification": "Xác minh số điện thoại",
         "settings": "Cài đặt",
         "features": "Công tắc tính năng",
         "auditLog": "Nhật ký kiểm toán",
@@ -82,6 +85,8 @@
         "supportRequests": "Yêu cầu",
         "supportSettings": "Cài đặt trợ lý",
         "adminAccounts": "Tài khoản quản trị",
+        "contentDocuments": "Tài liệu",
+        "contentMedia": "Thư viện media",
         "chatSettings": "Cài đặt"
       }
     },
