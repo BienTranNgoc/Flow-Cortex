@@ -33,17 +33,21 @@ class AssistantTelemetry {
                 (System.nanoTime() - startedNanos) / 1_000_000);
     }
 
-    /** Tags the current request span; high-cardinality, so the values never become metric tags. */
-    void provider(String model, LlmJsonResult result, int sources) {
+    /**
+     * Tags the current request span; high-cardinality, so the values never become metric tags. The model
+     * is the one that answered, known only after the call, so no request model is set.
+     */
+    void provider(String slot, LlmJsonResult result, int sources) {
         Observation current = observations.getCurrentObservation();
         if (current == null) {
             return;
         }
         current.highCardinalityKeyValue("gen_ai.system", "gcp.gemini")
-                .highCardinalityKeyValue("gen_ai.request.model", model)
+                .highCardinalityKeyValue("flowcortex.llm.slot", slot)
                 .highCardinalityKeyValue("support.assistant.sources", Integer.toString(sources));
         if (result instanceof LlmJsonResult.Answered answered) {
-            current.highCardinalityKeyValue("gen_ai.usage.input_tokens", Integer.toString(answered.inputTokens()))
+            current.highCardinalityKeyValue("gen_ai.response.model", answered.model())
+                    .highCardinalityKeyValue("gen_ai.usage.input_tokens", Integer.toString(answered.inputTokens()))
                     .highCardinalityKeyValue("gen_ai.usage.output_tokens", Integer.toString(answered.outputTokens()));
         }
     }
