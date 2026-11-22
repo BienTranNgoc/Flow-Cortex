@@ -297,6 +297,25 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
     }
 
     @Test
+    void aTokenStaysRefusedWhenTheAdminAccountsRouteDemotesAndPromotesItsOwner() {
+        Account owner = admin("console");
+        String email = uniqueEmail("console-flip");
+        UUID id = userService.createUser(owner.id(), email, PASSWORD, "Console Flip", "ADMIN").id();
+        Account flipped = new Account(id, email, login(email, PASSWORD));
+        String token = createToken(flipped, "console-flip");
+        String rolePath = "/api/v1/admin/accounts/" + id + "/role";
+
+        assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", "CONTENT_EDITOR"),
+                String.class).getStatusCode().value()).isEqualTo(200);
+        assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", "ADMIN"),
+                String.class).getStatusCode().value()).isEqualTo(200);
+
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE user_id = ? AND type = 'PAT_REVOKED'"
+                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test
     void aStepUpProofMintedBeforeACredentialResetCannotBeSpentAfterIt() {
         Account a = admin("proofreset");
         String proof = proof(a);
