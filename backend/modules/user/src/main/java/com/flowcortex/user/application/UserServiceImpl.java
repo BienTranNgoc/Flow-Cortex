@@ -15,6 +15,9 @@ import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
+import com.flowcortex.user.roles.RbacMutationRules;
+import com.flowcortex.user.roles.RbacMutationSwitch;
+import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,13 +47,15 @@ class UserServiceImpl implements UserService {
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
     private final RoleCatalog roleCatalog;
+    private final RbacMutationSwitch mutationSwitch;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
             SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
-            RoleCatalog roleCatalog) {
+            RoleCatalog roleCatalog, RbacMutationSwitch mutationSwitch) {
         this.roleCatalog = roleCatalog;
+        this.mutationSwitch = mutationSwitch;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.accountCredentials = accountCredentials;
@@ -74,6 +79,9 @@ class UserServiceImpl implements UserService {
         AppUser caller = requireActiveCaller(callerId);
         RoleRow newRole = roleCatalog.require(role);
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.create(newRole)));
+        if (RbacMutationRules.gatesCreate(newRole)) {
+            mutationSwitch.requireEnabled(RbacOperation.STAFF_ACCOUNT_CREATE, callerId);
+        }
         return createRow(UUID.randomUUID(), scopeOf(caller), email, rawPassword, name, Role.of(newRole.code()));
     }
 
@@ -118,6 +126,9 @@ class UserServiceImpl implements UserService {
         }
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.update(
                 roleCatalog.require(user.getRole().code()), newRoleRow, user.getStatus(), newStatus)));
+        if (RbacMutationRules.gatesUpdate(user.getRole().code(), newRoleRow)) {
+            mutationSwitch.requireEnabled(RbacOperation.USER_ROLE_CHANGE, callerId);
+        }
         boolean leavesAdminRole = user.getRole().isSuperAdmin() && newRole != null && !newRole.isSuperAdmin();
         boolean suspends = newStatus == UserStatus.SUSPENDED;
         if (leavesAdminRole || suspends) {

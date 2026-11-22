@@ -14,8 +14,11 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -76,8 +79,9 @@ class AdminRolesController {
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PostMapping(value = "/roles", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<RoleResponse> create(@Valid @RequestBody CreateRoleRequest request) {
-        String code = roles.create(request.name(), request.description(), request.permissionKeys());
+    ResponseEntity<RoleResponse> create(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateRoleRequest request) {
+        String code = roles.create(callerId(jwt), request.name(), request.description(), request.permissionKeys());
         return ResponseEntity.created(URI.create("/api/v1/admin/roles/" + code)).body(roleService.getRole(code));
     }
 
@@ -86,9 +90,9 @@ class AdminRolesController {
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PatchMapping(value = "/roles/{code}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<RoleResponse> update(@PathVariable @Size(max = CODE_MAX) String code,
-            @Valid @RequestBody UpdateRoleRequest request) {
-        roles.update(code, request.name(), request.description());
+    ResponseEntity<RoleResponse> update(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable @Size(max = CODE_MAX) String code, @Valid @RequestBody UpdateRoleRequest request) {
+        roles.update(callerId(jwt), code, request.name(), request.description());
         return ResponseEntity.ok(roleService.getRole(code));
     }
 
@@ -96,8 +100,8 @@ class AdminRolesController {
     @AdminAudit(value = "role.delete", resourceParam = "code")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @DeleteMapping("/roles/{code}")
-    ResponseEntity<Void> delete(@PathVariable @Size(max = CODE_MAX) String code) {
-        roles.delete(code);
+    ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable @Size(max = CODE_MAX) String code) {
+        roles.delete(callerId(jwt), code);
         return ResponseEntity.noContent().build();
     }
 
@@ -106,10 +110,14 @@ class AdminRolesController {
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PutMapping(value = "/roles/{code}/permissions", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<RoleResponse> replacePermissions(@PathVariable @Size(max = CODE_MAX) String code,
-            @Valid @RequestBody ReplacePermissionsRequest request) {
-        rolePermissions.replace(code, request.keys(), request.expectedVersion());
+    ResponseEntity<RoleResponse> replacePermissions(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable @Size(max = CODE_MAX) String code, @Valid @RequestBody ReplacePermissionsRequest request) {
+        rolePermissions.replace(callerId(jwt), code, request.keys(), request.expectedVersion());
         return ResponseEntity.ok(roleService.getRole(code));
+    }
+
+    private static UUID callerId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 
     record CreateRoleRequest(

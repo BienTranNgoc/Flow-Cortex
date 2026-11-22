@@ -26,6 +26,7 @@ import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
+import com.flowcortex.user.roles.RbacMutationSwitch;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
@@ -55,9 +56,10 @@ class UserServiceImplTest {
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
     private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
+    private final RbacMutationSwitch mutationSwitch = mock(RbacMutationSwitch.class);
     private final UserServiceImpl service =
             new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
-                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog);
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, mutationSwitch);
 
     UserServiceImplTest() {
         when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));
