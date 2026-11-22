@@ -5,8 +5,10 @@ import { useTranslation } from 'react-i18next';
 export const REASON_MAX = 2000;
 
 interface RbacRuntimeDialogProps {
-  /** The state the confirm button sets: false turns role edits off. */
+  /** The state the confirm button sets, fixed by the caller when the dialog opens: false turns role edits off. */
   readonly turnOn: boolean;
+  /** The live state already equals `turnOn`: someone else changed it, so confirming has nothing left to do. */
+  readonly alreadyApplied: boolean;
   readonly pending: boolean;
   /** The localized problem text of the last failed attempt, shown inside the dialog. */
   readonly error: string | undefined;
@@ -18,6 +20,7 @@ interface RbacRuntimeDialogProps {
 /** Modal that asks for an optional reason before the switch flips; a refusal stays inside it so it is read in place. */
 export function RbacRuntimeDialog({
   turnOn,
+  alreadyApplied,
   pending,
   error,
   onConfirm,
@@ -28,8 +31,10 @@ export function RbacRuntimeDialog({
   const reasonId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [reason, setReason] = useState('');
-  // Fixed at open: the saved state arrives before the dialog closes and must not flip its wording.
-  const [action] = useState(turnOn ? 'turnOn' : 'turnOff');
+  const [submitted, setSubmitted] = useState(false);
+  const action = turnOn ? 'turnOn' : 'turnOff';
+  // Our own save makes the live state equal the target before the dialog closes; that is not a change by someone else.
+  const stale = alreadyApplied && !submitted;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -40,10 +45,12 @@ export function RbacRuntimeDialog({
   // the toggle: while a modal is open the rest of the page is inert and focus() on it is ignored.
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (pending) return;
+    if (pending || stale) return;
+    setSubmitted(true);
     try {
       await onConfirm(reason.trim());
     } catch {
+      setSubmitted(false);
       return; // the refusal is shown inside the dialog through `error`
     }
     dialogRef.current?.close();
@@ -70,6 +77,11 @@ export function RbacRuntimeDialog({
             onChange={(event) => setReason(event.target.value)}
           />
         </div>
+        {stale && (
+          <p className="cortex-admin-form-error" role="alert">
+            {t('roles.runtime.dialog.alreadyChanged')}
+          </p>
+        )}
         {error && (
           <p className="cortex-admin-form-error" role="alert">
             {error}
@@ -90,7 +102,7 @@ export function RbacRuntimeDialog({
                 ? 'cortex-admin-btn cortex-admin-btn--primary'
                 : 'cortex-admin-btn cortex-admin-btn--danger'
             }
-            disabled={pending}
+            disabled={pending || stale}
           >
             {pending ? t('roles.runtime.dialog.working') : t(`roles.runtime.dialog.${action}.confirm`)}
           </button>

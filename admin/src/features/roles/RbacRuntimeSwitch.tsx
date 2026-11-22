@@ -17,7 +17,9 @@ export function RbacRuntimeSwitch({ runtime }: Readonly<RbacRuntimeSwitchProps>)
   const vetoId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const update = useUpdateRbacRuntimeMutation();
-  const [confirming, setConfirming] = useState(false);
+  // The state the open dialog asks for, fixed when it opens: a refetch under it must not change
+  // what the button says or what it sends.
+  const [target, setTarget] = useState<boolean | null>(null);
   const state = runtime.data;
 
   if (runtime.isPending) {
@@ -38,7 +40,7 @@ export function RbacRuntimeSwitch({ runtime }: Readonly<RbacRuntimeSwitchProps>)
     : undefined;
 
   const close = () => {
-    setConfirming(false);
+    setTarget(null);
     update.reset();
     toggleRef.current?.focus();
   };
@@ -68,7 +70,7 @@ export function RbacRuntimeSwitch({ runtime }: Readonly<RbacRuntimeSwitchProps>)
           className="roles-runtime__toggle"
           disabled={vetoed}
           aria-describedby={vetoed ? vetoId : undefined}
-          onClick={() => setConfirming(true)}
+          onClick={() => setTarget(!state.mutationsEnabled)}
         >
           {t(state.mutationsEnabled ? 'roles.runtime.on' : 'roles.runtime.off')}
         </button>
@@ -78,14 +80,15 @@ export function RbacRuntimeSwitch({ runtime }: Readonly<RbacRuntimeSwitchProps>)
           {t('roles.runtime.vetoed')}
         </p>
       )}
-      {confirming && (
+      {target !== null && (
         <RbacRuntimeDialog
-          turnOn={!state.mutationsEnabled}
+          turnOn={target}
+          alreadyApplied={state.mutationsEnabled === target}
           pending={update.isPending}
           error={failure}
           onConfirm={(reason) =>
             update.mutateAsync({
-              mutationsEnabled: !state.mutationsEnabled,
+              mutationsEnabled: target,
               ...(reason === '' ? {} : { reason }),
             })
           }

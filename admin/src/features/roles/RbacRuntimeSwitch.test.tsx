@@ -1,7 +1,7 @@
 import { setToken, type RbacRuntime, type RoleResponse } from '@flow-cortex/api-client';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ADMIN_ME, renderRoute, staffMe, stubApi } from '../../test/fakeApi';
+import { ADMIN_ME, renderRoute, settled, staffMe, stubApi } from '../../test/fakeApi';
 import { RoleDetailPage } from './RoleDetailPage';
 import { RolesPage } from './RolesPage';
 
@@ -137,6 +137,71 @@ describe('Roles page RBAC switch', () => {
     );
     expect(screen.getByRole('button', { name: 'Create role' })).toBeDisabled();
     expect(screen.queryByRole('link', { name: 'Create role' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { name: 'off', start: ON, other: OFF, button: 'Turn off', danger: true },
+    { name: 'on', start: OFF, other: ON, button: 'Turn on', danger: false },
+  ])(
+    'tells the admin the switch was already turned $name instead of sending anything when it changes under the open dialog',
+    async ({ start, other, button, danger }) => {
+      let current = start;
+      const calls = stubApi({
+        [ME]: { status: 200, body: ADMIN_ME },
+        [ROLES]: { status: 200, body: [CUSTOM_ROLE] },
+        [`GET ${RUNTIME}`]: () => ({ status: 200, body: current }),
+        [`PUT ${RUNTIME}`]: () => ({ status: 200, body: current }),
+      });
+      const { queryClient } = renderList();
+
+      await userEvent.click(await screen.findByRole('switch', { name: 'Role and permission changes' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByRole('button', { name: button })).toBeEnabled();
+
+      current = other;
+      await act(() => queryClient.invalidateQueries({ queryKey: ['admin', 'rbac-runtime'] }));
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Someone else already changed this switch',
+      );
+      const confirm = within(dialog).getByRole('button', { name: button });
+      expect(confirm).toBeDisabled();
+      expect(confirm).toHaveClass(
+        danger ? 'cortex-admin-btn--danger' : 'cortex-admin-btn--primary',
+      );
+      fireEvent.submit(confirm.closest('form') as HTMLFormElement);
+      expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('switch', { name: 'Role and permission changes' })).toHaveAttribute(
+        'aria-checked',
+        String(other.mutationsEnabled),
+      );
+    },
+  );
+
+  it('still sends the state the dialog showed when a refetch brings back the same value', async () => {
+    let current = ON;
+    const calls = stubApi({
+      [ME]: { status: 200, body: ADMIN_ME },
+      [ROLES]: { status: 200, body: [CUSTOM_ROLE] },
+      [`GET ${RUNTIME}`]: () => ({ status: 200, body: current }),
+      [`PUT ${RUNTIME}`]: () => ({ status: 200, body: OFF }),
+    });
+    const { queryClient } = renderList();
+
+    await userEvent.click(await screen.findByRole('switch', { name: 'Role and permission changes' }));
+    const dialog = await screen.findByRole('dialog');
+
+    current = { ...ON, updatedBy: 'other@flowcortex.dev', updatedAt: '2026-11-21T03:00:00Z' };
+    await act(() => queryClient.invalidateQueries({ queryKey: ['admin', 'rbac-runtime'] }));
+    await settled(queryClient);
+
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ mutationsEnabled: false });
   });
 
   it('shows an environment veto with a disabled toggle and no edits', async () => {

@@ -102,7 +102,7 @@ describe('useFeatures', () => {
         body: { ...ALL_OFF, runCancellation: true },
       };
       const calls = stubApi({ 'GET /api/v1/features': () => reply });
-      const { wrapper } = setup();
+      const { queryClient, wrapper } = setup();
       const first = renderHook(() => useFeatures(), { wrapper });
       await waitFor(() => expect(first.result.current.runCancellation).toBe(true));
 
@@ -110,6 +110,10 @@ describe('useFeatures', () => {
       vi.setSystemTime(Date.now() + 31_000);
       const second = renderHook(() => useFeatures(), { wrapper });
       await waitFor(() => expect(calls).toHaveLength(2));
+      // The call is recorded before its reply is built, so wait for the failure itself.
+      await waitFor(() =>
+        expect(queryClient.getQueryCache().getAll()[0]?.state.status).toBe('error'),
+      );
 
       expect(second.result.current.runCancellation).toBe(true);
     } finally {

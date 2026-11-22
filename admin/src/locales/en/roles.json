@@ -25,6 +25,7 @@
       "reason": "Reason (optional)",
       "cancel": "Cancel",
       "working": "Saving…",
+      "alreadyChanged": "Someone else already changed this switch, so there is nothing left to confirm. Close this dialog to see its current state.",
       "turnOff": {
         "title": "Turn off role and permission changes?",
         "description": "Creating, renaming and deleting roles, saving permissions and changing an account's role are refused until you turn this back on. Reading roles and deactivating or reactivating accounts keep working.",
