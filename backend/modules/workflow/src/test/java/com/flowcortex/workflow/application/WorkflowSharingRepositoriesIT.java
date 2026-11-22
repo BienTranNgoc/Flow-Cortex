@@ -137,7 +137,8 @@ class WorkflowSharingRepositoriesIT {
     void theMigrationMakesSharedRowsPublicAndOthersPrivate() {
         String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
         MigrationVersion before = lastVersionBefore(SHARING_MIGRATION);
-        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema).locations("filesystem:" + MIGRATION_DIR)
+        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema)
+                .locations("filesystem:" + MIGRATION_DIR)
                 .target(before).load().migrate();
         UUID shared = UUID.randomUUID();
         UUID unshared = UUID.randomUUID();
@@ -147,7 +148,8 @@ class WorkflowSharingRepositoriesIT {
                     id, UUID.randomUUID(), "pre-" + id, id.equals(shared));
         }
 
-        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema).locations("filesystem:" + MIGRATION_DIR)
+        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema)
+                .locations("filesystem:" + MIGRATION_DIR)
                 .load().migrate();
 
         assertThat(jdbc().queryForObject("SELECT visibility FROM " + schema + ".workflow WHERE id = ?",
