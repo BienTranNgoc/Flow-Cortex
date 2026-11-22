@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -40,6 +41,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -74,6 +76,7 @@ class ReviewTaskServiceImplTest {
 
     private void givenOwned(ReviewTask owned) {
         when(reviewTaskRepository.findById(owned.getId())).thenReturn(Optional.of(owned));
+        when(reviewTaskRepository.findRunIdById(owned.getId())).thenReturn(Optional.of(owned.getRunId()));
         when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.of(run));
         when(workflowRunRepository.findById(run.getId())).thenReturn(Optional.of(run));
         when(reviewTaskRepository.save(owned)).thenReturn(owned);
@@ -450,6 +453,26 @@ class ReviewTaskServiceImplTest {
                 .satisfies(detail("This step is no longer waiting for review"));
         verify(events, times(1)).publishEvent(any(ReviewTaskApprovedEvent.class));
         verify(runUpdates, never()).touched(any());
+    }
+
+    /**
+     * The run lock is what serialises two decisions on one task, so the task must first be read
+     * after it: a same-key repeat that waited for the first decision then sees it and replays,
+     * instead of judging a pending snapshot and losing on the version check.
+     */
+    @Test
+    void aDecisionReadsTheTaskOnlyAfterLockingItsRun() {
+        givenOwnedTask();
+
+        approveWithKey("k-1");
+        ReviewTaskView repeat = approveWithKey("k-1");
+
+        assertThat(repeat.status()).isEqualTo("approved");
+        InOrder order = inOrder(workflowRunRepository, reviewTaskRepository);
+        order.verify(workflowRunRepository).lockById(run.getId());
+        order.verify(reviewTaskRepository).findById(task.getId());
+        order.verify(workflowRunRepository).lockById(run.getId());
+        order.verify(reviewTaskRepository).findById(task.getId());
     }
 
     @Test

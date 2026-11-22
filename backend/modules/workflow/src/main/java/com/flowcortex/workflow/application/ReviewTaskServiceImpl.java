@@ -367,12 +367,15 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
      * before anything is changed.
      */
     private Decidable decidableTask(UUID taskId, UUID reviewerId) {
-        ReviewTask task = reviewTaskRepository.findById(taskId)
+        UUID runId = reviewTaskRepository.findRunIdById(taskId)
                 .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
         // Run row before step row, the order a cancel takes: a decision racing a stop waits for it
-        // and then sees the stopped run, instead of deadlocking or approving a cancelled run.
-        workflowRunRepository.lockById(task.getRunId());
-        WorkflowRun run = workflowRunRepository.findById(task.getRunId())
+        // and then sees the stopped run, instead of deadlocking or approving a cancelled run. The
+        // task is loaded only under the lock, so a decision that waited sees the one it waited for.
+        workflowRunRepository.lockById(runId);
+        ReviewTask task = reviewTaskRepository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
+        WorkflowRun run = workflowRunRepository.findById(runId)
                 .orElseThrow(() -> new NotFoundException(TASK_NOT_FOUND));
         if (!run.getOwnerId().equals(reviewerId)) {
             throw new NotFoundException(TASK_NOT_FOUND);

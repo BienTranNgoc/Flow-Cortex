@@ -23,6 +23,10 @@ public interface ReviewTaskRepository extends JpaRepository<ReviewTask, UUID> {
 
     Optional<ReviewTask> findByRunStepId(UUID runStepId);
 
+    /** The task's run, without loading the task into the persistence context. */
+    @Query("SELECT t.runId FROM ReviewTask t WHERE t.id = :id")
+    Optional<UUID> findRunIdById(@Param("id") UUID id);
+
     /** Ends a still-pending task as {@code expired}; {@code 0} when it was decided or expired already. */
     @Modifying
     @Transactional
