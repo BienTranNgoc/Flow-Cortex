@@ -1,7 +1,8 @@
 import { ApiError, StepUpRequestPurpose } from '@flow-cortex/api-client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { openInCurrentTab } from '../workflow/browser';
 import { useAuthPose } from './authPose';
 import { nodiPeekState } from './nodiPeekState';
 import {
@@ -52,22 +53,20 @@ function OAuthConsentPage() {
   const [askingPassword, setAskingPassword] = useState(false);
   const [failure, setFailure] = useState<GrantFailure | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const sentBack = useRef(false);
 
   const view = consentView(checkInput(check));
   const answered = check.data;
   const host = answered ? hostOf(answered.redirectUri) : '';
 
-  // A fault of the request itself goes to the client, as the OAuth error it is; once only, since
-  // StrictMode runs the effect twice.
-  useEffect(() => {
-    if (view !== 'redirectError' || !answered?.error || sentBack.current) return;
-    sentBack.current = true;
+  // A fault of the request itself goes to the client as the OAuth error it is, but only on the
+  // visitor's click: anyone can register a redirect URI, so following it unasked is an open redirect.
+  const sendBack = () => {
+    if (!answered?.error || leaving) return;
     setLeaving(true);
-    window.location.assign(
+    openInCurrentTab(
       consentRedirect(answered.redirectUri, { error: answered.error, state: params.state }),
     );
-  }, [view, answered, params.state]);
+  };
 
   useAuthPose(
     nodiPeekState({
@@ -86,7 +85,7 @@ function OAuthConsentPage() {
   const deny = () => {
     if (!answered || leaving) return;
     setLeaving(true);
-    window.location.assign(
+    openInCurrentTab(
       consentRedirect(answered.redirectUri, { error: 'access_denied', state: params.state }),
     );
   };
@@ -99,7 +98,7 @@ function OAuthConsentPage() {
       {
         onSuccess: ({ redirectTo }) => {
           setLeaving(true);
-          window.location.assign(redirectTo);
+          openInCurrentTab(redirectTo);
         },
         onError: (error) => {
           const refused =
@@ -156,9 +155,20 @@ function OAuthConsentPage() {
         )}
 
         {view === 'redirectError' && (
-          <p role="status" className="auth-status">
-            {t('auth.oauthConsent.redirectError', { host })}
-          </p>
+          <>
+            <p role="alert" className="auth-alert">
+              {t('auth.oauthConsent.redirectError', { host })}
+            </p>
+            <button
+              type="button"
+              className="auth-btn auth-btn--secondary"
+              disabled={leaving}
+              aria-busy={leaving}
+              onClick={sendBack}
+            >
+              {t('auth.oauthConsent.returnToClient', { host })}
+            </button>
+          </>
         )}
       </div>
 
