@@ -2,6 +2,41 @@
   "title": "Vai trò & quyền",
   "eyebrow": "Hệ thống",
   "description": "Tạo vai trò cho nhân sự và chọn thao tác mà mỗi vai trò được dùng trong trang quản trị.",
+  "runtime": {
+    "label": "Thay đổi vai trò và phân quyền",
+    "on": "Bật",
+    "off": "Tắt",
+    "loading": "Đang tải công tắc chỉnh sửa vai trò…",
+    "loadFailed": "Không tải được công tắc chỉnh sửa vai trò nên việc chỉnh sửa vai trò vẫn bị khóa.",
+    "retry": "Thử lại",
+    "notice": "Chức năng thay đổi vai trò và phân quyền đang tạm tắt",
+    "vetoed": "Đang bị tắt bởi cấu hình máy chủ",
+    "saveFailed": "Không lưu được. Vui lòng thử lại.",
+    "changedBy": "{{email}} đã thay đổi lúc {{at}}",
+    "changedAt": "Đã thay đổi lúc {{at}}",
+    "source": {
+      "STORED": "Do quản trị viên đặt",
+      "CONFIGURED": "Từ cấu hình máy chủ",
+      "DEFAULT": "Mặc định",
+      "VETOED": "Cấu hình máy chủ",
+      "DEGRADED": "Kho cài đặt không khả dụng"
+    },
+    "dialog": {
+      "reason": "Lý do (không bắt buộc)",
+      "cancel": "Hủy",
+      "working": "Đang lưu…",
+      "turnOff": {
+        "title": "Tắt chức năng thay đổi vai trò và phân quyền?",
+        "description": "Việc tạo, đổi tên, xóa vai trò, lưu phân quyền và đổi vai trò của tài khoản sẽ bị từ chối cho đến khi bạn bật lại. Việc xem vai trò, khóa và mở lại tài khoản vẫn hoạt động.",
+        "confirm": "Tắt"
+      },
+      "turnOn": {
+        "title": "Bật chức năng thay đổi vai trò và phân quyền?",
+        "description": "Quản trị viên có đủ quyền có thể tạo, đổi tên, xóa vai trò, lưu phân quyền và đổi vai trò tài khoản trở lại.",
+        "confirm": "Bật"
+      }
+    }
+  },
   "list": {
     "tableLabel": "Bảng vai trò",
     "columns": {
