@@ -276,16 +276,20 @@ class BatchDispatcher {
             List<BatchRunRow> claimedRows = rows.findByIdInOrderByRowIndex(claimed);
             for (int index = 0; index < claimedRows.size(); index++) {
                 BatchRunRow row = claimedRows.get(index);
+                RunView run;
                 try {
-                    RunView run = runService.startRun(batch.getOwnerId(), batch.getWorkflowId(), row.getInput(), null,
+                    run = runService.startRun(batch.getOwnerId(), batch.getWorkflowId(), row.getInput(), null,
                             null, null, batch.isAcknowledgeCost(), requestKey(batchId, row));
-                    rows.markRunning(row.getId(), run.id(), clock.instant());
-                    started++;
                 } catch (RuntimeException refusal) {
                     if (!handleRefusal(batch, row, refusal, claimedRows.subList(index + 1, claimedRows.size()))) {
                         return;
                     }
+                    continue;
                 }
+                // Not a refusal: the run exists. If this write fails the row stays claimed, and the
+                // abandoned-claim pass records the run by its request key instead of failing the row.
+                rows.markRunning(row.getId(), run.id(), clock.instant());
+                started++;
             }
         }
 

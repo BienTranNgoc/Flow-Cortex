@@ -473,6 +473,42 @@ class BatchDispatchIT extends AbstractWorkflowHttpIT {
         }
     }
 
+    @Test
+    void aStartedRunThatCouldNotBeRecordedKeepsItsRowAndIsPickedUpByItsKey() {
+        UserView member = member("unrecorded", 1000);
+        WorkflowView workflow = echoWorkflow(member);
+        UUID batch = UUID.randomUUID();
+        String function = "it_refuse_running_" + batch.toString().replace("-", "");
+        seedBatch(batch, member, workflow, "paused", 1, new RowSeed("pending", null, null));
+        jdbc.execute("CREATE FUNCTION " + function + "() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+                + "RAISE EXCEPTION 'row write refused'; END $$");
+        try {
+            jdbc.execute("CREATE TRIGGER " + function + " BEFORE UPDATE OF status ON batch_run_row FOR EACH ROW "
+                    + "WHEN (NEW.status = 'running' AND NEW.batch_id = '" + batch + "') "
+                    + "EXECUTE FUNCTION " + function + "()");
+            jdbc.update("UPDATE batch_run SET status = 'running', pause_reason = NULL WHERE id = ?", batch);
+
+            // The run commits, then recording it on the row fails; passes keep coming while that holds.
+            until(() -> count("SELECT count(*) FROM workflow_run WHERE workflow_id = ?", workflow.id()) == 1);
+            quietFor(Duration.ofSeconds(3));
+
+            assertThat(rowStatus(batch, 0)).as("a row whose run exists is neither failed nor given back")
+                    .isEqualTo("starting");
+            assertThat(count("SELECT count(*) FROM workflow_run WHERE workflow_id = ?", workflow.id())).isEqualTo(1);
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS " + function + " ON batch_run_row");
+            jdbc.execute("DROP FUNCTION IF EXISTS " + function + "()");
+        }
+        UUID run = jdbc.queryForObject("SELECT id FROM workflow_run WHERE workflow_id = ?", UUID.class, workflow.id());
+        jdbc.update("UPDATE batch_run_row SET claimed_at = now() - interval '10 minutes' WHERE batch_id = ?", batch);
+
+        until(() -> batchStatus(batch).equals("completed"));
+
+        assertThat(rowRunId(batch, 0)).isEqualTo(run);
+        assertThat(rowStatus(batch, 0)).isEqualTo("completed");
+        assertThat(count("SELECT count(*) FROM workflow_run WHERE workflow_id = ?", workflow.id())).isEqualTo(1);
+    }
+
     // --- support -------------------------------------------------------------------------------------------
 
     private UserView member(String prefix, long balance) {
