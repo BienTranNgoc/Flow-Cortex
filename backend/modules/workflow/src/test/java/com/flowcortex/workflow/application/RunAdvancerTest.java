@@ -58,7 +58,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.TaskScheduler;
