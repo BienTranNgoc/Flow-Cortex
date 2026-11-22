@@ -87,7 +87,10 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             return valid;
         }
 
-        /** What is wrong with the {@code outputInputs} step {@code order} declares in its config, or {@code null}. */
+        /**
+         * What is wrong with the config of step {@code order}: its {@code outputInputs} declaration,
+         * then its type's rule, then an iterate step's child type; or {@code null}.
+         */
         private static String configFault(NewWorkflowStep step, int order, boolean runsInline,
                 Set<String> iterateChildTypes) {
             String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);

@@ -53,7 +53,7 @@ class ProcessRunner:
                 return
         callback()
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         executable = Path(argv[0]).name
         # argv is not recorded: it holds local paths and, for later capabilities, parameters.
         with tracer.start_as_current_span(
@@ -62,7 +62,9 @@ class ProcessRunner:
             with self._lock:
                 if self._killed is not None:
                     raise ProcessKilled(self._killed)
-                process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                process = subprocess.Popen(
+                    argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 self._process = process
             try:
                 stdout, stderr = process.communicate()

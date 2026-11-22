@@ -344,6 +344,10 @@ flowcortex:
       interval: ${FLOWCORTEX_PHONE_RETENTION_INTERVAL:1h}
       send-attempts: ${FLOWCORTEX_PHONE_SEND_ATTEMPT_RETENTION:30d}
       sms-outbox: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:7d}
+  # The phone wall: on refuses a signed-in member's requests until a phone number is verified
+  # (staff and super admins excepted). Needs phone verification on, or startup fails; env + restart.
+  phone-gate:
+    enabled: ${FLOWCORTEX_PHONE_GATE_ENABLED:false}
   # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
   phone:
     hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}
@@ -380,7 +384,8 @@ flowcortex:
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
   # Payments region gate: off places nobody, shadow only counts callers outside Vietnam,
-  # enforce refuses them on payment-opening handlers. The refresh pace is for the registry download.
+  # enforce refuses them on payment-opening handlers. The mode is the configured layer of the console
+  # setting payment.region_gate.mode: a value stored there wins. The refresh pace is for the registry download.
   billing:
     region-gate:
       mode: ${FLOWCORTEX_BILLING_REGION_GATE_MODE:shadow}
@@ -453,6 +458,9 @@ flowcortex:
       # full pool rejects fails provider_busy; 1 loads the pool no more than a single top-level step does.
       # From 1 to flowcortex.dub.pool.size.
       provider-concurrency: ${FLOWCORTEX_WORKFLOW_ITERATE_PROVIDER_CONCURRENCY:1}
+    # How often reviews of an uploaded workflow file that were never imported are deleted.
+    import-review:
+      purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
@@ -484,6 +492,14 @@ flowcortex:
     pool:
       size: 4
       queue-capacity: 4
+  # Registering a run's assets makes object-store calls, so it runs on its own threads and never
+  # holds the shared async pool that advances runs; a hand-off finding both full waits for the sweep.
+  asset:
+    registration:
+      sweep-interval: 120s
+      pool:
+        size: 2
+        queue-capacity: 20
   # Product Video is opt-in outside development. Turning it off blocks only new
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
@@ -530,6 +546,24 @@ flowcortex:
       member-daily-quota: ${FLOWCORTEX_SUPPORT_MEMBER_DAILY_QUOTA:50}
       guest-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_DAILY_QUOTA:10}
       guest-network-daily-quota: ${FLOWCORTEX_SUPPORT_GUEST_NETWORK_DAILY_QUOTA:100}
+    # Request lifecycle: the three switches and three numbers below are configured here and changed at
+    # runtime in the console Settings page; a switch set to false here stays off whatever is stored.
+    lifecycle:
+      auto-close-enabled: ${FLOWCORTEX_SUPPORT_AUTO_CLOSE_ENABLED:true}
+      # Days after the member first opens a resolution before it closes (1-90).
+      auto-close-resolved-days: ${FLOWCORTEX_SUPPORT_AUTO_CLOSE_RESOLVED_DAYS:7}
+      reply-mail-enabled: ${FLOWCORTEX_SUPPORT_REPLY_MAIL_ENABLED:true}
+      # Minutes replies to one request are gathered into a single mail; 0 mails after the next sweep (0-1440).
+      reply-mail-window-minutes: ${FLOWCORTEX_SUPPORT_REPLY_MAIL_WINDOW_MINUTES:0}
+      retention-enabled: ${FLOWCORTEX_SUPPORT_RETENTION_ENABLED:true}
+      # Months a closed request is kept after its last activity (6-120).
+      retention-closed-request-months: ${FLOWCORTEX_SUPPORT_RETENTION_CLOSED_REQUEST_MONTHS:24}
+    # Pace of the reply-mail sweep and the closed-request purge; not under support.retention, whose
+    # interval paces the auto-close and assistant retention jobs.
+    reply-mail:
+      sweep-interval: PT1M
+    request-retention:
+      interval: PT6H
   # Main chat. Off: the page is hidden by the features flag. The console's chat switch gates sends on top
   # of it. Restart to apply. Limits count member messages; the sweeper fails a turn still running
   # sweep-grace after turn-timeout.
@@ -562,6 +596,7 @@ flowcortex:
       extract_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_EXTRACT_AUDIO:10m}
       align_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:10m}
       render_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:5m}
+      separate_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:15m}
     # The broker's per-delivery ack deadline; must outlast every max run time.
     consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
     # The provider runtime runs on the same ack deadline, so its ceilings are checked against

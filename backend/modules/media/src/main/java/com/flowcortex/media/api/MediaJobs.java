@@ -118,7 +118,8 @@ public interface MediaJobs {
      * @throws UploadRejectedException on field {@code uploadIds} if an upload is not an image, is larger than
      *         {@code maxBytes} (checked before any read), vanished, is not the image it was declared as, or has
      *         more than 25 million pixels
-     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/}, or there are not 1-10 inputs
+     * @throws IllegalArgumentException if {@code keyPrefix} is not under {@code support/} or
+     *         {@code workflow-review/}, or there are not 1-10 inputs
      * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
      */
     List<StoredAttachment> keepAttachments(String keyPrefix, List<MediaAssetInput> inputs, long maxBytes);
@@ -126,9 +127,31 @@ public interface MediaJobs {
     /**
      * Re-tags kept attachments pending again, so the media bucket's lifecycle rule expires them: for copies whose
      * request or message was never saved. Tries every object, then rethrows the first failure.
-     * @throws IllegalArgumentException if an attachment is not under {@code support/} of the media bucket
+     * @throws IllegalArgumentException if an attachment is not under {@code support/} or
+     *         {@code workflow-review/} of the media bucket
      */
     void releaseAttachments(List<StoredAttachment> attachments);
+
+    /**
+     * Keeps {@code ownerId}'s upload {@code uploadId}, granted for {@link UploadPurpose#CONTENT_MEDIA}, at
+     * {@code content/<mediaId>} of the media bucket and registers it as an asset. An image is read, checked
+     * (format, pixel cap) and written without its metadata; a video is copied server-side. The copy is tagged
+     * pending, its first bytes are checked against its kind (when the content check is on), and only then is it
+     * re-tagged kept; a refused copy expires by the media bucket's lifecycle rule. An upload granted for another
+     * purpose or owner is not found. Call it outside any transaction.
+     * @return the kept copy, with the size of the stored bytes
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of a type or size the
+     *         purpose does not accept, not the type it was declared as, or an image of more than 25 million pixels
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    StoredContentMedia keepContentMedia(UUID ownerId, UUID uploadId, UUID mediaId);
+
+    /**
+     * Re-tags a kept content copy pending again, so the media bucket's lifecycle rule expires it: for a copy
+     * whose library row was never saved.
+     * @throws IllegalArgumentException if {@code media} is not under {@code content/} of the media bucket
+     */
+    void releaseContentMedia(StoredContentMedia media);
 
     /**
      * Keeps the owner's {@link UploadPurpose#DRIVE_ITEM} upload {@code uploadId} at

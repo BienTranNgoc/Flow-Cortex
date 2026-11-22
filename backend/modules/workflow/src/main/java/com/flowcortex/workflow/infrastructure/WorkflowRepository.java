@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -44,4 +45,9 @@ public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
     /** The same load without the row lock, for owner-only reads. */
     @Query("SELECT w FROM Workflow w WHERE w.id = :id AND w.deletedAt IS NULL")
     Optional<Workflow> findActiveById(@Param("id") UUID id);
+
+    /** Atomic counter bump, so concurrent forks never lose an increment. */
+    @Modifying
+    @Query("UPDATE Workflow w SET w.forkCount = w.forkCount + 1 WHERE w.id = :id")
+    int incrementForkCount(@Param("id") UUID id);
 }

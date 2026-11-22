@@ -102,6 +102,57 @@ class RunStepTransactionsTest {
     }
 
     @Test
+    void aWonCompletionOfTheLastStepPublishesRunCompletedOnce() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+
+        verify(events, times(1)).publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
+    }
+
+    @Test
+    void aCompletionWhileAnotherStepIsOpenPublishesNothing() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void aLostCompletionPublishesNothing() {
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+
+        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
+
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void aFailurePublishesNothing() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
+
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void completeRunIfDoneOnAnAlreadyCompletedRunPublishesNothing() {
+        run.markCompleted(NOW);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.completeRunIfDone(runId, NOW);
+
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
     void aWonCompletionLeavesTheRunRunningWhileAnotherStepIsOpen() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
         when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
@@ -176,57 +227,6 @@ class RunStepTransactionsTest {
         transactions.completeRunIfDone(runId, NOW);
 
         verify(runUpdates, never()).touched(any());
-    }
-
-    @Test
-    void aWonCompletionOfTheLastStepPublishesRunCompletedOnce() {
-        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
-        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
-
-        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
-
-        verify(events, times(1)).publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
-    }
-
-    @Test
-    void aCompletionWhileAnotherStepIsOpenPublishesNothing() {
-        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
-
-        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
-
-        verifyNoInteractions(events);
-    }
-
-    @Test
-    void aLostCompletionPublishesNothing() {
-        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
-
-        transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
-
-        verifyNoInteractions(events);
-    }
-
-    @Test
-    void aFailurePublishesNothing() {
-        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "lease_expired", "boom", NOW)).thenReturn(1);
-        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
-
-        transactions.fail(runId, stepId, (short) 1, "lease_expired", "boom", NOW);
-
-        verifyNoInteractions(events);
-    }
-
-    @Test
-    void completeRunIfDoneOnAnAlreadyCompletedRunPublishesNothing() {
-        run.markCompleted(NOW);
-        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
-        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
-
-        transactions.completeRunIfDone(runId, NOW);
-
-        verifyNoInteractions(events);
     }
 
     @Test

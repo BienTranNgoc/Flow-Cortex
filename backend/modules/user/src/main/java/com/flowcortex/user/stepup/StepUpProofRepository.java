@@ -36,6 +36,11 @@ public interface StepUpProofRepository extends JpaRepository<StepUpProof, UUID> 
         return spend(tokenHash, now).map(row -> new ConsumedProof(row.getUserId(), row.getPurpose(), row.getExpiresAt()));
     }
 
+    /** Deletes every unspent proof of the user, so none minted earlier can be spent later; returns how many. */
+    @Modifying
+    @Query("DELETE FROM StepUpProof p WHERE p.userId = :userId AND p.consumedAt IS NULL")
+    int deleteUnspentByUserId(@Param("userId") UUID userId);
+
     /** Deletes every proof that was spent or has expired; returns how many. */
     @Modifying
     @Query("DELETE FROM StepUpProof p WHERE p.consumedAt IS NOT NULL OR p.expiresAt < :now")

@@ -153,6 +153,10 @@ class WorkflowCallStepExecutor implements StepExecutor {
                 throw new StepFailedException("workflow_call_child_incomplete",
                         "The called workflow is not complete", e);
             }
+            if (ConnectorStepOwnerGuard.CODE.equals(e.getCode())) {
+                throw new StepFailedException("workflow_call_child_connector_not_owner",
+                        "The called workflow calls a connected service, so only its owner can run it", e);
+            }
             throw e;
         }
     }

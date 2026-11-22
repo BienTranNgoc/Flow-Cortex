@@ -151,7 +151,9 @@ def test_garbage_input_is_probe_failed(tmp_path: Path) -> None:
 
 def test_a_stream_without_an_average_frame_rate_is_still_scanned(tmp_path: Path) -> None:
     class Scripted(ProcessRunner):
-        def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+        def run(
+            self, argv: list[str], cwd: Path | None = None
+        ) -> subprocess.CompletedProcess[bytes]:
             body = (
                 b'{"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0"},'
                 b'"streams":[{"index":0,"codec_type":"video","width":320,"height":240,'
@@ -172,7 +174,7 @@ class ThreeSeconds(ProcessRunner):
         super().__init__()
         self.scans: list[list[str]] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         if argv[0] == "ffprobe":
             body = (
                 b'{"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0"},'

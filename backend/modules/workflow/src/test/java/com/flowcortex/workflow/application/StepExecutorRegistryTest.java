@@ -46,7 +46,7 @@ class StepExecutorRegistryTest {
         assertThat(registry.knownTypes())
                 .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_storyboard",
                         "generate_speech", "generate_video", "probe", "extract_audio", "align_audio",
-                        "render_video");
+                        "render_video", "separate_audio");
     }
 
     @Test

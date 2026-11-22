@@ -4,8 +4,9 @@ import java.time.Duration;
 import java.util.Optional;
 
 /**
- * One declared limit over a shared store. A failing store never blocks a request: the call is
- * admitted and the failure is counted and logged.
+ * One declared limit over a shared store. A failing store admits the call and the failure is
+ * counted and logged, unless the definition is fail-closed: then the call is refused for one refill
+ * interval instead.
  */
 public final class RateLimiter {
 
@@ -32,7 +33,7 @@ public final class RateLimiter {
             return wait;
         } catch (RuntimeException e) {
             telemetry.storeFailed(definition, e);
-            return Optional.empty();
+            return answerWhenStoreFails();
         }
     }
 
@@ -43,8 +44,16 @@ public final class RateLimiter {
                     RateLimitKeys.storageKey(definition, identity), definition.capacity(), definition.period());
         } catch (RuntimeException e) {
             telemetry.storeFailed(definition, e);
+            return answerWhenStoreFails();
+        }
+    }
+
+    private Optional<Duration> answerWhenStoreFails() {
+        if (!definition.failClosed()) {
             return Optional.empty();
         }
+        Duration refill = definition.period().dividedBy(definition.capacity());
+        return Optional.of(refill.compareTo(Duration.ofSeconds(1)) < 0 ? Duration.ofSeconds(1) : refill);
     }
 
     /** Spends one unit without asking for an answer (a failure counted after the fact). */
