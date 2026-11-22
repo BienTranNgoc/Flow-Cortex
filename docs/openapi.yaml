@@ -7088,6 +7088,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/content/legal-index:
+    get:
+      tags:
+      - public-legal-index-controller
+      operationId: getLegalIndex
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalIndex"
+      security: []
   /api/v1/content/documents/{slug}:
     get:
       tags:
@@ -13385,6 +13398,30 @@ components:
         granted:
           type: integer
           format: int64
+    LegalIndex:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegalIndexEntry"
+      required:
+      - items
+    LegalIndexEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: "The document slug, e.g. legal-privacy"
+        path:
+          type: string
+          description: "The member page path, e.g. /legal/privacy"
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+      required:
+      - label
+      - path
+      - slug
     ContentDocumentHistoryEntry:
       type: object
       properties:
@@ -14212,6 +14249,12 @@ components:
             type: string
         publicHistory:
           type: boolean
+        minSections:
+          type: integer
+          format: int32
+        maxSections:
+          type: integer
+          format: int32
         draftVersion:
           type: integer
           format: int32
@@ -14230,6 +14273,8 @@ components:
           format: date-time
       required:
       - draftVersion
+      - maxSections
+      - minSections
       - publicHistory
       - publishedVersion
       - sectionTypes
