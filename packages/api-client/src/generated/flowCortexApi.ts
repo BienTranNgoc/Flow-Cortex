@@ -1825,6 +1825,10 @@ export interface Saved {
   baseUrl?: string;
 }
 
+export interface GoogleAuthorizeResponse {
+  authorizationUrl?: string;
+}
+
 export interface Attachment {
   uploadId?: string;
   fileName?: string;
@@ -3365,6 +3369,57 @@ export interface Summary {
   headerName?: string;
   paramName?: string;
   extraHeaderNames?: string[];
+}
+
+export interface GoogleConnection {
+  provider?: string;
+  email?: string;
+  scopes?: string[];
+  missingScopes?: string[];
+  expiresAt?: string;
+  usageEnabled?: boolean;
+}
+
+export interface Spreadsheet {
+  id?: string;
+  name?: string;
+  modifiedAt?: string;
+  ownerEmail?: string;
+  webViewUrl?: string;
+}
+
+export interface SpreadsheetPage {
+  items?: Spreadsheet[];
+  nextCursor?: string;
+}
+
+export interface Tab {
+  sheetId?: number;
+  title?: string;
+  rowCount?: number;
+  columnCount?: number;
+}
+
+export interface Tabs {
+  spreadsheetId?: string;
+  title?: string;
+  tabs?: Tab[];
+}
+
+export type PreviewRowsItem = { [key: string]: string };
+
+export interface Preview {
+  spreadsheetId?: string;
+  tab?: string;
+  range?: string;
+  header?: string[];
+  rows?: PreviewRowsItem[];
+}
+
+export interface GoogleHealth {
+  valid?: boolean;
+  email?: string;
+  reason?: string;
 }
 
 export interface ChatConversationList {
@@ -10153,6 +10208,11 @@ export const save = async (
   });
 };
 
+export type googleAuthorizeResponse200 = {
+  data: GoogleAuthorizeResponse;
+  status: 200;
+};
+
 export type googleAuthorizeResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -10163,13 +10223,16 @@ export type googleAuthorizeResponse503 = {
   status: 503;
 };
 
+export type googleAuthorizeResponseSuccess = googleAuthorizeResponse200 & {
+  headers: Headers;
+};
 export type googleAuthorizeResponseError = (
   googleAuthorizeResponse403 | googleAuthorizeResponse503
 ) & {
   headers: Headers;
 };
 
-export type googleAuthorizeResponse = googleAuthorizeResponseError;
+export type googleAuthorizeResponse = googleAuthorizeResponseSuccess | googleAuthorizeResponseError;
 
 export const getGoogleAuthorizeUrl = () => {
   return `/api/v1/connectors/google/authorize`;
@@ -15836,6 +15899,11 @@ export const health1 = async (
   });
 };
 
+export type googleReadResponse200 = {
+  data: GoogleConnection;
+  status: 200;
+};
+
 export type googleReadResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -15851,13 +15919,16 @@ export type googleReadResponse503 = {
   status: 503;
 };
 
+export type googleReadResponseSuccess = googleReadResponse200 & {
+  headers: Headers;
+};
 export type googleReadResponseError = (
   googleReadResponse403 | googleReadResponse404 | googleReadResponse503
 ) & {
   headers: Headers;
 };
 
-export type googleReadResponse = googleReadResponseError;
+export type googleReadResponse = googleReadResponseSuccess | googleReadResponseError;
 
 export const getGoogleReadUrl = () => {
   return `/api/v1/connectors/google`;
@@ -15870,6 +15941,11 @@ export const googleRead = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listGoogleSpreadsheetsResponse200 = {
+  data: SpreadsheetPage;
+  status: 200;
 };
 
 export type listGoogleSpreadsheetsResponse400 = {
@@ -15907,6 +15983,9 @@ export type listGoogleSpreadsheetsResponse503 = {
   status: 503;
 };
 
+export type listGoogleSpreadsheetsResponseSuccess = listGoogleSpreadsheetsResponse200 & {
+  headers: Headers;
+};
 export type listGoogleSpreadsheetsResponseError = (
   | listGoogleSpreadsheetsResponse400
   | listGoogleSpreadsheetsResponse403
@@ -15919,7 +15998,8 @@ export type listGoogleSpreadsheetsResponseError = (
   headers: Headers;
 };
 
-export type listGoogleSpreadsheetsResponse = listGoogleSpreadsheetsResponseError;
+export type listGoogleSpreadsheetsResponse =
+  listGoogleSpreadsheetsResponseSuccess | listGoogleSpreadsheetsResponseError;
 
 export const getListGoogleSpreadsheetsUrl = (params?: ListGoogleSpreadsheetsParams) => {
   const normalizedParams = new URLSearchParams();
@@ -15945,6 +16025,11 @@ export const listGoogleSpreadsheets = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listGoogleSpreadsheetTabsResponse200 = {
+  data: Tabs;
+  status: 200;
 };
 
 export type listGoogleSpreadsheetTabsResponse400 = {
@@ -15982,6 +16067,9 @@ export type listGoogleSpreadsheetTabsResponse503 = {
   status: 503;
 };
 
+export type listGoogleSpreadsheetTabsResponseSuccess = listGoogleSpreadsheetTabsResponse200 & {
+  headers: Headers;
+};
 export type listGoogleSpreadsheetTabsResponseError = (
   | listGoogleSpreadsheetTabsResponse400
   | listGoogleSpreadsheetTabsResponse403
@@ -15994,7 +16082,8 @@ export type listGoogleSpreadsheetTabsResponseError = (
   headers: Headers;
 };
 
-export type listGoogleSpreadsheetTabsResponse = listGoogleSpreadsheetTabsResponseError;
+export type listGoogleSpreadsheetTabsResponse =
+  listGoogleSpreadsheetTabsResponseSuccess | listGoogleSpreadsheetTabsResponseError;
 
 export const getListGoogleSpreadsheetTabsUrl = (id: string) => {
   return `/api/v1/connectors/google/sheets/${id}/tabs`;
@@ -16008,6 +16097,11 @@ export const listGoogleSpreadsheetTabs = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type previewGoogleSpreadsheetTabResponse200 = {
+  data: Preview;
+  status: 200;
 };
 
 export type previewGoogleSpreadsheetTabResponse400 = {
@@ -16045,6 +16139,9 @@ export type previewGoogleSpreadsheetTabResponse503 = {
   status: 503;
 };
 
+export type previewGoogleSpreadsheetTabResponseSuccess = previewGoogleSpreadsheetTabResponse200 & {
+  headers: Headers;
+};
 export type previewGoogleSpreadsheetTabResponseError = (
   | previewGoogleSpreadsheetTabResponse400
   | previewGoogleSpreadsheetTabResponse403
@@ -16057,7 +16154,8 @@ export type previewGoogleSpreadsheetTabResponseError = (
   headers: Headers;
 };
 
-export type previewGoogleSpreadsheetTabResponse = previewGoogleSpreadsheetTabResponseError;
+export type previewGoogleSpreadsheetTabResponse =
+  previewGoogleSpreadsheetTabResponseSuccess | previewGoogleSpreadsheetTabResponseError;
 
 export const getPreviewGoogleSpreadsheetTabUrl = (
   id: string,
@@ -16092,6 +16190,11 @@ export const previewGoogleSpreadsheetTab = async (
   );
 };
 
+export type googleHealthResponse200 = {
+  data: GoogleHealth;
+  status: 200;
+};
+
 export type googleHealthResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -16112,6 +16215,9 @@ export type googleHealthResponse503 = {
   status: 503;
 };
 
+export type googleHealthResponseSuccess = googleHealthResponse200 & {
+  headers: Headers;
+};
 export type googleHealthResponseError = (
   | googleHealthResponse403
   | googleHealthResponse404
@@ -16121,7 +16227,7 @@ export type googleHealthResponseError = (
   headers: Headers;
 };
 
-export type googleHealthResponse = googleHealthResponseError;
+export type googleHealthResponse = googleHealthResponseSuccess | googleHealthResponseError;
 
 export const getGoogleHealthUrl = () => {
   return `/api/v1/connectors/google/health`;

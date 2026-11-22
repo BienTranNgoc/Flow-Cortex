@@ -3454,6 +3454,12 @@ paths:
       - google-connector-controller
       operationId: googleAuthorize
       responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleAuthorizeResponse"
         "403":
           description: Member is suspended (SUSPENDED)
           content:
@@ -7302,6 +7308,12 @@ paths:
       - google-connector-controller
       operationId: googleRead
       responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleConnection"
         "403":
           description: Member is suspended (SUSPENDED)
           content:
@@ -7384,6 +7396,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SpreadsheetPage"
   /api/v1/connectors/google/sheets/{id}/tabs:
     get:
       tags:
@@ -7438,6 +7456,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Tabs"
   /api/v1/connectors/google/sheets/{id}/preview:
     get:
       tags:
@@ -7512,12 +7536,24 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Preview"
   /api/v1/connectors/google/health:
     get:
       tags:
       - google-connector-controller
       operationId: googleHealth
       responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleHealth"
         "403":
           description: Member is suspended (SUSPENDED)
           content:
@@ -11315,6 +11351,11 @@ components:
           type: string
         baseUrl:
           type: string
+    GoogleAuthorizeResponse:
+      type: object
+      properties:
+        authorizationUrl:
+          type: string
     Attachment:
       type: object
       properties:
@@ -13848,6 +13889,102 @@ components:
           type: array
           items:
             type: string
+    GoogleConnection:
+      type: object
+      properties:
+        provider:
+          type: string
+        email:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        missingScopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        usageEnabled:
+          type: boolean
+    Spreadsheet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        ownerEmail:
+          type: string
+        webViewUrl:
+          type: string
+    SpreadsheetPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Spreadsheet"
+        nextCursor:
+          type: string
+    Tab:
+      type: object
+      properties:
+        sheetId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        rowCount:
+          type: integer
+          format: int32
+        columnCount:
+          type: integer
+          format: int32
+    Tabs:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        title:
+          type: string
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tab"
+    Preview:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        tab:
+          type: string
+        range:
+          type: string
+        header:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    GoogleHealth:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        email:
+          type: string
+        reason:
+          type: string
     ChatConversationList:
       type: object
       properties:

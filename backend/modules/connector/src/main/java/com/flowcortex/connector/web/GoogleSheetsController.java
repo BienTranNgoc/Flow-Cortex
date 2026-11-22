@@ -54,6 +54,7 @@ class GoogleSheetsController {
     }
 
     @Operation(operationId = "listGoogleSpreadsheets")
+    @ApiResponse(responseCode = "200")
     @GetMapping
     SpreadsheetPage list(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) String q,
             @RequestParam(required = false) String limit, @RequestParam(required = false) String cursor) {
@@ -62,12 +63,14 @@ class GoogleSheetsController {
     }
 
     @Operation(operationId = "listGoogleSpreadsheetTabs")
+    @ApiResponse(responseCode = "200")
     @GetMapping("/{id}/tabs")
     Tabs tabs(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
         return sheets.listTabs(member.id(jwt), id);
     }
 
     @Operation(operationId = "previewGoogleSpreadsheetTab")
+    @ApiResponse(responseCode = "200")
     @GetMapping("/{id}/preview")
     Preview preview(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
             @RequestParam(required = false) String tab, @RequestParam(required = false) String range,

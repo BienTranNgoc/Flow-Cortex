@@ -54,6 +54,7 @@ class GoogleConnectorController {
     }
 
     @Operation(operationId = "googleAuthorize")
+    @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "403", description = "Member is suspended (SUSPENDED)", content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "503", description = "Connector switched off (TURNED_OFF)", content = @Content(
@@ -86,6 +87,7 @@ class GoogleConnectorController {
     }
 
     @Operation(operationId = "googleRead")
+    @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "403", description = "Member is suspended (SUSPENDED)", content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "No active Google connection (NOT_CONNECTED)", content = @Content(
@@ -98,6 +100,7 @@ class GoogleConnectorController {
     }
 
     @Operation(operationId = "googleHealth")
+    @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "403", description = "Member is suspended (SUSPENDED)", content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "404", description = "No active Google connection (NOT_CONNECTED)", content = @Content(
