@@ -71,4 +71,49 @@ describe('useFeatures', () => {
     expect(second.result.current.credits).toBe(true);
     expect(calls).toHaveLength(1);
   });
+
+  it('reads the features again on a mount once its answer is 30 seconds old', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const calls = stubApi({
+        'GET /api/v1/features': { status: 200, body: { ...ALL_OFF, runCancellation: true } },
+      });
+      const { wrapper } = setup();
+      const first = renderHook(() => useFeatures(), { wrapper });
+      await waitFor(() => expect(first.result.current.runCancellation).toBe(true));
+
+      vi.setSystemTime(Date.now() + 29_000);
+      renderHook(() => useFeatures(), { wrapper });
+      expect(calls).toHaveLength(1);
+
+      vi.setSystemTime(Date.now() + 2_000);
+      renderHook(() => useFeatures(), { wrapper });
+      await waitFor(() => expect(calls).toHaveLength(2));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the last answer when a later read fails', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let reply: { status: number; body: unknown } = {
+        status: 200,
+        body: { ...ALL_OFF, runCancellation: true },
+      };
+      const calls = stubApi({ 'GET /api/v1/features': () => reply });
+      const { wrapper } = setup();
+      const first = renderHook(() => useFeatures(), { wrapper });
+      await waitFor(() => expect(first.result.current.runCancellation).toBe(true));
+
+      reply = { status: 500, body: { status: 500 } };
+      vi.setSystemTime(Date.now() + 31_000);
+      const second = renderHook(() => useFeatures(), { wrapper });
+      await waitFor(() => expect(calls).toHaveLength(2));
+
+      expect(second.result.current.runCancellation).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
