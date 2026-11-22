@@ -3,8 +3,8 @@ import {
   getNotificationPreferences,
   unwrap,
   updateNotificationPreferences,
+  type NotificationPreferencesView as PreferencesView,
   type PatchBody,
-  type PreferencesView,
 } from '@flow-cortex/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
