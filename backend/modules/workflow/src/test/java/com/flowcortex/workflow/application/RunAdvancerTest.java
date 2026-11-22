@@ -1538,6 +1538,68 @@ class RunAdvancerTest {
                 eq((short) 1), eq(2), eq(NOW), eq(NOW.plus(LEASE)), any());
     }
 
+    private final Map<UUID, RunStepStatus> itemStatuses = new java.util.HashMap<>();
+
+    /** The items' statuses follow the claims and failures the advancer makes, as the database would. */
+    private void givenItemsFollowTheirTransitions(RunStep step, List<RunStep> items) {
+        items.forEach(item -> itemStatuses.put(item.getId(), RunStepStatus.PENDING));
+        when(runStepRepository.findChildStates(step.getId(), (short) 1)).thenAnswer(invocation -> items.stream()
+                .map(item -> row(item, itemStatuses.get(item.getId()), null,
+                        itemStatuses.get(item.getId()) == RunStepStatus.ERROR ? "provider_busy" : null))
+                .toList());
+        when(runStepRepository.claimPendingChild(any(), any(), anyShort(), anyInt(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    itemStatuses.put(invocation.getArgument(0), RunStepStatus.RUNNING);
+                    return 1;
+                });
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    itemStatuses.computeIfPresent(invocation.getArgument(0), (id, status) -> RunStepStatus.ERROR);
+                    return 1;
+                });
+        RunStepRepository.Lineage itemLineage = lineageOf("slow", step.getId());
+        items.forEach(item -> when(runStepRepository.findLineageById(item.getId()))
+                .thenReturn(Optional.of(itemLineage)));
+    }
+
+    @Test
+    void anItemTheProviderPoolRefusesDoesNotLeaveTheRunIdle() {
+        RunStep step = runningIterateStep("{\"child\":{\"type\":\"slow\"},\"concurrency\":1}", "[1,2,3]");
+        givenIterateRun("x", List.of(step), List.of(completed(1, step.getId(), "{}")));
+        List<RunStep> items = itemsOf(step, "slow", "1", "2", "3");
+        givenItemsFollowTheirTransitions(step, items);
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1, 0);
+
+        advancer(Runnable::run, task -> {
+            throw new TaskRejectedException("queue full");
+        }).advance(runId);
+
+        verify(runStepRepository, org.mockito.Mockito.times(3)).claimPendingChild(any(), eq(step.getId()),
+                eq((short) 1), eq(1), any(), any(), any());
+        items.forEach(item -> verify(runStepRepository).failIfRunning(eq(item.getId()), eq(runId), anyShort(),
+                eq("provider_busy"), contains("Too many"), any()));
+        verify(runStepRepository).completeIfRunning(step.getId(), runId, (short) 1,
+                "{\"results\":[null,null,null],\"texts\":[],\"succeeded\":0,\"failed\":3,\"total\":3,\"dropped\":0}",
+                null, NOW);
+    }
+
+    @Test
+    void anItemTheProviderPoolRefusesFailsAFailFastStepInTheSamePass() {
+        RunStep step = runningIterateStep(
+                "{\"child\":{\"type\":\"slow\"},\"concurrency\":3,\"onItemError\":\"fail\"}", "[1,2,3]");
+        givenIterateRun("x", List.of(step));
+        List<RunStep> items = itemsOf(step, "slow", "1", "2", "3");
+        givenItemsFollowTheirTransitions(step, items);
+
+        advancer(Runnable::run, task -> {
+            throw new TaskRejectedException("queue full");
+        }).advance(runId);
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("iterate_item_failed"), contains("Item 0 failed"), any());
+        verify(runStepRepository, never()).completeIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
     @Test
     void itemsThatAllFailInTheirClaimCompleteTheStepInOneAdvance() {
         String config = "{\"child\":{\"type\":\"capture\",\"config\":{\"t\":\"{item.title}\"}},\"concurrency\":1}";

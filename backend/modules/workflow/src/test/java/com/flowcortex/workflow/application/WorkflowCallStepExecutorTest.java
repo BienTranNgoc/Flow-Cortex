@@ -87,7 +87,7 @@ class WorkflowCallStepExecutorTest {
     private void givenValidChild() {
         when(workflows.findVisibleTo(childWorkflowId, owner)).thenReturn(Optional.of(child));
         when(served.stepsFor(child, owner)).thenReturn(childSteps);
-        when(registry.isAvailable(any())).thenReturn(true);
+        when(registry.isAvailable(any(), any())).thenReturn(true);
         when(mediaJobs.isEnabled()).thenReturn(true);
     }
 
@@ -226,7 +226,20 @@ class WorkflowCallStepExecutorTest {
     void aChildStepThatMayNotRunNowMakesTheCallUnavailable() {
         parentAtDepth(0, null);
         givenValidChild();
-        when(registry.isAvailable("echo")).thenReturn(false);
+        when(registry.isAvailable("echo", null)).thenReturn(false);
+
+        assertFails(contextFor(childWorkflowId), "workflow_call_unavailable");
+    }
+
+    @Test
+    void anIterateStepWhoseChildMayNotRunNowMakesTheCallUnavailable() {
+        parentAtDepth(0, null);
+        givenValidChild();
+        String config = "{\"child\":{\"type\":\"tts\"}}";
+        when(served.stepsFor(child, owner)).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), childWorkflowId, (short) 1, "each", "iterate", null, config)));
+        when(registry.isAvailable("iterate")).thenReturn(true);
+        when(registry.isAvailable("iterate", config)).thenReturn(false);
 
         assertFails(contextFor(childWorkflowId), "workflow_call_unavailable");
     }

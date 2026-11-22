@@ -467,6 +467,31 @@ class RunStepTransactionsTest {
     }
 
     @Test
+    void aLateFailureOfAnItemAlreadyClosedRefundsNothingMore() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "boom", "no", NOW)).thenReturn(0);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+
+        assertThat(transactions.fail(runId, stepId, (short) 1, "boom", "no", NOW)).isFalse();
+
+        verify(credits, never()).refundStep(any(), any(), anyShort(), any());
+        verify(runStepRepository, never()).findLineageById(any());
+    }
+
+    @Test
+    void aLateCompletionOfAnItemAlreadyClosedLeavesTheStepsOutputAlone() {
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.COMPLETED, GATHERED, null);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "late", null, NOW)).isFalse();
+
+        verify(runStepRepository, never()).replaceCompletedOutput(any(), any(), any());
+        verify(runStepRepository, never()).findLineageById(any());
+        verify(credits, never()).refundStep(any(), any(), anyShort(), any());
+    }
+
+    @Test
     void childClaimUsesTheCappedClaim() {
         UUID childId = stepId;
         when(runStepRepository.claimPendingChild(childId, parentId, (short) 2, 3, NOW, NOW.plusSeconds(120), "item"))

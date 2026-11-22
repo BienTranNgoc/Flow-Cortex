@@ -142,12 +142,25 @@ class LeaseReaper implements ClusterJob {
             return;
         }
         Reason r = reason.get();
-        String message = r.message(registry.find(step.getType()).map(executor -> executor.maxRuntime().toSeconds()));
+        String message = r.message(runBoundSeconds(step));
         if (transactions.fail(step.getRunId(), step.getId(), step.getAttempt(), r.code, message, now)) {
             (registry.isRemote(step.getType()) ? reapedRemote : reapedInline).get(r).increment();
             LOG.warn("Step reaped: runId={} runStepId={} type={} attempt={} deliveryCount={} code={}", step.getRunId(),
                     step.getId(), step.getType(), step.getAttempt(), step.getDeliveryCount(), r.code);
         }
+    }
+
+    /**
+     * The run bound the step was held to. A fan-out step's bound depends on its item count and is
+     * recorded on the step at pickup, so the executor's own maximum says nothing about it.
+     */
+    private Optional<Long> runBoundSeconds(RunStep step) {
+        Optional<StepExecutor> executor = registry.find(step.getType());
+        if (executor.map(found -> found.mode() == StepExecutor.Mode.FANOUT).orElse(false)) {
+            return step.getPickedUpAt() == null || step.getRunDeadline() == null ? Optional.empty()
+                    : Optional.of(Duration.between(step.getPickedUpAt(), step.getRunDeadline()).toSeconds());
+        }
+        return executor.map(found -> found.maxRuntime().toSeconds());
     }
 
     /** Which bound a running step passed; when two have, the one that passed first. */

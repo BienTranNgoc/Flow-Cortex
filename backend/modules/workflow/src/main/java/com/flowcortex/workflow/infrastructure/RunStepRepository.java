@@ -91,6 +91,11 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
             + "AND c.status = com.flowcortex.workflow.domain.RunStepStatus.RUNNING")
     long countRunningChildren(@Param("parentId") UUID parentId, @Param("parentAttempt") short parentAttempt);
 
+    /** Running items of the iterate step in any of its attempts: an earlier attempt's items outlive its failure. */
+    @Query("SELECT count(c) FROM RunStep c WHERE c.parentStepId = :parentId "
+            + "AND c.status = com.flowcortex.workflow.domain.RunStepStatus.RUNNING")
+    long countRunningChildrenOfAnyAttempt(@Param("parentId") UUID parentId);
+
     /** Items of one parent attempt that are running or still waiting to start. */
     @Query("SELECT count(c) FROM RunStep c WHERE c.parentStepId = :parentId AND c.parentAttempt = :parentAttempt "
             + "AND c.status IN (com.flowcortex.workflow.domain.RunStepStatus.RUNNING, "

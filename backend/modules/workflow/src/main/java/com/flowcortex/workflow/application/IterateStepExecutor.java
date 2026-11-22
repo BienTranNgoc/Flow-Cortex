@@ -33,7 +33,7 @@ class IterateStepExecutor implements StepExecutor {
         return Mode.FANOUT;
     }
 
-    /** Unused: the deadline of a fan-out step comes from its item count. */
+    /** Not a bound: the deadline of a fan-out step comes from its item count and is recorded on the step. */
     @Override
     public Duration maxRuntime() {
         return Duration.ZERO;
@@ -57,7 +57,8 @@ class IterateStepExecutor implements StepExecutor {
 
     /**
      * Attempt 1 starts every item pending. A retry carries over each item that an earlier attempt completed
-     * on the same input, so a retried step pays only for the items that did not finish.
+     * on the same input, so a retried step pays only for the items that did not finish. A retry is refused
+     * while an item of an earlier attempt still runs, so every item that did not complete has ended by now.
      */
     private List<RunStep> children(StepContext context, List<String> inputs, String childType) {
         short parentAttempt = context.attempt();

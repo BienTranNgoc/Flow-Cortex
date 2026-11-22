@@ -445,10 +445,10 @@ class RunAdvancer {
 
     /**
      * Decides what the running iterate step does next from its items as the database holds them, and does
-     * it. It decides again only after a pass in which an item failed in its claim: no thread runs for such
-     * an item, so nothing else would advance the run, and each one turns a pending item terminal, which
-     * bounds the passes by the item count. A pass whose claims were all lost, or that only started items,
-     * stops here: a running item's end advances the run.
+     * it. It decides again only after a pass in which an item failed in its claim or was refused by the
+     * provider pool: no thread runs for such an item, so nothing else would advance the run, and each one
+     * turns a pending item terminal, which bounds the passes by the item count. A pass whose claims were all
+     * lost, or that only started items, stops here: a running item's end advances the run.
      *
      * @param listInput the resolved list of the step, as the engine holds it now rather than as the entity read
      *                  earlier in the advance does
@@ -458,7 +458,7 @@ class RunAdvancer {
         int concurrency = effectiveConcurrency(config);
         int dropped = IterateItems.classify(listInput, config.maxItems()) instanceof IterateItems.Items items
                 ? items.dropped() : 0;
-        int failedAtClaim;
+        int endedInPass;
         do {
             List<IterateProgress.ChildState> children = runStepRepository
                     .findChildStates(step.getId(), step.getAttempt()).stream()
@@ -476,9 +476,9 @@ class RunAdvancer {
                     return false;
                 }
                 case IterateProgress.Dispatch dispatch ->
-                        failedAtClaim = dispatchItems(run, step, config, listInput, dispatch, concurrency);
+                        endedInPass = dispatchItems(run, step, config, listInput, dispatch, concurrency);
             }
-        } while (failedAtClaim > 0);
+        } while (endedInPass > 0);
         return false;
     }
 
@@ -504,7 +504,7 @@ class RunAdvancer {
         }
     }
 
-    /** @return how many of the items failed in their claim and so left nothing running to advance the run */
+    /** @return how many of the items failed in their claim or were refused by the provider pool, so no thread of theirs advances the run */
     private int dispatchItems(WorkflowRun run, RunStep step, IterateStepConfig config, String listInput,
             IterateProgress.Dispatch dispatch, int concurrency) {
         Map<UUID, RunStep> items = runStepRepository.findChildren(step.getId(), step.getAttempt()).stream()
@@ -523,7 +523,9 @@ class RunAdvancer {
 
     /**
      * Claims one item under the concurrency cap and hands it to its thread pool. Its config is rendered for
-     * its item first; a render that fails fails the item inside the claim, so its charge is refunded.
+     * its item first; a render that fails fails the item inside the claim, so its charge is refunded. An item
+     * the provider pool refuses after the claim fails {@code provider_busy} here and is reported as
+     * {@code FAILED}, like a failure in the claim: no thread runs for it.
      * {@code listInput} is the parent's resolved list: it alone tells a string element that reads like JSON
      * from the JSON value, so the caller passes the one it holds instead of this method reading the entity.
      */
@@ -561,7 +563,11 @@ class RunAdvancer {
                         item.getItemIndex(), parent.getStepOrder());
                 case FAILED -> LOG.warn("Item {} of step {} failed at dispatch", item.getItemIndex(),
                         parent.getStepOrder());
-                case DISPATCHED -> submitInline(run.getId(), item, executor.orElseThrow(), context);
+                case DISPATCHED -> {
+                    if (!submitInline(run.getId(), item, executor.orElseThrow(), context)) {
+                        return RunStepTransactions.ClaimOutcome.FAILED;
+                    }
+                }
                 default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
             }
             return outcome;
@@ -617,7 +623,8 @@ class RunAdvancer {
         }
     }
 
-    private void submitInline(UUID runId, RunStep step, StepExecutor executor, StepContext context) {
+    /** @return {@code false} when the provider pool refused the step and it failed {@code provider_busy} here */
+    private boolean submitInline(UUID runId, RunStep step, StepExecutor executor, StepContext context) {
         Runnable task = () -> inRun(runId, () -> {
             try (StepLogContext ignored = StepLogContext.step(runId, context.stepId(), false, context.attempt(),
                     null)) {
@@ -634,11 +641,12 @@ class RunAdvancer {
         } catch (TaskRejectedException e) {
             if (provider) {
                 failProviderBusy(context, e);
-                return;
+                return false;
             }
             LOG.warn("Step {} could not be scheduled ({}) — left for the reaper to close at its queue deadline",
                     step.getStepOrder(), e.getMessage());
         }
+        return true;
     }
 
     /** A provider step that finds every provider thread busy and the queue full fails now rather than waiting. */
@@ -691,7 +699,8 @@ class RunAdvancer {
     /**
      * A top-level step's failure halts its run. An item of an iterate step leaves the run to the iterate
      * step, so a failure that happened on this thread advances the run, unless the caller is itself the
-     * iterate step's own pass ({@code advanceAfterItem} false), which reads its items again anyway.
+     * iterate step's own pass ({@code advanceAfterItem} false), which decides again itself because
+     * {@code dispatchItem} reports the item as failed.
      */
     private void failInline(StepContext context, String code, String message, Throwable cause, Instant pickedUpAt,
             boolean advanceAfterItem) {

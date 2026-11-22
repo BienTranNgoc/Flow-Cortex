@@ -148,6 +148,13 @@ public class RunResumption {
 
         transactionTemplate.executeWithoutResult(status -> {
             workflowRunRepository.lockById(runId);
+            // A fail-fast or timed-out iterate step leaves its running items to finish; a new attempt that
+            // started beside them would pay for and run those items again. No item can start once the step
+            // has failed, so under the run's lock this count only falls.
+            if (operation != Operation.EXECUTE && runStepRepository.countRunningChildrenOfAnyAttempt(stepId) > 0) {
+                logRefusal(operation, "items_running", runId, stepId, attempt);
+                throw new ConflictException(new LocalizedMessage("workflow.runStep.itemsRunning"));
+            }
             if (operation != Operation.EXECUTE
                     && runStepRepository.reArm(stepId, runId, attempt, restoredInput) == 0) {
                 logRefusal(operation, "step_not_failed", runId, stepId, attempt);
@@ -326,7 +333,7 @@ public class RunResumption {
         if (remaining.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
+        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
             throw new DubDisabledException();
         }
     }
