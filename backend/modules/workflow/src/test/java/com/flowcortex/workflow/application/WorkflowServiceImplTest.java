@@ -198,6 +198,7 @@ class WorkflowServiceImplTest {
     void aNonOwnerCannotSetAllowFork() {
         Workflow workflow = stored(published(ANA, true));
         withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
 
         assertThatThrownBy(() -> service.updateWorkflow(BEN, workflow.getId(),
                 new UpdateWorkflow(null, null, true))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
@@ -537,6 +538,7 @@ class WorkflowServiceImplTest {
         WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
         Workflow workflow = stored(published(ANA, true));
         withEchoThenConnectorStep(workflow);
+        visibleTo(BEN, workflow);
 
         assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
                 new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
