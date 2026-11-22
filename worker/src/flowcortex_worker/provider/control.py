@@ -321,7 +321,8 @@ class ControlClient:
             ch = self._channel
             conn = self._connection
             reply_queue = self._reply_queue
-            assert ch is not None and conn is not None and reply_queue is not None
+            if ch is None or conn is None or reply_queue is None:
+                raise ControlClientClosed("Control client is not connected")
             self._in_flight[correlation_id] = (call, req.runId, req.jobId, req.attempt)
             props = pika.BasicProperties(
                 reply_to=reply_queue,

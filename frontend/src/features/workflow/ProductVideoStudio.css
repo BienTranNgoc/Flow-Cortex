@@ -263,7 +263,7 @@
   height: 1.25rem;
   border-radius: var(--radius-full);
   background: var(--primary);
-  color: #fff;
+  color: var(--primary-foreground);
   font-size: 0.75rem;
   font-weight: 700;
   display: inline-flex;
