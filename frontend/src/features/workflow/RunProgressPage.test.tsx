@@ -19,6 +19,7 @@ import {
   type FakeReply,
   type Handler,
 } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { openInCurrentTab } from './browser';
 import { RunProgressPage } from './RunProgressPage';
 
@@ -1730,39 +1731,6 @@ describe('RunProgressPage', () => {
     const stopButton = () => screen.findByRole('button', { name: 'Stop workflow' });
     const cancelCalls = (calls: { method: string; path: string }[]) =>
       calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/runs/r1/cancel');
-
-    /** jsdom has no `showModal`/`close`; Escape fires `cancel` the way a browser does. */
-    function stubModalDialog() {
-      const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-      Object.defineProperties(proto, {
-        showModal: {
-          configurable: true,
-          value(this: HTMLDialogElement) {
-            this.setAttribute('open', '');
-          },
-        },
-        close: {
-          configurable: true,
-          value(this: HTMLDialogElement) {
-            if (!this.hasAttribute('open')) return;
-            this.removeAttribute('open');
-            this.dispatchEvent(new Event('close'));
-          },
-        },
-      });
-      const onEscape = (event: KeyboardEvent) => {
-        const open = document.querySelector('dialog[open]');
-        if (event.key === 'Escape' && open instanceof HTMLDialogElement) {
-          if (open.dispatchEvent(new Event('cancel', { cancelable: true }))) open.close();
-        }
-      };
-      document.addEventListener('keydown', onEscape);
-      return () => {
-        document.removeEventListener('keydown', onEscape);
-        delete proto.showModal;
-        delete proto.close;
-      };
-    }
 
     function threeSteps(first: Partial<RunStepResponse>, later: string): RunStepResponse[] {
       return [
