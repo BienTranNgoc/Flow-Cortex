@@ -510,6 +510,32 @@ class ReviewTaskServiceImplTest {
     }
 
     @Test
+    void aStandardQuestionRefusesAnotherQuestionsOptionInEitherLanguage() {
+        ReviewTask qa = qaTask(ReviewTask.QUESTIONS_READY, QaQuestions.STANDARD_MARKER);
+        givenOwned(qa);
+
+        for (String foreign : List.of("Brief key points", "Ngắn gọn, điểm chính")) {
+            assertThatThrownBy(() -> service.answerTask(qa.getId(), ownerId, Map.of("q1", foreign), null, EN))
+                    .as(foreign)
+                    .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                            e -> assertThat(e.getErrors()).containsOnlyKeys("answers.q1"));
+        }
+        assertThat(qa.getStatus()).isEqualTo(ReviewTaskStatus.PENDING);
+        verify(events, never()).publishEvent(any(ReviewTaskApprovedEvent.class));
+    }
+
+    @Test
+    void aStandardQuestionStillAcceptsItsOwnOptionInTheOtherLanguage() {
+        ReviewTask qa = qaTask(ReviewTask.QUESTIONS_READY, QaQuestions.STANDARD_MARKER);
+        givenOwned(qa);
+
+        ReviewTaskView view = service.answerTask(qa.getId(), ownerId,
+                Map.of("q1", "Cá nhân tôi", "q2", "Brief key points"), null, EN);
+
+        assertThat(view.status()).isEqualTo("approved");
+    }
+
+    @Test
     void answeringWhileGeneratingIs409NotReady() {
         ReviewTask qa = qaTask(ReviewTask.QUESTIONS_GENERATING, null);
         givenOwned(qa);

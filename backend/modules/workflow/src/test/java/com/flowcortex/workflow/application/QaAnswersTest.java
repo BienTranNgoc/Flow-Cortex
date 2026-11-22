@@ -27,7 +27,10 @@ class QaAnswersTest {
                     List.of("Brief key points", "Medium with explanations", "Detailed with full reasoning")),
             new QaQuestion("q3", Type.TEXT, "Any specific requirements or constraints? (optional)", List.of()));
 
-    private static final List<QaQuestion> WITH_MULTI = List.of(
+    private static final Map<String, Set<String>> VIETNAMESE_OPTIONS =
+            Map.of("q1", Set.of("Chỉ mình tôi"), "q2", Set.of("Ngắn gọn, nêu ý chính"));
+
+    private static final List<QaQuestion> WITH_MULTI =List.of(
             new QaQuestion("m1", Type.MULTI, "Which channels?", List.of("Email", "Social", "Print")),
             new QaQuestion("t1", Type.TEXT, "Notes?", List.of()));
 
@@ -40,7 +43,7 @@ class QaAnswersTest {
     }
 
     private static Map<String, LocalizedMessage> validate(List<QaQuestion> questions, String answers) {
-        return QaAnswers.validate(questions, json(answers), Set.of());
+        return QaAnswers.validate(questions, json(answers), Map.of());
     }
 
     @Test
@@ -49,7 +52,7 @@ class QaAnswersTest {
         assertThat(validate(STANDARD, "{\"q1\":null,\"q2\":\"\",\"q3\":\"   \"}")).isEmpty();
         assertThat(validate(WITH_MULTI, "{\"m1\":[]}")).isEmpty();
         assertThat(validate(STANDARD, "{\"q1\":\"Just me\"}")).isEmpty();
-        assertThat(QaAnswers.validate(STANDARD, null, Set.of())).isEmpty();
+        assertThat(QaAnswers.validate(STANDARD, null, Map.of())).isEmpty();
     }
 
     @Test
@@ -105,12 +108,38 @@ class QaAnswersTest {
 
     @Test
     void standardAnswerAcceptedInEitherLanguage() {
-        Set<String> vietnameseOptions = Set.of("Chỉ mình tôi", "Ngắn gọn, nêu ý chính");
-
         assertThat(QaAnswers.validate(STANDARD, json("{\"q1\":\"Chỉ mình tôi\",\"q2\":\"Ngắn gọn, nêu ý chính\"}"),
-                vietnameseOptions)).isEmpty();
-        assertThat(QaAnswers.validate(STANDARD, json("{\"q1\":\"Chỉ tôi\"}"), vietnameseOptions)).containsOnlyKeys("q1");
+                VIETNAMESE_OPTIONS)).isEmpty();
+        assertThat(QaAnswers.validate(STANDARD, json("{\"q1\":\"Chỉ tôi\"}"), VIETNAMESE_OPTIONS))
+                .containsOnlyKeys("q1");
         assertThat(validate(STANDARD, "{\"q1\":\"Chỉ mình tôi\"}")).containsOnlyKeys("q1");
+    }
+
+    @Test
+    void anotherQuestionsOptionIsRefusedInEitherLanguage() {
+        Map<String, LocalizedMessage> errors = QaAnswers.validate(STANDARD,
+                json("{\"q1\":\"Brief key points\",\"q2\":\"Chỉ mình tôi\"}"), VIETNAMESE_OPTIONS);
+
+        assertThat(errors).containsOnlyKeys("q1", "q2");
+        assertThat(errors.get("q1").code()).isEqualTo("reviewTask.answers.notAnOption");
+        assertThat(QaAnswers.validate(STANDARD, json("{\"q1\":\"Ngắn gọn, nêu ý chính\"}"), VIETNAMESE_OPTIONS))
+                .containsOnlyKeys("q1");
+    }
+
+    @Test
+    void anotherMultiQuestionsOptionIsRefusedInEitherLanguage() {
+        List<QaQuestion> questions = List.of(
+                new QaQuestion("m1", Type.MULTI, "Which channels?", List.of("Email", "Social")),
+                new QaQuestion("m2", Type.MULTI, "Which formats?", List.of("Video", "Audio")));
+        Map<String, Set<String>> extra = Map.of("m1", Set.of("Thư điện tử"), "m2", Set.of("Âm thanh"));
+
+        assertThat(QaAnswers.validate(questions, json("{\"m1\":[\"Email\",\"Thư điện tử\"]}"), extra)).isEmpty();
+        for (String foreign : List.of("[\"Video\"]", "[\"Email\",\"Âm thanh\"]")) {
+            Map<String, LocalizedMessage> errors = QaAnswers.validate(questions, json("{\"m1\":" + foreign + "}"), extra);
+
+            assertThat(errors).as(foreign).containsOnlyKeys("m1");
+            assertThat(errors.get("m1").code()).isEqualTo("reviewTask.answers.notASubset");
+        }
     }
 
     @Test

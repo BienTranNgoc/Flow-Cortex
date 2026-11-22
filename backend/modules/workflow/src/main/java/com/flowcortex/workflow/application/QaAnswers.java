@@ -30,14 +30,14 @@ final class QaAnswers {
     /**
      * Field errors keyed by question id (an unknown id keys its own error), empty when every
      * answer fits. A null, blank or empty-list answer counts as no answer. {@code
-     * extraAcceptedOptions} are option texts accepted for a choice question besides its own, so a
-     * reviewer who switched language between reading and answering the standard questions is not
-     * refused.
+     * extraAcceptedOptions} maps a question id to option texts accepted for that choice question
+     * besides its own, so a reviewer who switched language between reading and answering the
+     * standard questions is not refused; another question's options are never accepted.
      *
      * @param answers a JSON object of question id to answer, or null for none
      */
     static Map<String, LocalizedMessage> validate(
-            List<QaQuestion> questions, JsonNode answers, Set<String> extraAcceptedOptions) {
+            List<QaQuestion> questions, JsonNode answers, Map<String, Set<String>> extraAcceptedOptions) {
         Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
         if (isMissing(answers)) {
             return errors;
@@ -51,7 +51,7 @@ final class QaAnswers {
                 errors.put(entry.getKey(), new LocalizedMessage("reviewTask.answers.unknownQuestion"));
                 return;
             }
-            fault(question, entry.getValue(), extraAcceptedOptions)
+            fault(question, entry.getValue(), extraAcceptedOptions.getOrDefault(question.id(), Set.of()))
                     .ifPresent(message -> errors.put(question.id(), message));
         });
         return errors;

@@ -176,8 +176,8 @@ class ReviewTaskServiceImpl implements ReviewTaskService {
         List<QaQuestion> questions = questionsOf(task, locale).orElseThrow(() -> new IllegalStateException(
                 "QA review " + task.getId() + " is ready but holds no readable questions"));
         JsonNode given = MAPPER.valueToTree(answers == null ? Map.of() : answers);
-        Set<String> otherLanguage = QaQuestions.isStandard(task.getQuestions())
-                ? StandardQaQuestions.optionsInEveryLanguage(messages) : Set.of();
+        Map<String, Set<String>> otherLanguage = QaQuestions.isStandard(task.getQuestions())
+                ? StandardQaQuestions.optionsInEveryLanguage(messages) : Map.of();
         Map<String, LocalizedMessage> faults = QaAnswers.validate(questions, given, otherLanguage);
         if (!faults.isEmpty()) {
             Map<String, LocalizedMessage> errors = new LinkedHashMap<>();

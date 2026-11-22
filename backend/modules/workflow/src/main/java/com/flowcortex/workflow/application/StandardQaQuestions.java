@@ -3,9 +3,11 @@ package com.flowcortex.workflow.application;
 import com.flowcortex.workflow.application.QaQuestions.QaQuestion;
 import com.flowcortex.workflow.application.QaQuestions.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.context.MessageSource;
 
@@ -40,14 +42,18 @@ final class StandardQaQuestions {
         return List.copyOf(questions);
     }
 
-    /** Every option text of the standard questions in every supported language, for a reader who switched language. */
-    static Set<String> optionsInEveryLanguage(MessageSource messages) {
-        Set<String> options = new HashSet<>();
+    /**
+     * Each standard question's option texts in every supported language, keyed by question id, for
+     * a reader who switched language. An option is only ever valid for its own question.
+     */
+    static Map<String, Set<String>> optionsInEveryLanguage(MessageSource messages) {
+        Map<String, Set<String>> options = new HashMap<>();
         for (Locale language : LANGUAGES) {
             for (QaQuestion question : in(messages, language)) {
-                options.addAll(question.options());
+                options.computeIfAbsent(question.id(), id -> new HashSet<>()).addAll(question.options());
             }
         }
-        return Set.copyOf(options);
+        options.replaceAll((id, texts) -> Set.copyOf(texts));
+        return Map.copyOf(options);
     }
 }
