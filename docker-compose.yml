@@ -317,6 +317,7 @@ services:
       FLOWCORTEX_DUB_ENABLED: ${FLOWCORTEX_DUB_ENABLED:-false}
       # One Gemini client and key serve dubbing and the Help Center assistant; empty fails both.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_SAFETY_THRESHOLD: ${GEMINI_SAFETY_THRESHOLD:-BLOCK_MEDIUM_AND_ABOVE}
       # Admin-console kill switch: off answers /api/v1/admin/** with 503; the member API is unaffected.
       FLOWCORTEX_ADMIN_ENABLED: ${FLOWCORTEX_ADMIN_ENABLED:-true}
       # Browser origins allowed to call the API directly (preflight). Defaults to the member SPA
@@ -352,7 +353,7 @@ services:
       FLOWCORTEX_SUPPORT_ENABLED: ${FLOWCORTEX_SUPPORT_ENABLED:-false}
       FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED: ${FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED:-false}
       FLOWCORTEX_SUPPORT_CONTACT_EMAIL: ${FLOWCORTEX_SUPPORT_CONTACT_EMAIL:-}
-      FLOWCORTEX_SUPPORT_ASSISTANT_MODEL: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:-gemini-3.5-flash-lite}
+      FLOWCORTEX_SUPPORT_ASSISTANT_MODEL: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:-gemini-3.5-flash-lite,gemini-3.8-flash}
       FLOWCORTEX_SUPPORT_HASH_SECRET: ${FLOWCORTEX_SUPPORT_HASH_SECRET:-dev-only-support-hash-secret-change-me-0123456789}
       FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:-dev-only-workflow-share-hash-secret-change-me-0123456789}
       FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_CAPACITY: ${FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_CAPACITY:-30}
