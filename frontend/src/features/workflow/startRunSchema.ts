@@ -22,8 +22,8 @@ export interface UploadKind {
   maxBytes: number;
 }
 
-const VIDEO: UploadKind = { extensions: ['mp4', 'mov', 'webm', 'mkv'], maxBytes: 500 * MEGABYTE };
-const AUDIO: UploadKind = { extensions: ['mp3', 'wav', 'm4a'], maxBytes: 100 * MEGABYTE };
+export const VIDEO: UploadKind = { extensions: ['mp4', 'mov', 'webm', 'mkv'], maxBytes: 500 * MEGABYTE };
+export const AUDIO: UploadKind = { extensions: ['mp3', 'wav', 'm4a'], maxBytes: 100 * MEGABYTE };
 export const IMAGE: UploadKind = {
   extensions: ['jpg', 'jpeg', 'png', 'webp'],
   maxBytes: 10 * MEGABYTE,
