@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.workflow.api.IterateStepConfig;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,6 +26,7 @@ final class StepConfigRules {
     private static Map<String, Function<String, String>> rules() {
         Map<String, Function<String, String>> rules = new LinkedHashMap<>();
         rules.put("workflow.call", WorkflowCallConfig::fault);
+        rules.put(IterateStepConfig.TYPE, IterateStepConfig::fault);
         return Collections.unmodifiableMap(rules);
     }
 }

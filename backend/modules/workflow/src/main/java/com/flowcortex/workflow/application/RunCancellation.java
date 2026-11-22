@@ -25,7 +25,9 @@ import org.springframework.web.server.ResponseStatusException;
  * A member stopping their own run. The step in flight finishes; every step not started is skipped
  * at once; the run is {@code cancelling} until no step is running, then {@code cancelled}. Each
  * guard is one conditional {@code UPDATE}, so a stop racing a step's claim or result is decided by
- * the database, and the run's row lock taken by the first one orders it against both.
+ * the database, and the run's row lock taken by the first one orders it against both. An iterate
+ * step's pending items are skipped with the other pending steps, its running items finish, and the
+ * step itself fails once none runs.
  */
 @Service
 public class RunCancellation {
@@ -39,13 +41,16 @@ public class RunCancellation {
     private final Clock clock;
     private final RunUpdates runUpdates;
     private final ChildRuns childRuns;
+    private final RunStepTransactions transactions;
     private final boolean enabled;
 
     RunCancellation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock, RunUpdates runUpdates,
-            ChildRuns childRuns, @Value("${flowcortex.workflow.cancel.enabled:false}") boolean enabled) {
+            ChildRuns childRuns, RunStepTransactions transactions,
+            @Value("${flowcortex.workflow.cancel.enabled:false}") boolean enabled) {
         this.runUpdates = runUpdates;
         this.childRuns = childRuns;
+        this.transactions = transactions;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.registry = registry;
@@ -86,9 +91,11 @@ public class RunCancellation {
     private void stop(UUID ownerId, UUID runId, String actor, UUID actorId) {
         if (workflowRunRepository.requestCancel(runId, ownerId) == 1) {
             int skipped = runStepRepository.skipPending(runId);
-            boolean settled = workflowRunRepository.settleCancelled(runId, Instant.now(clock)) == 1;
+            Instant now = Instant.now(clock);
+            boolean settledByIterate = transactions.failIdleIterateParents(runId, now);
+            boolean settled = settledByIterate || workflowRunRepository.settleCancelled(runId, now) == 1;
             runUpdates.touched(runId);
-            if (settled) {
+            if (settled && !settledByIterate) {
                 childRuns.finished(runId);
             }
             childRuns.stopChildrenOf(runId);
@@ -110,6 +117,6 @@ public class RunCancellation {
     private RunView currentView(UUID currentUserId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId).orElseThrow();
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote, mediaJobs::isDownloadable);
+                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
     }
 }

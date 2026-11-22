@@ -260,7 +260,7 @@ public class RunResumption {
             }
             runUpdates.touched(newRunId);
             events.publishEvent(new WorkflowRunStartedEvent(newRunId));
-            return WorkflowMapper.toRunView(created, saved, registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(created, saved, List.of(), registry::isRemote, mediaJobs::isDownloadable);
         });
         LOG.info("Run resume: op=retryRun outcome=created runId={} newRunId={} fromStepOrder={}", runId, newRunId, from);
         return view;
@@ -363,6 +363,6 @@ public class RunResumption {
     private RunView currentView(UUID callerId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, callerId).orElseThrow();
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote, mediaJobs::isDownloadable);
+                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
     }
 }

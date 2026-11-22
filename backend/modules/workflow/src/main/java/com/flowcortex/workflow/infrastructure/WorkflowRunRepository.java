@@ -120,11 +120,15 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     /**
      * Running runs with no step in flight: nothing will move them unless someone advances them
      * (a pending next step whose advance was lost, or all steps completed but the run not closed).
-     * Runs never swept come first, then the one swept longest ago, so a run that never moves
-     * cannot keep a newer one out of the batch.
+     * A running iterate step with no running item in its current attempt is not in flight either:
+     * it waits for the advance that follows an item's end. Runs never swept come first, then the
+     * one swept longest ago, so a run that never moves cannot keep a newer one out of the batch.
      */
     @Query(value = "SELECT r.id FROM workflow_run r WHERE r.status = 'running' AND NOT EXISTS "
-            + "(SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running') "
+            + "(SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running' "
+            + "AND NOT (s.type = 'iterate' AND s.parent_step_id IS NULL AND NOT EXISTS "
+            + "(SELECT 1 FROM run_step c WHERE c.parent_step_id = s.id AND c.parent_attempt = s.attempt "
+            + "AND c.status = 'running'))) "
             + "ORDER BY r.last_swept_at NULLS FIRST, r.started_at", nativeQuery = true)
     List<UUID> findStalledRunIds(Pageable page);
 

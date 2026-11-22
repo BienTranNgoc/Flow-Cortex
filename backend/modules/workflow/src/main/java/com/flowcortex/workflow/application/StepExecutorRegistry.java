@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.application.vendor.VendorJobLedger;
 import com.flowcortex.workflow.application.vendor.VendorJobsProperties;
 import java.time.Clock;
@@ -28,9 +29,10 @@ class StepExecutorRegistry {
 
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
-            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall) {
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall,
+            IterateStepExecutor iterate) {
         this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
-                tts), workflowCall));
+                tts), workflowCall, iterate));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -67,8 +69,10 @@ class StepExecutorRegistry {
         return executors;
     }
 
-    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall) {
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall,
+            StepExecutor iterate) {
         executors.add(workflowCall);
+        executors.add(iterate);
         return executors;
     }
 
@@ -79,6 +83,17 @@ class StepExecutorRegistry {
     /** An unknown type counts as available: it fails at dispatch with its own message. */
     boolean isAvailable(String type) {
         return find(type).map(StepExecutor::available).orElse(true);
+    }
+
+    /** Whether every step type a step of {@code type} runs is available; an iterate step also runs its children's type. */
+    boolean isAvailable(String type, String config) {
+        return IterateStepConfig.effectiveTypes(type, config).stream().allMatch(this::isAvailable);
+    }
+
+    /** The types an iterate step may run per item: the closed list, narrowed to those the engine has registered. */
+    Set<String> iterateChildTypes() {
+        return IterateStepConfig.CHILD_TYPES.stream().filter(byType::containsKey)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     boolean isRemote(String type) {

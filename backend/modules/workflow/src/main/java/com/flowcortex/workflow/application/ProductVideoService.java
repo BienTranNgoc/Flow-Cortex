@@ -160,7 +160,7 @@ public class ProductVideoService implements ProductVideoRuns {
             steps = runSteps.saveAll(steps);
             runUpdates.touched(run.getId());
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(run, steps, List.of(), registry::isRemote, mediaJobs::isDownloadable);
         });
     }
 

@@ -98,7 +98,7 @@ class RunCreation {
             // Published within this tx; RunAdvancer's @ApplicationModuleListener only
             // fires after commit — the caller returns first.
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, runSteps, steps::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(run, runSteps, List.of(), steps::isRemote, mediaJobs::isDownloadable);
         });
     }
 

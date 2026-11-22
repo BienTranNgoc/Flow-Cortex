@@ -11,10 +11,17 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.workflow.api.NewWorkflowStep;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -146,6 +153,88 @@ class StepExecutorRegistryTest {
         assertThat(job.getValue().inputs()).containsExactly(
                 new MediaJobInput("image_1", "uploads", "a"),
                 new MediaJobInput("image_2", "uploads", "b"));
+    }
+
+    @Test
+    void iterateChildTypesAreTheClosedListThatIsRegistered() {
+        StepExecutorRegistry full = new StepExecutorRegistry(List.of(inline("echo", true), inline("fail", true),
+                inline("translate", true), inline("tts", true), inline("workflow.call", true)));
+
+        assertThat(full.iterateChildTypes()).containsExactlyInAnyOrder("echo", "fail", "translate", "tts");
+        assertThat(registry.iterateChildTypes()).containsExactlyInAnyOrder("echo", "fail");
+    }
+
+    @Test
+    void registeredInlineResolvedTypeOutsideTheListIsNotAChildType() {
+        StepExecutorRegistry withExtra = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("inline.extra", true)));
+
+        assertThat(withExtra.knownTypes()).contains("inline.extra");
+        assertThat(withExtra.iterateChildTypes()).containsExactly("echo");
+
+        NewWorkflowStep iterate = new NewWorkflowStep("b", "iterate", null,
+                "{\"child\":{\"type\":\"inline.extra\"}}");
+        var definition = new KnownStepTypes.Definition(List.of(iterate),
+                Stream.concat(withExtra.knownTypes().stream(), Stream.of("iterate")).collect(Collectors.toSet()),
+                Set.of(), Set.of(), withExtra.iterateChildTypes());
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            Set<ConstraintViolation<KnownStepTypes.Definition>> violations = factory.getValidator().validate(definition);
+
+            assertThat(violations).hasSize(1);
+            assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("steps[0].config");
+            assertThat(violations.iterator().next().getMessage()).contains("child.type");
+        }
+    }
+
+    @Test
+    void isAvailableOfIterateIsItsChildTypes() {
+        StepExecutorRegistry dubOff = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("translate", false)));
+        String echoChild = "{\"child\":{\"type\":\"echo\"}}";
+        String translateChild = "{\"child\":{\"type\":\"translate\"}}";
+
+        assertThat(dubOff.isAvailable("iterate", echoChild)).isTrue();
+        assertThat(dubOff.isAvailable("iterate", translateChild)).isFalse();
+        assertThat(dubOff.isAvailable("translate", null)).isFalse();
+        assertThat(dubOff.isAvailable("echo", echoChild)).isTrue();
+    }
+
+    @Test
+    void anUnreadableIterateConfigIsAvailableLikeTheTypeAlone() {
+        StepExecutorRegistry dubOff = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("translate", false)));
+
+        assertThat(dubOff.isAvailable("iterate", null)).isTrue();
+        assertThat(dubOff.isAvailable("iterate", "{")).isTrue();
+    }
+
+    private static StepExecutor inline(String type, boolean available) {
+        return new StepExecutor() {
+            @Override
+            public String type() {
+                return type;
+            }
+
+            @Override
+            public Mode mode() {
+                return Mode.INLINE;
+            }
+
+            @Override
+            public Duration maxRuntime() {
+                return Duration.ofSeconds(60);
+            }
+
+            @Override
+            public boolean available() {
+                return available;
+            }
+
+            @Override
+            public String execute(StepContext context) {
+                return context.input();
+            }
+        };
     }
 
     @Test

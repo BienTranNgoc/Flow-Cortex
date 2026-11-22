@@ -7,6 +7,7 @@ import com.flowcortex.workflow.api.AdminRunDetailView;
 import com.flowcortex.workflow.api.AdminRunStepView;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
+import com.flowcortex.workflow.api.RunStepChildView;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
@@ -17,10 +18,13 @@ import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /** Entity -> {@code api} view mapping, mirroring {@code AppUserMapper}'s role in {@code :modules:user}. */
 final class WorkflowMapper {
@@ -70,24 +74,37 @@ final class WorkflowMapper {
      * A remote step's input is a reference to where its object is stored, which never leaves the
      * server; it is shown as {@code null}. The run's own input is shown: when the first step is
      * remote it is only the cleaned name of the uploaded file. A step offers only the outputs stored
-     * in a bucket {@code isDownloadable} accepts.
+     * in a bucket {@code isDownloadable} accepts. {@code children} are the items of the run's iterate steps in
+     * the attempt each step is in now; each step shows those whose parent it is, in the order given.
      */
-    static RunView toRunView(WorkflowRun run, List<RunStep> steps, Predicate<String> isRemoteType,
-            Predicate<String> isDownloadable) {
+    static RunView toRunView(WorkflowRun run, List<RunStep> steps, List<RunStep> children,
+            Predicate<String> isRemoteType, Predicate<String> isDownloadable) {
+        Map<UUID, List<RunStep>> itemsByParent = children.stream()
+                .collect(Collectors.groupingBy(RunStep::getParentStepId, LinkedHashMap::new, Collectors.toList()));
         return new RunView(run.getId(), run.getWorkflowId(), run.getOwnerId(), wire(run.getStatus().name()),
                 run.getInput(), run.getErrorMessage(), run.getStartedAt(),
                 run.getFinishedAt(),
-                steps.stream().map(step -> toRunStepView(step, isRemoteType, isDownloadable)).toList());
+                steps.stream()
+                        .map(step -> toRunStepView(step, itemsByParent.getOrDefault(step.getId(), List.of()),
+                                isRemoteType, isDownloadable))
+                        .toList());
     }
 
-    private static RunStepView toRunStepView(RunStep step, Predicate<String> isRemoteType,
+    private static RunStepView toRunStepView(RunStep step, List<RunStep> children, Predicate<String> isRemoteType,
             Predicate<String> isDownloadable) {
         Short percent = step.getProgressPercent();
         return new RunStepView(step.getId(), step.getStepOrder(), step.getType(), wire(step.getStatus().name()),
                 isRemoteType.test(step.getType()) ? null : step.getInput(), step.getOutput(), step.getErrorMessage(),
                 step.getStartedAt(), step.getFinishedAt(), percent == null ? null : percent.intValue(),
                 step.getAttempt(), step.getErrorCode(), step.getDeliveryCount(), step.getPickedUpAt(),
-                outputs(step, isDownloadable), mode(step.getType(), isRemoteType));
+                outputs(step, isDownloadable), mode(step.getType(), isRemoteType),
+                children.stream().map(child -> toRunStepChildView(child, isDownloadable)).toList());
+    }
+
+    private static RunStepChildView toRunStepChildView(RunStep child, Predicate<String> isDownloadable) {
+        return new RunStepChildView(child.getId(), child.getItemIndex(), wire(child.getStatus().name()),
+                child.getOutput(), child.getErrorCode(), child.getErrorMessage(), child.getAttempt(),
+                child.getStartedAt(), child.getFinishedAt(), outputs(child, isDownloadable));
     }
 
     static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail,

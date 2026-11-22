@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -36,11 +37,11 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     /**
      * The steps being created, with the types the registry knows, those of them that take the
-     * assets stored at run start, and those of them that run remotely.
+     * assets stored at run start, those of them that run remotely, and those an iterate step may run per item.
      */
     @KnownStepTypes
     record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes,
-            Set<String> remoteTypes) {
+            Set<String> remoteTypes, Set<String> iterateChildTypes) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
@@ -72,7 +73,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
                     violation(hibernateContext, "'{type}' needs an uploaded file, so the workflow must start with a media step", type, i);
                 }
                 boolean runsInline = allowedTypes.contains(type) && !definition.remoteTypes().contains(type);
-                String configFault = configFault(steps.get(i), i + 1, runsInline);
+                String configFault = configFault(steps.get(i), i + 1, runsInline, definition.iterateChildTypes());
                 if (configFault != null) {
                     valid = false;
                     // A message parameter is inserted literally, so the caller's text is never interpolated.
@@ -87,12 +88,26 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
         }
 
         /** What is wrong with the {@code outputInputs} step {@code order} declares in its config, or {@code null}. */
-        private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
+        private static String configFault(NewWorkflowStep step, int order, boolean runsInline,
+                Set<String> iterateChildTypes) {
             String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
-            return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
+            if (fault != null) {
+                return fault;
+            }
+            fault = StepConfigRules.fault(step.type(), step.config());
+            return fault != null ? fault : iterateChildFault(step, iterateChildTypes);
+        }
+
+        /** The child type is not echoed: it is the caller's text. */
+        private static String iterateChildFault(NewWorkflowStep step, Set<String> iterateChildTypes) {
+            if (!IterateStepConfig.TYPE.equals(step.type())
+                    || iterateChildTypes.contains(IterateStepConfig.parse(step.config()).childType())) {
+                return null;
+            }
+            return "child.type is not allowed; allowed: " + String.join(", ", new TreeSet<>(iterateChildTypes));
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

@@ -447,6 +447,12 @@ flowcortex:
       # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
       # child is stopped. Covers a child of four media steps at their queue and run bounds.
       max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
+    iterate:
+      # Most items of a provider-pool type (translate, tts) one iterate step runs at once, whatever its
+      # `concurrency`. Those items share flowcortex.dub.pool with every member's dub steps, and an item the
+      # full pool rejects fails provider_busy; 1 loads the pool no more than a single top-level step does.
+      # From 1 to flowcortex.dub.pool.size.
+      provider-concurrency: ${FLOWCORTEX_WORKFLOW_ITERATE_PROVIDER_CONCURRENCY:1}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
