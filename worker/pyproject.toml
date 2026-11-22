@@ -10,12 +10,21 @@ dependencies = [
     "boto3>=1.40",
     "pydantic>=2",
     "pydantic-settings>=2",
+    "pillow>=12.0",
     "edge-tts==7.3.1",
     "yt-dlp>=2026.5.25",
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-otlp-proto-http==1.44.0",
     "opentelemetry-instrumentation-botocore==0.65b0",
     "opentelemetry-instrumentation-logging==0.65b0",
+]
+
+[project.optional-dependencies]
+# Image clean overlay: geometry, pipeline and their tests. torch, torchvision and easyocr are
+# installed from engines/requirements-overlay.txt in the overlay image only.
+overlay = [
+    "numpy==1.26.4",
+    "opencv-python-headless==4.10.0.84",
 ]
 
 [dependency-groups]
@@ -49,8 +58,36 @@ plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 # No type information is published for these.
-module = ["pika.*", "boto3.*", "botocore.*", "jsonschema.*", "yt_dlp.*"]
+module = [
+    "pika.*",
+    "boto3.*",
+    "botocore.*",
+    "jsonschema.*",
+    "yt_dlp.*",
+    "cv2.*",
+    "torch.*",
+    "torchvision.*",
+    "easyocr.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Engine libraries exist only in the audio image; the worker process never imports them.
+module = [
+    "numpy.*",
+    "torch.*",
+    "torchaudio.*",
+    "demucs.*",
+    "soundfile.*",
+    "sherpa_onnx.*",
+    "sklearn.*",
+    "scipy.*",
+    "librosa.*",
+    "beat_this.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not engines'"
+markers = ["engines: needs the engine libraries and models of the audio image"]

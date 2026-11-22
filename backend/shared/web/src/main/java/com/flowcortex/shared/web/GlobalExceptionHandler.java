@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -39,6 +40,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 /**
  * Global exception -&gt; {@link ProblemDetail} mapping, uniform across every module.
@@ -93,6 +96,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ex.getErrors().forEach((field, reason) -> errors.put(field, messages.getMessage(reason, locale)));
             detail.setProperty("errors", errors);
         }
+        if (!ex.getReasons().isEmpty()) {
+            detail.setProperty("reasons", ex.getReasons());
+        }
         return detail;
     }
 
@@ -102,7 +108,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
     public ProblemDetail handleOptimisticLock(Exception ex, HttpServletRequest request) {
-        LOG.info("Concurrent update lost on {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        LOG.info("Concurrent update lost on {} {}: {}", request.getMethod(),
+                LoggedPaths.redact(request.getRequestURI()), ex.getMessage());
         return problem(HttpStatus.CONFLICT, "conflict",
                 message("problem.conflict.concurrentUpdate", locale(request)));
     }
@@ -115,6 +122,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "forbidden", message("problem.forbidden", locale(request)));
+    }
+
+    @ExceptionHandler(AdminDisabledException.class)
+    public ProblemDetail handleAdminDisabled(AdminDisabledException ex, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN, "admin-disabled", message("problem.adminDisabled", locale(request)));
     }
 
     @ExceptionHandler(AccountLockedException.class)
@@ -189,6 +201,30 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).headers(headers).body(detail);
     }
 
+    /**
+     * A body field whose JSON type cannot be read ({@code {"flag":"yes"}}): {@code errors} names the first property
+     * of the failing path. Any other unreadable body keeps the plain 400.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String field = ex.getCause() instanceof MismatchedInputException mismatch ? firstProperty(mismatch) : null;
+        if (field == null) {
+            return super.handleHttpMessageNotReadable(ex, headers, status, request);
+        }
+        Locale locale = locale(request);
+        ProblemDetail detail = createProblemDetail(ex, status, message("problem.validationFailed", locale), null, null,
+                request);
+        detail.setType(PROBLEM_BASE.resolve("validation-failed"));
+        detail.setProperty("errors", Map.of(field, message("validation.wrongType", locale)));
+        return ResponseEntity.status(status).headers(headers).body(detail);
+    }
+
+    private static String firstProperty(MismatchedInputException mismatch) {
+        return mismatch.getPath().stream().map(JacksonException.Reference::getPropertyName)
+                .filter(name -> name != null && !name.isEmpty()).findFirst().orElse(null);
+    }
+
     /** Resolves a {@link LocalizedStatusException}'s detail key in the request's language, not the thread's. */
     @Override
     protected ResponseEntity<Object> handleErrorResponseException(ErrorResponseException ex, HttpHeaders headers,
@@ -204,7 +240,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
-        LOG.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        LOG.error("Unhandled exception on {} {}", request.getMethod(),
+                LoggedPaths.redact(request.getRequestURI()), ex);
         ProblemDetail detail = problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error",
                 message("problem.unexpected", locale(request)));
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(detail);

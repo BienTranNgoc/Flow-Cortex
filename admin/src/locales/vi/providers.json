@@ -1,0 +1,124 @@
+{
+  "title": "Nhà cung cấp mô hình",
+  "eyebrow": "Tín dụng & thanh toán",
+  "description": "Các mô hình ngôn ngữ Nodi được phép gọi và nhà cung cấp đứng sau chúng.",
+  "tabs": {
+    "label": "Các mục của Nhà cung cấp mô hình",
+    "models": "Mô hình",
+    "providers": "Nhà cung cấp"
+  },
+  "retry": "Thử lại",
+  "loading": "Đang tải…",
+  "loadError": "Không tải được mục này.",
+  "models": {
+    "add": "Thêm mô hình",
+    "refresh": "Làm mới",
+    "empty": "Chưa đăng ký mô hình nào.",
+    "emptyHint": "Hãy thêm một mô hình để chọn được ở mọi nơi cần chọn mô hình ngôn ngữ.",
+    "tableLabel": "Bảng mô hình đã đăng ký",
+    "noun_one": "mô hình",
+    "noun_other": "mô hình",
+    "columns": {
+      "modelKey": "Mã mô hình",
+      "provider": "Nhà cung cấp",
+      "displayName": "Tên hiển thị",
+      "tokens": "Số token đầu ra",
+      "vision": "Hình ảnh",
+      "audio": "Âm thanh",
+      "active": "Hoạt động",
+      "order": "Thứ tự",
+      "actions": "Thao tác"
+    },
+    "yes": "Có",
+    "no": "Không",
+    "activeState": "Đang hoạt động",
+    "inactiveState": "Tạm tắt",
+    "activeSwitch": "Hoạt động: {{name}}",
+    "edit": "Sửa",
+    "editFor": "Sửa {{name}}",
+    "delete": "Xóa",
+    "deleteFor": "Xóa {{name}}",
+    "test": "Kiểm tra",
+    "testFor": "Kiểm tra {{name}}",
+    "testing": "Đang kiểm tra…",
+    "toggleFailed": "Không đổi được trạng thái của {{name}}.",
+    "deleted": "Đã xóa {{name}}.",
+    "saved": "Đã lưu {{name}}.",
+    "created": "Đã thêm {{name}}."
+  },
+  "form": {
+    "addTitle": "Thêm mô hình",
+    "editTitle": "Sửa {{name}}",
+    "modelKey": "Mã mô hình",
+    "modelKeyHint": "Chọn từ danh sách của nhà cung cấp hoặc tự nhập mã.",
+    "provider": "Nhà cung cấp",
+    "displayName": "Tên hiển thị",
+    "maxOutputTokens": "Giới hạn token đầu ra",
+    "displayOrder": "Thứ tự hiển thị",
+    "supportsVision": "Hiểu hình ảnh",
+    "supportsAudio": "Hiểu âm thanh",
+    "active": "Hoạt động",
+    "vendorLoading": "Đang tải danh sách mô hình của nhà cung cấp…",
+    "vendorFailed": "Không tải được danh sách mô hình của nhà cung cấp ({{code}}). Hãy tự nhập mã mô hình.",
+    "vendorNone": "Nhà cung cấp không liệt kê mô hình nào. Hãy tự nhập mã mô hình.",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "errors": {
+      "required": "Trường này là bắt buộc.",
+      "tokens": "Nhập số nguyên từ 1 đến 8192.",
+      "order": "Nhập số nguyên từ 0 đến 32767.",
+      "tooLong": "Tối đa {{max}} ký tự.",
+      "generic": "Không lưu được mô hình. Hãy thử lại."
+    }
+  },
+  "delete": {
+    "title": "Xóa {{name}}?",
+    "description": "Mục {{modelKey}} sẽ bị gỡ khỏi danh sách đăng ký. Không có gì khác thay đổi.",
+    "confirm": "Xóa mô hình",
+    "working": "Đang xóa…",
+    "cancel": "Hủy",
+    "error": "Không xóa được mô hình. Hãy thử lại."
+  },
+  "overview": {
+    "empty": "Chưa có nhà cung cấp nào được đăng ký.",
+    "category": {
+      "text": "Mô hình ngôn ngữ"
+    },
+    "configured": "Đã cấu hình",
+    "notConfigured": "Chưa cấu hình",
+    "missing": "Thiếu thiết lập:",
+    "liveCheck": "Có kiểm tra trực tiếp miễn phí",
+    "noLiveCheck": "Không có kiểm tra trực tiếp miễn phí",
+    "slots": "Các nhóm mô hình",
+    "noSlots": "Chưa cấu hình nhóm mô hình nào.",
+    "test": "Kiểm tra nhà cung cấp",
+    "testFor": "Kiểm tra {{key}}",
+    "testing": "Đang kiểm tra…",
+    "state": {
+      "active": "Đang hoạt động",
+      "inactive": "Tạm tắt",
+      "unregistered": "Chưa đăng ký",
+      "not_applicable": "Không áp dụng"
+    }
+  },
+  "probe": {
+    "ok": "Phản hồi sau {{ms}} ms ({{tokens}} token đầu ra)",
+    "reachable": "Kết nối được sau {{ms}} ms",
+    "notTested": "Đã cấu hình; nhà cung cấp này không có kiểm tra trực tiếp miễn phí nên chưa gửi gì.",
+    "failedIn": "{{reason}} ({{ms}} ms)",
+    "unknown": "Kiểm tra thất bại ({{code}}).",
+    "requestFailed": "Không chạy được kiểm tra. Hãy thử lại.",
+    "missingSettings": "{{reason}} {{names}}",
+    "code": {
+      "missing_config": "Nhà cung cấp chưa được cấu hình khóa:",
+      "quota_exceeded": "Hạn mức của nhà cung cấp đã hết.",
+      "rejected": "Nhà cung cấp từ chối yêu cầu: khóa hoặc mã mô hình không được chấp nhận.",
+      "blocked": "Nhà cung cấp đã chặn yêu cầu.",
+      "timeout": "Nhà cung cấp không phản hồi kịp thời.",
+      "unreachable": "Không kết nối được tới nhà cung cấp.",
+      "upstream": "Nhà cung cấp trả về lỗi.",
+      "unusable": "Nhà cung cấp có phản hồi nhưng kết quả không dùng được."
+    }
+  }
+}

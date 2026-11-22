@@ -1,7 +1,10 @@
 package com.flowcortex.workflow.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flowcortex.workflow.api.WorkflowVisibility;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -9,24 +12,91 @@ import org.junit.jupiter.api.Test;
 class WorkflowTest {
 
     @Test
-    void constructorSetsAllFieldsAndTimestamps() {
-        UUID id = UUID.randomUUID();
-        UUID ownerId = UUID.randomUUID();
+    void theConstructorCreatesAPublishedWorkflowAndDraftCreatesADraft() {
+        UUID owner = UUID.randomUUID();
 
-        Workflow workflow = new Workflow(id, ownerId, "Demo", true);
-
-        assertThat(workflow.getId()).isEqualTo(id);
-        assertThat(workflow.getOwnerId()).isEqualTo(ownerId);
-        assertThat(workflow.getName()).isEqualTo("Demo");
-        assertThat(workflow.isShared()).isTrue();
-        assertThat(workflow.getCreatedAt()).isNotNull();
-        assertThat(workflow.getUpdatedAt()).isEqualTo(workflow.getCreatedAt());
+        assertThat(new Workflow(UUID.randomUUID(), owner, "Demo", true).getStatus())
+                .isEqualTo(WorkflowStatus.PUBLISHED);
+        Workflow draft = Workflow.draft(UUID.randomUUID(), owner, "Demo");
+        assertThat(draft.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
+        assertThat(draft.getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
+        assertThat(draft.getDeletedAt()).isNull();
     }
 
     @Test
-    void notSharedByDefaultArgument() {
-        Workflow workflow = new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Private", false);
+    void mutatorsChangeTheFieldAndMarkDeletedStampsTheTime() throws InterruptedException {
+        Workflow workflow = Workflow.draft(UUID.randomUUID(), UUID.randomUUID(), "Demo");
+        Thread.sleep(2);
 
-        assertThat(workflow.isShared()).isFalse();
+        workflow.rename("Renamed");
+        workflow.makeListedOrPrivate(WorkflowVisibility.PUBLIC);
+        workflow.changeStatus(WorkflowStatus.PUBLISHED);
+        workflow.markDeleted();
+
+        assertThat(workflow.getName()).isEqualTo("Renamed");
+        assertThat(workflow.getVisibility()).isEqualTo(WorkflowVisibility.PUBLIC);
+        assertThat(workflow.getStatus()).isEqualTo(WorkflowStatus.PUBLISHED);
+        assertThat(workflow.getDeletedAt()).isNotNull();
+        assertThat(workflow.getUpdatedAt()).isAfter(workflow.getCreatedAt());
+    }
+
+    @Test
+    void theSharedFlagMapsToPublicOrPrivateAndStaysInSyncWithEveryTierChange() {
+        UUID owner = UUID.randomUUID();
+        Instant at = Instant.parse("2026-11-10T00:00:00Z");
+        Instant expiry = at.plusSeconds(3600);
+
+        assertThat(new Workflow(UUID.randomUUID(), owner, "A", true).getVisibility())
+                .isEqualTo(WorkflowVisibility.PUBLIC);
+        Workflow workflow = Workflow.draft(UUID.randomUUID(), owner, "B");
+        assertThat(workflow.getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
+
+        workflow.makeUnlisted("key", at, expiry);
+        assertThat(workflow.getVisibility()).isEqualTo(WorkflowVisibility.UNLISTED);
+        assertThat(workflow.getUnlistedKey()).isEqualTo("key");
+        assertThat(workflow.getUnlistedKeyGeneratedAt()).isEqualTo(at);
+        assertThat(workflow.getUnlistedKeyExpiresAt()).isEqualTo(expiry);
+
+        workflow.keepKey(null);
+        assertThat(workflow.getUnlistedKey()).isEqualTo("key");
+        assertThat(workflow.getUnlistedKeyExpiresAt()).isNull();
+
+        workflow.rotateKey("other", at.plusSeconds(5));
+        assertThat(workflow.getUnlistedKey()).isEqualTo("other");
+        assertThat(workflow.getUnlistedKeyGeneratedAt()).isEqualTo(at.plusSeconds(5));
+
+        workflow.makeListedOrPrivate(WorkflowVisibility.PUBLIC);
+        assertThat(workflow.getVisibility()).isEqualTo(WorkflowVisibility.PUBLIC);
+        assertThat(workflow.getUnlistedKey()).isNull();
+        assertThat(workflow.getUnlistedKeyGeneratedAt()).isNull();
+        assertThat(workflow.getUnlistedKeyExpiresAt()).isNull();
+
+        assertThatThrownBy(() -> workflow.makeListedOrPrivate(WorkflowVisibility.UNLISTED))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aNewDraftAndAForkStartWithForkingOff() {
+        assertThat(new Workflow(UUID.randomUUID(), UUID.randomUUID(), "Demo", true).isAllowFork()).isFalse();
+        Workflow draft = Workflow.draft(UUID.randomUUID(), UUID.randomUUID(), "Demo");
+        assertThat(draft.isAllowFork()).isFalse();
+        assertThat(draft.getForkCount()).isZero();
+        assertThat(draft.getForkedFromId()).isNull();
+    }
+
+    @Test
+    void forkOfRecordsTheSourceAndIsAnUnsharedDraft() {
+        UUID source = UUID.randomUUID();
+        UUID owner = UUID.randomUUID();
+
+        Workflow fork = Workflow.forkOf(UUID.randomUUID(), owner, "Copy", source);
+
+        assertThat(fork.getForkedFromId()).isEqualTo(source);
+        assertThat(fork.getOwnerId()).isEqualTo(owner);
+        assertThat(fork.getName()).isEqualTo("Copy");
+        assertThat(fork.getStatus()).isEqualTo(WorkflowStatus.DRAFT);
+        assertThat(fork.getVisibility()).isEqualTo(WorkflowVisibility.PRIVATE);
+        assertThat(fork.isAllowFork()).isFalse();
+        assertThat(fork.getForkCount()).isZero();
     }
 }

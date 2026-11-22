@@ -9,6 +9,7 @@ public enum MediaCapability {
     EXTRACT_AUDIO("extract_audio"),
     ALIGN_AUDIO("align_audio"),
     RENDER_VIDEO("render_video"),
+    SEPARATE_AUDIO("separate_audio"),
     FETCH_VIDEO("fetch_video");
 
     private final String value;

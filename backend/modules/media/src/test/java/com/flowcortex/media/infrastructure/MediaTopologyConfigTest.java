@@ -66,15 +66,7 @@ class MediaTopologyConfigTest {
     void declaresTheFetchLaneLikeTheDefaultJobQueue() {
         Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
 
-        Queue fetch = topology.getDeclarablesByType(Queue.class).stream()
-                .filter(queue -> queue.getName().equals("media.fetch.jobs"))
-                .findFirst()
-                .orElseThrow();
-        Queue jobs = topology.getDeclarablesByType(Queue.class).stream()
-                .filter(queue -> queue.getName().equals("media.jobs"))
-                .findFirst()
-                .orElseThrow();
-        assertThat(fetch.getArguments()).isEqualTo(jobs.getArguments());
+        assertThat(argumentsOf(topology, "media.fetch.jobs")).isEqualTo(argumentsOf(topology, "media.jobs"));
         assertThat(topology.getDeclarablesByType(Queue.class))
                 .extracting(Queue::getName)
                 .contains("media.fetch.jobs.dlq");
@@ -86,15 +78,39 @@ class MediaTopologyConfigTest {
     }
 
     @Test
+    void declaresTheAudioLaneLikeTheDefaultJobQueue() {
+        Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
+
+        assertThat(argumentsOf(topology, "media.audio.jobs")).isEqualTo(argumentsOf(topology, "media.jobs"));
+        assertThat(topology.getDeclarablesByType(Queue.class))
+                .extracting(Queue::getName)
+                .contains("media.audio.jobs.dlq");
+        assertThat(topology.getDeclarablesByType(Binding.class))
+                .extracting(Binding::getDestination, Binding::getExchange, Binding::getRoutingKey)
+                .contains(
+                        tuple("media.audio.jobs", "media", "audio.job"),
+                        tuple("media.audio.jobs.dlq", "media.dlx", "audio.job"));
+    }
+
+    @Test
     void eachLaneCapabilityIsRoutedToItsOwnLaneAndEveryOtherOneToTheDefault() {
         for (MediaCapability capability : MediaCapability.values()) {
             String expected = switch (capability) {
+                case SEPARATE_AUDIO -> "audio.job";
                 case RENDER_VIDEO -> "render.job";
                 case FETCH_VIDEO -> "fetch.job";
                 default -> "job";
             };
             assertThat(MediaTopologyConfig.mediaJobKey(capability)).as(capability.value()).isEqualTo(expected);
         }
+    }
+
+    private static Map<String, Object> argumentsOf(Declarables topology, String name) {
+        return topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals(name))
+                .findFirst()
+                .orElseThrow()
+                .getArguments();
     }
 
     @Test

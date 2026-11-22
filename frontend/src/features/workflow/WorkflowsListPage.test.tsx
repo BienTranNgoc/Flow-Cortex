@@ -10,8 +10,10 @@ const PRODUCT_VIDEO_ID = 'pv';
 const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
-  isShared: false,
+  visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [],
 };
@@ -19,8 +21,10 @@ const CHECK: WorkflowResponse = {
 const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [],
 };
@@ -28,8 +32,10 @@ const PRODUCT_VIDEO: WorkflowResponse = {
 const DOUYIN: WorkflowResponse = {
   id: 'douyin',
   name: 'Douyin Video Repurpose',
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
@@ -40,8 +46,10 @@ const DOUYIN: WorkflowResponse = {
 const ECHO: WorkflowResponse = {
   id: 'echo',
   name: 'Echo Demo (all steps succeed)',
-  isShared: false,
+  visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
@@ -49,8 +57,10 @@ const ECHO: WorkflowResponse = {
 const FAIL: WorkflowResponse = {
   id: 'fail',
   name: 'Failing Demo (deliberate)',
-  isShared: false,
+  visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
@@ -283,6 +293,7 @@ describe('WorkflowsListPage', () => {
           ? { status: 503, body: { status: 503 } }
           : { status: 200, body: [DOUYIN, ECHO, FAIL] };
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
@@ -305,6 +316,7 @@ describe('WorkflowsListPage', () => {
         status: 503,
         body: { status: 503, detail: 'Workflows are paused for maintenance.' },
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);

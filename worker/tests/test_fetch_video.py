@@ -46,9 +46,9 @@ class Runner(ProcessRunner):
         self.script = script
         self.ytdlp: list[list[str]] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         if argv[1:3] != ["-m", "yt_dlp"]:
-            return super().run(argv)
+            return super().run(argv, cwd)
         self.ytdlp.append(argv)
         assert self.script is not None, "yt-dlp must not start"
         code, out, err = self.script(len(self.ytdlp), argv)

@@ -12,7 +12,16 @@ function workflow(
   name: string,
   steps: WorkflowStepResponse[],
 ): WorkflowResponse {
-  return { id, name, isShared: true, available: true, startInput: 'text', steps };
+  return {
+    id,
+    name,
+    visibility: 'public',
+    available: true,
+    allowFork: false,
+    forkCount: 0,
+    startInput: 'text',
+    steps,
+  };
 }
 
 const DOUYIN_STEPS: WorkflowStepResponse[] = [

@@ -16,8 +16,10 @@ import { WorkflowDetailPage } from './WorkflowDetailPage';
 const CHECK: WorkflowResponse = {
   id: 'w1',
   name: 'Check a video file',
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'upload',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
 };
@@ -25,8 +27,10 @@ const CHECK: WorkflowResponse = {
 const ECHO: WorkflowResponse = {
   id: 'w1',
   name: 'Echo Demo',
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
@@ -43,8 +47,10 @@ const GRANT = {
 const INCOMPLETE: WorkflowResponse = {
   id: 'w1',
   name: 'Incomplete Demo (step 2 not configured)',
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   startInput: 'text',
   steps: [
     { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
@@ -126,8 +132,10 @@ describe('WorkflowDetailPage', () => {
     const THREE: WorkflowResponse = {
       id: 'w1',
       name: 'Three steps',
-      isShared: true,
+      visibility: 'public',
       available: true,
+      allowFork: false,
+      forkCount: 0,
       startInput: 'upload',
       steps: [
         { id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' },

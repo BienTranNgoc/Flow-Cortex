@@ -52,6 +52,7 @@ class PresignedGetExpiryIT extends AbstractPostgresBootTest {
             "extract_audio", Duration.ofMinutes(10),
             "align_audio", Duration.ofMinutes(10),
             "render_video", Duration.ofMinutes(10),
+            "separate_audio", Duration.ofMinutes(15),
             "fetch_video", Duration.ofMinutes(10)),
                 Duration.ofMinutes(20),
                 Duration.ofMinutes(2), Duration.ofMinutes(5),

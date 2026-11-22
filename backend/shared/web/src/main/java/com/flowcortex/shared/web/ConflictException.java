@@ -5,7 +5,7 @@ package com.flowcortex.shared.web;
  * constraint (e.g. a duplicate email). Mapped by {@link
  * GlobalExceptionHandler} to a 409 {@code application/problem+json} response.
  */
-public class ConflictException extends RuntimeException {
+public class ConflictException extends RuntimeException implements LocalizedProblem {
 
     private final LocalizedMessage detail;
 
@@ -16,6 +16,11 @@ public class ConflictException extends RuntimeException {
 
     /** The bundle key for the problem detail. */
     public LocalizedMessage getDetail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
         return detail;
     }
 }

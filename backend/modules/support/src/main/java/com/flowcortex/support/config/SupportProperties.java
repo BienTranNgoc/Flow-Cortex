@@ -2,6 +2,7 @@ package com.flowcortex.support.config;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,7 +21,7 @@ public record SupportProperties(
         boolean enabled,
         @Email String contactEmail,
         @NotNull @Valid Assistant assistant,
-        @NotNull @Valid Mail mail) {
+        @NotNull @Valid Lifecycle lifecycle) {
 
     /** The contact address, absent when none is configured. */
     public Optional<String> contact() {
@@ -40,7 +41,16 @@ public record SupportProperties(
             @Min(1) int guestNetworkDailyQuota) {
     }
 
-    /** Sender of the reply notification mails. */
-    public record Mail(@NotBlank @Email String from) {
+    /**
+     * The configured layer of the six lifecycle settings. A switch set to false here stays off whatever an
+     * admin stores; each integer is the value in force until an admin stores another.
+     */
+    public record Lifecycle(
+            boolean autoCloseEnabled,
+            @Min(1) @Max(90) int autoCloseResolvedDays,
+            boolean replyMailEnabled,
+            @Min(0) @Max(1440) int replyMailWindowMinutes,
+            boolean retentionEnabled,
+            @Min(6) @Max(120) int retentionClosedRequestMonths) {
     }
 }

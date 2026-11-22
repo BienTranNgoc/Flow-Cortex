@@ -1,7 +1,9 @@
 package com.flowcortex.credit.api;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -42,18 +44,34 @@ public interface CreditAccounts {
     /** The member's balance; {@code 0} when they have no wallet yet. */
     long balance(UUID userId);
 
-    /**
-     * Charges the step type's price, read in the caller's transaction, only if the balance covers it. Returns
-     * {@code false} when it does not (nothing is written); a step that costs nothing is never recorded.
-     */
-    boolean debitForStep(UUID userId, UUID runId, UUID runStepId, String stepType);
+    /** Credits ever added to the member's wallet by a crediting kind; {@code 0} without any. */
+    long granted(UUID userId);
 
     /**
-     * Returns the step's charge to its member in the caller's transaction, unless {@code errorCode} is
-     * one the member caused. At most once per step, however often it is called.
+     * Charges the step type's price for one attempt of the step, read in the caller's transaction, only
+     * if the balance covers it. Returns {@code false} when it does not (nothing is written); a step that
+     * costs nothing is never recorded.
      */
-    void refundStep(UUID runId, UUID runStepId, String errorCode);
+    boolean debitForStep(UUID userId, UUID runId, UUID runStepId, short attempt, String stepType);
+
+    /**
+     * Returns one attempt's charge of the step to its member in the caller's transaction, unless
+     * {@code errorCode} is one the member caused. At most once per step attempt, however often it is called.
+     */
+    void refundStep(UUID runId, UUID runStepId, short attempt, String errorCode);
 
     /** What the run has cost: its charges minus its refunds. */
     long chargedForRun(UUID runId);
+
+    /**
+     * What each run has cost, charges minus refunds, in one grouped read. A run without ledger entries is
+     * absent from the map (read it as 0); empty input returns an empty map without a query.
+     */
+    Map<UUID, Long> chargedForRuns(Collection<UUID> runIds);
+
+    /**
+     * What the member's runs have cost, per run, counting ledger entries written at or after {@code since}.
+     * A run without such entries is absent from the map.
+     */
+    Map<UUID, Long> chargedForRunsOf(UUID userId, Instant since);
 }

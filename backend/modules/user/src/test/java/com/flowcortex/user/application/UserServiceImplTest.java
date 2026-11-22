@@ -3,28 +3,50 @@ package com.flowcortex.user.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.api.AdminPermissions;
+import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
+import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.RoleRow;
+import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import java.sql.SQLException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
@@ -35,11 +57,81 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountCredentials accountCredentials = mock(AccountCredentials.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
+    private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
+    private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
+    private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
+    private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
+    private final UserDirectoryRepository directory = mock(UserDirectoryRepository.class);
+    private final Clock clock = Clock.fixed(Instant.parse("2026-11-08T03:04:05Z"), ZoneOffset.UTC);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, directory, clock);
+
+    UserServiceImplTest() {
+        when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));
+        when(roleCatalog.names()).thenReturn(Map.of("HO_TRO_CAP_2", "Support level 2"));
+    }
+
+    private static RoleRow roleRow(String code) {
+        boolean staff = List.of("OPERATION_MANAGER", "CUSTOMER_SUPPORT", "CONTENT_EDITOR", "PLATFORM_OPERATOR",
+                "HO_TRO_CAP_2").contains(code);
+        boolean system = !code.equals("HO_TRO_CAP_2");
+        return new RoleRow(code, code, system, staff, code.equals("ADMIN"));
+    }
+
+    @Test
+    void aCustomRoleCodeIsAcceptedAndShownByItsName() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserView created = service.createUser(ownerId, "agent@example.com", "correct horse battery staple",
+                "Agent", "HO_TRO_CAP_2");
+
+        assertThat(created.role()).isEqualTo("HO_TRO_CAP_2");
+        assertThat(created.roleName()).isEqualTo("Support level 2");
+    }
+
+    @Test
+    void anUnknownRoleCodeIsRefusedBeforeAnyWrite() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(roleCatalog.require("NOPE")).thenThrow(RoleCatalog.unknown("NOPE"));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "NOPE")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aRoleDeletedAfterTheLookupIsAnUnknownRoleNotATakenEmail() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("fk",
+                new ConstraintViolationException("fk", new SQLException("fk", "23503"), "fk_app_user_role")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "HO_TRO_CAP_2")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+    }
+
+    @Test
+    void anotherConstraintKeepsTheTakenEmailAnswer() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uname",
+                new ConstraintViolationException("uname", new SQLException("uname", "23505"),
+                        "uq_app_user_username")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "MEMBER")).isInstanceOf(ConflictException.class);
+    }
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -118,7 +210,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, null, null, "SUSPENDED");
 
-        verify(refreshTokenService).revokeAllFor(id);
+        verify(accountCredentials).revokeAllFor(id);
     }
 
     @Test
@@ -133,7 +225,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
-        verify(refreshTokenService, never()).revokeAllFor(any());
+        verify(accountCredentials, never()).revokeAllFor(any());
     }
 
     @Test
@@ -200,6 +292,143 @@ class UserServiceImplTest {
 
         assertThat(admin.ownerId()).isEqualTo(admin.id());
         assertThat(admin.role()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void aDelegatedAdminKeepsItsOwnScope() {
+        UUID creatorId = UUID.randomUUID();
+        AppUser delegated = new AppUser(UUID.randomUUID(), creatorId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        AppUser dung = new AppUser(UUID.randomUUID(), delegated.getId(), "dung@example.com", "$2a$hash", "Dung",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(delegated.getId())).thenReturn(Optional.of(delegated));
+        Instant now = clock.instant();
+        when(directory.count(delegated.getId(), UserQuery.all(), now)).thenReturn(1L);
+        when(directory.page(delegated.getId(), UserQuery.all(), now, 0, 100))
+                .thenReturn(List.of(AppUserMapper.toUserView(dung, Map.of(), now, false)));
+
+        assertThat(service.searchUsers(delegated.getId(), UserQuery.all(), 0, 100).items())
+                .extracting(UserView::email).containsExactly("dung@example.com");
+        verify(directory, never()).count(eq(creatorId), any(), any());
+    }
+
+    @Test
+    void anUnknownRoleFilterIsRefusedAndReadsNoAccount() {
+        AppUser admin = activeOwner(UUID.randomUUID());
+        when(repository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(directory.roleExists("NOPE")).thenReturn(false);
+        UserQuery query = new UserQuery("", Optional.of("NOPE"), Optional.empty(), UserQuery.Sort.NEWEST);
+
+        assertThatThrownBy(() -> service.searchUsers(admin.getId(), query, 0, 20))
+                .isInstanceOf(UnknownRoleException.class);
+        verify(directory, never()).count(any(), any(), any());
+        verify(directory, never()).page(any(), any(), any(), anyLong(), anyInt());
+    }
+
+    @Test
+    void aSuspendedCallerCannotReadTheStats() {
+        AppUser suspended = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "off@example.com", "$2a$hash", "Off",
+                Role.ADMIN, UserStatus.SUSPENDED);
+        when(repository.findById(suspended.getId())).thenReturn(Optional.of(suspended));
+
+        assertThatThrownBy(() -> service.userStats(suspended.getId())).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(directory);
+    }
+
+    @Test
+    void aStaffCallerActsInTheScopeOfTheAdminThatOwnsIt() {
+        UUID adminId = UUID.randomUUID();
+        AppUser staff = new AppUser(UUID.randomUUID(), adminId, "linh@example.com", "$2a$hash", "Linh",
+                Role.CUSTOMER_SUPPORT, UserStatus.ACTIVE);
+        AppUser member = new AppUser(UUID.randomUUID(), adminId, "ba@example.com", "$2a$hash", "Ba",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(staff.getId())).thenReturn(Optional.of(staff));
+        Instant now = clock.instant();
+        when(directory.count(adminId, UserQuery.all(), now)).thenReturn(2L);
+        when(directory.page(adminId, UserQuery.all(), now, 0, 100)).thenReturn(
+                List.of(AppUserMapper.toUserView(member, Map.of(), now, false),
+                        AppUserMapper.toUserView(staff, Map.of(), now, true)));
+        when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
+
+        assertThat(service.searchUsers(staff.getId(), UserQuery.all(), 0, 100).items()).hasSize(2);
+        assertThat(service.getUser(staff.getId(), member.getId()).email()).isEqualTo("ba@example.com");
+    }
+
+    @Test
+    void aMissingKeyRefusesTheChangeAndWritesNothing() {
+        UUID adminId = UUID.randomUUID();
+        AppUser manager = new AppUser(UUID.randomUUID(), adminId, "minh@example.com", "$2a$hash", "Minh",
+                Role.OPERATION_MANAGER, UserStatus.ACTIVE);
+        AppUser member = new AppUser(UUID.randomUUID(), adminId, "ba@example.com", "$2a$hash", "Ba",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(manager.getId())).thenReturn(Optional.of(manager));
+        when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
+        doThrow(new AccessDeniedException("Missing permission"))
+                .when(adminPermissions).require(manager.getId(), Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE);
+
+        assertThatThrownBy(() -> service.updateUser(manager.getId(), member.getId(), null, null,
+                "CUSTOMER_SUPPORT", null)).isInstanceOf(AccessDeniedException.class);
+
+        assertThat(member.getRole()).isEqualTo(Role.MEMBER);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void theSuperAdminInvariantRunsBeforeTheTargetIsChanged() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser other = new AppUser(UUID.randomUUID(), adminId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, other.getId())).thenReturn(Optional.of(other));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            assertThat(other.getRole()).isEqualTo(Role.ADMIN);
+            assertThat(other.getStatus()).isEqualTo(UserStatus.ACTIVE);
+            return null;
+        }).when(superAdminInvariant).assertNotLastActive(other);
+
+        service.updateUser(adminId, other.getId(), null, null, "MEMBER", "SUSPENDED");
+
+        verify(superAdminInvariant).assertNotLastActive(other);
+        assertThat(other.getRole()).isEqualTo(Role.MEMBER);
+    }
+
+    @Test
+    void aRefusedRegistrationOwnerChangeWritesNothing() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser owner = new AppUser(UUID.randomUUID(), adminId, "an@example.com", "$2a$hash", "An",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, owner.getId())).thenReturn(Optional.of(owner));
+        doThrow(new ConflictException(new LocalizedMessage("user.registrationOwner")))
+                .when(registrationOwnerGuard).assertNotRegistrationOwner(owner);
+
+        assertThatThrownBy(() -> service.updateUser(adminId, owner.getId(), null, null, "OPERATION_MANAGER", null))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.deleteUser(adminId, owner.getId())).isInstanceOf(ConflictException.class);
+
+        assertThat(owner.getRole()).isEqualTo(Role.ADMIN);
+        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).delete(any());
+        verifyNoInteractions(superAdminInvariant);
+    }
+
+    @Test
+    void deletingChecksTheInvariantBeforeTheRowIsDeleted() {
+        UUID adminId = UUID.randomUUID();
+        AppUser caller = activeOwner(adminId);
+        AppUser other = new AppUser(UUID.randomUUID(), adminId, "binh@example.com", "$2a$hash", "Binh",
+                Role.ADMIN, UserStatus.ACTIVE);
+        when(repository.findById(adminId)).thenReturn(Optional.of(caller));
+        when(repository.findByOwnerIdAndId(adminId, other.getId())).thenReturn(Optional.of(other));
+
+        service.deleteUser(adminId, other.getId());
+
+        var order = inOrder(superAdminInvariant, repository);
+        order.verify(superAdminInvariant).assertNotLastActive(other);
+        order.verify(repository).delete(other);
     }
 
     /** {@code requireActiveCaller} loads this row for every {@code ownerId} argument above. */

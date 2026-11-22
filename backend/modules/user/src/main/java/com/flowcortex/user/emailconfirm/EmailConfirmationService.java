@@ -1,5 +1,9 @@
 package com.flowcortex.user.emailconfirm;
 
+import com.flowcortex.mail.api.MailKey;
+import com.flowcortex.mail.api.MailOutcome;
+import com.flowcortex.mail.api.Mailer;
+import com.flowcortex.mail.api.OutgoingMail;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.user.application.OpaqueTokens;
@@ -11,19 +15,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Locale;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Example;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,21 +56,20 @@ public class EmailConfirmationService {
 
     private final EmailConfirmationTokenRepository tokens;
     private final AppUserRepository users;
-    private final JavaMailSender mailSender;
+    private final Mailer mailer;
     private final TaskExecutor mailExecutor;
     private final EmailConfirmationProperties properties;
     private final Clock clock;
     private final String publicUrl;
     private final Counter sendFailures;
-    private final MessageSource messages;
     private final RequestLocale requestLocale;
 
     /** Fails startup when confirmation is on and a link could not be built or mailed. */
     EmailConfirmationService(EmailConfirmationTokenRepository tokens, AppUserRepository users,
-            JavaMailSender mailSender, @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor,
+            Mailer mailer, @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor,
             EmailConfirmationProperties properties, Clock clock,
             @Value("${flowcortex.app.public-url:}") String publicUrl, @Value("${spring.mail.host:}") String mailHost,
-            MeterRegistry meters, MessageSource messages, RequestLocale requestLocale) {
+            MeterRegistry meters, RequestLocale requestLocale) {
         if (properties.enabled()) {
             requireSet(publicUrl, "flowcortex.app.public-url (FLOWCORTEX_APP_PUBLIC_URL), the member app origin"
                     + " the confirmation link opens");
@@ -77,7 +77,7 @@ public class EmailConfirmationService {
         }
         this.tokens = tokens;
         this.users = users;
-        this.mailSender = mailSender;
+        this.mailer = mailer;
         this.mailExecutor = mailExecutor;
         this.properties = properties;
         this.clock = clock;
@@ -86,7 +86,6 @@ public class EmailConfirmationService {
                 .description("Account mails (confirmation, set-password and reset links, notices) the SMTP server"
                         + " did not accept, or the send queue had no room for")
                 .register(meters);
-        this.messages = messages;
         this.requestLocale = requestLocale;
     }
 
@@ -186,8 +185,7 @@ public class EmailConfirmationService {
     /** Tells the account's address that a password was set, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailPasswordSetNotice(UUID userId, String email) {
-        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordSet.subject"),
-                new LocalizedMessage("email.passwordSet.body"), "password_set_notice");
+        mailAfterCommit(userId, email, MailKey.PASSWORD_SET);
     }
 
     /**
@@ -229,18 +227,15 @@ public class EmailConfirmationService {
         String rawToken = store(userId, EmailLinkPurpose.EMAIL_CONFIRM, properties.validity());
         // Asked for by a reset, so "ignore this email" would be wrong advice.
         String link = publicUrl + "/confirm-email?token=" + rawToken;
-        long hours = properties.validity().toHours();
-        LocalizedMessage body = request == LinkRequest.PASSWORD_RESET
-                ? new LocalizedMessage("email.confirmReset.body", link, hours)
-                : new LocalizedMessage("email.confirm.body", link, hours);
-        mailAfterCommit(userId, email, new LocalizedMessage("email.confirm.subject"), body, "sent");
+        MailKey key = request == LinkRequest.PASSWORD_RESET ? MailKey.ACTIVATION_AFTER_RESET_REQUEST
+                : MailKey.ACTIVATION;
+        mailAfterCommit(userId, email, key, link, properties.validity().toHours());
     }
 
     private void mailPasswordLink(UUID userId, String email) {
         String rawToken = store(userId, EmailLinkPurpose.PASSWORD_LINK, properties.passwordSetupValidity());
-        mailAfterCommit(userId, email, new LocalizedMessage("email.passwordLink.subject"),
-                new LocalizedMessage("email.passwordLink.body", publicUrl + "/set-password?token=" + rawToken,
-                        properties.passwordSetupValidity().toMinutes()), "password_link_sent");
+        mailAfterCommit(userId, email, MailKey.PASSWORD_SETUP_LINK, publicUrl + "/set-password?token=" + rawToken,
+                properties.passwordSetupValidity().toMinutes());
     }
 
     /**
@@ -252,25 +247,22 @@ public class EmailConfirmationService {
         int retired = retireOpenLinks(locked.getId());
         LOG.info("email_confirmation outcome=password_reset_link userId={} retiredLinks={}", locked.getId(), retired);
         String rawToken = store(locked.getId(), EmailLinkPurpose.PASSWORD_RESET, validity);
-        mailAfterCommit(locked.getId(), locked.getEmail(), new LocalizedMessage("email.passwordReset.subject"),
-                new LocalizedMessage("email.passwordReset.body", publicUrl + "/reset-password#token=" + rawToken,
-                        inWholeUnits(validity)), "password_reset_sent");
+        mailAfterCommit(locked.getId(), locked.getEmail(), MailKey.RESET_PASSWORD,
+                publicUrl + "/reset-password#token=" + rawToken, inWholeUnits(validity));
     }
 
-    /** "1 hour", "2 hours" when the validity is whole hours, otherwise "90 minutes", in the request's language. */
-    private String inWholeUnits(Duration validity) {
+    /** "1 hour", "2 hours" when the validity is whole hours, otherwise "90 minutes"; resolved in the mail's language. */
+    private static LocalizedMessage inWholeUnits(Duration validity) {
         long minutes = validity.toMinutes();
-        LocalizedMessage duration = minutes >= 60 && minutes % 60 == 0
+        return minutes >= 60 && minutes % 60 == 0
                 ? new LocalizedMessage("email.duration.hours", minutes / 60)
                 : new LocalizedMessage("email.duration.minutes", minutes);
-        return messages.getMessage(duration, requestLocale.current());
     }
 
     /** Tells an account without a password that it signs in with Google, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailGoogleSignInNotice(AppUser account) {
-        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.googleSignIn.subject"),
-                new LocalizedMessage("email.googleSignIn.body", publicUrl + "/login"), "google_notice_sent");
+        mailAfterCommit(account.getId(), account.getEmail(), MailKey.GOOGLE_SIGN_IN_NOTICE, publicUrl + "/login");
     }
 
     /**
@@ -299,8 +291,7 @@ public class EmailConfirmationService {
     /** Tells the account's address its password was changed, after the caller's transaction commits. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void mailPasswordChangedNotice(AppUser account) {
-        mailAfterCommit(account.getId(), account.getEmail(), new LocalizedMessage("email.passwordChanged.subject"),
-                new LocalizedMessage("email.passwordChanged.body", publicUrl + "/login"), "password_changed_notice");
+        mailAfterCommit(account.getId(), account.getEmail(), MailKey.PASSWORD_CHANGED, publicUrl + "/login");
     }
 
     private String store(UUID userId, EmailLinkPurpose purpose, Duration validity) {
@@ -312,42 +303,39 @@ public class EmailConfirmationService {
     }
 
     /**
-     * The text is resolved here, on the request's thread: the mail executor runs after the request has
-     * ended, when its language can no longer be read.
+     * Only the language is captured here, on the request's thread: the mail executor runs after the request
+     * has ended, when it can no longer be read. A wrong value count is a coding error and fails the
+     * request before anything is registered, rather than surfacing later on the executor.
      */
-    private void mailAfterCommit(UUID userId, String email, LocalizedMessage subjectKey, LocalizedMessage bodyKey,
-            String sentOutcome) {
-        Locale locale = requestLocale.current();
-        String subject = messages.getMessage(subjectKey, locale);
-        String body = messages.getMessage(bodyKey, locale);
+    private void mailAfterCommit(UUID userId, String email, MailKey key, Object... values) {
+        if (values.length != key.valueCount()) {
+            throw new IllegalArgumentException("Mail " + key.id() + " takes " + key.valueCount() + " values, got "
+                    + values.length);
+        }
+        OutgoingMail mail = new OutgoingMail(key, userId, email, requestLocale.current(), List.of(values));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 try {
-                    mailExecutor.execute(() -> send(userId, email, subject, body, sentOutcome));
+                    mailExecutor.execute(() -> send(mail));
                 } catch (TaskRejectedException ex) {
                     sendFailures.increment();
-                    LOG.warn("email_confirmation outcome=send_rejected userId={} mail={} reason=queue_full", userId,
-                            sentOutcome);
+                    LOG.warn("email_confirmation outcome=send_rejected userId={} mail={} reason=queue_full",
+                            mail.memberId(), mail.key().id());
                 }
             }
         });
     }
 
-    private void send(UUID userId, String email, String subject, String body, String sentOutcome) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(properties.from());
-        message.setTo(email);
-        message.setSubject(subject);
-        message.setText(body);
+    private void send(OutgoingMail mail) {
         try {
-            mailSender.send(message);
-            LOG.info("email_confirmation outcome={} userId={}", sentOutcome, userId);
-        } catch (RuntimeException ex) {
+            if (mailer.send(mail) == MailOutcome.FAILED) {
+                sendFailures.increment();
+            }
+        } catch (IllegalArgumentException ex) {
             sendFailures.increment();
-            // Only the class name: a send exception can carry the failed message, link included.
-            LOG.warn("email_confirmation outcome=send_failed userId={} mail={} error={}", userId, sentOutcome,
-                    ex.getClass().getName());
+            LOG.warn("email_confirmation outcome=send_failed userId={} mail={} error={}", mail.memberId(),
+                    mail.key().id(), ex.getClass().getName());
         }
     }
 }

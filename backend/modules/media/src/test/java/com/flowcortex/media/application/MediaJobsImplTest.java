@@ -15,6 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.flowcortex.media.api.KeptImage;
 import com.flowcortex.media.api.MediaCapability;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaDownload;
@@ -24,7 +25,10 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaStoreUnavailableException;
+import com.flowcortex.media.api.RunInputsBound;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.media.api.StoredContentMedia;
+import com.flowcortex.media.api.StoredDriveFile;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadPurpose;
@@ -57,6 +61,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
+import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
@@ -75,6 +81,7 @@ import software.amazon.awssdk.core.exception.SdkException;
 class MediaJobsImplTest {
 
     private static final UUID SPACE_ID = UUID.randomUUID();
+    private static final UUID OWNER_ID = UUID.randomUUID();
     private static final String SIZE_SENTENCE =
             "Files of this type must be at most 500 MB. Accepted: .mp4, .mov, .webm, .mkv.";
     private static final String AUDIO_SIZE_SENTENCE =
@@ -98,6 +105,7 @@ class MediaJobsImplTest {
         "flowcortex.media.max-runtime.extract_audio=10m",
         "flowcortex.media.max-runtime.align_audio=10m",
         "flowcortex.media.max-runtime.render_video=10m",
+        "flowcortex.media.max-runtime.separate_audio=15m",
         "flowcortex.media.max-runtime.fetch_video=10m",
         "flowcortex.media.consumer-timeout=20m",
         "flowcortex.media.provider-max-runtime=2m",
@@ -353,6 +361,46 @@ class MediaJobsImplTest {
     }
 
     @Test
+    void bindingPublishesRunInputsBoundWithTheRunAndItsOwnerOnce() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            givenRegistered(context, uploadId, "video");
+            List<MediaAssetInput> copy = List.of(new MediaAssetInput(uploadId,
+                    new MediaJobInput("media", "flowcortex-media", "runs/" + runId + "/inputs/media")));
+
+            tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copy));
+
+            assertThat(context.getBean(EventCapture.class).inputsBound)
+                    .containsExactly(new RunInputsBound(runId, OWNER_ID));
+        });
+    }
+
+    @Test
+    void bindingUploadsOfTwoOwnersIsRefusedAndNothingIsPublished() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            UUID runId = UUID.randomUUID();
+            UUID mine = UUID.randomUUID();
+            UUID theirs = UUID.randomUUID();
+            givenRegistered(context, mine, "video");
+            when(context.getBean(MediaAssetRepository.class).findById(theirs)).thenReturn(Optional.of(new MediaAsset(
+                    theirs, UUID.randomUUID(), SPACE_ID, "image", "flowcortex-uploads", "o/" + theirs, "image/png",
+                    16L, null, Instant.now())));
+            List<MediaAssetInput> copies = List.of(
+                    new MediaAssetInput(mine, new MediaJobInput("a", "flowcortex-media", "runs/" + runId + "/inputs/a")),
+                    new MediaAssetInput(theirs, new MediaJobInput("b", "flowcortex-media", "runs/" + runId + "/inputs/b")));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.bindRunInputs(runId, copies)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(context.getBean(EventCapture.class).inputsBound).isEmpty();
+        });
+    }
+
+    @Test
     void theCopyAndItsContentCheckRunWithNoTransactionOpenAndRefuseToJoinOne() {
         runner.run(context -> {
             MediaJobs jobs = context.getBean(MediaJobs.class);
@@ -482,17 +530,92 @@ class MediaJobsImplTest {
         });
     }
 
+    @Test
+    void copyStepOutputsMapsEachKeyUnderTheNewRunsFirstAttempt() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID from = UUID.randomUUID();
+            UUID to = UUID.randomUUID();
+            Map<String, Object> meta = Map.of("duration", 4);
+            List<MediaOutput> outputs = List.of(
+                    new MediaOutput("video", "flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
+                            "video/mp4", 42L, meta),
+                    new MediaOutput("clip", "flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
+                            "video/mp4", 7L, null));
+
+            List<MediaOutput> copies = jobs.copyStepOutputs(from, to, 2, outputs);
+
+            assertThat(copies).containsExactly(
+                    new MediaOutput("video", "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/video.mp4",
+                            "video/mp4", 42L, meta),
+                    new MediaOutput("clip", "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4",
+                            "video/mp4", 7L, null));
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/attempts/3/video.mp4",
+                    "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/video.mp4");
+            verify(store).copyWithoutTags("flowcortex-media", "runs/" + from + "/steps/2/clip.mp4",
+                    "flowcortex-media", "runs/" + to + "/steps/2/attempts/1/clip.mp4");
+        });
+    }
+
+    @Test
+    void copyStepOutputsRefusesAKeyOutsideTheSourceStep() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID from = UUID.randomUUID();
+            UUID to = UUID.randomUUID();
+            MediaOutput inside = new MediaOutput("a", "flowcortex-media", "runs/" + from + "/steps/2/a.mp4",
+                    "video/mp4", 1L, null);
+
+            for (String key : List.of("runs/" + UUID.randomUUID() + "/steps/2/b.mp4",
+                    "runs/" + from + "/steps/3/b.mp4", "runs/" + from + "/steps/2/../3/b.mp4",
+                    "runs/" + from + "/steps/2/")) {
+                assertThatThrownBy(() -> jobs.copyStepOutputs(from, to, 2, List.of(inside,
+                        new MediaOutput("b", "flowcortex-media", key, "video/mp4", 1L, null))))
+                        .as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(store, never()).copyWithoutTags(anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void runInputsStoredIsFalseWhenABoundCopyIsGone() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaAssetBindingRepository bindings = context.getBean(MediaAssetBindingRepository.class);
+            UUID runId = UUID.randomUUID();
+            when(bindings.findByRunIdOrderByPositionAsc(runId)).thenReturn(List.of(
+                    new com.flowcortex.media.domain.MediaAssetBinding(runId, "image_1", UUID.randomUUID(),
+                            (short) 0, Instant.now()),
+                    new com.flowcortex.media.domain.MediaAssetBinding(runId, "image_2", UUID.randomUUID(),
+                            (short) 1, Instant.now())));
+            String key1 = "runs/" + runId + "/inputs/image_1";
+            String key2 = "runs/" + runId + "/inputs/image_2";
+            when(store.head("flowcortex-media", key1)).thenReturn(Optional.of(new S3MediaStore.StoredObject(1, "x")));
+            when(store.head("flowcortex-media", key2)).thenReturn(Optional.empty());
+
+            assertThat(jobs.runInputsStored(runId)).isFalse();
+
+            when(store.head("flowcortex-media", key2)).thenReturn(Optional.of(new S3MediaStore.StoredObject(1, "x")));
+            assertThat(jobs.runInputsStored(runId)).isTrue();
+            assertThat(jobs.runInputsStored(UUID.randomUUID())).isTrue();
+        });
+    }
+
     private static void givenRegistered(org.springframework.context.ApplicationContext context, UUID assetId,
             String kind) {
         when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(
-                assetId, UUID.randomUUID(), SPACE_ID, kind, "flowcortex-uploads", "o/" + assetId, kind + "/x", 16L, null,
+                assetId, OWNER_ID, SPACE_ID, kind, "flowcortex-uploads", "o/" + assetId, kind + "/x", 16L, null,
                 Instant.now())));
     }
 
     private static void givenImage(org.springframework.context.ApplicationContext context, UUID assetId,
             String mimeType, long bytes) {
         when(context.getBean(MediaAssetRepository.class).findById(assetId)).thenReturn(Optional.of(new MediaAsset(
-                assetId, UUID.randomUUID(), SPACE_ID, MediaProperties.Upload.kindOf(mimeType), "flowcortex-uploads",
+                assetId, OWNER_ID, SPACE_ID, MediaProperties.Upload.kindOf(mimeType), "flowcortex-uploads",
                 "o/" + assetId, mimeType, bytes, null, Instant.now())));
     }
 
@@ -791,12 +914,157 @@ class MediaJobsImplTest {
                     new StoredAttachment("flowcortex-media", "support/r/m/2", "image/png", 40L))))
                     .hasMessage("store down");
             verify(store).retag("flowcortex-media", "support/r/m/2", "support-pending");
+            jobs.releaseAttachments(List.of(
+                    new StoredAttachment("flowcortex-media", "workflow-review/w/u/b/1", "image/png", 40L),
+                    new StoredAttachment("flowcortex-media", "support/r/m/3", "image/png", 40L)));
+            verify(store).retag("flowcortex-media", "workflow-review/w/u/b/1", "review-pending");
+            verify(store).retag("flowcortex-media", "support/r/m/3", "support-pending");
             assertThatThrownBy(() -> jobs.releaseAttachments(List.of(
                     new StoredAttachment("flowcortex-media", "runs/r/inputs/a", "image/png", 40L))))
                     .isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> jobs.releaseAttachments(List.of(
                     new StoredAttachment("flowcortex-uploads", "support/r/m/1", "image/png", 40L))))
                     .isInstanceOf(IllegalArgumentException.class);
+        });
+    }
+
+    private static String givenProfileUpload(org.springframework.context.ApplicationContext context, UUID ownerId,
+            UUID uploadId, byte[] bytes) {
+        String key = "profile-image/" + ownerId + "/" + uploadId;
+        when(context.getBean(S3MediaStore.class).head("flowcortex-uploads", key))
+                .thenReturn(Optional.of(new S3MediaStore.StoredObject(bytes.length, "image/png")));
+        when(context.getBean(MediaAssetRepository.class).findById(uploadId)).thenReturn(Optional.empty(),
+                Optional.of(new MediaAsset(uploadId, ownerId, SPACE_ID, "image", "flowcortex-uploads", key,
+                        "image/png", bytes.length, null, Instant.now())));
+        when(context.getBean(S3MediaStore.class).read(eq("flowcortex-uploads"), eq(key), anyInt()))
+                .thenReturn(bytes);
+        return key;
+    }
+
+    @Test
+    void aProfileImageIsResolvedOnlyUnderItsPurpose() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            when(store.head("flowcortex-uploads", "support-attachment/" + ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId,
+                    "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.again"));
+            verify(store).head("flowcortex-uploads", "profile-image/" + ownerId + "/" + uploadId);
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void aKeptProfileImageIsTheStrippedBytesWithItsDimensions() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            byte[] original = pngWithText(40, 30, "GPS 10.77,106.69");
+            givenProfileUpload(context, ownerId, uploadId, original);
+
+            KeptImage kept = context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId,
+                    "profile/u/avatar/1");
+
+            org.mockito.ArgumentCaptor<byte[]> written = org.mockito.ArgumentCaptor.forClass(byte[].class);
+            verify(store).put(eq("flowcortex-media"), eq("profile/u/avatar/1"), eq("image/png"), written.capture(),
+                    eq("profile-released"));
+            assertThat(written.getValue()).isEqualTo(png(40, 30)).hasSizeLessThan(original.length);
+            assertThat(kept).isEqualTo(new KeptImage("flowcortex-media", "profile/u/avatar/1", "image/png",
+                    png(40, 30).length, 40, 30));
+        });
+    }
+
+    @Test
+    void aKeptProfileImageStaysPendingUntilConfirmed() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            givenProfileUpload(context, ownerId, uploadId, png(40, 30));
+
+            context.getBean(MediaJobs.class).keepProfileImage(ownerId, uploadId, "profile/u/avatar/1");
+
+            verify(store).put(eq("flowcortex-media"), eq("profile/u/avatar/1"), eq("image/png"),
+                    any(byte[].class), eq("profile-released"));
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void aProfileImageThatIsNotTheImageItWasDeclaredAsOrIsOverThePixelCapIsRefusedAndNothingIsWritten() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID text = UUID.randomUUID();
+            UUID huge = UUID.randomUUID();
+            givenProfileUpload(context, ownerId, text, "not an image".getBytes());
+            givenProfileUpload(context, ownerId, huge, png(5001, 5000));
+
+            assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, text, "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.attachmentNotImage"));
+            assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, huge, "profile/u/avatar/1"))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.imageTooLarge"));
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void confirmingProfileImagesRetagsThemKept() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            context.getBean(MediaJobs.class).confirmProfileImages(List.of("profile/u/avatar/1", "profile/u/cover/2"));
+
+            verify(store).retag("flowcortex-media", "profile/u/avatar/1", "profile-image");
+            verify(store).retag("flowcortex-media", "profile/u/cover/2", "profile-image");
+        });
+    }
+
+    @Test
+    void aProfileImageOutsideTheProfilePrefixIsRefused() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            List<String> outside = List.of("support/r/m/1", "runs/r/inputs/a", "profile/", "profile/../runs/x",
+                    "profile/u/");
+
+            for (String key : outside) {
+                assertThatThrownBy(() -> jobs.keepProfileImage(ownerId, uploadId, key)).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> jobs.confirmProfileImages(List.of("profile/u/avatar/1", key))).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> jobs.releaseProfileImages(List.of(key))).as(key)
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(store, never()).head(anyString(), anyString());
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void releasingProfileImagesRetagsThemReleasedAndOneFailureStillReleasesTheRest() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            doThrow(new IllegalStateException("store down")).when(store)
+                    .retag("flowcortex-media", "profile/u/avatar/1", "profile-released");
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .releaseProfileImages(List.of("profile/u/avatar/1", "profile/u/avatar/2")))
+                    .hasMessage("store down");
+            verify(store).retag("flowcortex-media", "profile/u/avatar/2", "profile-released");
         });
     }
 
@@ -819,6 +1087,237 @@ class MediaJobsImplTest {
             assertThatThrownBy(() -> jobs.keepAttachments("support/r/m", List.of(), 5L * 1024 * 1024))
                     .isInstanceOf(IllegalArgumentException.class);
             verify(store, never()).read(anyString(), anyString(), anyInt());
+        });
+    }
+
+    @Test
+    void aDriveFileIsResolvedOnlyUnderTheDriveItemPurposeOfItsOwner() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID runUpload = UUID.randomUUID();
+            UUID ownedElsewhere = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", ownerId + "/" + runUpload))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + ownedElsewhere))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            givenImage(context, ownedElsewhere, "image/png", 16L);
+
+            for (UUID uploadId : List.of(runUpload, ownedElsewhere)) {
+                assertThatThrownBy(() -> jobs.keepDriveFile(ownerId, uploadId, "image", SPACE_ID, UUID.randomUUID()))
+                        .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                            assertThat(e.field()).isEqualTo("uploadId");
+                            assertThat(e.detail().code()).isEqualTo("upload.again");
+                        });
+            }
+            verify(store, never()).read(anyString(), anyString(), anyInt());
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void aDriveFileWhoseKindDiffersFromTheContentTypeIsRefusedBeforeAnyCopy() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("contentType");
+                        assertThat(e.detail().code()).isEqualTo("drive.contentType.mismatch");
+                    });
+            verify(store, never()).read(anyString(), anyString(), anyInt());
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void aDriveFileIsReportedUnavailableWhenTheObjectStoreDoesNotAnswer() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            SdkClientException outage = SdkClientException.create("connection refused");
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + uploadId)).thenThrow(outage);
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCause(outage);
+        });
+    }
+
+    @Test
+    void aDriveCopyThatTimesOutIsReportedUnavailable() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", "drive-item/" + ownerId + "/" + uploadId))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "video/mp4")));
+            ApiCallTimeoutException timeout = ApiCallTimeoutException.create(1000L);
+            doThrow(timeout).when(store).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCause(timeout);
+        });
+    }
+
+    @Test
+    void aDriveImageIsHardenedAndWrittenPendingUnderTheSpaceAndItem() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            UUID itemId = UUID.randomUUID();
+            String uploadKey = "drive-item/" + ownerId + "/" + uploadId;
+            byte[] original = pngWithText(40, 30, "GPS 10.77,106.69");
+            when(store.head("flowcortex-uploads", uploadKey))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(original.length, "image/png")));
+            givenUploadBytes(context, uploadKey, original);
+            String key = "drive/" + SPACE_ID + "/" + itemId;
+            when(store.readPrefix("flowcortex-media", key, 16)).thenReturn(Optional.of(PNG_PREFIX));
+
+            StoredDriveFile kept = context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "image", SPACE_ID, itemId);
+
+            assertThat(kept).isEqualTo(new StoredDriveFile("flowcortex-media", key, itemId + ".png", "image/png",
+                    png(40, 30).length, "image"));
+            verify(store).put("flowcortex-media", key, "image/png", png(40, 30), "drive-pending");
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void aDriveImageOverTheMegapixelCapIsRefusedOnTheUploadFieldBeforeAnythingIsWritten() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            String uploadKey = "drive-item/" + ownerId + "/" + uploadId;
+            when(store.head("flowcortex-uploads", uploadKey))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(60L, "image/png")));
+            givenUploadBytes(context, uploadKey, png(5001, 5000));
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "image", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.detail().code()).isEqualTo("upload.imageTooLarge");
+                    });
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void aDriveVideoIsCopiedPendingAndContentChecked() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID ownerId = UUID.randomUUID();
+            UUID uploadId = UUID.randomUUID();
+            UUID itemId = UUID.randomUUID();
+            String uploadKey = "drive-item/" + ownerId + "/" + uploadId;
+            String key = "drive/" + SPACE_ID + "/" + itemId;
+            when(store.head("flowcortex-uploads", uploadKey))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(4096L, "video/mp4")));
+            when(store.readPrefix("flowcortex-media", key, 16)).thenReturn(Optional.of(MP4_PREFIX));
+
+            StoredDriveFile kept = context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, uploadId, "video", SPACE_ID, itemId);
+
+            assertThat(kept).isEqualTo(new StoredDriveFile("flowcortex-media", key, itemId + ".mp4", "video/mp4",
+                    4096L, "video"));
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).copy("flowcortex-uploads", uploadKey, "flowcortex-media", key, "drive-pending");
+            order.verify(store).readPrefix("flowcortex-media", key, 16);
+
+            UUID other = UUID.randomUUID();
+            String otherKey = "drive-item/" + ownerId + "/" + other;
+            UUID otherItem = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", otherKey))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(4096L, "video/mp4")));
+            when(store.readPrefix("flowcortex-media", "drive/" + SPACE_ID + "/" + otherItem, 16))
+                    .thenReturn(Optional.of(PNG_PREFIX));
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(ownerId, other, "video", SPACE_ID, otherItem))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.field()).isEqualTo("uploadId"));
+        });
+    }
+
+    @Test
+    void confirmRetagsKeptAndReleaseRetagsPendingOnlyUnderDrive() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            StoredDriveFile file = new StoredDriveFile("flowcortex-media", "drive/s/i", "i.png", "image/png", 5L,
+                    "image");
+
+            jobs.confirmDriveFile(file);
+            jobs.releaseDriveFile(file);
+
+            verify(store).retag("flowcortex-media", "drive/s/i", "drive-file");
+            verify(store).retag("flowcortex-media", "drive/s/i", "drive-pending");
+            for (StoredDriveFile bad : List.of(
+                    new StoredDriveFile("flowcortex-media", "support/r/m/1", "x.png", "image/png", 5L, "image"),
+                    new StoredDriveFile("flowcortex-uploads", "drive/s/i", "x.png", "image/png", 5L, "image"))) {
+                assertThatThrownBy(() -> jobs.confirmDriveFile(bad)).isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> jobs.releaseDriveFile(bad)).isInstanceOf(IllegalArgumentException.class);
+            }
+            verify(store, never()).retag("flowcortex-media", "support/r/m/1", "drive-file");
+        });
+    }
+
+    @Test
+    void aDriveFileIsRefusedWithMediaDisabled() {
+        runner.withPropertyValues("flowcortex.media.enabled=false").run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class)
+                    .keepDriveFile(UUID.randomUUID(), UUID.randomUUID(), "image", SPACE_ID, UUID.randomUUID()))
+                    .isInstanceOf(MediaStoreUnavailableException.class);
+            verify(store, never()).head(anyString(), anyString());
+        });
+    }
+
+    @Test
+    void keepingADriveFileRefusesToJoinATransaction() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(status -> jobs.keepDriveFile(UUID.randomUUID(),
+                    UUID.randomUUID(), "image", SPACE_ID, UUID.randomUUID())))
+                    .isInstanceOf(IllegalTransactionStateException.class);
+            verify(context.getBean(S3MediaStore.class), never()).head(anyString(), anyString());
+        });
+    }
+
+    @Test
+    void reviewImagesAreKeptUnderTheWorkflowReviewRootWithTheirOwnTags() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID image = UUID.randomUUID();
+            givenImage(context, image, "image/png", 100L);
+            givenUploadBytes(context, "o/" + image, png(40, 30));
+            String prefix = "workflow-review/" + UUID.randomUUID() + "/" + UUID.randomUUID() + "/" + UUID.randomUUID();
+            when(store.readPrefix("flowcortex-media", prefix + "/1", 16)).thenReturn(Optional.of(PNG_PREFIX));
+
+            jobs.keepAttachments(prefix, List.of(upload(image, "image_1")), 5L * 1024 * 1024);
+
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).put("flowcortex-media", prefix + "/1", "image/png", png(40, 30), "review-pending");
+            order.verify(store).retag("flowcortex-media", prefix + "/1", "review-image");
+            verify(store, never()).retag(eq("flowcortex-media"), anyString(), eq("support-attachment"));
         });
     }
 
@@ -851,6 +1350,211 @@ class MediaJobsImplTest {
             verify(store).put("flowcortex-media", "support/r/m/1", "image/jpeg", jpeg(40, 30), "support-pending");
             verify(store, never()).readPrefix(anyString(), anyString(), anyInt());
             verify(store).retag("flowcortex-media", "support/r/m/1", "support-attachment");
+        });
+    }
+
+    private static String contentUploadKey(UUID ownerId, UUID uploadId) {
+        return "content-media/" + ownerId + "/" + uploadId;
+    }
+
+    private static void givenContentUpload(org.springframework.context.ApplicationContext context, UUID ownerId,
+            UUID uploadId, String contentType, long size) {
+        when(context.getBean(S3MediaStore.class).head("flowcortex-uploads", contentUploadKey(ownerId, uploadId)))
+                .thenReturn(Optional.of(new S3MediaStore.StoredObject(size, contentType)));
+    }
+
+    @Test
+    void keepContentMediaCopiesAnImageHardenedToContentIdTaggedContent() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            UUID mediaId = UUID.randomUUID();
+            byte[] original = pngWithText(40, 30, "GPS 10.77,106.69");
+            givenContentUpload(context, owner, upload, "image/png", original.length);
+            givenUploadBytes(context, contentUploadKey(owner, upload), original);
+            when(store.readPrefix("flowcortex-media", "content/" + mediaId, 16)).thenReturn(Optional.of(PNG_PREFIX));
+
+            StoredContentMedia kept = jobs.keepContentMedia(owner, upload, mediaId);
+
+            assertThat(kept).isEqualTo(new StoredContentMedia("flowcortex-media", "content/" + mediaId, "image/png",
+                    "image", png(40, 30).length));
+            assertThat(kept.sizeBytes()).isLessThan(original.length);
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).read("flowcortex-uploads", contentUploadKey(owner, upload), 10 * 1024 * 1024);
+            order.verify(store).put("flowcortex-media", "content/" + mediaId, "image/png", png(40, 30),
+                    "content-pending");
+            order.verify(store).readPrefix("flowcortex-media", "content/" + mediaId, 16);
+            order.verify(store).retag("flowcortex-media", "content/" + mediaId, "content");
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void keepContentMediaCopiesAVideoServerSideAndChecksItsFirstBytes() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            UUID mediaId = UUID.randomUUID();
+            givenContentUpload(context, owner, upload, "video/mp4", 4_000_000L);
+            when(store.readPrefix("flowcortex-media", "content/" + mediaId, 16)).thenReturn(Optional.of(MP4_PREFIX));
+
+            StoredContentMedia kept = jobs.keepContentMedia(owner, upload, mediaId);
+
+            assertThat(kept).isEqualTo(new StoredContentMedia("flowcortex-media", "content/" + mediaId, "video/mp4",
+                    "video", 4_000_000L));
+            org.mockito.InOrder order = org.mockito.Mockito.inOrder(store);
+            order.verify(store).copy("flowcortex-uploads", contentUploadKey(owner, upload), "flowcortex-media",
+                    "content/" + mediaId, "content-pending");
+            order.verify(store).readPrefix("flowcortex-media", "content/" + mediaId, 16);
+            order.verify(store).retag("flowcortex-media", "content/" + mediaId, "content");
+            verify(store, never()).read(anyString(), anyString(), anyInt());
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+        });
+    }
+
+    @Test
+    void withTheContentCheckOffAContentVideoIsRetaggedWithoutReadingIt() {
+        runner.withPropertyValues("flowcortex.media.upload.content-check.enabled=false").run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            UUID mediaId = UUID.randomUUID();
+            givenContentUpload(context, owner, upload, "video/webm", 1_000L);
+
+            context.getBean(MediaJobs.class).keepContentMedia(owner, upload, mediaId);
+
+            verify(store, never()).readPrefix(anyString(), anyString(), anyInt());
+            verify(store).retag("flowcortex-media", "content/" + mediaId, "content");
+        });
+    }
+
+    @Test
+    void aCopyWhoseContentIsNotItsKindStaysContentPendingAndIsRefused() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID video = UUID.randomUUID();
+            UUID videoMedia = UUID.randomUUID();
+            givenContentUpload(context, owner, video, "video/mp4", 4_000L);
+            when(store.readPrefix("flowcortex-media", "content/" + videoMedia, 16))
+                    .thenReturn(Optional.of("plain text notes".getBytes()));
+            UUID image = UUID.randomUUID();
+            UUID imageMedia = UUID.randomUUID();
+            givenContentUpload(context, owner, image, "image/png", 40L);
+            givenUploadBytes(context, contentUploadKey(owner, image), "plain text notes".getBytes());
+
+            assertThatThrownBy(() -> jobs.keepContentMedia(owner, video, videoMedia))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.detail().code()).isEqualTo("upload.invalidVideo");
+                        assertThat(e.detail().args()).containsExactly(".mp4, .webm");
+                    });
+            assertThatThrownBy(() -> jobs.keepContentMedia(owner, image, imageMedia))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.detail().code()).isEqualTo("upload.invalidImage");
+                        assertThat(e.detail().args()).containsExactly(".jpg, .jpeg, .png, .webp");
+                    });
+            verify(store).copy("flowcortex-uploads", contentUploadKey(owner, video), "flowcortex-media",
+                    "content/" + videoMedia, "content-pending");
+            verify(store, never()).put(anyString(), anyString(), anyString(), any(byte[].class), anyString());
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void anUploadGrantedForARunInputIsMissingAsContentMedia() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            when(store.head("flowcortex-uploads", owner + "/" + upload))
+                    .thenReturn(Optional.of(new S3MediaStore.StoredObject(16L, "image/png")));
+            when(store.head("flowcortex-uploads", contentUploadKey(owner, upload))).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> jobs.keepContentMedia(owner, upload, UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class, e -> {
+                        assertThat(e.field()).isEqualTo("uploadId");
+                        assertThat(e.detail().code()).isEqualTo("upload.again");
+                    });
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+            verify(store, never()).read(anyString(), anyString(), anyInt());
+            verify(store, never()).retag(anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void anotherOwnersUploadIsMissing() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID stranger = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            givenContentUpload(context, owner, upload, "image/png", 16L);
+            when(context.getBean(MediaAssetRepository.class).findById(upload)).thenReturn(Optional.of(new MediaAsset(
+                    upload, stranger, SPACE_ID, "image", "flowcortex-uploads", contentUploadKey(stranger, upload),
+                    "image/png", 16L, null, Instant.now())));
+            when(store.head("flowcortex-uploads", contentUploadKey(stranger, upload))).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> jobs.keepContentMedia(owner, upload, UUID.randomUUID()))
+                    .isInstanceOfSatisfying(UploadRejectedException.class,
+                            e -> assertThat(e.detail().code()).isEqualTo("upload.again"));
+            verify(store, never()).read(anyString(), anyString(), anyInt());
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void keepContentMediaRefusesToRunInsideATransaction() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            TransactionTemplate tx = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID owner = UUID.randomUUID();
+            UUID upload = UUID.randomUUID();
+            givenContentUpload(context, owner, upload, "video/mp4", 16L);
+
+            assertThatThrownBy(() -> tx.executeWithoutResult(
+                    status -> jobs.keepContentMedia(owner, upload, UUID.randomUUID())))
+                    .isInstanceOf(IllegalTransactionStateException.class);
+            verify(store, never()).head(anyString(), anyString());
+            verify(store, never()).copy(anyString(), anyString(), anyString(), anyString(), anyString());
+        });
+    }
+
+    @Test
+    void releaseContentMediaRetagsContentPending() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            UUID mediaId = UUID.randomUUID();
+
+            context.getBean(MediaJobs.class).releaseContentMedia(
+                    new StoredContentMedia("flowcortex-media", "content/" + mediaId, "image/png", "image", 40L));
+
+            verify(store).retag("flowcortex-media", "content/" + mediaId, "content-pending");
+        });
+    }
+
+    @Test
+    void releaseContentMediaRefusesAKeyOutsideContent() {
+        runner.run(context -> {
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            assertThatThrownBy(() -> jobs.releaseContentMedia(
+                    new StoredContentMedia("flowcortex-media", "support/r/m/1", "image/png", "image", 40L)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> jobs.releaseContentMedia(
+                    new StoredContentMedia("flowcortex-uploads", "content/a", "image/png", "image", 40L)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(store, never()).retag(anyString(), anyString(), anyString());
         });
     }
 
@@ -1009,6 +1713,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.provider-max-runtime=10m",
                 "flowcortex.media.consumer-timeout=12m")
@@ -1070,6 +1775,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.consumer-timeout=7m")
         .run(context -> {
@@ -1084,6 +1790,7 @@ class MediaJobsImplTest {
                 "flowcortex.media.max-runtime.extract_audio=5m",
                 "flowcortex.media.max-runtime.align_audio=5m",
                 "flowcortex.media.max-runtime.render_video=5m",
+                "flowcortex.media.max-runtime.separate_audio=5m",
                 "flowcortex.media.max-runtime.fetch_video=5m",
                 "flowcortex.media.provider-video-max-runtime=5m",
                 "flowcortex.media.consumer-timeout=421s")
@@ -1262,6 +1969,34 @@ class MediaJobsImplTest {
             assertThat(jobs.isDownloadable("flowcortex-media")).isTrue();
             assertThat(jobs.isDownloadable("flowcortex-uploads")).isFalse();
             assertThat(jobs.isDownloadable(null)).isFalse();
+        });
+    }
+
+    @Test
+    void openDownloadableRefusesAnotherBucket() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+
+            assertThatThrownBy(() -> context.getBean(MediaJobs.class).openDownloadable("flowcortex-uploads", "u/up"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            verify(store, never()).open(any(), any());
+        });
+    }
+
+    @Test
+    void openDownloadableServesTheMediaBucketObjectAndAStoreFailureIsUnavailable() {
+        runner.run(context -> {
+            S3MediaStore store = context.getBean(S3MediaStore.class);
+            java.io.InputStream bytes = new java.io.ByteArrayInputStream(new byte[] {1});
+            when(store.open("flowcortex-media", "runs/r/steps/1/a.wav")).thenReturn(bytes);
+            when(store.open("flowcortex-media", "runs/r/steps/1/b.wav"))
+                    .thenThrow(SdkException.builder().message("connection refused").build());
+            MediaJobs jobs = context.getBean(MediaJobs.class);
+
+            assertThat(jobs.openDownloadable("flowcortex-media", "runs/r/steps/1/a.wav")).isSameAs(bytes);
+            assertThatThrownBy(() -> jobs.openDownloadable("flowcortex-media", "runs/r/steps/1/b.wav"))
+                    .isInstanceOf(MediaStoreUnavailableException.class)
+                    .hasCauseInstanceOf(SdkException.class);
         });
     }
 
@@ -1552,6 +2287,12 @@ class MediaJobsImplTest {
         final List<MediaJobRequested> events = new ArrayList<>();
         final List<Boolean> publishedInTransaction = new ArrayList<>();
         final List<ProviderJobRequested> providerEvents = new ArrayList<>();
+        final List<RunInputsBound> inputsBound = new ArrayList<>();
+
+        @EventListener
+        void on(RunInputsBound event) {
+            inputsBound.add(event);
+        }
 
         @EventListener
         void on(MediaJobRequested event) {

@@ -9,13 +9,11 @@ import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.ConfirmedEmailSession;
-import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OAuthFailure;
 import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.domain.AppUser;
-import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
@@ -24,6 +22,7 @@ import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.passwordreset.PasswordResetService;
 import com.flowcortex.user.passwordreset.ResetRequestPolicy;
+import com.flowcortex.user.profile.UsernameRules;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -42,7 +41,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -80,6 +78,7 @@ class AuthServiceImpl implements AuthService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final AccountCredentials accountCredentials;
     private final LoginAttemptRecorder loginAttempts;
     private final LoginRateLimiter loginRateLimiter;
     private final RegistrationRateLimiter registrationRateLimiter;
@@ -94,18 +93,21 @@ class AuthServiceImpl implements AuthService {
     private final PasswordResetRateLimiter passwordResetRateLimiter;
     private final PasswordResetService passwordResetService;
     private final PasswordResetSubmitLimiter passwordResetSubmitLimiter;
+    private final UsernameRules usernameRules;
 
     AuthServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService, LoginAttemptRecorder loginAttempts,
+            RefreshTokenService refreshTokenService, AccountCredentials accountCredentials,
+            LoginAttemptRecorder loginAttempts,
             LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
             GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, RegistrationProperties registration,
             Clock clock, ApplicationEventPublisher events, PlatformTransactionManager transactionManager,
             EmailConfirmationService emailConfirmation, EmailConfirmationProperties emailConfirmationProperties,
             PasswordResetRateLimiter passwordResetRateLimiter, PasswordResetService passwordResetService,
-            PasswordResetSubmitLimiter passwordResetSubmitLimiter) {
+            PasswordResetSubmitLimiter passwordResetSubmitLimiter, UsernameRules usernameRules) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.accountCredentials = accountCredentials;
         this.loginAttempts = loginAttempts;
         this.loginRateLimiter = loginRateLimiter;
         this.registrationRateLimiter = registrationRateLimiter;
@@ -120,6 +122,7 @@ class AuthServiceImpl implements AuthService {
         this.passwordResetRateLimiter = passwordResetRateLimiter;
         this.passwordResetService = passwordResetService;
         this.passwordResetSubmitLimiter = passwordResetSubmitLimiter;
+        this.usernameRules = usernameRules;
     }
 
     @Override
@@ -182,6 +185,9 @@ class AuthServiceImpl implements AuthService {
         return transaction.execute(status -> {
             Optional<AppUser> existing = userRepository.findIdByEmail(details.email())
                     .flatMap(userRepository::findByIdForUpdate);
+            if (details.username() != null) {
+                usernameRules.assertAllowedForNewAccount(details.username(), Instant.now(clock));
+            }
             if (existing.isPresent()) {
                 AppUser account = existing.get();
                 if (account.isEmailConfirmed()) {
@@ -215,7 +221,7 @@ class AuthServiceImpl implements AuthService {
             Optional<EmailConfirmationService.Confirmed> spent = emailConfirmation.confirm(rawToken);
             spent.filter(EmailConfirmationService.Confirmed::firstConfirmation).ifPresent(first -> {
                 AppUser account = first.account();
-                refreshTokenService.revokeAllFor(account.getId());
+                accountCredentials.revokeAllFor(account.getId());
                 // A suspended account is activated by the admin who reactivates it, not by its link.
                 if (account.getStatus() == UserStatus.ACTIVE) {
                     events.publishEvent(new UserActivatedEvent(account.getId()));
@@ -277,11 +283,14 @@ class AuthServiceImpl implements AuthService {
                     throw new UnprocessableEntityException(PASSWORD_SETUP_TOKEN_INVALID,
                             PASSWORD_SETUP_TOKEN_INVALID_CODE);
                 }
+                if (setup.username() != null) {
+                    usernameRules.assertAllowedForNewAccount(setup.username(), Instant.now(clock));
+                }
                 account.setUpFirstPassword(passwordHash, setup.firstName().trim(), setup.lastName().trim(),
                         setup.username());
                 userRepository.saveAndFlush(account);
                 emailConfirmation.retireOpenLinks(userId);
-                refreshTokenService.revokeAllFor(userId);
+                accountCredentials.revokeAllFor(userId);
                 emailConfirmation.mailPasswordSetNotice(userId, account.getEmail());
                 return account;
             });
@@ -394,16 +403,6 @@ class AuthServiceImpl implements AuthService {
 
     private static String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    @Override
-    @Transactional
-    public CurrentUser updateOwnProfile(UUID userId, String name) {
-        AppUser user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", userId)));
-        AccountStatusGuard.requireActive(user);
-        user.changeName(name);
-        return AppUserMapper.toCurrentUser(user);
     }
 
     @Override
@@ -522,7 +521,7 @@ class AuthServiceImpl implements AuthService {
                 account.confirmEmailDroppingUnprovenChoices(Instant.now(clock), googleName);
                 userRepository.saveAndFlush(account);
                 emailConfirmation.retireOpenLinks(userId);
-                refreshTokenService.revokeAllFor(userId);
+                accountCredentials.revokeAllFor(userId);
                 events.publishEvent(new UserActivatedEvent(userId));
                 return new Claim(account, null);
             });
@@ -579,7 +578,7 @@ class AuthServiceImpl implements AuthService {
         }
         AppUser owner = userRepository.findByEmail(ownerEmail).orElse(null);
         String unusable = owner == null ? "owner_not_found"
-                : owner.getRole() != Role.ADMIN ? "owner_not_admin"
+                : !owner.getRole().isSuperAdmin() ? "owner_not_admin"
                 : owner.getStatus() != UserStatus.ACTIVE ? "owner_not_active"
                 : null;
         if (unusable != null) {

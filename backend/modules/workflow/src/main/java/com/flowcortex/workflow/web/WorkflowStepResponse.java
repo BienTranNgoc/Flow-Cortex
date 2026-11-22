@@ -4,12 +4,31 @@ import com.flowcortex.workflow.api.WorkflowStepView;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import java.util.UUID;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
+/** {@code inputRef} is null when the step reads the previous step's output; {@code config} is null when unset. */
 record WorkflowStepResponse(
         UUID id, int stepOrder, String name, String type,
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode) {
+        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode,
+        @Schema(nullable = true) String inputRef, @Schema(type = "object", nullable = true) JsonNode config) {
+
+    private static final JsonMapper CONFIG_READER = JsonMapper.builder().build();
 
     static WorkflowStepResponse from(WorkflowStepView view) {
-        return new WorkflowStepResponse(view.id(), view.stepOrder(), view.name(), view.type(), view.mode());
+        return new WorkflowStepResponse(view.id(), view.stepOrder(), view.name(), view.type(), view.mode(),
+                view.inputRef(), parse(view));
+    }
+
+    private static JsonNode parse(WorkflowStepView view) {
+        if (view.config() == null) {
+            return null;
+        }
+        try {
+            return CONFIG_READER.readTree(view.config());
+        } catch (JacksonException e) {
+            throw new IllegalStateException("workflow_step " + view.id() + " holds a config that is not JSON", e);
+        }
     }
 }

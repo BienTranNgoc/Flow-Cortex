@@ -9,6 +9,7 @@ import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
@@ -35,7 +36,7 @@ class WorkflowMapperTest {
                 type -> false);
 
         assertThat(view.id()).isEqualTo(workflow.getId());
-        assertThat(view.shared()).isTrue();
+        assertThat(view.visibility()).isEqualTo(WorkflowVisibility.PUBLIC);
         assertThat(view.steps()).hasSize(1);
         assertThat(view.steps().get(0).type()).isEqualTo("echo");
     }

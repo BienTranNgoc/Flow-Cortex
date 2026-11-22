@@ -3,20 +3,29 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
-import type { UserResponse } from '@flow-cortex/api-client';
+import type { UpdateUserRequest, UserResponse } from '@flow-cortex/api-client';
 import { Link } from 'react-router-dom';
+import { can } from '../../app/permissions';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
-import { roleLabel, statusLabel } from './enumLabels';
+import { useMeQuery } from '../auth/useAuth';
+import { StatusPill } from '../../app/StatusPill';
+import { roleLabel, stateLabel, stateTone } from './enumLabels';
+import { RoleOptions } from './RoleOptions';
+import { canManageAccount } from './userAccess';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation } from './useUsers';
 
 /** One row of the users table — view mode, or an inline edit form. */
 export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const { t } = useTranslation();
+  const me = useMeQuery().data;
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
-  const role = user.role === 'ADMIN' || user.role === 'CREATOR' ? user.role : 'MEMBER';
+  const { assignable, names } = useAssignableRoles();
+  const role = user.role || 'MEMBER';
+  const status = user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
   const {
     register,
     handleSubmit,
@@ -27,7 +36,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       email: user.email ?? '',
       name: user.name ?? '',
       role,
-      status: user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
+      status,
     },
   });
 
@@ -37,14 +46,19 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const id = user.id;
 
   const onSave = handleSubmit((values) => {
-    updateMutation.mutate({ id, changes: values }, { onSuccess: () => setEditing(false) });
+    const changes: UpdateUserRequest = { email: values.email, name: values.name };
+    if (values.role !== role) changes.role = values.role;
+    if (values.status !== status) changes.status = values.status;
+    updateMutation.mutate({ id, changes }, { onSuccess: () => setEditing(false) });
   });
 
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
 
-  if (editing) {
+  const manageable = canManageAccount(me, user);
+
+  if (editing && manageable) {
     return (
       <tr>
         <td colSpan={6}>
@@ -78,15 +92,25 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
             </div>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-role-${id}`}>{t('users.row.role')}</label>
-              <select id={`edit-role-${id}`} {...register('role')}>
-                <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
-                <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
-                <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
+              <select
+                id={`edit-role-${id}`}
+                disabled={assignable.length === 0}
+                {...register('role')}
+              >
+                <RoleOptions
+                  roles={assignable}
+                  current={role}
+                  names={{ [role]: user.roleName, ...names }}
+                />
               </select>
             </div>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-status-${id}`}>{t('users.row.status')}</label>
-              <select id={`edit-status-${id}`} {...register('status')}>
+              <select
+                id={`edit-status-${id}`}
+                disabled={!can(me, 'user.account.suspend')}
+                {...register('status')}
+              >
                 <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
                 <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
               </select>
@@ -124,18 +148,12 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       </td>
       <td data-label={t('users.columns.email')}>{user.email}</td>
       <td data-label={t('users.columns.role')}>
-        <span className="cortex-admin-pill cortex-admin-pill--info">{roleLabel(t, user.role)}</span>
-      </td>
-      <td data-label={t('users.columns.status')}>
-        <span
-          className={
-            user.status === 'ACTIVE'
-              ? 'cortex-admin-pill cortex-admin-pill--success'
-              : 'cortex-admin-pill cortex-admin-pill--warning'
-          }
-        >
-          {statusLabel(t, user.status)}
+        <span className="cortex-admin-pill cortex-admin-pill--info">
+          {roleLabel(t, user.role, user.roleName)}
         </span>
+      </td>
+      <td data-label={t('users.columns.state')}>
+        <StatusPill tone={stateTone(user.state)} label={stateLabel(t, user.state)} />
       </td>
       <td data-label={t('users.columns.joined')}>
         {user.createdAt ? (
@@ -149,13 +167,17 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
           <Link className="cortex-admin-link" to={`/users/${id}`}>
             {t('users.row.view')}
           </Link>
-          <button
-            type="button"
-            className="cortex-admin-btn cortex-admin-btn--sm"
-            onClick={() => setEditing(true)}
-          >
-            {t('users.row.edit')}
-          </button>
+          {manageable ? (
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--sm"
+              onClick={() => setEditing(true)}
+            >
+              {t('users.row.edit')}
+            </button>
+          ) : (
+            <span className="cortex-admin-stale">{t('users.readOnlyAdminAccount')}</span>
+          )}
         </div>
       </td>
     </tr>
