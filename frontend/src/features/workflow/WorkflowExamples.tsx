@@ -50,7 +50,7 @@ export function WorkflowExamples() {
   const create = useUseWorkflowExampleMutation();
   const locale = activeLocale();
 
-  if (examples.isError) {
+  if (examples.isError && !examples.data) {
     return (
       <section className="wf-examples" aria-labelledby="wf-examples-heading">
         <h2 id="wf-examples-heading" className="wf-examples__heading">
