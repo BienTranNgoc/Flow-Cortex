@@ -106,7 +106,9 @@
       "support": "Hỗ trợ",
       "content": "Nội dung",
       "platform": "Nền tảng",
-      "system": "Hệ thống"
+      "system": "Hệ thống",
+      "ai": "AI",
+      "payment": "Thanh toán"
     },
     "features": {
       "user": {
@@ -121,7 +123,9 @@
       },
       "content": {
         "help_topic": "Chủ đề hướng dẫn",
-        "help_article": "Bài hướng dẫn"
+        "help_article": "Bài hướng dẫn",
+        "document": "Tài liệu",
+        "media": "Thư viện media"
       },
       "platform": {
         "setting": "Cài đặt",
@@ -130,6 +134,12 @@
       "system": {
         "role": "Vai trò",
         "admin_account": "Tài khoản quản trị"
+      },
+      "ai": {
+        "provider": "Nhà cung cấp AI"
+      },
+      "payment": {
+        "setting": "Cài đặt thanh toán"
       }
     },
     "actions": {
@@ -145,17 +155,22 @@
       },
       "workflow": {
         "run": {
-          "view": "Xem lượt chạy"
+          "view": "Xem lượt chạy",
+          "export": "Xuất lượt chạy",
+          "cancel": "Hủy lượt chạy"
         },
         "workflow": {
-          "manage": "Quản lý quy trình"
+          "view": "Xem quy trình",
+          "manage": "Quản lý quy trình",
+          "export": "Xuất quy trình"
         }
       },
       "support": {
         "ticket": {
           "view": "Xem yêu cầu",
           "reply": "Trả lời yêu cầu",
-          "close": "Đóng yêu cầu"
+          "close": "Đóng yêu cầu",
+          "assign": "Phân công yêu cầu"
         }
       },
       "content": {
@@ -166,6 +181,14 @@
         "help_article": {
           "view": "Xem bài viết",
           "manage": "Quản lý bài viết"
+        },
+        "document": {
+          "view": "Xem tài liệu",
+          "manage": "Quản lý tài liệu"
+        },
+        "media": {
+          "view": "Xem thư viện media",
+          "manage": "Quản lý thư viện media"
         }
       },
       "platform": {
@@ -185,6 +208,18 @@
         "admin_account": {
           "view": "Xem tài khoản quản trị",
           "manage": "Quản lý tài khoản quản trị"
+        }
+      },
+      "ai": {
+        "provider": {
+          "view": "Xem nhà cung cấp AI",
+          "update": "Đổi nhà cung cấp AI"
+        }
+      },
+      "payment": {
+        "setting": {
+          "view": "Xem cài đặt thanh toán",
+          "update": "Đổi cài đặt thanh toán"
         }
       }
     }
