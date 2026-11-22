@@ -91,6 +91,10 @@ describe('stepErrorSentence', () => {
       'provider_busy',
       'INSUFFICIENT_CREDITS',
       'APPROVAL_REJECTED',
+      'load_template_invalid_input',
+      'load_template_not_found',
+      'load_template_invalid_template',
+      'load_template_missing_input',
     ];
 
     expect(backendCodes.filter((code) => !KNOWN_STEP_ERROR_CODES.includes(code))).toEqual([]);
@@ -152,6 +156,42 @@ describe('stepErrorSentence', () => {
     );
     expect(stepErrorSentence(undefined, rawError, true, vi, 'vi')).toBe(
       viWorkflow.stepError.noMessage,
+    );
+  });
+
+  describe('load_template_missing_input', () => {
+    // Exactly what the backend TemplateLoad writes for two missing fields.
+    const fromServer = 'Required input missing: productName, productImage.';
+
+    it('names the missing fields in English', () => {
+      expect(stepErrorSentence('load_template_missing_input', fromServer, false, en, 'en')).toBe(
+        'Missing required template inputs: productName, productImage.',
+      );
+    });
+
+    it('names the missing fields in Vietnamese without English prose', () => {
+      const sentence = stepErrorSentence('load_template_missing_input', fromServer, false, vi, 'vi');
+
+      expect(sentence).toBe('Còn thiếu đầu vào bắt buộc của mẫu: productName, productImage.');
+      expect(sentence).not.toContain('Required');
+    });
+
+    it('does not entity-escape field names', () => {
+      expect(
+        stepErrorSentence('load_template_missing_input', 'Required input missing: a&b.', false, en, 'en'),
+      ).toBe('Missing required template inputs: a&b.');
+    });
+
+    it.each([undefined, 'Something else went wrong', 'Required input missing: .'])(
+      'falls back to the plain sentence when the message is %s',
+      (message) => {
+        expect(stepErrorSentence('load_template_missing_input', message, false, en, 'en')).toBe(
+          'Some required inputs for the template are missing.',
+        );
+        expect(stepErrorSentence('load_template_missing_input', message, false, vi, 'vi')).toBe(
+          viWorkflow.stepError.load_template_missing_input,
+        );
+      },
     );
   });
 });

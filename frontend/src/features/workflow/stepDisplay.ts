@@ -39,6 +39,7 @@ const CHECKPOINT = 'APPROVAL_CHECKPOINT';
 const LABEL_KEYS: Record<string, string> = {
   probe: 'workflow.step.label.probe',
   extract_audio: 'workflow.step.label.extract_audio',
+  load_template: 'workflow.step.label.load_template',
   [CHECKPOINT]: 'workflow.step.label.review',
   generate_script: 'workflow.step.label.generate_script',
   generate_storyboard: 'workflow.step.label.generate_storyboard',

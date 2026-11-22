@@ -1,0 +1,18 @@
+{
+  "id": "media-ingest",
+  "pattern": "media-ingest",
+  "title": {
+    "en": "Inspect an upload and extract its audio",
+    "vi": "Kiểm tra tệp tải lên và tách âm thanh"
+  },
+  "description": {
+    "en": "Starts from a media file you upload: the first step reads its details and the second extracts the audio track.",
+    "vi": "Bắt đầu từ tệp phương tiện bạn tải lên: bước đầu đọc thông tin của tệp, bước hai tách riêng phần âm thanh."
+  },
+  "sampleInput": null,
+  "steps": [
+    { "name": "probe", "type": "probe" },
+    { "name": "audio", "type": "extract_audio" }
+  ],
+  "dataStore": []
+}
