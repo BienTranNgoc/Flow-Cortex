@@ -97,7 +97,7 @@ RUN mkdir -p /models/speakers && cd /models/speakers \
       https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx \
  && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
       -o 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
-      https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
+      https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
  && printf '%s  %s\n' \
       9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6 silero_vad.onnx \
       aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2 \
