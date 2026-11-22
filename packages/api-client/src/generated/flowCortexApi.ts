@@ -1955,7 +1955,7 @@ export interface PatchBody {
   marketingEmail?: boolean;
 }
 
-export interface PreferencesView {
+export interface NotificationPreferencesView {
   inApp?: boolean;
   careEmail?: boolean;
   marketingEmail?: boolean;
@@ -2929,6 +2929,24 @@ export interface DayCountResponse {
 export interface BuilderChartResponse {
   period: BuilderChartResponsePeriod;
   series: DayCountResponse[];
+}
+
+/**
+ * @nullable
+ */
+export type PreferencesViewLocale =
+  (typeof PreferencesViewLocale)[keyof typeof PreferencesViewLocale] | null;
+
+export const PreferencesViewLocale = {
+  vi: 'vi',
+  en: 'en',
+} as const;
+
+export interface PreferencesView {
+  /** @nullable */
+  locale?: PreferencesViewLocale;
+  ui: UiPreferences;
+  privacy: PrivacySettings;
 }
 
 export type AdminWorkflowResponseStatus =
@@ -11105,7 +11123,7 @@ export const updateRun = async (
 };
 
 export type getNotificationPreferencesResponse200 = {
-  data: PreferencesView;
+  data: NotificationPreferencesView;
   status: 200;
 };
 
@@ -11128,7 +11146,7 @@ export const getNotificationPreferences = async (
 };
 
 export type updateNotificationPreferencesResponse200 = {
-  data: PreferencesView;
+  data: NotificationPreferencesView;
   status: 200;
 };
 
