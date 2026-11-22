@@ -1,6 +1,7 @@
 package com.flowcortex.notification.infrastructure;
 
 import com.flowcortex.notification.api.NotificationRequested;
+import com.flowcortex.notification.application.Audience;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -52,16 +53,20 @@ public class NotificationRepository {
                 .addValue("link", request.link()).addValue("now", Timestamp.from(now)));
     }
 
-    /** Deletes the member's notifications beyond the newest {@code cap}. @return rows deleted */
-    public int trim(UUID userId, int cap) {
-        return jdbc.update("DELETE FROM notification WHERE user_id = :user AND id IN (SELECT id FROM notification "
-                + "WHERE user_id = :user ORDER BY created_at DESC, id DESC OFFSET :cap)",
+    /**
+     * Deletes the member's notifications of one audience beyond the newest {@code cap}; the other
+     * audience is never touched. @return rows deleted
+     */
+    public int trim(UUID userId, Audience audience, int cap) {
+        return jdbc.update("DELETE FROM notification WHERE user_id = :user AND " + audience.sqlClause()
+                + " AND id IN (SELECT id FROM notification WHERE user_id = :user AND " + audience.sqlClause()
+                + " ORDER BY created_at DESC, id DESC OFFSET :cap)",
                 new MapSqlParameterSource().addValue("user", userId).addValue("cap", cap));
     }
 
-    public RowPage page(UUID userId, boolean unreadOnly, int offset, int limit) {
+    public RowPage page(UUID userId, Audience audience, boolean unreadOnly, int offset, int limit) {
         List<NotificationRow> rows = jdbc.query("SELECT id, type, title_code, body_code, args, link, read_at, "
-                + "created_at FROM notification WHERE user_id = :user"
+                + "created_at FROM notification WHERE user_id = :user AND " + audience.sqlClause()
                 + (unreadOnly ? " AND read_at IS NULL" : "")
                 + " ORDER BY created_at DESC, id DESC OFFSET :offset LIMIT :limit",
                 new MapSqlParameterSource().addValue("user", userId).addValue("offset", offset)
@@ -70,9 +75,10 @@ public class NotificationRepository {
         return new RowPage(hasMore ? rows.subList(0, limit) : rows, hasMore);
     }
 
-    public long unreadCount(UUID userId) {
-        Long count = jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = :user AND read_at IS NULL",
-                new MapSqlParameterSource("user", userId), Long.class);
+    public long unreadCount(UUID userId, Audience audience) {
+        Long count = jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = :user AND "
+                + audience.sqlClause() + " AND read_at IS NULL", new MapSqlParameterSource("user", userId),
+                Long.class);
         return count == null ? 0 : count;
     }
 
@@ -89,10 +95,10 @@ public class NotificationRepository {
         return found != null && found > 0;
     }
 
-    /** @return the number of notifications that were unread */
-    public int markAllRead(UUID userId, Instant now) {
-        return jdbc.update("UPDATE notification SET read_at = :now WHERE user_id = :user AND read_at IS NULL",
-                new MapSqlParameterSource().addValue("user", userId).addValue("now", Timestamp.from(now)));
+    /** @return the number of notifications of the audience that were unread */
+    public int markAllRead(UUID userId, Audience audience, Instant now) {
+        return jdbc.update("UPDATE notification SET read_at = :now WHERE user_id = :user AND "
+                + audience.sqlClause() + " AND read_at IS NULL", new MapSqlParameterSource().addValue("user", userId).addValue("now", Timestamp.from(now)));
     }
 
     /** No preference row means every in-app notification is on. */
