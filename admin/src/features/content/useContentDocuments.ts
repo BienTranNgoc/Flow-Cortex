@@ -9,7 +9,7 @@ import {
 } from '@flow-cortex/api-client';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { unwrapContent } from './contentProblems';
-import type { DocumentContent } from './documentModel';
+import { toWire, type DocumentContent } from './documentModel';
 
 export const REVISIONS_PAGE_SIZE = 20;
 
@@ -48,7 +48,7 @@ export function useSaveDraftMutation(slug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ version, content }: { version: number; content: DocumentContent }) =>
-      unwrapContent(saveContentDocumentDraft(slug, { version, ...content }, authHeaders())),
+      unwrapContent(saveContentDocumentDraft(slug, { version, ...toWire(content) }, authHeaders())),
     onSuccess: (draft) => {
       queryClient.setQueryData(draftKey(slug), draft);
       void queryClient.invalidateQueries({ queryKey: LIST_KEY });
