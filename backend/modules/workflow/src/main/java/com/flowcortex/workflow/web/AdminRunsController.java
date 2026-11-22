@@ -3,6 +3,7 @@ package com.flowcortex.workflow.web;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.workflow.api.AdminRunFilter;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
@@ -132,6 +133,7 @@ class AdminRunsController {
 
     /** Stops any member's run; the answer is the staff detail, never the member's own run view. */
     @Operation(operationId = "cancelAdminRun")
+    @AdminAudit("workflow_run.cancel")
     @RequirePermission(Permission.WORKFLOW_RUN_CANCEL)
     @PostMapping(value = "/runs/{id}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminRunDetailResponse> cancelRun(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

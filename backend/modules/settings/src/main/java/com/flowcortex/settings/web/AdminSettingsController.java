@@ -11,6 +11,7 @@ import com.flowcortex.settings.application.SettingsService;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -124,6 +125,7 @@ class AdminSettingsController {
     @ApiResponse(responseCode = "422", description = "setting.invalidValue (errors.value)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "platform_setting.update", resourceParam = "key", capture = "value")
     @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
     @PutMapping(value = "/{key:.+}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -136,6 +138,7 @@ class AdminSettingsController {
     @ApiResponse(responseCode = "404", description = "not-found (unknown key)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "platform_setting.reset", resourceParam = "key")
     @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
     @DeleteMapping(value = "/{key:.+}", produces = MediaType.APPLICATION_JSON_VALUE)
     AdminSetting reset(Principal caller, @PathVariable String key) {
