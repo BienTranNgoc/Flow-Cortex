@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 class AssistantTelemetry {
 
     static final String OUTCOME_COUNTER = "support.assistant.outcome";
+    static final String HANDOFF_COUNTER = "support.assistant.handoff";
 
     private static final Logger LOG = LoggerFactory.getLogger(AssistantTelemetry.class);
 
@@ -25,6 +26,15 @@ class AssistantTelemetry {
     AssistantTelemetry(MeterRegistry meters, ObservationRegistry observations) {
         this.meters = meters;
         this.observations = observations;
+    }
+
+    /** Counts a handoff by its topic; the question and the draft never reach this. */
+    void handoff(TopicGuard.Topic topic) {
+        if (topic == null) {
+            return;
+        }
+        meters.counter(HANDOFF_COUNTER, "topic", topic.value()).increment();
+        LOG.info("support.assistant.handoff topic={}", topic.value());
     }
 
     void record(String outcome, int sources, int questionLength, long startedNanos) {

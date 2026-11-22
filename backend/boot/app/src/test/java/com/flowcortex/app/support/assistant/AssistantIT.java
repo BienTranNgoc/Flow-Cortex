@@ -131,7 +131,10 @@ class AssistantIT extends AbstractPostgresBootTest {
     record Source(String slug, String title) {
     }
 
-    record Message(String role, String text, String outcome, List<Source> sources) {
+    record Handoff(String topic, String subject, String description) {
+    }
+
+    record Message(String role, String text, String outcome, List<Source> sources, Handoff handoff) {
     }
 
     record Quota(int remaining, Instant resetsAt) {
@@ -140,7 +143,8 @@ class AssistantIT extends AbstractPostgresBootTest {
     record Reply(UUID conversationId, Message message, Quota quota) {
     }
 
-    record HistoryMessage(String role, String text, String outcome, List<Source> sources, Instant createdAt) {
+    record HistoryMessage(String role, String text, String outcome, List<Source> sources, Handoff handoff,
+            Instant createdAt) {
     }
 
     record Conversation(UUID conversationId, List<HistoryMessage> messages) {
@@ -551,6 +555,42 @@ class AssistantIT extends AbstractPostgresBootTest {
         assertThat(continued.conversationId()).isEqualTo(conversation);
         assertThat(restTemplate.exchange("/api/v1/support/assistant/conversations/latest", HttpMethod.GET,
                 new HttpEntity<>(bearer(member)), Conversation.class).getBody().messages()).hasSize(4);
+    }
+
+    @Test
+    void aMemberDoubleChargeIsHandedOffAndStored() {
+        String question = "Tại sao tôi bị trừ tiền hai lần?";
+        String member = memberToken("as-handoff");
+
+        Reply reply = ask(member, null, question).getBody();
+
+        assertThat(reply.message().outcome()).isEqualTo("handoff");
+        assertThat(reply.message().handoff()).isEqualTo(new Handoff("money", question, question));
+        assertThat(reply.quota().remaining()).isEqualTo(50);
+        assertThat(fakeLlm.requests).isEmpty();
+        assertThat(jdbcTemplate.queryForList("SELECT outcome FROM support_ai_message WHERE conversation_id = ? "
+                + "AND role = 'assistant'", String.class, reply.conversationId())).containsExactly("handoff");
+        Conversation latest = memberLatest(restTemplate, member).getBody();
+        assertThat(latest.messages()).extracting(HistoryMessage::outcome).containsExactly(null, "handoff");
+        assertThat(latest.messages().get(1).handoff()).isEqualTo(reply.message().handoff());
+    }
+
+    @Test
+    void aGuestSpendRequestIsASignIn() {
+        String session = UUID.randomUUID().toString();
+
+        Reply reply = guestAsk(session, null, "tạo video quảng cáo cho shop").getBody();
+
+        assertThat(reply.message().outcome()).isEqualTo("sign_in");
+        assertThat(reply.message().handoff()).isNull();
+        assertThat(reply.quota().remaining()).isEqualTo(9);
+        assertThat(fakeLlm.requests).isEmpty();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT count FROM support_quota_usage WHERE subject_key LIKE 'guest-%'", Integer.class))
+                .containsExactly(1, 1);
+        assertThat(jdbcTemplate.queryForList("SELECT outcome FROM support_ai_message WHERE conversation_id = ? "
+                + "AND role = 'assistant'", String.class, reply.conversationId())).containsExactly("sign_in");
+        assertThat(guestLatest(restTemplate, session).getBody().messages().get(1).outcome()).isEqualTo("sign_in");
     }
 
     @Test
