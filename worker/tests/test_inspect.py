@@ -26,9 +26,9 @@ class Recording(ProcessRunner):
         super().__init__()
         self.calls: list[list[str]] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.calls.append(argv)
-        return super().run(argv)
+        return super().run(argv, cwd)
 
     @property
     def decodes(self) -> list[list[str]]:
@@ -183,7 +183,7 @@ class Scripted(ProcessRunner):
         self.frames_text = frames_text
         self.rate = rate
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         if argv[0] == "ffprobe":
             body = (
                 '{"format":{"format_name":"mov,mp4,m4a,3gp,3g2,mj2","duration":"3.0"},'
