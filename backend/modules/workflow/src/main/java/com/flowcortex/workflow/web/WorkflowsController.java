@@ -2,7 +2,6 @@ package com.flowcortex.workflow.web;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.api.RunOptions;
-import com.flowcortex.workflow.application.WorkflowSharingService;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
 import com.flowcortex.workflow.api.WorkflowStepView;
