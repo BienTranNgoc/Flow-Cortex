@@ -1,33 +1,15 @@
-import { setToken, type EventStreamOptions } from '@flow-cortex/api-client';
+import { setToken } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { stubApi } from '../../test/fakeApi';
+import { openStreams, streams } from '../../test/fakeEventStream';
 import { useSupportStream } from './useSupportStream';
-
-interface FakeStream {
-  options: EventStreamOptions;
-  closed: boolean;
-}
-
-const streams = vi.hoisted(() => ({ opened: [] as FakeStream[] }));
 
 vi.mock('@flow-cortex/api-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  openEventStream: (options: EventStreamOptions) => {
-    const stream: FakeStream = { options, closed: false };
-    streams.opened.push(stream);
-    return {
-      close: () => {
-        stream.closed = true;
-      },
-    };
-  },
+  openEventStream: (await import('../../test/fakeEventStream')).openFakeEventStream,
 }));
-
-function openStreams(): FakeStream[] {
-  return streams.opened.filter((stream) => !stream.closed);
-}
 
 function features(supportWidget: boolean) {
   return { status: 200, body: { supportWidget } };

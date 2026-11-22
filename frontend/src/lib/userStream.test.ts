@@ -1,34 +1,11 @@
-import type { EventStreamOptions, StreamEvent } from '@flow-cortex/api-client';
+import type { StreamEvent } from '@flow-cortex/api-client';
+import { openStreams, setVisibility, streams } from '../test/fakeEventStream';
 import { followUserStream } from './userStream';
-
-interface FakeStream {
-  options: EventStreamOptions;
-  closed: boolean;
-}
-
-const streams = vi.hoisted(() => ({ opened: [] as FakeStream[] }));
 
 vi.mock('@flow-cortex/api-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  openEventStream: (options: EventStreamOptions) => {
-    const stream: FakeStream = { options, closed: false };
-    streams.opened.push(stream);
-    return {
-      close: () => {
-        stream.closed = true;
-      },
-    };
-  },
+  openEventStream: (await import('../test/fakeEventStream')).openFakeEventStream,
 }));
-
-function openStreams(): FakeStream[] {
-  return streams.opened.filter((stream) => !stream.closed);
-}
-
-function setVisibility(state: 'visible' | 'hidden') {
-  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-  document.dispatchEvent(new Event('visibilitychange'));
-}
 
 function follower() {
   const opens = vi.fn();

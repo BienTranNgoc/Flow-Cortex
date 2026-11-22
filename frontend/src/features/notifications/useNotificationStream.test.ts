@@ -1,38 +1,20 @@
-import type { EventStreamOptions } from '@flow-cortex/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
+import {
+  openStreams,
+  setVisibility as dispatchVisibility,
+  streams,
+} from '../../test/fakeEventStream';
 import { useNotificationStream } from './useNotificationStream';
-
-interface FakeStream {
-  options: EventStreamOptions;
-  closed: boolean;
-}
-
-const streams = vi.hoisted(() => ({ opened: [] as FakeStream[] }));
 
 vi.mock('@flow-cortex/api-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  openEventStream: (options: EventStreamOptions) => {
-    const stream: FakeStream = { options, closed: false };
-    streams.opened.push(stream);
-    return {
-      close: () => {
-        stream.closed = true;
-      },
-    };
-  },
+  openEventStream: (await import('../../test/fakeEventStream')).openFakeEventStream,
 }));
 
-function openStreams(): FakeStream[] {
-  return streams.opened.filter((stream) => !stream.closed);
-}
-
 function setVisibility(state: 'visible' | 'hidden') {
-  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'));
-  });
+  act(() => dispatchVisibility(state));
 }
 
 function mount() {
