@@ -18,6 +18,7 @@ include(
     ":modules:drive",
     ":modules:profile",
     ":modules:asset",
+    ":modules:entity",
     ":modules:realtime",
     ":modules:onboarding",
     ":modules:mail",
