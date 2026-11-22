@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import java.time.Instant;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 class PatEligibilityTest {
@@ -13,7 +12,7 @@ class PatEligibilityTest {
     private static final Instant NOW = Instant.parse("2026-11-11T10:00:00Z");
 
     private static boolean eligible(Role role, UserStatus status, Instant lockedUntil, PatUse use) {
-        return PatEligibility.eligible(role, status, lockedUntil, NOW, use);
+        return PatEligibility.eligible(role, status, false, lockedUntil, NOW, use);
     }
 
     @Test
@@ -60,10 +59,22 @@ class PatEligibilityTest {
         assertThat(eligible(Role.ADMIN, UserStatus.ACTIVE, NOW, PatUse.MANAGE)).isTrue();
     }
 
-    @Disabled("live when rbac-permission-catalog-enforcement is on the branch")
     @Test
-    void anAdminDeactivatedByRbacAndEveryStaffRoleAreNotEligible() {
-        // Remap target: role.isSuperAdmin() && ACTIVE && admin_disabled_at IS NULL; whichever of the
-        // two changes merges second enables this case.
+    void anAdminDeactivatedByRbacIsNeverEligible() {
+        for (PatUse use : PatUse.values()) {
+            assertThat(PatEligibility.eligible(Role.ADMIN, UserStatus.ACTIVE, true, null, NOW, use)).isFalse();
+        }
+    }
+
+    @Test
+    void everyStaffRoleIsNeverEligible() {
+        for (Role role : Role.values()) {
+            if (!role.isStaff()) {
+                continue;
+            }
+            for (PatUse use : PatUse.values()) {
+                assertThat(eligible(role, UserStatus.ACTIVE, null, use)).as(role + " " + use).isFalse();
+            }
+        }
     }
 }
