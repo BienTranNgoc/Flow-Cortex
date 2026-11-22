@@ -438,6 +438,12 @@ flowcortex:
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
+      # GET /api/v1/workflows/by-key/{key} without a token: each client address gets `capacity`
+      # reads per `period`, refilled gradually; over it answers 429 with Retry-After. A signed-in
+      # reader is not counted. Budgets are shared by every backend instance. Env var + restart.
+      rate-limit:
+        capacity: ${FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_CAPACITY:30}
+        period: ${FLOWCORTEX_WORKFLOW_SHARE_RATE_LIMIT_PERIOD:1m}
     call:
       # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
       # child is stopped. Covers a child of four media steps at their queue and run bounds.
