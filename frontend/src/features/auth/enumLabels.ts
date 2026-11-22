@@ -11,12 +11,15 @@ const ROLES: ReadonlySet<string> = new Set([
 ]);
 const STATUSES: readonly string[] = ['ACTIVE', 'SUSPENDED'];
 
-/** The role's label in the active language; a code this app does not know is shown as sent. */
-export function roleLabel(t: TFunction, role: string | undefined): string {
+/**
+ * The role's label in the active language: a built-in role by its localized label, any other role by the
+ * name its admin gave it, falling back to the code when the name is not at hand.
+ */
+export function roleLabel(t: TFunction, role: string | undefined, roleName?: string): string {
   if (!role) {
     return '';
   }
-  return ROLES.has(role) ? t(`auth.profile.role.${role}`) : role;
+  return ROLES.has(role) ? t(`auth.profile.role.${role}`) : roleName || role;
 }
 
 /** The account status's label in the active language; an unknown code is shown as sent, none as ''. */
