@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 
 /**
  * The Trash routes answer 503 with the feature-turned-off text, in the request's language, while the switch is off,
- * even for a body that cannot be read.
+ * even for a body that cannot be read and a parameter that is not a number.
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "flowcortex.trash.enabled=false")
 @AutoConfigureTestRestTemplate
@@ -76,6 +76,34 @@ class TrashListSwitchedOffIT extends AbstractPostgresBootTest {
             assertThat(answer.getStatusCode()).as(route).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
             assertThat(answer.getBody().detail()).as(route).isEqualTo("This feature is turned off");
         }
+    }
+
+    @Test
+    void aParameterThatIsNotANumberAnswers503() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(signIn());
+
+        for (String query : new String[] {"page=abc", "size=x", "page=abc&size=x"}) {
+            ResponseEntity<Problem> answer = restTemplate.exchange("/api/v1/trash?" + query, HttpMethod.GET,
+                    new HttpEntity<>(headers), Problem.class);
+
+            assertThat(answer.getStatusCode()).as(query).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+            assertThat(answer.getBody().detail()).as(query).isEqualTo("This feature is turned off");
+        }
+    }
+
+    @Test
+    void aCallWithoutASignInStillAnswers401() {
+        ResponseEntity<Problem> answer = restTemplate.getForEntity("/api/v1/trash?page=abc", Problem.class);
+
+        assertThat(answer.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    private String signIn() {
+        UserView member = userService.createInitialAdmin("trash-off-" + UUID.randomUUID() + "@example.com",
+                "password123", "trash-off");
+        return restTemplate.postForEntity("/api/v1/auth/login",
+                new LoginRequest(member.email(), "password123"), Token.class).getBody().accessToken();
     }
 
     private ResponseEntity<Problem> list(String token, String language) {

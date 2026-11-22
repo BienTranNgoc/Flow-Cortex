@@ -1,8 +1,5 @@
 package com.flowcortex.trash.web;
 
-import com.flowcortex.shared.web.LocalizedMessage;
-import com.flowcortex.shared.web.LocalizedStatusException;
-import com.flowcortex.trash.application.TrashProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Locale;
@@ -31,12 +28,10 @@ class TrashProblemHandler {
 
     private final MessageSource messages;
     private final LocaleResolver localeResolver;
-    private final TrashProperties properties;
 
-    TrashProblemHandler(MessageSource messages, LocaleResolver localeResolver, TrashProperties properties) {
+    TrashProblemHandler(MessageSource messages, LocaleResolver localeResolver) {
         this.messages = messages;
         this.localeResolver = localeResolver;
-        this.properties = properties;
     }
 
     @ExceptionHandler(TrashInvalidRequestException.class)
@@ -60,15 +55,11 @@ class TrashProblemHandler {
 
     /**
      * A body that is missing, is not JSON or has a field of the wrong type is read before the controller runs, so
-     * the switch check and the rule check never see it: this answers what they would, 503 while the Trash is off,
-     * otherwise 400 on the field the route's body carries ({@code next} for empty, {@code items} for the others).
+     * the rule check never sees it: this answers 400 on the field the route's body carries ({@code next} for empty,
+     * {@code items} for the others).
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ProblemDetail unreadableBody(HttpMessageNotReadableException e, HttpServletRequest request) {
-        if (!properties.enabled()) {
-            return new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"))
-                    .updateAndGetBody(messages, localeResolver.resolveLocale(request));
-        }
         String field = request.getRequestURI().endsWith("/empty") ? "next" : "items";
         return invalidRequest(new TrashInvalidRequestException(field), request);
     }

@@ -455,6 +455,8 @@ services:
       FLOWCORTEX_SMS_OUTBOX_RETENTION: ${FLOWCORTEX_SMS_OUTBOX_RETENTION:-7d}
       # Personal spaces: off makes the session space answer 503; spaces are still provisioned.
       FLOWCORTEX_SPACES_ENABLED: ${FLOWCORTEX_SPACES_ENABLED:-true}
+      # Member Trash: off makes its routes answer 503 and the sweep and reminder jobs do nothing; recording still works.
+      FLOWCORTEX_TRASH_ENABLED: ${FLOWCORTEX_TRASH_ENABLED:-false}
       # Member onboarding journey: off hides it and makes progress writes answer 409.
       FLOWCORTEX_ONBOARDING_ENABLED: ${FLOWCORTEX_ONBOARDING_ENABLED:-true}
       # Confirmation mail goes to the Mailpit sink unless .env names a relay; links in it point
