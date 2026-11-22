@@ -2528,6 +2528,7 @@ export interface FeaturesResponse {
   personalAccessTokens: boolean;
   onboarding: boolean;
   chat: boolean;
+  drive: boolean;
 }
 
 export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
