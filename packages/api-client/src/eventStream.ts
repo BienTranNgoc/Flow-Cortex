@@ -144,22 +144,6 @@ export function openEventStream(options: EventStreamOptions): EventStream {
       idleTimer = null;
     }
   };
-  const streamId = (nextStreamId += 1);
-  let down = false;
-
-  function markDown(): void {
-    if (!down) {
-      down = true;
-      emitNetworkSignal({ type: 'stream-down', streamId });
-    }
-  }
-
-  function markUp(): void {
-    if (down) {
-      down = false;
-      emitNetworkSignal({ type: 'stream-up', streamId });
-    }
-  }
 
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {

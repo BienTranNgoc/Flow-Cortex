@@ -5,7 +5,7 @@ import {
   changeCancel,
   changeStart,
   changeVerify,
-  current,
+  current1 as current,
   sendCode,
   unwrap,
   verify,
