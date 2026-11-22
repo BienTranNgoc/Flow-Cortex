@@ -90,6 +90,14 @@ def vendor_scope(base_url: str, api_key: str) -> dict[str, str]:
 def fingerprint_document(
     identity: VideoIdentity, scope: Mapping[str, str], request: VideoRequest
 ) -> dict[str, Any]:
+    primary_image = request.reference_image_bytes or (
+        request.reference_images[0] if request.reference_images else None
+    )
+    extra_images = (
+        [hashlib.sha256(img).hexdigest() for img in request.reference_images[1:]]
+        if len(request.reference_images) > 1
+        else None
+    )
     document: dict[str, Any] = {
         "vendor": identity.provider,
         "model": identity.model,
@@ -101,11 +109,8 @@ def fingerprint_document(
         "generateAudio": identity.generate_audio,
         "scope": dict(scope),
         "prompt": request.prompt,
-        "imageSha256": (
-            hashlib.sha256(request.reference_image_bytes).hexdigest()
-            if request.reference_image_bytes
-            else None
-        ),
+        "imageSha256": hashlib.sha256(primary_image).hexdigest() if primary_image else None,
+        "extraImageSha256s": extra_images,
     }
     return {key: value for key, value in document.items() if value is not None}
 

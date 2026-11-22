@@ -626,7 +626,7 @@ def _make_storage_with_png(png_body: bytes | None = None) -> Any:
 
 def test_video_capability_rejects_non_image_reference() -> None:
     """A reference whose bytes are not a recognised image format is rejected at the boundary."""
-    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.capabilities import _resolve_reference_images
     from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
 
     job = _video_job_dict()
@@ -640,31 +640,29 @@ def test_video_capability_rejects_non_image_reference() -> None:
     context.abort = MagicMock()
     context.storage = storage
     with pytest.raises(PermanentError) as raised:
-        _resolve_reference_image(parsed, context, by_url=True)
+        _resolve_reference_images(parsed, context, by_url=True)
     assert raised.value.code == "input_rejected"
     storage.presigned_get_url.assert_not_called()
 
 
-def test_video_capability_rejects_two_reference_images() -> None:
-    """The contract pins maxItems:1; a producer that wires two images fails fast at the boundary.
-
-    Schema validation runs before the executor; we assert both layers reject the contract
-    violation so neither is silent.
-    """
+def test_video_capability_rejects_more_than_three_reference_images() -> None:
+    """The contract pins maxItems:3; four reference images must fail fast at the boundary."""
     job = _video_job_dict()
     job["inputs"] = [
         {"key": "first", "bucket": "flowcortex-uploads", "objectKey": "a"},
         {"key": "second", "bucket": "flowcortex-uploads", "objectKey": "b"},
+        {"key": "third", "bucket": "flowcortex-uploads", "objectKey": "c"},
+        {"key": "fourth", "bucket": "flowcortex-uploads", "objectKey": "d"},
     ]
     with pytest.raises(ValidationError) as raised:
         ProviderJob.model_validate(job)
-    assert "at most 1 item" in str(raised.value) or "too_long" in str(raised.value)
+    assert "at most 3 items" in str(raised.value) or "too_long" in str(raised.value)
 
 
 @pytest.mark.parametrize("by_url", [True, False])
 def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: bool) -> None:
     """The bytes are always read (image check, idempotency); a URL is signed only on request."""
-    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.capabilities import _resolve_reference_images
     from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
 
     png = _png_header(b"reference-bytes")
@@ -678,14 +676,14 @@ def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: 
     context.bucket = BUCKET
     context.abort = MagicMock()
     context.storage = storage
-    image_bytes, image_url = _resolve_reference_image(parsed, context, by_url=by_url)
-    assert image_bytes == png
+    images, image_urls = _resolve_reference_images(parsed, context, by_url=by_url)
+    assert images == (png,)
     storage.fetch_bytes.assert_called_once_with("flowcortex-uploads", "refs/cap.png", context.abort)
     if by_url:
-        assert image_url == "https://signed.example/refs/cap.png"
+        assert image_urls == ("https://signed.example/refs/cap.png",)
         storage.presigned_get_url.assert_called_once_with("flowcortex-uploads", "refs/cap.png")
     else:
-        assert image_url is None
+        assert image_urls == ()
         storage.presigned_get_url.assert_not_called()
 
 

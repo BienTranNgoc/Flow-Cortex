@@ -84,16 +84,38 @@ describe('ProductVideoStartForm', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the product input fields and a single image picker', async () => {
+  it('renders the product input fields and a multi-image picker', async () => {
     renderForm();
 
     expect(await screen.findByLabelText('Product name *')).toBeInTheDocument();
     expect(screen.getByLabelText('Description *')).toBeInTheDocument();
     expect(screen.queryByLabelText('Call to action *')).not.toBeInTheDocument();
     const picker = screen.getByLabelText(/Product image/);
-    expect(picker).not.toHaveAttribute('multiple');
+    expect(picker).toHaveAttribute('multiple');
     expect(picker).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
     expect(picker).toBeRequired();
+  });
+
+  it('supports picking up to 3 images, removing one, and rejecting a 4th', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    const picker = await screen.findByLabelText(/Product image/);
+
+    await user.upload(picker, [image('front.png'), image('side.png')]);
+    expect(screen.getByText('front.png')).toBeInTheDocument();
+    expect(screen.getByText('side.png')).toBeInTheDocument();
+    expect(screen.getByText('2 / 3 photos')).toBeInTheDocument();
+
+    await user.upload(picker, [image('back.png')]);
+    expect(screen.getByText('back.png')).toBeInTheDocument();
+    expect(screen.getByText('3 / 3 photos')).toBeInTheDocument();
+
+    await user.upload(picker, [image('extra.png')]);
+    expect(screen.getByText('At most 3 images per run.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove extra.png' }));
+    expect(screen.queryByText('At most 3 images per run.')).not.toBeInTheDocument();
+    expect(screen.getByText('3 / 3 photos')).toBeInTheDocument();
   });
 
   it('asks for at least one product image when Start is pressed without one', async () => {
@@ -257,7 +279,8 @@ describe('ProductVideoStartForm', () => {
 
       await user.upload(picker, [image('front.png')]);
 
-      expect(screen.getByText('Đã chọn 1 ảnh: front.png')).toBeInTheDocument();
+      expect(screen.getByText('front.png')).toBeInTheDocument();
+      expect(screen.getByText('1 / 3 ảnh')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Bắt đầu lượt chạy' })).toBeInTheDocument();
     });
   });
@@ -326,10 +349,79 @@ describe('ProductVideoStartForm', () => {
 
     const picker = screen.getByLabelText('Product image (JPG/PNG/WebP, ≤ 10 MB) *');
     await user.upload(picker, [image('bottle.png')]);
-    expect(screen.getByText('1 image selected: bottle.png')).toBeInTheDocument();
+    expect(screen.getByText('bottle.png')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove' }));
-    expect(screen.queryByText('1 image selected: bottle.png')).not.toBeInTheDocument();
+    expect(screen.queryByText('bottle.png')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Call to action *')).not.toBeInTheDocument();
+  });
+
+  it('restores product images passed via productDraft state on retry', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const baseFetch = globalThis.fetch;
+    stubApi({
+      'GET /api/v1/workflows': { status: 200, body: [PRODUCT_VIDEO] },
+      'GET /api/v1/capabilities': {
+        status: 200,
+        body: {
+          mediaEnabled: true,
+          productVideoEnabled: true,
+          productVideoWorkflowId: PRODUCT_VIDEO_ID,
+        },
+      },
+      [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: PRODUCT_VIDEO },
+    });
+    const stubbedFetch = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url.startsWith('http://minio.test/')) {
+          return Promise.resolve(
+            new Response(new Blob(['imgdata'], { type: 'image/jpeg' }), {
+              status: 200,
+              headers: { 'Content-Type': 'image/jpeg' },
+            }),
+          );
+        }
+        return stubbedFetch(input, init);
+      }),
+    );
+
+    try {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: `/workflows/${PRODUCT_VIDEO_ID}`,
+                state: {
+                  productDraft: {
+                    productName: 'Royal M239',
+                    description: 'Mũ bảo hiểm 1/2 đầu',
+                    images: [
+                      { name: 'image_1', mimeType: 'image/jpeg', url: 'http://minio.test/image_1' },
+                      { name: 'image_2', mimeType: 'image/jpeg', url: 'http://minio.test/image_2' },
+                    ],
+                  },
+                },
+              },
+            ]}
+          >
+            <Routes>
+              <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText('image_1.jpg')).toBeInTheDocument();
+      expect(screen.getByText('image_2.jpg')).toBeInTheDocument();
+      expect(screen.getByText('2 / 3 photos')).toBeInTheDocument();
+    } finally {
+      vi.stubGlobal('fetch', baseFetch);
+    }
   });
 });

@@ -71,6 +71,8 @@ class VideoRequest:
     profile: str = "vertical_ad_clip_v1"
     reference_image_url: str | None = None
     reference_image_bytes: bytes | None = None
+    reference_images: tuple[bytes, ...] = ()
+    reference_image_urls: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,7 @@ class ScriptAdapter(Protocol):
         request: StoryboardRequest,
         reference_image: bytes | None = None,
         *,
+        reference_images: tuple[bytes, ...] = (),
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact: ...
@@ -181,12 +184,14 @@ class CapabilityProviderAdapter:
         request: StoryboardRequest,
         reference_image: bytes | None = None,
         *,
+        reference_images: tuple[bytes, ...] = (),
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
         return self.script_adapter.generate_storyboard(
             request,
             reference_image,
+            reference_images=reference_images,
             abort=abort,
             deadline_monotonic=deadline_monotonic,
         )
@@ -248,16 +253,17 @@ class FixtureProviderAdapter:
         request: StoryboardRequest,
         reference_image: bytes | None = None,
         *,
+        reference_images: tuple[bytes, ...] = (),
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
         if abort is not None:
             abort.check()
         return StoryboardArtifact(
-            "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
-            "realistic movement, clean background, no text.",
-            "Vertical 9:16 product-in-use benefit shot followed by a clean closing beauty shot, "
-            "space for CTA overlay, realistic movement, no rendered text.",
+            "Vertical 9:16 opening product hero shot, smooth push-in, soft even studio lighting, "
+            "clean minimalist backdrop, realistic commercial photography.",
+            "Vertical 9:16 product-in-use benefit shot followed by a clean centered closing hero "
+            "frame, natural movement, realistic commercial lighting.",
         )
 
     def speech_identity(self) -> SpeechIdentity:

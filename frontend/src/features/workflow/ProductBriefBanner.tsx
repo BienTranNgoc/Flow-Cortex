@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { ProductBrief } from './productVideoSchemas';
+import { MAX_IMAGES } from './productVideoUpload';
 import { inputUrlNeedsRenewal, useRunInputsQuery } from './useWorkflows';
 
 interface ProductBriefBannerProps {
@@ -22,8 +23,17 @@ export function ProductBriefBanner({
   const { t } = useTranslation();
   const inputsQuery = useRunInputsQuery(runId);
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
-  const firstImage = inputsQuery.data?.find((item) => item.kind === 'image');
+  const imageInputs = (inputsQuery.data ?? []).filter((item) => item.kind === 'image');
+  const firstImage = imageInputs[0];
   const imageUrl = firstImage?.url && firstImage.url !== brokenUrl ? firstImage.url : undefined;
+  const draftImages = imageInputs
+    .filter((item) => Boolean(item.url))
+    .slice(0, MAX_IMAGES)
+    .map((item) => ({
+      name: item.bindingKey,
+      mimeType: item.mimeType,
+      url: item.url,
+    }));
 
   const onImageError = () => {
     if (!firstImage?.url) return;
@@ -62,6 +72,7 @@ export function ProductBriefBanner({
               productDraft: {
                 productName: brief.productName,
                 description: brief.description,
+                ...(draftImages.length > 0 ? { images: draftImages } : {}),
               },
             }}
           >

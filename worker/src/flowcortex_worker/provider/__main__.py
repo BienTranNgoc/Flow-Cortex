@@ -35,6 +35,7 @@ from .contracts.provider_job import ProviderJob
 from .control import ControlClient, ControlConfig
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
 from .fal_queue import probe_fal_queue, urllib_fetch
+from .minimax_adapter import PROVIDER_MINIMAX, MinimaxAdapter, MinimaxConfig
 from .openai_adapter import (
     _OPENAI_BASE_URL,
     _OPENAI_SCRIPT_MODEL,
@@ -275,11 +276,12 @@ def _build_adapter(
         parallel_clips_enabled = _parallel_clips_enabled()
     if video_enabled and parallel_clips_enabled and configured_video_provider not in {
         PROVIDER_WAN,
+        PROVIDER_MINIMAX,
         PROVIDER_FIXTURE,
     }:
         raise RuntimeError(
-            "PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED only supports VIDEO_PROVIDER 'wan' or "
-            f"'fixture', got '{configured_video_provider}'"
+            "PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED only supports VIDEO_PROVIDER 'wan', "
+            f"'minimax' or 'fixture', got '{configured_video_provider}'"
         )
     video_provider = configured_video_provider if video_enabled else PROVIDER_FIXTURE
     legacy_openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -322,6 +324,14 @@ def _build_adapter(
         video_api_key = os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
         video_base_url = os.environ.get("WAN_BASE_URL", "").strip() or generic_video_url
         video_model = os.environ.get("WAN_MODEL", "").strip() or generic_video_model
+    elif video_provider == PROVIDER_MINIMAX:
+        video_api_key = (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_video_key
+        )
+        video_base_url = os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_video_url
+        video_model = os.environ.get("MINIMAX_MODEL", "").strip() or generic_video_model
     else:
         video_api_key = generic_video_key
         video_base_url = generic_video_url
@@ -479,11 +489,40 @@ def _build_video_adapter(
                 ),
             )
         )
+    if provider == PROVIDER_MINIMAX:
+        if not api_key:
+            raise RuntimeError("MiniMax video provider requires MINIMAX_API_KEY")
+        duration = int(os.environ.get("MINIMAX_DURATION", "5"))
+        if duration != 5:
+            raise RuntimeError(
+                f"MiniMax video provider requires MINIMAX_DURATION=5, got {duration}"
+            )
+        adapter = MinimaxAdapter(
+            MinimaxConfig(
+                api_key=api_key,
+                base_url=base_url or "https://api.replicate.com/v1",
+                model=model or "minimax/h3-lite",
+                resolution=os.environ.get("MINIMAX_RESOLUTION", "768P").strip().upper(),
+                duration=duration,
+                request_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
+                ),
+                poll_interval_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_INTERVAL_SECONDS", "5")
+                ),
+                poll_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS", "480")
+                ),
+            )
+        )
+        adapter.video_identity()
+        return adapter
     if provider == PROVIDER_FIXTURE:
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown VIDEO_PROVIDER '{provider}'; accepted values: "
-        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}, {PROVIDER_WAN}"
+        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}, {PROVIDER_WAN}, "
+        f"{PROVIDER_MINIMAX}"
     )
 
 

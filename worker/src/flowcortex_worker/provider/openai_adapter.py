@@ -113,58 +113,50 @@ _STORYBOARD_RESPONSE_FORMAT: dict[str, Any] = {
 
 _STORYBOARD_SYSTEM_PROMPT = (
     "You are an expert visual director for vertical (9:16) commercial product video "
-    "advertisements. Convert the approved Vietnamese voice-over into exactly two distinct, "
-    "highly compelling English video generation prompts, each designed for a five-second "
-    "9:16 clip.\n\n"
-    "UNIVERSAL PRODUCT ADVERTISING DIRECTIVE:\n"
-    "- Adapt naturally and dynamically to ANY product category (e.g. fashion/apparel, "
-    "electronics, home goods, accessories, beauty/cosmetics, sports gear, vehicles, etc.).\n"
-    "- The featured product in the reference image is the SOLE HERO SUBJECT of the entire "
-    "commercial.\n\n"
-    "DYNAMIC VISUAL EXTRACTION & STRICT CONSISTENCY (CRITICAL FOR BOTH SCENES):\n"
-    "- When a product reference image is provided, closely examine it as the absolute ground "
-    "truth for the featured product.\n"
-    "- Dynamically extract and accurately identify the exact product attributes from the image:\n"
-    "  * Product Type & Category (e.g., hooded windbreaker jacket, stainless steel tumbler, "
-    "mechanical watch, sneakers, helmet, etc.).\n"
-    "  * Exact Colors, Finishes & Textures (e.g., matte black technical fabric, brushed chrome "
-    "metal, textured knit, matte leather, glossy ceramic).\n"
-    "  * Distinctive Silhouettes, Details & Hardware (e.g., front zip closure, hood toggles, "
-    "ergonomic handle, stitching lines, sole pattern, display screen).\n"
-    "- BOTH Scene 1 and Scene 2 prompts MUST explicitly and meticulously describe these exact "
-    "extracted physical traits so the video model never drifts.\n"
-    "- IN SCENE 2, NEVER use vague terms like 'the product' or 'the item'. You MUST explicitly "
-    "reiterate the full specific product description (e.g., 'wearing the exact same matte black "
-    "hooded technical windbreaker jacket with front zipper', 'holding the exact same matte "
-    "black stainless steel tumbler') so that Scene 2 maintains 100% visual consistency with "
-    "Scene 1.\n"
-    "- DO NOT introduce or overemphasize unrelated secondary accessories (such as helmets, "
-    "sunglasses, backpacks, etc.) unless they are the actual product being advertised. "
-    "The featured product must always remain the clear visual focal point.\n\n"
-    "DIVERSE, DYNAMIC COMMERCIAL SCENES (AVOID STATIC TABLETOPS):\n"
-    "- DO NOT restrict the product to sitting statically on a plain table, desk, or empty studio "
-    "floor across both scenes!\n"
-    "- Create rich, diverse, realistic scenes that match the product's natural use and the tone "
-    "of the voice-over:\n"
-    "  * Scene 1 (Opening Hook): A high-impact, attention-grabbing opening. Can be an "
-    "eye-catching commercial product reveal with sweeping cinematic lighting flares, "
-    "reflections, and bold camera movement, OR an engaging lifestyle moment (e.g. a stylish "
-    "person putting on, holding, or preparing the product in natural atmospheric daylight).\n"
-    "  * Scene 2 (Benefit & Action & Hero Finish): Demonstrate the product in active, natural "
-    "use and benefit (e.g. apparel in motion outdoors, a gadget being used seamlessly in modern "
-    "life, a drinkware item providing refreshment), concluding with a clean, centered hero beauty "
-    "framing with empty negative space (e.g. lower-third) for the CTA text overlay.\n\n"
-    "CAMERA MOTION & STABILITY:\n"
-    "- Use smooth, continuous cinematic directional camera movements: tracking shots alongside "
-    "the subject/product, dynamic forward push-in, lateral slide, low-angle tilt-up, or gentle "
-    "pull-back.\n"
-    "- AVOID extreme 360-degree orbital rotation around a single object, which causes 3D "
-    "distortion artifacts in AI video generation.\n\n"
-    "CONSTRAINTS:\n"
-    "- Do not request generated text, captions, subtitles, logos, voice, or music inside the "
-    "video prompts.\n"
-    "- Return only one valid JSON object with exactly two string fields: `scene1Prompt` and "
-    "`scene2Prompt`; do not rename, nest, or wrap these fields."
+    "advertisements. Convert the approved Vietnamese voice-over and ALL attached product "
+    "reference images (1 to 3 photos) into exactly two distinct, compelling English video "
+    "generation prompts, each designed for a five-second 9:16 clip.\n\n"
+    "MULTI-IMAGE VISUAL GROUND TRUTH (INSPECT ALL ATTACHED IMAGES):\n"
+    "- Treat ALL attached product photos as the absolute visual ground truth for product "
+    "identity, silhouette, proportions, materials, logos, and hardware. Never invent unrelated "
+    "accessories or alter the product's core design.\n"
+    "- Inspect how the attached images relate to each other and apply the matching branch:\n"
+    "  * MULTIPLE COLORWAYS OR FINISH VARIANTS (2-3 photos showing the same product in "
+    "different colors or finishes, e.g. matte black, matte grey, glossy black):\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — Hero Color/Variant Showcase): Present the product "
+    "centered against a clean, minimalist neutral studio backdrop with soft, even commercial "
+    "lighting. Keep the framing steady with a gentle slow push-in or subtle angle shift as "
+    "the product smoothly transitions across the exact colorways and finishes shown in the "
+    "reference images. Do NOT lock Scene 1 to only the first photo's color.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Feature the hero "
+    "product from the reference images in an authentic, dynamic real-world usage moment "
+    "matching the voice-over, concluding on a clean, balanced close-up hero frame.\n"
+    "  * MULTIPLE ANGLES OF THE SAME PRODUCT (2-3 photos showing front, side, back, or detail "
+    "views of one single colorway):\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — Hero 3D Angle Showcase): Combine the geometry and "
+    "details from all reference angles in a smooth, continuous parallax glide or gentle "
+    "rotation under soft, even studio lighting.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Show the exact same "
+    "product in natural active use matching the voice-over, settling on a crisp hero frame.\n"
+    "  * SINGLE PRODUCT IMAGE (1 photo provided):\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — Opening Hero Reveal): Clean, scroll-stopping "
+    "commercial reveal preserving 100% of the product's exact color, finish, and details "
+    "with smooth directional camera movement.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Authentic in-use "
+    "benefit shot of the exact same product, finishing on a clean centered hero frame.\n\n"
+    "PHYSICAL GROUNDING & CAMERA STABILITY:\n"
+    "- If the reference images are isolated cutouts on a white background, keep Scene 1 on a "
+    "clean minimalist studio backdrop or resting firmly on a solid surface — NEVER place a "
+    "cutout product hovering above a turntable or floating unnaturally in mid-air.\n"
+    "- Keep each prompt concise and vivid (40-75 English words) with ONE smooth continuous "
+    "camera or subject motion per scene. Avoid chaotic cuts or extreme 360-degree spins.\n\n"
+    "PURE VISUAL CINEMATOGRAPHY — STRICT PROHIBITIONS:\n"
+    "- NEVER mention text, graphics, or UI elements ('text', 'caption', 'subtitle', 'CTA', "
+    "'overlay', 'watermark', 'font', 'price tag', 'button', 'no text') anywhere in "
+    "`scene1Prompt` or `scene2Prompt`.\n"
+    "- Do not mention voice, speech, sound effects, or music.\n"
+    "- Return only one valid JSON object with exactly two distinct string fields: "
+    "`scene1Prompt` and `scene2Prompt`; do not rename, nest, or wrap these fields."
 )
 
 _SYSTEM_PROMPT = (
@@ -348,10 +340,12 @@ class OpenAIProviderAdapter:
         request: StoryboardRequest,
         reference_image: bytes | None = None,
         *,
+        reference_images: tuple[bytes, ...] = (),
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
-        user_content = self._storyboard_user_content(request.script, reference_image)
+        images = reference_images or ((reference_image,) if reference_image is not None else ())
+        user_content = self._storyboard_user_content(request.script, images)
         return self._run_with_fallback(
             operation="generate_storyboard",
             system_prompt=_STORYBOARD_SYSTEM_PROMPT,
@@ -359,7 +353,7 @@ class OpenAIProviderAdapter:
             user_content=user_content,
             response_format=_STORYBOARD_RESPONSE_FORMAT,
             validate=_validate_storyboard_response,
-            temperature=0.4,
+            temperature=0.35,
             abort=abort,
             deadline_monotonic=deadline_monotonic,
         )
@@ -743,38 +737,35 @@ class OpenAIProviderAdapter:
 
     @classmethod
     def _storyboard_user_content(
-        cls, script: str, reference_image: bytes | None
+        cls, script: str, reference_images: tuple[bytes, ...]
     ) -> str | list[dict[str, Any]]:
         text = f"Approved Vietnamese voice-over:\n{script}"
-        if reference_image is None:
+        if not reference_images:
             return text
-        mime = _image_mime(reference_image)
-        encoded = base64.b64encode(reference_image).decode("ascii")
-        return [
-            {
-                "type": "text",
-                "text": (
-                    f"{text}\n\n"
-                    "CRITICAL VISUAL GROUND TRUTH & DIVERSITY:\n"
-                    "1. Closely inspect the attached product image as the absolute "
-                    "visual ground truth for the featured product.\n"
-                    "2. Dynamically identify the exact product category, materials, "
-                    "colors, textures, and key design features directly from the image.\n"
-                    "3. In BOTH Scene 1 and Scene 2, explicitly describe these exact "
-                    "physical product traits so the video model maintains 100% "
-                    "product identity. Never introduce distracting unrelated "
-                    "accessories.\n"
-                    "4. DO NOT place the product statically on a plain table in both "
-                    "scenes. Create diverse, dynamic, real-world scenes "
-                    "(cinematic commercial reveal / outdoor lifestyle in-use) "
-                    "matching the approved script."
-                ),
-            },
-            {
-                "type": "image_url",
-                "image_url": {"url": f"data:{mime};base64,{encoded}", "detail": "high"},
-            },
-        ]
+        count = len(reference_images)
+        instruction = (
+            f"{text}\n\n"
+            f"MULTI-IMAGE VISUAL GROUND TRUTH (Reference images provided: {count}):\n"
+            "1. Inspect ALL attached product photos as visual ground truth.\n"
+            "2. Decide whether the photos show multiple color/finish variants, multiple angles "
+            "of one colorway, or a single product photo, and follow the matching branch.\n"
+            "3. When multiple color variants are provided, make Scene 1 smoothly showcase the "
+            "color/finish transitions on a clean minimalist studio backdrop (no floating above "
+            "a turntable), and make Scene 2 an authentic lifestyle in-use shot.\n"
+            "4. Keep each prompt 40-75 English words and NEVER mention text, captions, CTA, "
+            "overlays, or audio."
+        )
+        content: list[dict[str, Any]] = [{"type": "text", "text": instruction}]
+        for image_bytes in reference_images:
+            mime = _image_mime(image_bytes)
+            encoded = base64.b64encode(image_bytes).decode("ascii")
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{encoded}", "detail": "high"},
+                }
+            )
+        return content
 
 
 _THINK_BLOCK_RE = re.compile(

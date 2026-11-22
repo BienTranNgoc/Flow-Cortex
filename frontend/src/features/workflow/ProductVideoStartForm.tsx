@@ -1,4 +1,4 @@
-import { UploadSimple } from '@phosphor-icons/react';
+import { Plus, UploadSimple, X } from '@phosphor-icons/react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import {
@@ -22,6 +22,7 @@ import { ProductVideoPreviewPanel } from './ProductVideoPreviewPanel';
 import {
   createMultiUpload,
   firstImageProblem,
+  MAX_IMAGES,
   MultiUploadError,
   type ImageProblem,
   type MultiUploadPhase,
@@ -62,12 +63,36 @@ const TEXT_FIELDS = [
 
 type TextFieldName = (typeof TEXT_FIELDS)[number]['name'];
 
+const DraftImageSchema = z.object({
+  name: z.string().min(1),
+  mimeType: z.string().min(1),
+  url: z.string().url(),
+});
+
+type DraftImage = z.infer<typeof DraftImageSchema>;
+
 const ProductDraftStateSchema = z.object({
   productDraft: z.object({
     productName: z.string().optional(),
     description: z.string().optional(),
+    images: z.array(DraftImageSchema).optional(),
   }),
 });
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+};
+
+function normalizeDraftFileName(name: string, mimeType: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) {
+    return name;
+  }
+  const ext = MIME_TO_EXT[mimeType.toLowerCase()] ?? '.jpg';
+  return `${name}${ext}`;
+}
 
 function readInitialDraft(state: unknown): Record<TextFieldName, string> {
   const parsed = ProductDraftStateSchema.safeParse(state);
@@ -76,6 +101,12 @@ function readInitialDraft(state: unknown): Record<TextFieldName, string> {
     productName: parsed.data.productDraft.productName ?? '',
     description: parsed.data.productDraft.description ?? '',
   };
+}
+
+function readInitialImages(state: unknown): DraftImage[] {
+  const parsed = ProductDraftStateSchema.safeParse(state);
+  if (!parsed.success || !parsed.data.productDraft.images) return [];
+  return parsed.data.productDraft.images.slice(0, MAX_IMAGES);
 }
 
 function formatBytes(bytes: number): string {
@@ -121,6 +152,7 @@ export function ProductVideoStartForm({
   const [text, setText] = useState<Record<TextFieldName, string>>(() =>
     readInitialDraft(location.state),
   );
+  const [initialImages] = useState<DraftImage[]>(() => readInitialImages(location.state));
   const [blankFieldKey, setBlankFieldKey] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -137,26 +169,65 @@ export function ProductVideoStartForm({
     };
   }, []);
 
-  const previewUrl = useMemo(() => {
-    const file = files[0];
-    if (!file || typeof URL.createObjectURL !== 'function') return null;
-    return URL.createObjectURL(file);
+  useEffect(() => {
+    if (initialImages.length === 0) return;
+    const controller = new AbortController();
+    void (async () => {
+      const loaded: File[] = [];
+      for (const item of initialImages) {
+        try {
+          const response = await fetch(item.url, { signal: controller.signal });
+          if (!response.ok) continue;
+          const blob = await response.blob();
+          const mime = blob.type || item.mimeType;
+          const fileName = normalizeDraftFileName(item.name, mime);
+          loaded.push(new File([blob], fileName, { type: mime }));
+        } catch {
+          if (controller.signal.aborted) return;
+        }
+      }
+      if (!controller.signal.aborted && loaded.length > 0) {
+        setFiles((current) => (current.length > 0 ? current : loaded));
+      }
+    })();
+    return () => controller.abort();
+  }, [initialImages]);
+
+  const previewUrls = useMemo(() => {
+    if (typeof URL.createObjectURL !== 'function') return [] as string[];
+    return files.map((file) => URL.createObjectURL(file));
   }, [files]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(previewUrl);
+      if (typeof URL.revokeObjectURL === 'function') {
+        for (const url of previewUrls) {
+          URL.revokeObjectURL(url);
+        }
       }
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
+
+  const previewUrl = previewUrls[0] ?? null;
 
   const applyPickedFiles = (fileList: FileList | null) => {
-    if (phase) return;
-    const picked = fileList && fileList[0] ? [fileList[0]] : [];
-    setFiles(picked);
+    if (phase || !fileList || fileList.length === 0) return;
+    const incoming = Array.from(fileList);
+    const seen = new Set(files.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
+    const merged = [...files];
+    for (const file of incoming) {
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(file);
+      }
+    }
+    setFiles(merged);
     setFailure(null);
-    setImageError(asCheck(firstImageProblem(picked)));
+    setImageError(asCheck(firstImageProblem(merged)));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const onPick = (event: ChangeEvent<HTMLInputElement>) => {
@@ -167,6 +238,17 @@ export function ProductVideoStartForm({
     event.preventDefault();
     setDragOver(false);
     applyPickedFiles(event.dataTransfer.files);
+  };
+
+  const onRemoveImage = (index: number) => {
+    if (phase) return;
+    const next = files.filter((_, i) => i !== index);
+    setFiles(next);
+    setFailure(null);
+    setImageError(next.length > 0 ? asCheck(firstImageProblem(next)) : null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const onClearImage = () => {
@@ -285,7 +367,6 @@ export function ProductVideoStartForm({
 
   const uploadPercent = phase?.kind === 'uploading' ? phase.percent : null;
   const resend = failure?.kind === 'credits' ? failure.resend : null;
-  const selectedFile = files[0];
 
   return (
     <div className="pv-studio-grid">
@@ -342,6 +423,12 @@ export function ProductVideoStartForm({
           <div className="pv-field">
             <div className="pv-field-header">
               <label htmlFor="product-images">{t('workflow.productVideo.image')}</label>
+              <span className="pv-char-count">
+                {t('workflow.productVideo.imageCount', {
+                  count: files.length,
+                  max: MAX_IMAGES,
+                })}
+              </span>
             </div>
             <div
               className={dragOver ? 'pv-dropzone pv-dropzone--active' : 'pv-dropzone'}
@@ -357,13 +444,14 @@ export function ProductVideoStartForm({
                 id="product-images"
                 className="pv-dropzone-input"
                 type="file"
+                multiple
                 accept="image/jpeg,image/png,image/webp"
                 required
                 onChange={onPick}
                 aria-invalid={imageError ? true : undefined}
                 aria-describedby={imageError ? 'product-images-problem' : undefined}
               />
-              {!selectedFile ? (
+              {files.length === 0 ? (
                 <button
                   type="button"
                   className="pv-dropzone-empty"
@@ -381,42 +469,63 @@ export function ProductVideoStartForm({
                   </span>
                 </button>
               ) : (
-                <div className="pv-dropzone-selected">
-                  {previewUrl && (
-                    <img
-                      src={previewUrl}
-                      alt={t('workflow.productVideo.imagePreviewAlt')}
-                      className="pv-dropzone-thumb"
-                    />
-                  )}
-                  <div className="pv-dropzone-meta">
-                    <p className="pv-dropzone-filename">
-                      {t('workflow.productVideo.imageSelected', { name: selectedFile.name })}
-                    </p>
-                    {!imageError && (
-                      <p className="pv-dropzone-sub">
-                        {t('workflow.productVideo.fileReady', {
-                          size: formatBytes(selectedFile.size),
-                        })}
-                      </p>
-                    )}
-                  </div>
+                <div className="pv-image-list-wrap">
+                  <ul className="pv-image-list">
+                    {files.map((file, index) => (
+                      <li className="pv-image-item" key={`${file.name}-${file.size}-${index}`}>
+                        <div className="pv-image-thumb-wrap">
+                          {previewUrls[index] && (
+                            <img
+                              src={previewUrls[index]}
+                              alt={t('workflow.productVideo.imagePreviewAlt')}
+                              className="pv-dropzone-thumb"
+                            />
+                          )}
+                          <span className="pv-image-badge">{index + 1}</span>
+                        </div>
+                        <div className="pv-dropzone-meta">
+                          <p className="pv-dropzone-filename">{file.name}</p>
+                          <p className="pv-dropzone-sub">
+                            {t('workflow.productVideo.fileReady', {
+                              size: formatBytes(file.size),
+                            })}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="pv-image-remove"
+                          disabled={phase !== null}
+                          onClick={() => onRemoveImage(index)}
+                          aria-label={t('workflow.productVideo.removeImageAt', {
+                            name: file.name,
+                          })}
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                   <div className="pv-dropzone-actions">
-                    <button
-                      type="button"
-                      className="pv-secondary-btn"
-                      disabled={phase !== null}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {t('workflow.productVideo.changeImage')}
-                    </button>
+                    {files.length < MAX_IMAGES && (
+                      <button
+                        type="button"
+                        className="pv-secondary-btn"
+                        disabled={phase !== null}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Plus size={16} aria-hidden="true" />
+                        {t('workflow.productVideo.addMoreImages')}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="pv-secondary-btn"
                       disabled={phase !== null}
                       onClick={onClearImage}
                     >
-                      {t('workflow.productVideo.removeImage')}
+                      {files.length > 1
+                        ? t('workflow.productVideo.clearAllImages')
+                        : t('workflow.productVideo.removeImage')}
                     </button>
                   </div>
                 </div>

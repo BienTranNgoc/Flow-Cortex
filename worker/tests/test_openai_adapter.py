@@ -186,6 +186,45 @@ def test_generate_storyboard_sends_product_image_as_multimodal_input(
     assert content[1]["type"] == "image_url"
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
 
+
+def test_generate_storyboard_sends_multiple_product_images(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _patch_urlopen(
+        monkeypatch,
+        _http_response(
+            _ok_body(
+                json.dumps(
+                    {
+                        "scene1Prompt": (
+                            "Vertical 9:16 smooth colorway showcase on minimalist studio."
+                        ),
+                        "scene2Prompt": "Vertical 9:16 lifestyle in-use shot ending on hero frame.",
+                    }
+                )
+            )
+        ),
+    )
+
+    png = b"\x89PNG\r\n\x1a\nimg1"
+    jpg = b"\xff\xd8\xff\xe0img2"
+    storyboard = _adapter().generate_storyboard(
+        StoryboardRequest("Approved Vietnamese script", UUID(int=2)),
+        reference_images=(png, jpg, png),
+    )
+
+    assert "colorway" in storyboard.scene_1_prompt
+    system_prompt = captured["body"]["messages"][0]["content"]
+    assert "MULTIPLE COLORWAYS OR FINISH VARIANTS" in system_prompt
+    assert "for the CTA text overlay" not in system_prompt
+    content = captured["body"]["messages"][1]["content"]
+    assert content[0]["type"] == "text"
+    assert "Reference images provided: 3" in content[0]["text"]
+    assert len(content) == 4
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert content[2]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert content[3]["image_url"]["url"].startswith("data:image/png;base64,")
+
 @pytest.mark.parametrize(
     "provider_content",
     [

@@ -191,10 +191,11 @@ def _generate_storyboard(
     if not isinstance(job, GenerateStoryboardJob):
         raise UnsupportedCapability("generate_storyboard received the wrong job shape")
     payload = job.params.payload
-    reference_image = _fetch_reference_image(job, context)
+    reference_images = _fetch_reference_images(job, context)
     storyboard = adapter.generate_storyboard(
         StoryboardRequest(payload.script, payload.sourceRevisionId),
-        reference_image=reference_image,
+        reference_image=reference_images[0] if reference_images else None,
+        reference_images=reference_images,
         abort=context.abort,
         deadline_monotonic=context.deadline_monotonic,
     )
@@ -216,14 +217,16 @@ def _generate_video(
         raise UnsupportedCapability("generate_video received the wrong job shape")
     payload = job.params.payload
     identity = adapter.video_identity()
-    image_bytes, image_url = _resolve_reference_image(
+    images, image_urls = _resolve_reference_images(
         job, context, by_url=identity.provider in _URL_REFERENCE_PROVIDERS
     )
     request = VideoRequest(
         payload.prompt,
         payload.sourceRevisionId,
-        reference_image_url=image_url,
-        reference_image_bytes=image_bytes,
+        reference_image_url=image_urls[0] if image_urls else None,
+        reference_image_bytes=images[0] if images else None,
+        reference_images=images,
+        reference_image_urls=image_urls,
     )
     idempotency_key = _video_idempotency_key(request, identity)
     ledger = job.vendorLedger
@@ -456,23 +459,43 @@ def _report_verdict(
     )
 
 
-def _resolve_reference_image(
+def _resolve_reference_images(
     job: GenerateVideoJob, context: ExecutionContext, *, by_url: bool
-) -> tuple[bytes | None, str | None]:
-    """Returns (bytes, url) of the job's reference image, or (None, None) without one.
+) -> tuple[tuple[bytes, ...], tuple[str, ...]]:
+    """Returns (images, urls) of the job's reference images (0..3)."""
+    images = _fetch_reference_images(job, context)
+    if not images:
+        return (), ()
+    if not by_url or not job.inputs:
+        return images, ()
+    urls = tuple(
+        context.storage.presigned_get_url(ref.bucket, ref.objectKey)
+        for ref in job.inputs
+    )
+    return images, urls
 
-    The bytes are always read: they are checked to be an image and key the job's idempotency.
-    The URL is signed only when the provider reads the image ``by_url`` (Seedance). Veo and Wan
-    take the bytes inline, so no URL to our store leaves the worker for them."""
-    body = _fetch_reference_image(job, context)
-    if body is None:
-        return None, None
-    if not by_url:
-        return body, None
-    if not job.inputs:
-        return body, None
-    reference = job.inputs[0]
-    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+
+def _fetch_reference_images(
+    job: GenerateStoryboardJob | GenerateVideoJob, context: ExecutionContext
+) -> tuple[bytes, ...]:
+    inputs = job.inputs or ()
+    if not inputs:
+        return ()
+    if len(inputs) > 3:
+        raise PermanentError(
+            "contract_violation",
+            f"{job.capability} accepts at most three reference images",
+        )
+    bodies: list[bytes] = []
+    for reference in inputs:
+        body = context.storage.fetch_bytes(reference.bucket, reference.objectKey, context.abort)
+        if not _looks_like_image(body):
+            raise PermanentError(
+                "input_rejected",
+                f"reference image '{reference.key}' is not a recognised image format",
+            )
+        bodies.append(body)
+    return tuple(bodies)
 
 
 def _fetch_reference_image(
@@ -667,11 +690,14 @@ def _speech_idempotency_key(request: SpeechRequest, identity: SpeechIdentity) ->
 
 
 def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> str:
-    image_digest = (
-        hashlib.sha256(request.reference_image_bytes or b"").hexdigest()
-        if request.reference_image_bytes or request.reference_image_url
-        else ""
-    )
+    if len(request.reference_images) > 1:
+        image_digest = hashlib.sha256(
+            b"\0".join(hashlib.sha256(img).digest() for img in request.reference_images)
+        ).hexdigest()
+    elif request.reference_image_bytes or request.reference_image_url:
+        image_digest = hashlib.sha256(request.reference_image_bytes or b"").hexdigest()
+    else:
+        image_digest = ""
     value = "\0".join((
         str(request.source_revision_id),
         request.profile,
