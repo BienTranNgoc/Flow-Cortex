@@ -7,6 +7,7 @@ import com.flowcortex.llm.registry.ProbeResult;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -92,6 +93,7 @@ class AdminAiModelsController {
     @ApiResponse(responseCode = "409", description = "llm-model-exists",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "ai_model.create", resourceParam = "modelKey", capture = {"providerKey", "active"})
     @RequirePermission(Permission.AI_PROVIDER_UPDATE)
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AiModel> create(@Valid @RequestBody ModelRequest body) {
@@ -106,6 +108,7 @@ class AdminAiModelsController {
     @ApiResponse(responseCode = "404", description = "llm-model-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "ai_model.update", resourceParam = "modelKey", capture = {"providerKey", "active"})
     @RequirePermission(Permission.AI_PROVIDER_UPDATE)
     @PutMapping(value = "/{modelKey}", produces = MediaType.APPLICATION_JSON_VALUE)
     AiModel replace(@PathVariable String modelKey, @Valid @RequestBody ModelRequest body) {
@@ -118,6 +121,7 @@ class AdminAiModelsController {
     @ApiResponse(responseCode = "404", description = "llm-model-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "ai_model.delete", resourceParam = "modelKey")
     @RequirePermission(Permission.AI_PROVIDER_UPDATE)
     @DeleteMapping("/{modelKey}")
     ResponseEntity<Void> delete(@PathVariable String modelKey) {
@@ -130,6 +134,7 @@ class AdminAiModelsController {
     @ApiResponse(responseCode = "404", description = "llm-model-not-found, ai-provider-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "ai_model.test", resourceParam = "modelKey")
     @RequirePermission(Permission.AI_PROVIDER_UPDATE)
     @PostMapping(value = "/{modelKey}/test", produces = MediaType.APPLICATION_JSON_VALUE)
     ProbeResult test(@PathVariable String modelKey) {
