@@ -196,6 +196,7 @@ export const MeResponsePermissionsItem = {
   supportticketview: 'support.ticket.view',
   supportticketreply: 'support.ticket.reply',
   supportticketclose: 'support.ticket.close',
+  supportticketassign: 'support.ticket.assign',
   contenthelp_topicview: 'content.help_topic.view',
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
@@ -212,6 +213,8 @@ export const MeResponsePermissionsItem = {
   workflowruncancel: 'workflow.run.cancel',
   workflowworkflowview: 'workflow.workflow.view',
   workflowworkflowexport: 'workflow.workflow.export',
+  paymentsettingview: 'payment.setting.view',
+  paymentsettingupdate: 'payment.setting.update',
 } as const;
 
 export interface MeResponse {
@@ -322,6 +325,12 @@ export interface SupportRequester {
   deleted: boolean;
 }
 
+export interface SupportAssignee {
+  id: string;
+  email?: string;
+  deleted: boolean;
+}
+
 export type SupportRequestMessageAuthorKind =
   (typeof SupportRequestMessageAuthorKind)[keyof typeof SupportRequestMessageAuthorKind];
 
@@ -381,10 +390,15 @@ export interface AdminSupportRequestDetail {
   lastActivityAt: string;
   resolvedAt?: string;
   requester: SupportRequester;
+  assignee?: SupportAssignee;
   messages: SupportRequestMessage[];
   conversation?: SupportConversationMessage[];
   conversationExpired: boolean;
   allowedStatuses: AdminSupportRequestDetailAllowedStatusesItem[];
+}
+
+export interface AdminSupportRequestAssignee {
+  assigneeId?: string;
 }
 
 export interface AdminSupportKbGroupRequest {
@@ -454,7 +468,7 @@ export interface AdminSupportKbArticle {
 }
 
 export interface AdminSettingUpdate {
-  value: boolean | number;
+  value: string | boolean | number;
 }
 
 export type AdminSettingType = (typeof AdminSettingType)[keyof typeof AdminSettingType];
@@ -462,6 +476,7 @@ export type AdminSettingType = (typeof AdminSettingType)[keyof typeof AdminSetti
 export const AdminSettingType = {
   SWITCH: 'SWITCH',
   INTEGER: 'INTEGER',
+  ENUM: 'ENUM',
 } as const;
 
 export type AdminSettingSource = (typeof AdminSettingSource)[keyof typeof AdminSettingSource];
@@ -478,15 +493,16 @@ export interface AdminSetting {
   key: string;
   group: string;
   type: AdminSettingType;
-  value: boolean | number;
-  decidedValue: boolean | number;
+  value: string | boolean | number;
+  decidedValue: string | boolean | number;
   source: AdminSettingSource;
   /** @nullable */
-  storedValue?: boolean | number | null;
+  storedValue?: string | boolean | number | null;
   /** @nullable */
-  configuredValue?: boolean | number | null;
+  configuredValue?: string | boolean | number | null;
   /** @nullable */
-  defaultValue?: boolean | number | null;
+  defaultValue?: string | boolean | number | null;
+  options: string[];
   /** @nullable */
   min?: number | null;
   /** @nullable */
@@ -495,6 +511,56 @@ export interface AdminSetting {
   updatedBy?: string | null;
   /** @nullable */
   updatedAt?: string | null;
+}
+
+export interface PaymentSettingUpdate {
+  value: string | boolean | number;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   * @nullable
+   */
+  reason?: string | null;
+}
+
+export type PaymentSettingViewType =
+  (typeof PaymentSettingViewType)[keyof typeof PaymentSettingViewType];
+
+export const PaymentSettingViewType = {
+  SWITCH: 'SWITCH',
+  INTEGER: 'INTEGER',
+  ENUM: 'ENUM',
+} as const;
+
+export type PaymentSettingViewSource =
+  (typeof PaymentSettingViewSource)[keyof typeof PaymentSettingViewSource];
+
+export const PaymentSettingViewSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface PaymentSettingView {
+  key: string;
+  group: string;
+  type: PaymentSettingViewType;
+  value: string | boolean | number;
+  source: PaymentSettingViewSource;
+  /** @nullable */
+  storedValue?: string | boolean | number | null;
+  /** @nullable */
+  configuredValue?: string | boolean | number | null;
+  /** @nullable */
+  defaultValue?: string | boolean | number | null;
+  dangerous: boolean;
+  options: string[];
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
 }
 
 export interface AdminChatSettingsUpdate {
@@ -1819,6 +1885,36 @@ export interface AdminSupportRequestReply {
   status: AdminSupportRequestReplyStatus;
 }
 
+export interface AdminSupportBulkAssign {
+  /**
+   * @minItems 1
+   * @maxItems 100
+   * @items.minimum 1
+   */
+  numbers: number[];
+  assigneeId: string;
+}
+
+export type SupportBulkAssignFailureReason =
+  (typeof SupportBulkAssignFailureReason)[keyof typeof SupportBulkAssignFailureReason];
+
+export const SupportBulkAssignFailureReason = {
+  not_found: 'not_found',
+  closed: 'closed',
+  changed: 'changed',
+} as const;
+
+export interface SupportBulkAssignFailure {
+  number: number;
+  reason: SupportBulkAssignFailureReason;
+}
+
+export interface AdminSupportBulkAssignResult {
+  assigned: number[];
+  unchanged: number[];
+  failed: SupportBulkAssignFailure[];
+}
+
 export interface Step {
   stepOrder: number;
   type: string;
@@ -3033,6 +3129,7 @@ export interface AdminSupportRequestSummary {
   subject: string;
   status: AdminSupportRequestSummaryStatus;
   requester: SupportRequester;
+  assignee?: SupportAssignee;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -3042,6 +3139,30 @@ export interface AdminSupportRequestPage {
   page: number;
   size: number;
   total: number;
+}
+
+export interface SupportAssigneeCount {
+  id: string;
+  email?: string;
+  count: number;
+}
+
+export interface AdminSupportAssigneeFacet {
+  unassigned: number;
+  mine: number;
+  people: SupportAssigneeCount[];
+}
+
+export interface SupportFacetCount {
+  value: string;
+  count: number;
+}
+
+export interface AdminSupportRequestFacets {
+  status: SupportFacetCount[];
+  type: SupportFacetCount[];
+  created: SupportFacetCount[];
+  assignee: AdminSupportAssigneeFacet;
 }
 
 export type AdminSupportKbArticleSummaryStatus =
@@ -3084,11 +3205,13 @@ export interface AdminSettingList {
 
 export interface AdminSettingChange {
   /** @nullable */
-  previousValue?: boolean | number | null;
+  previousValue?: string | boolean | number | null;
   /** @nullable */
-  newValue?: boolean | number | null;
+  newValue?: string | boolean | number | null;
   /** @nullable */
   changedBy?: string | null;
+  /** @nullable */
+  reason?: string | null;
   changedAt: string;
 }
 
@@ -3134,6 +3257,7 @@ export const RoleResponsePermissionsItem = {
   supportticketview: 'support.ticket.view',
   supportticketreply: 'support.ticket.reply',
   supportticketclose: 'support.ticket.close',
+  supportticketassign: 'support.ticket.assign',
   contenthelp_topicview: 'content.help_topic.view',
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
@@ -3150,6 +3274,8 @@ export const RoleResponsePermissionsItem = {
   workflowruncancel: 'workflow.run.cancel',
   workflowworkflowview: 'workflow.workflow.view',
   workflowworkflowexport: 'workflow.workflow.export',
+  paymentsettingview: 'payment.setting.view',
+  paymentsettingupdate: 'payment.setting.update',
 } as const;
 
 export interface RoleResponse {
@@ -3157,6 +3283,29 @@ export interface RoleResponse {
   staff: boolean;
   superAdmin: boolean;
   permissions: RoleResponsePermissionsItem[];
+}
+
+export interface PaymentSettingChangeView {
+  id: string;
+  key: string;
+  /** @nullable */
+  previousValue?: string | null;
+  /** @nullable */
+  newValue?: string | null;
+  /** @nullable */
+  actorId?: string | null;
+  /** @nullable */
+  actorEmail?: string | null;
+  /** @nullable */
+  reason?: string | null;
+  changedAt: string;
+}
+
+export interface PageViewPaymentSettingChangeView {
+  items: PaymentSettingChangeView[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface MediaJobResponse {
@@ -3183,6 +3332,12 @@ export interface PageViewMediaJobResponse {
   page: number;
   size: number;
   total: number;
+}
+
+export interface AdminAssignee {
+  id: string;
+  email: string;
+  name: string;
 }
 
 export interface AiProviderSlotModel {
@@ -3565,6 +3720,17 @@ export type ListAdminSupportRequestsParams = {
   status?: ListAdminSupportRequestsStatus;
   type?: ListAdminSupportRequestsType;
   /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: ListAdminSupportRequestsCreated;
+  /**
+   * Subject text, or a request number with or without a leading #
+   * @maxLength 100
+   */
+  q?: string;
+  sort?: ListAdminSupportRequestsSort;
+  /**
    * @minimum 0
    * @maximum 10000
    */
@@ -3591,6 +3757,70 @@ export const ListAdminSupportRequestsType = {
   workflow: 'workflow',
   technical: 'technical',
   other: 'other',
+} as const;
+
+export type ListAdminSupportRequestsCreated =
+  (typeof ListAdminSupportRequestsCreated)[keyof typeof ListAdminSupportRequestsCreated];
+
+export const ListAdminSupportRequestsCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
+} as const;
+
+export type ListAdminSupportRequestsSort =
+  (typeof ListAdminSupportRequestsSort)[keyof typeof ListAdminSupportRequestsSort];
+
+export const ListAdminSupportRequestsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+} as const;
+
+export type GetAdminSupportRequestFacetsParams = {
+  status?: GetAdminSupportRequestFacetsStatus;
+  type?: GetAdminSupportRequestFacetsType;
+  /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: GetAdminSupportRequestFacetsCreated;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type GetAdminSupportRequestFacetsStatus =
+  (typeof GetAdminSupportRequestFacetsStatus)[keyof typeof GetAdminSupportRequestFacetsStatus];
+
+export const GetAdminSupportRequestFacetsStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type GetAdminSupportRequestFacetsType =
+  (typeof GetAdminSupportRequestFacetsType)[keyof typeof GetAdminSupportRequestFacetsType];
+
+export const GetAdminSupportRequestFacetsType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type GetAdminSupportRequestFacetsCreated =
+  (typeof GetAdminSupportRequestFacetsCreated)[keyof typeof GetAdminSupportRequestFacetsCreated];
+
+export const GetAdminSupportRequestFacetsCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
 } as const;
 
 export type ListAdminSmsOutboxParams = {
@@ -3667,6 +3897,20 @@ export const ExportAdminRunsStatus = {
   cancelled: 'cancelled',
 } as const;
 
+export type ListPaymentSettingHistoryParams = {
+  key?: string;
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
 export type ListAdminMediaJobsParams = {
   /**
    * @minimum 0
@@ -3693,6 +3937,13 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type ListAdminAssigneesParams = {
+  /**
+   * The list to read, named by the permission it serves
+   */
+  for: string;
+};
 
 export type ListAdminAccountsParams = {
   /**
@@ -4840,6 +5091,76 @@ export const setAdminSupportRequestStatus = async (
   );
 };
 
+export type assignAdminSupportRequestResponse200 = {
+  data: AdminSupportRequestDetail;
+  status: 200;
+};
+
+export type assignAdminSupportRequestResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type assignAdminSupportRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type assignAdminSupportRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type assignAdminSupportRequestResponseSuccess = assignAdminSupportRequestResponse200 & {
+  headers: Headers;
+};
+export type assignAdminSupportRequestResponseError = (
+  | assignAdminSupportRequestResponse400
+  | assignAdminSupportRequestResponse404
+  | assignAdminSupportRequestResponse409
+) & {
+  headers: Headers;
+};
+
+export type assignAdminSupportRequestResponse =
+  assignAdminSupportRequestResponseSuccess | assignAdminSupportRequestResponseError;
+
+export const getAssignAdminSupportRequestUrl = (number: number) => {
+  return `/api/v1/admin/support/requests/${number}/assignee`;
+};
+
+export const assignAdminSupportRequest = async (
+  number: number,
+  adminSupportRequestAssignee: AdminSupportRequestAssignee,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<assignAdminSupportRequestResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<assignAdminSupportRequestResponse>(getAssignAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminSupportRequestAssignee),
+  });
+};
+
 export type renameAdminSupportKbGroupResponse200 = {
   data: AdminSupportKbGroup;
   status: 200;
@@ -5204,6 +5525,82 @@ export const resetAdminSetting = async (
   return customFetch<resetAdminSettingResponse>(getResetAdminSettingUrl(key), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type updatePaymentSettingResponse200 = {
+  data: PaymentSettingView;
+  status: 200;
+};
+
+export type updatePaymentSettingResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updatePaymentSettingResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type updatePaymentSettingResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updatePaymentSettingResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updatePaymentSettingResponseSuccess = updatePaymentSettingResponse200 & {
+  headers: Headers;
+};
+export type updatePaymentSettingResponseError = (
+  | updatePaymentSettingResponse400
+  | updatePaymentSettingResponse403
+  | updatePaymentSettingResponse404
+  | updatePaymentSettingResponse422
+) & {
+  headers: Headers;
+};
+
+export type updatePaymentSettingResponse =
+  updatePaymentSettingResponseSuccess | updatePaymentSettingResponseError;
+
+export const getUpdatePaymentSettingUrl = (key: string) => {
+  return `/api/v1/admin/payment-settings/${key}`;
+};
+
+export const updatePaymentSetting = async (
+  key: string,
+  paymentSettingUpdate: PaymentSettingUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updatePaymentSettingResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updatePaymentSettingResponse>(getUpdatePaymentSettingUrl(key), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(paymentSettingUpdate),
   });
 };
 
@@ -9974,6 +10371,66 @@ export const replyToAdminSupportRequest = async (
   });
 };
 
+export type bulkAssignAdminSupportRequestsResponse200 = {
+  data: AdminSupportBulkAssignResult;
+  status: 200;
+};
+
+export type bulkAssignAdminSupportRequestsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type bulkAssignAdminSupportRequestsResponseSuccess =
+  bulkAssignAdminSupportRequestsResponse200 & {
+    headers: Headers;
+  };
+export type bulkAssignAdminSupportRequestsResponseError =
+  bulkAssignAdminSupportRequestsResponse400 & {
+    headers: Headers;
+  };
+
+export type bulkAssignAdminSupportRequestsResponse =
+  bulkAssignAdminSupportRequestsResponseSuccess | bulkAssignAdminSupportRequestsResponseError;
+
+export const getBulkAssignAdminSupportRequestsUrl = () => {
+  return `/api/v1/admin/support/requests/bulk-assign`;
+};
+
+export const bulkAssignAdminSupportRequests = async (
+  adminSupportBulkAssign: AdminSupportBulkAssign,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<bulkAssignAdminSupportRequestsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<bulkAssignAdminSupportRequestsResponse>(
+    getBulkAssignAdminSupportRequestsUrl(),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(adminSupportBulkAssign),
+    },
+  );
+};
+
 export type listAdminSupportKbGroupsResponse200 = {
   data: AdminSupportKbGroup[];
   status: 200;
@@ -14059,6 +14516,56 @@ export const countOpenSupportRequests = async (
   });
 };
 
+export type getAdminSupportRequestFacetsResponse200 = {
+  data: AdminSupportRequestFacets;
+  status: 200;
+};
+
+export type getAdminSupportRequestFacetsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getAdminSupportRequestFacetsResponseSuccess =
+  getAdminSupportRequestFacetsResponse200 & {
+    headers: Headers;
+  };
+export type getAdminSupportRequestFacetsResponseError = getAdminSupportRequestFacetsResponse400 & {
+  headers: Headers;
+};
+
+export type getAdminSupportRequestFacetsResponse =
+  getAdminSupportRequestFacetsResponseSuccess | getAdminSupportRequestFacetsResponseError;
+
+export const getGetAdminSupportRequestFacetsUrl = (params?: GetAdminSupportRequestFacetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests/facets?${stringifiedParams}`
+    : `/api/v1/admin/support/requests/facets`;
+};
+
+export const getAdminSupportRequestFacets = async (
+  params?: GetAdminSupportRequestFacetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportRequestFacetsResponse> => {
+  return customFetch<getAdminSupportRequestFacetsResponse>(
+    getGetAdminSupportRequestFacetsUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type listAdminSmsOutboxResponse200 = {
   data: SmsOutboxEntryResponse[];
   status: 200;
@@ -14287,6 +14794,82 @@ export const listAdminRoles = async (
   });
 };
 
+export type listPaymentSettingsResponse200 = {
+  data: PaymentSettingView[];
+  status: 200;
+};
+
+export type listPaymentSettingsResponseSuccess = listPaymentSettingsResponse200 & {
+  headers: Headers;
+};
+export type listPaymentSettingsResponse = listPaymentSettingsResponseSuccess;
+
+export const getListPaymentSettingsUrl = () => {
+  return `/api/v1/admin/payment-settings`;
+};
+
+export const listPaymentSettings = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listPaymentSettingsResponse> => {
+  return customFetch<listPaymentSettingsResponse>(getListPaymentSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listPaymentSettingHistoryResponse200 = {
+  data: PageViewPaymentSettingChangeView;
+  status: 200;
+};
+
+export type listPaymentSettingHistoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listPaymentSettingHistoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listPaymentSettingHistoryResponseSuccess = listPaymentSettingHistoryResponse200 & {
+  headers: Headers;
+};
+export type listPaymentSettingHistoryResponseError = (
+  listPaymentSettingHistoryResponse400 | listPaymentSettingHistoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type listPaymentSettingHistoryResponse =
+  listPaymentSettingHistoryResponseSuccess | listPaymentSettingHistoryResponseError;
+
+export const getListPaymentSettingHistoryUrl = (params?: ListPaymentSettingHistoryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/payment-settings/history?${stringifiedParams}`
+    : `/api/v1/admin/payment-settings/history`;
+};
+
+export const listPaymentSettingHistory = async (
+  params?: ListPaymentSettingHistoryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listPaymentSettingHistoryResponse> => {
+  return customFetch<listPaymentSettingHistoryResponse>(getListPaymentSettingHistoryUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminMediaJobsResponse200 = {
   data: PageViewMediaJobResponse;
   status: 200;
@@ -14318,6 +14901,59 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAssigneesResponse200 = {
+  data: AdminAssignee[];
+  status: 200;
+};
+
+export type listAdminAssigneesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listAdminAssigneesResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listAdminAssigneesResponseSuccess = listAdminAssigneesResponse200 & {
+  headers: Headers;
+};
+export type listAdminAssigneesResponseError = (
+  listAdminAssigneesResponse400 | listAdminAssigneesResponse403
+) & {
+  headers: Headers;
+};
+
+export type listAdminAssigneesResponse =
+  listAdminAssigneesResponseSuccess | listAdminAssigneesResponseError;
+
+export const getListAdminAssigneesUrl = (params: ListAdminAssigneesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/assignees?${stringifiedParams}`
+    : `/api/v1/admin/assignees`;
+};
+
+export const listAdminAssignees = async (
+  params: ListAdminAssigneesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAssigneesResponse> => {
+  return customFetch<listAdminAssigneesResponse>(getListAdminAssigneesUrl(params), {
     ...options,
     method: 'GET',
   });

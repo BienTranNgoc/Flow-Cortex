@@ -24,6 +24,7 @@ public enum Permission {
     SUPPORT_TICKET_VIEW("support.ticket.view", false),
     SUPPORT_TICKET_REPLY("support.ticket.reply", false),
     SUPPORT_TICKET_CLOSE("support.ticket.close", false),
+    SUPPORT_TICKET_ASSIGN("support.ticket.assign", false),
     CONTENT_HELP_TOPIC_VIEW("content.help_topic.view", false),
     CONTENT_HELP_TOPIC_MANAGE("content.help_topic.manage", false),
     CONTENT_HELP_ARTICLE_VIEW("content.help_article.view", false),
@@ -39,7 +40,9 @@ public enum Permission {
     WORKFLOW_RUN_EXPORT("workflow.run.export", false),
     WORKFLOW_RUN_CANCEL("workflow.run.cancel", false),
     WORKFLOW_WORKFLOW_VIEW("workflow.workflow.view", false),
-    WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false);
+    WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
+    PAYMENT_SETTING_VIEW("payment.setting.view", false),
+    PAYMENT_SETTING_UPDATE("payment.setting.update", false);
 
     private static final Map<String, Permission> BY_KEY =
             Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(Permission::key, Function.identity()));

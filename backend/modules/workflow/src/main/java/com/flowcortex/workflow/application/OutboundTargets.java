@@ -9,8 +9,7 @@ import java.util.Map;
 
 /**
  * Finds the destinations an imported workflow would send data to: a rule table from step type to the config fields
- * that name one. Every step type registered at the base whose config names an external destination belongs in
- * {@link #TABLE}; none does yet.
+ * that name one. Every registered step type whose config names an external destination belongs in {@link #TABLE}.
  */
 final class OutboundTargets {
 
@@ -18,7 +17,7 @@ final class OutboundTargets {
     record Target(int stepOrder, String type, String field, String value) {
     }
 
-    static final Map<String, List<String>> TABLE = Map.of();
+    static final Map<String, List<String>> TABLE = Map.of(ConnectorCallStepExecutor.TYPE, List.of("url"));
 
     private static final ObjectMapper JSON = new ObjectMapper();
 

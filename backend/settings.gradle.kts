@@ -16,6 +16,7 @@ include(
     ":modules:space",
     ":modules:drive",
     ":modules:profile",
+    ":modules:asset",
     ":modules:realtime",
     ":modules:onboarding",
     ":modules:mail",

@@ -673,6 +673,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}/assignee:
+    put:
+      tags:
+      - admin-request-controller
+      operationId: assignAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestAssignee"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: validation-failed (errors.assigneeId)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups/{id}:
     put:
       tags:
@@ -890,6 +933,55 @@ paths:
                 $ref: "#/components/schemas/AdminSetting"
         "404":
           description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/payment-settings/{key}:
+    put:
+      tags:
+      - payment-settings-admin-controller
+      operationId: updatePaymentSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSettingView"
+        "400":
+          description: "validation-failed (errors.value, errors.reason)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: forbidden (needs payment.setting.update)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: paymentSetting.reasonRequired (errors.reason) or setting.invalidValue
+            (errors.value)
           content:
             application/problem+json:
               schema:
@@ -3780,6 +3872,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/bulk-assign:
+    post:
+      tags:
+      - admin-request-controller
+      operationId: bulkAssignAdminSupportRequests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportBulkAssign"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportBulkAssignResult"
+        "400":
+          description: "validation-failed (errors.numbers, errors.assigneeId)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/kb/groups:
     get:
       tags:
@@ -6645,6 +6761,39 @@ paths:
           - workflow
           - technical
           - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        description: "Subject text, or a request number with or without a leading\
+          \ #"
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
       - name: page
         in: query
         required: false
@@ -6662,7 +6811,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
-          description: "validation-failed (errors.status, errors.type, errors.page)"
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -6704,6 +6854,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SupportCount"
+  /api/v1/admin/support/requests/facets:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportRequestFacets
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestFacets"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/sms-outbox:
     get:
       tags:
@@ -6921,6 +7135,68 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/RoleResponse"
+  /api/v1/admin/payment-settings:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentSettingView"
+  /api/v1/admin/payment-settings/history:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettingHistory
+      parameters:
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 25
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewPaymentSettingChangeView"
+        "400":
+          description: "validation-failed (errors.page, errors.size)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -6963,6 +7239,39 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/assignees:
+    get:
+      tags:
+      - admin-assignees-controller
+      operationId: listAdminAssignees
+      parameters:
+      - name: for
+        in: query
+        description: "The list to read, named by the permission it serves"
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAssignee"
+        "400":
+          description: Missing or unknown list (errors.for)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: The caller may not read this list
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/ai/providers:
     get:
       tags:
@@ -7459,6 +7768,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -7475,6 +7785,8 @@ components:
             - workflow.run.cancel
             - workflow.workflow.view
             - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
         adminDisabled:
           type: boolean
       required:
@@ -7604,6 +7916,8 @@ components:
           format: date-time
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         messages:
           type: array
           items:
@@ -7634,6 +7948,19 @@ components:
       - status
       - subject
       - type
+    SupportAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        deleted:
+          type: boolean
+      required:
+      - deleted
+      - id
     SupportConversationMessage:
       type: object
       properties:
@@ -7718,6 +8045,12 @@ components:
       required:
       - deleted
       - id
+    AdminSupportRequestAssignee:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
     AdminSupportKbGroupRequest:
       type: object
       properties:
@@ -7829,6 +8162,7 @@ components:
       properties:
         value:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
@@ -7846,13 +8180,16 @@ components:
           enum:
           - SWITCH
           - INTEGER
+          - ENUM
         value:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         decidedValue:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
@@ -7867,21 +8204,28 @@ components:
         storedValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         configuredValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         defaultValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
+        options:
+          type: array
+          items:
+            type: string
         min:
           type:
           - integer
@@ -7905,6 +8249,96 @@ components:
       - decidedValue
       - group
       - key
+      - options
+      - source
+      - type
+      - value
+    PaymentSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        reason:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+          minLength: 0
+      required:
+      - value
+    PaymentSettingView:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+          - ENUM
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        dangerous:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - dangerous
+      - group
+      - key
+      - options
       - source
       - type
       - value
@@ -9820,6 +10254,60 @@ components:
       required:
       - body
       - status
+    AdminSupportBulkAssign:
+      type: object
+      properties:
+        numbers:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+        assigneeId:
+          type: string
+          format: uuid
+      required:
+      - assigneeId
+      - numbers
+    AdminSupportBulkAssignResult:
+      type: object
+      properties:
+        assigned:
+          type: array
+          items:
+            type: integer
+            format: int64
+        unchanged:
+          type: array
+          items:
+            type: integer
+            format: int64
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportBulkAssignFailure"
+      required:
+      - assigned
+      - failed
+      - unchanged
+    SupportBulkAssignFailure:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum:
+          - not_found
+          - closed
+          - changed
+      required:
+      - number
+      - reason
     AdminRunDetailResponse:
       type: object
       properties:
@@ -11862,6 +12350,8 @@ components:
           - closed
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         createdAt:
           type: string
           format: date-time
@@ -11876,6 +12366,70 @@ components:
       - status
       - subject
       - type
+    AdminSupportAssigneeFacet:
+      type: object
+      properties:
+        unassigned:
+          type: integer
+          format: int64
+        mine:
+          type: integer
+          format: int64
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssigneeCount"
+      required:
+      - mine
+      - people
+      - unassigned
+    AdminSupportRequestFacets:
+      type: object
+      properties:
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        type:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        assignee:
+          $ref: "#/components/schemas/AdminSupportAssigneeFacet"
+      required:
+      - assignee
+      - created
+      - status
+      - type
+    SupportAssigneeCount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - id
+    SupportFacetCount:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - value
     AdminSupportKbArticleList:
       type: object
       properties:
@@ -11961,16 +12515,22 @@ components:
         previousValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         newValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         changedBy:
+          type:
+          - string
+          - "null"
+        reason:
           type:
           - string
           - "null"
@@ -12082,6 +12642,7 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
@@ -12098,11 +12659,70 @@ components:
             - workflow.run.cancel
             - workflow.workflow.view
             - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
       required:
       - code
       - permissions
       - staff
       - superAdmin
+    PageViewPaymentSettingChangeView:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentSettingChangeView"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    PaymentSettingChangeView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        previousValue:
+          type:
+          - string
+          - "null"
+        newValue:
+          type:
+          - string
+          - "null"
+        actorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        actorEmail:
+          type:
+          - string
+          - "null"
+        reason:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+      - id
+      - key
     MediaJobResponse:
       type: object
       properties:
@@ -12179,6 +12799,20 @@ components:
       - page
       - size
       - total
+    AdminAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+      required:
+      - email
+      - id
+      - name
     AiProviderCategory:
       type: object
       properties:

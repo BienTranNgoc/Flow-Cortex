@@ -63,11 +63,14 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         Set<String> operationManager = new TreeSet<>(keys(Permission.values()));
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
+        operationManager.remove(Permission.PAYMENT_SETTING_UPDATE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).isEqualTo(operationManager);
+        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key())
+                .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_WORKFLOW_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
@@ -82,6 +85,11 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
                 Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         assertThat(workflowManageHolders).isZero();
+
+        Integer paymentUpdateHolders = jdbc.queryForObject(
+                "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
+                Permission.PAYMENT_SETTING_UPDATE.key());
+        assertThat(paymentUpdateHolders).isZero();
     }
 
     @Test

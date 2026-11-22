@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":modules:realtime"))
     implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
+    implementation(project(":modules:connector"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))
