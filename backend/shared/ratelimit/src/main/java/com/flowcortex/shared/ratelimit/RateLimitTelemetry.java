@@ -41,7 +41,7 @@ public class RateLimitTelemetry {
         }
     }
 
-    /** One store failure that was admitted through: counter every time, ERROR line once a minute. */
+    /** One store failure, admitted or refused per the definition: counter every time, ERROR line once a minute. */
     public void storeFailed(RateLimitDefinition definition, Exception cause) {
         try {
             meters.counter("rate_limit.store.failures", "limiter", definition.name()).increment();
@@ -51,8 +51,8 @@ public class RateLimitTelemetry {
         try {
             long suppressed = throttle(definition.name()).acquire(clock.instant());
             if (suppressed >= 0) {
-                LOG.error("rate_limit_store_failed limiter={} suppressed={} admittedWithoutLimit=true",
-                        definition.name(), suppressed, cause);
+                LOG.error("rate_limit_store_failed limiter={} suppressed={} admittedWithoutLimit={}",
+                        definition.name(), suppressed, !definition.failClosed(), cause);
             }
         } catch (RuntimeException e) {
             telemetryFailed(e);

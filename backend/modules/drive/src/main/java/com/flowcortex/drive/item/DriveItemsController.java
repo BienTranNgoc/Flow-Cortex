@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -58,6 +59,7 @@ class DriveItemsController {
 
     @Operation(operationId = "createDriveItem")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
     ResponseEntity<DriveItemResponse> create(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateDriveItemRequest request) {
         Caller caller = driveCaller.require(jwt);
@@ -84,6 +86,7 @@ class DriveItemsController {
 
     @Operation(operationId = "deleteDriveItem")
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         Caller caller = driveCaller.require(jwt);
         service.delete(caller, id);

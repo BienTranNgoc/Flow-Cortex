@@ -9753,12 +9753,12 @@ export const oneClickUnsubscribeEmailLink = async (
   );
 };
 
-export type requestDriveUploadResponse200 = {
+export type requestDriveUploadResponse201 = {
   data: DriveUploadResponse;
-  status: 200;
+  status: 201;
 };
 
-export type requestDriveUploadResponseSuccess = requestDriveUploadResponse200 & {
+export type requestDriveUploadResponseSuccess = requestDriveUploadResponse201 & {
   headers: Headers;
 };
 export type requestDriveUploadResponse = requestDriveUploadResponseSuccess;
@@ -9798,12 +9798,12 @@ export const requestDriveUpload = async (
   });
 };
 
-export type pinDriveMemoryResponse200 = {
+export type pinDriveMemoryResponse204 = {
   data: void;
-  status: 200;
+  status: 204;
 };
 
-export type pinDriveMemoryResponseSuccess = pinDriveMemoryResponse200 & {
+export type pinDriveMemoryResponseSuccess = pinDriveMemoryResponse204 & {
   headers: Headers;
 };
 export type pinDriveMemoryResponse = pinDriveMemoryResponseSuccess;
@@ -9822,12 +9822,12 @@ export const pinDriveMemory = async (
   });
 };
 
-export type unpinDriveMemoryResponse200 = {
+export type unpinDriveMemoryResponse204 = {
   data: void;
-  status: 200;
+  status: 204;
 };
 
-export type unpinDriveMemoryResponseSuccess = unpinDriveMemoryResponse200 & {
+export type unpinDriveMemoryResponseSuccess = unpinDriveMemoryResponse204 & {
   headers: Headers;
 };
 export type unpinDriveMemoryResponse = unpinDriveMemoryResponseSuccess;
@@ -9846,12 +9846,12 @@ export const unpinDriveMemory = async (
   });
 };
 
-export type hideDriveMemoryResponse200 = {
+export type hideDriveMemoryResponse204 = {
   data: void;
-  status: 200;
+  status: 204;
 };
 
-export type hideDriveMemoryResponseSuccess = hideDriveMemoryResponse200 & {
+export type hideDriveMemoryResponseSuccess = hideDriveMemoryResponse204 & {
   headers: Headers;
 };
 export type hideDriveMemoryResponse = hideDriveMemoryResponseSuccess;
@@ -9906,12 +9906,12 @@ export const listDriveItems = async (
   });
 };
 
-export type createDriveItemResponse200 = {
+export type createDriveItemResponse201 = {
   data: DriveItemResponse;
-  status: 200;
+  status: 201;
 };
 
-export type createDriveItemResponseSuccess = createDriveItemResponse200 & {
+export type createDriveItemResponseSuccess = createDriveItemResponse201 & {
   headers: Headers;
 };
 export type createDriveItemResponse = createDriveItemResponseSuccess;
@@ -13081,12 +13081,12 @@ export const getDriveItem = async (
   });
 };
 
-export type deleteDriveItemResponse200 = {
+export type deleteDriveItemResponse204 = {
   data: void;
-  status: 200;
+  status: 204;
 };
 
-export type deleteDriveItemResponseSuccess = deleteDriveItemResponse200 & {
+export type deleteDriveItemResponseSuccess = deleteDriveItemResponse204 & {
   headers: Headers;
 };
 export type deleteDriveItemResponse = deleteDriveItemResponseSuccess;
