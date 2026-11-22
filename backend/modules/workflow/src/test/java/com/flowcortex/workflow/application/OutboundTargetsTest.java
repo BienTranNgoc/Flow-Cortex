@@ -1,18 +1,15 @@
 package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import com.flowcortex.media.api.MediaJobs;
-import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.connector.api.HttpConnector;
 import com.flowcortex.workflow.application.OutboundTargets.Target;
-import java.time.Clock;
-import java.time.Duration;
+import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 class OutboundTargetsTest {
 
@@ -52,12 +49,22 @@ class OutboundTargetsTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void theProductionTableNamesOnlyRegisteredTypes() {
-        MediaJobs mediaJobs = mock(MediaJobs.class);
-        when(mediaJobs.providerLimits(anyString()))
-                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
-        StepExecutorRegistry registry = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
+        ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(mock(HttpConnector.class),
+                mock(WorkflowRunRepository.class), DubFixtures.dub(), mock(ObjectProvider.class));
+        StepExecutorRegistry registry = new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall));
 
         assertThat(registry.knownTypes()).containsAll(OutboundTargets.TABLE.keySet());
+    }
+
+    @Test
+    void aConnectorCallStepNamesItsUrlAsTheDestinationInTheProductionTable() {
+        List<Target> targets = OutboundTargets.targetsOf(List.of(step(2, "connector.call",
+                "{\"connector\":\"crm\",\"method\":\"POST\",\"url\":\"https://api.crm.example/v1/export\"}")),
+                OutboundTargets.TABLE);
+
+        assertThat(targets).containsExactly(
+                new Target(2, "connector.call", "url", "https://api.crm.example/v1/export"));
     }
 }
