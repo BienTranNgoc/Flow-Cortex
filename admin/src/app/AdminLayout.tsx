@@ -218,7 +218,7 @@ export function AdminLayout() {
                         <span>{me.email}</span>
                         <span className="cortex-admin-user-menu__role-pill">
                           <ShieldCheck aria-hidden="true" size={11} />
-                          {roleLabel(t, me.role)}
+                          {roleLabel(t, me.role, me.roleName)}
                         </span>
                       </div>
                     </div>
@@ -300,7 +300,7 @@ export function AdminLayout() {
                 <h2 id="cortex-admin-account-dialog-title">{displayName}</h2>
                 <span className="cortex-admin-account-dialog__role-pill">
                   <ShieldCheck aria-hidden="true" size={12} />
-                  {roleLabel(t, me.role)}
+                  {roleLabel(t, me.role, me.roleName)}
                 </span>
               </div>
               <div className="cortex-admin-account-dialog__email-row">
