@@ -19,7 +19,27 @@
   "vetoedNote": "Turned off by the server configuration; the stored value applies once it is lifted.",
   "degradedNote": "The settings store is unavailable, so a safe fallback applies.",
   "groups": {
-    "support": "Help Center"
+    "support": "Help Center",
+    "user": "Accounts"
+  },
+  "deletionConditions": {
+    "title": "Account deletion conditions",
+    "description": "A member cannot request deletion while an enabled condition below applies to them. The message is shown to the member in their language.",
+    "loadFailed": "Could not load the account deletion conditions.",
+    "empty": "There are no account deletion conditions to show.",
+    "enabled": "Blocks deletion",
+    "order": "Order",
+    "messageVi": "Message to the member (Vietnamese)",
+    "messageEn": "Message to the member (English)",
+    "messageLimit": "Up to {{max}} characters.",
+    "names": {
+      "workflow": {
+        "active_run": "A workflow is running"
+      },
+      "support": {
+        "open_request": "A support request is open"
+      }
+    }
   },
   "source": {
     "STORED": "Set by an admin",
@@ -45,6 +65,18 @@
     "older": "Older"
   },
   "keys": {
+    "user": {
+      "account_deletion": {
+        "enabled": {
+          "label": "Members can request account deletion",
+          "help": "Turning it off stops new requests; requests already made keep their deadline. Nothing is erased at the deadline until the erasure step ships."
+        },
+        "grace_period_days": {
+          "label": "Days to change one's mind",
+          "help": "A member can cancel until this many days after requesting. Each request keeps the period that applied when it was made. 1 to 365 days."
+        }
+      }
+    },
     "support": {
       "assistant": {
         "enabled": {

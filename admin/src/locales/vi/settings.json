@@ -19,7 +19,27 @@
   "vetoedNote": "Đang bị tắt bởi cấu hình máy chủ; giá trị đã lưu sẽ có hiệu lực khi cấu hình được gỡ.",
   "degradedNote": "Kho cài đặt không khả dụng nên đang áp dụng giá trị dự phòng an toàn.",
   "groups": {
-    "support": "Trung tâm trợ giúp"
+    "support": "Trung tâm trợ giúp",
+    "user": "Tài khoản"
+  },
+  "deletionConditions": {
+    "title": "Điều kiện chặn xoá tài khoản",
+    "description": "Thành viên không thể yêu cầu xoá tài khoản khi còn một điều kiện đang bật dưới đây áp dụng cho họ. Thông báo được hiển thị cho thành viên bằng ngôn ngữ của họ.",
+    "loadFailed": "Không tải được các điều kiện chặn xoá tài khoản.",
+    "empty": "Chưa có điều kiện chặn xoá tài khoản nào để hiển thị.",
+    "enabled": "Chặn việc xoá",
+    "order": "Thứ tự",
+    "messageVi": "Thông báo cho thành viên (tiếng Việt)",
+    "messageEn": "Thông báo cho thành viên (tiếng Anh)",
+    "messageLimit": "Tối đa {{max}} ký tự.",
+    "names": {
+      "workflow": {
+        "active_run": "Có quy trình đang chạy"
+      },
+      "support": {
+        "open_request": "Có yêu cầu hỗ trợ đang mở"
+      }
+    }
   },
   "source": {
     "STORED": "Do quản trị viên đặt",
@@ -45,6 +65,18 @@
     "older": "Cũ hơn"
   },
   "keys": {
+    "user": {
+      "account_deletion": {
+        "enabled": {
+          "label": "Thành viên được yêu cầu xoá tài khoản",
+          "help": "Tắt công tắc sẽ chặn các yêu cầu mới; yêu cầu đã gửi vẫn giữ hạn của mình. Chưa có dữ liệu nào bị xoá khi hết hạn cho đến khi bước xoá dữ liệu được phát hành."
+        },
+        "grace_period_days": {
+          "label": "Số ngày để thành viên đổi ý",
+          "help": "Thành viên có thể huỷ yêu cầu cho đến hết số ngày này kể từ lúc gửi. Mỗi yêu cầu giữ thời hạn đang áp dụng lúc gửi. Từ 1 đến 365 ngày."
+        }
+      }
+    },
     "support": {
       "assistant": {
         "enabled": {
