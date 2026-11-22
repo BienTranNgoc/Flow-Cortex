@@ -120,7 +120,18 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     @Transactional
     public WorkflowView createWorkflow(UUID ownerId, String name, boolean shared, List<NewWorkflowStep> steps) {
         writeAccess.validateDefinition(steps);
-        Workflow workflow = workflowRepository.save(new Workflow(UUID.randomUUID(), ownerId, name, shared));
+        return saveWithSteps(new Workflow(UUID.randomUUID(), ownerId, name, shared), steps);
+    }
+
+    @Override
+    @Transactional
+    public WorkflowView createDraft(UUID ownerId, String name, List<NewWorkflowStep> steps) {
+        writeAccess.validateDefinition(steps);
+        return saveWithSteps(Workflow.draft(UUID.randomUUID(), ownerId, name), steps);
+    }
+
+    private WorkflowView saveWithSteps(Workflow unsaved, List<NewWorkflowStep> steps) {
+        Workflow workflow = workflowRepository.save(unsaved);
 
         List<WorkflowStep> stepEntities = new ArrayList<>();
         short order = 1;
