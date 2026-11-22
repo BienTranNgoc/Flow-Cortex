@@ -6,14 +6,14 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from test_render_document import scene, style
+from test_render_document import scene, style, text_overlay, with_overlays
 from test_render_timeline import plan
 
 from flowcortex_worker.captions.line_breaks import FontMetrics, GlyphTable
+from flowcortex_worker.render.overlays import ass_escape
 from flowcortex_worker.render.subtitles import (
     FONT_SIZE_PCT,
     ass_document,
-    ass_escape,
     caption_styles,
     caption_text,
     line_breaks_by_syllables,
@@ -117,16 +117,14 @@ def test_box_backdrop_draws_no_shadow() -> None:
 
 
 def test_font_outside_the_library_is_refused() -> None:
-    p = planned(captions([cue()], base_style=style(fontFamily="Lora")))
-    with pytest.raises(ValueError, match=r"fontFamily is invalid.*Allowed"):
-        caption_styles(p, 1080, 1920, no_table)
+    with pytest.raises(ValueError, match=r"captions\.style\.fontFamily.*Lora"):
+        planned(captions([cue()], base_style=style(fontFamily="Lora")))
 
 
 def test_unused_project_style_is_still_checked() -> None:
     mutate = captions([cue()], styles={"bad": style(fontFamily="Lora")})
-    p = planned(mutate)
-    with pytest.raises(ValueError, match="Lora"):
-        caption_styles(p, 1080, 1920, no_table)
+    with pytest.raises(ValueError, match=r"captions\.styles\.bad\.fontFamily.*Lora"):
+        planned(mutate)
 
 
 def test_free_position_prints_an5_pos() -> None:
@@ -335,3 +333,57 @@ def test_timecode_never_reads_sixty_seconds() -> None:
     assert timecode(59999.9) == "0:01:00.00"
     assert timecode(3_723_450) == "1:02:03.45"
     assert timecode(-5) == "0:00:00.00"
+
+
+def overlays_on(*items: dict[str, Any], base_style: dict[str, Any] | None = None) -> Mutate:
+    def apply(raw: dict[str, Any]) -> None:
+        captions([cue()], base_style=base_style)(raw)
+        with_overlays(raw, *items)
+        raw["timeline"]["overlayRows"] = {"text": [{"id": "rw0"}, {"id": "rw1"}], "image": []}
+
+    return apply
+
+
+def test_row_zero_is_written_last_so_it_draws_on_top() -> None:
+    mutate = overlays_on(
+        text_overlay(id="top", row="rw0"),
+        text_overlay(id="low", row="rw1", text={"vi": "Dưới", "en": "Low"}),
+    )
+    text = render(mutate)
+    styles = [line for line in text.splitlines() if line.startswith("Style: Ov")]
+    assert [line.split(",")[0] for line in styles] == ["Style: Ov1", "Style: Ov0"]
+    overlay_events = [line for line in dialogues(text) if ",Ov" in line]
+    assert [line.split(",")[3] for line in overlay_events] == ["Ov1", "Ov0"]
+    assert text.index("Style: Cap,") < text.index("Style: Ov1,")
+    assert text.index("Dialogue: 0,") < text.index("Dialogue: 1,")
+
+
+def test_overlay_outside_the_window_writes_no_event_but_keeps_its_style() -> None:
+    text = render(overlays_on(text_overlay(startMs=0, endMs=1000)), start_ms=5000, dur_ms=3000)
+    assert not [line for line in dialogues(text) if ",Ov" in line]
+    assert "Style: Ov0," in text
+
+
+def test_sticker_base_font_is_the_caption_track_font() -> None:
+    mutate = overlays_on(text_overlay(), base_style=style(fontFamily="Roboto"))
+    assert style_line(render(mutate), "Ov0").startswith("Style: Ov0,Roboto,")
+    own = overlays_on(text_overlay(font="Anton"), base_style=style(fontFamily="Roboto"))
+    assert style_line(render(own), "Ov0").startswith("Style: Ov0,Anton,")
+
+
+def test_slide_up_across_a_chunk_boundary_enters_only_where_it_starts() -> None:
+    mutate = overlays_on(text_overlay(anim="slide_up", startMs=2000, endMs=7000))
+    first = [line for line in dialogues(render(mutate, start_ms=0, dur_ms=4000)) if ",Ov" in line]
+    assert "\\move(" in first[0] and "\\fad(400,0)" in first[0]
+    second = [
+        line for line in dialogues(render(mutate, start_ms=4000, dur_ms=4000)) if ",Ov" in line
+    ]
+    assert "\\pos(" in second[0] and "\\move" not in second[0] and "\\fad(0,200)" in second[0]
+    assert second[0].startswith("Dialogue: 1,0:00:00.00,0:00:03.00,")
+
+
+def test_overlay_text_is_escaped_and_never_reaches_a_style_name() -> None:
+    mutate = overlays_on(text_overlay(id="x,y\nz", text={"vi": "{\\b1}đậm", "en": "x"}))
+    text = render(mutate)
+    assert "x,y" not in text
+    assert next(line for line in dialogues(text) if ",Ov" in line).endswith("\\{\\\\b1\\}đậm")

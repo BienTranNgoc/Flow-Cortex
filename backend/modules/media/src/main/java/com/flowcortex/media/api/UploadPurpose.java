@@ -5,7 +5,11 @@ public enum UploadPurpose {
     /** A file a workflow run takes as input (video, audio or product image). */
     RUN_INPUT,
     /** An image attached to a support request or message. */
-    SUPPORT_ATTACHMENT;
+    SUPPORT_ATTACHMENT,
+    /** A video, audio or image file a member keeps in the Drive library; same formats and caps as a run input. */
+    DRIVE_ITEM,
+    /** A member's avatar or cover picture; only the owner ever sees it. */
+    PROFILE_IMAGE;
 
     /** Size cap of one support-attachment image; the purpose table and the support module both read it here. */
     public static final long SUPPORT_ATTACHMENT_MAX_BYTES = 5L * 1024 * 1024;

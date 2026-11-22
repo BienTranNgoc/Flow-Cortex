@@ -28,8 +28,9 @@ class StepExecutorRegistry {
 
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
-            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs) {
-        this(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate, tts));
+            VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall) {
+        this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
+                tts), workflowCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -63,6 +64,11 @@ class StepExecutorRegistry {
             StepExecutor tts) {
         executors.add(translate);
         executors.add(tts);
+        return executors;
+    }
+
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall) {
+        executors.add(workflowCall);
         return executors;
     }
 

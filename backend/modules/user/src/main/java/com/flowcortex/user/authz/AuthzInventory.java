@@ -6,9 +6,14 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /** Checks every mapped route against the posture rules; the result lists each breach, empty when sound. */
-final class AuthzInventory {
+public final class AuthzInventory {
 
     private AuthzInventory() {
+    }
+
+    /** The governed-path rule the posture check and the audit coverage check both apply. */
+    public static boolean isGoverned(String pattern) {
+        return GovernedPaths.isGoverned(pattern);
     }
 
     static List<String> violations(List<RouteDescriptor> routes, Set<String> seededKeys) {

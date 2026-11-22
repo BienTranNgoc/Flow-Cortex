@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { requestReplay } from '../features/onboarding/onboardingSession';
 import { useOnboardingStatus } from '../features/onboarding/useOnboarding';
+import { useImageFailure } from '../features/profile/useImageFailure';
+import { useProfileImagesQuery } from '../features/profile/useProfileImages';
 import { formatNumber } from '../lib/format';
 import { activeLocale } from '../lib/i18n';
 import { accountStatsEnabled, demoPagesEnabled } from './featureFlags';
@@ -45,6 +47,13 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
 
   const initials = initialsFrom(name, email);
   const canReplay = useOnboardingStatus().data?.entry === null;
+  const images = useProfileImagesQuery();
+  const avatar = useImageFailure(images.data?.avatar?.url);
+  const avatarContent = avatar.shown ? (
+    <img src={images.data?.avatar?.url} alt="" onError={avatar.onError} />
+  ) : (
+    initials
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +102,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
         onClick={() => setOpen((prev) => !prev)}
       >
         <span className="cortex-user-menu__avatar" aria-hidden="true">
-          {initials}
+          {avatarContent}
         </span>
       </button>
 
@@ -104,7 +113,7 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
               className="cortex-user-menu__avatar cortex-user-menu__avatar--lg"
               aria-hidden="true"
             >
-              {initials}
+              {avatarContent}
             </span>
             <div className="cortex-user-menu__identity-text">
               {typeof name === 'string' && name.trim().length > 0 && (

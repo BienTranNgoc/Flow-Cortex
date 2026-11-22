@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":modules:llm"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.

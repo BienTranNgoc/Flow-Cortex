@@ -4,6 +4,7 @@ import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.credit.api.InsufficientCreditsException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.workflow.api.WorkflowRunCompleted;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,13 +50,18 @@ class RunStepTransactions {
     private final WorkflowRunRepository workflowRunRepository;
     private final CreditAccounts creditAccounts;
     private final RunUpdates runUpdates;
+    private final ApplicationEventPublisher events;
+    private final ChildRuns childRuns;
 
     RunStepTransactions(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            CreditAccounts creditAccounts, RunUpdates runUpdates) {
+            CreditAccounts creditAccounts, RunUpdates runUpdates, ApplicationEventPublisher events,
+            ChildRuns childRuns) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.creditAccounts = creditAccounts;
         this.runUpdates = runUpdates;
+        this.events = events;
+        this.childRuns = childRuns;
     }
 
     /**
@@ -173,6 +180,7 @@ class RunStepTransactions {
         }
         runUpdates.touched(runId);
         creditAccounts.refundStep(runId, stepId, attempt, code);
+        childRuns.stopChildOfStep(stepId);
         if (settleIfCancelling(runId, now)) {
             return true;
         }
@@ -180,6 +188,7 @@ class RunStepTransactions {
         if (run.markError(message, now)) {
             workflowRunRepository.save(run);
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=error code={}", runId, code);
         }
         return true;
@@ -197,7 +206,9 @@ class RunStepTransactions {
         if (run.getStatus() == RunStatus.RUNNING) {
             run.markCompleted(now);
             workflowRunRepository.save(run);
+            events.publishEvent(new WorkflowRunCompleted(runId, run.getOwnerId()));
             runUpdates.touched(runId);
+            childRuns.finished(runId);
             LOG.info("Workflow run finished: runId={} status=completed", runId);
         }
     }
@@ -208,6 +219,7 @@ class RunStepTransactions {
             return false;
         }
         runUpdates.touched(runId);
+        childRuns.finished(runId);
         LOG.info("Workflow run finished: runId={} status=cancelled", runId);
         return true;
     }
