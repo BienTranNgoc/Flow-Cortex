@@ -77,6 +77,7 @@ class SupportSlaSweepIT extends AbstractPostgresBootTest {
     private UserView linh;
     private UserView minh;
     private UserView member;
+    private List<UUID> parked = List.of();
 
     record LoginRequest(String email, String password) {
     }
@@ -127,10 +128,17 @@ class SupportSlaSweepIT extends AbstractPostgresBootTest {
                 "CUSTOMER_SUPPORT");
         member = userService.createUser(admin.id(), "sweep-member-" + run + "@nodi.test", PASSWORD, "Member",
                 "MEMBER");
+        // The sweep alerts at most 500 holders, first by email, and the suite's other classes leave hundreds
+        // of console accounts in the shared database; set them aside so the holders are this test's own.
+        parked = jdbc.queryForList("UPDATE app_user SET admin_disabled_at = now(), admin_disabled_by = ? "
+                + "WHERE admin_disabled_at IS NULL AND role <> 'MEMBER' AND id NOT IN (?, ?, ?) RETURNING id",
+                UUID.class, admin.id(), admin.id(), minh.id(), linh.id());
     }
 
     @AfterEach
     void restoreSettings() {
+        jdbc.batchUpdate("UPDATE app_user SET admin_disabled_at = NULL, admin_disabled_by = NULL WHERE id = ?",
+                parked.stream().map(id -> new Object[] {id}).toList());
         FailingPublisher.FAIL_FOR_SUBJECT.set(null);
         jdbc.update("DELETE FROM app_setting WHERE key LIKE 'support.sla.%'");
         jdbc.update("DELETE FROM app_setting_change WHERE key LIKE 'support.sla.%'");
