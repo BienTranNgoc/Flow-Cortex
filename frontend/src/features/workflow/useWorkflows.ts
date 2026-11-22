@@ -63,6 +63,8 @@ export function useWorkflowExamplesQuery() {
   return useQuery({
     queryKey: ['workflow-examples', locale],
     queryFn: () => unwrapSuccess(listWorkflowExamples(authHeaders())),
+    // The catalog ships with the server build, so it cannot change under an open page.
+    staleTime: Infinity,
   });
 }
 
