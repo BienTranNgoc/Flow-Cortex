@@ -166,6 +166,17 @@
     "selectedCount_other": "{{count}} selected",
     "pickAssignee": "Choose a person",
     "assigneesFailed": "Could not load the list of staff.",
+    "sla": {
+      "bannerLabel": "Response time",
+      "summary": "{{overdue}} overdue · {{dueSoon}} due soon",
+      "showAtRisk": "Show at-risk only",
+      "showAll": "Show all",
+      "level": {
+        "due_soon": "Due soon",
+        "overdue": "Overdue"
+      },
+      "badgeLabel": "Response time: {{level}}"
+    },
     "bulk": {
       "label": "Assign selected requests",
       "assignTo": "Assign to",

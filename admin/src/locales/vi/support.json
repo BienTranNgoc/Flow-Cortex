@@ -166,6 +166,17 @@
     "selectedCount_other": "Đã chọn {{count}}",
     "pickAssignee": "Chọn người phụ trách",
     "assigneesFailed": "Không tải được danh sách nhân viên.",
+    "sla": {
+      "bannerLabel": "Thời hạn xử lý",
+      "summary": "{{overdue}} quá hạn · {{dueSoon}} sắp quá hạn",
+      "showAtRisk": "Chỉ xem yêu cầu có nguy cơ quá hạn",
+      "showAll": "Xem tất cả",
+      "level": {
+        "due_soon": "Sắp quá hạn",
+        "overdue": "Quá hạn"
+      },
+      "badgeLabel": "Thời hạn xử lý: {{level}}"
+    },
     "bulk": {
       "label": "Giao các yêu cầu đã chọn",
       "assignTo": "Giao cho",

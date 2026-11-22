@@ -97,6 +97,30 @@
           "label": "Số tháng lưu yêu cầu đã đóng",
           "help": "Tính từ hoạt động cuối của yêu cầu. Từ 6 đến 120 tháng."
         }
+      },
+      "sla": {
+        "alerts": {
+          "enabled": {
+            "label": "Cảnh báo quản trị viên về yêu cầu trễ hạn",
+            "help": "Rung chuông quản trị khi một yêu cầu sắp quá hạn hoặc đã quá hạn. Khi tắt, hộp thư vẫn hiện mức xử lý của từng yêu cầu."
+          }
+        },
+        "new_hours": {
+          "label": "Số giờ trước khi yêu cầu mới quá hạn",
+          "help": "Tính từ hoạt động cuối của yêu cầu. Từ 1 đến 720 giờ. Mốc cảnh báo bằng hoặc cao hơn giới hạn này thì không có mức \"sắp quá hạn\"."
+        },
+        "new_warn_hours": {
+          "label": "Số giờ trước khi yêu cầu mới sắp quá hạn",
+          "help": "Tính từ hoạt động cuối của yêu cầu. Từ 1 đến 720 giờ. Bằng hoặc cao hơn giới hạn thì không bao giờ hiện \"sắp quá hạn\"."
+        },
+        "in_progress_days": {
+          "label": "Số ngày trước khi yêu cầu đang xử lý quá hạn",
+          "help": "Tính từ hoạt động cuối của yêu cầu. Từ 1 đến 90 ngày. Mốc cảnh báo bằng hoặc cao hơn giới hạn này thì không có mức \"sắp quá hạn\"."
+        },
+        "in_progress_warn_days": {
+          "label": "Số ngày trước khi yêu cầu đang xử lý sắp quá hạn",
+          "help": "Tính từ hoạt động cuối của yêu cầu. Từ 1 đến 90 ngày. Bằng hoặc cao hơn giới hạn thì không bao giờ hiện \"sắp quá hạn\"."
+        }
       }
     }
   }

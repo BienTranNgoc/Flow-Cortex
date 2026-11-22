@@ -1,6 +1,7 @@
 import {
   ApiError,
   ListAdminSupportRequestsCreated,
+  ListAdminSupportRequestsSla,
   ListAdminSupportRequestsSort,
   ListAdminSupportRequestsStatus,
   ListAdminSupportRequestsType,
@@ -23,6 +24,7 @@ import { activeLocale } from '../../../lib/i18n';
 import { useMeQuery } from '../../auth/useAuth';
 import './requests.css';
 import { RequestTime } from './RequestTime';
+import { SlaBadge, SlaBanner } from './SlaBanner';
 import { AssigneeLabel, RequesterLabel, StatusBadge } from './StatusBadge';
 import { useAssignees } from './useAssignees';
 import {
@@ -36,6 +38,7 @@ const STATUSES = Object.values(ListAdminSupportRequestsStatus);
 const TYPES = Object.values(ListAdminSupportRequestsType);
 const CREATED = Object.values(ListAdminSupportRequestsCreated);
 const SORTS = Object.values(ListAdminSupportRequestsSort);
+const SLAS = Object.values(ListAdminSupportRequestsSla);
 const FAILURE_REASONS: readonly SupportBulkAssignFailureReason[] = [
   'not_found',
   'closed',
@@ -67,6 +70,7 @@ function readFilter(params: URLSearchParams): RequestFilter {
         : undefined,
     created: oneOf(CREATED, params.get('created')),
     q: q || undefined,
+    sla: oneOf(SLAS, params.get('sla')),
     sort: oneOf(SORTS, params.get('sort')),
     page: Number.isInteger(page) && page > 0 ? Math.min(page, MAX_PAGE) : 0,
   };
@@ -133,7 +137,9 @@ export function RequestsInboxPage() {
     );
   };
 
-  const filtered = Boolean(filter.type || filter.assignee || filter.created || filter.q);
+  const filtered = Boolean(
+    filter.type || filter.assignee || filter.created || filter.q || filter.sla,
+  );
   const statusLabel = (value: string) =>
     oneOf(STATUSES, value)
       ? withCount(t, t(`support.requests.status.${value}`), countOf(facets?.status, value))
@@ -151,6 +157,13 @@ export function RequestsInboxPage() {
       </div>
 
       <div className="request-inbox">
+        <SlaBanner
+          filter={filter}
+          atRisk={filter.sla === ListAdminSupportRequestsSla.at_risk}
+          onToggle={(atRisk) =>
+            change({ sla: atRisk ? ListAdminSupportRequestsSla.at_risk : undefined })
+          }
+        />
         <AdminList
           toolbar={{
             label: t('support.requests.filtersLabel'),
@@ -429,7 +442,10 @@ function RequestsTable({
               {t(`support.requests.type.${request.type}`)}
             </td>
             <td className="request-cell-fit" data-label={t('support.requests.columns.status')}>
-              <StatusBadge status={request.status} />
+              <div className="request-status-cell">
+                <StatusBadge status={request.status} />
+                <SlaBadge level={request.slaLevel} />
+              </div>
             </td>
             <td data-label={t('support.requests.columns.assignee')}>
               <AssigneeLabel assignee={request.assignee} />

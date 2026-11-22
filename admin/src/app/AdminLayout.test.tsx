@@ -10,6 +10,10 @@ import { ADMIN_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { stubMatchMedia } from '../test/matchMedia';
 import { AdminLayout } from './AdminLayout';
 
+const BELL_ROUTES = {
+  'GET /api/v1/notifications/unread-count': { status: 200, body: { unreadCount: 3 } },
+};
+
 function Exploding(): never {
   throw new TypeError('Runs exploded');
 }
@@ -75,7 +79,7 @@ afterAll(() => consoleError.mockRestore());
 
 describe('AdminLayout', () => {
   it('contains a page that throws inside the shell, with Reload and one structured event', async () => {
-    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-layout', true);
     window.history.pushState({}, '', '/runs');
 
@@ -101,7 +105,7 @@ describe('AdminLayout', () => {
   });
 
   it('opens the account menu, shows identity, and closes after clicking outside', async () => {
-    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-menu', true);
     renderAdminPage();
 
@@ -126,8 +130,18 @@ describe('AdminLayout', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('shows the notification bell with its unread count before the language toggle', async () => {
+    stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    setToken('admin-token-bell', true);
+    renderAdminPage();
+
+    const bell = await screen.findByRole('button', { name: 'Notifications, 3 unread' });
+    const language = screen.getByRole('group', { name: 'Language' });
+    expect(bell.compareDocumentPosition(language) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('supports menu arrow navigation and Escape returns focus to the trigger', async () => {
-    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-menu-keys', true);
     renderAdminPage();
 
@@ -148,7 +162,7 @@ describe('AdminLayout', () => {
   });
 
   it('opens account details from the menu and restores focus after closing', async () => {
-    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+    stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-account-details', true);
     renderAdminPage();
 
@@ -174,7 +188,7 @@ describe('AdminLayout', () => {
 
     it('honours a collapsed choice stored before the redesign and renders the rail', async () => {
       localStorage.setItem('flow-cortex:admin:sidebar:collapsed', '1');
-      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
       setToken('admin-token-rail', true);
       renderAdminPage();
 
@@ -187,7 +201,7 @@ describe('AdminLayout', () => {
     });
 
     it('collapses from the control inside the sidebar and keeps the rail after a reload', async () => {
-      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
       setToken('admin-token-toggle', true);
       const first = renderAdminPage();
 
@@ -207,7 +221,7 @@ describe('AdminLayout', () => {
   describe('drawer below 1024px', () => {
     it('opens from the topbar menu button and returns focus to it after a choice', async () => {
       stubMatchMedia(false);
-      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
       setToken('admin-token-drawer', true);
       renderAdminPage();
 
@@ -227,7 +241,7 @@ describe('AdminLayout', () => {
 
     it('closes when the viewport reaches 1024px and puts focus on the main region', async () => {
       const media = stubMatchMedia(false);
-      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
       setToken('admin-token-grow', true);
       const { container } = renderAdminPage();
 
@@ -251,7 +265,7 @@ describe('AdminLayout', () => {
     });
 
     it('labels the header, its toggles and the account menu in Vietnamese', async () => {
-      stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
+      stubApi({ ...BELL_ROUTES, 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
       setToken('admin-token-layout-vi', true);
       renderAdminPage();
 
@@ -259,6 +273,9 @@ describe('AdminLayout', () => {
         name: `${ADMIN_ME.name}, menu tài khoản`,
       });
       expect(screen.getByRole('group', { name: viCommon.language.groupLabel })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: viCommon.bell.label.replace('{{unread}}', '3') }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole('button', {
           name: new RegExp(`${viCommon.theme.switchToLight}|${viCommon.theme.switchToDark}`),
