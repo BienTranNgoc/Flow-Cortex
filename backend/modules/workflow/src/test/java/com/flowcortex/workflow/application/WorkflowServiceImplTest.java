@@ -178,6 +178,61 @@ class WorkflowServiceImplTest {
     }
 
     @Test
+    void updateSetsAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+
+        WorkflowView on = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, true));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(on.allowFork()).isTrue();
+
+        WorkflowView untouched = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow("W2", null, null));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(untouched.allowFork()).isTrue();
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, false));
+        assertThat(workflow.isAllowFork()).isFalse();
+    }
+
+    @Test
+    void aNonOwnerCannotSetAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
+
+        assertThatThrownBy(() -> service.updateWorkflow(BEN, workflow.getId(),
+                new UpdateWorkflow(null, null, true))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+
+        assertThat(workflow.isAllowFork()).isFalse();
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void anAdminSetsAllowForkOnAnyWorkflow() {
+        Workflow seeded = stored(published(NIL_OWNER, true));
+        withSteps(seeded, "echo");
+        Workflow members = stored(published(ANA, false));
+        withSteps(members, "echo");
+
+        service.updateWorkflow(Caller.admin(CLEO), seeded.getId(), new UpdateWorkflow(null, null, true));
+        service.updateWorkflow(Caller.admin(CLEO), members.getId(), new UpdateWorkflow(null, null, true));
+
+        assertThat(seeded.isAllowFork()).isTrue();
+        assertThat(members.isAllowFork()).isTrue();
+    }
+
+    @Test
+    void createdDraftsHaveForkingOff() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView view = service.createDraft(ANA, "Fresh");
+
+        assertThat(view.allowFork()).isFalse();
+        assertThat(view.forkCount()).isZero();
+        assertThat(view.forkedFromId()).isNull();
+    }
+
+    @Test
     void aNonOwnerWhoCannotSeeTheDraftGetsNotFound() {
         Workflow sharedDraft = stored(draft(ANA, true));
         Workflow privatePublished = stored(published(ANA, false));

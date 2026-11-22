@@ -447,6 +447,9 @@ flowcortex:
       # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
       # child is stopped. Covers a child of four media steps at their queue and run bounds.
       max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
+    # How often reviews of an uploaded workflow file that were never imported are deleted.
+    import-review:
+      purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every

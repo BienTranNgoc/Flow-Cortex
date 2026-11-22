@@ -16,7 +16,8 @@ final class AuthoringRequests {
     }
 
     static UpdateWorkflow update(UpdateWorkflowRequest request) {
-        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.status());
+        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.status(),
+                request.allowFork());
     }
 
     static NewStep newStep(CreateStepRequest request) {
