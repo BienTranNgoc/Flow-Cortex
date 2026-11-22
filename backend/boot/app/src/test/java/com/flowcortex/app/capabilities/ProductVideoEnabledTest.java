@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.user.authz.CallerFactsLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ class ProductVideoEnabledTest {
 
     @MockitoBean
     private MediaJobs mediaJobs;
+
+    @MockitoBean
+    private CallerFactsLoader callerFactsLoader;
 
     @BeforeEach
     void enableMedia() {

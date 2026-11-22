@@ -3,20 +3,27 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@flow-cortex/api-client';
-import type { UserResponse } from '@flow-cortex/api-client';
+import type { UpdateUserRequest, UserResponse } from '@flow-cortex/api-client';
 import { Link } from 'react-router-dom';
+import { can } from '../../app/permissions';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { useMeQuery } from '../auth/useAuth';
 import { roleLabel, statusLabel } from './enumLabels';
+import { RoleOptions } from './RoleOptions';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation } from './useUsers';
 
 /** One row of the users table — view mode, or an inline edit form. */
 export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const { t } = useTranslation();
+  const me = useMeQuery().data;
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
-  const role = user.role === 'ADMIN' || user.role === 'CREATOR' ? user.role : 'MEMBER';
+  const { assignable, names } = useAssignableRoles();
+  const role = user.role || 'MEMBER';
+  const status = user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
   const {
     register,
     handleSubmit,
@@ -27,7 +34,7 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       email: user.email ?? '',
       name: user.name ?? '',
       role,
-      status: user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
+      status,
     },
   });
 
@@ -37,7 +44,10 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const id = user.id;
 
   const onSave = handleSubmit((values) => {
-    updateMutation.mutate({ id, changes: values }, { onSuccess: () => setEditing(false) });
+    const changes: UpdateUserRequest = { email: values.email, name: values.name };
+    if (values.role !== role) changes.role = values.role;
+    if (values.status !== status) changes.status = values.status;
+    updateMutation.mutate({ id, changes }, { onSuccess: () => setEditing(false) });
   });
 
   const updateError =
@@ -78,15 +88,25 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
             </div>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-role-${id}`}>{t('users.row.role')}</label>
-              <select id={`edit-role-${id}`} {...register('role')}>
-                <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
-                <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
-                <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
+              <select
+                id={`edit-role-${id}`}
+                disabled={assignable.length === 0}
+                {...register('role')}
+              >
+                <RoleOptions
+                  roles={assignable}
+                  current={role}
+                  names={{ [role]: user.roleName, ...names }}
+                />
               </select>
             </div>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-status-${id}`}>{t('users.row.status')}</label>
-              <select id={`edit-status-${id}`} {...register('status')}>
+              <select
+                id={`edit-status-${id}`}
+                disabled={!can(me, 'user.account.suspend')}
+                {...register('status')}
+              >
                 <option value="ACTIVE">{t('users.status.ACTIVE')}</option>
                 <option value="SUSPENDED">{t('users.status.SUSPENDED')}</option>
               </select>
@@ -124,7 +144,9 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       </td>
       <td data-label={t('users.columns.email')}>{user.email}</td>
       <td data-label={t('users.columns.role')}>
-        <span className="cortex-admin-pill cortex-admin-pill--info">{roleLabel(t, user.role)}</span>
+        <span className="cortex-admin-pill cortex-admin-pill--info">
+          {roleLabel(t, user.role, user.roleName)}
+        </span>
       </td>
       <td data-label={t('users.columns.status')}>
         <span

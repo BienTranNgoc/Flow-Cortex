@@ -1,8 +1,11 @@
 package com.flowcortex.onboarding.web;
 
 import com.flowcortex.onboarding.application.OnboardingSampleService;
+import com.flowcortex.shared.security.authz.Permission;
+import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -12,7 +15,6 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,11 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code /api/v1/admin/onboarding/sample} — the workflow new members are offered at the end of the
- * onboarding journey, the input typed for it and that input's translations. ADMIN only.
+ * onboarding journey, the input typed for it and that input's translations. Reading needs
+ * {@code platform.setting.view}, every write {@code platform.setting.update}.
  */
 @RestController
 @RequestMapping("/api/v1/admin/onboarding/sample")
-@PreAuthorize("hasRole('ADMIN')")
 class AdminOnboardingSampleController {
 
     private final OnboardingSampleService sample;
@@ -47,6 +49,7 @@ class AdminOnboardingSampleController {
     @ApiResponse(responseCode = "403", description = "the caller is not an admin",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.PLATFORM_SETTING_VIEW)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     AdminOnboardingSample get() {
         return AdminOnboardingSample.of(sample.view());
@@ -67,6 +70,9 @@ class AdminOnboardingSampleController {
             description = "ONBOARDING_SAMPLE_INELIGIBLE (errors.workflowId says why); the stored sample is unchanged",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
+    @AdminAudit(value = "onboarding_sample.update", resourceParam = "workflowId",
+            capture = {"workflowId", "sourceLocale"})
     @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     AdminOnboardingSample update(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AdminOnboardingSampleUpdate body) {
         UUID workflowId = body.workflowId() == null ? null : UUID.fromString(body.workflowId());
@@ -93,6 +99,8 @@ class AdminOnboardingSampleController {
     @ApiResponse(responseCode = "422", description = "the sample's own language has no translation (errors.locale)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.PLATFORM_SETTING_UPDATE)
+    @AdminAudit(value = "onboarding_sample.translate", resourceParam = "locale", params = "locale")
     @PutMapping(value = "/translations/{locale}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     AdminOnboardingSample updateTranslation(@AuthenticationPrincipal Jwt jwt,

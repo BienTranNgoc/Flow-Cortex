@@ -12,8 +12,10 @@ const step = (type: string, stepOrder: number) => ({
 const workflow = (name: string, types: readonly string[]): WorkflowResponse => ({
   id: name,
   name,
-  isShared: true,
+  visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
   steps: types.map((type, index) => step(type, index + 1)),
 });
 

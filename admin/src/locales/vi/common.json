@@ -60,6 +60,7 @@
         "administration": "Quản trị",
         "system": "Hệ thống",
         "support": "Hỗ trợ",
+        "content": "Nội dung",
         "chat": "Trò chuyện"
       },
       "items": {
@@ -69,8 +70,11 @@
         "approvals": "Hàng chờ duyệt",
         "credits": "Credit & ví",
         "providers": "Nhà cung cấp mô hình",
+        "paymentSettings": "Cài đặt thanh toán",
         "users": "Người dùng",
         "smsOutbox": "Hộp thư đi SMS",
+        "phoneVerification": "Xác minh số điện thoại",
+        "settings": "Cài đặt",
         "features": "Công tắc tính năng",
         "auditLog": "Nhật ký kiểm toán",
         "mediaJobs": "Tác vụ media",
@@ -81,13 +85,23 @@
         "supportRequests": "Yêu cầu",
         "supportSettings": "Cài đặt trợ lý",
         "onboardingSample": "Mẫu làm quen",
+        "adminAccounts": "Tài khoản quản trị",
+        "roles": "Vai trò & quyền",
+        "contentDocuments": "Tài liệu",
+        "contentMedia": "Thư viện media",
         "chatSettings": "Cài đặt"
       }
     },
     "noAccess": {
       "title": "Không có quyền truy cập",
-      "messageWithEmail": "<account>{{email}}</account> không có vai trò ADMIN nên không thể dùng trang quản trị.",
-      "message": "Tài khoản này không có vai trò ADMIN nên không thể dùng trang quản trị.",
+      "messageWithEmail": "<account>{{email}}</account> không có quyền quản trị nào nên không thể dùng trang quản trị.",
+      "message": "Tài khoản này không có quyền quản trị nào nên không thể dùng trang quản trị.",
+      "signOut": "Đăng xuất"
+    },
+    "disabled": {
+      "title": "Tài khoản quản trị của bạn đã bị vô hiệu hóa",
+      "messageWithEmail": "<account>{{email}}</account> đã bị vô hiệu hóa nên không thể dùng trang quản trị. Hãy nhờ quản trị viên cấp cao kích hoạt lại. Bạn vẫn dùng được ứng dụng thành viên.",
+      "message": "Tài khoản quản trị này đã bị vô hiệu hóa nên không thể dùng trang quản trị. Hãy nhờ quản trị viên cấp cao kích hoạt lại. Bạn vẫn dùng được ứng dụng thành viên.",
       "signOut": "Đăng xuất"
     },
     "session": {
@@ -113,6 +127,15 @@
       "previousPage": "Trang trước",
       "pager": "Trang {{page}}/{{pages}} · {{total}} {{noun}}",
       "nextPage": "Trang sau"
+    },
+    "export": {
+      "button": "Xuất CSV",
+      "working": "Đang chuẩn bị tệp…",
+      "done": "Đã lưu {{fileName}}.",
+      "capped": "Tệp chứa {{shown}} {{noun}} mới nhất trong tổng số {{total}}.",
+      "forbidden": "Bạn không có quyền xuất dữ liệu.",
+      "disabled": "Trang quản trị đang tạm tắt",
+      "failed": "Không xuất được. Hãy thử lại."
     }
   }
 }

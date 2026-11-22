@@ -10,11 +10,22 @@ import { queryClient } from './app/queryClient';
 import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
+import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
+import { DocumentEditorPage } from './features/content/DocumentEditorPage';
+import { DocumentsPage } from './features/content/DocumentsPage';
+import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { OnboardingSamplePage } from './features/onboarding/OnboardingSamplePage';
+import { RoleDetailPage } from './features/roles/RoleDetailPage';
+import { RolesPage } from './features/roles/RolesPage';
+import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
+import { ProvidersPage } from './features/providers/ProvidersPage';
+import { RunDetailPage } from './features/runs/RunDetailPage';
+import { PaymentSettingsPage } from './features/paymentSettings/PaymentSettingsPage';
 import { RunsPage } from './features/runs/RunsPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
 import { ArticleEditorPage } from './features/support/kb/ArticleEditorPage';
 import { ArticlesPage } from './features/support/kb/ArticlesPage';
@@ -24,32 +35,48 @@ import { RequestsInboxPage } from './features/support/requests/RequestsInboxPage
 import { SupportSettingsPage } from './features/support/settings/SupportSettingsPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
+import { WorkflowReportPage } from './features/workflows/WorkflowReportPage';
+import { WorkflowsPage } from './features/workflows/WorkflowsPage';
 
 const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
+  '/workflows': <WorkflowsPage />,
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
+  '/providers': <ProvidersPage />,
   '/sms-outbox': <SmsOutboxPage />,
+  '/phone-verification': <PhoneVerificationStatusPage />,
+  '/settings': <SettingsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/onboarding-sample': <OnboardingSamplePage />,
+  '/admin-accounts': <AdminAccountsPage />,
+  '/roles': <RolesPage />,
+  '/payment-settings': <PaymentSettingsPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,
   '/support/requests': <RequestsInboxPage />,
   '/support/settings': <SupportSettingsPage />,
   '/chat/settings': <ChatSettingsPage />,
+  '/content/documents': <DocumentsPage />,
+  '/content/media': <MediaLibraryPage />,
 };
 
 /** Pages under a sidebar entry, routable only where that entry is. */
 const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
+  { parent: '/workflows', path: '/workflows/:workflowId', element: <WorkflowReportPage /> },
+  { parent: '/runs', path: '/runs/:runId', element: <RunDetailPage /> },
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
+  { parent: '/roles', path: '/roles/new', element: <RoleDetailPage /> },
+  { parent: '/roles', path: '/roles/:code', element: <RoleDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
   { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },
+  { parent: '/content/documents', path: '/content/documents/:slug', element: <DocumentEditorPage /> },
 ];
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */
 function AdminRoutes() {
   const { t } = useTranslation();
-  const items = reachableItems(useMeQuery().data?.role);
+  const items = reachableItems(useMeQuery().data);
   const home = items[0]?.path;
 
   return (

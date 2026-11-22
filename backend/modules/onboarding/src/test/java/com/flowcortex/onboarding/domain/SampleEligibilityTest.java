@@ -7,6 +7,7 @@ import com.flowcortex.workflow.api.AudienceView.Audience;
 import com.flowcortex.workflow.api.AudienceView.StartKind;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -23,8 +24,8 @@ class SampleEligibilityTest {
 
     private static AudienceView view(Audience audience, List<WorkflowStepView> steps, boolean available,
             StartKind startKind) {
-        WorkflowView workflow = new WorkflowView(UUID.randomUUID(), UUID.randomUUID(), "Sample", true,
-                Instant.EPOCH, Instant.EPOCH, steps, available, "published");
+        WorkflowView workflow = new WorkflowView(UUID.randomUUID(), UUID.randomUUID(), "Sample",
+                WorkflowVisibility.PUBLIC, Instant.EPOCH, Instant.EPOCH, steps, available, "published", null, null);
         return new AudienceView(audience, workflow, startKind);
     }
 

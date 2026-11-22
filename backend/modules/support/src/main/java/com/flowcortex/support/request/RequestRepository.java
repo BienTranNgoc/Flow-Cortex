@@ -1,13 +1,18 @@
 package com.flowcortex.support.request;
 
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.support.request.InboxQuery.CreatedBucket;
+import com.flowcortex.support.request.InboxQuery.InboxFilter;
+import com.flowcortex.support.request.InboxSql.Dimension;
+import com.flowcortex.support.request.InboxSql.Where;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
@@ -24,14 +29,15 @@ class RequestRepository {
 
     private static final String REQUEST_COLUMNS = "id, number, requester_id, type, subject, status, "
             + "ai_conversation_id, ai_conversation_linked, member_unread, last_activity_at, resolved_at, "
-            + "resolved_seen_at, closed_reason, created_at";
+            + "resolved_seen_at, closed_reason, created_at, assignee_id, locale";
     private static final RowMapper<RequestRow> REQUEST = (rs, n) -> new RequestRow(
             rs.getObject("id", UUID.class), rs.getLong("number"), rs.getObject("requester_id", UUID.class),
             rs.getString("type"), rs.getString("subject"), RequestStatus.of(rs.getString("status")),
             rs.getObject("ai_conversation_id", UUID.class), rs.getBoolean("ai_conversation_linked"),
             rs.getBoolean("member_unread"),
             instant(rs, "last_activity_at"), instant(rs, "resolved_at"), instant(rs, "resolved_seen_at"),
-            rs.getString("closed_reason"), instant(rs, "created_at"));
+            rs.getString("closed_reason"), instant(rs, "created_at"), rs.getObject("assignee_id", UUID.class),
+            rs.getString("locale"));
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -42,11 +48,32 @@ class RequestRepository {
     /**
      * @param aiConversationLinked whether the request was filed with a conversation; it stays true once the
      *        retention job deletes that conversation and {@code aiConversationId} becomes null
+     * @param assigneeId the staff account the request is assigned to, or null
+     * @param locale the language the member filed the request in
      */
     record RequestRow(UUID id, long number, UUID requesterId, String type, String subject, RequestStatus status,
             UUID aiConversationId, boolean aiConversationLinked, boolean memberUnread, Instant lastActivityAt,
-            Instant resolvedAt, Instant resolvedSeenAt, String closedReason, Instant createdAt) {
+            Instant resolvedAt, Instant resolvedSeenAt, String closedReason, Instant createdAt, UUID assigneeId,
+            String locale) {
     }
+
+    /** Raw inbox counts: only the options that have requests appear; {@code people} are the largest groups. */
+    record FacetRows(Map<String, Long> status, Map<String, Long> type, Map<String, Long> created, long unassigned,
+            long mine, List<AssigneeGroup> people) {
+    }
+
+    record AssigneeGroup(UUID id, long count) {
+    }
+
+    record DueReplyMail(UUID id, Instant dueAt) {
+    }
+
+    /** The reply mail a claim took over from the request row. */
+    record ClaimedReplyMail(UUID requestId, long number, UUID requesterId, String locale, UUID messageId) {
+    }
+
+    /** People shown in the assignee counts. */
+    static final int FACET_PEOPLE = 50;
 
     record MessageRow(UUID id, String authorKind, String body, Instant createdAt) {
     }
@@ -93,16 +120,69 @@ class RequestRepository {
                 REQUEST);
     }
 
-    List<RequestRow> page(String status, String type, int offset, int limit) {
-        return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request" + filter(status, type)
-                + " ORDER BY last_activity_at DESC, number DESC OFFSET :offset LIMIT :limit",
-                filterParams(status, type).addValue("offset", offset).addValue("limit", limit), REQUEST);
+    List<RequestRow> page(InboxFilter filter, int offset, int limit) {
+        Where where = InboxSql.where(filter, null);
+        return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request" + where.sql()
+                + InboxSql.orderBy(filter.sort()) + " OFFSET :offset LIMIT :limit",
+                where.params().addValue("offset", offset).addValue("limit", limit), REQUEST);
     }
 
-    long count(String status, String type) {
-        Long count = jdbc.queryForObject("SELECT count(*) FROM support_request" + filter(status, type),
-                filterParams(status, type), Long.class);
+    long count(InboxFilter filter) {
+        Where where = InboxSql.where(filter, null);
+        Long count = jdbc.queryForObject("SELECT count(*) FROM support_request" + where.sql(), where.params(),
+                Long.class);
         return count;
+    }
+
+    /**
+     * Four grouped counts, each under the filter minus its own dimension, plus the unassigned and the
+     * caller's own counts and the {@link #FACET_PEOPLE} largest assignee groups.
+     */
+    FacetRows facets(InboxFilter filter, UUID caller) {
+        Map<String, Long> status = grouped("status", InboxSql.where(filter, Dimension.STATUS));
+        Map<String, Long> type = grouped("type", InboxSql.where(filter, Dimension.TYPE));
+        Where createdWhere = InboxSql.where(filter, Dimension.CREATED);
+        Instant now = filter.now();
+        Map<String, Long> created = grouped("CASE WHEN created_at > :bucketDay THEN 'today' "
+                + "WHEN created_at > :bucketWeek THEN '7d' WHEN created_at > :bucketMonth THEN '30d' "
+                + "ELSE 'older' END", new Where(createdWhere.sql(), createdWhere.params()
+                .addValue("bucketDay", Timestamp.from(CreatedBucket.TODAY.bounds(now).after()))
+                .addValue("bucketWeek", Timestamp.from(CreatedBucket.WEEK.bounds(now).after()))
+                .addValue("bucketMonth", Timestamp.from(CreatedBucket.MONTH.bounds(now).after()))));
+        Where assigneeWhere = InboxSql.where(filter, Dimension.ASSIGNEE);
+        long[] counts = jdbc.queryForObject("SELECT count(*) FILTER (WHERE assignee_id IS NULL), "
+                + "count(*) FILTER (WHERE assignee_id = :caller) FROM support_request" + assigneeWhere.sql(),
+                assigneeWhere.params().addValue("caller", caller),
+                (rs, n) -> new long[] {rs.getLong(1), rs.getLong(2)});
+        List<AssigneeGroup> people = jdbc.query("SELECT assignee_id, count(*) AS total FROM support_request"
+                + assigneeWhere.and("assignee_id IS NOT NULL") + " GROUP BY assignee_id "
+                + "ORDER BY total DESC, assignee_id LIMIT " + FACET_PEOPLE, assigneeWhere.params(),
+                (rs, n) -> new AssigneeGroup(rs.getObject("assignee_id", UUID.class), rs.getLong("total")));
+        return new FacetRows(status, type, created, counts[0], counts[1], people);
+    }
+
+    private Map<String, Long> grouped(String expression, Where where) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        jdbc.query("SELECT " + expression + " AS bucket, count(*) AS total FROM support_request" + where.sql()
+                + " GROUP BY 1", where.params(), rs -> {
+                    counts.put(rs.getString("bucket"), rs.getLong("total"));
+                });
+        return counts;
+    }
+
+    /**
+     * Assigns (or, with a null {@code assignee}, unassigns) only while the request is still in {@code from}; the
+     * status moves to {@code to} and the activity clock with it only when they differ.
+     * @return whether this write won
+     */
+    boolean assign(UUID id, RequestStatus from, RequestStatus to, UUID assignee, Instant at) {
+        return jdbc.update("UPDATE support_request SET assignee_id = CAST(:a AS uuid), "
+                + "assigned_at = CASE WHEN CAST(:a AS uuid) IS NULL THEN NULL ELSE CAST(:at AS timestamptz) END, "
+                + "status = :to, last_activity_at = CASE WHEN :to <> :from THEN CAST(:at AS timestamptz) "
+                + "ELSE last_activity_at END, updated_at = :at "
+                + "WHERE id = :id AND status = :from", new MapSqlParameterSource()
+                .addValue("a", assignee).addValue("at", Timestamp.from(at))
+                .addValue("to", to.value()).addValue("from", from.value()).addValue("id", id)) == 1;
     }
 
     long countUnread(UUID requesterId) {
@@ -150,6 +230,41 @@ class RequestRepository {
                 .addValue("cutoff", Timestamp.from(cutoff))) == 1;
     }
 
+    /**
+     * Notes that the request's member is to be mailed about {@code messageId} at {@code dueAt}; a later reply
+     * overwrites both, so the timer restarts and the mail links to the newest reply.
+     */
+    void markReplyMailDue(UUID id, UUID messageId, Instant dueAt) {
+        jdbc.update("UPDATE support_request SET reply_mail_due_at = :due, reply_mail_message_id = :message "
+                + "WHERE id = :id", new MapSqlParameterSource().addValue("due", Timestamp.from(dueAt))
+                .addValue("message", messageId).addValue("id", id));
+    }
+
+    /** At most {@code limit} requests whose reply mail is due at or before {@code now}, earliest first. */
+    List<DueReplyMail> dueReplyMails(Instant now, int limit) {
+        return jdbc.query("SELECT id, reply_mail_due_at FROM support_request WHERE reply_mail_due_at <= :now "
+                + "ORDER BY reply_mail_due_at, number LIMIT :limit",
+                new MapSqlParameterSource("now", Timestamp.from(now)).addValue("limit", limit),
+                (rs, n) -> new DueReplyMail(rs.getObject("id", UUID.class), instant(rs, "reply_mail_due_at")));
+    }
+
+    /**
+     * Clears the due marker only while it still holds {@code dueAt}: a reply that arrived after the read moved it,
+     * so this claim loses and the newer time stands. The message id is read from the row before it is cleared,
+     * because RETURNING would show the cleared value.
+     * @return what the marker held, or empty when the claim lost
+     */
+    Optional<ClaimedReplyMail> claimReplyMail(UUID id, Instant dueAt) {
+        return jdbc.query("UPDATE support_request r SET reply_mail_due_at = NULL, reply_mail_message_id = NULL "
+                + "FROM (SELECT id, reply_mail_message_id FROM support_request "
+                + "WHERE id = :id AND reply_mail_due_at = :due FOR UPDATE) held WHERE r.id = held.id "
+                + "RETURNING r.number, r.requester_id, r.locale, held.reply_mail_message_id",
+                new MapSqlParameterSource("id", id).addValue("due", Timestamp.from(dueAt)),
+                (rs, n) -> new ClaimedReplyMail(id, rs.getLong("number"), rs.getObject("requester_id", UUID.class),
+                        rs.getString("locale"), rs.getObject("reply_mail_message_id", UUID.class)))
+                .stream().findFirst();
+    }
+
     /** Clears the unread mark; the first read of a resolution starts its close clock. */
     void markSeen(UUID id, Instant now) {
         jdbc.update("UPDATE support_request SET member_unread = false, resolved_seen_at = CASE "
@@ -162,6 +277,13 @@ class RequestRepository {
         return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request WHERE status = 'resolved' "
                 + "AND resolved_seen_at <= :cutoff", new MapSqlParameterSource("cutoff", Timestamp.from(cutoff)),
                 REQUEST);
+    }
+
+    /** At most {@code limit} resolutions first seen at or before {@code cutoff}, oldest sight first. */
+    List<RequestRow> seenResolutionsBefore(Instant cutoff, int limit) {
+        return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request WHERE status = 'resolved' "
+                + "AND resolved_seen_at <= :cutoff ORDER BY resolved_seen_at, number LIMIT :limit",
+                new MapSqlParameterSource("cutoff", Timestamp.from(cutoff)).addValue("limit", limit), REQUEST);
     }
 
     void insertMessage(UUID id, UUID requestId, String authorKind, UUID authorId, String body, Instant now) {
@@ -215,21 +337,6 @@ class RequestRepository {
                 + "WHERE conversation_id = :id ORDER BY created_at, id", new MapSqlParameterSource("id", conversationId),
                 (rs, n) -> new ConversationMessageRow(rs.getString("role"), rs.getString("text"),
                         rs.getString("outcome"), instant(rs, "created_at")));
-    }
-
-    private static String filter(String status, String type) {
-        List<String> clauses = new ArrayList<>();
-        if (status != null) {
-            clauses.add("status = :status");
-        }
-        if (type != null) {
-            clauses.add("type = :type");
-        }
-        return clauses.isEmpty() ? "" : " WHERE " + String.join(" AND ", clauses);
-    }
-
-    private static MapSqlParameterSource filterParams(String status, String type) {
-        return new MapSqlParameterSource().addValue("status", status).addValue("type", type);
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

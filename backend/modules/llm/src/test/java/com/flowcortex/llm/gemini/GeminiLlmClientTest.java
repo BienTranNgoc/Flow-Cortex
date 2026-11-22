@@ -12,11 +12,16 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
 import java.net.ConnectException;
-import java.net.SocketTimeoutException;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -96,10 +101,95 @@ class GeminiLlmClientTest {
     }
 
     @Test
-    void aReadTimeoutIsATimeout() {
-        server.expect(requestTo(ENDPOINT)).andRespond(withException(new SocketTimeoutException("Read timed out")));
+    void aReadTimeoutIsATimeout() throws IOException {
+        HttpServer silent = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        silent.setExecutor(Executors.newCachedThreadPool());
+        silent.createContext("/", exchange -> {
+            try {
+                Thread.sleep(2_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        silent.start();
+        try {
+            GeminiLlmClient overHttp = new GeminiLlmClient(
+                    new GeminiProperties(KEY, URI.create("http://127.0.0.1:" + silent.getAddress().getPort() + "/v1beta"),
+                            Duration.ofSeconds(5), Duration.ofMillis(200), Duration.ofSeconds(20)),
+                    GeminiAttempts.restClient(HttpClient.newBuilder().build(), Duration.ofMillis(200)), meters);
 
-        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.TIMEOUT));
+            assertThat(overHttp.generateJson(request()))
+                    .isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.TIMEOUT));
+            assertThat(meters.get("llm.requests").tag("outcome", "timeout").timer().count()).isEqualTo(1);
+        } finally {
+            silent.stop(0);
+        }
+    }
+
+    @Test
+    void aBodyThatStallsAfterTheHeadersIsGivenUp() throws IOException {
+        HttpServer stalling = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        stalling.setExecutor(Executors.newCachedThreadPool());
+        stalling.createContext("/", exchange -> {
+            try {
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, 1_000);
+                exchange.getResponseBody().write("{\"candidates\":[".getBytes(StandardCharsets.UTF_8));
+                exchange.getResponseBody().flush();
+                Thread.sleep(2_000);
+            } catch (InterruptedException | IOException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        stalling.start();
+        try {
+            GeminiLlmClient overHttp = new GeminiLlmClient(
+                    new GeminiProperties(KEY, URI.create("http://127.0.0.1:" + stalling.getAddress().getPort() + "/v1beta"),
+                            Duration.ofSeconds(5), Duration.ofMillis(200), Duration.ofSeconds(20)),
+                    GeminiAttempts.restClient(HttpClient.newBuilder().build(), Duration.ofMillis(200)), meters);
+
+            assertThat(overHttp.generateJson(request())).isInstanceOfSatisfying(LlmJsonResult.Failed.class,
+                    failed -> assertThat(failed.kind()).isIn(LlmJsonResult.Kind.TIMEOUT,
+                            LlmJsonResult.Kind.UPSTREAM));
+        } finally {
+            stalling.stop(0);
+        }
+    }
+
+    @Test
+    void anInterruptedCallReturnsAFailureInsteadOfThrowing() {
+        server.expect(requestTo(ENDPOINT)).andRespond(request -> {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request was interrupted");
+        });
+        try {
+            assertThat(client.generateJson(request())).isInstanceOf(LlmJsonResult.Failed.class);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void anAnswerThatIsNotJsonIsUnusable() {
+        geminiAnswers("""
+                {"candidates":[{"content":{"parts":[{"text":"sorry, no json"}]},"finishReason":"STOP"}]}
+                """);
+
+        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.UNUSABLE));
+        assertThat(meters.get("llm.requests").tag("outcome", "unusable").timer().count()).isEqualTo(1);
+    }
+
+    @Test
+    void aBodyThatIsNotJsonIsUnusable() {
+        geminiAnswers("<html>gateway page</html>");
+
+        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.UNUSABLE));
+        assertThat(meters.get("llm.requests").tag("outcome", "unusable").timer().count()).isEqualTo(1);
     }
 
     @Test
@@ -110,11 +200,14 @@ class GeminiLlmClientTest {
     }
 
     @Test
-    void aRateLimitIsAnUpstreamFailureWithoutTheConfigErrorLine(CapturedOutput output) {
+    void aRateLimitIsAQuotaFailureWithoutTheConfigErrorLine(CapturedOutput output) {
         server.expect(requestTo(ENDPOINT)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
-        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.UPSTREAM));
+        assertThat(client.generateJson(request()))
+                .isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.QUOTA_EXCEEDED));
         assertThat(output).doesNotContain("outcome=config_error");
+        assertThat(meters.get("llm.requests").tag("outcome", "quota_exceeded").timer().count()).isEqualTo(1);
+        server.verify();
     }
 
     @Test
@@ -126,11 +219,11 @@ class GeminiLlmClientTest {
     }
 
     @Test
-    void aRejectedRequestIsAnUpstreamFailureLoggedAsAConfigError(CapturedOutput output) {
+    void aRejectedRequestIsRejectedAndLoggedAsAConfigError(CapturedOutput output) {
         server.expect(requestTo(ENDPOINT)).andRespond(withStatus(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_JSON).body("{\"error\":{\"message\":\"API key not valid\"}}"));
 
-        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.UPSTREAM));
+        assertThat(client.generateJson(request())).isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.REJECTED));
         assertThat(output).contains("ERROR").contains("llm.request outcome=config_error status=400 model=" + MODEL)
                 .doesNotContain("API key not valid").doesNotContain(KEY).doesNotContain(QUESTION);
     }
@@ -140,7 +233,7 @@ class GeminiLlmClientTest {
         GeminiLlmClient unconfigured = new GeminiLlmClient(properties(" "), builder.build(), meters);
 
         assertThat(unconfigured.generateJson(request()))
-                .isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.UPSTREAM));
+                .isEqualTo(new LlmJsonResult.Failed(LlmJsonResult.Kind.REJECTED));
         assertThat(output).contains("llm.request outcome=config_error");
         server.verify();
     }

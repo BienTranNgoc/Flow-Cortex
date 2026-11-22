@@ -5,6 +5,7 @@ import com.flowcortex.workflow.api.AudienceView.Audience;
 import com.flowcortex.workflow.api.AudienceView.StartKind;
 import com.flowcortex.workflow.api.WorkflowAudience;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
@@ -47,7 +48,7 @@ class WorkflowAudienceImpl implements WorkflowAudience {
         if (workflow.getStatus() == WorkflowStatus.DRAFT) {
             return Audience.DRAFT;
         }
-        return workflow.isShared() ? Audience.ALL_MEMBERS : Audience.OWNER_ONLY;
+        return workflow.getVisibility() == WorkflowVisibility.PUBLIC ? Audience.ALL_MEMBERS : Audience.OWNER_ONLY;
     }
 
     /** A first step that runs on the media engine reads an uploaded file; every other first step reads text. */

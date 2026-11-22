@@ -8,6 +8,8 @@ import { useFeatures } from '../../app/useFeatures';
 import { useRefreshOnboardingOnCompletion } from '../onboarding/useFirstResultClaim';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
+import { RunInputs } from './RunInputs';
+import { RunLogPanel } from './RunLogPanel';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
 import {
@@ -218,6 +220,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
         </p>
       )}
       {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
+      <RunInputs runId={runId} />
       {selected && (
         <div className="run-layout">
           <div className="run-layout-pipeline">
@@ -246,6 +249,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
           </div>
         </div>
       )}
+      <RunLogPanel runId={runId} />
       {backTo && (
         <Link className="run-back-link action-link" to={`/workflows/${backTo}`}>
           {t('workflow.run.back')}

@@ -9,14 +9,17 @@ import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
 import { roleLabel, statusLabel } from './enumLabels';
+import { RoleOptions } from './RoleOptions';
+import { roleCodeSchema } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
-const userRoleSchema = z.enum(['ADMIN', 'MEMBER', 'CREATOR']);
 
 export function UserDetailPage() {
   const { t } = useTranslation();
   usePageTitle(t('users.detail.title'));
+  const { assignable, names } = useAssignableRoles();
   const { userId = '' } = useParams();
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
@@ -70,7 +73,7 @@ export function UserDetailPage() {
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
-    const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
+    const parsedRole = roleCodeSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
       setRoleErrorKey('users.detail.invalidRole');
       return;
@@ -135,7 +138,7 @@ export function UserDetailPage() {
             </div>
             <div>
               <dt>{t('users.detail.role')}</dt>
-              <dd>{roleLabel(t, user.role)}</dd>
+              <dd>{roleLabel(t, user.role, user.roleName)}</dd>
             </div>
             <div>
               <dt>{t('users.detail.status')}</dt>
@@ -173,14 +176,17 @@ export function UserDetailPage() {
             <select
               id="user-role"
               value={role || user.role || 'MEMBER'}
+              disabled={assignable.length === 0}
               onChange={(event) => {
                 setRole(event.target.value);
                 setRoleErrorKey('');
               }}
             >
-              <option value="MEMBER">{t('users.roleOptions.MEMBER')}</option>
-              <option value="ADMIN">{t('users.roleOptions.ADMIN')}</option>
-              <option value="CREATOR">{t('users.roleOptions.CREATOR')}</option>
+              <RoleOptions
+                roles={assignable}
+                current={user.role}
+                names={{ ...(user.role ? { [user.role]: user.roleName } : {}), ...names }}
+              />
             </select>
           </div>
           <button

@@ -121,6 +121,21 @@ public class RunStep {
         this.status = RunStepStatus.PENDING;
     }
 
+    /**
+     * A step a run retry carries over from the run it retries: {@code completed} at attempt 1 with the
+     * original's input, output and stored objects (already copied), never dispatched or charged.
+     */
+    public static RunStep reused(UUID id, UUID runId, short stepOrder, String type, String input, String config,
+            String inputRef, String output, String outputs, Instant startedAt, Instant finishedAt) {
+        RunStep step = new RunStep(id, runId, stepOrder, type, input, config, inputRef);
+        step.status = RunStepStatus.COMPLETED;
+        step.output = output;
+        step.outputs = outputs;
+        step.startedAt = startedAt;
+        step.finishedAt = finishedAt;
+        return step;
+    }
+
     public UUID getId() {
         return id;
     }

@@ -1,0 +1,177 @@
+{
+  "eyebrow": "Nội dung",
+  "languages": {
+    "vi": "Tiếng Việt",
+    "en": "Tiếng Anh"
+  },
+  "fields": {
+    "body": "Nội dung",
+    "alt": "Văn bản thay thế",
+    "caption": "Chú thích",
+    "mediaId": "Mục trong thư viện",
+    "seoTitle": "Tiêu đề SEO",
+    "seoDescription": "Mô tả SEO"
+  },
+  "sectionTypes": {
+    "richText": "Văn bản",
+    "media": "Ảnh hoặc video"
+  },
+  "dialog": {
+    "cancel": "Hủy",
+    "working": "Đang xử lý…"
+  },
+  "documents": {
+    "title": "Tài liệu",
+    "description": "Các tài liệu có bản nháp và bản đã xuất bản, bằng tiếng Việt và tiếng Anh.",
+    "loading": "Đang tải tài liệu…",
+    "loadError": "Không tải được danh sách tài liệu.",
+    "empty": "Chưa có tài liệu nào được đăng ký",
+    "emptyHint": "Tài liệu sẽ xuất hiện ở đây khi mã nguồn đăng ký nó.",
+    "tableLabel": "Bảng tài liệu",
+    "columns": {
+      "document": "Tài liệu",
+      "draft": "Bản nháp",
+      "published": "Đã xuất bản"
+    },
+    "version": "Phiên bản {{version}}",
+    "noDraft": "Chưa có bản nháp",
+    "notPublished": "Chưa xuất bản"
+  },
+  "editor": {
+    "fallbackTitle": "Tài liệu",
+    "backToList": "Về danh sách tài liệu",
+    "loading": "Đang tải tài liệu…",
+    "loadError": "Không tải được tài liệu.",
+    "refreshFailed": "Không làm mới được dữ liệu mới nhất — đang hiển thị phiên bản đã tải trước đó.",
+    "notFound": "Tài liệu này chưa được đăng ký.",
+    "languageTabs": "Ngôn ngữ",
+    "modeLabel": "Chế độ xem",
+    "edit": "Chỉnh sửa",
+    "preview": "Xem trước",
+    "revisions": "Lịch sử phiên bản",
+    "unsaved": "Có thay đổi chưa lưu",
+    "draftVersion": "Bản nháp phiên bản {{version}}",
+    "noDraft": "Chưa lưu bản nháp nào",
+    "saved": "Đã lưu thành phiên bản {{version}}",
+    "published": "Phiên bản {{version}} đã được xuất bản",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "publish": "Xuất bản",
+    "publishHint": {
+      "forbidden": "Bạn không có quyền xuất bản tài liệu này",
+      "unsaved": "Hãy lưu trước khi xuất bản",
+      "no-draft": "Hãy lưu bản nháp trước khi xuất bản"
+    },
+    "saveFailed": "Không lưu được. Hãy thử lại.",
+    "publishFailed": "Không xuất bản được. Hãy thử lại.",
+    "readOnly": "Bạn chỉ có thể đọc tài liệu này, không thể sửa.",
+    "invalidSummary": "Một số giá trị không thể lưu:",
+    "incompleteSummary": "Hãy điền các văn bản sau bằng cả hai ngôn ngữ trước khi xuất bản:",
+    "seo": "Văn bản cho công cụ tìm kiếm",
+    "fieldIn": "{{field}} ({{language}})",
+    "pathSection": "Phần {{n}}: {{field}}",
+    "pathLocale": "{{label}} ({{language}})",
+    "sections": "Các phần",
+    "noSections": "Tài liệu này chưa có phần nào.",
+    "sectionTitle": "Phần {{n}}: {{type}}",
+    "moveUp": "Chuyển phần {{n}} lên",
+    "moveDown": "Chuyển phần {{n}} xuống",
+    "remove": "Xóa phần {{n}}",
+    "up": "Lên",
+    "down": "Xuống",
+    "removeShort": "Xóa",
+    "addType": "Loại phần",
+    "addSection": "Thêm phần",
+    "sectionLimit": "Một tài liệu có tối đa {{max}} phần.",
+    "noAddableTypes": "Trang quản trị này chưa có trình soạn cho các loại phần mà tài liệu cho phép.",
+    "count": "{{current}} / {{max}} ký tự",
+    "tooLong": "Văn bản này vượt quá giới hạn {{max}} ký tự nên không thể lưu.",
+    "noMedia": "Chưa chọn mục nào",
+    "chooseMedia": "Chọn từ thư viện",
+    "replaceMedia": "Thay thế",
+    "needsMediaView": "Cần quyền xem thư viện media để chọn.",
+    "unsupportedType": "Trang quản trị này không sửa được phần loại “{{type}}”; phần này được giữ nguyên."
+  },
+  "publish": {
+    "title": "Xuất bản tài liệu này?",
+    "message": "Bản nháp phiên bản {{version}} sẽ được công khai bằng cả hai ngôn ngữ và thay thế bản đã xuất bản.",
+    "confirm": "Xuất bản"
+  },
+  "conflict": {
+    "title": "Tài liệu đã thay đổi",
+    "message": "Có người đã lưu phiên bản {{version}} sau khi bạn tải tài liệu này. Thay đổi của bạn vẫn còn trong trình soạn.",
+    "messageUnknown": "Có người đã lưu tài liệu này sau khi bạn tải nó. Thay đổi của bạn vẫn còn trong trình soạn.",
+    "loadLatest": "Tải bản mới nhất",
+    "overwrite": "Ghi đè bằng bản của tôi",
+    "loaded": "Đã tải phiên bản {{version}}",
+    "loadFailed": "Không tải được phiên bản mới nhất. Hãy thử lại."
+  },
+  "revisions": {
+    "title": "Lịch sử phiên bản",
+    "noun_one": "phiên bản",
+    "noun_other": "phiên bản",
+    "loading": "Đang tải lịch sử phiên bản…",
+    "loadError": "Không tải được lịch sử phiên bản.",
+    "empty": "Chưa có phiên bản nào. Mỗi lần lưu và mỗi lần xuất bản sẽ thêm một phiên bản.",
+    "tableLabel": "Bảng lịch sử phiên bản",
+    "columns": {
+      "kind": "Loại",
+      "version": "Phiên bản",
+      "author": "Tác giả",
+      "time": "Thời điểm",
+      "actions": "Thao tác"
+    },
+    "kind": {
+      "draft": "Bản nháp",
+      "publication": "Bản xuất bản"
+    },
+    "unknownAuthor": "—",
+    "load": "Nạp vào trình soạn",
+    "loadAria": "Nạp vào trình soạn: {{kind}} {{version}}",
+    "loadingRevision": "Đang tải…",
+    "loaded": "Đã nạp phiên bản {{version}} vào trình soạn. Chưa có gì được lưu cho đến khi bạn bấm Lưu.",
+    "loadRevisionFailed": "Không tải được phiên bản đó. Hãy thử lại.",
+    "replaceTitle": "Thay thế các thay đổi chưa lưu?",
+    "replaceMessage": "Nạp phiên bản này sẽ thay thế nội dung đang có trong trình soạn.",
+    "replaceConfirm": "Nạp phiên bản"
+  },
+  "leave": {
+    "title": "Rời khỏi trang này?",
+    "message": "Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, chúng sẽ mất.",
+    "confirm": "Rời đi"
+  },
+  "preview": {
+    "label": "Xem trước",
+    "empty": "Chưa có gì để xem trước.",
+    "blankText": "(Văn bản này đang trống.)",
+    "noMedia": "(Chưa chọn mục nào trong thư viện.)"
+  },
+  "picker": {
+    "title": "Chọn từ thư viện media"
+  },
+  "media": {
+    "title": "Thư viện media",
+    "description": "Ảnh và video mà các tài liệu có thể đặt vào các phần của mình.",
+    "noun_one": "mục",
+    "noun_other": "mục",
+    "filter": {
+      "label": "Loại",
+      "all": "Tất cả",
+      "image": "Ảnh",
+      "video": "Video"
+    },
+    "upload": {
+      "label": "Tải lên ảnh hoặc video",
+      "progress": "Đang tải lên {{name}} — {{percent}}%",
+      "progressLabel": "Tiến độ tải lên {{name}}"
+    },
+    "uploadFailed": "Tải lên không thành công. Hãy thử lại.",
+    "loading": "Đang tải thư viện…",
+    "loadError": "Không tải được thư viện.",
+    "empty": "Thư viện đang trống.",
+    "emptyFiltered": "Không có mục nào thuộc loại này.",
+    "gridLabel": "Các mục trong thư viện",
+    "choose": "Chọn {{name}}",
+    "thumbMissing": "Không xem trước được"
+  }
+}

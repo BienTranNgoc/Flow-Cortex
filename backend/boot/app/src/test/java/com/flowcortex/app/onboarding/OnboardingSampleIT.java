@@ -400,7 +400,7 @@ class OnboardingSampleIT extends AbstractPostgresBootTest {
     }
 
     private UUID jdbcDraft(Account owner) {
-        return workflowService.createDraft(owner.id(), "draft-" + UUID.randomUUID(), true).id();
+        return workflowService.createDraft(owner.id(), "draft-" + UUID.randomUUID()).id();
     }
 
     private Account admin() {

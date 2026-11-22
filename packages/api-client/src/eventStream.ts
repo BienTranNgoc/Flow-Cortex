@@ -1,4 +1,5 @@
 import { withLocale } from './locale';
+import { emitNetworkSignal } from './networkSignals';
 import { refreshAccessToken } from './session';
 import { getToken } from './tokenStore';
 
@@ -7,6 +8,7 @@ const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30_000;
 /** Three missed server heartbeats (the hub pings every 15 s). */
 const IDLE_TIMEOUT_MS = 45_000;
+let nextStreamId = 0;
 
 type Outcome = 'retry' | 'reauth' | 'stop';
 
@@ -117,6 +119,23 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
+  const streamId = (nextStreamId += 1);
+  let down = false;
+
+  function markDown(): void {
+    if (!down) {
+      down = true;
+      emitNetworkSignal({ type: 'stream-down', streamId });
+    }
+  }
+
+  function markUp(): void {
+    if (down) {
+      down = false;
+      emitNetworkSignal({ type: 'stream-up', streamId });
+    }
+  }
+
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const clearIdle = () => {
@@ -197,18 +216,25 @@ export function openEventStream(options: EventStreamOptions): EventStream {
       if (isFinalRefusal(response.status)) {
         return 'stop';
       }
-      if (response.ok && response.body) {
+      if (response.status === 429) {
+        markUp();
+        emitNetworkSignal({ type: 'rate-limited', waitSeconds: null });
+      } else if (response.ok && response.body) {
         state.refreshedOn401 = false;
+        markUp();
         onOpen?.();
         if (await pump(response.body, () => (state.failures = 0))) {
           return 'stop';
         }
+      } else {
+        markDown();
       }
     } catch {
       // A failed connect or a broken body is retried; only close() ends the loop.
       if (closed) {
         return 'stop';
       }
+      markDown();
     }
     return 'retry';
   }
@@ -227,11 +253,13 @@ export function openEventStream(options: EventStreamOptions): EventStream {
     }
   }
 
-  void run();
+  // However the loop ends (close, refused topic, second 401) the stream stops counting as down.
+  void run().finally(markUp);
 
   return {
     close() {
       closed = true;
+      markUp();
       controller?.abort();
       clearIdle();
       if (timer !== null) {

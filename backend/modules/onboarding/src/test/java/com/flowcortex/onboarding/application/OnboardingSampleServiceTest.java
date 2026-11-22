@@ -24,6 +24,7 @@ import com.flowcortex.workflow.api.AudienceView.StartKind;
 import com.flowcortex.workflow.api.WorkflowAudience;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -60,8 +61,8 @@ class OnboardingSampleServiceTest {
 
     private AudienceView view(Audience who) {
         WorkflowStepView step = new WorkflowStepView(UUID.randomUUID(), 1, "step", "echo", "inline", null, null);
-        WorkflowView workflow = new WorkflowView(workflowId, UUID.randomUUID(), "Sample", true, Instant.EPOCH,
-                Instant.EPOCH, List.of(step), true, "published");
+        WorkflowView workflow = new WorkflowView(workflowId, UUID.randomUUID(), "Sample", WorkflowVisibility.PUBLIC,
+                Instant.EPOCH, Instant.EPOCH, List.of(step), true, "published", null, null);
         return new AudienceView(who, workflow, StartKind.TEXT);
     }
 

@@ -1,0 +1,177 @@
+.notification-bell {
+  position: relative;
+}
+
+.notification-bell__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max(38px, var(--control-h));
+  min-width: 0;
+  height: max(38px, var(--control-h));
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+}
+
+.notification-bell__trigger:hover {
+  background: var(--chrome-hover);
+  transform: none;
+}
+
+.notification-bell__trigger:active,
+.notification-bell__trigger[aria-expanded='true'] {
+  background: var(--chrome-active);
+  color: var(--primary);
+  transform: none;
+}
+
+.notification-bell__trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.notification-bell__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  color: var(--paper-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+.notification-bell__panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  width: 22rem;
+  max-height: min(32rem, calc(100dvh - 56px - 1.5rem));
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-lg);
+}
+
+.notification-bell__head,
+.notification-bell__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.notification-bell__head {
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.notification-bell__foot {
+  border-top: 1px solid var(--chrome-border);
+}
+
+.notification-bell__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.notification-bell__action {
+  min-height: var(--control-h);
+  min-width: 0;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.notification-bell__action:not(:disabled):hover {
+  background: var(--chrome-hover);
+  transform: none;
+}
+
+.notification-bell__action:not(:disabled):active {
+  background: var(--chrome-active);
+  transform: none;
+}
+
+.notification-bell__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Positioned so the rows' absolutely placed visually-hidden text stays clipped by this scroller. */
+.notification-bell__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notification-bell__empty {
+  margin: 0;
+  padding: 1.25rem 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.notification-bell__all {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding-inline: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.notification-bell__all:hover {
+  text-decoration: underline;
+}
+
+.notification-bell__all:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Beside the other topbar actions a right-anchored panel would run off the left edge, so it spans the viewport. */
+@media (max-width: 640px) {
+  .notification-bell__panel {
+    position: fixed;
+    top: calc(56px + 0.5rem);
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-bell__trigger,
+  .notification-bell__action {
+    transition: none;
+  }
+}

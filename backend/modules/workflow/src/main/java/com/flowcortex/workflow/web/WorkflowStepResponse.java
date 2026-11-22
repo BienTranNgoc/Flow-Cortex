@@ -1,12 +1,12 @@
 package com.flowcortex.workflow.web;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import java.util.UUID;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /** {@code inputRef} is null when the step reads the previous step's output; {@code config} is null when unset. */
 record WorkflowStepResponse(
@@ -14,7 +14,7 @@ record WorkflowStepResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode,
         @Schema(nullable = true) String inputRef, @Schema(type = "object", nullable = true) JsonNode config) {
 
-    private static final ObjectMapper CONFIG_READER = new ObjectMapper();
+    private static final JsonMapper CONFIG_READER = JsonMapper.builder().build();
 
     static WorkflowStepResponse from(WorkflowStepView view) {
         return new WorkflowStepResponse(view.id(), view.stepOrder(), view.name(), view.type(), view.mode(),
@@ -27,7 +27,7 @@ record WorkflowStepResponse(
         }
         try {
             return CONFIG_READER.readTree(view.config());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("workflow_step " + view.id() + " holds a config that is not JSON", e);
         }
     }

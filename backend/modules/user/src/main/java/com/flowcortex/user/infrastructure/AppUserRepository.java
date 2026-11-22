@@ -1,11 +1,14 @@
 package com.flowcortex.user.infrastructure;
 
 import com.flowcortex.user.domain.AppUser;
+import com.flowcortex.user.domain.Role;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -39,6 +42,57 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     @Query("SELECT u FROM AppUser u WHERE u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);
 
+    /** The role alone, read without loading the entity, so a later locked read still sees the row's own state. */
+    default Optional<Role> findRoleById(UUID id) {
+        return findRoleCodeById(id).map(Role::of);
+    }
+
+    /** Native, because Spring Data would read a {@code Role}-typed result as a constructor projection. */
+    @Query(value = "SELECT role FROM app_user WHERE id = :id", nativeQuery = true)
+    Optional<String> findRoleCodeById(@Param("id") UUID id);
+
+    /**
+     * Row-locks every active super admin in id order (so two removals never wait on each other in
+     * opposite orders); the second of two concurrent removals re-reads the set the first shrank.
+     */
+    default List<AppUser> lockActiveSuperAdmins() {
+        return lockActiveWithRole(Role.ADMIN);
+    }
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT u FROM AppUser u
+            WHERE u.role = :role
+              AND u.status = com.flowcortex.user.domain.UserStatus.ACTIVE
+              AND u.adminDisabledAt IS NULL
+            ORDER BY u.id""")
+    List<AppUser> lockActiveWithRole(@Param("role") Role role);
+
+    /**
+     * Accounts holding one of {@code roles}, across every owner scope, newest first. {@code pattern}
+     * is a lower-case {@code LIKE} pattern whose wildcards the caller escaped with {@code !}.
+     */
+    @Query(value = """
+            SELECT u FROM AppUser u
+            WHERE u.role IN :roles
+              AND (lower(u.email) LIKE :pattern ESCAPE '!' OR lower(u.name) LIKE :pattern ESCAPE '!')
+            ORDER BY u.createdAt DESC, u.id DESC""",
+            countQuery = """
+            SELECT count(u) FROM AppUser u
+            WHERE u.role IN :roles
+              AND (lower(u.email) LIKE :pattern ESCAPE '!' OR lower(u.name) LIKE :pattern ESCAPE '!')""")
+    Page<AppUser> searchByRoles(@Param("roles") Collection<Role> roles, @Param("pattern") String pattern,
+            Pageable pageable);
+
+    boolean existsByUsernameAndIdNot(String username, UUID id);
+
+    /**
+     * Serialises every write of one username until the caller's transaction ends. The lock is taken
+     * after the caller's own row lock, always in that order.
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext('username:' || :name))", nativeQuery = true)
+    void lockUsername(@Param("name") String name);
+
     Optional<AppUser> findByGoogleSubject(String googleSubject);
 
     Optional<AppUser> findByOwnerIdAndEmail(UUID ownerId, String email);
@@ -50,4 +104,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     /** Ids and emails only, whatever the status: the rest of the row, the password hash included, stays unread. */
     @Query("SELECT new com.flowcortex.user.infrastructure.UserEmail(u.id, u.email) FROM AppUser u WHERE u.id IN :ids")
     List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<UUID> ids);
+
+    /** Ids and display names only, whatever the status: the email and the password hash stay unread. */
+    @Query("SELECT new com.flowcortex.user.infrastructure.UserName(u.id, u.name) FROM AppUser u WHERE u.id IN :ids")
+    List<UserName> findNamesByIdIn(@Param("ids") Collection<UUID> ids);
 }
