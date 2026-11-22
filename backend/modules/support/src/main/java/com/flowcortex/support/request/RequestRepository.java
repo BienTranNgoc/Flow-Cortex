@@ -191,6 +191,15 @@ class RequestRepository {
         return count;
     }
 
+    /** Whether the member has a request still waiting on staff or on them: new, in progress or waiting for the member. */
+    boolean existsOpenFor(UUID requesterId) {
+        Boolean open = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM support_request WHERE requester_id = :requester "
+                + "AND status IN (:statuses))", new MapSqlParameterSource("requester", requesterId)
+                .addValue("statuses", List.of(RequestStatus.NEW.value(), RequestStatus.IN_PROGRESS.value(),
+                        RequestStatus.WAITING_MEMBER.value())), Boolean.class);
+        return Boolean.TRUE.equals(open);
+    }
+
     long countOpen() {
         Long count = jdbc.queryForObject("SELECT count(*) FROM support_request WHERE status IN ('new', 'in_progress')",
                 new MapSqlParameterSource(), Long.class);

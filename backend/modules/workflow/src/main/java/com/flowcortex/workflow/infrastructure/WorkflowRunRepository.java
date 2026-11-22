@@ -99,6 +99,9 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
 
     boolean existsByOwnerIdAndStatus(UUID ownerId, RunStatus status);
 
+    /** Whether the owner has a run in any of {@code statuses}. */
+    boolean existsByOwnerIdAndStatusIn(UUID ownerId, Collection<RunStatus> statuses);
+
     /** A member-result run with its workflow's name; empty for any other run. */
     @Query("SELECT new com.flowcortex.workflow.infrastructure.RunWithWorkflowName(r, w.name) "
             + "FROM WorkflowRun r JOIN Workflow w ON w.id = r.workflowId "
