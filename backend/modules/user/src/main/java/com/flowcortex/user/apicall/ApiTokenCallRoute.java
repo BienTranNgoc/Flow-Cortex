@@ -20,7 +20,11 @@ final class ApiTokenCallRoute {
 
     /** A write sent with a personal access token; sessions, anonymous callers and reads are not recorded. */
     static boolean acts(String method, Object principal) {
-        return WRITES.contains(method) && principal instanceof Jwt jwt && PersonalAccessTokenAuthenticator.isPat(jwt);
+        return isWrite(method) && principal instanceof Jwt jwt && PersonalAccessTokenAuthenticator.isPat(jwt);
+    }
+
+    static boolean isWrite(String method) {
+        return WRITES.contains(method);
     }
 
     static boolean isWorkflowCreate(String method, String path) {

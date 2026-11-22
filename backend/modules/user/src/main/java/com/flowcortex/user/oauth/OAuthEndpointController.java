@@ -157,8 +157,12 @@ class OAuthEndpointController {
     @Operation(operationId = "registerOAuthClient")
     @SecurityRequirements
     @ApiResponse(responseCode = "201")
-    @ApiResponse(responseCode = "400", description = "invalid_redirect_uri or invalid_client_metadata as OAuth JSON")
-    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After")
+    @ApiResponse(responseCode = "400", description = "invalid_redirect_uri or invalid_client_metadata as OAuth JSON",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
+    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -182,9 +186,16 @@ class OAuthEndpointController {
     @Operation(operationId = "oauthToken")
     @SecurityRequirements
     @ApiResponse(responseCode = "200")
-    @ApiResponse(responseCode = "400", description = "OAuth JSON: invalid_request, invalid_grant or unsupported_grant_type")
-    @ApiResponse(responseCode = "401", description = "OAuth JSON: invalid_client")
-    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After")
+    @ApiResponse(responseCode = "400",
+            description = "OAuth JSON: invalid_request, invalid_grant or unsupported_grant_type",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
+    @ApiResponse(responseCode = "401", description = "OAuth JSON: invalid_client",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
+    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -215,9 +226,15 @@ class OAuthEndpointController {
     @Operation(operationId = "revokeOAuthToken")
     @SecurityRequirements
     @ApiResponse(responseCode = "200")
-    @ApiResponse(responseCode = "400", description = "OAuth JSON: invalid_request")
-    @ApiResponse(responseCode = "401", description = "OAuth JSON: invalid_client")
-    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After")
+    @ApiResponse(responseCode = "400", description = "OAuth JSON: invalid_request",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
+    @ApiResponse(responseCode = "401", description = "OAuth JSON: invalid_client",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
+    @ApiResponse(responseCode = "429", description = "temporarily_unavailable as OAuth JSON, with Retry-After",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = @Schema(implementation = OAuthErrorAdvice.ErrorBody.class)))
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
     @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_FORM_URLENCODED_VALUE,

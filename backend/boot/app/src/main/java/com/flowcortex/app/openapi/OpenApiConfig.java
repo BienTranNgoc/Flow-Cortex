@@ -32,22 +32,23 @@ public class OpenApiConfig {
                     .type(SecurityScheme.Type.HTTP)
                     .scheme("bearer")
                     .bearerFormat("JWT"))
-                .addParameters("IdempotencyKey", idempotencyKey())
-                .addHeaders("IdempotentReplayed", new Header()
+                .addParameters(CallGuardOpenApiCustomizer.IDEMPOTENCY_KEY, idempotencyKey())
+                .addHeaders(CallGuardOpenApiCustomizer.IDEMPOTENT_REPLAYED, new Header()
                     .description("true when the answer is the stored one of an earlier request with the same key")
                     .schema(new StringSchema()._enum(List.of("true"))))
-                .addResponses("IdempotencyKeyInvalid", problem("The Idempotency-Key header is blank or longer"
-                    + " than 80 characters, or the keyed request body cannot be fingerprinted (multipart or over"
-                    + " 1 MiB).", null))
-                .addResponses("IdempotencyInProgress", problem("A request with the same key is still running.", null))
-                .addResponses("IdempotencyKeyReused", problem("The key was used with a different method, path,"
-                    + " query or body.", null))
-                .addResponses("ApiTokenDailyLimit", problem("The token owner's daily write limit is reached"
-                    + " (code API_TOKEN_DAILY_LIMIT); retry after the UTC day ends.",
+                .addResponses(CallGuardOpenApiCustomizer.KEY_INVALID, problem("The Idempotency-Key header is blank"
+                    + " or longer than 80 characters, or the keyed request body cannot be fingerprinted (multipart"
+                    + " or over 1 MiB).", null))
+                .addResponses(CallGuardOpenApiCustomizer.IN_PROGRESS,
+                    problem("A request with the same key is still running.", null))
+                .addResponses(CallGuardOpenApiCustomizer.KEY_REUSED, problem("The key was used with a different"
+                    + " method, path, query or body.", null))
+                .addResponses(CallGuardOpenApiCustomizer.DAILY_LIMIT, problem("The token owner's daily write limit"
+                    + " is reached (code API_TOKEN_DAILY_LIMIT); retry after the UTC day ends.",
                     new Header().description("Seconds until the next UTC day").schema(new StringSchema()))));
     }
 
-    /** Documented once here: the guard applies to every route a personal access token may reach. */
+    /** Documented once here and attached to the guarded operations by {@link CallGuardOpenApiCustomizer}. */
     private static Parameter idempotencyKey() {
         return new Parameter()
             .name("Idempotency-Key")

@@ -1174,6 +1174,16 @@ export interface TokenForm {
   client_secret?: string;
 }
 
+/**
+ * The error object of RFC 6749 section 5.2, also used by RFC 7591
+ */
+export interface OAuthError {
+  /** The OAuth error code, for example invalid_grant */
+  error: string;
+  /** A human-readable explanation; never echoes a request value */
+  error_description?: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -3145,12 +3155,6 @@ export type StartRunParams = {
 
 export type RevokeOAuthToken200 = { [key: string]: unknown };
 
-export type RevokeOAuthToken400 = { [key: string]: unknown };
-
-export type RevokeOAuthToken401 = { [key: string]: unknown };
-
-export type RevokeOAuthToken429 = { [key: string]: unknown };
-
 export type UnsubscribeEmailLinkParams = {
   src?: string;
 };
@@ -3630,12 +3634,18 @@ export type reorderWorkflowStepsResponse422 = {
   status: 422;
 };
 
+export type reorderWorkflowStepsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type reorderWorkflowStepsResponseError = (
   | reorderWorkflowStepsResponse400
   | reorderWorkflowStepsResponse403
   | reorderWorkflowStepsResponse404
   | reorderWorkflowStepsResponse409
   | reorderWorkflowStepsResponse422
+  | reorderWorkflowStepsResponse429
 ) & {
   headers: Headers;
 };
@@ -4967,9 +4977,19 @@ export type createWorkflowResponse404 = {
   status: 404;
 };
 
+export type createWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type createWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type createWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
@@ -4979,7 +4999,9 @@ export type createWorkflowResponseError = (
   | createWorkflowResponse400
   | createWorkflowResponse403
   | createWorkflowResponse404
+  | createWorkflowResponse409
   | createWorkflowResponse422
+  | createWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -5100,13 +5122,33 @@ export type saveWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type saveWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveWorkflowVersionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveWorkflowVersionResponseSuccess = (
   saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
 ) & {
   headers: Headers;
 };
 export type saveWorkflowVersionResponseError = (
-  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse400
+  | saveWorkflowVersionResponse403
+  | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse409
+  | saveWorkflowVersionResponse422
+  | saveWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -5175,9 +5217,19 @@ export type rollbackWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type rollbackWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type rollbackWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type rollbackWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type rollbackWorkflowVersionResponseSuccess = (
@@ -5189,7 +5241,9 @@ export type rollbackWorkflowVersionResponseError = (
   | rollbackWorkflowVersionResponse400
   | rollbackWorkflowVersionResponse403
   | rollbackWorkflowVersionResponse404
+  | rollbackWorkflowVersionResponse409
   | rollbackWorkflowVersionResponse422
+  | rollbackWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -5264,6 +5318,11 @@ export type addStepResponse422 = {
   status: 422;
 };
 
+export type addStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
@@ -5273,6 +5332,7 @@ export type addStepResponseError = (
   | addStepResponse404
   | addStepResponse409
   | addStepResponse422
+  | addStepResponse429
 ) & {
   headers: Headers;
 };
@@ -5320,15 +5380,41 @@ export type startRunResponse200 = {
   status: 200;
 };
 
+export type startRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type startRunResponse410 = {
   data: ProblemDetail;
   status: 410;
 };
 
+export type startRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startRunResponseSuccess = startRunResponse200 & {
   headers: Headers;
 };
-export type startRunResponseError = startRunResponse410 & {
+export type startRunResponseError = (
+  | startRunResponse400
+  | startRunResponse409
+  | startRunResponse410
+  | startRunResponse422
+  | startRunResponse429
+) & {
   headers: Headers;
 };
 
@@ -5388,6 +5474,11 @@ export type regenerateWorkflowShareKeyResponse200 = {
   status: 200;
 };
 
+export type regenerateWorkflowShareKeyResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type regenerateWorkflowShareKeyResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -5403,13 +5494,26 @@ export type regenerateWorkflowShareKeyResponse409 = {
   status: 409;
 };
 
+export type regenerateWorkflowShareKeyResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateWorkflowShareKeyResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type regenerateWorkflowShareKeyResponseSuccess = regenerateWorkflowShareKeyResponse200 & {
   headers: Headers;
 };
 export type regenerateWorkflowShareKeyResponseError = (
+  | regenerateWorkflowShareKeyResponse400
   | regenerateWorkflowShareKeyResponse403
   | regenerateWorkflowShareKeyResponse404
   | regenerateWorkflowShareKeyResponse409
+  | regenerateWorkflowShareKeyResponse422
+  | regenerateWorkflowShareKeyResponse429
 ) & {
   headers: Headers;
 };
@@ -5480,16 +5584,30 @@ export type pinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type pinWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type pinWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type pinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type pinWorkflowVersionResponseError = (
-  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse400
+  | pinWorkflowVersionResponse404
+  | pinWorkflowVersionResponse409
+  | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -5543,10 +5661,17 @@ export type unpinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type unpinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
   headers: Headers;
 };
-export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
+export type unpinWorkflowVersionResponseError = (
+  unpinWorkflowVersionResponse404 | unpinWorkflowVersionResponse429
+) & {
   headers: Headers;
 };
 
@@ -5592,13 +5717,33 @@ export type hotfixWorkflowResponse404 = {
   status: 404;
 };
 
+export type hotfixWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type hotfixWorkflowResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type hotfixWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type hotfixWorkflowResponseSuccess = (
   hotfixWorkflowResponse200 | hotfixWorkflowResponse201
 ) & {
   headers: Headers;
 };
 export type hotfixWorkflowResponseError = (
-  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse400
+  | hotfixWorkflowResponse403
+  | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse409
+  | hotfixWorkflowResponse422
+  | hotfixWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -5712,10 +5857,39 @@ export type requestUploadResponse201 = {
   status: 201;
 };
 
+export type requestUploadResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type requestUploadResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type requestUploadResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type requestUploadResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type requestUploadResponseSuccess = requestUploadResponse201 & {
   headers: Headers;
 };
-export type requestUploadResponse = requestUploadResponseSuccess;
+export type requestUploadResponseError = (
+  | requestUploadResponse400
+  | requestUploadResponse409
+  | requestUploadResponse422
+  | requestUploadResponse429
+) & {
+  headers: Headers;
+};
+
+export type requestUploadResponse = requestUploadResponseSuccess | requestUploadResponseError;
 
 export const getRequestUploadUrl = () => {
   return `/api/v1/uploads`;
@@ -6243,6 +6417,11 @@ export type retryRunStepResponse200 = {
   status: 200;
 };
 
+export type retryRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type retryRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -6258,6 +6437,16 @@ export type retryRunStepResponse409 = {
   status: 409;
 };
 
+export type retryRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type retryRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -6267,9 +6456,12 @@ export type retryRunStepResponseSuccess = retryRunStepResponse200 & {
   headers: Headers;
 };
 export type retryRunStepResponseError = (
+  | retryRunStepResponse400
   | retryRunStepResponse401
   | retryRunStepResponse404
   | retryRunStepResponse409
+  | retryRunStepResponse422
+  | retryRunStepResponse429
   | retryRunStepResponse503
 ) & {
   headers: Headers;
@@ -6297,6 +6489,11 @@ export type resetRunStepResponse200 = {
   status: 200;
 };
 
+export type resetRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type resetRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -6312,11 +6509,26 @@ export type resetRunStepResponse409 = {
   status: 409;
 };
 
+export type resetRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type resetRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type resetRunStepResponseSuccess = resetRunStepResponse200 & {
   headers: Headers;
 };
 export type resetRunStepResponseError = (
-  resetRunStepResponse401 | resetRunStepResponse404 | resetRunStepResponse409
+  | resetRunStepResponse400
+  | resetRunStepResponse401
+  | resetRunStepResponse404
+  | resetRunStepResponse409
+  | resetRunStepResponse422
+  | resetRunStepResponse429
 ) & {
   headers: Headers;
 };
@@ -6343,6 +6555,11 @@ export type executeRunStepResponse200 = {
   status: 200;
 };
 
+export type executeRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type executeRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -6358,6 +6575,16 @@ export type executeRunStepResponse409 = {
   status: 409;
 };
 
+export type executeRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type executeRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type executeRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -6367,9 +6594,12 @@ export type executeRunStepResponseSuccess = executeRunStepResponse200 & {
   headers: Headers;
 };
 export type executeRunStepResponseError = (
+  | executeRunStepResponse400
   | executeRunStepResponse401
   | executeRunStepResponse404
   | executeRunStepResponse409
+  | executeRunStepResponse422
+  | executeRunStepResponse429
   | executeRunStepResponse503
 ) & {
   headers: Headers;
@@ -6427,6 +6657,11 @@ export type retryRunResponse422 = {
   status: 422;
 };
 
+export type retryRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -6442,6 +6677,7 @@ export type retryRunResponseError = (
   | retryRunResponse404
   | retryRunResponse409
   | retryRunResponse422
+  | retryRunResponse429
   | retryRunResponse503
 ) & {
   headers: Headers;
@@ -6490,10 +6726,36 @@ export type cancelRunResponse200 = {
   status: 200;
 };
 
+export type cancelRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type cancelRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type cancelRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type cancelRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type cancelRunResponseSuccess = cancelRunResponse200 & {
   headers: Headers;
 };
-export type cancelRunResponse = cancelRunResponseSuccess;
+export type cancelRunResponseError = (
+  cancelRunResponse400 | cancelRunResponse409 | cancelRunResponse422 | cancelRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type cancelRunResponse = cancelRunResponseSuccess | cancelRunResponseError;
 
 export const getCancelRunUrl = (id: string) => {
   return `/api/v1/runs/${id}/cancel`;
@@ -6538,10 +6800,39 @@ export type saveRevisionResponse200 = {
   status: 200;
 };
 
+export type saveRevisionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type saveRevisionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveRevisionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveRevisionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveRevisionResponseSuccess = saveRevisionResponse200 & {
   headers: Headers;
 };
-export type saveRevisionResponse = saveRevisionResponseSuccess;
+export type saveRevisionResponseError = (
+  | saveRevisionResponse400
+  | saveRevisionResponse409
+  | saveRevisionResponse422
+  | saveRevisionResponse429
+) & {
+  headers: Headers;
+};
+
+export type saveRevisionResponse = saveRevisionResponseSuccess | saveRevisionResponseError;
 
 export const getSaveRevisionUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/revisions`;
@@ -6584,10 +6875,36 @@ export type rejectTaskResponse200 = {
   status: 200;
 };
 
+export type rejectTaskResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type rejectTaskResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type rejectTaskResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type rejectTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type rejectTaskResponseSuccess = rejectTaskResponse200 & {
   headers: Headers;
 };
-export type rejectTaskResponse = rejectTaskResponseSuccess;
+export type rejectTaskResponseError = (
+  rejectTaskResponse400 | rejectTaskResponse409 | rejectTaskResponse422 | rejectTaskResponse429
+) & {
+  headers: Headers;
+};
+
+export type rejectTaskResponse = rejectTaskResponseSuccess | rejectTaskResponseError;
 
 export const getRejectTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/reject`;
@@ -6608,10 +6925,36 @@ export type approveTaskResponse200 = {
   status: 200;
 };
 
+export type approveTaskResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type approveTaskResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type approveTaskResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type approveTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type approveTaskResponseSuccess = approveTaskResponse200 & {
   headers: Headers;
 };
-export type approveTaskResponse = approveTaskResponseSuccess;
+export type approveTaskResponseError = (
+  approveTaskResponse400 | approveTaskResponse409 | approveTaskResponse422 | approveTaskResponse429
+) & {
+  headers: Headers;
+};
+
+export type approveTaskResponse = approveTaskResponseSuccess | approveTaskResponseError;
 
 export const getApproveTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/approve`;
@@ -6769,10 +7112,40 @@ export type startProductVideoRunResponse200 = {
   status: 200;
 };
 
+export type startProductVideoRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startProductVideoRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type startProductVideoRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startProductVideoRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
   headers: Headers;
 };
-export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+export type startProductVideoRunResponseError = (
+  | startProductVideoRunResponse400
+  | startProductVideoRunResponse409
+  | startProductVideoRunResponse422
+  | startProductVideoRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type startProductVideoRunResponse =
+  startProductVideoRunResponseSuccess | startProductVideoRunResponseError;
 
 export const getStartProductVideoRunUrl = () => {
   return `/api/v1/product-videos/runs`;
@@ -7165,17 +7538,17 @@ export type oauthTokenResponse200 = {
 };
 
 export type oauthTokenResponse400 = {
-  data: TokenResponse;
+  data: OAuthError;
   status: 400;
 };
 
 export type oauthTokenResponse401 = {
-  data: TokenResponse;
+  data: OAuthError;
   status: 401;
 };
 
 export type oauthTokenResponse429 = {
-  data: TokenResponse;
+  data: OAuthError;
   status: 429;
 };
 
@@ -7251,17 +7624,17 @@ export type revokeOAuthTokenResponse200 = {
 };
 
 export type revokeOAuthTokenResponse400 = {
-  data: RevokeOAuthToken400;
+  data: OAuthError;
   status: 400;
 };
 
 export type revokeOAuthTokenResponse401 = {
-  data: RevokeOAuthToken401;
+  data: OAuthError;
   status: 401;
 };
 
 export type revokeOAuthTokenResponse429 = {
-  data: RevokeOAuthToken429;
+  data: OAuthError;
   status: 429;
 };
 
@@ -7341,12 +7714,12 @@ export type registerOAuthClientResponse201 = {
 };
 
 export type registerOAuthClientResponse400 = {
-  data: Registration;
+  data: OAuthError;
   status: 400;
 };
 
 export type registerOAuthClientResponse429 = {
-  data: Registration;
+  data: OAuthError;
   status: 429;
 };
 
@@ -10031,6 +10404,11 @@ export type deleteWorkflowResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
   headers: Headers;
 };
@@ -10039,6 +10417,7 @@ export type deleteWorkflowResponseError = (
   | deleteWorkflowResponse403
   | deleteWorkflowResponse404
   | deleteWorkflowResponse422
+  | deleteWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -10079,9 +10458,19 @@ export type updateWorkflowResponse404 = {
   status: 404;
 };
 
+export type updateWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type updateWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type updateWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type updateWorkflowResponseSuccess = updateWorkflowResponse200 & {
@@ -10091,7 +10480,9 @@ export type updateWorkflowResponseError = (
   | updateWorkflowResponse400
   | updateWorkflowResponse403
   | updateWorkflowResponse404
+  | updateWorkflowResponse409
   | updateWorkflowResponse422
+  | updateWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -10164,6 +10555,11 @@ export type setWorkflowVisibilityResponse422 = {
   status: 422;
 };
 
+export type setWorkflowVisibilityResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowVisibilityResponseSuccess = setWorkflowVisibilityResponse200 & {
   headers: Headers;
 };
@@ -10173,6 +10569,7 @@ export type setWorkflowVisibilityResponseError = (
   | setWorkflowVisibilityResponse404
   | setWorkflowVisibilityResponse409
   | setWorkflowVisibilityResponse422
+  | setWorkflowVisibilityResponse429
 ) & {
   headers: Headers;
 };
@@ -10271,9 +10668,19 @@ export type renameWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type renameWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type renameWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type renameWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type renameWorkflowVersionResponseSuccess = renameWorkflowVersionResponse200 & {
@@ -10283,7 +10690,9 @@ export type renameWorkflowVersionResponseError = (
   | renameWorkflowVersionResponse400
   | renameWorkflowVersionResponse403
   | renameWorkflowVersionResponse404
+  | renameWorkflowVersionResponse409
   | renameWorkflowVersionResponse422
+  | renameWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -10358,6 +10767,11 @@ export type deleteWorkflowStepResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
   headers: Headers;
 };
@@ -10367,6 +10781,7 @@ export type deleteWorkflowStepResponseError = (
   | deleteWorkflowStepResponse404
   | deleteWorkflowStepResponse409
   | deleteWorkflowStepResponse422
+  | deleteWorkflowStepResponse429
 ) & {
   headers: Headers;
 };
@@ -10419,6 +10834,11 @@ export type updateStepResponse422 = {
   status: 422;
 };
 
+export type updateStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateStepResponseSuccess = updateStepResponse200 & {
   headers: Headers;
 };
@@ -10428,6 +10848,7 @@ export type updateStepResponseError = (
   | updateStepResponse404
   | updateStepResponse409
   | updateStepResponse422
+  | updateStepResponse429
 ) & {
   headers: Headers;
 };
@@ -10476,6 +10897,11 @@ export type setPublishedWorkflowVersionResponse200 = {
   status: 200;
 };
 
+export type setPublishedWorkflowVersionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type setPublishedWorkflowVersionResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -10486,18 +10912,31 @@ export type setPublishedWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type setPublishedWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type setPublishedWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type setPublishedWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type setPublishedWorkflowVersionResponseSuccess = setPublishedWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type setPublishedWorkflowVersionResponseError = (
+  | setPublishedWorkflowVersionResponse400
   | setPublishedWorkflowVersionResponse403
   | setPublishedWorkflowVersionResponse404
+  | setPublishedWorkflowVersionResponse409
   | setPublishedWorkflowVersionResponse422
+  | setPublishedWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -10570,10 +11009,19 @@ export type deleteRunResponse200 = {
   status: 200;
 };
 
+export type deleteRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteRunResponseSuccess = deleteRunResponse200 & {
   headers: Headers;
 };
-export type deleteRunResponse = deleteRunResponseSuccess;
+export type deleteRunResponseError = deleteRunResponse429 & {
+  headers: Headers;
+};
+
+export type deleteRunResponse = deleteRunResponseSuccess | deleteRunResponseError;
 
 export const getDeleteRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -10594,10 +11042,36 @@ export type updateRunResponse200 = {
   status: 200;
 };
 
+export type updateRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type updateRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type updateRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type updateRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateRunResponseSuccess = updateRunResponse200 & {
   headers: Headers;
 };
-export type updateRunResponse = updateRunResponseSuccess;
+export type updateRunResponseError = (
+  updateRunResponse400 | updateRunResponse409 | updateRunResponse422 | updateRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type updateRunResponse = updateRunResponseSuccess | updateRunResponseError;
 
 export const getUpdateRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -11523,6 +11997,11 @@ export type revokeAllWorkflowLinkGrantsResponse409 = {
   status: 409;
 };
 
+export type revokeAllWorkflowLinkGrantsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeAllWorkflowLinkGrantsResponseSuccess = revokeAllWorkflowLinkGrantsResponse200 & {
   headers: Headers;
 };
@@ -11530,6 +12009,7 @@ export type revokeAllWorkflowLinkGrantsResponseError = (
   | revokeAllWorkflowLinkGrantsResponse403
   | revokeAllWorkflowLinkGrantsResponse404
   | revokeAllWorkflowLinkGrantsResponse409
+  | revokeAllWorkflowLinkGrantsResponse429
 ) & {
   headers: Headers;
 };
@@ -13810,6 +14290,11 @@ export type revokeWorkflowLinkGrantResponse409 = {
   status: 409;
 };
 
+export type revokeWorkflowLinkGrantResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeWorkflowLinkGrantResponseSuccess = revokeWorkflowLinkGrantResponse200 & {
   headers: Headers;
 };
@@ -13817,6 +14302,7 @@ export type revokeWorkflowLinkGrantResponseError = (
   | revokeWorkflowLinkGrantResponse403
   | revokeWorkflowLinkGrantResponse404
   | revokeWorkflowLinkGrantResponse409
+  | revokeWorkflowLinkGrantResponse429
 ) & {
   headers: Headers;
 };
