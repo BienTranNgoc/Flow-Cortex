@@ -28,6 +28,7 @@
     "next": "Sau",
     "notAvailable": "Phiên bản này hiện không có sẵn",
     "olderNotice": "Đây là phiên bản trước, được công bố ngày {{date}}.",
+    "currentNotice": "Đây là phiên bản hiện hành, được công bố ngày {{date}}.",
     "currentLink": "Xem phiên bản hiện hành",
     "error": "Không tải được các phiên bản trước."
   },

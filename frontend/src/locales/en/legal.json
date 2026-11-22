@@ -28,6 +28,7 @@
     "next": "Next",
     "notAvailable": "This version is not available",
     "olderNotice": "This is an earlier version, published on {{date}}.",
+    "currentNotice": "This is the current version, published on {{date}}.",
     "currentLink": "Read the current version",
     "error": "The earlier versions could not be loaded."
   },
