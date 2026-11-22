@@ -20,6 +20,7 @@ import com.flowcortex.workflow.application.ReviewTokenState.ReviewRow;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowImportReview;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.infrastructure.WorkflowDataEntryRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowImportReviewRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
@@ -92,6 +93,8 @@ public class WorkflowTransferService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowStepRepository stepRepository;
     private final WorkflowImportReviewRepository reviewRepository;
+    private final WorkflowDataEntryRepository dataEntryRepository;
+    private final WorkflowDataStore dataStore;
     private final WorkflowWriteAccess writeAccess;
     private final WorkflowReadinessGuard readinessGuard;
     private final StepExecutorRegistry registry;
@@ -101,19 +104,22 @@ public class WorkflowTransferService {
 
     @Autowired
     WorkflowTransferService(WorkflowRepository workflowRepository, WorkflowStepRepository stepRepository,
-            WorkflowImportReviewRepository reviewRepository, WorkflowWriteAccess writeAccess,
-            WorkflowReadinessGuard readinessGuard, StepExecutorRegistry registry, JdbcTemplate jdbc, Clock clock) {
-        this(workflowRepository, stepRepository, reviewRepository, writeAccess, readinessGuard, registry, jdbc, clock,
-                OutboundTargets.TABLE);
+            WorkflowImportReviewRepository reviewRepository, WorkflowDataEntryRepository dataEntryRepository,
+            WorkflowDataStore dataStore, WorkflowWriteAccess writeAccess, WorkflowReadinessGuard readinessGuard,
+            StepExecutorRegistry registry, JdbcTemplate jdbc, Clock clock) {
+        this(workflowRepository, stepRepository, reviewRepository, dataEntryRepository, dataStore, writeAccess,
+                readinessGuard, registry, jdbc, clock, OutboundTargets.TABLE);
     }
 
     WorkflowTransferService(WorkflowRepository workflowRepository, WorkflowStepRepository stepRepository,
-            WorkflowImportReviewRepository reviewRepository, WorkflowWriteAccess writeAccess,
-            WorkflowReadinessGuard readinessGuard, StepExecutorRegistry registry, JdbcTemplate jdbc, Clock clock,
-            Map<String, List<String>> outboundTable) {
+            WorkflowImportReviewRepository reviewRepository, WorkflowDataEntryRepository dataEntryRepository,
+            WorkflowDataStore dataStore, WorkflowWriteAccess writeAccess, WorkflowReadinessGuard readinessGuard,
+            StepExecutorRegistry registry, JdbcTemplate jdbc, Clock clock, Map<String, List<String>> outboundTable) {
         this.workflowRepository = workflowRepository;
         this.stepRepository = stepRepository;
         this.reviewRepository = reviewRepository;
+        this.dataEntryRepository = dataEntryRepository;
+        this.dataStore = dataStore;
         this.writeAccess = writeAccess;
         this.readinessGuard = readinessGuard;
         this.registry = registry;
@@ -131,10 +137,17 @@ public class WorkflowTransferService {
             throw new ConflictException(new LocalizedMessage("workflow.copy.fixedWorkflow"));
         }
         List<StepDefinition> steps = WorkflowCarry.of(stepRepository.findByWorkflowIdOrderByStepOrderAsc(workflowId));
-        ObjectNode artifact = WorkflowArtifacts.write(workflow.getName(), steps, clock.instant());
-        if (artifact.toString().getBytes(StandardCharsets.UTF_8).length > MAX_ARTIFACT_BYTES) {
+        List<WorkflowDataStore.Seed> entries =
+                WorkflowCarry.seedsOf(dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(workflowId));
+        ObjectNode artifact = WorkflowArtifacts.write(workflow.getName(), steps, entries, clock.instant());
+        byte[] bytes = artifact.toString().getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_ARTIFACT_BYTES) {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.artifact.tooLarge"),
                     "ARTIFACT_TOO_LARGE");
+        }
+        if (!WorkflowArtifacts.withinReadLimits(bytes)) {
+            throw new UnprocessableEntityException(new LocalizedMessage("workflow.artifact.notPortable"),
+                    "ARTIFACT_NOT_PORTABLE");
         }
         LOG.info("Workflow {} exported by admin {}", workflowId, adminId);
         return new Exported(artifact, WorkflowArtifacts.filename(workflow.getName()) + ".workflow.json");
@@ -151,7 +164,7 @@ public class WorkflowTransferService {
                     new LocalizedMessage("workflow.artifact.tooLarge"));
         }
         WorkflowArtifact artifact = parse(body);
-        Review graded = grade(artifact);
+        Review graded = grade(artifact, adminId);
 
         jdbc.query(REVIEW_LOCK, (RowCallbackHandler) row -> {
         }, REVIEW_LOCK_PREFIX + adminId);
@@ -161,7 +174,8 @@ public class WorkflowTransferService {
                     new LocalizedMessage("workflow.artifact.tooManyReviews"));
         }
         WorkflowImportReview row = reviewRepository.saveAndFlush(new WorkflowImportReview(UUID.randomUUID(), adminId,
-                WorkflowArtifacts.write(artifact.name(), artifact.steps(), artifact.exportedAt()).toString(),
+                WorkflowArtifacts.write(artifact.name(), artifact.steps(), artifact.dataStore(), artifact.exportedAt())
+                        .toString(),
                 reviewJson(graded), graded.outbound(), body.length, now, now.plus(REVIEW_TTL)));
         return new ReviewView(row.getToken(), row.getExpiresAt(), artifact.name(), artifact.steps().size(),
                 graded.blocked(), graded.outbound(), graded.issues().stream().map(WorkflowTransferService::view).toList(),
@@ -195,7 +209,7 @@ public class WorkflowTransferService {
 
     private ImportResult create(WorkflowImportReview row, UUID adminId, boolean acknowledged, Instant now) {
         WorkflowArtifact artifact = storedArtifact(row);
-        Review graded = grade(artifact);
+        Review graded = grade(artifact, adminId);
         if (graded.blocked()) {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.import.blocked"), "IMPORT_BLOCKED",
                     blockingIssues(graded));
@@ -207,6 +221,7 @@ public class WorkflowTransferService {
         Workflow workflow = workflowRepository
                 .save(Workflow.draft(UUID.randomUUID(), adminId, artifact.name()));
         List<WorkflowStep> steps = stepRepository.saveAll(WorkflowCarry.copySteps(artifact.steps(), workflow.getId()));
+        dataStore.seed(workflow.getId(), artifact.dataStore());
         row.markImported(workflow.getId(), now);
         reviewRepository.save(row);
         LOG.info("Workflow {} imported by admin {} from review {}", workflow.getId(), adminId, row.getToken());
@@ -266,13 +281,15 @@ public class WorkflowTransferService {
         };
     }
 
-    private Review grade(WorkflowArtifact artifact) {
+    /** Grades for {@code adminId}: a {@code workflow.call} step is resolved only if that admin can read its target. */
+    private Review grade(WorkflowArtifact artifact, UUID adminId) {
         List<StepDefinition> steps = artifact.steps();
         List<StepDef> runSteps = steps.stream()
                 .map(step -> new StepDef(step.stepOrder(), step.name(), step.type(), step.config(), step.inputRef()))
                 .toList();
         return ImportGrading.grade(artifact, definitionFaults(steps), readinessGuard.faults(runSteps),
-                OutboundTargets.targetsOf(steps, outboundTable));
+                OutboundTargets.targetsOf(steps, outboundTable),
+                WorkflowCallReferences.unresolved(steps, adminId, workflowRepository));
     }
 
     /** What authoring would refuse for these steps, keyed {@code steps[i].field}. */

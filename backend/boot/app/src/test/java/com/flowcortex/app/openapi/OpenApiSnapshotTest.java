@@ -16,6 +16,8 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * {@code /v3/api-docs.yaml} is the live source of the contract-first pipeline; this test proves
@@ -43,6 +45,22 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("Overall service health status.");
+    }
+
+    @Test
+    void theWorkflowArtifactPublishesAStepConfigAsAnObjectAndTheOptionalDataStore() {
+        ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode schemas = JsonMapper.builder().build().readTree(response.getBody()).at("/components/schemas");
+
+        JsonNode config = schemas.at("/WorkflowArtifactStep/properties/config");
+        assertThat(config.get("type").toString()).contains("object").contains("null").doesNotContain("string");
+        assertThat(schemas.at("/WorkflowArtifactStep/properties/stepOrder/maximum").asInt()).isEqualTo(32767);
+        assertThat(schemas.at("/WorkflowArtifact/properties/dataStore/items/$ref").asText())
+                .endsWith("/WorkflowArtifactDataEntry");
+        assertThat(schemas.at("/WorkflowArtifact/required").toString()).doesNotContain("dataStore");
+        assertThat(schemas.at("/WorkflowArtifactDataEntry/required").toString()).contains("key", "dataType", "value");
     }
 
     @Test
