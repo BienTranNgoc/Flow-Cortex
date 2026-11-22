@@ -142,7 +142,7 @@ def test_direct_mp4_link_records_video_audio_and_facts(
         seen,
     ):
         monkeypatch.setenv("FETCH_PROXY_URL", proxy_url)
-        outcome = handle(make_job({"url": MP4}), {}, runner)
+        outcome = handle(make_job({"url": MP4, "echoSource": True}), {}, runner)
 
     assert seen.targets == [MP4]
     assert runner.ytdlp == []
@@ -163,6 +163,23 @@ def test_direct_mp4_link_records_video_audio_and_facts(
     assert outcome.data["fps"] == 25.0
     assert outcome.data["platform"] == "cdn.example.com"
     assert outcome.data["sourceUrl"] == MP4
+    runner.close()
+
+
+@pytest.mark.parametrize("params", [{"url": MP4}, {"url": MP4, "echoSource": False}])
+def test_the_link_is_not_echoed_unless_the_api_says_the_member_gave_it(
+    params: dict[str, Any], clip: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = Runner()
+    with proxy(serving(headers={"Content-Type": "video/mp4"}, body=clip.read_bytes())) as (
+        proxy_url,
+        _,
+    ):
+        monkeypatch.setenv("FETCH_PROXY_URL", proxy_url)
+        outcome = handle(make_job(params), {}, runner)
+
+    assert "sourceUrl" not in outcome.data
+    assert outcome.data["platform"] == "cdn.example.com"
     runner.close()
 
 
@@ -243,7 +260,13 @@ def test_yt_dlp_argument_list() -> None:
 
 @pytest.mark.parametrize(
     "params",
-    [{"url": YOUTUBE, "quality": "4k"}, {"url": YOUTUBE, "extractAudio": "no"}, {}, {"url": ""}],
+    [
+        {"url": YOUTUBE, "quality": "4k"},
+        {"url": YOUTUBE, "extractAudio": "no"},
+        {"url": YOUTUBE, "echoSource": "yes"},
+        {},
+        {"url": ""},
+    ],
 )
 def test_params_that_break_the_contract_are_refused(params: dict[str, Any]) -> None:
     error = refused(make_job(params), Runner())

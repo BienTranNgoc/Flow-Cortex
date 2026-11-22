@@ -160,14 +160,14 @@ line for any shared or deployed stack.
 | `postgres` | the database | `localhost:5432` |
 | `rabbitmq` | the broker: `media.*` and `provider.*` job/result/progress queues | AMQP `localhost:5672`, management UI <http://localhost:15672> (the `RABBITMQ_DEFAULT_*` account) |
 | `minio` | the S3-compatible object store (the Silo image) | S3 API `localhost:9000`, console <http://localhost:9001> (the `MINIO_ROOT_*` account) |
-| `rabbitmq-init` | one-shot: creates the provider workers' restricted broker user (`PROVIDER_RABBITMQ_*`), then exits | — |
+| `rabbitmq-init` | one-shot: creates the provider workers' and the fetch worker's restricted broker users (`PROVIDER_RABBITMQ_*`, `FETCH_RABBITMQ_*`), then exits | — |
 | `minio-init` | one-shot: creates the buckets, the 1-day uploads lifecycle, the run-input expiry and one least-privilege user per service, then exits | — |
 | `mailpit` | the mail sink: catches every email the backend sends (confirmation links); nothing is delivered | web UI <http://localhost:8025>, SMTP `localhost:1025` |
 | `backend` | the API (internal network only; it reaches the internet through `egress-proxy`) | <http://localhost:8080>, through `api-publish` (`/livez`, `/readyz`) |
 | `api-publish` | a socat relay that publishes `backend` on `127.0.0.1:8080`, because a service on internal networks only cannot publish a port | <http://localhost:8080> |
 | `egress-proxy` | the forward proxy with the domain allowlist: the only way the backend and the provider workers reach third parties | not published |
 | `egress-fetch` | the open-policy proxy tier for URL downloads, on the `fetch` network; `fetch-worker` is its client | not published |
-| `fetch-worker` | the same image on `media.fetch.jobs`: `fetch_video` only, the one service on `internal` and `fetch`. It downloads a member's link through `egress-fetch` (yt-dlp for platform pages, a guarded download for direct files); `FETCH_PLATFORM_LINKS_ENABLED` and `FETCH_UPSTREAM_ROTATES` set its behaviour. Its store key (`FETCH_S3_*`) can only write under `runs/` and it holds no database credential | none — it reaches the internet only through `egress-fetch` |
+| `fetch-worker` | the same image on `media.fetch.jobs`: `fetch_video` only, the one service on `internal` and `fetch`. It downloads a member's link through `egress-fetch` (yt-dlp for platform pages, a guarded download for direct files); `FETCH_PLATFORM_LINKS_ENABLED` and `FETCH_UPSTREAM_ROTATES` set its behaviour. Its store key (`FETCH_S3_*`) can only write under `runs/`, its broker login (`FETCH_RABBITMQ_*`) can only consume `media.fetch.jobs` and publish to `media`, and it holds no database credential | none — it reaches the internet only through `egress-fetch` |
 | `worker` | the Python media worker on `media.jobs` (internal network only, no proxy): probe, audio and caption jobs | none — and no internet access |
 | `render-worker` | the same image on `media.render.jobs`: `render_video` only. `MEDIA_RENDER_WORKERS` replicas (default 1), one encode each, so a render never waits behind a probe or audio job | none — and no internet access |
 | `audio-worker` | the audio image (`audio-runtime`: torch, demucs and the models baked in, large) on `media.audio.jobs`: `separate_audio` only. `MEDIA_AUDIO_WORKERS` replicas (default 1), one separation each, so a separation never waits behind a probe or render. The first build of this image is slow and large | none — and no internet access |
@@ -272,7 +272,9 @@ What to know about the media path:
   write under `flowcortex-media/runs/`); the root account (`MINIO_ROOT_*`) is used only by
   `minio` and `minio-init`. The backend and the media worker share the broker account
   (`RABBITMQ_DEFAULT_*`); the provider workers share their own (`PROVIDER_RABBITMQ_*`), which
-  can only consume `provider.jobs` and `provider.video.jobs` and publish to the `provider` exchange.
+  can only consume `provider.jobs` and `provider.video.jobs` and publish to the `provider` exchange;
+  the fetch worker has its own (`FETCH_RABBITMQ_*`), which can only consume `media.fetch.jobs` and
+  publish to the `media` exchange.
 
 **Kill switches (rollout notes).** Each is an env var in `.env`, read at startup;
 apply a change with `docker compose up -d backend`.
@@ -456,12 +458,14 @@ A video worker started before that re-run fails to consume (`ACCESS_REFUSED`) an
 reconnecting with backoff until the permission exists.
 
 **Upgrading to link downloads.** `fetch_video` jobs go to their own queue, `media.fetch.jobs`
-(the backend declares it at startup), and run on `fetch-worker`. Set `FETCH_S3_ACCESS_KEY` and
-`FETCH_S3_SECRET_KEY` in `.env` first (compose refuses to start any service without them), then
-re-run `minio-init` so the `flowcortex-fetch` store user and policy exist before the worker starts:
+(the backend declares it at startup), and run on `fetch-worker`. Set `FETCH_S3_ACCESS_KEY`,
+`FETCH_S3_SECRET_KEY`, `FETCH_RABBITMQ_USER` and `FETCH_RABBITMQ_PASS` in `.env` first (compose
+refuses to start any service without them; the two broker values use only letters, digits and
+`. _ ~ -`), then re-run `minio-init` and `rabbitmq-init` so the `flowcortex-fetch` store user and
+policy and the worker's broker user exist before the worker starts:
 
 ```bash
-docker compose up -d --force-recreate minio-init
+docker compose up -d --force-recreate minio-init rabbitmq-init
 docker compose up -d --build
 ```
 

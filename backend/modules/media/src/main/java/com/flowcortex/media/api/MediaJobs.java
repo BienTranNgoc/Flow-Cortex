@@ -251,7 +251,8 @@ public interface MediaJobs {
 
     /**
      * Copies {@code source}, an object of run {@code runId} in the media bucket, server-side to object {@code name}
-     * of step {@code stepOrder}, kept like a worker output; the result carries the copy's type and size.
+     * of step {@code stepOrder} at {@code runs/{runId}/steps/{stepOrder}/attempts/1/{name}}, kept like a worker
+     * output; the result carries the copy's type and size. A retry of the step overwrites the same object.
      * @throws IllegalArgumentException if {@code source} is outside {@code runs/<runId>/} of the media bucket or
      *         {@code name} is not a plain file name; nothing is copied
      * @throws UploadRejectedException if {@code source} is gone

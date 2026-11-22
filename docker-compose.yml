@@ -194,9 +194,9 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Creates the restricted broker identity used by provider-worker and provider-video-worker.
-  # The data volume, read-only, gives rabbitmqctl the node cookie; no password is passed on a
-  # command line.
+  # Creates the restricted broker identities: one for provider-worker and provider-video-worker,
+  # one for fetch-worker alone. The data volume, read-only, gives rabbitmqctl the node cookie; no
+  # password is passed on a command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
     entrypoint: ['/bin/sh', '/init/init.sh']
@@ -204,6 +204,8 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq
       PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
       PROVIDER_RABBITMQ_PASS: ${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}
+      FETCH_RABBITMQ_USER: ${FETCH_RABBITMQ_USER:?Set FETCH_RABBITMQ_USER (see .env.example)}
+      FETCH_RABBITMQ_PASS: ${FETCH_RABBITMQ_PASS:?Set FETCH_RABBITMQ_PASS (see .env.example)}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq:ro
       - ./infra/rabbitmq:/init:ro
@@ -529,7 +531,8 @@ services:
   # Fetch worker: consumes media.fetch.jobs (fetch_video) and is the only service on the
   # `fetch` network, so it alone can download a member's link, through egress-fetch. It
   # runs yt-dlp and ffmpeg on content from anywhere, so it gets its own object-store key
-  # (write-only under runs/, no read of uploads or run objects) instead of the media
+  # (write-only under runs/, no read of uploads or run objects) and its own broker login
+  # (consume media.fetch.jobs, publish to media, nothing else) instead of the media
   # worker's, and no database credential. No WORKER_ID: it reports its container hostname.
   fetch-worker:
     <<: *media-worker
@@ -537,12 +540,15 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
       egress-fetch:
         condition: service_started
     environment:
       <<: *media-worker-env
+      AMQP_URL: amqp://${FETCH_RABBITMQ_USER:?Set FETCH_RABBITMQ_USER (see .env.example)}:${FETCH_RABBITMQ_PASS:?Set FETCH_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
       S3_ACCESS_KEY: ${FETCH_S3_ACCESS_KEY:?Set FETCH_S3_ACCESS_KEY (see .env.example)}
       S3_SECRET_KEY: ${FETCH_S3_SECRET_KEY:?Set FETCH_S3_SECRET_KEY (see .env.example)}
       MEDIA_QUEUE: media.fetch.jobs

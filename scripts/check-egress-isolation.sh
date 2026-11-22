@@ -10,7 +10,9 @@
 #   6. a proxy or fetch-worker is on a network outside its set, or a service other than
 #      those two names egress-fetch;
 #   7. fetch-worker's object-store key equals another service's (it holds untrusted
-#      downloads, so it must not carry a key that reads uploads or run objects).
+#      downloads, so it must not carry a key that reads uploads or run objects);
+#   8. fetch-worker's broker user equals another service's (the backend's administrator
+#      account, or the login another worker uses, reads queues that carry members' data).
 # A new service lands on the default network, so it fails rule 1 until it is made
 # internal-only or consciously added to NON_INTERNAL_OK below.
 #
@@ -59,6 +61,7 @@ done
 python3 - "$tmp" "$n" <<'PY'
 import json
 import sys
+from urllib.parse import urlsplit
 
 tmp, count = sys.argv[1], int(sys.argv[2])
 
@@ -111,6 +114,20 @@ for i in range(1, count + 1):
         for name, svc in sorted(services.items()):
             if name != "fetch-worker" and (svc.get("environment") or {}).get("S3_ACCESS_KEY") == fetch_key:
                 violations.append(f"[{label}] fetch-worker: object-store key equals the one of {name}")
+
+    def broker_user(svc):
+        env = svc.get("environment") or {}
+        if env.get("AMQP_URL"):
+            return urlsplit(env["AMQP_URL"]).username
+        return env.get("SPRING_RABBITMQ_USERNAME")
+
+    fetch_broker_user = broker_user(services.get("fetch-worker", {}))
+    if "fetch-worker" in services and not fetch_broker_user:
+        violations.append(f"[{label}] fetch-worker: no broker user in AMQP_URL")
+    if fetch_broker_user:
+        for name, svc in sorted(services.items()):
+            if name != "fetch-worker" and broker_user(svc) == fetch_broker_user:
+                violations.append(f"[{label}] fetch-worker: broker user equals the one of {name}")
 
     if not networks.get("internal", {}).get("internal", False):
         violations.append(f"[{label}] network internal is not internal: true")

@@ -49,7 +49,7 @@ class FetchVideoStepExecutorTest {
         assertThat(job.capability()).isEqualTo(MediaCapability.FETCH_VIDEO);
         assertThat(job.inputs()).isEmpty();
         assertThat(job.params()).isEqualTo(Map.of("url", "https://cdn.example.com/clip.mp4",
-                "quality", "best", "extractAudio", true));
+                "quality", "best", "extractAudio", true, "echoSource", true));
         assertThat(job.maxInputBytes()).isEqualTo(500_000_000L);
         assertThat(job.maxRuntimeSeconds()).isEqualTo(600);
         assertThat(job.jobId()).isEqualTo(stepId);
@@ -71,11 +71,19 @@ class FetchVideoStepExecutorTest {
     }
 
     @Test
+    void aLinkFromTheOwnersConfigIsNeverMarkedForEchoInTheStepData() {
+        executor.execute(context("https://cdn.example.com/typed.mp4",
+                "{\"url\":\"https://cdn.example.com/v.mp4?token=secret\"}"));
+
+        assertThat(enqueued().params()).doesNotContainKey("echoSource");
+    }
+
+    @Test
     void aConfigWithoutUrlTakesTheInputAndKeepsItsOtherValues() {
         executor.execute(context("https://cdn.example.com/a.mp4", "{\"quality\":\"audio_only\"}"));
 
         assertThat(enqueued().params()).isEqualTo(Map.of("url", "https://cdn.example.com/a.mp4",
-                "quality", "audio_only", "extractAudio", true));
+                "quality", "audio_only", "extractAudio", true, "echoSource", true));
     }
 
     @Test

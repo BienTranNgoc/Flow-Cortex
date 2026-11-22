@@ -78,7 +78,7 @@ _FORMATS = {
 def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) -> HandlerOutcome:
     if inputs:
         raise PermanentError("contract_violation", "fetch_video takes no inputs")
-    url, quality, extract_audio = _params(job)
+    url, quality, extract_audio, echo_source = _params(job)
     settings = FetchSettings()
     proxy = settings.fetch_proxy_url
     _proxy_address(proxy)
@@ -128,10 +128,11 @@ def handle(job: MediaJob, inputs: Mapping[str, Path], processes: ProcessRunner) 
         "fetch finished",
         extra={"source": target.label, "route": route, "outputs": [f.name for f in files]},
     )
-    return HandlerOutcome(data=_facts(report, moving, info, url, target.host), files=files)
+    facts = _facts(report, moving, info, url if echo_source else None, target.host)
+    return HandlerOutcome(data=facts, files=files)
 
 
-def _params(job: MediaJob) -> tuple[str, str, bool]:
+def _params(job: MediaJob) -> tuple[str, str, bool, bool]:
     url = job.params.get("url")
     if not isinstance(url, str) or not url or len(url) > MAX_URL_LENGTH:
         raise PermanentError(
@@ -148,7 +149,15 @@ def _params(job: MediaJob) -> tuple[str, str, bool]:
         raise PermanentError(
             "contract_violation", "fetch_video param 'extractAudio' must be a boolean"
         )
-    return url, str(quality), extract_audio
+    # Only the API knows whether the member typed the link or the workflow's owner configured it,
+    # and a configured link may carry a credential the member must not read back: absent means
+    # do not echo.
+    echo_source = job.params.get("echoSource", False)
+    if not isinstance(echo_source, bool):
+        raise PermanentError(
+            "contract_violation", "fetch_video param 'echoSource' must be a boolean"
+        )
+    return url, str(quality), extract_audio, echo_source
 
 
 def _download_direct(
@@ -307,7 +316,7 @@ def _facts(
     report: Mapping[str, Any],
     moving: list[Mapping[str, Any]],
     info: Mapping[str, Any],
-    url: str,
+    source_url: str | None,
     host: str,
 ) -> dict[str, Any]:
     video = moving[0] if moving else None
@@ -321,7 +330,7 @@ def _facts(
         "fps": _fps(video) if video else None,
         "title": title.strip()[:MAX_TITLE_LENGTH] if isinstance(title, str) else None,
         "platform": extractor if extractor and extractor != "generic" else host,
-        "sourceUrl": url,
+        "sourceUrl": source_url,
     }
     return {key: value for key, value in facts.items() if value is not None}
 
