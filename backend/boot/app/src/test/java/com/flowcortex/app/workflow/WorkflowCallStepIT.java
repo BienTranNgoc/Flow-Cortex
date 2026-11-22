@@ -36,7 +36,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = {
         "flowcortex.credits.enabled=true",
         "flowcortex.workflow.cancel.enabled=true",
-        "flowcortex.workflow.reaper-interval-ms=500"})
+        "flowcortex.workflow.reaper-interval-ms=500",
+        "flowcortex.jobs.runner.enabled=true",
+        "flowcortex.jobs.poll-interval=100ms"})
 @AutoConfigureTestRestTemplate
 @Import(StepClosingTestConfig.class)
 class WorkflowCallStepIT extends AbstractWorkflowHttpIT {
