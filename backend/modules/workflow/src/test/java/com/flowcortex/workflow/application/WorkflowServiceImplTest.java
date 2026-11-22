@@ -537,6 +537,7 @@ class WorkflowServiceImplTest {
         WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
         Workflow workflow = stored(published(ANA, true));
         withEchoThenConnectorStep(workflow);
+        visibleTo(BEN, workflow);
 
         assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
                 new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
