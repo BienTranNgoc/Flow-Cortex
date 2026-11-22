@@ -51,6 +51,7 @@ import org.springframework.stereotype.Service;
 class ScheduleServiceImpl implements ScheduleService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduleServiceImpl.class);
+    private static final int RESUME_ATTEMPTS = 3;
     private static final TypeReference<List<Object>> ARGS = new TypeReference<>() {
     };
 
@@ -129,11 +130,22 @@ class ScheduleServiceImpl implements ScheduleService {
             return view(current);
         }
         checkStartable(callerId, workflowId, true);
-        Instant now = clock.instant();
-        Instant next = ScheduleClock.next(current.getFrequency(), toInt(current.getDayOfWeek()),
-                toInt(current.getDayOfMonth()), current.getLocalTime(), ZoneId.of(current.getTimeZone()), now);
-        schedules.resume(callerId, workflowId, next, now);
-        return view(own(callerId, workflowId));
+        // The write holds only while the stored rule is the one the next fire came from; a rule replaced in
+        // between is re-read and its own next fire written. The start checks depend on the workflow, not the
+        // rule, so they are not repeated.
+        for (int attempt = 1; ; attempt++) {
+            Instant now = clock.instant();
+            Instant next = ScheduleClock.next(current.getFrequency(), toInt(current.getDayOfWeek()),
+                    toInt(current.getDayOfMonth()), current.getLocalTime(), ZoneId.of(current.getTimeZone()), now);
+            if (schedules.resume(callerId, workflowId, current.getFrequency(), current.getDayOfWeek(),
+                    current.getDayOfMonth(), current.getLocalTime(), current.getTimeZone(), next, now) == 1) {
+                return view(own(callerId, workflowId));
+            }
+            current = own(callerId, workflowId);
+            if (current.isActive() || attempt == RESUME_ATTEMPTS) {
+                return view(current);
+            }
+        }
     }
 
     @Override

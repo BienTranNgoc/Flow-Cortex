@@ -221,16 +221,58 @@ class WorkflowScheduleRepositoryIT extends AbstractWorkflowModuleIT {
         upsert(owner, workflow, "daily", null, null, "08:00", true, now, null);
         Instant next = now.plusSeconds(7200);
 
-        assertThat(schedules.resume(owner, workflow, next, now)).as("already active").isZero();
+        assertThat(resumeDaily(owner, workflow, "08:00", next, now)).as("already active").isZero();
         schedules.pause(owner, workflow, now);
-        assertThat(schedules.resume(owner, workflow, next, now.plusSeconds(5))).isEqualTo(1);
-        assertThat(schedules.resume(owner, workflow, next.plusSeconds(60), now.plusSeconds(6))).isZero();
+        assertThat(resumeDaily(owner, workflow, "08:00", next, now.plusSeconds(5))).isEqualTo(1);
+        assertThat(resumeDaily(owner, workflow, "08:00", next.plusSeconds(60), now.plusSeconds(6))).isZero();
 
         WorkflowSchedule stored = schedules.findByOwnerIdAndWorkflowId(owner, workflow).orElseThrow();
         assertThat(stored.getStatus()).isEqualTo(WorkflowSchedule.ACTIVE);
         assertThat(stored.getPausedAt()).isNull();
         assertThat(stored.getNextRunAt()).isEqualTo(next);
-        assertThat(schedules.resume(owner, UUID.randomUUID(), next, now)).as("no schedule").isZero();
+        assertThat(resumeDaily(owner, UUID.randomUUID(), "08:00", next, now)).as("no schedule").isZero();
+    }
+
+    @Test
+    void resumeWritesOnlyWhileTheRuleItsNextFireCameFromIsStillStored() {
+        UUID owner = newUser("resume-stale").id();
+        UUID workflow = workflowOf(owner);
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        upsert(owner, workflow, "daily", null, null, "08:00", false, now, null);
+        Instant staleNext = now.plusSeconds(7200);
+        Instant freshNext = now.plusSeconds(86400);
+
+        upsert(owner, workflow, "weekly", (short) 1, null, "09:00", false, now.plusSeconds(1), null);
+
+        assertThat(resumeDaily(owner, workflow, "08:00", staleNext, now.plusSeconds(2)))
+                .as("the rule was replaced after it was read").isZero();
+        WorkflowSchedule untouched = schedules.findByOwnerIdAndWorkflowId(owner, workflow).orElseThrow();
+        assertThat(untouched.getStatus()).isEqualTo(WorkflowSchedule.PAUSED);
+        assertThat(untouched.getNextRunAt()).isNull();
+        assertThat(schedules.resume(owner, workflow, "weekly", (short) 2, null, LocalTime.of(9, 0), ZONE, freshNext,
+                now.plusSeconds(3))).as("a different day of the week is another rule").isZero();
+        assertThat(schedules.resume(owner, workflow, "weekly", (short) 1, null, LocalTime.of(9, 0), "UTC", freshNext,
+                now.plusSeconds(3))).as("a different time zone is another rule").isZero();
+        assertThat(schedules.resume(owner, workflow, "weekly", (short) 1, null, LocalTime.of(9, 0), ZONE, freshNext,
+                now.plusSeconds(4))).isEqualTo(1);
+
+        WorkflowSchedule stored = schedules.findByOwnerIdAndWorkflowId(owner, workflow).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(WorkflowSchedule.ACTIVE);
+        assertThat(stored.getNextRunAt()).isEqualTo(freshNext);
+    }
+
+    @Test
+    void resumeMatchesAMonthlyRuleAndRefusesAChangedDayOfMonth() {
+        UUID owner = newUser("resume-monthly").id();
+        UUID workflow = workflowOf(owner);
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        upsert(owner, workflow, "monthly", null, (short) 15, "08:00", false, now, null);
+        Instant next = now.plusSeconds(7200);
+
+        assertThat(schedules.resume(owner, workflow, "monthly", null, (short) 16, LocalTime.of(8, 0), ZONE, next, now))
+                .isZero();
+        assertThat(schedules.resume(owner, workflow, "monthly", null, (short) 15, LocalTime.of(8, 0), ZONE, next, now))
+                .isEqualTo(1);
     }
 
     @Test
@@ -242,7 +284,7 @@ class WorkflowScheduleRepositoryIT extends AbstractWorkflowModuleIT {
         WorkflowSchedule mine = upsert(owner, workflow, "daily", null, null, "08:00", true, now, "mine");
 
         assertThat(schedules.pause(other, workflow, now)).isZero();
-        assertThat(schedules.resume(other, workflow, now.plusSeconds(60), now)).isZero();
+        assertThat(resumeDaily(other, workflow, "08:00", now.plusSeconds(60), now)).isZero();
         assertThat(schedules.deleteByOwnerIdAndWorkflowId(other, workflow)).isZero();
         assertThat(schedules.findByOwnerIdAndWorkflowId(other, workflow)).isEmpty();
         WorkflowSchedule theirs = upsert(other, workflow, "weekly", (short) 5, null, "10:15", true, now, "theirs");
@@ -419,6 +461,10 @@ class WorkflowScheduleRepositoryIT extends AbstractWorkflowModuleIT {
             String time, boolean active, Instant now, String input) {
         return schedules.upsert(UUID.randomUUID(), owner, workflow, frequency, dayOfWeek, dayOfMonth,
                 LocalTime.parse(time), ZONE, active, active ? now.plusSeconds(3600) : null, input, false, now);
+    }
+
+    private int resumeDaily(UUID owner, UUID workflow, String time, Instant next, Instant now) {
+        return schedules.resume(owner, workflow, "daily", null, null, LocalTime.parse(time), ZONE, next, now);
     }
 
     private UUID record(WorkflowSchedule schedule, UUID owner, Instant at) {

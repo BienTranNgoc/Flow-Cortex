@@ -15,7 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Spring Data JPA repository for {@link WorkflowSchedule}. Every write is one statement keyed by the
  * owner and decided in the database: {@link #upsert} on the unique (owner, workflow) pair, {@link #pause}
  * and {@link #resume} on the status they leave. A statement that matches no row answers {@code 0}, which
- * the caller reads as "already there" or "not found" — never a read-then-write.
+ * the caller reads as "already there", "not found" or, for resume, "the rule changed" — never a
+ * read-then-write.
  */
 public interface WorkflowScheduleRepository extends JpaRepository<WorkflowSchedule, UUID> {
 
@@ -72,16 +73,27 @@ public interface WorkflowScheduleRepository extends JpaRepository<WorkflowSchedu
             """, nativeQuery = true)
     int pause(@Param("ownerId") UUID ownerId, @Param("workflowId") UUID workflowId, @Param("now") Instant now);
 
-    /** {@code paused -> active} with its next fire; {@code 0} when the owner has no paused schedule for the workflow. */
+    /**
+     * {@code paused -> active} with the next fire the caller computed from the given rule. The write also
+     * requires the stored rule to still equal that rule, so a concurrent replace that kept the schedule paused
+     * cannot end up with the next fire of the rule it replaced. Returns {@code 0} when the owner has no paused
+     * schedule for the workflow or its rule changed since the caller read it.
+     */
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             UPDATE workflow_schedule
                SET status = 'active', paused_at = NULL, next_run_at = :nextRunAt, updated_at = :now
              WHERE owner_id = :ownerId AND workflow_id = :workflowId AND status = 'paused'
+               AND frequency = :frequency
+               AND day_of_week IS NOT DISTINCT FROM CAST(:dayOfWeek AS smallint)
+               AND day_of_month IS NOT DISTINCT FROM CAST(:dayOfMonth AS smallint)
+               AND local_time = :localTime AND time_zone = :timeZone
             """, nativeQuery = true)
     int resume(@Param("ownerId") UUID ownerId, @Param("workflowId") UUID workflowId,
-            @Param("nextRunAt") Instant nextRunAt, @Param("now") Instant now);
+            @Param("frequency") String frequency, @Param("dayOfWeek") Short dayOfWeek,
+            @Param("dayOfMonth") Short dayOfMonth, @Param("localTime") LocalTime localTime,
+            @Param("timeZone") String timeZone, @Param("nextRunAt") Instant nextRunAt, @Param("now") Instant now);
 
     /** Removes the owner's schedule; its fires stay with {@code schedule_id} cleared. Returns the rows removed. */
     @Transactional
