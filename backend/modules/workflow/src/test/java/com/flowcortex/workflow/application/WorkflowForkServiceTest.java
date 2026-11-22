@@ -177,6 +177,23 @@ class WorkflowForkServiceTest {
     }
 
     @Test
+    void aWorkflowHoldingAConnectorCallStepIsRefusedWith422AndWritesNothing() {
+        Workflow source = visible(forkable("CRM export"));
+        when(stepRepository.findByWorkflowIdOrderByStepOrderAsc(source.getId())).thenReturn(List.of(
+                step(source, 1, "plain", "echo", null, null),
+                step(source, 2, "send", "connector.call", null,
+                        "{\"connector\":\"crm\",\"method\":\"POST\",\"url\":\"https://api.crm.example/v1/x\"}")));
+
+        assertThatThrownBy(() -> service.fork(BINH, source.getId()))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("CANNOT_FORK_CONNECTOR_STEP"));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowRepository, never()).incrementForkCount(any());
+        verify(stepRepository, never()).saveAll(any());
+    }
+
+    @Test
     void productVideoIsRefusedWith409() {
         Workflow fixed = new Workflow(ProductVideoWorkflow.ID, Workflow.SYSTEM_OWNER_ID, "Product Video", true);
         fixed.setAllowFork(true);
