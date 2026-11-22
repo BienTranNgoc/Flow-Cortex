@@ -651,6 +651,19 @@ export const RunStepResponseMode = {
   remote: 'remote',
 } as const;
 
+export interface RunStepChildResponse {
+  id: string;
+  itemIndex: number;
+  status: string;
+  output?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  attempt: number;
+  startedAt?: string;
+  finishedAt?: string;
+  outputs: RunStepOutputResponse[];
+}
+
 export interface RunStepResponse {
   id?: string;
   stepOrder?: number;
@@ -668,6 +681,7 @@ export interface RunStepResponse {
   pickedUpAt?: string;
   outputs: RunStepOutputResponse[];
   mode: RunStepResponseMode;
+  children: RunStepChildResponse[];
 }
 
 export interface RunResponse {
@@ -6188,6 +6202,67 @@ export const executeRunStep = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<executeRunStepResponse> => {
   return customFetch<executeRunStepResponse>(getExecuteRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type regenerateChildResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type regenerateChildResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type regenerateChildResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type regenerateChildResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type regenerateChildResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type regenerateChildResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type regenerateChildResponseSuccess = regenerateChildResponse200 & {
+  headers: Headers;
+};
+export type regenerateChildResponseError = (
+  | regenerateChildResponse401
+  | regenerateChildResponse402
+  | regenerateChildResponse404
+  | regenerateChildResponse409
+  | regenerateChildResponse503
+) & {
+  headers: Headers;
+};
+
+export type regenerateChildResponse = regenerateChildResponseSuccess | regenerateChildResponseError;
+
+export const getRegenerateChildUrl = (id: string, stepId: string, itemIndex: number) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/children/${itemIndex}/regenerate`;
+};
+
+export const regenerateChild = async (
+  id: string,
+  stepId: string,
+  itemIndex: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<regenerateChildResponse> => {
+  return customFetch<regenerateChildResponse>(getRegenerateChildUrl(id, stepId, itemIndex), {
     ...options,
     method: 'POST',
   });
