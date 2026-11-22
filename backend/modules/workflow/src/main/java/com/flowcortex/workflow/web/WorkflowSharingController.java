@@ -1,5 +1,7 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.shared.ratelimit.RateLimiter;
+import com.flowcortex.shared.ratelimit.RateLimiters;
 import com.flowcortex.workflow.application.Caller;
 import com.flowcortex.workflow.application.ShareOrigin;
 import com.flowcortex.workflow.application.WorkflowSharingService;
@@ -9,6 +11,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,10 +45,13 @@ class WorkflowSharingController {
 
     private final WorkflowSharingService sharingService;
     private final CurrentUserResolver currentUserResolver;
+    private final RateLimiter anonymousKeyLimiter;
 
-    WorkflowSharingController(WorkflowSharingService sharingService, CurrentUserResolver currentUserResolver) {
+    WorkflowSharingController(WorkflowSharingService sharingService, CurrentUserResolver currentUserResolver,
+            RateLimiters rateLimiters) {
         this.sharingService = sharingService;
         this.currentUserResolver = currentUserResolver;
+        this.anonymousKeyLimiter = rateLimiters.named(ShareKeyRateLimits.SHARE_KEY);
     }
 
     static ShareOrigin originOf(HttpServletRequest request) {
@@ -101,16 +108,29 @@ class WorkflowSharingController {
                 originOf(http))));
     }
 
-    /** Token optional: a signed-in reader is named in the access log, an anonymous one is hashed by network. */
+    /**
+     * Token optional: a signed-in reader is named in the access log, an anonymous one is hashed by network. An
+     * anonymous reader spends the per-address budget before the key is looked up; a signed-in reader writes at most
+     * one log row per window, so only the anonymous path is limited.
+     */
     @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "410", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "429", description = "workflow.share.rateLimited (Retry-After)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "getWorkflowByShareKey")
     @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = "/by-key/{key}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<SharedWorkflowResponse> getByKey(@AuthenticationPrincipal Jwt jwt, @PathVariable String key,
             HttpServletRequest http) {
+        if (jwt == null) {
+            Optional<Duration> wait = anonymousKeyLimiter.tryAcquire(http.getRemoteAddr());
+            if (wait.isPresent()) {
+                throw new ShareKeyRateLimitedException(wait.get());
+            }
+        }
         UUID callerId = jwt == null ? null : currentUserResolver.require(jwt);
         return ResponseEntity.ok(SharedWorkflowResponse.from(sharingService.sharedView(callerId, key,
                 originOf(http))));
