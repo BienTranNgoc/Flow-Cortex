@@ -137,6 +137,26 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void aMismatchedFieldTypeNamesTheField() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookmarked\":\"yes\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.valueOf("application/problem+json")))
+                .andExpect(jsonPath("$.errors.bookmarked").value("has the wrong type"));
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"images\":[\"x\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.images").value("has the wrong type"));
+    }
+
+    @Test
+    void anotherUnreadableBodyKeepsTheBare400() throws Exception {
+        mockMvc.perform(post("/test/typed").contentType(MediaType.APPLICATION_JSON).content("{not json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
     void aValidationFailureIsWrittenInVietnamese() throws Exception {
         mockMvc.perform(post("/test/validate")
                         .header(HttpHeaders.ACCEPT_LANGUAGE, "vi")

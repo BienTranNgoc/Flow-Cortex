@@ -70,7 +70,11 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     @Override
     @Transactional(readOnly = true)
     public List<WorkflowView> listVisibleWorkflows(UUID currentUserId) {
-        List<Workflow> workflows = workflowRepository.findAllVisibleTo(currentUserId);
+        return toViews(workflowRepository.findAllVisibleTo(currentUserId), currentUserId);
+    }
+
+    /** The one mapping of workflows to the views a member list shows, in the given order. */
+    List<WorkflowView> toViews(List<Workflow> workflows, UUID currentUserId) {
         Map<UUID, ServedDefinitions.ServedSteps> served = servedDefinitions.servedFor(workflows, currentUserId);
         return workflows.stream()
                 .map(workflow -> servedView(workflow, served.get(workflow.getId()), currentUserId))

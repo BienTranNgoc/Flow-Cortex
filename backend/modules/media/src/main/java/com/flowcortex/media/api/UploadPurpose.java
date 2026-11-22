@@ -9,8 +9,13 @@ public enum UploadPurpose {
     /** A video, audio or image file a member keeps in the Drive library; same formats and caps as a run input. */
     DRIVE_ITEM,
     /** A member's avatar or cover picture; only the owner ever sees it. */
-    PROFILE_IMAGE;
+    PROFILE_IMAGE,
+    /** An image attached to a workflow review. */
+    REVIEW_IMAGE;
 
     /** Size cap of one support-attachment image; the purpose table and the support module both read it here. */
     public static final long SUPPORT_ATTACHMENT_MAX_BYTES = 5L * 1024 * 1024;
+
+    /** Size cap of one review image; the purpose table and the workflow module both read it here. */
+    public static final long REVIEW_IMAGE_MAX_BYTES = 5L * 1024 * 1024;
 }

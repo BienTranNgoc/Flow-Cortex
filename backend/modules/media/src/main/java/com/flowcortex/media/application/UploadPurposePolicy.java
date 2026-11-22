@@ -20,6 +20,7 @@ final class UploadPurposePolicy {
     static final String SUPPORT_ATTACHMENT_PREFIX = "support-attachment/";
     static final String DRIVE_ITEM_PREFIX = "drive-item/";
     static final String PROFILE_IMAGE_PREFIX = "profile-image/";
+    static final String REVIEW_IMAGE_PREFIX = "review-image/";
 
     private static final long MEGABYTE = 1024L * 1024;
     /** Insertion order is the order formats are listed to the member. */
@@ -67,6 +68,7 @@ final class UploadPurposePolicy {
             case SUPPORT_ATTACHMENT -> SUPPORT_ATTACHMENT_PREFIX;
             case DRIVE_ITEM -> DRIVE_ITEM_PREFIX;
             case PROFILE_IMAGE -> PROFILE_IMAGE_PREFIX;
+            case REVIEW_IMAGE -> REVIEW_IMAGE_PREFIX;
         };
         return prefix + ownerId + "/" + uploadId;
     }
@@ -77,6 +79,7 @@ final class UploadPurposePolicy {
             case RUN_INPUT, DRIVE_ITEM -> upload.maxBytesOf(kind);
             case SUPPORT_ATTACHMENT -> "image".equals(kind) ? UploadPurpose.SUPPORT_ATTACHMENT_MAX_BYTES : 0L;
             case PROFILE_IMAGE -> "image".equals(kind) ? upload.maxBytesOf(kind) : 0L;
+            case REVIEW_IMAGE -> "image".equals(kind) ? UploadPurpose.REVIEW_IMAGE_MAX_BYTES : 0L;
         };
     }
 
@@ -92,7 +95,8 @@ final class UploadPurposePolicy {
 
     /** Purposes that take only png, jpg, jpeg and webp images. */
     private static boolean imageOnly(UploadPurpose purpose) {
-        return purpose == UploadPurpose.SUPPORT_ATTACHMENT || purpose == UploadPurpose.PROFILE_IMAGE;
+        return purpose == UploadPurpose.SUPPORT_ATTACHMENT || purpose == UploadPurpose.PROFILE_IMAGE
+                || purpose == UploadPurpose.REVIEW_IMAGE;
     }
 
     private static String extensionOf(String fileName) {
