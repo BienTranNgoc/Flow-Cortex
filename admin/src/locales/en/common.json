@@ -73,6 +73,7 @@
         "paymentSettings": "Payment settings",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "phoneVerification": "Phone verification",
         "settings": "Settings",
         "features": "Feature Switches",
         "auditLog": "Audit Log",

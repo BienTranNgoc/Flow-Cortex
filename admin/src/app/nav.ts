@@ -7,6 +7,7 @@ import {
   Cpu,
   CreditCard,
   Cube,
+  DeviceMobile,
   FileText,
   GearSix,
   Headset,
@@ -125,6 +126,12 @@ export const NAV: NavGroup[] = [
         path: '/sms-outbox',
         icon: ChatText,
         key: 'platform.sms_outbox.view',
+      },
+      {
+        label: 'common.shell.nav.items.phoneVerification',
+        path: '/phone-verification',
+        icon: DeviceMobile,
+        key: 'platform.setting.view',
       },
       {
         label: 'common.shell.nav.items.settings',

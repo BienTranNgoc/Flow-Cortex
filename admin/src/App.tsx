@@ -17,6 +17,7 @@ import { DocumentsPage } from './features/content/DocumentsPage';
 import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
 import { ProvidersPage } from './features/providers/ProvidersPage';
 import { RunDetailPage } from './features/runs/RunDetailPage';
 import { PaymentSettingsPage } from './features/paymentSettings/PaymentSettingsPage';
@@ -41,6 +42,7 @@ const PAGES: Record<string, ReactElement> = {
   '/users': <UsersPage />,
   '/providers': <ProvidersPage />,
   '/sms-outbox': <SmsOutboxPage />,
+  '/phone-verification': <PhoneVerificationStatusPage />,
   '/settings': <SettingsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
