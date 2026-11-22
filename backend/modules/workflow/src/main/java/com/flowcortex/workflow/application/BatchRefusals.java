@@ -39,6 +39,8 @@ final class BatchRefusals {
     }
 
     static final String START_ERROR = "startError";
+    /** The row shows this message code, never the exception's own text, which may carry SQL or host names. */
+    static final String START_ERROR_MESSAGE = "workflow.batch.startError";
     static final int MAX_START_FAILURES = 3;
 
     private static final int MESSAGE_LIMIT = 300;
@@ -70,7 +72,7 @@ final class BatchRefusals {
             }
         }
         if (previousFailures + 1 >= MAX_START_FAILURES) {
-            return new Outcome(Action.FAIL_ROW, null, START_ERROR, truncate(unexpectedMessage(refusal), MESSAGE_LIMIT));
+            return new Outcome(Action.FAIL_ROW, null, START_ERROR, START_ERROR_MESSAGE);
         }
         return new Outcome(Action.RETRY_ROW, null, null, null);
     }
@@ -122,12 +124,6 @@ final class BatchRefusals {
             return conflict.getDetail().code();
         }
         return ((LocalizedStatusException) error).getDetailMessageCode();
-    }
-
-    private static String unexpectedMessage(Throwable error) {
-        return error.getMessage() == null || error.getMessage().isBlank()
-                ? error.getClass().getSimpleName()
-                : error.getMessage();
     }
 
     private static String truncate(String text, int limit) {

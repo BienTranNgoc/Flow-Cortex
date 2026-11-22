@@ -105,13 +105,16 @@ class BatchRefusalsTest {
         assertThat(second.action()).isEqualTo(Action.RETRY_ROW);
         assertThat(third.action()).isEqualTo(Action.FAIL_ROW);
         assertThat(third.errorCode()).isEqualTo("startError");
-        assertThat(third.errorMessage()).isEqualTo("store went away");
+        assertThat(third.errorMessage()).isEqualTo("workflow.batch.startError");
     }
 
     @Test
-    void anUnexpectedErrorWithoutAMessageStillFailsWithText() {
-        Outcome outcome = BatchRefusals.classify(new NullPointerException(), 2);
+    void anUnexpectedErrorNeverShowsItsOwnTextOnTheRow() {
+        Outcome sql = BatchRefusals.classify(new IllegalStateException(
+                "could not execute statement [insert into workflow_run (id) values (?)] on db-primary:5432"), 2);
+        Outcome blank = BatchRefusals.classify(new NullPointerException(), 2);
 
-        assertThat(outcome.errorMessage()).isEqualTo("NullPointerException");
+        assertThat(sql.errorMessage()).isEqualTo("workflow.batch.startError");
+        assertThat(blank.errorMessage()).isEqualTo("workflow.batch.startError");
     }
 }
