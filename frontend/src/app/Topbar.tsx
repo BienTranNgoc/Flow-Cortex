@@ -4,8 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useMeQuery } from '../features/auth/useAuth';
 import { useBalance } from '../features/credits/useBalance';
 import { WalletBadge } from '../features/credits/WalletBadge';
+import { RunTray } from '../features/runHistory/RunTray';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
-import { useTheme } from './useTheme';
+import { useSaveLocale } from '../features/auth/useAccountPreferences';
+import type { Theme } from './useTheme';
 import { UserMenu } from './UserMenu';
 import './Topbar.css';
 
@@ -14,14 +17,23 @@ interface TopbarProps {
   readonly showMenuButton: boolean;
   readonly drawerOpen: boolean;
   readonly onOpenMenu: () => void;
+  /** The shell owns the one theme instance; the topbar only shows and flips it. */
+  readonly theme: Theme;
+  readonly onToggleTheme: () => void;
 }
 
 /** Rendered only inside `Layout`, which sits behind `RequireAuth` — the user is always signed in here. */
-export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<TopbarProps>) {
+export function Topbar({
+  showMenuButton,
+  drawerOpen,
+  onOpenMenu,
+  theme,
+  onToggleTheme,
+}: Readonly<TopbarProps>) {
   const { t } = useTranslation();
   const meQuery = useMeQuery();
   const credits = useBalance();
-  const { theme, toggle } = useTheme();
+  const saveLocale = useSaveLocale();
   return (
     <header className="topbar">
       {showMenuButton && (
@@ -38,10 +50,12 @@ export function Topbar({ showMenuButton, drawerOpen, onOpenMenu }: Readonly<Topb
       )}
       <div className="topbar__actions">
         {credits !== undefined && <WalletBadge wallet={credits} />}
-        <AppLanguageToggle />
+        <RunTray />
+        <NotificationBell />
+        <AppLanguageToggle onSwitch={saveLocale.mutate} />
         <ThemeToggle
           theme={theme}
-          onToggle={toggle}
+          onToggle={onToggleTheme}
           compact
           labels={{
             switchToLight: t('common.theme.switchToLight'),

@@ -75,6 +75,15 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Page<AppUser> searchByRoles(@Param("roles") Collection<Role> roles, @Param("pattern") String pattern,
             Pageable pageable);
 
+    boolean existsByUsernameAndIdNot(String username, UUID id);
+
+    /**
+     * Serialises every write of one username until the caller's transaction ends. The lock is taken
+     * after the caller's own row lock, always in that order.
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext('username:' || :name))", nativeQuery = true)
+    void lockUsername(@Param("name") String name);
+
     Optional<AppUser> findByGoogleSubject(String googleSubject);
 
     Optional<AppUser> findByOwnerIdAndEmail(UUID ownerId, String email);

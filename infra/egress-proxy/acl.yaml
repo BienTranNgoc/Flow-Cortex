@@ -21,3 +21,5 @@ default:
     - ftp.lacnic.net
     - ftp.afrinic.net
     - api.telegram.org
+    - payment.momo.vn
+    - test-payment.momo.vn

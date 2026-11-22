@@ -119,7 +119,6 @@ export function openEventStream(options: EventStreamOptions): EventStream {
   let controller: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let wake: (() => void) | null = null;
-  let idleTimer: ReturnType<typeof setTimeout> | null = null;
   const streamId = (nextStreamId += 1);
   let down = false;
 
@@ -136,6 +135,8 @@ export function openEventStream(options: EventStreamOptions): EventStream {
       emitNetworkSignal({ type: 'stream-up', streamId });
     }
   }
+
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const clearIdle = () => {
     if (idleTimer !== null) {

@@ -729,3 +729,221 @@ Format per entry: **Context → Decision → Consequences**.
   - **A two-way door for now:** the two schemas have no consumer yet. Once an
     adapter, the checkout pages and the transaction ledger use them, an edit
     goes through the changes that consume them.
+
+---
+
+## ADR-0022 — Personal access tokens: decoder dispatch, role-less principal, route allowlist
+
+Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
+
+- **Context:** Admin accounts need to call the API from scripts without a
+  browser session. Every bearer chain is a resource server over one `JwtDecoder`
+  bean and every controller reads the caller as a `Jwt`, so a second credential
+  type must arrive as a `Jwt` or each chain and controller changes.
+- **Decision:**
+  - **Resolved inside the shared JWT decoder.** `PatAwareJwtDecoder` sends a
+    bearer starting with `fc_pat_` to the user module's authenticator and
+    everything else to the HS256 decoder unchanged. The authenticator builds a
+    `Jwt` with the owner's id as `sub`, the claim `fc_auth = "pat"` and **no
+    `role` claim**, so a token carries no authority of its own; an unknown,
+    expired, revoked or ineligible token is a `BadJwtException` (401) and no
+    other credential is tried. No chain configuration and no controller changed.
+  - **The route allowlist decides where a token may act**, independent of how
+    admin routes authorize. `PatRouteInterceptor` matches the route pattern
+    Spring resolved against `PatRoutePolicy` (workflows, runs, review tasks,
+    uploads, product videos, credits, and `GET /api/v1/auth/me`) and answers
+    403 `PAT_NOT_ALLOWED` for anything else, whatever the owner's role. A token
+    cannot mint a step-up proof or another token. A role-guarded route that
+    denies the role-less principal first is answered with the same code.
+  - **The throttle runs before authentication.** `PatRateLimitFilter` counts
+    every `fc_pat_` bearer, valid or not, against registry limiters keyed on
+    the SHA-256 of the token (60 per minute, 1000 per day), so a replayed
+    revoked or mistyped token is limited and nothing raw reaches the store.
+  - **A switch.** `flowcortex.auth.personal-access-tokens.enabled` defaults to
+    off: the token routes answer 503, every `fc_pat_` bearer answers 401, rows
+    are kept and work again when it is turned back on.
+  - **Stored form.** The token is `fc_pat_` plus 32 random bytes in base64url;
+    only its SHA-256 hex is stored (`personal_access_token.token_hash`), and the
+    raw value is shown once in the create response. Creating needs a single-use
+    step-up proof minted by re-entering the password.
+- **Consequences:**
+  - **A database read per token request:** the decoder looks the token up and
+    reads the owner row, so a demoted or suspended admin's tokens stop on the
+    next request. The per-token budget bounds this per value, not across many
+    distinct unknown values; a per-IP failed-token limiter is a follow-up.
+  - **A login lockout does not stop issued tokens**, because anyone who knows an
+    admin's email can cause one; revoke, suspension, demotion and the switch do.
+  - **A route added under an allowlisted prefix is reachable by tokens
+    automatically**, so a reviewer adding one checks it against this table.
+  - **Changing the prefix or the hash** means revoking every issued token.
+
+---
+
+## ADR-0016 — Runtime settings registry
+
+- **Context:** Operator-tunable values (the Help Center assistant switch and
+  its four daily limits) were bound once from environment variables at
+  startup, with one ad-hoc table per feature for the switch. Changing a limit
+  meant a restart, there was no common history, and a console page would have
+  needed per-feature code. Every later runtime switch would have repeated the
+  pattern.
+- **Decision:** One registry of typed keys, decided at read time.
+  - **Declaration:** each module declares its own keys as `SettingDefinition`
+    beans (key, type, bounds, code default, a supplier of the configured
+    value); the settings module collects them at startup and refuses a
+    duplicate, a malformed name, bounds with min above max, a configured value
+    outside its bounds, and any key whose segment looks like a secret
+    (`key`, `token`, `secret`, `password`). No secret is ever a setting.
+  - **Composition:** one pure function decides every read. The environment is
+    the configured layer. A switch is tri-state there: configured off vetoes
+    whatever is stored, configured on turns the switch on when nothing is
+    stored, unset defers to stored-else-code-default. An integer is stored,
+    else configured. A stored value beats the configured one except for the
+    veto.
+  - **Reads never throw:** one primary-key query outside the caller's
+    transaction, no cache. A failed read or unparseable stored text degrades
+    by type (a switch to off, an integer to its configured value), increments
+    `settings.read.degraded{key}` and logs the key, never the text.
+  - **Writes:** one transaction per key under a per-key advisory lock; the
+    value and its history row commit together, an unchanged value records
+    nothing, and a reset deletes the stored value and records one row.
+  - **Surface:** an admin API gated by `platform.setting.view|update` lists
+    keys with their source, edits, resets and pages the history; the console
+    Settings page renders any declared key from that API.
+- **Consequences:**
+  - A later key adds a declaration and copy, no store or page code.
+  - A switch fails closed on a database fault, intended for cost-bearing
+    switches; a key whose safe position is "on" needs a hold-last policy
+    first.
+  - Every read is one indexed query; a cache would need cross-instance
+    invalidation and is deferred until there is more than one instance.
+  - `support_settings` stays unread after the switch is copied, so rolling the
+    release back still serves the pre-upgrade switch; a cleanup change drops
+    it.
+
+## ADR-0028 — MoMo payment provider
+
+- **Context:** ADR-0013 defines one gateway shape for every provider and
+  leaves each adapter to its own change. MoMo is the first adapter. It opens a
+  payment on its own page, then reports the result twice: the payer returns to
+  our return URL, and MoMo posts an IPN to a backend route. Outbound calls
+  must go through `egress-proxy` and its allowlist (ADR-0010). No contract with
+  MoMo is signed yet, so the adapter has to start switched off. The IPN is
+  retried by MoMo and can be forged by anyone who can reach the route, so what
+  is checked, in what order, and what is stored must be fixed before a payment
+  can settle on it.
+- **Decision:**
+  - **Scope:** one-time payments. Recurring payments are added by
+    `billing-recurring-mandates-a` on the same port.
+  - **Where it lives:** the provider port and the MoMo adapter are in
+    `:modules:billing`. No MoMo type crosses the port.
+  - **Signing:** HMAC-SHA256, hex, over the field list MoMo declares for each
+    request and callback kind, taken from the raw bytes parsed as strict JSON
+    (duplicate keys, an absent signed field or a signed value that is neither
+    a string nor an integral number are refused). Signatures compare in constant time. A signature failure is
+    answered and counted without echoing any received value.
+  - **Amount range:** 1,000 to 50,000,000 đồng, checked before anything is
+    signed or sent, so an amount MoMo would refuse never leaves the process.
+  - **Failures:** every outbound call is bounded by a timeout. A transport
+    failure, a timeout or an unreadable answer is reported as unresolved: the
+    payment is neither failed nor settled by it, because MoMo may have created
+    it. A per-instance circuit breaker opens after 5 consecutive failures for
+    30 s, then lets one probe through; a call it refuses says that nothing was
+    sent, so that operation is not in doubt.
+  - **Callback admission, in this order:** source allowlist (everything else
+    is answered 403 before the body is read or the database touched) ->
+    signature verification over the raw bytes -> reference check (our order
+    reference shape and a minted order) -> cross-check of the order and amount
+    through the order-lookup port -> one accepted inbox row per request id.
+    Answers carry status only. A repeated request id is answered 204 and adds
+    no accepted row; each rejected callback writes its own evidence row.
+  - **Hand-off:** the callback only writes an inbox row, in a single insert
+    with no wider transaction. The ledger reads accepted rows; no Modulith
+    event or broker message is involved.
+  - **Off by default:** `flowcortex.billing.momo.enabled` is false. When it is
+    true, startup fails fast on a missing partner code or key, a base,
+    redirect or IPN URL that is not absolute https with a host, or an
+    unreadable source allowlist, rather than at the first payment. The sandbox
+    host default lives only in `application.yml` and `.env.example`, so an
+    explicitly blank base URL is reported instead of silently using it.
+  - **Refund query matching:** a refund-query entry counts as ours when it
+    names our order id, or when it is the only entry and names no order id.
+    Deviation from Xood's `refund-query-outcome.ts`, which also accepts a sole
+    entry naming another order: that would settle a refund MoMo never saw.
+- **Alternatives:**
+  - **Resilience4j for the breaker:** rejected. A new dependency whose
+    count-based window needs a failure-rate setting to mimic "consecutive
+    failures" and whose half-open state admits several calls; a small
+    state machine over an injected clock is unit-testable.
+  - **A Modulith event or a RabbitMQ message to hand the callback to the
+    ledger:** rejected. The durable row is the hand-off; an event adds a
+    delivery that can be lost between the row and the consumer.
+  - **Record first, then verify:** rejected for the admission path. It costs a
+    body read and a row per forged request; the allowlist and the signature
+    check come first and only a request that passes them is stored, except the
+    reference-check evidence row below.
+  - **A runtime check instead of a startup check:** rejected. Configuration is
+    static at startup, so the fault is knowable before the first payment.
+- **Consequences:**
+  - **ADR-0013 is refined in one sentence:** "foreign references are not
+    stored" covers the provider event and payment state. A verified callback
+    for an order that is not ours is still kept as a rejected
+    `reference_not_ours` evidence row with its raw bytes and no event, so it is
+    never read by the ledger yet remains evidence for a dispute or a
+    misconfigured merchant. Logs still carry no payload value.
+  - **The source allowlist assumes the current trusted ingress chain** (Caddy
+    -> frontend nginx -> Tomcat) resolving the real caller. It must be revisited
+    if a CDN or a public load balancer is added, or every callback becomes 403.
+  - **The ledger consumes accepted rows** and owns turning them into payment
+    state; this change stops at the durable row.
+  - **MoMo cannot be enabled before an order lookup exists**, because the
+    cross-check has nothing to ask.
+  - **Settings move to runtime** with `payment-admin-settings`; until then
+    they are application properties read at startup.
+
+---
+
+## ADR-0024 — A step may wait on a child run
+
+- **Context:** ADR-0007's run engine runs one workflow's steps in order. A step
+  either runs inline and returns its output, or hands a job to the media engine
+  and waits for a media event. The `workflow.call` step type runs another
+  workflow as part of a run, so a step must be able to wait on a whole run, and
+  `workflow_run` must be able to name its parent.
+- **Decision:**
+  - **A third step mode, `NESTED`.** The step starts its child run inside its
+    own claim transaction, so a crash cannot leave a running step with no child,
+    and finishes when the child ends, the way a remote step finishes on a media
+    event. No thread waits; `REMOTE` keeps meaning "media". The child is an
+    ordinary run owned by the parent run's owner, started for the workflow's
+    served steps, and charged step by step at its own claims, so nothing is
+    charged twice; `workflow.call` itself is priced `free`.
+  - **A run-finished signal at every terminal transition.** Wherever a run
+    becomes `completed`, `error` or `cancelled`, the same transaction calls
+    `ChildRuns.finished(runId)`, which publishes `ChildRunFinishedEvent` only
+    for a run that has a parent step. The listener completes or fails the parent
+    step with the existing compare-and-set on `running` and attempt, so a late
+    or repeated signal changes nothing. Today these are
+    `RunStepTransactions.completeRunIfAllStepsCompleted`, `failRunning` (and its
+    settle branch), `settleIfCancelling` from `complete`,
+    `RunCancellation.cancelRun` when it settles at once, and a child stopped by
+    its parent.
+  - **Stops go down the tree.** Stopping a run, or failing its `workflow.call`
+    step (for instance by the reaper at its run deadline), stops the unfinished
+    children, each under its own owner, and theirs in turn.
+  - **Bounded shape.** Depth is 0 to 2, enforced by the executor and by a
+    database check; a workflow naming itself or an ancestor is refused; one
+    step attempt has at most one child (a unique index); a child may not be a
+    Product Video run, need an upload, or contain an approval checkpoint.
+    `flowcortex.workflow.call.max-runtime` bounds how long a step waits.
+- **Consequences:**
+  - `workflow_run` gains `parent_run_id`, `parent_step_id`,
+    `parent_step_attempt` and `call_depth`; the migration is additive and
+    two-way, and existing rows read as roots at depth 0.
+  - **A new terminal transition must call `ChildRuns.finished`.** One that does
+    not leaves the parent step waiting until its run deadline, then failing
+    `run_timeout`. The list above is the places to check.
+  - A lost signal costs at most the wait up to that run deadline.
+  - The executor and `RunCreation` need the step registry, which takes the
+    executor; they resolve it, and the start guards, when they run rather than
+    at construction.
