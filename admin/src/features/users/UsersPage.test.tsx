@@ -13,6 +13,7 @@ const ALICE = {
   email: 'alice@flowcortex.dev',
   name: 'Alice',
   role: 'MEMBER',
+  roleName: 'Member',
   status: 'ACTIVE',
   state: 'active',
   staffTarget: false,
@@ -42,6 +43,7 @@ describe('UsersPage', () => {
       email: 'ops@flowcortex.dev',
       name: 'Ops',
       role: 'OPERATION_MANAGER',
+      roleName: 'Operation Manager',
       staffTarget: true,
     };
     const calls = stubApi({
@@ -68,7 +70,13 @@ describe('UsersPage', () => {
   });
 
   it('keeps the Creator role selected and sends no role when it is untouched', async () => {
-    const creator = { ...ALICE, id: 'u3', email: 'creator@flowcortex.dev', role: 'CREATOR' };
+    const creator = {
+      ...ALICE,
+      id: 'u3',
+      email: 'creator@flowcortex.dev',
+      role: 'CREATOR',
+      roleName: 'Creator',
+    };
     const calls = stubApi({
       [ME_PATH]: { status: 200, body: ADMIN_ME },
       [STATS_PATH]: STATS,
@@ -112,6 +120,7 @@ describe('UsersPage', () => {
         id: 'u9',
         email: 'linh@flowcortex.dev',
         role: 'CUSTOMER_SUPPORT',
+        roleName: 'Customer Support',
         staffTarget: true,
       };
       stubApi({

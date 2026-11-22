@@ -30,7 +30,8 @@ public class UserDirectoryRepository {
             "app_user_search_fold(u.name || ' ' || u.email || ' ' || coalesce(u.username, ''))";
 
     private static final String SELECT = """
-            SELECT u.id, u.owner_id, u.email, u.name, u.role, u.status, u.created_at, u.updated_at, u.username,
+            SELECT u.id, u.owner_id, u.email, u.name, u.role, r.name AS role_name, u.status, u.created_at,
+                   u.updated_at, u.username,
                    u.email_confirmed_at, u.locked_until, u.has_password,
                    (u.google_subject IS NOT NULL) AS google_linked,
                    (u.admin_disabled_at IS NOT NULL) AS admin_disabled,
@@ -155,6 +156,7 @@ public class UserDirectoryRepository {
                 rs.getString("email"),
                 rs.getString("name"),
                 rs.getString("role"),
+                rs.getString("role_name"),
                 status.name(),
                 instant(rs, "created_at"),
                 instant(rs, "updated_at"),

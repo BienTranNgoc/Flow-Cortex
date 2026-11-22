@@ -20,19 +20,17 @@ function readStoredMode(): SidebarMode {
 }
 
 export function useSidebarMode() {
-  const [mode, setMode] = useState<SidebarMode>(readStoredMode);
-  const toggle = useCallback(() => {
-    setMode((current) => {
-      const next: SidebarMode = current === 'pinned' ? 'rail' : 'pinned';
-      try {
-        localStorage.setItem(SIDEBAR_MODE_KEY, next);
-      } catch {
-        // Not persisted; the choice still applies until reload.
-      }
-      return next;
-    });
+  const [mode, setModeState] = useState<SidebarMode>(readStoredMode);
+  const setMode = useCallback((next: SidebarMode) => {
+    try {
+      localStorage.setItem(SIDEBAR_MODE_KEY, next);
+    } catch {
+      // Not persisted; the choice still applies until reload.
+    }
+    setModeState(next);
   }, []);
-  return { mode, toggle };
+  const toggle = useCallback(() => setMode(mode === 'pinned' ? 'rail' : 'pinned'), [mode, setMode]);
+  return { mode, setMode, toggle };
 }
 
 function canMatchMedia(): boolean {

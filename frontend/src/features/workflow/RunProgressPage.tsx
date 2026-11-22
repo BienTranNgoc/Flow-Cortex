@@ -5,8 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
+import { useRefreshOnboardingOnCompletion } from '../onboarding/useFirstResultClaim';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
+import { RunInputs } from './RunInputs';
+import { RunLogPanel } from './RunLogPanel';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
 import {
@@ -217,6 +220,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
         </p>
       )}
       {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
+      <RunInputs runId={runId} />
       {selected && (
         <div className="run-layout">
           <div className="run-layout-pipeline">
@@ -245,6 +249,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
           </div>
         </div>
       )}
+      <RunLogPanel runId={runId} />
       {backTo && (
         <Link className="run-back-link action-link" to={`/workflows/${backTo}`}>
           {t('workflow.run.back')}
@@ -263,6 +268,7 @@ export function RunProgressPage() {
   const { workflowId, runId } = useParams<{ workflowId: string; runId: string }>();
   const runQuery = useRunQuery(runId);
   const { t } = useTranslation();
+  useRefreshOnboardingOnCompletion(runQuery.data?.status);
 
   if (!runId) {
     return <p role="alert">{t('workflow.run.noRun')}</p>;

@@ -6,8 +6,9 @@ import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
 import { ArrowsClockwise, DownloadSimple, Plus } from '@phosphor-icons/react';
 import { useMeQuery } from '../auth/useAuth';
-import { assignableRoles, ROLE_CODES } from './enumLabels';
+import { ROLE_CODES } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
+import { useAssignableRoles } from './useAssignableRoles';
 import { UserRow } from './UserRow';
 import { createUserSchema, type CreateUserFormValues } from './userSchemas';
 import {
@@ -46,7 +47,7 @@ export function UsersPage() {
   const locale = activeLocale();
   usePageTitle(t('users.title'));
   const me = useMeQuery().data;
-  const assignable = assignableRoles(me);
+  const { assignable, names } = useAssignableRoles();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useMemo(() => parseUsersParams(searchParams), [searchParams]);
   const usersQuery = useUsersQuery(params);
@@ -156,6 +157,19 @@ export function UsersPage() {
       );
     }
   }
+  const pageItems = page?.items;
+  const { filterRoles, filterNames } = useMemo(() => {
+    const customNames: Record<string, string> = {};
+    for (const user of pageItems ?? []) {
+      if (user.role && !(ROLE_CODES as readonly string[]).includes(user.role)) {
+        customNames[user.role] = user.roleName;
+      }
+    }
+    return {
+      filterRoles: [...ROLE_CODES, ...Object.keys(customNames)],
+      filterNames: customNames,
+    };
+  }, [pageItems]);
 
   return (
     <div className="cortex-admin-users">
@@ -293,7 +307,10 @@ export function UsersPage() {
           <div className="cortex-admin-field">
             <label htmlFor="new-user-role">{t('users.create.role')}</label>
             <select id="new-user-role" {...register('role')}>
-              <RoleOptions roles={assignable.length > 0 ? assignable : DEFAULT_CREATE_ROLES} />
+              <RoleOptions
+                roles={assignable.length > 0 ? assignable : DEFAULT_CREATE_ROLES}
+                names={names}
+              />
             </select>
           </div>
           {createError && !createError.errors && (
@@ -356,10 +373,11 @@ export function UsersPage() {
               onChange={(event) => change({ role: event.target.value })}
             >
               <option value="">{t('users.directory.allRoles')}</option>
-              <RoleOptions roles={ROLE_CODES} />
-              {params.role !== '' && !ROLE_CODES.some((code) => code === params.role) && (
-                <option value={params.role}>{params.role}</option>
-              )}
+              <RoleOptions
+                roles={filterRoles}
+                current={params.role || undefined}
+                names={{ ...filterNames, ...names }}
+              />
             </select>
           </div>
           <div className="cortex-admin-field">

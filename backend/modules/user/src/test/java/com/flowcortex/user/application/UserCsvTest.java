@@ -16,8 +16,8 @@ class UserCsvTest {
     private static final Instant CREATED = Instant.parse("2026-11-08T03:04:05Z");
 
     private static UserView view(String name, String username, Instant confirmed, List<String> methods) {
-        return new UserView(ID, UUID.randomUUID(), "a@example.com", name, "MEMBER", "ACTIVE", CREATED, CREATED,
-                username, "active", confirmed, null, methods, false, false);
+        return new UserView(ID, UUID.randomUUID(), "a@example.com", name, "MEMBER", "Member", "ACTIVE", CREATED,
+                CREATED, username, "active", confirmed, null, methods, false, false);
     }
 
     @Test

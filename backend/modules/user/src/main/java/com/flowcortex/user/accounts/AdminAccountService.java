@@ -4,19 +4,23 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.user.application.ConstraintViolations;
 import com.flowcortex.user.application.RegistrationOwnerGuard;
+import com.flowcortex.user.application.RoleCatalog;
 import com.flowcortex.user.application.SuperAdminInvariant;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.RoleRow;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,42 +33,43 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 class AdminAccountService {
 
-    private static final Set<Role> ADMIN_ROLES = EnumSet.copyOf(
-            Arrays.stream(Role.values()).filter(r -> r.isSuperAdmin() || r.isStaff()).toList());
-
     private final AppUserRepository users;
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
+    private final RoleCatalog roleCatalog;
 
     AdminAccountService(AppUserRepository users, SuperAdminInvariant superAdminInvariant,
-            RegistrationOwnerGuard registrationOwnerGuard) {
+            RegistrationOwnerGuard registrationOwnerGuard, RoleCatalog roleCatalog) {
         this.users = users;
         this.superAdminInvariant = superAdminInvariant;
         this.registrationOwnerGuard = registrationOwnerGuard;
+        this.roleCatalog = roleCatalog;
     }
 
     /**
-     * @param role an optional role code to filter by; a role that is not an admin role matches nothing
+     * @param role an optional role code to filter by; a code that is not an admin role matches nothing
      * @param q    an optional case-insensitive fragment of the email or name
      */
     @Transactional(readOnly = true)
     PageView<AdminAccountResponse> list(String role, String q, int page, int size) {
-        Set<Role> roles = ADMIN_ROLES;
-        if (role != null && !role.isBlank()) {
-            Role filter = Role.valueOf(role);
-            roles = ADMIN_ROLES.contains(filter) ? EnumSet.of(filter) : EnumSet.noneOf(Role.class);
-        }
+        boolean filtered = role != null && !role.isBlank();
+        Set<Role> roles = roleCatalog.adminRoles().stream()
+                .filter(row -> !filtered || row.code().equals(role))
+                .map(row -> Role.of(row.code()))
+                .collect(Collectors.toSet());
         if (roles.isEmpty()) {
             return new PageView<>(List.of(), page, size, 0);
         }
         Page<AppUser> found = users.searchByRoles(roles, likePattern(q), PageRequest.of(page, size));
-        return new PageView<>(found.getContent().stream().map(AdminAccountResponse::from).toList(), page, size,
-                found.getTotalElements());
+        Map<String, String> roleNames = roleCatalog.names();
+        return new PageView<>(found.getContent().stream().map(user -> AdminAccountResponse.from(user, roleNames))
+                .toList(), page, size, found.getTotalElements());
     }
 
     @Transactional
     AdminAccountResponse changeRole(UUID callerId, UUID id, String role) {
-        Role newRole = Role.valueOf(role);
+        RoleRow newRoleRow = roleCatalog.require(role);
+        Role newRole = Role.of(newRoleRow.code());
         if (id.equals(callerId)) {
             throw new ConflictException(new LocalizedMessage("user.cannotChangeOwnRole"));
         }
@@ -73,8 +78,16 @@ class AdminAccountService {
             registrationOwnerGuard.assertNotRegistrationOwner(target);
             superAdminInvariant.assertNotLastActive(target);
         }
-        target.changeRole(newRole);
-        return AdminAccountResponse.from(users.saveAndFlush(target));
+        target.changeRole(newRole, newRoleRow.isAdminAccount());
+        try {
+            return AdminAccountResponse.from(users.saveAndFlush(target), roleCatalog.names());
+        } catch (DataIntegrityViolationException e) {
+            // A role deleted after the catalog lookup fails the foreign key at this flush, not at commit.
+            if (ConstraintViolations.isRoleForeignKey(e)) {
+                throw RoleCatalog.unknown(role);
+            }
+            throw e;
+        }
     }
 
     /** Idempotent: a second deactivation keeps the first time and the first actor. */
@@ -90,7 +103,7 @@ class AdminAccountService {
             target.deactivateAdmin(callerId, Instant.now().truncatedTo(ChronoUnit.MICROS));
             users.saveAndFlush(target);
         }
-        return AdminAccountResponse.from(target);
+        return AdminAccountResponse.from(target, roleCatalog.names());
     }
 
     @Transactional
@@ -100,7 +113,7 @@ class AdminAccountService {
             target.activateAdmin();
             users.saveAndFlush(target);
         }
-        return AdminAccountResponse.from(target);
+        return AdminAccountResponse.from(target, roleCatalog.names());
     }
 
     /**
@@ -120,7 +133,7 @@ class AdminAccountService {
 
     private AppUser requireAdminAccount(UUID id) {
         AppUser target = requireAccount(id);
-        if (!ADMIN_ROLES.contains(target.getRole())) {
+        if (!roleCatalog.find(target.getRole().code()).map(RoleRow::isAdminAccount).orElse(false)) {
             throw new ConflictException(new LocalizedMessage("user.notAdminAccount"));
         }
         return target;

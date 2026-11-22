@@ -18,6 +18,7 @@ public record UserView(
         String email,
         String name,
         String role,
+        String roleName,
         String status,
         Instant createdAt,
         Instant updatedAt,

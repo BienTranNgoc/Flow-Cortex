@@ -145,9 +145,8 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
         assertThat(phone.getBody()).isEqualTo(new PhoneView(e164, true, masked(e164)));
 
         ResponseEntity<ProblemView> again = verify(token, code, ProblemView.class);
-        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-        assertThat(again.getBody().code()).isEqualTo("OTP_INVALID");
-        assertThat(again.getBody().detail()).isEqualTo(NO_LONGER_VALID);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(again.getBody().code()).isEqualTo("PHONE_ALREADY_VERIFIED");
     }
 
     @Test
@@ -398,18 +397,24 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
     }
 
     @Test
-    void verifyingASecondNumberReplacesTheFirst() {
+    void aVerifiedMemberIsRefusedOnThePlainPathAndNothingIsSent() {
         String token = memberToken("phone-replace");
         String first = sendOk(token);
         assertThat(verify(token, latestCodeFor(first), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        long outboxBefore = outboxRows();
+        String second = randomLocalNumber();
 
-        String second = sendOk(token);
-        assertThat(verify(token, latestCodeFor(second), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<ProblemView> send = sendCode(token, second, ProblemView.class);
+        ResponseEntity<ProblemView> check = verify(token, "123456", ProblemView.class);
 
+        for (ResponseEntity<ProblemView> refused : List.of(send, check)) {
+            assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertThat(refused.getBody().code()).isEqualTo("PHONE_ALREADY_VERIFIED");
+        }
+        assertThat(outboxRows()).isEqualTo(outboxBefore);
+        assertThat(outboxRowsFor("+84" + second.substring(1))).isZero();
         assertThat(get("/api/v1/me/phone", token, PhoneView.class).getBody())
-                .isEqualTo(new PhoneView(second, true, masked(second)));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_phone WHERE phone_e164 = ?", Long.class, first))
-                .isZero();
+                .isEqualTo(new PhoneView(first, true, masked(first)));
     }
 
     @Test

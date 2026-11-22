@@ -1,0 +1,177 @@
+{
+  "eyebrow": "Content",
+  "languages": {
+    "vi": "Vietnamese",
+    "en": "English"
+  },
+  "fields": {
+    "body": "Content",
+    "alt": "Alternative text",
+    "caption": "Caption",
+    "mediaId": "Library item",
+    "seoTitle": "SEO title",
+    "seoDescription": "SEO description"
+  },
+  "sectionTypes": {
+    "richText": "Rich text",
+    "media": "Image or video"
+  },
+  "dialog": {
+    "cancel": "Cancel",
+    "working": "Working…"
+  },
+  "documents": {
+    "title": "Documents",
+    "description": "Versioned documents with a draft and a published copy, in Vietnamese and English.",
+    "loading": "Loading documents…",
+    "loadError": "Could not load the documents.",
+    "empty": "No documents are registered yet",
+    "emptyHint": "A document appears here once the code registers it.",
+    "tableLabel": "Documents table",
+    "columns": {
+      "document": "Document",
+      "draft": "Draft",
+      "published": "Published"
+    },
+    "version": "Version {{version}}",
+    "noDraft": "No draft yet",
+    "notPublished": "Not published"
+  },
+  "editor": {
+    "fallbackTitle": "Document",
+    "backToList": "Back to documents",
+    "loading": "Loading the document…",
+    "loadError": "Could not load the document.",
+    "refreshFailed": "Could not refresh the latest data — showing the version loaded earlier.",
+    "notFound": "This document is not registered.",
+    "languageTabs": "Language",
+    "modeLabel": "View",
+    "edit": "Edit",
+    "preview": "Preview",
+    "revisions": "Revisions",
+    "unsaved": "Unsaved changes",
+    "draftVersion": "Draft version {{version}}",
+    "noDraft": "No draft saved yet",
+    "saved": "Saved as version {{version}}",
+    "published": "Version {{version}} is now published",
+    "save": "Save",
+    "saving": "Saving…",
+    "publish": "Publish",
+    "publishHint": {
+      "forbidden": "You cannot publish this document",
+      "unsaved": "Save before publishing",
+      "no-draft": "Save a draft before publishing"
+    },
+    "saveFailed": "Could not save. Please try again.",
+    "publishFailed": "Could not publish. Please try again.",
+    "readOnly": "You can read this document but not change it.",
+    "invalidSummary": "Some values cannot be saved:",
+    "incompleteSummary": "Fill in these texts in both languages before publishing:",
+    "seo": "Search engine text",
+    "fieldIn": "{{field}} ({{language}})",
+    "pathSection": "Section {{n}}: {{field}}",
+    "pathLocale": "{{label}} ({{language}})",
+    "sections": "Sections",
+    "noSections": "This document has no sections yet.",
+    "sectionTitle": "Section {{n}}: {{type}}",
+    "moveUp": "Move section {{n}} up",
+    "moveDown": "Move section {{n}} down",
+    "remove": "Remove section {{n}}",
+    "up": "Up",
+    "down": "Down",
+    "removeShort": "Remove",
+    "addType": "Section type",
+    "addSection": "Add section",
+    "sectionLimit": "A document holds at most {{max}} sections.",
+    "noAddableTypes": "This console has no editor for the section types this document allows.",
+    "count": "{{current}} / {{max}} characters",
+    "tooLong": "This text is over the {{max}} character limit and cannot be saved.",
+    "noMedia": "No item chosen",
+    "chooseMedia": "Choose from library",
+    "replaceMedia": "Replace",
+    "needsMediaView": "Choosing needs the media library permission.",
+    "unsupportedType": "This console cannot edit sections of type “{{type}}”; it is kept as it is."
+  },
+  "publish": {
+    "title": "Publish this document?",
+    "message": "Draft version {{version}} goes live in both languages and replaces the published copy.",
+    "confirm": "Publish"
+  },
+  "conflict": {
+    "title": "The document changed",
+    "message": "Someone saved version {{version}} after you loaded this document. Your changes are still in the editor.",
+    "messageUnknown": "Someone saved this document after you loaded it. Your changes are still in the editor.",
+    "loadLatest": "Load latest",
+    "overwrite": "Overwrite with mine",
+    "loaded": "Loaded version {{version}}",
+    "loadFailed": "Could not load the latest version. Try again."
+  },
+  "revisions": {
+    "title": "Revisions",
+    "noun_one": "revision",
+    "noun_other": "revisions",
+    "loading": "Loading revisions…",
+    "loadError": "Could not load the revisions.",
+    "empty": "No revisions yet. Each save and each publication adds one.",
+    "tableLabel": "Revisions table",
+    "columns": {
+      "kind": "Type",
+      "version": "Version",
+      "author": "Author",
+      "time": "When",
+      "actions": "Actions"
+    },
+    "kind": {
+      "draft": "Draft",
+      "publication": "Publication"
+    },
+    "unknownAuthor": "—",
+    "load": "Load into editor",
+    "loadAria": "Load into editor: {{kind}} {{version}}",
+    "loadingRevision": "Loading…",
+    "loaded": "Loaded revision {{version}} into the editor. Nothing is stored until you save.",
+    "loadRevisionFailed": "Could not load that revision. Try again.",
+    "replaceTitle": "Replace your unsaved changes?",
+    "replaceMessage": "Loading this revision replaces what is in the editor now.",
+    "replaceConfirm": "Load revision"
+  },
+  "leave": {
+    "title": "Leave this page?",
+    "message": "You have unsaved changes. If you leave now they are lost.",
+    "confirm": "Leave"
+  },
+  "preview": {
+    "label": "Preview",
+    "empty": "Nothing to preview yet.",
+    "blankText": "(This text is empty.)",
+    "noMedia": "(No library item chosen.)"
+  },
+  "picker": {
+    "title": "Choose from the media library"
+  },
+  "media": {
+    "title": "Media library",
+    "description": "Images and videos that documents can place in their sections.",
+    "noun_one": "item",
+    "noun_other": "items",
+    "filter": {
+      "label": "Type",
+      "all": "All",
+      "image": "Images",
+      "video": "Videos"
+    },
+    "upload": {
+      "label": "Upload an image or video",
+      "progress": "Uploading {{name}} — {{percent}}%",
+      "progressLabel": "Upload progress of {{name}}"
+    },
+    "uploadFailed": "The upload failed. Try again.",
+    "loading": "Loading the library…",
+    "loadError": "Could not load the library.",
+    "empty": "The library is empty.",
+    "emptyFiltered": "No items of this type.",
+    "gridLabel": "Library items",
+    "choose": "Choose {{name}}",
+    "thumbMissing": "Preview unavailable"
+  }
+}

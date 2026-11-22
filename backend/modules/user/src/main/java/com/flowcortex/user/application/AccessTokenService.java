@@ -38,7 +38,7 @@ public class AccessTokenService {
                 .issuedAt(now)
                 .expiresAt(expiresAt)
                 .subject(user.getId().toString())
-                .claim(JwtClaims.ROLE, user.getRole().name())
+                .claim(JwtClaims.ROLE, user.getRole().code())
                 .build();
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }

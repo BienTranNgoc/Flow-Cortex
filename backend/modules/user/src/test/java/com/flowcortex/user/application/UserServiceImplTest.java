@@ -18,6 +18,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UnknownRoleException;
@@ -29,14 +30,18 @@ import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -52,17 +57,81 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class UserServiceImplTest {
 
     private final AppUserRepository repository = mock(AppUserRepository.class);
-    private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
+    private final AccountCredentials accountCredentials = mock(AccountCredentials.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailLinks = mock(EmailConfirmationService.class);
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
+    private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
     private final UserDirectoryRepository directory = mock(UserDirectoryRepository.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-08T03:04:05Z"), ZoneOffset.UTC);
     private final UserServiceImpl service =
-            new UserServiceImpl(repository, new BCryptPasswordEncoder(), refreshTokenService, events, emailLinks,
-                    adminPermissions, superAdminInvariant, registrationOwnerGuard, directory, clock);
+            new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, directory, clock);
+
+    UserServiceImplTest() {
+        when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));
+        when(roleCatalog.names()).thenReturn(Map.of("HO_TRO_CAP_2", "Support level 2"));
+    }
+
+    private static RoleRow roleRow(String code) {
+        boolean staff = List.of("OPERATION_MANAGER", "CUSTOMER_SUPPORT", "CONTENT_EDITOR", "PLATFORM_OPERATOR",
+                "HO_TRO_CAP_2").contains(code);
+        boolean system = !code.equals("HO_TRO_CAP_2");
+        return new RoleRow(code, code, system, staff, code.equals("ADMIN"));
+    }
+
+    @Test
+    void aCustomRoleCodeIsAcceptedAndShownByItsName() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserView created = service.createUser(ownerId, "agent@example.com", "correct horse battery staple",
+                "Agent", "HO_TRO_CAP_2");
+
+        assertThat(created.role()).isEqualTo("HO_TRO_CAP_2");
+        assertThat(created.roleName()).isEqualTo("Support level 2");
+    }
+
+    @Test
+    void anUnknownRoleCodeIsRefusedBeforeAnyWrite() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(roleCatalog.require("NOPE")).thenThrow(RoleCatalog.unknown("NOPE"));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "NOPE")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aRoleDeletedAfterTheLookupIsAnUnknownRoleNotATakenEmail() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("fk",
+                new ConstraintViolationException("fk", new SQLException("fk", "23503"), "fk_app_user_role")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "HO_TRO_CAP_2")).isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((LocalizedStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+    }
+
+    @Test
+    void anotherConstraintKeepsTheTakenEmailAnswer() {
+        UUID ownerId = UUID.randomUUID();
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uname",
+                new ConstraintViolationException("uname", new SQLException("uname", "23505"),
+                        "uq_app_user_username")));
+
+        assertThatThrownBy(() -> service.createUser(ownerId, "x@example.com", "correct horse battery staple", "X",
+                "MEMBER")).isInstanceOf(ConflictException.class);
+    }
 
     @Test
     void createUserDefaultsToActiveAndHashesThePasswordWithBcrypt() {
@@ -141,7 +210,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, null, null, "SUSPENDED");
 
-        verify(refreshTokenService).revokeAllFor(id);
+        verify(accountCredentials).revokeAllFor(id);
     }
 
     @Test
@@ -156,7 +225,7 @@ class UserServiceImplTest {
 
         service.updateUser(ownerId, id, null, "New Name", null, "ACTIVE");
 
-        verify(refreshTokenService, never()).revokeAllFor(any());
+        verify(accountCredentials, never()).revokeAllFor(any());
     }
 
     @Test
@@ -236,7 +305,7 @@ class UserServiceImplTest {
         Instant now = clock.instant();
         when(directory.count(delegated.getId(), UserQuery.all(), now)).thenReturn(1L);
         when(directory.page(delegated.getId(), UserQuery.all(), now, 0, 100))
-                .thenReturn(List.of(AppUserMapper.toUserView(dung, now, false)));
+                .thenReturn(List.of(AppUserMapper.toUserView(dung, Map.of(), now, false)));
 
         assertThat(service.searchUsers(delegated.getId(), UserQuery.all(), 0, 100).items())
                 .extracting(UserView::email).containsExactly("dung@example.com");
@@ -277,7 +346,8 @@ class UserServiceImplTest {
         Instant now = clock.instant();
         when(directory.count(adminId, UserQuery.all(), now)).thenReturn(2L);
         when(directory.page(adminId, UserQuery.all(), now, 0, 100)).thenReturn(
-                List.of(AppUserMapper.toUserView(member, now, false), AppUserMapper.toUserView(staff, now, true)));
+                List.of(AppUserMapper.toUserView(member, Map.of(), now, false),
+                        AppUserMapper.toUserView(staff, Map.of(), now, true)));
         when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
 
         assertThat(service.searchUsers(staff.getId(), UserQuery.all(), 0, 100).items()).hasSize(2);

@@ -334,8 +334,8 @@ class UserDirectoryIT extends AbstractUserModuleIT {
         UserView member = seed(admin, "Plain member", "MEMBER");
         String customRole = "CUSTOM_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         UUID customId = UUID.randomUUID();
-        jdbc.update("INSERT INTO role (code, staff, super_admin, system, sort_order) VALUES (?, true, false, false, 99)",
-                customRole);
+        jdbc.update("INSERT INTO role (code, name, staff, super_admin, system, sort_order) "
+                + "VALUES (?, ?, true, false, false, 99)", customRole, customRole);
         try {
             jdbc.update("""
                     INSERT INTO app_user (id, owner_id, email, password_hash, name, role, status, created_at, updated_at)

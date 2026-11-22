@@ -10,8 +10,6 @@ import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useMeQuery } from '../auth/useAuth';
 import {
-  assignableRoles,
-  ROLE_CODES,
   roleLabel,
   signInMethodLabel,
   stateLabel,
@@ -20,16 +18,17 @@ import {
 } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
 import { canManageAccount } from './userAccess';
+import { roleCodeSchema } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
-const userRoleSchema = z.enum(ROLE_CODES);
 
 export function UserDetailPage() {
   const { t } = useTranslation();
   usePageTitle(t('users.detail.title'));
   const me = useMeQuery().data;
-  const assignable = assignableRoles(me);
+  const { assignable, names } = useAssignableRoles();
   const { userId = '' } = useParams();
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
@@ -84,7 +83,7 @@ export function UserDetailPage() {
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
-    const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
+    const parsedRole = roleCodeSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
       setRoleErrorKey('users.detail.invalidRole');
       return;
@@ -149,7 +148,7 @@ export function UserDetailPage() {
             )}
             <div>
               <dt>{t('users.detail.role')}</dt>
-              <dd>{roleLabel(t, user.role)}</dd>
+              <dd>{roleLabel(t, user.role, user.roleName)}</dd>
             </div>
             <div>
               <dt>{t('users.detail.status')}</dt>
@@ -223,7 +222,11 @@ export function UserDetailPage() {
                     setRoleErrorKey('');
                   }}
                 >
-                  <RoleOptions roles={assignable} current={user.role} />
+                  <RoleOptions
+                    roles={assignable}
+                    current={user.role}
+                    names={{ ...(user.role ? { [user.role]: user.roleName } : {}), ...names }}
+                  />
                 </select>
               </div>
               <button

@@ -1,5 +1,6 @@
 import { withClientId } from './clientId';
 import { withLocale } from './locale';
+import { emitNetworkSignal, rateLimitWaitSeconds } from './networkSignals';
 import { getToken } from './tokenStore';
 import type { ProblemDetail } from './problemDetail';
 import { REFRESH_PATH, refreshAccessToken } from './session';
@@ -13,12 +14,41 @@ const NO_REFRESH_PATHS = [
 ];
 
 /**
- * Fetch used by every generated operation (orval `override.mutator`). A 401 triggers one shared
- * refresh and the request is replayed once with the new token; a replay that is rejected again
- * is returned as is.
+ * Raw fetch with the session behaviour every client call shares: locale and client-id headers,
+ * and on a 401 one shared refresh followed by a single replay with the new token. A replay that
+ * is rejected again is returned as is.
  */
+export async function sessionFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const sentToken = bearerOf(options.headers);
+  let response = await fetch(url, {
+    ...options,
+    headers: withLocale(withClientId(url, options.headers)),
+  });
+  if (response.status === 401 && !NO_REFRESH_PATHS.includes(url.split('?')[0] ?? url)) {
+    const current = getToken();
+    const token = current !== null && current !== sentToken ? current : await refreshAccessToken();
+    if (token !== null) {
+      response = await fetch(url, withBearer(options, token));
+    }
+  }
+  return response;
+}
+
+/** Fetch used by every generated operation (orval `override.mutator`); a 429 also raises the rate-limit signal. */
 export async function customFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
-  return toResult<T>(await fetchWithRefresh(url, options));
+  const response = await sessionFetch(url, options);
+  const result = await toResult<{ data: unknown }>(response);
+  if (response.status === 429) {
+    emitNetworkSignal({
+      type: 'rate-limited',
+      waitSeconds: rateLimitWaitSeconds(
+        result.data,
+        response.headers.get('Retry-After'),
+        Date.now(),
+      ),
+    });
+  }
+  return result as T;
 }
 
 export interface DownloadResult {
@@ -36,7 +66,7 @@ export interface DownloadResult {
  * `Accept` (and the bearer) in `options`; a non-2xx answer is returned as its problem, never thrown.
  */
 export async function downloadFile(url: string, options: RequestInit = {}): Promise<DownloadResult> {
-  const response = await fetchWithRefresh(url, options);
+  const response = await sessionFetch(url, options);
   if (response.ok) {
     return {
       status: response.status,
@@ -45,22 +75,6 @@ export async function downloadFile(url: string, options: RequestInit = {}): Prom
     };
   }
   return { status: response.status, problem: await problemOf(response) };
-}
-
-async function fetchWithRefresh(url: string, options: RequestInit): Promise<Response> {
-  const sentToken = bearerOf(options.headers);
-  let response = await fetch(url, {
-    ...options,
-    headers: withLocale(withClientId(url, options.headers)),
-  });
-  if (response.status === 401 && !NO_REFRESH_PATHS.includes(url.split('?')[0] ?? url)) {
-    const current = getToken();
-    const token = current !== null && current !== sentToken ? current : await refreshAccessToken();
-    if (token !== null) {
-      response = await fetch(url, withBearer(options, token));
-    }
-  }
-  return response;
 }
 
 function fileNameOf(disposition: string | null): string | undefined {

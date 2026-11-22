@@ -74,6 +74,7 @@ a:focus-visible {
   position: sticky;
   top: 0;
   z-index: 100;
+  height: var(--admin-topbar-h);
   border-bottom: 1px solid var(--admin-chrome-border);
   background: var(--admin-paper-2);
 }
@@ -82,7 +83,7 @@ a:focus-visible {
   width: 100%;
   margin: 0;
   padding: 0 clamp(0.85rem, 1.5vw, 1.1rem);
-  height: 56px;
+  height: 100%;
   display: flex;
   align-items: center;
   gap: 0.85rem;
@@ -927,7 +928,7 @@ html:has(dialog.cortex-admin-nav--drawer[open]) {
 
 .cortex-admin-content {
   grid-area: content;
-  padding: clamp(1rem, 2.4vw, 2rem);
+  padding: var(--admin-content-pad);
   min-width: 0;
   max-width: 1600px;
   width: 100%;

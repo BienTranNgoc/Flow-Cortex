@@ -1,8 +1,8 @@
 package com.flowcortex.workflow.application.provider;
 
-import io.micrometer.observation.ObservationRegistry;
+import com.flowcortex.llm.api.LlmSlots;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,10 +13,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @EnableConfigurationProperties(DubProperties.class)
 class DubConfig {
 
+    /** Stops boot, naming the slot, when a slot the dub steps call is not configured. */
     @Bean
-    GeminiClient geminiClient(DubProperties dub, ObjectProvider<ObservationRegistry> observations) {
-        return GeminiClient.create(dub.gemini(), wait -> Thread.sleep(wait),
-                observations.getIfAvailable(() -> ObservationRegistry.NOOP));
+    InitializingBean dubSlotsPresent(LlmSlots llm) {
+        return () -> {
+            llm.jsonWorstCase(DubSlots.TRANSLATE);
+            llm.speechWorstCase(DubSlots.SPEECH);
+        };
     }
 
     @Bean
