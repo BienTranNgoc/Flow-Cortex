@@ -98,7 +98,8 @@ public class NotificationRepository {
     /** @return the number of notifications of the audience that were unread */
     public int markAllRead(UUID userId, Audience audience, Instant now) {
         return jdbc.update("UPDATE notification SET read_at = :now WHERE user_id = :user AND "
-                + audience.sqlClause() + " AND read_at IS NULL", new MapSqlParameterSource().addValue("user", userId).addValue("now", Timestamp.from(now)));
+                + audience.sqlClause() + " AND read_at IS NULL",
+                new MapSqlParameterSource().addValue("user", userId).addValue("now", Timestamp.from(now)));
     }
 
     /** No preference row means every in-app notification is on. */
