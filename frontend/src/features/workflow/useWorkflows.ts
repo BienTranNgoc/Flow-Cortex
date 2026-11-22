@@ -63,6 +63,8 @@ export function useWorkflowExamplesQuery() {
   return useQuery({
     queryKey: ['workflow-examples', locale],
     queryFn: () => unwrapSuccess(listWorkflowExamples(authHeaders())),
+    // The catalog ships with the server build, so it cannot change under an open page.
+    staleTime: Infinity,
   });
 }
 
@@ -144,10 +146,14 @@ function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
   return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
 }
 
-/** The run's uploaded files with signed links, renewed before the first expires while the tab stays open. */
+/**
+ * The run's uploaded files with signed links, renewed before the first expires while the tab stays
+ * open. The key sits outside `runs`, so a run refresh after a decision does not hand every input
+ * element a fresh link and remount it.
+ */
 export function useRunInputsQuery(runId: string) {
   return useQuery({
-    queryKey: ['runs', runId, 'inputs'],
+    queryKey: ['run-inputs', runId],
     queryFn: () => unwrap(getRunInputs(runId, authHeaders())),
     enabled: Boolean(runId),
     staleTime: (query) => untilInputRefresh(query.state.data),
