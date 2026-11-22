@@ -8,6 +8,7 @@ import com.flowcortex.support.request.RequestViews.AdminFacets;
 import com.flowcortex.support.request.RequestViews.BulkAssignResult;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.Count;
+import com.flowcortex.support.request.RequestViews.SlaSummary;
 import com.flowcortex.support.web.SupportCaller;
 import com.flowcortex.user.api.AdminPermissions;
 import io.swagger.v3.oas.annotations.Operation;
@@ -86,7 +87,7 @@ class AdminRequestController {
     @Operation(operationId = "listAdminSupportRequests")
     @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, "
-            + "errors.assignee, errors.created, errors.q, errors.sort, errors.page)",
+            + "errors.assignee, errors.created, errors.q, errors.sla, errors.sort, errors.page)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
@@ -104,12 +105,38 @@ class AdminRequestController {
             @Parameter(description = "Subject text, or a request number with or without a leading #",
                     schema = @Schema(maxLength = InboxQuery.MAX_SEARCH_LENGTH))
             @RequestParam(required = false) String q,
+            @Parameter(description = "Keeps only due-soon and overdue requests",
+                    schema = @Schema(allowableValues = InboxQuery.AT_RISK))
+            @RequestParam(required = false) String sla,
             @Parameter(schema = @Schema(allowableValues = {"newest", "oldest"}, defaultValue = "newest"))
             @RequestParam(required = false) String sort,
             @Parameter(schema = @Schema(type = "integer", format = "int32", defaultValue = "0", minimum = "0",
                     maximum = "" + RequestService.MAX_PAGE))
             @RequestParam(defaultValue = "0") int page) {
-        return requests.page(status, type, assignee, created, q, sort, page, caller.require(jwt).id());
+        return requests.page(status, type, assignee, created, q, sla, sort, page, caller.require(jwt).id());
+    }
+
+    @Operation(operationId = "getAdminSupportSlaSummary")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors.status, errors.type, "
+            + "errors.assignee, errors.created, errors.q)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @RequirePermission(Permission.SUPPORT_TICKET_VIEW)
+    @GetMapping(value = "/sla-summary", produces = MediaType.APPLICATION_JSON_VALUE)
+    SlaSummary slaSummary(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(schema = @Schema(allowableValues = {"new", "in_progress", "waiting_member", "resolved",
+                    "closed"}))
+            @RequestParam(required = false) String status,
+            @Parameter(schema = @Schema(allowableValues = {"account", "credit", "workflow", "technical", "other"}))
+            @RequestParam(required = false) String type,
+            @Parameter(description = "me, unassigned or an account id")
+            @RequestParam(required = false) String assignee,
+            @Parameter(schema = @Schema(allowableValues = {"today", "7d", "30d", "older"}))
+            @RequestParam(required = false) String created,
+            @Parameter(schema = @Schema(maxLength = InboxQuery.MAX_SEARCH_LENGTH))
+            @RequestParam(required = false) String q) {
+        return requests.slaSummary(status, type, assignee, created, q, caller.require(jwt).id());
     }
 
     @Operation(operationId = "getAdminSupportRequestFacets")

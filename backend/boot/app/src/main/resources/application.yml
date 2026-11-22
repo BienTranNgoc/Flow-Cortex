@@ -552,6 +552,21 @@ flowcortex:
       retention-enabled: ${FLOWCORTEX_SUPPORT_RETENTION_ENABLED:true}
       # Months a closed request is kept after its last activity (6-120).
       retention-closed-request-months: ${FLOWCORTEX_SUPPORT_RETENTION_CLOSED_REQUEST_MONTHS:24}
+    # Response deadline of an admin inbox request: the alert switch and four numbers below are configured
+    # here and changed at runtime in the console Settings page; alerts set to false here stay off whatever
+    # is stored. A warning must be below its limit or startup fails.
+    sla:
+      alerts-enabled: ${FLOWCORTEX_SUPPORT_SLA_ALERTS_ENABLED:true}
+      # Hours a new request may wait for a first response before it is overdue (1-720).
+      new-hours: ${FLOWCORTEX_SUPPORT_SLA_NEW_HOURS:24}
+      # Hours of waiting after which a new request is due soon; below new-hours (1-720).
+      new-warn-hours: ${FLOWCORTEX_SUPPORT_SLA_NEW_WARN_HOURS:20}
+      # Days an in-progress request may sit without activity before it is overdue (1-90).
+      in-progress-days: ${FLOWCORTEX_SUPPORT_SLA_IN_PROGRESS_DAYS:3}
+      # Days of inactivity after which an in-progress request is due soon; below in-progress-days (1-90).
+      in-progress-warn-days: ${FLOWCORTEX_SUPPORT_SLA_IN_PROGRESS_WARN_DAYS:2}
+      # Pace of the sweep that raises the due-soon and overdue alerts.
+      sweep-interval: PT5M
     # Pace of the reply-mail sweep and the closed-request purge; not under support.retention, whose
     # interval paces the auto-close and assistant retention jobs.
     reply-mail:
