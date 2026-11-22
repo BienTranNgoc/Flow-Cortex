@@ -3545,6 +3545,19 @@ export interface PermissionCatalogEntry {
   superAdminOnly: boolean;
 }
 
+export interface AdminPhoneVerificationStatus {
+  verificationEnabled: boolean;
+  /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
+  smsSender: string;
+  /** True when the hash secret is set and at least 32 bytes; the value is never returned */
+  hashSecretConfigured: boolean;
+  gateEnabled: boolean;
+  /** Cap on codes sent from every member per 24 hours */
+  globalSendsPerDay: number;
+  /** Codes sent in the last 24 hours */
+  sentLast24h: number;
+}
+
 export interface PaymentSettingChangeView {
   id: string;
   key: string;
@@ -16157,6 +16170,34 @@ export const listAdminPermissionCatalog = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type getAdminPhoneVerificationStatusResponse200 = {
+  data: AdminPhoneVerificationStatus;
+  status: 200;
+};
+
+export type getAdminPhoneVerificationStatusResponseSuccess =
+  getAdminPhoneVerificationStatusResponse200 & {
+    headers: Headers;
+  };
+export type getAdminPhoneVerificationStatusResponse =
+  getAdminPhoneVerificationStatusResponseSuccess;
+
+export const getGetAdminPhoneVerificationStatusUrl = () => {
+  return `/api/v1/admin/phone-verification/status`;
+};
+
+export const getAdminPhoneVerificationStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminPhoneVerificationStatusResponse> => {
+  return customFetch<getAdminPhoneVerificationStatusResponse>(
+    getGetAdminPhoneVerificationStatusUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type listPaymentSettingsResponse200 = {
