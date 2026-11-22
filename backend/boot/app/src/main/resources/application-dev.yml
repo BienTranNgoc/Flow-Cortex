@@ -14,6 +14,11 @@ flowcortex:
       current: k1
       keys:
         k1: ZGV2LW9ubHktaW5zZWN1cmUtY29ubmVjdHIta2V5ISE=
+  # Placeholder share access-log hash key for a bare bootRun; an environment value overrides it.
+  # The base file keeps the empty default, so every other profile still refuses to start without one.
+  workflow:
+    share:
+      accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:dev-only-workflow-share-hash-secret-do-not-use-elsewhere}
   # Self-registered demo accounts belong to DevDataSeeder's first admin. Compose
   # passes the variable even when unset (empty), so .env names it too.
   registration:
